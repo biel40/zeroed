@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { AssetManager } from '../assets/AssetManager';
 import { AudioSystem } from '../audio/AudioSystem';
-import { WEAPON_DEFINITIONS, WEAPON_ORDER } from '../config/weapons';
+import { WEAPON_DEFINITIONS } from '../config/weapons';
 import { getDeviceProfile, type DeviceProfile } from '../core/DeviceProfile';
 import { Stats } from '../game/Stats';
+import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
 import { ShootingRange } from '../range/ShootingRange';
@@ -43,7 +44,9 @@ function makeSkyTexture(): THREE.CanvasTexture {
 
 /**
  * Composition root: owns the renderer and the frame loop, and wires input,
- * player, weapons, ballistics, effects, audio and HUD together.
+ * player, weapons, ballistics, effects, audio and HUD together. Mode-specific
+ * behavior (targets vs. zombies, energy projectiles, game over) lives in the
+ * plugged GameMode; this shell stays mode-agnostic.
  */
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
@@ -58,6 +61,8 @@ export class Game {
   private readonly stats = new Stats();
   private readonly weapons: Weapon[] = [];
   private readonly views: WeaponView[] = [];
+  /** Range colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
+  private readonly hitColliders: THREE.Object3D[];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
   private readonly aimRaycaster = new THREE.Raycaster();
   private readonly aimHits: THREE.Intersection[] = [];
@@ -84,6 +89,7 @@ export class Game {
     private readonly hud: HUD,
     private readonly assets: AssetManager,
     private readonly profile: DeviceProfile = getDeviceProfile(),
+    private readonly mode: GameMode,
   ) {
     const rendererOptions = {
       antialias: !this.profile.useReducedEffects,
@@ -124,17 +130,13 @@ export class Game {
     this.scene.add(this.range.group);
 
     this.effects = new Effects(this.scene);
-    this.ballistics = new BallisticsSystem(this.range.colliders, this.scene);
+
+    // The ballistics layer raycasts against this shared, mutable array:
+    // range geometry is static, modes may add/remove dynamic hitboxes.
+    this.hitColliders = [...this.range.colliders];
+    this.ballistics = new BallisticsSystem(this.hitColliders, this.scene);
     this.ballistics.onTargetHit = (target, distance, point, normal, object) => {
-      this.stats.registerHit(distance);
-      this.hud.showHitmarker();
-      if (target.surface === 'metal') {
-        this.audio.playPing();
-        this.effects.spark(point, normal);
-      } else {
-        this.audio.playImpact('paper');
-        this.effects.bulletHole(point, normal, object);
-      }
+      this.mode.onTargetHit(target, distance, point, normal, object, this.currentWeapon);
     };
     this.ballistics.onEnvironmentHit = (point, normal, object) => {
       const surface = (object.userData.surface as SurfaceType | undefined) ?? 'dirt';
@@ -159,7 +161,7 @@ export class Game {
       }
     };
 
-    for (const id of WEAPON_ORDER) {
+    for (const id of this.mode.weaponIds) {
       const weapon = new Weapon(WEAPON_DEFINITIONS[id]);
       const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id));
       this.player.camera.add(view.root);
@@ -169,23 +171,31 @@ export class Game {
     this.views[0].root.visible = true;
     this.scene.add(this.flashLight);
 
+    this.mode.init({
+      scene: this.scene,
+      player: this.player,
+      input: this.input,
+      hud: this.hud,
+      audio: this.audio,
+      effects: this.effects,
+      stats: this.stats,
+      hitColliders: this.hitColliders,
+      lockPointer: () => this.start(),
+      unlockPointer: () => document.exitPointerLock(),
+    });
+
     this.input.onLockChange = (locked) => {
       if (this.profile.useTouchControls || locked) {
         this.hud.hideStartScreen();
         this.hud.setHudVisible(true);
-      } else {
-        this.hud.showStartScreen(true);
-        this.hud.setHudVisible(false);
+        return;
       }
+      // A mode with its own overlay (game over) suppresses the pause screen.
+      if (this.mode.onPointerUnlock?.()) return;
+      this.hud.showStartScreen(true);
+      this.hud.setHudVisible(false);
     };
-    this.hud.setStartHandler(() => {
-      this.audio.resume();
-      this.input.requestPointerLock();
-      if (this.profile.useTouchControls) {
-        this.hud.hideStartScreen();
-        this.hud.setHudVisible(true);
-      }
-    });
+    this.hud.setStartHandler(() => this.start());
 
     if (new URLSearchParams(window.location.search).has('debug')) {
       this.debugElement = document.createElement('div');
@@ -196,6 +206,16 @@ export class Game {
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('orientationchange', this.handleResize);
     this.renderer.setAnimationLoop(this.tick);
+  }
+
+  /** Entry point for the first user gesture: resumes audio, locks the pointer. */
+  start(): void {
+    this.audio.resume();
+    this.input.requestPointerLock();
+    if (this.profile.useTouchControls) {
+      this.hud.hideStartScreen();
+      this.hud.setHudVisible(true);
+    }
   }
 
   private get currentWeapon(): Weapon {
@@ -239,23 +259,35 @@ export class Game {
   private handleShot(): void {
     const weapon = this.currentWeapon;
     const view = this.currentView;
+    const energy = weapon.definition.energy;
     this.stats.registerShot();
 
     this.player.camera.getWorldPosition(this.tmpOrigin);
     this.player.camera.getWorldDirection(this.tmpDirection);
     this.applyCone(this.tmpDirection, weapon.currentSpread());
-    this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile);
+
+    // Energy weapons fire visible bolts handled by the mode; everything
+    // else goes through the classic ballistic simulation.
+    const handledByMode = this.mode.onWeaponFired?.(weapon, this.tmpOrigin, this.tmpDirection);
+    if (!handledByMode) {
+      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile);
+    }
 
     this.audio.playShot(weapon.definition.audio);
     view.onShot();
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
+    this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
     this.flashLight.intensity = 9;
-    this.effects.puff(this.tmpMuzzle, 0xdedede, 0.26);
 
-    this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
-    view.getEjectionWorldPosition(this.tmpEject);
-    this.effects.ejectShell(this.tmpEject, this.tmpRight);
+    if (energy) {
+      this.effects.puff(this.tmpMuzzle, energy.color, 0.2);
+    } else {
+      this.effects.puff(this.tmpMuzzle, 0xdedede, 0.26);
+      this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
+      view.getEjectionWorldPosition(this.tmpEject);
+      this.effects.ejectShell(this.tmpEject, this.tmpRight);
+    }
   }
 
   private processWeaponEvents(): void {
@@ -269,7 +301,7 @@ export class Game {
           this.audio.playDryFire();
           break;
         case 'reloadStart':
-          this.audio.playReload(weapon.definition.reloadTime);
+          this.audio.playReload(weapon.definition.reloadTime, !!weapon.definition.audio.energy);
           break;
         case 'boltStart':
           this.audio.playBolt();
@@ -291,7 +323,7 @@ export class Game {
     this.aimRaycaster.near = 0;
     this.aimRaycaster.far = 600;
     this.aimHits.length = 0;
-    this.aimRaycaster.intersectObjects(this.range.colliders, false, this.aimHits);
+    this.aimRaycaster.intersectObjects(this.hitColliders, false, this.aimHits);
     this.aimDistance = this.aimHits.length > 0 ? this.aimHits[0].distance : null;
   }
 
@@ -316,7 +348,7 @@ export class Game {
     const allowGameplayInput = this.input.pointerLocked || this.profile.useTouchControls;
 
     if (allowGameplayInput) {
-      for (let i = 0; i < WEAPON_ORDER.length; i++) {
+      for (let i = 0; i < this.weapons.length; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
       if (this.input.wasPressed('KeyR')) weapon.reload();
@@ -331,6 +363,7 @@ export class Game {
 
     this.ballistics.update(dt);
     this.range.update(dt);
+    this.mode.update(dt);
     this.currentView.update(
       dt,
       weapon,

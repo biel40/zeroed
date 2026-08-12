@@ -1,4 +1,4 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -60,6 +60,20 @@ export interface WeaponAudioConfig {
   readonly duration: number;
   readonly lowpass: number;
   readonly thump: number;
+  /** Energy weapons get a sci-fi synth shot instead of a powder report. */
+  readonly energy?: boolean;
+}
+
+/** Behaviour of an energy projectile weapon (Ray Gun). Zombies mode only. */
+export interface EnergyWeaponConfig {
+  /** Visible projectile travel speed, m/s. Deliberately slow enough to see. */
+  readonly projectileSpeed: number;
+  /** Splash damage radius in meters. */
+  readonly splashRadius: number;
+  /** Splash damage at the epicenter; falls off linearly to 0 at the edge. */
+  readonly splashDamage: number;
+  /** Emissive / VFX color of the energy bolt. */
+  readonly color: number;
 }
 
 export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal';
@@ -116,6 +130,8 @@ export interface ViewModelConfig {
   readonly sightHeight: number;
   /** Overall chunkiness multiplier. */
   readonly bulk: number;
+  /** When set, the dedicated Ray Gun procedural builder is used with this glow color. */
+  readonly energyColor?: number;
 }
 
 export interface WeaponDefinition {
@@ -129,6 +145,12 @@ export interface WeaponDefinition {
   readonly boltAction: boolean;
   readonly boltCycleTime: number;
   readonly scoped: boolean;
+  /** Base torso damage per hit (zombies mode). */
+  readonly damage: number;
+  /** Headshot damage multiplier (zombies mode). */
+  readonly headshotMultiplier: number;
+  /** Energy projectile behaviour; absence means classic ballistics. */
+  readonly energy?: EnergyWeaponConfig;
   readonly recoil: RecoilConfig;
   readonly spread: SpreadConfig;
   readonly ads: AdsConfig;

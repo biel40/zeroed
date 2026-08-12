@@ -17,6 +17,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
+    damage: 34,
+    headshotMultiplier: 2,
     recoil: {
       verticalKick: 0.0105,
       horizontalKick: 0.0035,
@@ -73,6 +75,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
+    damage: 40,
+    headshotMultiplier: 2,
     recoil: {
       verticalKick: 0.016,
       horizontalKick: 0.0065,
@@ -129,6 +133,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
+    damage: 32,
+    headshotMultiplier: 2,
     recoil: {
       verticalKick: 0.019,
       horizontalKick: 0.009,
@@ -183,6 +189,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltAction: true,
     boltCycleTime: 1.35,
     scoped: true,
+    damage: 150,
+    headshotMultiplier: 3,
     recoil: {
       verticalKick: 0.045,
       horizontalKick: 0.004,
@@ -227,6 +235,72 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bulk: 1.1,
     },
   },
+
+  /**
+   * Ray Gun — original retro-futuristic homage to the classic zombies-mode
+   * wonder weapon. Procedural view model, synthesized audio, visible energy
+   * projectile with splash damage. Only registered in Zombies mode.
+   */
+  raygun: {
+    id: 'raygun',
+    name: 'RAY GUN',
+    fireModes: ['semi'],
+    defaultFireMode: 'semi',
+    rpm: 140,
+    magazineSize: 20,
+    reloadTime: 2.8,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 150,
+    headshotMultiplier: 1.5,
+    energy: { projectileSpeed: 48, splashRadius: 2.5, splashDamage: 100, color: 0x63f2a4 },
+    recoil: {
+      verticalKick: 0.012,
+      horizontalKick: 0.004,
+      horizontalBias: 0,
+      kickVariance: 0.2,
+      recoverySpeed: 10,
+      recoveryDelay: 0.06,
+      cameraShare: 0.55,
+      adsRecoilMultiplier: 0.8,
+    },
+    spread: {
+      hipBase: 0.004,
+      adsBase: 0.001,
+      bloomPerShot: 0.001,
+      maxBloom: 0.008,
+      bloomRecovery: 0.05,
+    },
+    ads: { fov: 60, speed: 10, sensitivity: 0.8 },
+    projectile: { muzzleVelocity: 48, gravity: 0, maxDistance: 80, drag: 0 },
+    moveSpeedMultiplier: 1,
+    equipTime: 0.4,
+    audio: { volume: 0.5, duration: 0.22, lowpass: 4200, thump: 200, energy: true },
+    view: {
+      // No GLB: dedicated procedural Ray Gun builder (see WeaponView).
+      energyColor: 0x63f2a4,
+      hip: [0.22, -0.2, -0.4],
+      ads: [0, 0, -0.28],
+      sway: 0.9,
+      bob: 1,
+      visualRecoil: { kickImpulse: 0.7, pitchImpulse: 1.4, rollImpulse: 0.6, stiffness: 160, damping: 15 },
+      scale: 1,
+      bodyColor: 0x8f9aa4,
+      accentColor: 0xb87333,
+      barrelLength: 0.16,
+      barrelRadius: 0.02,
+      receiverLength: 0.2,
+      stockLength: 0.06,
+      magazine: 'internal',
+      optic: 'irons',
+      sightHeight: 0.07,
+      bulk: 0.9,
+    },
+  },
 };
 
 export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96'];
+
+/** Zombies mode adds the Ray Gun as a fifth slot (key 5). */
+export const ZOMBIES_WEAPON_ORDER: readonly WeaponId[] = [...WEAPON_ORDER, 'raygun'];

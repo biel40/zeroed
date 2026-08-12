@@ -255,6 +255,198 @@ body {
   min-width: 160px;
 }
 
+/* ---------- Zombies mode ---------- */
+
+#hud-zombies {
+  right: 24px;
+  bottom: 24px;
+  min-width: 190px;
+}
+
+#z-round {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ff8a5c;
+  margin-bottom: 6px;
+}
+
+#z-hp-bar {
+  height: 5px;
+  margin: 4px 0 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#z-hp-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #7fd06a;
+  transition: width 0.15s ease;
+}
+
+#z-hp-fill.low {
+  background: #ff5b4d;
+}
+
+#round-banner {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#banner-title {
+  font: 700 44px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.3em;
+  color: #ff5b4d;
+  text-shadow: 0 0 18px rgba(255, 60, 40, 0.55), 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+#banner-sub {
+  font: 600 15px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.4em;
+  color: #e8ecf1;
+  margin-top: 6px;
+}
+
+#round-banner.active {
+  animation: bannerfade 2s ease-out forwards;
+}
+
+@keyframes bannerfade {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.25);
+  }
+  12% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+#damage-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(200, 20, 10, 0.5) 100%);
+}
+
+#damage-overlay.active {
+  animation: damageflash 0.45s ease-out forwards;
+}
+
+@keyframes damageflash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+#mode-select,
+#game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 9, 13, 0.78);
+}
+
+/* Game over must always win over the start/pause screen. */
+#game-over {
+  z-index: 25;
+}
+
+.mode-hint {
+  color: #ffd267;
+  letter-spacing: 0.3em;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.mode-grid {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+}
+
+.mode-grid button {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 220px;
+  padding: 22px 18px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(24, 31, 40, 0.9);
+  color: #e8ecf1;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.mode-grid button:hover {
+  border-color: #ffd267;
+  transform: translateY(-2px);
+}
+
+.mode-name {
+  font: 700 16px 'Consolas', monospace;
+  letter-spacing: 0.14em;
+}
+
+.mode-desc {
+  font-size: 12px;
+  color: #9aa7b4;
+}
+
+#game-over h1 {
+  color: #ff5b4d;
+  text-shadow: 0 0 22px rgba(255, 60, 40, 0.5);
+}
+
+.go-stats {
+  min-width: 240px;
+  margin: 6px 0 22px;
+  font-family: 'Consolas', 'SF Mono', monospace;
+  font-size: 14px;
+  color: #e8ecf1;
+}
+
+.go-stats .hud-row {
+  padding: 3px 0;
+}
+
+#go-restart {
+  padding: 12px 34px;
+  cursor: pointer;
+  border: 1px solid #ffd267;
+  border-radius: 6px;
+  background: rgba(255, 210, 103, 0.12);
+  color: #ffd267;
+  font: 700 14px 'Consolas', monospace;
+  letter-spacing: 0.25em;
+}
+
+#go-restart:hover {
+  background: rgba(255, 210, 103, 0.28);
+}
+
 .hud-row {
   display: flex;
   justify-content: space-between;

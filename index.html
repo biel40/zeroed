@@ -51,6 +51,47 @@
         <div class="hud-row"><span class="hud-label">ACCURACY</span><span id="hud-accuracy">0 %</span></div>
         <div class="hud-row"><span class="hud-label">HITS</span><span id="hud-hits">0 / 0</span></div>
       </div>
+
+      <div id="hud-zombies" class="hud-panel hidden">
+        <div id="z-round">GET READY</div>
+        <div class="hud-row"><span class="hud-label">ZOMBIES</span><span id="z-count">0 LEFT</span></div>
+        <div class="hud-row"><span class="hud-label">HP</span><span id="z-hp">100</span></div>
+        <div id="z-hp-bar"><span id="z-hp-fill"></span></div>
+        <div class="hud-row"><span class="hud-label">KILLS</span><span id="z-kills">0</span></div>
+        <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="z-headshots">0</span></div>
+      </div>
+
+      <div id="round-banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+      <div id="damage-overlay"></div>
+    </div>
+
+    <div id="mode-select" class="hidden">
+      <div class="start-panel">
+        <h1>ZEROED</h1>
+        <p class="mode-hint">SELECT MODE</p>
+        <div class="mode-grid">
+          <button type="button" data-mode="range">
+            <span class="mode-name">SHOOTING RANGE</span>
+            <span class="mode-desc">Classic target practice · 4 weapons</span>
+          </button>
+          <button type="button" data-mode="zombies">
+            <span class="mode-name">ZOMBIES</span>
+            <span class="mode-desc">Endless rounds · Ray Gun on <kbd>5</kbd></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="game-over" class="hidden">
+      <div class="start-panel">
+        <h1>GAME OVER</h1>
+        <div class="go-stats">
+          <div class="hud-row"><span class="hud-label">ROUND REACHED</span><span id="go-round">1</span></div>
+          <div class="hud-row"><span class="hud-label">KILLS</span><span id="go-kills">0</span></div>
+          <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="go-headshots">0</span></div>
+        </div>
+        <button type="button" id="go-restart">RESTART</button>
+      </div>
     </div>
 
     <div id="start-screen">

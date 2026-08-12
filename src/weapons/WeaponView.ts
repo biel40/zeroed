@@ -89,6 +89,93 @@ interface BuiltProcedural {
   muzzlePosition: THREE.Vector3;
   ejectionPosition: THREE.Vector3;
   sightY: number;
+  /** Emissive materials that pulse over time; only the Ray Gun uses this. */
+  energyMaterials?: THREE.MeshStandardMaterial[];
+}
+
+/**
+ * Ray Gun view model: an original retro-futuristic homage built from
+ * primitives — brushed-metal body, brass accents, glowing accelerator rings
+ * around a tapered barrel and a caged power cell on top. No external assets.
+ */
+function buildRaygun(config: ViewModelConfig): BuiltProcedural {
+  const group = new THREE.Group();
+  const glowColor = config.energyColor ?? 0x63f2a4;
+
+  const body = new THREE.MeshStandardMaterial({
+    color: config.bodyColor,
+    roughness: 0.34,
+    metalness: 0.85,
+  });
+  const brass = new THREE.MeshStandardMaterial({
+    color: config.accentColor,
+    roughness: 0.3,
+    metalness: 0.9,
+  });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.55, metalness: 0.4 });
+  const energyMaterials: THREE.MeshStandardMaterial[] = [];
+  const makeGlow = (): THREE.MeshStandardMaterial => {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x0b0e12,
+      roughness: 0.4,
+      metalness: 0.2,
+      emissive: glowColor,
+      emissiveIntensity: 1.5,
+    });
+    energyMaterials.push(material);
+    return material;
+  };
+
+  const add = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    rx = 0,
+    rz = 0,
+  ): void => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = rx;
+    mesh.rotation.z = rz;
+    group.add(mesh);
+  };
+
+  // Grip and receiver.
+  add(new THREE.BoxGeometry(0.042, 0.115, 0.052), dark, 0, -0.078, 0.055, 0.32);
+  add(new THREE.BoxGeometry(0.058, 0.07, 0.21), body, 0, 0, -0.01);
+  // Brass fin strips along the receiver — pure pulp sci-fi.
+  for (const side of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.004, 0.05, 0.16), brass, side * 0.032, 0.012, -0.01);
+  }
+
+  // Tapered barrel with glowing accelerator rings.
+  add(new THREE.CylinderGeometry(0.024, 0.015, 0.18, 12), body, 0, 0.006, -0.2, Math.PI / 2);
+  const ringGeometry = new THREE.TorusGeometry(0.028, 0.0065, 8, 18);
+  for (const z of [-0.145, -0.2, -0.255]) {
+    add(ringGeometry, makeGlow(), 0, 0.006, z);
+  }
+  // Emitter tip.
+  add(new THREE.SphereGeometry(0.019, 10, 8), makeGlow(), 0, 0.006, -0.295);
+
+  // Caged power cell on top: glowing sphere inside a brass frame.
+  add(new THREE.SphereGeometry(0.024, 12, 10), makeGlow(), 0, 0.062, 0.01);
+  add(new THREE.TorusGeometry(0.03, 0.004, 6, 16), brass, 0, 0.062, 0.01, Math.PI / 2);
+  add(new THREE.BoxGeometry(0.008, 0.028, 0.008), brass, 0, 0.032, 0.01);
+
+  // Rear coil housing + iron sights.
+  add(new THREE.CylinderGeometry(0.026, 0.03, 0.07, 10), brass, 0, 0.004, 0.115, Math.PI / 2);
+  add(new THREE.BoxGeometry(0.006, 0.02, 0.006), dark, 0, 0.062, -0.11);
+  add(new THREE.BoxGeometry(0.026, 0.018, 0.01), dark, 0, 0.06, 0.09);
+
+  return {
+    group,
+    muzzlePosition: new THREE.Vector3(0, 0.006, -0.31),
+    ejectionPosition: new THREE.Vector3(0.035, 0, 0.02),
+    sightY: 0.068,
+    energyMaterials,
+  };
 }
 
 /**
@@ -232,6 +319,8 @@ export class WeaponView {
   private bobPhase = 0;
   private swayX = 0;
   private swayY = 0;
+  private pulseTime = 0;
+  private readonly energyMaterials: THREE.MeshStandardMaterial[] = [];
 
   constructor(
     private readonly definition: WeaponDefinition,
@@ -245,11 +334,12 @@ export class WeaponView {
       const sightY = this.attachGlbModel(model, view);
       this.adsPosition = new THREE.Vector3(view.ads[0], -sightY + view.ads[1], view.ads[2]);
     } else {
-      const built = buildProcedural(view);
+      const built = view.energyColor !== undefined ? buildRaygun(view) : buildProcedural(view);
       this.root.add(built.group);
       this.muzzle.position.copy(built.muzzlePosition);
       this.ejectionPort.position.copy(built.ejectionPosition);
       this.adsPosition = new THREE.Vector3(view.ads[0], -built.sightY + view.ads[1], view.ads[2]);
+      if (built.energyMaterials) this.energyMaterials.push(...built.energyMaterials);
     }
     this.root.add(this.muzzle, this.ejectionPort);
 
@@ -260,6 +350,8 @@ export class WeaponView {
       depthWrite: false,
       toneMapped: false,
     });
+    // Energy weapons tint the muzzle flash to their bolt color.
+    if (view.energyColor !== undefined) flashMaterial.color.setHex(view.energyColor);
     this.flash = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), flashMaterial);
     this.flash.visible = false;
     this.muzzle.add(this.flash);
@@ -378,6 +470,13 @@ export class WeaponView {
     if (this.flashTime > 0) {
       this.flashTime -= dt;
       if (this.flashTime <= 0) this.flash.visible = false;
+    }
+
+    // Ray Gun power cell and rings pulse gently at all times.
+    if (this.energyMaterials.length > 0) {
+      this.pulseTime += dt;
+      const pulse = 1.35 + Math.sin(this.pulseTime * 5) * 0.45;
+      for (const material of this.energyMaterials) material.emissiveIntensity = pulse;
     }
 
     // Inside a real scope you would not see the rifle body at all.

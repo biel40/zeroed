@@ -2,6 +2,23 @@ import type { Stats } from '../game/Stats';
 import { clamp } from '../utils/math';
 import type { Weapon } from '../weapons/Weapon';
 
+/** Live state shown on the Zombies mode panel. */
+export interface ZombieHudState {
+  readonly round: number;
+  readonly alive: number;
+  readonly pending: number;
+  readonly hp: number;
+  readonly maxHp: number;
+  readonly kills: number;
+  readonly headshots: number;
+}
+
+export interface GameOverStats {
+  readonly round: number;
+  readonly kills: number;
+  readonly headshots: number;
+}
+
 function mustGet(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing HUD element #${id}`);
@@ -27,6 +44,23 @@ export class HUD {
   private readonly startHint = mustGet('start-hint');
   private readonly loadingBar = mustGet('loading-bar');
   private readonly loadingBarFill: HTMLElement;
+  private readonly statsPanel = mustGet('hud-stats');
+  private readonly zombiesPanel = mustGet('hud-zombies');
+  private readonly zRound = mustGet('z-round');
+  private readonly zCount = mustGet('z-count');
+  private readonly zHp = mustGet('z-hp');
+  private readonly zHpFill = mustGet('z-hp-fill');
+  private readonly zKills = mustGet('z-kills');
+  private readonly zHeadshots = mustGet('z-headshots');
+  private readonly roundBanner = mustGet('round-banner');
+  private readonly bannerTitle = mustGet('banner-title');
+  private readonly bannerSub = mustGet('banner-sub');
+  private readonly damageOverlay = mustGet('damage-overlay');
+  private readonly gameOverPanel = mustGet('game-over');
+  private readonly goRound = mustGet('go-round');
+  private readonly goKills = mustGet('go-kills');
+  private readonly goHeadshots = mustGet('go-headshots');
+  private readonly modeSelect = mustGet('mode-select');
 
   private lastWeapon = '';
   private lastAmmo = -1;
@@ -34,6 +68,7 @@ export class HUD {
   private lastDistance = '';
   private lastAccuracy = '';
   private lastHits = '';
+  private lastZombies = '';
   private ready = false;
 
   constructor() {
@@ -81,6 +116,73 @@ export class HUD {
     this.startScreen.addEventListener('click', () => {
       if (this.ready) handler();
     });
+  }
+
+  /** Mode picker shown once assets are ready, before the pointer-lock screen. */
+  showModeSelect(onSelect: (mode: 'range' | 'zombies') => void): void {
+    this.startScreen.classList.add('hidden');
+    this.modeSelect.classList.remove('hidden');
+    for (const button of this.modeSelect.querySelectorAll<HTMLButtonElement>('[data-mode]')) {
+      button.addEventListener('click', () => {
+        this.modeSelect.classList.add('hidden');
+        onSelect(button.dataset.mode === 'zombies' ? 'zombies' : 'range');
+      });
+    }
+  }
+
+  setRangeStatsVisible(visible: boolean): void {
+    this.statsPanel.classList.toggle('hidden', !visible);
+  }
+
+  setZombiesPanelVisible(visible: boolean): void {
+    this.zombiesPanel.classList.toggle('hidden', !visible);
+  }
+
+  /** Zombies panel; the whole block only re-renders when something changed. */
+  updateZombies(state: ZombieHudState): void {
+    const key = `${state.round}|${state.alive}|${state.pending}|${state.hp}|${state.kills}|${state.headshots}`;
+    if (key === this.lastZombies) return;
+    this.lastZombies = key;
+    this.zRound.textContent = state.round > 0 ? `ROUND ${state.round}` : 'GET READY';
+    this.zCount.textContent = `${state.alive + state.pending} LEFT`;
+    this.zHp.textContent = `${Math.ceil(state.hp)}`;
+    const ratio = clamp(state.hp / state.maxHp, 0, 1);
+    this.zHpFill.style.width = `${ratio * 100}%`;
+    this.zHpFill.classList.toggle('low', ratio <= 0.3);
+    this.zKills.textContent = `${state.kills}`;
+    this.zHeadshots.textContent = `${state.headshots}`;
+  }
+
+  /** Big centered announcement; CSS animation auto-fades it. */
+  showRoundBanner(title: string, sub = ''): void {
+    this.bannerTitle.textContent = title;
+    this.bannerSub.textContent = sub;
+    this.roundBanner.classList.remove('active');
+    // Force reflow so the animation restarts on back-to-back rounds.
+    void this.roundBanner.offsetWidth;
+    this.roundBanner.classList.add('active');
+  }
+
+  /** Brief red vignette when the player takes a hit. */
+  flashDamage(): void {
+    this.damageOverlay.classList.remove('active');
+    void this.damageOverlay.offsetWidth;
+    this.damageOverlay.classList.add('active');
+  }
+
+  showGameOver(stats: GameOverStats): void {
+    this.goRound.textContent = `${stats.round}`;
+    this.goKills.textContent = `${stats.kills}`;
+    this.goHeadshots.textContent = `${stats.headshots}`;
+    this.gameOverPanel.classList.remove('hidden');
+  }
+
+  hideGameOver(): void {
+    this.gameOverPanel.classList.add('hidden');
+  }
+
+  setZombiesRestartHandler(handler: () => void): void {
+    mustGet('go-restart').addEventListener('click', handler);
   }
 
   showHitmarker(): void {

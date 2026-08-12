@@ -37,6 +37,10 @@ export class AudioSystem {
   }
 
   playShot(config: WeaponAudioConfig): void {
+    if (config.energy) {
+      this.playEnergyShot(config);
+      return;
+    }
     const audio = this.context();
     if (!audio) return;
     const { ctx, master, noise } = audio;
@@ -71,10 +75,64 @@ export class AudioSystem {
     osc.stop(t + 0.11);
   }
 
-  playReload(duration: number): void {
+  playReload(duration: number, energy = false): void {
+    if (energy) {
+      // Energy cell swap: rising charge sweep with mechanical latches.
+      this.tick(0, 1300, 0.22);
+      this.sweep(0.08, 'sine', 180, 840, 0.2, duration * 0.75);
+      this.tick(duration * 0.85, 1900, 0.3);
+      return;
+    }
     this.tick(0, 1300, 0.28);
     this.tick(duration * 0.45, 900, 0.3);
     this.tick(duration * 0.85, 1800, 0.34);
+  }
+
+  /** Ray Gun shot: bright descending zap with a short high sizzle. */
+  private playEnergyShot(config: WeaponAudioConfig): void {
+    this.sweep(0, 'sawtooth', 950, 170, config.volume * 0.45, 0.16);
+    this.sweep(0, 'square', 1900, 340, config.volume * 0.16, 0.09);
+    this.tick(0, 3900, config.volume * 0.18);
+  }
+
+  /** Ray Gun impact: energetic pop with a low sub tail. */
+  playRayImpact(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    this.tick(0, 1500, 0.4);
+    this.tick(0.015, 420, 0.32);
+    this.sweep(0, 'sine', 120, 42, 0.5, 0.3, t);
+  }
+
+  /** Fleshy thud when a bullet connects with a zombie. */
+  playZombieHit(): void {
+    this.tick(0, 300, 0.38);
+    this.tick(0.012, 150, 0.26);
+  }
+
+  /** Low guttural drop when a zombie dies. */
+  playZombieDeath(): void {
+    this.sweep(0, 'sawtooth', 190, 52, 0.3, 0.34);
+    this.tick(0.03, 170, 0.3);
+  }
+
+  /** Heavy thump when the player takes a hit. */
+  playPlayerHurt(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    this.sweep(0, 'triangle', 130, 65, 0.55, 0.18, t);
+    this.tick(0, 380, 0.35);
+  }
+
+  /** Two-note ominous sting when a new round begins. */
+  playRoundSting(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    this.tone(t, 'square', 220, 0.12, 0.14);
+    this.tone(t + 0.16, 'square', 277, 0.14, 0.2);
   }
 
   playBolt(): void {
@@ -149,6 +207,33 @@ export class AudioSystem {
     gain.connect(master);
     osc.start(at);
     osc.stop(at + duration + 0.02);
+  }
+
+  /** Oscillator glissando: the workhorse for sci-fi and creature sounds. */
+  private sweep(
+    offset: number,
+    type: OscillatorType,
+    fromFrequency: number,
+    toFrequency: number,
+    volume: number,
+    duration: number,
+    at?: number,
+  ): void {
+    const audio = this.context();
+    if (!audio) return;
+    const { ctx, master } = audio;
+    const t = at ?? ctx.currentTime + offset;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(fromFrequency, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(20, toFrequency), t + duration);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
   }
 
   private tick(offset: number, frequency: number, volume: number): void {

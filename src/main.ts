@@ -3,6 +3,9 @@ import { AssetManager, TEXTURE_MANIFEST, type AssetManifest } from './assets/Ass
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
+import type { GameMode } from './modes/GameMode';
+import { ShootingRangeMode } from './modes/ShootingRangeMode';
+import { ZombiesMode } from './modes/ZombiesMode';
 import { HUD } from './ui/HUD';
 
 const container = document.getElementById('app');
@@ -35,13 +38,21 @@ try {
   // AssetManager, so loading always completes.
   await assets.loadAll(manifest, (loaded, total) => hud.setLoadProgress(loaded / total));
   hud.setReady();
-  const game = new Game(container, hud, assets, profile);
-  console.info('[Zeroed boot] Game initialized successfully.', {
-    mobile: profile.isMobile,
-    touch: profile.useTouchControls,
-    pixelRatioLimit: profile.pixelRatioLimit,
+
+  // Mode selection comes first: each mode only initializes what it needs.
+  // After picking, the classic click-to-start screen locks the pointer.
+  hud.showModeSelect((modeId) => {
+    const mode: GameMode = modeId === 'zombies' ? new ZombiesMode() : new ShootingRangeMode();
+    const game = new Game(container, hud, assets, profile, mode);
+    console.info('[Zeroed boot] Game initialized successfully.', {
+      mode: mode.id,
+      mobile: profile.isMobile,
+      touch: profile.useTouchControls,
+      pixelRatioLimit: profile.pixelRatioLimit,
+    });
+    hud.showStartScreen(false);
+    void game;
   });
-  void game;
 } catch (error) {
   console.error('[Zeroed boot] Initialization failed.', error);
   hud.setError('La inicialización falló. Revisa la consola del navegador para más detalles.');
