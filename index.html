@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Shooting Range</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud" class="hidden">
+      <div id="crosshair">
+        <span class="arm arm-top"></span>
+        <span class="arm arm-right"></span>
+        <span class="arm arm-bottom"></span>
+        <span class="arm arm-left"></span>
+      </div>
+      <div id="aim-distance">—</div>
+      <div id="scope-overlay"></div>
+      <div id="hitmarker">
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <div id="hud-weapon" class="hud-panel">
+        <div id="hud-weapon-name">M4A1</div>
+        <div id="hud-ammo">30 / ∞</div>
+        <div class="hud-row"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
+      </div>
+
+      <div id="hud-stats" class="hud-panel">
+        <div class="hud-row"><span class="hud-label">ACCURACY</span><span id="hud-accuracy">0 %</span></div>
+        <div class="hud-row"><span class="hud-label">HITS</span><span id="hud-hits">0 / 0</span></div>
+      </div>
+    </div>
+
+    <div id="start-screen">
+      <div class="start-panel">
+        <h1>THREE.JS SHOOTING RANGE</h1>
+        <p id="start-hint">LOADING ASSETS</p>
+        <div id="loading-bar"><span></span></div>
+        <div class="controls-grid">
+          <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Move</span>
+          <span><kbd>Mouse</kbd></span><span>Aim</span>
+          <span><kbd>LMB</kbd></span><span>Fire</span>
+          <span><kbd>RMB</kbd></span><span>ADS</span>
+          <span><kbd>R</kbd></span><span>Reload</span>
+          <span><kbd>X</kbd></span><span>Fire mode</span>
+          <span><kbd>1</kbd>–<kbd>4</kbd></span><span>Weapons</span>
+          <span><kbd>ESC</kbd></span><span>Release mouse</span>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
