@@ -34,12 +34,15 @@ export class AssetManager {
   private readonly models = new Map<WeaponId, THREE.Group>();
   private readonly textures = new Map<string, THREE.Texture>();
 
+  constructor(private readonly anisotropyLimit = 8) {}
+
   async loadAll(
     manifest: AssetManifest,
     onProgress: (loaded: number, total: number) => void,
   ): Promise<void> {
     const total = manifest.weapons.length + manifest.textures.length;
     let loaded = 0;
+    console.info(`[AssetManager] Starting load: ${total} assets`);
     const track = <T>(promise: Promise<T>): Promise<T> =>
       promise.then((value) => {
         onProgress(++loaded, total);
@@ -50,6 +53,7 @@ export class AssetManager {
       ...manifest.weapons.map((w) => track(this.loadModel(w.id, w.url))),
       ...manifest.textures.map((name) => track(this.loadTexture(name))),
     ]);
+    console.info(`[AssetManager] Completed load: ${loaded}/${total} assets loaded`);
   }
 
   /** Returns the cached model, or null when missing/failed (use fallback). */
@@ -109,7 +113,7 @@ export class AssetManager {
         : THREE.NoColorSpace;
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
-      texture.anisotropy = 8;
+      texture.anisotropy = Math.min(this.anisotropyLimit, 8);
       this.textures.set(name, texture);
     } catch (error) {
       console.warn(`[AssetManager] Could not load texture "${name}". Flat colors will be used.`, error);

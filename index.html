@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Three.js Shooting Range</title>
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="description" content="Zeroed — a browser FPS shooting range built with Three.js and TypeScript." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Zeroed</title>
   </head>
   <body>
     <div id="app"></div>
@@ -19,6 +22,23 @@
       <div id="scope-overlay"></div>
       <div id="hitmarker">
         <span></span><span></span><span></span><span></span>
+      </div>
+
+      <div id="touch-controls" aria-label="Touch controls">
+        <div class="touch-pad">
+          <button type="button" data-action="forward">▲</button>
+          <div class="touch-row">
+            <button type="button" data-action="left">◀</button>
+            <button type="button" data-action="backward">▼</button>
+            <button type="button" data-action="right">▶</button>
+          </div>
+        </div>
+        <div class="touch-actions">
+          <button type="button" data-action="reload">RLD</button>
+          <button type="button" data-action="mode">MODE</button>
+          <button type="button" data-action="ads">ADS</button>
+          <button type="button" data-action="fire">FIRE</button>
+        </div>
       </div>
 
       <div id="hud-weapon" class="hud-panel">

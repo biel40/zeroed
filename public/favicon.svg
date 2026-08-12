@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Zeroed favicon</title>
+  <desc id="desc">Zeroed FPS target icon with crosshair and glowing accent.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0a1020"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f8d66d"/>
+      <stop offset="100%" stop-color="#ff7a59"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd166" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffd166" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="128" height="128" rx="24" fill="url(#bg)"/>
+
+  <circle cx="64" cy="64" r="44" fill="url(#glow)" opacity="0.45"/>
+  <circle cx="64" cy="64" r="36" fill="none" stroke="#dbe7f5" stroke-width="4"/>
+  <circle cx="64" cy="64" r="24" fill="none" stroke="#dbe7f5" stroke-width="3" opacity="0.9"/>
+  <circle cx="64" cy="64" r="9" fill="url(#accent)"/>
+
+  <g stroke="#e5edf7" stroke-width="4" stroke-linecap="round" opacity="0.95">
+    <line x1="64" y1="14" x2="64" y2="34"/>
+    <line x1="64" y1="94" x2="64" y2="114"/>
+    <line x1="14" y1="64" x2="34" y2="64"/>
+    <line x1="94" y1="64" x2="114" y2="64"/>
+  </g>
+
+  <g fill="url(#accent)">
+    <path d="M39 35h16l-4 14H35z"/>
+    <path d="M73 35h16l-4 14H69z"/>
+    <path d="M40 79h16l-4 14H36z"/>
+    <path d="M73 79h16l-4 14H69z"/>
+  </g>
+
+  <path d="M38 84L90 44" stroke="#ff9b5e" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="32" cy="89" r="5" fill="#ff9b5e"/>
+  <circle cx="96" cy="39" r="5" fill="#ff9b5e"/>
+</svg>

@@ -55,6 +55,14 @@ export class HUD {
     this.startHint.textContent = 'CLICK TO START';
   }
 
+  setError(message: string): void {
+    this.ready = false;
+    this.loadingBar.classList.remove('hidden');
+    this.loadingBarFill.style.width = '0%';
+    this.startHint.textContent = message;
+    this.startScreen.classList.remove('hidden');
+  }
+
   setHudVisible(visible: boolean): void {
     this.root.classList.toggle('hidden', !visible);
   }

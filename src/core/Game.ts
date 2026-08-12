@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { AssetManager } from '../assets/AssetManager';
 import { AudioSystem } from '../audio/AudioSystem';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from '../config/weapons';
+import { getDeviceProfile, type DeviceProfile } from '../core/DeviceProfile';
 import { Stats } from '../game/Stats';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
@@ -82,14 +83,27 @@ export class Game {
     container: HTMLElement,
     private readonly hud: HUD,
     private readonly assets: AssetManager,
+    private readonly profile: DeviceProfile = getDeviceProfile(),
   ) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const rendererOptions = {
+      antialias: !this.profile.useReducedEffects,
+      powerPreference: 'high-performance' as const,
+      alpha: false,
+      depth: true,
+      stencil: false,
+      precision: this.profile.isMobile ? 'mediump' : 'highp',
+    };
+
+    console.info('[Game] Initializing renderer with profile', this.profile.log);
+    this.renderer = new THREE.WebGLRenderer(rendererOptions);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = !this.profile.useReducedEffects;
+    this.renderer.shadowMap.type = this.profile.shadowQuality === 0 ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = !this.profile.useReducedEffects;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = this.profile.useReducedEffects ? 1.0 : 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
     this.scene.background = makeSkyTexture();
@@ -99,10 +113,10 @@ export class Game {
     // MIT-licensed, and enough to make metals and plastics read as PBR.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.45;
+    this.scene.environmentIntensity = this.profile.useReducedEffects ? 0.3 : 0.45;
     pmrem.dispose();
 
-    this.input = new Input(this.renderer.domElement);
+    this.input = new Input(this.renderer.domElement, this.profile);
     this.player = new PlayerController(window.innerWidth / window.innerHeight);
     this.scene.add(this.player.rig);
 
@@ -156,7 +170,7 @@ export class Game {
     this.scene.add(this.flashLight);
 
     this.input.onLockChange = (locked) => {
-      if (locked) {
+      if (this.profile.useTouchControls || locked) {
         this.hud.hideStartScreen();
         this.hud.setHudVisible(true);
       } else {
@@ -167,6 +181,10 @@ export class Game {
     this.hud.setStartHandler(() => {
       this.audio.resume();
       this.input.requestPointerLock();
+      if (this.profile.useTouchControls) {
+        this.hud.hideStartScreen();
+        this.hud.setHudVisible(true);
+      }
     });
 
     if (new URLSearchParams(window.location.search).has('debug')) {
@@ -176,6 +194,7 @@ export class Game {
     }
 
     window.addEventListener('resize', this.handleResize);
+    window.addEventListener('orientationchange', this.handleResize);
     this.renderer.setAnimationLoop(this.tick);
   }
 
@@ -188,8 +207,12 @@ export class Game {
   }
 
   private readonly handleResize = (): void => {
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.player.resize(window.innerWidth / window.innerHeight);
+    const viewport = window.visualViewport;
+    const width = viewport ? viewport.width : window.innerWidth || document.documentElement.clientWidth || 1;
+    const height = viewport ? viewport.height : window.innerHeight || document.documentElement.clientHeight || 1;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit));
+    this.renderer.setSize(width, height, false);
+    this.player.resize(width / height);
   };
 
   private switchWeapon(index: number): void {
@@ -290,8 +313,9 @@ export class Game {
   private readonly tick = (): void => {
     const dt = Math.min(this.clock.getDelta(), MAX_DELTA);
     const weapon = this.currentWeapon;
+    const allowGameplayInput = this.input.pointerLocked || this.profile.useTouchControls;
 
-    if (this.input.pointerLocked) {
+    if (allowGameplayInput) {
       for (let i = 0; i < WEAPON_ORDER.length; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
@@ -300,8 +324,8 @@ export class Game {
     }
 
     this.player.update(dt, this.input, weapon);
-    this.frameInput.trigger = this.input.pointerLocked && this.input.leftButtonDown;
-    this.frameInput.ads = this.input.pointerLocked && this.input.rightButtonDown;
+    this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown;
+    this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown;
     weapon.update(dt, this.frameInput);
     this.processWeaponEvents();
 

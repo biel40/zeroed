@@ -10,6 +10,7 @@ body {
   overflow: hidden;
   background: #0b0e12;
   font-family: 'Segoe UI', system-ui, sans-serif;
+  touch-action: none;
 }
 
 #app,
@@ -17,6 +18,7 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 .hidden {
@@ -151,6 +153,61 @@ body {
 
 #hitmarker.active {
   animation: hitpop 0.18s ease-out;
+}
+
+#touch-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+}
+
+.touch-pad,
+.touch-actions {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.touch-pad {
+  left: 18px;
+  bottom: 18px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.touch-row {
+  display: flex;
+  gap: 8px;
+}
+
+.touch-actions {
+  right: 18px;
+  bottom: 18px;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 180px;
+  justify-content: flex-end;
+}
+
+#touch-controls button {
+  min-width: 52px;
+  min-height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(12, 17, 22, 0.72);
+  color: #eef5ff;
+  font: 700 12px 'Segoe UI', sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  #touch-controls {
+    display: block;
+  }
 }
 
 @keyframes hitpop {
