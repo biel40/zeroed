@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1220" />
     <meta name="description" content="Zeroed — a browser FPS shooting range built with Three.js and TypeScript." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -25,20 +25,19 @@
       </div>
 
       <div id="touch-controls" aria-label="Touch controls">
-        <div class="touch-pad">
-          <button type="button" data-action="forward">▲</button>
-          <div class="touch-row">
-            <button type="button" data-action="left">◀</button>
-            <button type="button" data-action="backward">▼</button>
-            <button type="button" data-action="right">▶</button>
-          </div>
-        </div>
+        <!-- Floating joystick visual: appears where the left-zone finger lands. -->
+        <div id="joystick"><div id="joystick-knob"></div></div>
         <div class="touch-actions">
-          <button type="button" data-action="reload">RLD</button>
-          <button type="button" data-action="mode">MODE</button>
-          <button type="button" data-action="interact">USE</button>
-          <button type="button" data-action="ads">ADS</button>
-          <button type="button" data-action="fire">FIRE</button>
+          <div class="touch-row">
+            <button type="button" data-action="reload">RLD</button>
+            <button type="button" data-action="mode">MODE</button>
+            <button type="button" data-action="swap-weapon">WPN</button>
+            <button type="button" data-action="interact">USE</button>
+          </div>
+          <div class="touch-row touch-row-main">
+            <button type="button" data-action="ads" id="btn-ads">ADS</button>
+            <button type="button" data-action="fire" id="btn-fire">FIRE</button>
+          </div>
         </div>
       </div>
 

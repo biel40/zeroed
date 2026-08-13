@@ -6,12 +6,14 @@ import type { Weapon } from '../src/weapons/Weapon';
 const DT = 1 / 60;
 
 /** Only what PlayerController.update reads from Input. */
-function inputStub(keys: ReadonlySet<string>): Input {
+function inputStub(keys: ReadonlySet<string>, axes: { x?: number; y?: number } = {}): Input {
   return {
     isDown: (code: string) => keys.has(code),
     wasPressed: () => false,
     mouseDeltaX: 0,
     mouseDeltaY: 0,
+    moveAxisX: axes.x ?? 0,
+    moveAxisY: axes.y ?? 0,
   } as unknown as Input;
 }
 
@@ -58,5 +60,32 @@ describe('PlayerController movement bounds', () => {
     const player = new PlayerController(1);
     step(player, inputStub(new Set(['KeyS'])), 6);
     expect(player.rig.position.z).toBeCloseTo(PLAYER_BOUNDS.maxZ, 3);
+  });
+});
+
+describe('PlayerController analog movement (virtual joystick)', () => {
+  it('half stick deflection moves the player slower than full deflection', () => {
+    const full = new PlayerController(1);
+    step(full, inputStub(new Set(), { y: 1 }), 0.5);
+    const half = new PlayerController(1);
+    step(half, inputStub(new Set(), { y: 0.5 }), 0.5);
+    // Forward is -z: the slower player stays closer to the spawn z.
+    expect(half.rig.position.z).toBeGreaterThan(full.rig.position.z);
+    expect(full.rig.position.z).toBeGreaterThan(PLAYER_BOUNDS.minZ);
+  });
+
+  it('clamps keyboard + joystick combined input to full deflection', () => {
+    const blended = new PlayerController(1);
+    step(blended, inputStub(new Set(['KeyW']), { y: 1 }), 0.5);
+    const keysOnly = new PlayerController(1);
+    step(keysOnly, inputStub(new Set(['KeyW'])), 0.5);
+    expect(blended.rig.position.z).toBeCloseTo(keysOnly.rig.position.z, 5);
+  });
+
+  it('drives diagonal movement from stick axes alone', () => {
+    const player = new PlayerController(1);
+    step(player, inputStub(new Set(), { x: 1, y: 1 }), 0.5);
+    expect(player.rig.position.x).toBeGreaterThan(0);
+    expect(player.rig.position.z).toBeLessThan(4);
   });
 });

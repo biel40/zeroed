@@ -184,6 +184,9 @@ export class Game {
     this.entry(this.inventory.currentWeapon).view.root.visible = true;
     this.scene.add(this.flashLight);
 
+    // Touch-only weapon swap button (mobile keyboards have no 1–5 row).
+    this.input.onWeaponSwap = () => this.cycleWeapon();
+
     this.mode.init({
       scene: this.scene,
       player: this.player,
@@ -270,6 +273,13 @@ export class Game {
     this.entry(previousId).view.root.visible = false;
     this.currentView.root.visible = true;
     this.currentWeapon.equip();
+  }
+
+  /** Cycles to the next carried weapon (touch swap button). */
+  private cycleWeapon(): void {
+    const count = this.inventory.weapons.length;
+    if (count < 2) return;
+    this.switchWeapon((this.inventory.currentIndex + 1) % count);
   }
 
   /**

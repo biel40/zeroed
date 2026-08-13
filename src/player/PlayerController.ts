@@ -63,8 +63,19 @@ export class PlayerController {
     this.pitchNode.rotation.x = this.pitch;
     this.camera.rotation.set(weapon.recoil.pitch, weapon.recoil.yaw, 0);
 
-    const strafe = (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0);
-    const forward = (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0);
+    // Digital keys plus the analog touch axes (virtual joystick); the clamp
+    // keeps combined input from exceeding full deflection, and desktop is
+    // untouched because both axes stay 0 without touch controls.
+    const strafe = clamp(
+      (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0) + input.moveAxisX,
+      -1,
+      1,
+    );
+    const forward = clamp(
+      (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0) + input.moveAxisY,
+      -1,
+      1,
+    );
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     this.wish.set(-sin * forward + cos * strafe, 0, -cos * forward - sin * strafe);

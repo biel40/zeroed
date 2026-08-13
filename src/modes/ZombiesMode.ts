@@ -194,14 +194,15 @@ export class ZombiesMode implements GameMode {
   /** Center-screen prompt: only near the box, and only when it is usable. */
   getInteractPrompt(): string | null {
     if (this.gameOver || !this.box || !this.playerInBoxRange()) return null;
+    const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
     switch (this.box.state) {
       case 'closed':
         return MYSTERY_BOX_TUNING.cost > 0
-          ? `MYSTERY BOX\nPress E — ${MYSTERY_BOX_TUNING.cost} PTS`
-          : 'MYSTERY BOX\nPress E';
+          ? `MYSTERY BOX\n${key} — ${MYSTERY_BOX_TUNING.cost} PTS`
+          : `MYSTERY BOX\n${key}`;
       case 'awaitingPickup': {
         const result = this.box.result;
-        return result ? `Press E to take ${WEAPON_DEFINITIONS[result].name}` : null;
+        return result ? `${key} to take ${WEAPON_DEFINITIONS[result].name}` : null;
       }
       default:
         return null;
