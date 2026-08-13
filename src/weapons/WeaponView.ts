@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import { clamp, damp } from '../utils/math';
+import type { MagazineDropPool } from './MagazineDrop';
+import { ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import type { Weapon } from './Weapon';
-import type { ViewModelConfig, WeaponDefinition } from './WeaponTypes';
+import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
 const FLASH_DURATION = 0.045;
 /** Bore line as a fraction of the sight line height (rifle geometry heuristic). */
 const BORE_HEIGHT_FRACTION = 0.65;
+/** Pistol slide blowback: travel in meters and full return time in seconds. */
+const SLIDE_TRAVEL = 0.026;
+const SLIDE_RETURN_TIME = 0.09;
 const SWAY_PER_PIXEL = 0.0016;
 const SWAY_LIMIT = 0.02;
 const SWAY_SMOOTHING = 9;
@@ -91,6 +96,10 @@ interface BuiltProcedural {
   sightY: number;
   /** Emissive materials that pulse over time; only the Ray Gun uses this. */
   energyMaterials?: THREE.MeshStandardMaterial[];
+  /** Reload parts the animator drives (magazine, feed cover, handle, cell). */
+  reloadParts?: Partial<ReloadParts>;
+  /** Pistol slide: kicks back per shot and is racked by the reload charge. */
+  slide?: THREE.Object3D;
 }
 
 /**
@@ -159,8 +168,11 @@ function buildRaygun(config: ViewModelConfig): BuiltProcedural {
   // Emitter tip.
   add(new THREE.SphereGeometry(0.019, 10, 8), makeGlow(), 0, 0.006, -0.295);
 
-  // Caged power cell on top: glowing sphere inside a brass frame.
-  add(new THREE.SphereGeometry(0.024, 12, 10), makeGlow(), 0, 0.062, 0.01);
+  // Caged power cell on top: glowing sphere inside a brass frame. The cell
+  // is the reloadable part — the animator lifts it out of the cage.
+  const cell = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), makeGlow());
+  cell.position.set(0, 0.062, 0.01);
+  group.add(cell);
   add(new THREE.TorusGeometry(0.03, 0.004, 6, 16), brass, 0, 0.062, 0.01, Math.PI / 2);
   add(new THREE.BoxGeometry(0.008, 0.028, 0.008), brass, 0, 0.032, 0.01);
 
@@ -175,6 +187,125 @@ function buildRaygun(config: ViewModelConfig): BuiltProcedural {
     ejectionPosition: new THREE.Vector3(0.035, 0, 0.02),
     sightY: 0.068,
     energyMaterials,
+    reloadParts: { magazine: cell },
+  };
+}
+
+/**
+ * M1911-style pistol built from primitives: a static frame (grip, trigger
+ * guard, hammer) plus a SEPARATE SLIDE carrying the barrel shroud and the
+ * iron sights. The slide is a live part: WeaponView kicks it back on every
+ * shot and the ReloadAnimator racks it during the charge window (it is the
+ * reload "handle"). The magazine lives inside the grip and drops on reload.
+ */
+function buildPistol(config: ViewModelConfig): BuiltProcedural {
+  const group = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: config.bodyColor,
+    roughness: 0.42,
+    metalness: 0.78,
+  });
+  const slideMat = new THREE.MeshStandardMaterial({
+    color: config.bodyColor,
+    roughness: 0.32,
+    metalness: 0.88,
+  });
+  const gripMat = new THREE.MeshStandardMaterial({
+    color: config.accentColor,
+    roughness: 0.72,
+    metalness: 0,
+  });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.5 });
+
+  const add = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    rx = 0,
+    rz = 0,
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = rx;
+    mesh.rotation.z = rz;
+    group.add(mesh);
+    return mesh;
+  };
+
+  const length = config.receiverLength;
+  const slideY = 0.026;
+  const slideTop = slideY + 0.015;
+
+  // Frame: receiver rails, trigger guard, trigger and beavertail.
+  add(new THREE.BoxGeometry(0.032, 0.034, length), frameMat, 0, 0, 0);
+  add(new THREE.BoxGeometry(0.026, 0.006, 0.062), frameMat, 0, -0.032, -0.015);
+  add(new THREE.BoxGeometry(0.006, 0.02, 0.008), dark, 0, -0.024, -0.015, 0.25);
+  add(new THREE.BoxGeometry(0.024, 0.014, 0.03), frameMat, 0, 0.012, length / 2 - 0.012);
+  // Hammer at the rear of the frame.
+  add(new THREE.BoxGeometry(0.01, 0.024, 0.012), dark, 0, 0.02, length / 2 + 0.002, -0.4);
+
+  // Grip: wood scales over a steel frame, classic 1911 rake.
+  add(new THREE.BoxGeometry(0.03, 0.1, 0.04), frameMat, 0, -0.062, 0.048, 0.28);
+  add(new THREE.BoxGeometry(0.033, 0.094, 0.036), gripMat, 0, -0.064, 0.05, 0.28);
+
+  // Barrel tip peeking past the slide.
+  add(
+    new THREE.CylinderGeometry(config.barrelRadius, config.barrelRadius, 0.03, 10),
+    dark,
+    0,
+    slideY + 0.001,
+    -length / 2 - 0.008,
+    Math.PI / 2,
+  );
+
+  // SLIDE GROUP — everything in here moves with the blowback / racking.
+  const slide = new THREE.Group();
+  slide.position.set(0, slideY, 0);
+  const slideBody = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.03, length * 1.02), slideMat);
+  slide.add(slideBody);
+  // Rear cocking serrations.
+  for (let i = 0; i < 4; i++) {
+    const serration = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.024, 0.003), dark);
+    serration.position.set(0, 0, length / 2 - 0.014 - i * 0.007);
+    slide.add(serration);
+  }
+  // Iron sights ON the slide: rear notch + front post. The sight line must
+  // sit at sightY so ADS alignment (which uses sightY) is exact.
+  const sightTop = config.sightHeight;
+  const rearSight = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.014, 0.008), dark);
+  rearSight.position.set(0, sightTop - slideY - 0.007, length / 2 - 0.012);
+  slide.add(rearSight);
+  const frontPost = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.016, 0.005), dark);
+  frontPost.position.set(0, sightTop - slideY - 0.008, -length / 2 + 0.012);
+  slide.add(frontPost);
+  group.add(slide);
+
+  // Magazine inside the grip; the baseplate peeks out. The animator drops
+  // it (magDrop) and seats a fresh one (magIn/magSeat).
+  const [magW, magH, magD] = config.reloadAnim?.magSize ?? [0.024, 0.095, 0.036];
+  const magazine = new THREE.Mesh(
+    new THREE.BoxGeometry(magW, magH, magD),
+    new THREE.MeshStandardMaterial({
+      color: config.reloadAnim?.magColor ?? 0x23262b,
+      roughness: 0.4,
+      metalness: 0.7,
+    }),
+  );
+  magazine.position.set(0, -0.062, 0.048);
+  magazine.rotation.x = 0.28;
+  group.add(magazine);
+
+  group.scale.setScalar(config.scale);
+  const sightY = sightTop * config.scale;
+  return {
+    group,
+    muzzlePosition: new THREE.Vector3(0, (slideY + 0.001) * config.scale, (-length / 2 - 0.023) * config.scale),
+    ejectionPosition: new THREE.Vector3(0.022 * config.scale, slideTop * config.scale, 0.01),
+    sightY,
+    slide,
+    reloadParts: { magazine, handle: slide },
   };
 }
 
@@ -252,22 +383,66 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
     0.35,
   );
 
+  const reloadParts: Partial<ReloadParts> = {};
+
   switch (config.magazine) {
     case 'straight':
-      add(new THREE.BoxGeometry(width * 0.72, 0.13, 0.05), dark, 0, -height / 2 - 0.062, -0.02, 0.08);
+      reloadParts.magazine = add(
+        new THREE.BoxGeometry(width * 0.72, 0.13, 0.05),
+        dark,
+        0,
+        -height / 2 - 0.062,
+        -0.02,
+        0.08,
+      );
       break;
-    case 'curved':
-      add(new THREE.BoxGeometry(width * 0.7, 0.09, 0.046), dark, 0, -height / 2 - 0.042, -0.028, 0.3);
-      add(new THREE.BoxGeometry(width * 0.7, 0.09, 0.042), dark, 0, -height / 2 - 0.1, -0.062, 0.62);
+    case 'curved': {
+      const magGroup = new THREE.Group();
+      magGroup.position.set(0, -height / 2 - 0.042, -0.028);
+      group.add(magGroup);
+      const seg1 = new THREE.Mesh(new THREE.BoxGeometry(width * 0.7, 0.09, 0.046), dark);
+      seg1.rotation.x = 0.3;
+      magGroup.add(seg1);
+      const seg2 = new THREE.Mesh(new THREE.BoxGeometry(width * 0.7, 0.09, 0.042), dark);
+      seg2.position.set(0, -0.058, -0.034);
+      seg2.rotation.x = 0.62;
+      magGroup.add(seg2);
+      reloadParts.magazine = magGroup;
       break;
+    }
     case 'box': {
       // M60: ammo box, feed tray with visible rounds, bipod and carry handle.
-      add(new THREE.BoxGeometry(width * 1.35, 0.1, 0.12), accent, -0.025, -height / 2 - 0.05, -0.02);
+      reloadParts.magazine = add(
+        new THREE.BoxGeometry(width * 1.35, 0.1, 0.12),
+        accent,
+        -0.025,
+        -height / 2 - 0.05,
+        -0.02,
+      );
       const roundGeometry = new THREE.CylinderGeometry(0.004, 0.004, 0.02, 6);
       const brass = new THREE.MeshStandardMaterial({ color: 0xc8a24a, roughness: 0.35, metalness: 0.85 });
       for (let i = 0; i < 5; i++) {
         add(roundGeometry, brass, -0.01 - i * 0.008, height / 2 + 0.004, -0.045, Math.PI / 2);
       }
+      // Feed cover on a rear hinge: the animator swings it open.
+      const coverPivot = new THREE.Group();
+      coverPivot.position.set(0, height / 2 + 0.002, 0.055);
+      const coverPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(width * 0.86, 0.008, 0.15),
+        accent,
+      );
+      coverPlate.position.z = -0.08;
+      coverPivot.add(coverPlate);
+      group.add(coverPivot);
+      reloadParts.cover = coverPivot;
+      // Charging handle nub on the right flank.
+      reloadParts.handle = add(
+        new THREE.BoxGeometry(0.016, 0.02, 0.05),
+        dark,
+        width / 2 + 0.012,
+        -0.01,
+        0.05,
+      );
       add(new THREE.BoxGeometry(0.012, 0.05, 0.012), dark, 0, height / 2 + 0.028, -0.02); // carry handle post
       add(new THREE.BoxGeometry(0.02, 0.012, 0.1), dark, 0, height / 2 + 0.056, -0.02); // carry handle grip
       const legGeometry = new THREE.CylinderGeometry(0.004, 0.004, 0.16, 6);
@@ -276,7 +451,13 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
       break;
     }
     case 'internal':
-      add(new THREE.BoxGeometry(width * 0.8, 0.04, 0.09), accent, 0, -height / 2 - 0.016, -0.01);
+      reloadParts.magazine = add(
+        new THREE.BoxGeometry(width * 0.8, 0.04, 0.09),
+        accent,
+        0,
+        -height / 2 - 0.016,
+        -0.01,
+      );
       break;
   }
 
@@ -299,7 +480,53 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
     muzzlePosition: new THREE.Vector3(0, config.barrelRadius * 0.6 * config.scale, muzzleZ),
     ejectionPosition: new THREE.Vector3((width / 2) * config.scale, 0.01, -0.02),
     sightY,
+    reloadParts,
   };
+}
+
+/**
+ * World-space display model of a weapon (Mystery Box roulette, pickups).
+ * GLB weapons CLONE the cached AssetManager scene — shared geometry and
+ * materials, zero network. Procedural weapons (M60, Ray Gun) are rebuilt
+ * from the same builders the first-person viewmodel uses. The result is
+ * centered on its pivot and normalized to `targetLength` meters.
+ */
+export function buildWeaponDisplayModel(
+  definition: WeaponDefinition,
+  glb: THREE.Group | null,
+  targetLength = 0.72,
+): THREE.Group {
+  const view = definition.view;
+  let inner: THREE.Object3D;
+  if (glb) {
+    inner = glb.clone(true);
+    tuneGlbMaterials(inner);
+    // Match the first-person orientation fix so every display model faces -Z.
+    const oriented = new THREE.Group();
+    oriented.rotation.y = view.modelYaw ?? 0;
+    oriented.add(inner);
+    inner = oriented;
+  } else {
+    const built =
+      view.energyColor !== undefined
+        ? buildRaygun(view)
+        : view.frame === 'pistol'
+          ? buildPistol(view)
+          : buildProcedural(view);
+    inner = built.group;
+  }
+
+  // Center on the origin before scaling so the anchor can just rotate.
+  const rawBox = new THREE.Box3().setFromObject(inner);
+  const center = rawBox.getCenter(new THREE.Vector3());
+  inner.position.sub(center);
+
+  const wrapper = new THREE.Group();
+  wrapper.add(inner);
+  const size = rawBox.getSize(new THREE.Vector3());
+  const longest = Math.max(size.x, size.z, 0.001);
+  wrapper.scale.setScalar(targetLength / longest);
+  return wrapper;
 }
 
 /**
@@ -315,33 +542,64 @@ export class WeaponView {
   private readonly spring: SpringRecoil;
   private readonly hipPosition: THREE.Vector3;
   private readonly adsPosition: THREE.Vector3;
+  private readonly animator: ReloadAnimator | null = null;
   private flashTime = 0;
   private bobPhase = 0;
   private swayX = 0;
   private swayY = 0;
   private pulseTime = 0;
   private readonly energyMaterials: THREE.MeshStandardMaterial[] = [];
+  private slide: THREE.Object3D | null = null;
+  private slideHomeZ = 0;
+  private slideBlowback = 0;
 
   constructor(
     private readonly definition: WeaponDefinition,
     model: THREE.Group | null,
+    dropPool: MagazineDropPool | null = null,
   ) {
     const view = definition.view;
     this.spring = new SpringRecoil(view.visualRecoil);
     this.hipPosition = new THREE.Vector3(view.hip[0], view.hip[1], view.hip[2]);
 
+    let reloadParts: Partial<ReloadParts> = {};
     if (model && view.modelLength !== undefined && view.modelYaw !== undefined) {
-      const sightY = this.attachGlbModel(model, view);
-      this.adsPosition = new THREE.Vector3(view.ads[0], -sightY + view.ads[1], view.ads[2]);
+      const attached = this.attachGlbModel(model, view);
+      this.adsPosition = new THREE.Vector3(view.ads[0], -attached.sightY + view.ads[1], view.ads[2]);
+      // GLBs are single-mesh: the detachable magazine and charging handle
+      // are procedural add-ons anchored to the model bounds.
+      reloadParts = this.buildGlbReloadParts(view, attached);
     } else {
-      const built = view.energyColor !== undefined ? buildRaygun(view) : buildProcedural(view);
+      const built =
+        view.energyColor !== undefined
+          ? buildRaygun(view)
+          : view.frame === 'pistol'
+            ? buildPistol(view)
+            : buildProcedural(view);
       this.root.add(built.group);
       this.muzzle.position.copy(built.muzzlePosition);
       this.ejectionPort.position.copy(built.ejectionPosition);
       this.adsPosition = new THREE.Vector3(view.ads[0], -built.sightY + view.ads[1], view.ads[2]);
       if (built.energyMaterials) this.energyMaterials.push(...built.energyMaterials);
+      if (built.slide) {
+        this.slide = built.slide;
+        this.slideHomeZ = built.slide.position.z;
+      }
+      reloadParts = built.reloadParts ?? {};
     }
     this.root.add(this.muzzle, this.ejectionPort);
+
+    if (view.reloadAnim) {
+      this.animator = new ReloadAnimator(
+        view.reloadAnim,
+        {
+          magazine: reloadParts.magazine ?? null,
+          handle: reloadParts.handle ?? null,
+          cover: reloadParts.cover ?? null,
+        },
+        dropPool,
+      );
+    }
 
     const flashMaterial = new THREE.MeshBasicMaterial({
       map: getFlashTexture(),
@@ -360,8 +618,11 @@ export class WeaponView {
     this.root.visible = false;
   }
 
-  /** Attaches the GLB normalized to real-world length; returns the sight line height. */
-  private attachGlbModel(model: THREE.Group, view: ViewModelConfig): number {
+  /** Attaches the GLB normalized to real-world length; returns bounds info. */
+  private attachGlbModel(
+    model: THREE.Group,
+    view: ViewModelConfig,
+  ): { sightY: number; box: THREE.Box3 } {
     tuneGlbMaterials(model);
 
     const rawBox = new THREE.Box3().setFromObject(model);
@@ -382,7 +643,55 @@ export class WeaponView {
     const sightY = box.max.y;
     this.muzzle.position.set(0, sightY * BORE_HEIGHT_FRACTION, box.min.z);
     this.ejectionPort.position.set(box.max.x + 0.01, sightY * 0.35, box.min.z * 0.25);
-    return sightY;
+    return { sightY, box };
+  }
+
+  /**
+   * Procedural magazine + charging handle for single-mesh GLB weapons,
+   * anchored to the model bounds: the magazine hangs below the bore line at
+   * the receiver, the handle rides the right flank. Positions follow each
+   * style's real-world layout (AK handle sits forward, M4's at the rear).
+   */
+  private buildGlbReloadParts(
+    view: ViewModelConfig,
+    attached: { sightY: number; box: THREE.Box3 },
+  ): Partial<ReloadParts> {
+    const anim = view.reloadAnim;
+    if (!anim) return {};
+    const { sightY, box } = attached;
+    const [magW, magH, magD] = anim.magSize;
+
+    const magazine = new THREE.Mesh(
+      new THREE.BoxGeometry(magW, magH, magD),
+      new THREE.MeshStandardMaterial({
+        color: anim.magColor,
+        roughness: 0.45,
+        metalness: 0.6,
+      }),
+    );
+    magazine.position.set(0, sightY * 0.35 - magH * 0.35, box.min.z * 0.45);
+    if (anim.style === 'rock') magazine.rotation.x = 0.22; // AK curve hint
+    this.root.add(magazine);
+
+    let handle: THREE.Mesh | null = null;
+    if (anim.style !== 'cell') {
+      handle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.014, 0.02, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x1a1d20, roughness: 0.4, metalness: 0.7 }),
+      );
+      const handleZ =
+        anim.style === 'rock'
+          ? box.min.z * 0.32 // AK charging handle rides the mid receiver
+          : box.max.z * 0.55; // M4/L96: rear of the receiver
+      handle.position.set(box.max.x + 0.006, sightY * 0.52, handleZ);
+      this.root.add(handle);
+    }
+    return { magazine, handle };
+  }
+
+  /** Wired by Game: reload phase events for audio synchronization. */
+  set onReloadPhase(handler: ((phase: ReloadPhase) => void) | null) {
+    if (this.animator) this.animator.onPhase = handler;
   }
 
   /** Called by Game on every shot event. */
@@ -392,6 +701,8 @@ export class WeaponView {
     this.flash.rotation.z = Math.random() * Math.PI * 2;
     this.flash.visible = true;
     this.spring.kick();
+    // Pistol slide cycles with every shot.
+    if (this.slide) this.slideBlowback = 1;
   }
 
   getMuzzleWorldPosition(out: THREE.Vector3): THREE.Vector3 {
@@ -442,13 +753,21 @@ export class WeaponView {
     this.root.rotation.x += this.spring.pitch;
     this.root.rotation.z += this.spring.roll;
 
-    // 5. State-driven animations.
+    // 5. State-driven animations. The reload animator runs every frame so
+    // it can restore parts the moment the state is left (weapon switch).
+    this.animator?.update(weapon);
     switch (weapon.state) {
       case 'reloading': {
-        const curve = Math.sin(weapon.stateProgress * Math.PI);
-        this.root.position.y -= curve * 0.13;
-        this.root.rotation.x -= curve * 0.45;
-        this.root.rotation.z += curve * 0.35;
+        if (this.animator) {
+          this.root.position.y += this.animator.bodyDip;
+          this.root.rotation.x += this.animator.bodyTilt;
+          this.root.rotation.z += this.animator.bodyRoll;
+        } else {
+          const curve = Math.sin(weapon.stateProgress * Math.PI);
+          this.root.position.y -= curve * 0.13;
+          this.root.rotation.x -= curve * 0.45;
+          this.root.rotation.z += curve * 0.35;
+        }
         break;
       }
       case 'equipping': {
@@ -461,6 +780,7 @@ export class WeaponView {
         const curve = Math.sin(weapon.stateProgress * Math.PI);
         this.root.position.z += curve * 0.035;
         this.root.rotation.x -= curve * 0.12;
+        this.animator?.updateCycling(weapon.stateProgress);
         break;
       }
       default:
@@ -472,10 +792,19 @@ export class WeaponView {
       if (this.flashTime <= 0) this.flash.visible = false;
     }
 
-    // Ray Gun power cell and rings pulse gently at all times.
+    // Slide blowback: snaps back on the shot, returns to battery in ~90 ms.
+    // While reloading the ReloadAnimator owns the slide (it is the charge
+    // handle), so the blowback never fights the choreography.
+    if (this.slide && weapon.state !== 'reloading') {
+      this.slideBlowback = Math.max(0, this.slideBlowback - dt / SLIDE_RETURN_TIME);
+      this.slide.position.z = this.slideHomeZ + this.slideBlowback * SLIDE_TRAVEL;
+    }
+
+    // Ray Gun power cell and rings pulse gently; the reload spin-up surges.
     if (this.energyMaterials.length > 0) {
       this.pulseTime += dt;
-      const pulse = 1.35 + Math.sin(this.pulseTime * 5) * 0.45;
+      const pulse =
+        1.35 + Math.sin(this.pulseTime * 5) * 0.45 + (this.animator?.chargeGlow ?? 0) * 2.2;
       for (const material of this.energyMaterials) material.emissiveIntensity = pulse;
     }
 

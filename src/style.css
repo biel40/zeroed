@@ -319,6 +319,21 @@ body {
   animation: bannerfade 2s ease-out forwards;
 }
 
+#interact-prompt {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: pre-line;
+  font: 600 16px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.22em;
+  line-height: 1.7;
+  color: #e8ecf1;
+  text-shadow: 0 0 12px rgba(143, 107, 255, 0.65), 0 2px 4px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
 @keyframes bannerfade {
   0% {
     opacity: 0;

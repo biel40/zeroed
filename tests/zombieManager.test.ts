@@ -92,8 +92,8 @@ describe('ZombieManager movement', () => {
     manager.onPlayerAttack = (amount) => {
       damage += amount;
     };
-    // One second: spawn animation (0.35 s) + wind-up (0.32 s) → exactly one hit.
-    step(manager, 1);
+    // Spawn rise (1.1 s) + wind-up (0.45 s) → exactly one hit in 2 seconds.
+    step(manager, 2);
     expect(damage).toBe(ZOMBIE_ATTACK_DAMAGE);
   });
 });
@@ -122,9 +122,9 @@ describe('ZombieManager damage', () => {
     expect(kills).toEqual([true]);
     expect(colliders).toHaveLength(0);
     expect(manager.aliveCount).toBe(0);
-    // Still active (playing the death animation) until it finishes.
+    // Still active (playing the death sequence) until it finishes.
     expect(manager.activeCount).toBe(1);
-    step(manager, 1.3);
+    step(manager, 3.6);
     expect(manager.activeCount).toBe(0);
   });
 

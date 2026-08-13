@@ -16,19 +16,49 @@ export const MAX_ALIVE = 24;
 export const ZOMBIE_BASE_HP = 100;
 /** Walk speed in m/s at round 1. */
 export const ZOMBIE_BASE_SPEED = 1.9;
-export const ZOMBIE_ATTACK_DAMAGE = 12;
+/**
+ * Damage per landed attack. 25 HP means four clean hits kill a full-health
+ * player: reaching the player must be genuinely dangerous.
+ */
+export const ZOMBIE_ATTACK_DAMAGE = 25;
 /** Distance at which a zombie starts its attack lunge, meters. */
 export const ZOMBIE_ATTACK_RANGE = 1.9;
-export const ZOMBIE_ATTACK_COOLDOWN = 1.1;
+/** Seconds between the end of one attack and the next wind-up. */
+export const ZOMBIE_ATTACK_RECOVERY = 0.7;
 /** Zombies closer than this push each other apart (soft separation). */
 export const ZOMBIE_SEPARATION_RADIUS = 1.15;
+
+// --- Zombie state timings (seconds) ---
+/** Rise-from-the-ground spawn sequence. */
+export const ZOMBIE_SPAWN_DURATION = 1.1;
+/** Full attack lunge; the damage lands at the hit moment below. */
+export const ZOMBIE_ATTACK_DURATION = 0.9;
+/** Wind-up before the blow connects — the player's dodge window. */
+export const ZOMBIE_ATTACK_HIT_MOMENT = 0.45;
+/** Brief stagger on non-lethal hits; movement resumes right after. */
+export const ZOMBIE_HIT_DURATION = 0.28;
+/** Headshot stagger lasts longer: precision should feel impactful. */
+export const ZOMBIE_HIT_HEADSHOT_FACTOR = 1.6;
+/** Death fall, corpse linger and fade-out before the body is recycled. */
+export const ZOMBIE_DEATH_FALL = 1.0;
+export const ZOMBIE_CORPSE_LINGER = 1.6;
+export const ZOMBIE_DEATH_FADE = 0.8;
+
+// --- Per-zombie visual/behavior variation (fractions, applied at spawn) ---
+export const ZOMBIE_SPEED_JITTER = 0.08;
+export const ZOMBIE_SCALE_JITTER = 0.05;
+export const ZOMBIE_WALK_JITTER = 0.07;
 
 export const ROUND_BREAK_SECONDS = 4;
 export const ROUND_START_DELAY = 2.5;
 
 export const PLAYER_MAX_HP = 100;
-/** Brief invulnerability window after taking a hit, seconds. */
-export const PLAYER_HIT_INVULN = 0.9;
+/**
+ * Brief invulnerability window after taking a hit, seconds. Long enough to
+ * prevent a surrounding horde from deleting the player in a single frame,
+ * short enough that being surrounded is still deadly.
+ */
+export const PLAYER_HIT_INVULN = 0.45;
 
 export interface RoundConfig {
   /** Total zombies spawned during the round (not simultaneously). */

@@ -5,6 +5,7 @@ import { AudioSystem } from '../audio/AudioSystem';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import { getDeviceProfile, type DeviceProfile } from '../core/DeviceProfile';
 import { Stats } from '../game/Stats';
+import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
@@ -15,7 +16,14 @@ import type { SurfaceType } from '../shooting/HitTarget';
 import { HUD } from '../ui/HUD';
 import { clamp } from '../utils/math';
 import { Weapon } from '../weapons/Weapon';
+import { MagazineDropPool } from '../weapons/MagazineDrop';
+import type { WeaponId } from '../weapons/WeaponTypes';
 import { WeaponView } from '../weapons/WeaponView';
+
+interface ArsenalEntry {
+  readonly weapon: Weapon;
+  readonly view: WeaponView;
+}
 
 const MAX_DELTA = 0.05;
 const AIM_QUERY_INTERVAL = 0.1;
@@ -59,14 +67,15 @@ export class Game {
   private readonly effects: Effects;
   private readonly audio = new AudioSystem();
   private readonly stats = new Stats();
-  private readonly weapons: Weapon[] = [];
-  private readonly views: WeaponView[] = [];
+  /** Every weapon the mode may use, preloaded once; the inventory picks slots. */
+  private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
+  private inventory!: WeaponInventory;
+  private readonly magazineDrops: MagazineDropPool;
   /** Range colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
   private readonly hitColliders: THREE.Object3D[];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
   private readonly aimRaycaster = new THREE.Raycaster();
   private readonly aimHits: THREE.Intersection[] = [];
-  private currentWeaponIndex = 0;
   private aimTimer = 0;
   private aimDistance: number | null = null;
 
@@ -130,6 +139,7 @@ export class Game {
     this.scene.add(this.range.group);
 
     this.effects = new Effects(this.scene);
+    this.magazineDrops = new MagazineDropPool(this.scene);
 
     // The ballistics layer raycasts against this shared, mutable array:
     // range geometry is static, modes may add/remove dynamic hitboxes.
@@ -163,12 +173,15 @@ export class Game {
 
     for (const id of this.mode.weaponIds) {
       const weapon = new Weapon(WEAPON_DEFINITIONS[id]);
-      const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id));
+      const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops);
+      view.onReloadPhase = (phase) =>
+        this.audio.playReloadPhase(phase, !!weapon.definition.audio.energy);
       this.player.camera.add(view.root);
-      this.weapons.push(weapon);
-      this.views.push(view);
+      this.arsenal.set(id, { weapon, view });
     }
-    this.views[0].root.visible = true;
+    const starting = this.mode.startingInventory ?? this.mode.weaponIds;
+    this.inventory = new WeaponInventory(starting, this.mode.maxWeapons ?? starting.length);
+    this.entry(this.inventory.currentWeapon).view.root.visible = true;
     this.scene.add(this.flashLight);
 
     this.mode.init({
@@ -179,9 +192,17 @@ export class Game {
       audio: this.audio,
       effects: this.effects,
       stats: this.stats,
+      assets: this.assets,
+      profile: this.profile,
+      range: this.range,
       hitColliders: this.hitColliders,
+      setExposure: (exposure) => {
+        this.renderer.toneMappingExposure = exposure;
+      },
       lockPointer: () => this.start(),
       unlockPointer: () => document.exitPointerLock(),
+      grantWeapon: (id) => this.grantWeapon(id),
+      resetArsenal: () => this.resetArsenal(),
     });
 
     this.input.onLockChange = (locked) => {
@@ -218,12 +239,19 @@ export class Game {
     }
   }
 
+  /** Arsenal lookup; every WeaponId the modes reference is preloaded. */
+  private entry(id: WeaponId): ArsenalEntry {
+    const entry = this.arsenal.get(id);
+    if (!entry) throw new Error(`Weapon "${id}" is not preloaded in mode "${this.mode.id}"`);
+    return entry;
+  }
+
   private get currentWeapon(): Weapon {
-    return this.weapons[this.currentWeaponIndex];
+    return this.entry(this.inventory.currentWeapon).weapon;
   }
 
   private get currentView(): WeaponView {
-    return this.views[this.currentWeaponIndex];
+    return this.entry(this.inventory.currentWeapon).view;
   }
 
   private readonly handleResize = (): void => {
@@ -236,9 +264,42 @@ export class Game {
   };
 
   private switchWeapon(index: number): void {
-    if (index === this.currentWeaponIndex) return;
-    this.currentView.root.visible = false;
-    this.currentWeaponIndex = index;
+    const previousId = this.inventory.currentWeapon;
+    const nextId = this.inventory.switchTo(index);
+    if (!nextId) return;
+    this.entry(previousId).view.root.visible = false;
+    this.currentView.root.visible = true;
+    this.currentWeapon.equip();
+  }
+
+  /**
+   * Mystery Box pickup: the weapon enters the inventory (slot cap rules
+   * live in WeaponInventory), arrives with fresh ammo, and is equipped.
+   */
+  private grantWeapon(id: WeaponId): void {
+    const entry = this.arsenal.get(id);
+    if (!entry) {
+      console.warn(`[Game] Cannot grant "${id}": not preloaded in mode "${this.mode.id}"`);
+      return;
+    }
+    const previousId = this.inventory.currentWeapon;
+    const { equipped, dropped } = this.inventory.grant(id);
+    entry.weapon.resetAmmo();
+    if (previousId !== equipped) this.entry(previousId).view.root.visible = false;
+    entry.view.root.visible = true;
+    entry.weapon.equip();
+    console.info(
+      `[Game] Weapon granted: ${equipped}` + (dropped ? ` (replaced ${dropped})` : ''),
+    );
+  }
+
+  /** Zombies restart: starting loadout, every weapon back to full ammo. */
+  private resetArsenal(): void {
+    this.inventory.reset(this.mode.startingInventory ?? this.mode.weaponIds);
+    for (const entry of this.arsenal.values()) {
+      entry.weapon.resetAmmo();
+      entry.view.root.visible = false;
+    }
     this.currentView.root.visible = true;
     this.currentWeapon.equip();
   }
@@ -301,8 +362,7 @@ export class Game {
           this.audio.playDryFire();
           break;
         case 'reloadStart':
-          this.audio.playReload(weapon.definition.reloadTime, !!weapon.definition.audio.energy);
-          break;
+          break; // per-phase foley kicks in via WeaponView.onReloadPhase
         case 'boltStart':
           this.audio.playBolt();
           break;
@@ -348,11 +408,12 @@ export class Game {
     const allowGameplayInput = this.input.pointerLocked || this.profile.useTouchControls;
 
     if (allowGameplayInput) {
-      for (let i = 0; i < this.weapons.length; i++) {
+      for (let i = 0; i < this.inventory.weapons.length; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
       if (this.input.wasPressed('KeyR')) weapon.reload();
       if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
+      if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
     }
 
     this.player.update(dt, this.input, weapon);
@@ -372,6 +433,7 @@ export class Game {
       this.input.mouseDeltaY,
     );
     this.effects.update(dt);
+    this.magazineDrops.update(dt);
 
     this.flashLight.intensity =
       this.flashLight.intensity > 0.02
@@ -391,6 +453,9 @@ export class Game {
       MAX_SPREAD_PIXELS,
     );
     this.hud.update(weapon, this.stats, this.aimDistance, spreadPixels);
+    this.hud.setInteractionPrompt(
+      allowGameplayInput ? (this.mode.getInteractPrompt?.() ?? null) : null,
+    );
 
     this.renderer.render(this.scene, this.player.camera);
     this.updateDebug(dt);

@@ -1,5 +1,5 @@
 import type { SurfaceType } from '../shooting/HitTarget';
-import type { WeaponAudioConfig } from '../weapons/WeaponTypes';
+import type { ReloadPhase, WeaponAudioConfig } from '../weapons/WeaponTypes';
 
 const PING_THROTTLE = 0.045;
 
@@ -19,6 +19,7 @@ export class AudioSystem {
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private lastPingTime = -1;
+  private wind: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
 
   /** Must be called from a user gesture before any sound can play. */
   resume(): void {
@@ -75,17 +76,68 @@ export class AudioSystem {
     osc.stop(t + 0.11);
   }
 
-  playReload(duration: number, energy = false): void {
+  /**
+   * Per-phase reload foley, fired by the ReloadAnimator thresholds so the
+   * sound always matches what the hands are doing. Energy weapons get a
+   * synthesized cell-swap variant.
+   */
+  playReloadPhase(phase: ReloadPhase, energy = false): void {
     if (energy) {
-      // Energy cell swap: rising charge sweep with mechanical latches.
-      this.tick(0, 1300, 0.22);
-      this.sweep(0.08, 'sine', 180, 840, 0.2, duration * 0.75);
-      this.tick(duration * 0.85, 1900, 0.3);
+      switch (phase) {
+        case 'magOut':
+          this.sweep(0, 'sine', 320, 170, 0.2, 0.14);
+          break;
+        case 'magDrop':
+          this.tick(0, 500, 0.08);
+          break;
+        case 'magIn':
+          this.sweep(0, 'sine', 210, 520, 0.2, 0.16);
+          break;
+        case 'magSeat':
+          this.tick(0, 1900, 0.24);
+          this.sweep(0, 'sine', 420, 940, 0.16, 0.12);
+          break;
+        case 'chargeStart':
+          this.sweep(0, 'sine', 260, 1250, 0.2, 0.5);
+          break;
+        case 'chargeEnd':
+          this.tick(0, 2100, 0.3);
+          break;
+        default:
+          break;
+      }
       return;
     }
-    this.tick(0, 1300, 0.28);
-    this.tick(duration * 0.45, 900, 0.3);
-    this.tick(duration * 0.85, 1800, 0.34);
+    switch (phase) {
+      case 'magOut':
+        this.tick(0, 1100, 0.24);
+        break;
+      case 'magDrop':
+        this.tick(0, 480, 0.1);
+        break;
+      case 'magIn':
+        this.tick(0, 700, 0.28);
+        break;
+      case 'magSeat':
+        this.tick(0, 1500, 0.34);
+        this.tick(0.015, 850, 0.22);
+        break;
+      case 'chargeStart':
+        this.tick(0, 1350, 0.3);
+        this.tick(0.05, 900, 0.18);
+        break;
+      case 'chargeEnd':
+        this.tick(0, 1850, 0.36);
+        break;
+      case 'coverOpen':
+        this.tick(0, 900, 0.26);
+        break;
+      case 'coverClose':
+        this.tick(0, 1150, 0.3);
+        break;
+      default:
+        break;
+    }
   }
 
   /** Ray Gun shot: bright descending zap with a short high sizzle. */
@@ -126,6 +178,59 @@ export class AudioSystem {
     this.tick(0, 380, 0.35);
   }
 
+  /**
+   * Zombies-mode ambience: an endless filtered-noise wind bed with a slow
+   * LFO on the gain. Quiet on purpose — gunshots must stay in charge.
+   */
+  startWind(): void {
+    const audio = this.context();
+    if (!audio || this.wind) return;
+    const { ctx, master, noise } = audio;
+    const source = ctx.createBufferSource();
+    source.buffer = noise;
+    source.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 240;
+    filter.Q.value = 0.6;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.045;
+    // Slow swell so the wind breathes instead of hissing flatly.
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.09;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.02;
+    lfo.connect(lfoGain);
+    lfoGain.connect(gain.gain);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    source.start();
+    lfo.start();
+    this.wind = { source, gain };
+  }
+
+  stopWind(): void {
+    if (!this.wind) return;
+    try {
+      this.wind.source.stop();
+    } catch {
+      // Already stopped; safe to ignore.
+    }
+    this.wind = null;
+  }
+
+  /** Far-away groan: low, slow, and quiet enough to be half-imagined. */
+  playDistantMoan(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    const base = 65 + Math.random() * 40;
+    this.sweep(0, 'sawtooth', base, base * 0.6, 0.05, 1.4, t);
+    this.sweep(0.1, 'triangle', base * 1.5, base, 0.035, 1.1, t);
+  }
+
   /** Two-note ominous sting when a new round begins. */
   playRoundSting(): void {
     const audio = this.context();
@@ -138,6 +243,49 @@ export class AudioSystem {
   playBolt(): void {
     this.tick(0, 1500, 0.3);
     this.tick(0.16, 1050, 0.36);
+  }
+
+  /** Mystery Box opening: a hollow rising creak with a wooden knock. */
+  playMysteryBoxOpen(): void {
+    this.sweep(0, 'triangle', 110, 330, 0.3, 0.45);
+    this.tick(0.04, 620, 0.22);
+    this.tick(0.16, 940, 0.18);
+  }
+
+  /** Roulette tick: a short mechanical click per weapon flash. */
+  playMysteryBoxTick(): void {
+    this.tick(0, 1400 + Math.random() * 350, 0.13);
+  }
+
+  /**
+   * Result reveal. Normal pulls get a two-tone chime; the Ray Gun gets a
+   * bright ascending arpeggio with a shimmer tail — the rare-jackpot tell.
+   */
+  playMysteryBoxReveal(energy: boolean): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    if (energy) {
+      this.tone(t, 'square', 523, 0.14, 0.12);
+      this.tone(t + 0.1, 'square', 784, 0.14, 0.12);
+      this.tone(t + 0.2, 'square', 1046, 0.16, 0.2);
+      this.sweep(0.2, 'sine', 1400, 2600, 0.12, 0.4, t);
+      return;
+    }
+    this.tone(t, 'triangle', 330, 0.2, 0.16);
+    this.tone(t + 0.14, 'triangle', 415, 0.2, 0.24);
+  }
+
+  /** Weapon taken from the box: a confirming click-chime. */
+  playMysteryBoxPickup(): void {
+    this.tick(0, 1900, 0.26);
+    this.sweep(0.03, 'sine', 520, 880, 0.18, 0.14);
+  }
+
+  /** Lid closing (result taken or expired): a low wooden settling thud. */
+  playMysteryBoxClose(): void {
+    this.sweep(0, 'triangle', 260, 95, 0.24, 0.3);
+    this.tick(0.12, 420, 0.2);
   }
 
   playDryFire(): void {

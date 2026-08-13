@@ -8,13 +8,27 @@ import {
   ZOMBIE_ATTACK_RANGE,
   ZOMBIE_BASE_HP,
   ZOMBIE_BASE_SPEED,
+  ZOMBIE_SCALE_JITTER,
   ZOMBIE_SEPARATION_RADIUS,
+  ZOMBIE_SPEED_JITTER,
+  ZOMBIE_WALK_JITTER,
 } from './ZombieConfig';
 import { Zombie } from './Zombie';
 import { ZombiePool } from './ZombiePool';
 import { ZombieSpawner } from './ZombieSpawner';
+import {
+  ZombieVisual,
+  ZOMBIE_VARIANTS,
+  type ZombieModelSource,
+  type ZombieVariantId,
+} from './ZombieVisual';
 
 const SEPARATION_PUSH = 2.2;
+/** Share of the pool built as the lighter walker variant; rest are hulks. */
+const WALKER_SHARE = 0.6;
+
+/** GLB payloads per variant, keyed by variant id. Missing keys fall back. */
+export type ZombieModelSources = Partial<Record<ZombieVariantId, ZombieModelSource | null>>;
 
 /**
  * Owns the zombie population: pooling, spawning, steering (seek + soft
@@ -30,6 +44,7 @@ export class ZombieManager {
 
   private readonly pool: ZombiePool;
   private readonly spawner: ZombieSpawner;
+  private readonly rng: () => number;
   private colliders: THREE.Object3D[] = [];
 
   // Reused temporaries: no allocations in the per-frame steering loop.
@@ -37,10 +52,18 @@ export class ZombieManager {
   private readonly tmpSeparation = new THREE.Vector3();
   private readonly tmpDelta = new THREE.Vector3();
 
-  constructor(rng: () => number = Math.random) {
+  constructor(rng: () => number = Math.random, sources: ZombieModelSources = {}, castShadows = true) {
+    this.rng = rng;
     this.spawner = new ZombieSpawner(rng);
     this.pool = new ZombiePool(MAX_ALIVE, () => {
-      const zombie = new Zombie();
+      // The variant mix is fixed at pool build time: 24 pre-cloned bodies,
+      // zero runtime asset work when a round starts.
+      const variantId: ZombieVariantId = rng() < WALKER_SHARE ? 'walker' : 'hulk';
+      const variant = ZOMBIE_VARIANTS[variantId];
+      const tint = variant.tints[Math.floor(rng() * variant.tints.length)];
+      const zombie = new Zombie(
+        new ZombieVisual(variantId, sources[variantId] ?? null, tint, castShadows),
+      );
       zombie.onDeathFinished = () => this.finishDeath(zombie);
       this.group.add(zombie.group);
       return zombie;
@@ -67,11 +90,16 @@ export class ZombieManager {
     const zombie = this.pool.acquire();
     if (!zombie) return false;
     const [x, z] = this.spawner.pick(playerX, playerZ);
+    // Cheap per-spawn variation: scale, ground speed and walk-cycle phase all
+    // jitter so 24 zombies never read as synchronized clones.
+    const jitter = (amount: number): number => 1 + (this.rng() * 2 - 1) * amount;
+    zombie.group.scale.setScalar(jitter(ZOMBIE_SCALE_JITTER));
+    zombie.visual.setWalkJitter(jitter(ZOMBIE_WALK_JITTER));
     zombie.spawn(
       x,
       z,
       Math.round(ZOMBIE_BASE_HP * config.healthMultiplier),
-      ZOMBIE_BASE_SPEED * config.speedMultiplier,
+      ZOMBIE_BASE_SPEED * config.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
     );
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
     return true;
@@ -85,7 +113,7 @@ export class ZombieManager {
     headshotMultiplier: number,
   ): void {
     const damage = computeDamage(baseDamage, part, headshotMultiplier);
-    if (zombie.applyDamage(damage)) this.kill(zombie, part === 'head');
+    if (zombie.applyDamage(damage, part === 'head')) this.kill(zombie, part === 'head');
   }
 
   /** Ray Gun splash: linear falloff around the impact point, XZ distance. */
@@ -117,6 +145,7 @@ export class ZombieManager {
     for (const zombie of this.pool.actives) {
       zombie.group.visible = false;
       zombie.state = 'death'; // not alive; prevents stale attack callbacks
+      zombie.visual.setOpacity(1);
       this.removeColliders(zombie);
     }
     this.pool.releaseAll();

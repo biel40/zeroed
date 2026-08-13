@@ -1,5 +1,5 @@
 import './style.css';
-import { AssetManager, TEXTURE_MANIFEST, type AssetManifest } from './assets/AssetManager';
+import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
@@ -31,6 +31,7 @@ const manifest: AssetManifest = {
     return url ? [{ id, url }] : [];
   }),
   textures: TEXTURE_MANIFEST,
+  zombies: ZOMBIE_MANIFEST,
 };
 
 try {

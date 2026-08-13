@@ -6,6 +6,82 @@ import type { WeaponDefinition, WeaponId } from '../weapons/WeaponTypes';
  * cone half-angle in radians, velocities are m/s.
  */
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
+  /**
+   * M1911 — the Zombies starting pistol. Deliberately a sidearm: modest
+   * torso damage but a strong headshot multiplier, light recoil, fast ADS
+   * and a quick reload. Precise players stretch it through early rounds;
+   * raw damage per magazine keeps it from competing with the box weapons.
+   * Procedural view model (no GLB), finite 8 / 32 ammunition.
+   */
+  m1911: {
+    id: 'm1911',
+    name: 'M1911',
+    fireModes: ['semi'],
+    defaultFireMode: 'semi',
+    rpm: 360,
+    magazineSize: 8,
+    reserveAmmo: 32,
+    reloadTime: 1.6,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 30,
+    headshotMultiplier: 2.5,
+    recoil: {
+      verticalKick: 0.011,
+      horizontalKick: 0.003,
+      horizontalBias: 0,
+      kickVariance: 0.2,
+      recoverySpeed: 12,
+      recoveryDelay: 0.06,
+      cameraShare: 0.5,
+      adsRecoilMultiplier: 0.7,
+    },
+    spread: {
+      hipBase: 0.008,
+      adsBase: 0.0015,
+      bloomPerShot: 0.002,
+      maxBloom: 0.012,
+      bloomRecovery: 0.08,
+    },
+    ads: { fov: 58, speed: 12, sensitivity: 0.75 },
+    projectile: { muzzleVelocity: 260, gravity: 9.8, maxDistance: 200, drag: 0.08 },
+    moveSpeedMultiplier: 1.04,
+    equipTime: 0.28,
+    audio: { volume: 0.45, duration: 0.07, lowpass: 4200, thump: 210 },
+    view: {
+      // No GLB: dedicated procedural pistol builder (see WeaponView).
+      frame: 'pistol',
+      hip: [0.19, -0.19, -0.36],
+      ads: [0, 0, -0.26],
+      sway: 0.85,
+      bob: 1.05,
+      visualRecoil: { kickImpulse: 0.7, pitchImpulse: 1.9, rollImpulse: 0.5, stiffness: 220, damping: 18 },
+      scale: 1,
+      bodyColor: 0x2b2e33,
+      accentColor: 0x6e4a2f,
+      barrelLength: 0.12,
+      barrelRadius: 0.0085,
+      receiverLength: 0.19,
+      stockLength: 0,
+      magazine: 'straight',
+      optic: 'irons',
+      sightHeight: 0.05,
+      bulk: 0.75,
+      reloadAnim: {
+        style: 'pistol',
+        magOut: 0.08,
+        magDrop: 0.2,
+        magIn: 0.44,
+        magSeat: 0.6,
+        charge: 0.68,
+        chargeEnd: 0.94,
+        magSize: [0.024, 0.095, 0.036],
+        magColor: 0x23262b,
+      },
+    },
+  },
+
   m4a1: {
     id: 'm4a1',
     name: 'M4A1',
@@ -61,6 +137,17 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.075,
       bulk: 1,
+      reloadAnim: {
+        style: 'rifle',
+        magOut: 0.1,
+        magDrop: 0.24,
+        magIn: 0.48,
+        magSeat: 0.64,
+        charge: 0.72,
+        chargeEnd: 0.94,
+        magSize: [0.045, 0.13, 0.055],
+        magColor: 0x23262b,
+      },
     },
   },
 
@@ -119,6 +206,17 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.07,
       bulk: 1.02,
+      reloadAnim: {
+        style: 'rock',
+        magOut: 0.07,
+        magDrop: 0.2,
+        magIn: 0.44,
+        magSeat: 0.6,
+        charge: 0.68,
+        chargeEnd: 0.92,
+        magSize: [0.05, 0.15, 0.06],
+        magColor: 0x2a2d31,
+      },
     },
   },
 
@@ -175,6 +273,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.085,
       bulk: 1.35,
+      reloadAnim: {
+        style: 'belt',
+        magOut: 0.04,
+        magDrop: 0.12,
+        coverOpen: 0.18,
+        magIn: 0.34,
+        magSeat: 0.48,
+        coverClose: 0.68,
+        charge: 0.76,
+        chargeEnd: 0.92,
+        magSize: [0.1, 0.11, 0.13],
+        magColor: 0x3a3e42,
+      },
     },
   },
 
@@ -233,6 +344,17 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'scope',
       sightHeight: 0.095,
       bulk: 1.1,
+      reloadAnim: {
+        style: 'bolt',
+        magOut: 0.08,
+        magDrop: 0.22,
+        magIn: 0.42,
+        magSeat: 0.56,
+        charge: 0.64,
+        chargeEnd: 0.96,
+        magSize: [0.05, 0.08, 0.06],
+        magColor: 0x272c25,
+      },
     },
   },
 
@@ -296,11 +418,36 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.07,
       bulk: 0.9,
+      reloadAnim: {
+        style: 'cell',
+        magOut: 0.1,
+        magDrop: 0.26,
+        magIn: 0.48,
+        magSeat: 0.62,
+        // No charging handle: the charge window drives the energy spin-up.
+        charge: 0.68,
+        chargeEnd: 0.95,
+        magSize: [0.048, 0.048, 0.048],
+        magColor: 0x63f2a4,
+      },
     },
   },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96', 'm1911'];
 
-/** Zombies mode adds the Ray Gun as a fifth slot (key 5). */
-export const ZOMBIES_WEAPON_ORDER: readonly WeaponId[] = [...WEAPON_ORDER, 'raygun'];
+/**
+ * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
+ * pistol plus the whole Mystery Box pool — so box rolls never touch the
+ * network. This is NOT the slot list: the zombies inventory starts with
+ * the M1911 alone (see ZombiesMode.startingInventory) and the Ray Gun is
+ * only obtainable from the Mystery Box.
+ */
+export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
+  'm1911',
+  'm4a1',
+  'ak47',
+  'm60',
+  'l96',
+  'raygun',
+];

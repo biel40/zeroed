@@ -1,10 +1,18 @@
-import type * as THREE from 'three';
-import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_ORDER } from '../config/weapons';
+import * as THREE from 'three';
+import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerHealth } from '../game/PlayerHealth';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
+import {
+  MYSTERY_BOX_PLACEMENT,
+  MYSTERY_BOX_POOL,
+  MYSTERY_BOX_TUNING,
+  MysteryBoxMachine,
+} from '../zombies/MysteryBox';
+import { MysteryBoxView } from '../zombies/MysteryBoxView';
+import { NightEnvironment } from '../zombies/NightEnvironment';
 import { RoundManager } from '../zombies/RoundManager';
 import { Zombie } from '../zombies/Zombie';
 import type { ZombieHitPart } from '../zombies/ZombieConfig';
@@ -13,29 +21,59 @@ import { ZombieManager } from '../zombies/ZombieManager';
 import type { GameMode, ModeContext } from './GameMode';
 import { standardTargetHitEffects } from './hitEffects';
 
+/** Camera-shake tuning: how much one zombie hit rattles the view. */
+const HIT_TRAUMA = 0.42;
+const TRAUMA_DECAY = 1.6;
+const SHAKE_MAX_ANGLE = 0.035;
+/** Distant moans drift in every few seconds, never on a fixed rhythm. */
+const MOAN_MIN_DELAY = 6;
+const MOAN_SPREAD = 9;
+
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
  * brief post-hit invulnerability, game over / restart, and the mode-only
- * Ray Gun firing visible energy bolts with splash damage. Everything lives
- * here; the shared Game shell only routes events in.
+ * Ray Gun firing visible energy bolts with splash damage. The mode owns the
+ * night atmosphere (moonlight, fog, practicals, ambience) — the shooting
+ * range stays sunny because each mode applies its own environment.
  */
 export class ZombiesMode implements GameMode {
   readonly id = 'zombies' as const;
-  readonly weaponIds: readonly WeaponId[] = ZOMBIES_WEAPON_ORDER;
+  /** Every handout the mode can give is preloaded: no loads mid-game. */
+  readonly weaponIds: readonly WeaponId[] = ZOMBIES_WEAPON_PRELOAD;
+  /** Zombies starts with the M1911 alone; better guns come from the box. */
+  readonly startingInventory: readonly WeaponId[] = ['m1911'];
+  /** Two-weapon carry limit, enforced by the shared inventory. */
+  readonly maxWeapons = 2;
 
   private ctx!: ModeContext;
   private zombies!: ZombieManager;
   private energy!: EnergyProjectiles;
+  private night: NightEnvironment | null = null;
+  private box: MysteryBoxMachine | null = null;
+  private boxView: MysteryBoxView | null = null;
   private readonly rounds = new RoundManager();
   private readonly health = new PlayerHealth(PLAYER_MAX_HP, PLAYER_HIT_INVULN);
   private kills = 0;
   private headshots = 0;
   private gameOver = false;
+  private trauma = 0;
+  private shakeSeed = 0;
+  private moanTimer = MOAN_MIN_DELAY;
+  /** Reused by the box facing check; avoids per-frame allocation. */
+  private readonly tmpDirection = new THREE.Vector3();
 
   init(ctx: ModeContext): void {
     this.ctx = ctx;
 
-    this.zombies = new ZombieManager();
+    this.zombies = new ZombieManager(
+      Math.random,
+      {
+        walker: ctx.assets.getZombieModel('walker'),
+        hulk: ctx.assets.getZombieModel('hulk'),
+      },
+      // Static shadow maps (mobile) must not have moving casters.
+      !ctx.profile.useReducedEffects,
+    );
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
@@ -44,6 +82,15 @@ export class ZombiesMode implements GameMode {
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
     this.energy.onImpact = (point, config, object, distance) =>
       this.onEnergyImpact(point, config, object, distance);
+
+    // Day → night: sky, fog, moonlight, practicals and the ambient bed.
+    this.night = new NightEnvironment(ctx.scene, ctx.range, ctx.setExposure, ctx.profile);
+    ctx.audio.startWind();
+
+    // The Mystery Box: main weapon progression, exclusive to this mode.
+    this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, Math.random);
+    this.boxView = new MysteryBoxView(ctx.assets, MYSTERY_BOX_PLACEMENT.position, MYSTERY_BOX_POOL);
+    ctx.scene.add(this.boxView.group);
 
     ctx.hud.setRangeStatsVisible(false);
     ctx.hud.setZombiesPanelVisible(true);
@@ -58,11 +105,19 @@ export class ZombiesMode implements GameMode {
       this.health.update(dt);
       this.rounds.update(dt, this.zombies.aliveCount);
       this.processRoundEvents();
+      this.updateAmbience(dt);
     }
 
     const playerPos = this.ctx.player.rig.position;
     this.zombies.update(dt, playerPos.x, playerPos.z);
     this.energy.update(dt);
+    this.night?.update(dt);
+    if (this.box && this.boxView) {
+      this.box.update(dt);
+      this.boxView.update(dt, this.box);
+      this.processBoxEvents();
+    }
+    this.updateCameraShake(dt);
     this.pushHudState();
   }
 
@@ -111,6 +166,84 @@ export class ZombiesMode implements GameMode {
     return this.gameOver;
   }
 
+  /** E pressed: use the box when closed, take the result when offered. */
+  onInteract(): void {
+    if (this.gameOver || !this.box || !this.playerInBoxRange()) return;
+    if (this.box.state === 'closed') {
+      // Free while no points economy exists; MYSTERY_BOX_TUNING.cost is the
+      // future hook and must be charged HERE, at activation time.
+      this.box.tryActivate();
+      return;
+    }
+    if (this.box.state === 'awaitingPickup') {
+      const id = this.box.tryPickup();
+      if (id) this.ctx.grantWeapon(id);
+    }
+  }
+
+  /** Center-screen prompt: only near the box, and only when it is usable. */
+  getInteractPrompt(): string | null {
+    if (this.gameOver || !this.box || !this.playerInBoxRange()) return null;
+    switch (this.box.state) {
+      case 'closed':
+        return MYSTERY_BOX_TUNING.cost > 0
+          ? `MYSTERY BOX\nPress E — ${MYSTERY_BOX_TUNING.cost} PTS`
+          : 'MYSTERY BOX\nPress E';
+      case 'awaitingPickup': {
+        const result = this.box.result;
+        return result ? `Press E to take ${WEAPON_DEFINITIONS[result].name}` : null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Interaction gate: the player must stand close AND roughly face the
+   * crate, so the box can never be triggered from across the map.
+   */
+  private playerInBoxRange(): boolean {
+    const playerPos = this.ctx.player.rig.position;
+    const boxPos = MYSTERY_BOX_PLACEMENT.position;
+    const dx = boxPos.x - playerPos.x;
+    const dz = boxPos.z - playerPos.z;
+    const distanceSq = dx * dx + dz * dz;
+    if (distanceSq > MYSTERY_BOX_PLACEMENT.useRange * MYSTERY_BOX_PLACEMENT.useRange) return false;
+
+    const camera = this.ctx.player.camera;
+    const forward = camera.getWorldDirection(this.tmpDirection);
+    const distance = Math.sqrt(distanceSq);
+    if (distance < 1e-3) return true; // standing on top of it counts as facing
+    const dot = (forward.x * dx + forward.z * dz) / distance;
+    return dot >= MYSTERY_BOX_PLACEMENT.lookDotMin;
+  }
+
+  /** Box events drive only audio; visuals read the machine directly. */
+  private processBoxEvents(): void {
+    if (!this.box) return;
+    for (const event of this.box.pendingEvents) {
+      switch (event.type) {
+        case 'opened':
+          this.ctx.audio.playMysteryBoxOpen();
+          break;
+        case 'rollTick':
+          this.ctx.audio.playMysteryBoxTick();
+          break;
+        case 'result':
+          this.ctx.audio.playMysteryBoxReveal(event.weaponId === 'raygun');
+          break;
+        case 'pickedUp':
+          this.ctx.audio.playMysteryBoxPickup();
+          break;
+        case 'expired':
+        case 'closed':
+          this.ctx.audio.playMysteryBoxClose();
+          break;
+      }
+    }
+    this.box.clearEvents();
+  }
+
   private processRoundEvents(): void {
     const playerPos = this.ctx.player.rig.position;
     for (const event of this.rounds.pendingEvents) {
@@ -143,7 +276,32 @@ export class ZombiesMode implements GameMode {
     if (!this.health.damage(damage)) return;
     this.ctx.audio.playPlayerHurt();
     this.ctx.hud.flashDamage();
+    // Trauma-based shake: offsets pile up and decay smoothly.
+    this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);
     if (this.health.isDead) this.endGame();
+  }
+
+  /**
+   * Decaying rotational noise layered on the camera after PlayerController
+   * has written its recoil pose (mode.update runs later in the frame).
+   */
+  private updateCameraShake(dt: number): void {
+    if (this.trauma <= 0) return;
+    this.trauma = Math.max(0, this.trauma - TRAUMA_DECAY * dt);
+    this.shakeSeed += dt * 34;
+    const amount = this.trauma * this.trauma * SHAKE_MAX_ANGLE;
+    const camera = this.ctx.player.camera;
+    camera.rotation.x += Math.sin(this.shakeSeed * 1.1) * amount;
+    camera.rotation.y += Math.sin(this.shakeSeed * 0.9 + 1.7) * amount;
+    camera.rotation.z += Math.sin(this.shakeSeed * 1.3 + 3.1) * amount * 0.6;
+  }
+
+  private updateAmbience(dt: number): void {
+    this.moanTimer -= dt;
+    if (this.moanTimer <= 0) {
+      this.moanTimer = MOAN_MIN_DELAY + Math.random() * MOAN_SPREAD;
+      this.ctx.audio.playDistantMoan();
+    }
   }
 
   private onEnergyImpact(
@@ -185,6 +343,9 @@ export class ZombiesMode implements GameMode {
     this.health.reset();
     this.rounds.reset();
     this.zombies.reset();
+    // Fresh run: M1911 with 8 / 32, no box weapons, box back to closed.
+    this.box?.reset();
+    this.ctx.resetArsenal();
     this.ctx.hud.hideGameOver();
     this.pushHudState();
     this.ctx.lockPointer();

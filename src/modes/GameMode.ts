@@ -1,8 +1,11 @@
 import type * as THREE from 'three';
+import type { AssetManager } from '../assets/AssetManager';
 import type { AudioSystem } from '../audio/AudioSystem';
+import type { DeviceProfile } from '../core/DeviceProfile';
 import type { Stats } from '../game/Stats';
 import type { Input } from '../player/Input';
 import type { PlayerController } from '../player/PlayerController';
+import type { ShootingRange } from '../range/ShootingRange';
 import type { Effects } from '../rendering/Effects';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { HUD } from '../ui/HUD';
@@ -20,14 +23,33 @@ export interface ModeContext {
   readonly audio: AudioSystem;
   readonly effects: Effects;
   readonly stats: Stats;
+  /** Loaded external assets (weapon/zombie GLBs, PBR textures). */
+  readonly assets: AssetManager;
+  /** Hardware quality tiers for mode-level effect scaling. */
+  readonly profile: DeviceProfile;
+  /**
+   * The physical range: modes may restyle its lights (night mode) without
+   * touching geometry. One mode runs per session, so changes never need
+   * to be reverted.
+   */
+  readonly range: ShootingRange;
   /**
    * Mutable collider array shared with the BallisticsSystem and the aim
    * raycast. Modes may push/splice dynamic hitboxes (zombies) here.
    */
   readonly hitColliders: THREE.Object3D[];
+  /** Adjusts the renderer tone-mapping exposure (atmosphere control). */
+  setExposure(exposure: number): void;
   /** User-gesture-safe pointer lock + audio resume. */
   lockPointer(): void;
   unlockPointer(): void;
+  /**
+   * Adds a weapon to the player inventory, honouring the mode's slot cap
+   * (Mystery Box pickups). The granted weapon arrives with fresh ammo.
+   */
+  grantWeapon(id: WeaponId): void;
+  /** Restores the starting inventory with fresh ammo (zombies restart). */
+  resetArsenal(): void;
 }
 
 /**
@@ -37,8 +59,15 @@ export interface ModeContext {
  */
 export interface GameMode {
   readonly id: GameModeId;
-  /** Weapons available in this mode, in slot order (keys 1..n). */
+  /** Weapons instantiated and preloaded for this mode (no runtime loads). */
   readonly weaponIds: readonly WeaponId[];
+  /**
+   * Loadout the player starts with. Defaults to weaponIds (the Shooting
+   * Range keeps one slot per weapon; Zombies starts with the M1911 alone).
+   */
+  readonly startingInventory?: readonly WeaponId[];
+  /** Inventory slot cap; defaults to weaponIds.length (effectively uncapped). */
+  readonly maxWeapons?: number;
   init(ctx: ModeContext): void;
   update(dt: number): void;
   /** Routes ballistics hits on HitTargets (range plates, zombie hitboxes…). */
@@ -60,4 +89,11 @@ export interface GameMode {
    * its own UI (game over) and the default pause screen should be skipped.
    */
   onPointerUnlock?(): boolean;
+  /** Interact key (E) pressed while gameplay input is active. */
+  onInteract?(): void;
+  /**
+   * Center-screen interaction prompt ("MYSTERY BOX\nPress E"); polled every
+   * frame by the shell. Return null to hide it.
+   */
+  getInteractPrompt?(): string | null;
 }

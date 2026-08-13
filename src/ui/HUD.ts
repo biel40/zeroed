@@ -61,14 +61,16 @@ export class HUD {
   private readonly goKills = mustGet('go-kills');
   private readonly goHeadshots = mustGet('go-headshots');
   private readonly modeSelect = mustGet('mode-select');
+  private readonly interactPrompt = mustGet('interact-prompt');
 
   private lastWeapon = '';
-  private lastAmmo = -1;
+  private lastAmmo = '';
   private lastMode = '';
   private lastDistance = '';
   private lastAccuracy = '';
   private lastHits = '';
   private lastZombies = '';
+  private lastPrompt: string | null = null;
   private ready = false;
 
   constructor() {
@@ -192,6 +194,14 @@ export class HUD {
     this.hitmarker.classList.add('active');
   }
 
+  /** Center-screen interaction prompt ("MYSTERY BOX\nPress E"); null hides it. */
+  setInteractionPrompt(text: string | null): void {
+    if (text === this.lastPrompt) return;
+    this.lastPrompt = text;
+    this.interactPrompt.classList.toggle('hidden', text === null);
+    if (text !== null) this.interactPrompt.textContent = text;
+  }
+
   update(weapon: Weapon, stats: Stats, aimDistance: number | null, spreadPixels: number): void {
     const definition = weapon.definition;
 
@@ -199,9 +209,14 @@ export class HUD {
       this.weaponName.textContent = definition.name;
       this.lastWeapon = definition.name;
     }
-    if (weapon.ammoInMagazine !== this.lastAmmo) {
-      this.ammo.textContent = `${weapon.ammoInMagazine} / ∞`;
-      this.lastAmmo = weapon.ammoInMagazine;
+    // Finite-reserve weapons show the real pool; range weapons keep the ∞.
+    const ammoText =
+      weapon.reserveAmmo === null
+        ? `${weapon.ammoInMagazine} / ∞`
+        : `${weapon.ammoInMagazine} / ${weapon.reserveAmmo}`;
+    if (ammoText !== this.lastAmmo) {
+      this.ammo.textContent = ammoText;
+      this.lastAmmo = ammoText;
     }
     const mode = weapon.fireMode.toUpperCase();
     if (mode !== this.lastMode) {

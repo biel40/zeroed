@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { Zombie } from '../src/zombies/Zombie';
+import {
+  ZOMBIE_ATTACK_DURATION,
+  ZOMBIE_ATTACK_HIT_MOMENT,
+  ZOMBIE_ATTACK_RECOVERY,
+  ZOMBIE_CORPSE_LINGER,
+  ZOMBIE_DEATH_FADE,
+  ZOMBIE_DEATH_FALL,
+  ZOMBIE_SPAWN_DURATION,
+} from '../src/zombies/ZombieConfig';
 
 const DT = 1 / 60;
+const DEATH_TOTAL = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
 
 function makeZombie(hp = 100, speed = 1.9): Zombie {
   const zombie = new Zombie();
@@ -25,21 +35,41 @@ describe('Zombie lifecycle', () => {
     expect(zombie.isAlive).toBe(true);
   });
 
-  it('transitions from spawn to walk after the spawn animation', () => {
+  it('rises from the ground while spawning, then walks', () => {
     const zombie = makeZombie();
-    step(zombie, 0.5);
+    step(zombie, ZOMBIE_SPAWN_DURATION / 2);
+    expect(zombie.state).toBe('spawn');
+    expect(zombie.visual.root.position.y).toBeLessThan(0); // still emerging
+    step(zombie, ZOMBIE_SPAWN_DURATION / 2 + 0.1);
     expect(zombie.state).toBe('walk');
+    expect(zombie.visual.root.position.y).toBeCloseTo(0, 3);
   });
 
   it('non-lethal damage interrupts to the hit state', () => {
     const zombie = makeZombie(100);
-    step(zombie, 0.5); // reach walk
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1); // reach walk
     expect(zombie.applyDamage(30)).toBe(false);
     expect(zombie.hp).toBe(70);
     expect(zombie.state).toBe('hit');
     expect(zombie.isAlive).toBe(true);
-    step(zombie, 0.3);
+    step(zombie, 0.4);
     expect(zombie.state).toBe('walk');
+  });
+
+  it('non-lethal headshots stagger longer than torso hits', () => {
+    const torso = makeZombie(100);
+    step(torso, ZOMBIE_SPAWN_DURATION + 0.1);
+    torso.applyDamage(10, false);
+    step(torso, 0.35);
+    expect(torso.state).toBe('walk');
+
+    const head = makeZombie(100);
+    step(head, ZOMBIE_SPAWN_DURATION + 0.1);
+    head.applyDamage(10, true);
+    step(head, 0.35);
+    expect(head.state).toBe('hit'); // still reeling
+    step(head, 0.2);
+    expect(head.state).toBe('walk');
   });
 
   it('lethal damage switches to death and reports the kill', () => {
@@ -55,14 +85,21 @@ describe('Zombie lifecycle', () => {
     expect(zombie.applyDamage(50)).toBe(false);
   });
 
-  it('finishes the death animation hidden and notifies the pool', () => {
+  it('keeps the corpse visible for a while before recycling', () => {
+    const zombie = makeZombie(50);
+    zombie.applyDamage(50);
+    step(zombie, ZOMBIE_DEATH_FALL + 0.2);
+    expect(zombie.group.visible).toBe(true); // fallen, still on the field
+  });
+
+  it('finishes the death sequence hidden and notifies the pool', () => {
     const zombie = makeZombie(50);
     let finished = false;
     zombie.onDeathFinished = () => {
       finished = true;
     };
     zombie.applyDamage(50);
-    step(zombie, 1.3);
+    step(zombie, DEATH_TOTAL + 0.2);
     expect(finished).toBe(true);
     expect(zombie.group.visible).toBe(false);
   });
@@ -71,27 +108,27 @@ describe('Zombie lifecycle', () => {
 describe('Zombie attacks', () => {
   it('attack lands at the hit moment and then walks again', () => {
     const zombie = makeZombie();
-    step(zombie, 0.5); // walk
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1); // walk
     let hits = 0;
     zombie.onAttackLanded = () => hits++;
     expect(zombie.tryAttack()).toBe(true);
     expect(zombie.state).toBe('attack');
-    step(zombie, 0.2);
+    step(zombie, ZOMBIE_ATTACK_HIT_MOMENT - 0.1);
     expect(hits).toBe(0); // wind-up not finished yet
-    step(zombie, 0.2);
-    expect(hits).toBe(1); // hit moment (~0.32 s)
-    step(zombie, 0.3);
+    step(zombie, 0.15);
+    expect(hits).toBe(1); // the blow connects
+    step(zombie, ZOMBIE_ATTACK_DURATION - ZOMBIE_ATTACK_HIT_MOMENT);
     expect(zombie.state).toBe('walk');
   });
 
   it('respects the attack cooldown', () => {
     const zombie = makeZombie();
-    step(zombie, 0.5);
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
     expect(zombie.tryAttack()).toBe(true);
-    step(zombie, 0.7); // finish the lunge; cooldown still running
+    step(zombie, ZOMBIE_ATTACK_DURATION + 0.1); // finish the lunge
     expect(zombie.state).toBe('walk');
-    expect(zombie.tryAttack()).toBe(false);
-    step(zombie, 0.5);
+    expect(zombie.tryAttack()).toBe(false); // still recovering
+    step(zombie, ZOMBIE_ATTACK_RECOVERY);
     expect(zombie.tryAttack()).toBe(true);
   });
 

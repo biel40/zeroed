@@ -16,12 +16,15 @@ import { lerp, moveToward } from '../utils/math';
 export class Weapon {
   readonly recoil: RecoilController;
   ammoInMagazine: number;
+  /** Remaining reserve rounds; null = bottomless reserve (Shooting Range). */
+  reserveAmmo: number | null;
   fireMode: FireMode;
   /** 0 = hip fire, 1 = fully aimed. */
   adsAlpha = 0;
   /** Events produced during the last update; drain with clearEvents(). */
   readonly pendingEvents: WeaponEvent[] = [];
 
+  private readonly initialReserve: number | null;
   private weaponState: WeaponState = 'ready';
   private cooldown = 0;
   private stateTimer = 0;
@@ -35,6 +38,8 @@ export class Weapon {
   ) {
     this.recoil = new RecoilController(definition.recoil, rng);
     this.ammoInMagazine = definition.magazineSize;
+    this.initialReserve = definition.reserveAmmo ?? null;
+    this.reserveAmmo = this.initialReserve;
     this.fireMode = definition.defaultFireMode;
   }
 
@@ -81,6 +86,8 @@ export class Weapon {
   reload(): boolean {
     if (this.weaponState !== 'ready') return false;
     if (this.ammoInMagazine >= this.definition.magazineSize) return false;
+    // A finite, empty reserve makes the reload impossible.
+    if (this.reserveAmmo !== null && this.reserveAmmo <= 0) return false;
     this.enterState('reloading', this.definition.reloadTime, 'reloadStart');
     return true;
   }
@@ -98,6 +105,24 @@ export class Weapon {
     this.fireMode = this.fireMode === 'auto' ? 'semi' : 'auto';
     this.pendingEvents.push({ type: 'fireModeChanged' });
     return this.fireMode;
+  }
+
+  /**
+   * Restores magazine and reserve to their starting values. Used by the
+   * zombies restart and by Mystery Box pickups (fresh weapon, fresh ammo).
+   */
+  resetAmmo(): void {
+    this.ammoInMagazine = this.definition.magazineSize;
+    this.reserveAmmo = this.initialReserve;
+    this.weaponState = 'ready';
+    this.stateTimer = 0;
+    this.stateDuration = 0;
+    this.cooldown = 0;
+    this.bloom = 0;
+    this.adsAlpha = 0;
+    this.prevTrigger = false;
+    this.recoil.reset();
+    this.pendingEvents.length = 0;
   }
 
   clearEvents(): void {
@@ -138,10 +163,16 @@ export class Weapon {
 
   private completeState(): void {
     switch (this.weaponState) {
-      case 'reloading':
-        this.ammoInMagazine = this.definition.magazineSize;
+      case 'reloading': {
+        // Draw only what the magazine needs from the reserve; bottomless
+        // reserves (null) always refill to full.
+        const needed = this.definition.magazineSize - this.ammoInMagazine;
+        const taken = this.reserveAmmo === null ? needed : Math.min(needed, this.reserveAmmo);
+        this.ammoInMagazine += taken;
+        if (this.reserveAmmo !== null) this.reserveAmmo -= taken;
         this.pendingEvents.push({ type: 'reloadEnd' });
         break;
+      }
       case 'cycling':
         this.pendingEvents.push({ type: 'boltEnd' });
         break;

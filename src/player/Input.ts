@@ -152,6 +152,9 @@ export class Input {
       case 'mode':
         this.setKey('KeyX', pressed);
         break;
+      case 'interact':
+        this.setKey('KeyE', pressed);
+        break;
       case 'next-weapon':
         this.setKey('Digit2', pressed);
         break;

@@ -44,6 +44,9 @@ export class ShootingRange {
   readonly group = new THREE.Group();
   readonly colliders: THREE.Object3D[] = [];
   readonly targets: Target[] = [];
+  /** Scene-level lights; modes may restyle them (e.g. sun → moon at night). */
+  hemisphere!: THREE.HemisphereLight;
+  sun!: THREE.DirectionalLight;
 
   constructor(private readonly assets: AssetManager) {
     this.buildGround();
@@ -260,8 +263,8 @@ export class ShootingRange {
   }
 
   private buildLighting(): void {
-    const hemisphere = new THREE.HemisphereLight(0xbfd4ea, 0x57503f, 0.55);
-    this.group.add(hemisphere);
+    this.hemisphere = new THREE.HemisphereLight(0xbfd4ea, 0x57503f, 0.55);
+    this.group.add(this.hemisphere);
 
     const sun = new THREE.DirectionalLight(0xfff1d8, 2.2);
     sun.position.set(45, 75, 25);
@@ -275,6 +278,7 @@ export class ShootingRange {
     sun.shadow.camera.near = 20;
     sun.shadow.camera.far = 220;
     sun.shadow.bias = -0.0004;
+    this.sun = sun;
     this.group.add(sun, sun.target);
   }
 }

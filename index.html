@@ -36,6 +36,7 @@
         <div class="touch-actions">
           <button type="button" data-action="reload">RLD</button>
           <button type="button" data-action="mode">MODE</button>
+          <button type="button" data-action="interact">USE</button>
           <button type="button" data-action="ads">ADS</button>
           <button type="button" data-action="fire">FIRE</button>
         </div>
@@ -63,6 +64,7 @@
 
       <div id="round-banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
       <div id="damage-overlay"></div>
+      <div id="interact-prompt" class="hidden"></div>
     </div>
 
     <div id="mode-select" class="hidden">
@@ -72,11 +74,11 @@
         <div class="mode-grid">
           <button type="button" data-mode="range">
             <span class="mode-name">SHOOTING RANGE</span>
-            <span class="mode-desc">Classic target practice · 4 weapons</span>
+            <span class="mode-desc">Classic target practice · 5 weapons</span>
           </button>
           <button type="button" data-mode="zombies">
             <span class="mode-name">ZOMBIES</span>
-            <span class="mode-desc">Endless rounds · Ray Gun on <kbd>5</kbd></span>
+            <span class="mode-desc">Endless rounds · M1911 start · Mystery Box</span>
           </button>
         </div>
       </div>
@@ -106,7 +108,8 @@
           <span><kbd>RMB</kbd></span><span>ADS</span>
           <span><kbd>R</kbd></span><span>Reload</span>
           <span><kbd>X</kbd></span><span>Fire mode</span>
-          <span><kbd>1</kbd>–<kbd>4</kbd></span><span>Weapons</span>
+          <span><kbd>E</kbd></span><span>Interact</span>
+          <span><kbd>1</kbd>–<kbd>5</kbd></span><span>Weapons</span>
           <span><kbd>ESC</kbd></span><span>Release mouse</span>
         </div>
       </div>

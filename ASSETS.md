@@ -21,6 +21,29 @@ https://creativecommons.org/publicdomain/zero/1.0/
 Los materiales PBR (metalness/roughness por nombre de material) se ajustan en
 tiempo de carga en `src/weapons/WeaponView.ts`.
 
+## Modelos de zombies (`public/assets/zombies/`)
+
+Autor: **Quaternius** — https://quaternius.com. Descargados de **Poly Pizza**
+(https://poly.pizza). Modelos skinned, rigged y con clips de animación GLTF;
+los clips concretos por estado se resuelven por nombre en
+`src/zombies/ZombieVisual.ts` (contrato verificado en `tests/zombieAssets.test.ts`).
+
+| Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
+| --- | --- | --- | --- | --- | --- |
+| `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0** (atribución: Quaternius) | ~2.1k | ZombieCrawl (spawn), ZombieWalk, ZombieBite (attack) |
+| `hulk` | "Zombie" | https://poly.pizza/m/VlXjG0N8Eg | **Public Domain (CC0)** | ~7.8k | Crawl (spawn), Walk, Punch (attack), HitReact, Death |
+
+Notas:
+
+- El `walker` no trae clip de muerte/impacto: cae proceduralmente
+  (`ZombieVisual.setDeathProgress`) y el impacto usa flash + crossfade a walk.
+- Atribución CC-BY: **Quaternius — "Animated Zombie"**, vía Poly Pizza.
+- Variedad por instancia: tinte de piel/ropa, escala ±5 %, walk jitter ±7 %
+  (sin cargar modelos adicionales).
+- Cargadores, cerrojos y tapas de alimentación de las armas son meshes
+  procedurales propios (los GLB de armas de Quaternius son mono-mesh); los
+  cargadores soltados se reciclan en un pool de 12 (`src/weapons/MagazineDrop.ts`).
+
 ## Texturas PBR (`public/assets/textures/`)
 
 Autor: **Poly Haven** — https://polyhaven.com (CC0):

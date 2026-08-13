@@ -1,4 +1,4 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -79,6 +79,43 @@ export interface EnergyWeaponConfig {
 export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal';
 export type OpticStyle = 'irons' | 'scope';
 
+/**
+ * Reload choreography per weapon. All times are fractions of reloadTime
+ * (0..1), so retuning the reload duration never desyncs the animation.
+ * Phases: the magazine detaches (magOut), is released to gravity (magDrop),
+ * a fresh one rises (magIn) and seats (magSeat), then the action is worked
+ * (charge→chargeEnd). Belt-fed guns add cover open/close around the swap.
+ */
+export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'pistol';
+
+export interface ReloadAnimConfig {
+  readonly style: ReloadStyle;
+  readonly magOut: number;
+  readonly magDrop: number;
+  readonly magIn: number;
+  readonly magSeat: number;
+  /** Action/charging-handle window; set charge < 0 to skip (cell style). */
+  readonly charge: number;
+  readonly chargeEnd: number;
+  /** Belt-fed only: feed-cover open/close fractions. */
+  readonly coverOpen?: number;
+  readonly coverClose?: number;
+  /** Procedural magazine dimensions [w, h, d] in meters and color. */
+  readonly magSize: readonly [number, number, number];
+  readonly magColor: number;
+}
+
+/** Events the ReloadAnimator emits as thresholds are crossed. */
+export type ReloadPhase =
+  | 'magOut'
+  | 'magDrop'
+  | 'magIn'
+  | 'magSeat'
+  | 'chargeStart'
+  | 'chargeEnd'
+  | 'coverOpen'
+  | 'coverClose';
+
 /** Spring parameters of the purely-visual recoil layer (view model only). */
 export interface VisualRecoilConfig {
   /** Backward translation impulse, m/s. */
@@ -132,6 +169,10 @@ export interface ViewModelConfig {
   readonly bulk: number;
   /** When set, the dedicated Ray Gun procedural builder is used with this glow color. */
   readonly energyColor?: number;
+  /** 'pistol' uses the handgun builder (slide, hammer, grip magazine). Default: long gun. */
+  readonly frame?: 'pistol';
+  /** Reload choreography; absence keeps the legacy generic dip. */
+  readonly reloadAnim?: ReloadAnimConfig;
 }
 
 export interface WeaponDefinition {
@@ -141,6 +182,12 @@ export interface WeaponDefinition {
   readonly defaultFireMode: FireMode;
   readonly rpm: number;
   readonly magazineSize: number;
+  /**
+   * Starting reserve ammunition. Absent means a bottomless reserve (the
+   * classic Shooting Range behaviour); zombies-mode weapons set a finite
+   * pool that reloads draw from.
+   */
+  readonly reserveAmmo?: number;
   readonly reloadTime: number;
   readonly boltAction: boolean;
   readonly boltCycleTime: number;

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { WeaponId } from '../weapons/WeaponTypes';
+import type { ZombieModelSource } from '../zombies/ZombieVisual';
+import type { ZombieVariantId } from '../zombies/ZombieVisual';
 
 export const TEXTURE_MANIFEST: readonly string[] = [
   'concrete_diff.jpg',
@@ -17,9 +19,16 @@ export const TEXTURE_MANIFEST: readonly string[] = [
   'brown_mud_dry_rough.jpg',
 ];
 
+/** Zombie GLBs (skinned + animated) served from public/assets/zombies/. */
+export const ZOMBIE_MANIFEST: ReadonlyArray<{ id: ZombieVariantId; url: string }> = [
+  { id: 'walker', url: 'assets/zombies/zombie_walker.glb' },
+  { id: 'hulk', url: 'assets/zombies/zombie_hulk.glb' },
+];
+
 export interface AssetManifest {
   readonly weapons: ReadonlyArray<{ id: WeaponId; url: string }>;
   readonly textures: readonly string[];
+  readonly zombies: ReadonlyArray<{ id: ZombieVariantId; url: string }>;
 }
 
 /**
@@ -32,6 +41,7 @@ export class AssetManager {
   private readonly gltfLoader = new GLTFLoader();
   private readonly textureLoader = new THREE.TextureLoader();
   private readonly models = new Map<WeaponId, THREE.Group>();
+  private readonly zombies = new Map<ZombieVariantId, ZombieModelSource>();
   private readonly textures = new Map<string, THREE.Texture>();
 
   constructor(private readonly anisotropyLimit = 8) {}
@@ -40,7 +50,7 @@ export class AssetManager {
     manifest: AssetManifest,
     onProgress: (loaded: number, total: number) => void,
   ): Promise<void> {
-    const total = manifest.weapons.length + manifest.textures.length;
+    const total = manifest.weapons.length + manifest.textures.length + manifest.zombies.length;
     let loaded = 0;
     console.info(`[AssetManager] Starting load: ${total} assets`);
     const track = <T>(promise: Promise<T>): Promise<T> =>
@@ -52,6 +62,7 @@ export class AssetManager {
     await Promise.all([
       ...manifest.weapons.map((w) => track(this.loadModel(w.id, w.url))),
       ...manifest.textures.map((name) => track(this.loadTexture(name))),
+      ...manifest.zombies.map((z) => track(this.loadZombie(z.id, z.url))),
     ]);
     console.info(`[AssetManager] Completed load: ${loaded}/${total} assets loaded`);
   }
@@ -59,6 +70,11 @@ export class AssetManager {
   /** Returns the cached model, or null when missing/failed (use fallback). */
   getWeaponModel(id: WeaponId): THREE.Group | null {
     return this.models.get(id) ?? null;
+  }
+
+  /** Skinned zombie template + clips; null degrades to procedural bodies. */
+  getZombieModel(id: ZombieVariantId): ZombieModelSource | null {
+    return this.zombies.get(id) ?? null;
   }
 
   getTexture(name: string): THREE.Texture | null {
@@ -89,6 +105,16 @@ export class AssetManager {
       });
     }
     this.models.clear();
+    for (const source of this.zombies.values()) {
+      source.scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          object.geometry.dispose();
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          for (const material of materials) material.dispose();
+        }
+      });
+    }
+    this.zombies.clear();
     for (const texture of this.textures.values()) texture.dispose();
     this.textures.clear();
   }
@@ -100,6 +126,18 @@ export class AssetManager {
     } catch (error) {
       console.warn(
         `[AssetManager] Could not load weapon model "${id}" (${url}). Procedural fallback will be used.`,
+        error,
+      );
+    }
+  }
+
+  private async loadZombie(id: ZombieVariantId, url: string): Promise<void> {
+    try {
+      const gltf = await this.gltfLoader.loadAsync(this.resolve(url));
+      this.zombies.set(id, { scene: gltf.scene, clips: gltf.animations });
+    } catch (error) {
+      console.warn(
+        `[AssetManager] Could not load zombie model "${id}" (${url}). Procedural fallback will be used.`,
         error,
       );
     }
