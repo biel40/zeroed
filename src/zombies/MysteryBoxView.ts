@@ -40,10 +40,12 @@ export class MysteryBoxView {
 
   constructor(
     assets: AssetManager,
-    placement: { x: number; y: number; z: number },
+    placement: { x: number; y: number; z: number; yaw?: number },
     pool: readonly MysteryBoxEntry[],
   ) {
     this.group.position.set(placement.x, placement.y, placement.z);
+    // Face the walkable area so the glowing front seams read on approach.
+    this.group.rotation.y = placement.yaw ?? 0;
 
     const wood = assets.getTextureSet('brown_planks_03');
     const metal = assets.getTextureSet('metal_plate');

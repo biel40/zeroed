@@ -11,7 +11,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    * torso damage but a strong headshot multiplier, light recoil, fast ADS
    * and a quick reload. Precise players stretch it through early rounds;
    * raw damage per magazine keeps it from competing with the box weapons.
-   * Procedural view model (no GLB), finite 8 / 32 ammunition.
+   * Detailed procedural view model (no CC0 GLB exists), finite 8 / 32 ammunition.
    */
   m1911: {
     id: 'm1911',

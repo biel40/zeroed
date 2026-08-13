@@ -16,7 +16,13 @@ import { NightEnvironment } from '../zombies/NightEnvironment';
 import { RoundManager } from '../zombies/RoundManager';
 import { Zombie } from '../zombies/Zombie';
 import type { ZombieHitPart } from '../zombies/ZombieConfig';
-import { PLAYER_HIT_INVULN, PLAYER_MAX_HP } from '../zombies/ZombieConfig';
+import {
+  PLAYER_HIT_INVULN,
+  PLAYER_MAX_HP,
+  PLAYER_REGEN_DELAY,
+  PLAYER_REGEN_RATE,
+  RAYGUN_UNLOCK_KILLS,
+} from '../zombies/ZombieConfig';
 import { ZombieManager } from '../zombies/ZombieManager';
 import type { GameMode, ModeContext } from './GameMode';
 import { standardTargetHitEffects } from './hitEffects';
@@ -52,9 +58,15 @@ export class ZombiesMode implements GameMode {
   private box: MysteryBoxMachine | null = null;
   private boxView: MysteryBoxView | null = null;
   private readonly rounds = new RoundManager();
-  private readonly health = new PlayerHealth(PLAYER_MAX_HP, PLAYER_HIT_INVULN);
+  private readonly health = new PlayerHealth(
+    PLAYER_MAX_HP,
+    PLAYER_HIT_INVULN,
+    PLAYER_REGEN_DELAY,
+    PLAYER_REGEN_RATE,
+  );
   private kills = 0;
   private headshots = 0;
+  private rayGunUnlocked = false;
   private gameOver = false;
   private trauma = 0;
   private shakeSeed = 0;
@@ -67,10 +79,8 @@ export class ZombiesMode implements GameMode {
 
     this.zombies = new ZombieManager(
       Math.random,
-      {
-        walker: ctx.assets.getZombieModel('walker'),
-        hulk: ctx.assets.getZombieModel('hulk'),
-      },
+      // Only the small walker category exists; nothing else is requested.
+      { walker: ctx.assets.getZombieModel('walker') },
       // Static shadow maps (mobile) must not have moving casters.
       !ctx.profile.useReducedEffects,
     );
@@ -269,6 +279,20 @@ export class ZombiesMode implements GameMode {
     this.kills++;
     if (headshot) this.headshots++;
     this.ctx.audio.playZombieDeath();
+    if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) this.unlockRayGun();
+  }
+
+  /**
+   * 115-kill milestone: the Ray Gun is granted outright (the inventory's
+   * slot-cap rules apply), announced with the round banner and the box's
+   * Ray Gun reveal sting. The flag makes the handout fire exactly once per
+   * run; restart() re-arms it.
+   */
+  private unlockRayGun(): void {
+    this.rayGunUnlocked = true;
+    this.ctx.grantWeapon('raygun');
+    this.ctx.hud.showRoundBanner('RAY GUN UNLOCKED', `${RAYGUN_UNLOCK_KILLS} KILLS`);
+    this.ctx.audio.playMysteryBoxReveal(true);
   }
 
   private onPlayerHit(damage: number): void {
@@ -340,6 +364,7 @@ export class ZombiesMode implements GameMode {
     this.gameOver = false;
     this.kills = 0;
     this.headshots = 0;
+    this.rayGunUnlocked = false;
     this.health.reset();
     this.rounds.reset();
     this.zombies.reset();

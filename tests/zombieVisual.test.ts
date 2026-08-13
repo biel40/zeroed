@@ -57,10 +57,7 @@ function renderedBounds(root: THREE.Object3D): THREE.Box3 {
 }
 
 describe('ZombieVisual GLB normalization', () => {
-  it.each([
-    ['walker', 107.0066, 0.076],
-    ['hulk', 100, 0.012],
-  ] as const)(
+  it.each([['walker', 107.0066, 0.076]] as const)(
     'normalizes %s-style exports (inflated armature) to variant height, feet on the ground',
     (variantId: ZombieVariantId, armatureScale: number, rawHeight: number) => {
       const visual = new ZombieVisual(

@@ -24,8 +24,6 @@ import {
 } from './ZombieVisual';
 
 const SEPARATION_PUSH = 2.2;
-/** Share of the pool built as the lighter walker variant; rest are hulks. */
-const WALKER_SHARE = 0.6;
 
 /** GLB payloads per variant, keyed by variant id. Missing keys fall back. */
 export type ZombieModelSources = Partial<Record<ZombieVariantId, ZombieModelSource | null>>;
@@ -56,13 +54,13 @@ export class ZombieManager {
     this.rng = rng;
     this.spawner = new ZombieSpawner(rng);
     this.pool = new ZombiePool(MAX_ALIVE, () => {
-      // The variant mix is fixed at pool build time: 24 pre-cloned bodies,
+      // Every zombie is the small walker: the variant mix was dropped (no
+      // large zombies), so the pool is 24 pre-cloned walker bodies with
       // zero runtime asset work when a round starts.
-      const variantId: ZombieVariantId = rng() < WALKER_SHARE ? 'walker' : 'hulk';
-      const variant = ZOMBIE_VARIANTS[variantId];
+      const variant = ZOMBIE_VARIANTS.walker;
       const tint = variant.tints[Math.floor(rng() * variant.tints.length)];
       const zombie = new Zombie(
-        new ZombieVisual(variantId, sources[variantId] ?? null, tint, castShadows),
+        new ZombieVisual('walker', sources.walker ?? null, tint, castShadows),
       );
       zombie.onDeathFinished = () => this.finishDeath(zombie);
       this.group.add(zombie.group);

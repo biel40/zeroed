@@ -8,6 +8,43 @@ const MAX_STEP_LENGTH = 3;
 const TRACER_LENGTH = 2.5;
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
+/**
+ * How far behind the torso surface a head hitbox entry may lie and still
+ * count as a headshot, meters. The generous torso capsule deliberately
+ * overlaps the lower head sphere (otherwise the bobbing skull would open a
+ * hittable gap at the neck in some animation phases). The price of that
+ * overlap: whenever the walk cycle dips the head into the capsule
+ * silhouette, the torso surface sits marginally closer to the muzzle and
+ * the nearest-hit rule would report a torso hit for a shot at the visible
+ * head — alternating with the pose, which read as "inconsistent hits".
+ */
+export const HEAD_PRIORITY_WINDOW = 0.15;
+
+/**
+ * Resolves which intersection of a segment actually takes the bullet.
+ * Normally the nearest; but when the nearest is a zombie's torso AND the
+ * segment also pierces THE SAME zombie's head within HEAD_PRIORITY_WINDOW,
+ * the head wins — aim at the visible skull, get the headshot, at every
+ * animation phase. Only same-zombie head hits qualify: a bullet never
+ * upgrades by clipping a different zombie standing behind. Runs only when
+ * a segment already hit something; no allocations, no new geometry.
+ */
+export function resolveSegmentHit(
+  hits: readonly THREE.Intersection[],
+): THREE.Intersection | null {
+  const first = hits[0] ?? null;
+  if (!first) return null;
+  const firstData = first.object.userData;
+  if (firstData.hitPart !== 'torso' || !firstData.zombie) return first;
+  for (let i = 1; i < hits.length; i++) {
+    const hit = hits[i];
+    if (hit.distance - first.distance > HEAD_PRIORITY_WINDOW) break; // sorted ascending
+    const data = hit.object.userData;
+    if (data.zombie === firstData.zombie && data.hitPart === 'head') return hit;
+  }
+  return first;
+}
+
 interface Projectile extends TrajectoryState {
   active: boolean;
   config: ProjectileConfig | null;
@@ -121,7 +158,8 @@ export class BallisticsSystem {
         this.raycaster.intersectObjects(this.colliders, false, this.hits);
 
         if (this.hits.length > 0) {
-          const hit = this.hits[0];
+          // Head-priority resolution: see resolveSegmentHit.
+          const hit = resolveSegmentHit(this.hits) ?? this.hits[0];
           p.active = false;
           p.tracer.visible = false;
 

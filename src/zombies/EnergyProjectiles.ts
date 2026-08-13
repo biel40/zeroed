@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { resolveSegmentHit } from '../shooting/BallisticsSystem';
 import type { EnergyWeaponConfig } from '../weapons/WeaponTypes';
 
 const MAX_PROJECTILES = 12;
@@ -205,7 +206,8 @@ export class EnergyProjectiles {
       this.raycaster.intersectObjects(this.colliders, false, this.hits);
 
       if (this.hits.length > 0) {
-        const hit = this.hits[0];
+        // Same head-priority rule as hitscan ballistics.
+        const hit = resolveSegmentHit(this.hits) ?? this.hits[0];
         bolt.active = false;
         this.hideBolt(bolt);
         this.spawnBurst(hit.point, config);

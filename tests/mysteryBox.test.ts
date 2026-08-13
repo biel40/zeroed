@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { PLAYER_BOUNDS } from '../src/player/PlayerController';
 import {
+  MYSTERY_BOX_PLACEMENT,
   MYSTERY_BOX_POOL,
   MYSTERY_BOX_TUNING,
   MysteryBoxMachine,
@@ -181,5 +183,27 @@ describe('MysteryBoxMachine state flow', () => {
     expect(machine.pendingEvents).toHaveLength(0);
     // And a fresh roll works afterwards.
     expect(machine.tryActivate()).toBe(true);
+  });
+});
+
+describe('Mystery Box placement', () => {
+  it('stays inside the walkable area, comfortably reachable by the player', () => {
+    const { position, useRange } = MYSTERY_BOX_PLACEMENT;
+    // Distance from the crate to the closest reachable point must be well
+    // inside the interaction range (the crate body itself occupies ~0.6 m).
+    const clampedX = Math.min(Math.max(position.x, PLAYER_BOUNDS.minX), PLAYER_BOUNDS.maxX);
+    const clampedZ = Math.min(Math.max(position.z, PLAYER_BOUNDS.minZ), PLAYER_BOUNDS.maxZ);
+    expect(Math.hypot(position.x - clampedX, position.z - clampedZ)).toBeLessThanOrEqual(
+      useRange - 0.8,
+    );
+  });
+
+  it('sits off the firing lanes and behind the bench frontier', () => {
+    const { position } = MYSTERY_BOX_PLACEMENT;
+    // Target lanes run at x = -3 / 0 / 3: the box must never block them.
+    expect(Math.abs(position.x)).toBeGreaterThan(3.5);
+    // And it must stay on the player's side of the bench, out of the
+    // zombies' main approach corridor.
+    expect(position.z).toBeGreaterThan(PLAYER_BOUNDS.minZ);
   });
 });

@@ -4,6 +4,8 @@ import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { ShootingRangeMode } from '../src/modes/ShootingRangeMode';
 import type { GameMode } from '../src/modes/GameMode';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING } from '../src/zombies/MysteryBox';
+import { RAYGUN_UNLOCK_KILLS } from '../src/zombies/ZombieConfig';
+import type { WeaponId } from '../src/weapons/WeaponTypes';
 
 /**
  * Progression contract tests: the Zombies starting loadout, the two-weapon
@@ -30,12 +32,13 @@ describe('Zombies progression contract', () => {
     expect(mode.weaponIds).toContain('m1911');
   });
 
-  it('keeps the Ray Gun out of the starting slots: Mystery Box only', () => {
+  it('keeps the Ray Gun out of the starting slots: earned, never given', () => {
     const mode = new ZombiesMode();
     expect(mode.startingInventory).not.toContain('raygun');
     // Not directly slot-selectable either: it is not part of the start
     // loadout and the inventory caps at maxWeapons, so number keys can
-    // never reach it. It IS preloaded so the box can hand it out.
+    // never reach it. It IS preloaded so the Mystery Box and the 115-kill
+    // milestone can hand it out without touching the network.
     expect(mode.weaponIds).toContain('raygun');
     expect(MYSTERY_BOX_POOL.some((e) => e.weaponId === 'raygun')).toBe(true);
   });
@@ -58,5 +61,87 @@ describe('Zombies progression contract', () => {
       if (id === 'm1911') continue; // the pistol keeps its 32 everywhere
       expect(WEAPON_DEFINITIONS[id].reserveAmmo).toBeUndefined();
     }
+  });
+});
+
+/**
+ * Ray Gun milestone: RAYGUN_UNLOCK_KILLS unlocks it exactly once per run.
+ * ZombiesMode is driven without init(): the kill callback only touches the
+ * context surface mocked here (grant + banner + audio), exactly as the
+ * real ZombieManager callback invokes it in-game.
+ */
+describe('Ray Gun unlock at the 115-kill milestone', () => {
+  interface MockContext {
+    granted: WeaponId[];
+    banners: string[];
+    reveals: boolean[];
+  }
+
+  function makeMode(): { mode: ZombiesMode; ctx: MockContext } {
+    const mode = new ZombiesMode();
+    const ctx: MockContext = { granted: [], banners: [], reveals: [] };
+    (mode as unknown as { ctx: unknown }).ctx = {
+      grantWeapon: (id: WeaponId) => ctx.granted.push(id),
+      hud: { showRoundBanner: (title: string) => ctx.banners.push(title) },
+      audio: {
+        playZombieDeath: () => undefined,
+        playMysteryBoxReveal: (isRayGun: boolean) => void ctx.reveals.push(isRayGun),
+      },
+    };
+    return { mode, ctx };
+  }
+
+  function kill(mode: ZombiesMode, count: number): void {
+    const onKilled = (mode as unknown as { onZombieKilled: (headshot: boolean) => void })
+      .onZombieKilled;
+    for (let i = 0; i < count; i++) onKilled.call(mode, false);
+  }
+
+  it('pins the milestone at exactly 115 kills', () => {
+    expect(RAYGUN_UNLOCK_KILLS).toBe(115);
+  });
+
+  it('does not unlock before the milestone', () => {
+    const { mode, ctx } = makeMode();
+    kill(mode, RAYGUN_UNLOCK_KILLS - 1);
+    expect(ctx.granted).toEqual([]);
+    expect(ctx.banners).toEqual([]);
+    expect(ctx.reveals).toEqual([]);
+  });
+
+  it('grants the Ray Gun with a banner exactly at 115 kills, and only once', () => {
+    const { mode, ctx } = makeMode();
+    kill(mode, RAYGUN_UNLOCK_KILLS);
+    expect(ctx.granted).toEqual(['raygun']);
+    expect(ctx.banners).toEqual(['RAY GUN UNLOCKED']);
+    expect(ctx.reveals).toEqual([true]);
+
+    kill(mode, 50); // the horde keeps dying; the unlock must not repeat
+    expect(ctx.granted).toEqual(['raygun']);
+    expect(ctx.banners).toHaveLength(1);
+    expect(ctx.reveals).toHaveLength(1);
+  });
+
+  it('re-arms the milestone after a restart (new run, fresh kill count)', () => {
+    const { mode, ctx } = makeMode();
+    kill(mode, RAYGUN_UNLOCK_KILLS);
+    expect(ctx.granted).toEqual(['raygun']);
+
+    // Minimal shell surface restart() touches beyond what makeMode mocks.
+    const shell = (mode as unknown as { ctx: Record<string, unknown> }).ctx;
+    shell.resetArsenal = () => undefined;
+    shell.lockPointer = () => undefined;
+    (shell.hud as Record<string, unknown>).hideGameOver = () => undefined;
+    (shell.hud as Record<string, unknown>).updateZombies = () => undefined;
+    (mode as unknown as { zombies: unknown }).zombies = {
+      reset: () => undefined,
+      aliveCount: 0,
+    };
+
+    (mode as unknown as { restart(): void }).restart();
+    kill(mode, RAYGUN_UNLOCK_KILLS - 1);
+    expect(ctx.granted).toEqual(['raygun']); // still re-armed, not early
+    kill(mode, 1);
+    expect(ctx.granted).toEqual(['raygun', 'raygun']);
   });
 });

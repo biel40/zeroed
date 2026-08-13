@@ -8,7 +8,7 @@ export interface ZombieModelSource {
   readonly clips: THREE.AnimationClip[];
 }
 
-export type ZombieVariantId = 'walker' | 'hulk';
+export type ZombieVariantId = 'walker';
 
 interface VariantConfig {
   /** World height the model is normalized to, meters. */
@@ -21,6 +21,11 @@ interface VariantConfig {
   readonly tints: readonly number[];
 }
 
+/**
+ * Only the small walker category exists: the large hulk variant was removed
+ * and must not be reintroduced (see the variant contract test). Per-instance
+ * variety comes from tints, scale jitter and walk jitter instead.
+ */
 export const ZOMBIE_VARIANTS: Record<ZombieVariantId, VariantConfig> = {
   // Quaternius "Animated Zombie" (CC-BY 3.0): classic shambling corpse.
   walker: {
@@ -34,19 +39,6 @@ export const ZOMBIE_VARIANTS: Record<ZombieVariantId, VariantConfig> = {
     },
     walkReferenceSpeed: 1.35,
     tints: [0xa8b89a, 0x9aa88e, 0xb0a890, 0x98a498],
-  },
-  // Quaternius "Zombie" (CC0): hulking brute with a full animation set.
-  hulk: {
-    height: 1.92,
-    clips: {
-      spawn: ['Crawl'],
-      walk: ['Walk'],
-      attack: ['Punch', 'Idle_Attack'],
-      hit: ['HitReact'],
-      death: ['Death'],
-    },
-    walkReferenceSpeed: 1.5,
-    tints: [0x9fb08c, 0x8fa084, 0xa89f88],
   },
 };
 
@@ -77,6 +69,7 @@ export function resolveClip(
 }
 
 interface ProceduralRig {
+  hips: THREE.Group;
   torso: THREE.Group;
   head: THREE.Group;
   armL: THREE.Group;
@@ -182,7 +175,54 @@ function buildProceduralHumanoid(
   const legL = buildLeg(-1);
   const legR = buildLeg(1);
 
-  return { root, rig: { torso, head, armL, armR, legL, legR }, materials: [skin, cloth] };
+  return { root, rig: { hips, torso, head, armL, armR, legL, legR }, materials: [skin, cloth] };
+}
+
+/** Skeleton lookups for the hitbox anchors; first match wins. */
+const TORSO_BONE_NAMES = ['Hips', 'Pelvis'] as const;
+const HEAD_BONE_NAMES = ['Head'] as const;
+const HEAD_TOP_BONE_NAMES = ['HeadTop_End', 'HeadTop'] as const;
+
+/**
+ * Bind-pose world targets for the hitboxes. The torso envelope (centered at
+ * hip height, slightly forward, reaching the ground) is the play-tested
+ * shape tuned for the old static rig — it is preserved exactly, only
+ * anchored to the skeleton now.
+ */
+const TORSO_HITBOX_CENTER = new THREE.Vector3(0, 0.75, 0.04);
+/** Static fallback when no head bone exists (tests, degenerate rigs). */
+const HEAD_HITBOX_FALLBACK = new THREE.Vector3(0, 1.58, 0.06);
+/** Skull-center offset above the head anchor when no head-top bone exists. */
+const HEAD_HITBOX_UP = 0.12;
+
+const anchorTmpA = new THREE.Vector3();
+const anchorTmpB = new THREE.Vector3();
+const anchorTmpC = new THREE.Vector3();
+const anchorTmpD = new THREE.Vector3();
+
+function findByName(root: THREE.Object3D, names: readonly string[]): THREE.Object3D | null {
+  for (const name of names) {
+    const found = root.getObjectByName(name);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Places a hitbox on an animated anchor so that, in bind pose, it sits
+ * exactly at `worldTarget` with its geometry measured in world meters.
+ * Counter-scaling undoes any armature scale (the Quaternius rigs run at
+ * x100+), which keeps the geometry shareable across every pooled zombie.
+ */
+function placeOnAnchor(
+  hitbox: THREE.Object3D,
+  anchor: THREE.Object3D,
+  worldTarget: THREE.Vector3,
+): void {
+  anchor.add(hitbox);
+  hitbox.position.copy(anchor.worldToLocal(anchorTmpD.copy(worldTarget)));
+  const scale = anchor.getWorldScale(anchorTmpB).x;
+  hitbox.scale.setScalar(1 / Math.max(scale, 1e-6));
 }
 
 /**
@@ -193,12 +233,21 @@ function buildProceduralHumanoid(
  */
 export class ZombieVisual {
   readonly root = new THREE.Group();
+  /**
+   * Animated anchor the torso hitbox rides: the Hips bone on a GLB rig, the
+   * hips group on the procedural fallback, or `root` as a last resort.
+   */
+  readonly torsoAnchor: THREE.Object3D;
+  /** Animated anchor the head hitbox rides (Head bone / head group / root). */
+  readonly headAnchor: THREE.Object3D;
 
   private readonly mixer: THREE.AnimationMixer | null = null;
   private readonly actions = new Map<ZombieState, THREE.AnimationAction>();
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly rig: ProceduralRig | null = null;
   private readonly variant: VariantConfig;
+  /** End of the head bone chain, when the rig has one (skull midpoint math). */
+  private headTop: THREE.Object3D | null = null;
   private state: ZombieState = 'spawn';
   private currentAction: THREE.AnimationAction | null = null;
   private walkJitter = 1;
@@ -253,6 +302,9 @@ export class ZombieVisual {
         object.material = Array.isArray(object.material) ? cloned : cloned[0];
       });
       this.root.add(model);
+      this.torsoAnchor = findByName(model, TORSO_BONE_NAMES) ?? this.root;
+      this.headAnchor = findByName(model, HEAD_BONE_NAMES) ?? this.root;
+      this.headTop = findByName(model, HEAD_TOP_BONE_NAMES);
 
       this.mixer = new THREE.AnimationMixer(model);
       for (const state of ['spawn', 'walk', 'attack', 'hit', 'death'] as const) {
@@ -270,7 +322,36 @@ export class ZombieVisual {
       this.rig = built.rig;
       this.materials.push(...built.materials);
       this.root.add(built.root);
+      this.torsoAnchor = built.rig.hips;
+      this.headAnchor = built.rig.head;
     }
+  }
+
+  /**
+   * Parents the invisible colliders to the animated rig. They used to be
+   * static children of the visual root, but the animation clips displace
+   * the visible body far from any fixed offset — measured on the shipped
+   * walker GLB: up to ~0.5 m of head sway during the walk cycle and ~0.9 m
+   * of forward lunge during the attack — so shots at the visible head or
+   * chest regularly crossed where the colliders used to be. Riding the
+   * bones makes the hitboxes track the rendered pose exactly, at zero
+   * per-frame cost: the mixer already updates those matrices every frame.
+   */
+  attachHitboxes(torso: THREE.Object3D, head: THREE.Object3D): void {
+    // Every animated node is still at its loaded (bind) TRS here.
+    this.root.updateMatrixWorld(true);
+    placeOnAnchor(torso, this.torsoAnchor, TORSO_HITBOX_CENTER);
+    placeOnAnchor(head, this.headAnchor, this.resolveHeadTarget());
+  }
+
+  /** Skull center in bind pose: between the head bone and its end bone. */
+  private resolveHeadTarget(): THREE.Vector3 {
+    if (this.headAnchor === this.root) return anchorTmpA.copy(HEAD_HITBOX_FALLBACK);
+    const head = this.headAnchor.getWorldPosition(anchorTmpA);
+    if (this.headTop) {
+      return head.add(this.headTop.getWorldPosition(anchorTmpC)).multiplyScalar(0.5);
+    }
+    return head.add(anchorTmpC.set(0, HEAD_HITBOX_UP, 0));
   }
 
   /** Walk-cycle randomization so the horde never marches in sync. */

@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { AnimationClip } from 'three';
 import { describe, expect, it } from 'vitest';
+import { ZOMBIE_MANIFEST } from '../src/assets/AssetManager';
 import { resolveClip, ZOMBIE_VARIANTS, type ZombieVariantId } from '../src/zombies/ZombieVisual';
 import type { ZombieState } from '../src/zombies/Zombie';
 
 const GLB_DIR = fileURLToPath(new URL('../public/assets/zombies', import.meta.url));
 const GLB_FILES: Record<ZombieVariantId, string> = {
   walker: 'zombie_walker.glb',
-  hulk: 'zombie_hulk.glb',
 };
 
 /** Reads animation clip names straight from the GLB JSON chunk. */
@@ -56,4 +56,11 @@ describe('zombie GLB assets', () => {
       }
     });
   }
+});
+
+describe('variant contract', () => {
+  it('ships only the small walker variant — large zombies are gone for good', () => {
+    expect(Object.keys(ZOMBIE_VARIANTS)).toEqual(['walker']);
+    expect(ZOMBIE_MANIFEST.map((entry) => entry.id)).toEqual(['walker']);
+  });
 });

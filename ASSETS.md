@@ -17,6 +17,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | AK-47 | "Ak47" (AK) | https://poly.pizza/m/em1Hi9GuCv | ~1.1k | 59 KB |
 | L96 | "Sniper Rifle" (SniperRifle_3) | https://poly.pizza/m/TKaBjAEofL | ~1.7k | 93 KB |
 | M60 | — (placeholder procedural mejorado; no se encontró LMG CC0 adecuada) | — | — | — |
+| M1911 | — (modelo procedural detallado en `WeaponView.ts`; sin GLB CC0 adecuado) | — | — | — |
 
 Los materiales PBR (metalness/roughness por nombre de material) se ajustan en
 tiempo de carga en `src/weapons/WeaponView.ts`.
@@ -31,7 +32,10 @@ los clips concretos por estado se resuelven por nombre en
 | Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
 | --- | --- | --- | --- | --- | --- |
 | `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0** (atribución: Quaternius) | ~2.1k | ZombieCrawl (spawn), ZombieWalk, ZombieBite (attack) |
-| `hulk` | "Zombie" | https://poly.pizza/m/VlXjG0N8Eg | **Public Domain (CC0)** | ~7.8k | Crawl (spawn), Walk, Punch (attack), HitReact, Death |
+
+> Solo existe la categoría pequeña (`walker`): la variante grande (`hulk`)
+> se eliminó del juego junto con su GLB. No la reintroduzcas sin actualizar
+> también el contrato de `tests/zombieAssets.test.ts`.
 
 Notas:
 

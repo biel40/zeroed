@@ -48,8 +48,15 @@ export const MYSTERY_BOX_TUNING = {
 
 /** Where the crate sits in the zombies arena and how interaction reaches. */
 export const MYSTERY_BOX_PLACEMENT = {
-  /** Right side of the shooting platform, beside the player spawn. */
-  position: { x: 3.2, y: 0, z: 1.5 },
+  /**
+   * Rear-left corner of the platform, by the back wall: a short walk from
+   * the player spawn, clear of the firing lanes (x = -3/0/3) and off the
+   * zombies' main approach corridor toward the bench — the old spot
+   * (3.2, 1.5) sat right on that corridor, just behind the bench.
+   */
+  position: { x: -5.6, y: 0, z: 6.6 },
+  /** Rotated to face the platform center, so the glowing seams read on approach. */
+  yaw: -1.17,
   /** Maximum distance from the box center to use it. */
   useRange: 2.4,
   /** Minimum look-direction dot product: rough aim at the box, no exact ray. */

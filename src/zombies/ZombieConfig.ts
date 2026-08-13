@@ -52,6 +52,12 @@ export const ZOMBIE_WALK_JITTER = 0.07;
 export const ROUND_BREAK_SECONDS = 4;
 export const ROUND_START_DELAY = 2.5;
 
+/**
+ * Kills that auto-unlock the Ray Gun. 115 — the Element 115 nod — is high
+ * enough to be an earned mid-run milestone, reachable around rounds 8-10.
+ */
+export const RAYGUN_UNLOCK_KILLS = 115;
+
 export const PLAYER_MAX_HP = 100;
 /**
  * Brief invulnerability window after taking a hit, seconds. Long enough to
@@ -59,6 +65,13 @@ export const PLAYER_MAX_HP = 100;
  * short enough that being surrounded is still deadly.
  */
 export const PLAYER_HIT_INVULN = 0.45;
+/**
+ * Seconds without taking damage before regeneration kicks in. Longer than
+ * the full zombie attack cycle (~1.6 s), so regen never starts mid-brawl.
+ */
+export const PLAYER_REGEN_DELAY = 4;
+/** HP regenerated per second once the delay elapses: 0 → 100 in 5 s. */
+export const PLAYER_REGEN_RATE = 20;
 
 export interface RoundConfig {
   /** Total zombies spawned during the round (not simultaneously). */

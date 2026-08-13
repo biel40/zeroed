@@ -21,11 +21,15 @@ let headGeometry: THREE.SphereGeometry | null = null;
 let hitboxMaterial: THREE.MeshBasicMaterial | null = null;
 
 function getTorsoGeometry(): THREE.CapsuleGeometry {
-  torsoGeometry ??= new THREE.CapsuleGeometry(0.32, 0.72, 4, 10);
+  // Envelope of the animated torso + arms: slightly wider than the visible
+  // body, and tall enough to reach the ground (leg shots count as torso).
+  torsoGeometry ??= new THREE.CapsuleGeometry(0.38, 0.8, 4, 12);
   return torsoGeometry;
 }
 function getHeadGeometry(): THREE.SphereGeometry {
-  headGeometry ??= new THREE.SphereGeometry(0.2, 12, 10);
+  // Slightly wider than the visible skull: headshots stay rewarding without
+  // demanding pixel-perfect aim at a swaying target.
+  headGeometry ??= new THREE.SphereGeometry(0.26, 12, 10);
   return headGeometry;
 }
 /** Invisible to the eye, fully visible to the raycaster. */
@@ -39,7 +43,9 @@ function getHitboxMaterial(): THREE.MeshBasicMaterial {
  * skinned humanoid or procedural fallback). Movement decisions live in
  * ZombieManager; this class owns animation timing, hit reactions and the
  * death sequence (fall → corpse linger → fade → recycle). Two invisible
- * humanoid-proportioned meshes double as raycast hitboxes via userData.
+ * humanoid-proportioned meshes double as raycast hitboxes via userData;
+ * they ride the animated skeleton (see attachHitboxes) so they can never
+ * desync from the rendered pose.
  */
 export class Zombie implements HitTarget {
   readonly group = new THREE.Group();
@@ -66,12 +72,17 @@ export class Zombie implements HitTarget {
   constructor(visual?: ZombieVisual) {
     this.visual = visual ?? new ZombieVisual('walker', null, 0xa8b89a);
 
+    // Hitboxes are parented onto the animated rig (bones, or the procedural
+    // rig groups): the walk sway and the attack lunge move the visible body
+    // up to ~0.5–0.9 m away from any static offset, so colliders fixed to
+    // the visual root systematically lagged the rendered pose. Bone-anchored
+    // hitboxes follow every animation frame for free — the mixer updates
+    // those world matrices anyway.
     this.torsoHitbox = new THREE.Mesh(getTorsoGeometry(), getHitboxMaterial());
-    this.torsoHitbox.position.y = 0.95;
     this.headHitbox = new THREE.Mesh(getHeadGeometry(), getHitboxMaterial());
-    this.headHitbox.position.y = 1.62;
 
-    this.group.add(this.visual.root, this.torsoHitbox, this.headHitbox);
+    this.group.add(this.visual.root);
+    this.visual.attachHitboxes(this.torsoHitbox, this.headHitbox);
 
     this.torsoHitbox.userData.target = this;
     this.torsoHitbox.userData.zombie = this;

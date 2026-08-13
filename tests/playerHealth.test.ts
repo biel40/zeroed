@@ -56,4 +56,68 @@ describe('PlayerHealth', () => {
     expect(health.isDead).toBe(false);
     expect(health.isInvulnerable).toBe(false);
   });
+
+  describe('regeneration', () => {
+    it('regenerates only after the delay without damage', () => {
+      const health = new PlayerHealth(100, 0.5, 1, 10);
+      health.damage(30); // 70 hp, invulnerable for 0.5 s
+      health.update(0.5); // timer 0.5 < delay 1 → no regen yet
+      expect(health.hp).toBe(70);
+      health.update(0.6); // timer 1.1 ≥ 1 → regen applies
+      expect(health.hp).toBeCloseTo(76, 5);
+    });
+
+    it('regenerates progressively, not instantly', () => {
+      const health = new PlayerHealth(100, 0.5, 1, 10);
+      health.damage(50); // 50 hp
+      health.update(1.5); // past the 1 s delay → 15 hp of partial regen
+      expect(health.hp).toBeGreaterThan(50);
+      expect(health.hp).toBeLessThan(70);
+      expect(health.hp).toBeCloseTo(65, 5);
+    });
+
+    it('restarts the delay timer every time damage lands', () => {
+      const health = new PlayerHealth(100, 0.5, 1, 10);
+      health.damage(30); // 70 hp
+      health.update(0.8); // invuln over at 0.5, regen timer at 0.8
+      health.damage(10); // lands (invuln expired) → 60 hp, timer reset
+      health.update(0.9); // timer 0.9 < 1 → still no regen
+      expect(health.hp).toBe(60);
+      health.update(0.2); // timer 1.1 → regen resumes
+      expect(health.hp).toBeCloseTo(62, 5);
+    });
+
+    it('never regenerates past maxHp', () => {
+      const health = new PlayerHealth(100, 0.5, 1, 50);
+      health.damage(10); // 90 hp
+      health.update(0.6);
+      health.update(2); // would overshoot (90 + 100) → clamped
+      expect(health.hp).toBe(100);
+    });
+
+    it('does not regenerate while dead', () => {
+      const health = new PlayerHealth(100, 0.5, 1, 10);
+      health.damage(100);
+      health.update(5);
+      expect(health.hp).toBe(0);
+      expect(health.isDead).toBe(true);
+    });
+
+    it('stays disabled when no regen is configured', () => {
+      const health = new PlayerHealth(100, 0.5);
+      health.damage(30);
+      health.update(10);
+      expect(health.hp).toBe(70);
+    });
+
+    it('reset clears the regen timer', () => {
+      const health = new PlayerHealth(100, 0.5, 1, 10);
+      health.damage(30);
+      health.update(0.8);
+      health.reset();
+      health.damage(20); // 80 hp, fresh timer
+      health.update(0.9); // 0.9 < delay → no regen
+      expect(health.hp).toBe(80);
+    });
+  });
 });

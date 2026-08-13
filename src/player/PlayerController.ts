@@ -11,11 +11,20 @@ const EYE_HEIGHT = 1.7;
 const WALK_SPEED = 4.6;
 const ACCELERATION = 14;
 const ADS_MOVE_PENALTY = 0.45;
-/** Delimited shooting area the player can walk on. */
-const MIN_X = -7;
-const MAX_X = 7;
-const MIN_Z = -0.5;
-const MAX_Z = 8;
+/**
+ * Delimited walkable area, enforced by the movement clamp below. minZ is
+ * the frontier: the firing-line bench (top spanning z 0.8–1.6) plus the
+ * angled barriers form a physical barrier the player can neither cross nor
+ * round — the field beyond (target lanes, zombie grounds) stays off-limits
+ * in every mode. 1.7 keeps a hair of clearance so the view never clips the
+ * bench top.
+ */
+export const PLAYER_BOUNDS = {
+  minX: -7,
+  maxX: 7,
+  minZ: 1.7,
+  maxZ: 8,
+} as const;
 
 /**
  * First-person rig: rig (yaw + position) → pitch node → camera (recoil
@@ -67,8 +76,16 @@ export class PlayerController {
     this.velocity.x = damp(this.velocity.x, this.wish.x, ACCELERATION, dt);
     this.velocity.z = damp(this.velocity.z, this.wish.z, ACCELERATION, dt);
 
-    this.rig.position.x = clamp(this.rig.position.x + this.velocity.x * dt, MIN_X, MAX_X);
-    this.rig.position.z = clamp(this.rig.position.z + this.velocity.z * dt, MIN_Z, MAX_Z);
+    this.rig.position.x = clamp(
+      this.rig.position.x + this.velocity.x * dt,
+      PLAYER_BOUNDS.minX,
+      PLAYER_BOUNDS.maxX,
+    );
+    this.rig.position.z = clamp(
+      this.rig.position.z + this.velocity.z * dt,
+      PLAYER_BOUNDS.minZ,
+      PLAYER_BOUNDS.maxZ,
+    );
 
     const targetFov = lerp(BASE_FOV, definition.ads.fov, weapon.adsAlpha);
     if (Math.abs(targetFov - this.fov) > 0.05) {

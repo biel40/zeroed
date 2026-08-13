@@ -22,7 +22,6 @@ export const TEXTURE_MANIFEST: readonly string[] = [
 /** Zombie GLBs (skinned + animated) served from public/assets/zombies/. */
 export const ZOMBIE_MANIFEST: ReadonlyArray<{ id: ZombieVariantId; url: string }> = [
   { id: 'walker', url: 'assets/zombies/zombie_walker.glb' },
-  { id: 'hulk', url: 'assets/zombies/zombie_hulk.glb' },
 ];
 
 export interface AssetManifest {

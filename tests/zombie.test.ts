@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { Zombie } from '../src/zombies/Zombie';
 import {
@@ -136,5 +137,120 @@ describe('Zombie attacks', () => {
     const zombie = makeZombie(10);
     zombie.applyDamage(10);
     expect(zombie.tryAttack()).toBe(false);
+  });
+});
+
+describe('Zombie hitboxes', () => {
+  /** World-space center of a hitbox after refreshing the group matrices. */
+  function worldCenter(hitbox: THREE.Object3D): THREE.Vector3 {
+    return new THREE.Vector3().setFromMatrixPosition(hitbox.matrixWorld);
+  }
+
+  it('rides both hitboxes on the animated rig, not the static visual root', () => {
+    const zombie = makeZombie();
+    // The whole point: colliders follow the pose the player actually sees.
+    expect(zombie.visual.torsoAnchor).not.toBe(zombie.visual.root);
+    expect(zombie.visual.headAnchor).not.toBe(zombie.visual.root);
+    expect(zombie.torsoHitbox.parent).toBe(zombie.visual.torsoAnchor);
+    expect(zombie.headHitbox.parent).toBe(zombie.visual.headAnchor);
+    // ...while staying under the visual root, so the spawn rise still
+    // carries them with the body.
+    const underRoot = (object: THREE.Object3D): boolean => {
+      let current = object.parent;
+      while (current) {
+        if (current === zombie.visual.root) return true;
+        current = current.parent;
+      }
+      return false;
+    };
+    expect(underRoot(zombie.torsoHitbox)).toBe(true);
+    expect(underRoot(zombie.headHitbox)).toBe(true);
+  });
+
+  it('keeps the torso hitbox buried with the visible body during the spawn rise', () => {
+    const zombie = makeZombie();
+    zombie.update(DT); // rise barely started: the body is still underground
+    zombie.group.updateMatrixWorld(true);
+    expect(worldCenter(zombie.torsoHitbox).y).toBeLessThan(0);
+  });
+
+  it('returns the hitboxes to standing height once the rise finishes', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    zombie.group.updateMatrixWorld(true);
+    expect(worldCenter(zombie.torsoHitbox).y).toBeCloseTo(0.75, 3);
+  });
+
+  it('torso capsule reaches the ground so leg shots register', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    zombie.group.updateMatrixWorld(true);
+    const { radius, height } = (zombie.torsoHitbox.geometry as THREE.CapsuleGeometry).parameters;
+    const bottom = worldCenter(zombie.torsoHitbox).y - (height / 2 + radius);
+    expect(bottom).toBeLessThanOrEqual(0.05);
+  });
+
+  it('torso hitbox is slightly wider than the visible body, without being exaggerated', () => {
+    const zombie = makeZombie();
+    const { radius } = (zombie.torsoHitbox.geometry as THREE.CapsuleGeometry).parameters;
+    expect(radius).toBeGreaterThan(0.32); // the old size was tighter than the animated envelope
+    expect(radius).toBeLessThanOrEqual(0.45);
+  });
+
+  it('keeps a distinct head sphere above the torso cylinder for headshots', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    zombie.group.updateMatrixWorld(true);
+    const torso = (zombie.torsoHitbox.geometry as THREE.CapsuleGeometry).parameters;
+    const head = (zombie.headHitbox.geometry as THREE.SphereGeometry).parameters;
+    const torsoCylinderTop = worldCenter(zombie.torsoHitbox).y + torso.height / 2;
+    expect(head.radius).toBeGreaterThan(0.2);
+    expect(worldCenter(zombie.headHitbox).y).toBeGreaterThan(torsoCylinderTop);
+  });
+
+  it('moves the hitboxes with the rig when the animated pose changes', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    zombie.group.updateMatrixWorld(true);
+    const before = worldCenter(zombie.headHitbox);
+    // What the mixer does every frame: drive the rig to a new pose. The
+    // colliders must follow — static, root-parented hitboxes would not move.
+    zombie.visual.torsoAnchor.rotation.x += 0.6;
+    zombie.group.updateMatrixWorld(true);
+    const after = worldCenter(zombie.headHitbox);
+    expect(after.distanceTo(before)).toBeGreaterThan(0.2);
+  });
+
+  it('registers a shot at the visible head as a headshot, not a torso hit', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    zombie.group.updateMatrixWorld(true);
+    const head = worldCenter(zombie.headHitbox);
+    const raycaster = new THREE.Raycaster(
+      new THREE.Vector3(head.x, head.y, head.z + 5),
+      new THREE.Vector3(0, 0, -1),
+    );
+    const hits = raycaster.intersectObjects([zombie.torsoHitbox, zombie.headHitbox], false);
+    expect(hits[0]?.object).toBe(zombie.headHitbox);
+  });
+
+  it('registers a center-mass shot as a torso hit', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    zombie.group.updateMatrixWorld(true);
+    const chest = worldCenter(zombie.torsoHitbox);
+    const raycaster = new THREE.Raycaster(
+      new THREE.Vector3(chest.x, chest.y + 0.25, chest.z + 5),
+      new THREE.Vector3(0, 0, -1),
+    );
+    const hits = raycaster.intersectObjects([zombie.torsoHitbox, zombie.headHitbox], false);
+    expect(hits[0]?.object).toBe(zombie.torsoHitbox);
+  });
+
+  it('shares hitbox geometry across pooled zombies', () => {
+    const a = new Zombie();
+    const b = new Zombie();
+    expect(a.torsoHitbox.geometry).toBe(b.torsoHitbox.geometry);
+    expect(a.headHitbox.geometry).toBe(b.headHitbox.geometry);
   });
 });
