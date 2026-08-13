@@ -20,6 +20,8 @@ export class AudioSystem {
   private noiseBuffer: AudioBuffer | null = null;
   private lastPingTime = -1;
   private wind: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
+  private mysteryBoxOpenBuffer: AudioBuffer | null = null;
+  private readonly mysteryBoxOpenUrl = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
 
   /** Must be called from a user gesture before any sound can play. */
   resume(): void {
@@ -157,6 +159,48 @@ export class AudioSystem {
     this.sweep(0, 'sine', 120, 42, 0.5, 0.3, t);
   }
 
+  /**
+   * Tesla shot: a sharp crack (high filtered noise) over a rising mains-hum
+   * sweep — a capacitor bank discharging, not a powder report.
+   */
+  playTeslaShot(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    this.tick(0, 3600, 0.5);
+    this.tick(0.02, 5400, 0.32);
+    this.sweep(0, 'sawtooth', 180, 1200, 0.28, 0.22, t);
+    this.sweep(0, 'square', 120, 60, 0.2, 0.3, t); // 50/60 Hz-style hum tail
+  }
+
+  /**
+   * Tesla chain arc: rapid descending crackle as the charge hops between
+   * zombies. One call per electrocuted group; the count drives the crackle.
+   */
+  playTeslaChain(targets: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime;
+    const crackles = Math.min(targets, 6);
+    for (let i = 0; i < crackles; i++) {
+      const at = i * 0.045;
+      this.tick(at, 2600 - i * 260, 0.3);
+      this.sweep(at, 'square', 900 - i * 90, 320, 0.1, 0.06, t);
+    }
+    this.sweep(0, 'sine', 220, 55, 0.34, 0.34, t); // low discharge body
+  }
+
+  /** Tesla unlock milestone: an ascending electric arpeggio + hum swell. */
+  playTeslaUnlock(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = Math.max(0, audio.ctx.currentTime - 0.08);
+    this.tone(t, 'square', 392, 0.14, 0.12);
+    this.tone(t + 0.1, 'square', 587, 0.14, 0.12);
+    this.tone(t + 0.2, 'square', 784, 0.16, 0.22);
+    this.sweep(0.2, 'sawtooth', 100, 400, 0.16, 0.5, t);
+  }
+
   /** Fleshy thud when a bullet connects with a zombie. */
   playZombieHit(): void {
     this.tick(0, 300, 0.38);
@@ -245,8 +289,60 @@ export class AudioSystem {
     this.tick(0.16, 1050, 0.36);
   }
 
+  async loadMysteryBoxOpenAsset(): Promise<void> {
+    if (this.mysteryBoxOpenBuffer) return;
+
+    const ctx = this.ctx ?? new AudioContext();
+    this.ctx = ctx;
+    if (!this.master) {
+      this.master = ctx.createGain();
+      this.master.gain.value = 0.55;
+      this.master.connect(ctx.destination);
+
+      const length = ctx.sampleRate;
+      this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const data = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    }
+
+    try {
+      const response = await fetch(this.mysteryBoxOpenUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const audioData = await response.arrayBuffer();
+      this.mysteryBoxOpenBuffer = await ctx.decodeAudioData(audioData.slice(0));
+    } catch (error) {
+      console.warn('[AudioSystem] Mystery box open MP3 not available; procedural fallback will be used.', error);
+    }
+  }
+
+  /**
+   * Duration of the decoded Mystery Box opening theme in seconds, or null
+   * while the MP3 is still fetching/decoding (or failed to load). Lets the
+   * box machine time the weapon reveal against the REAL audio instead of
+   * a hardcoded guess.
+   */
+  getMysteryBoxOpenDuration(): number | null {
+    return this.mysteryBoxOpenBuffer ? this.mysteryBoxOpenBuffer.duration : null;
+  }
+
   /** Mystery Box opening: a hollow rising creak with a wooden knock. */
   playMysteryBoxOpen(): void {
+    const audio = this.context();
+    if (!audio) return;
+
+    if (this.mysteryBoxOpenBuffer) {
+      const source = audio.ctx.createBufferSource();
+      const gain = audio.ctx.createGain();
+      source.buffer = this.mysteryBoxOpenBuffer;
+      gain.gain.value = 0.85;
+      source.connect(gain);
+      gain.connect(audio.master);
+      // Compensate for browser scheduling latency so the audio starts on the
+      // same moment the player presses the interaction button.
+      source.start(Math.max(0, audio.ctx.currentTime - 0.06));
+      return;
+    }
+
     this.sweep(0, 'triangle', 110, 330, 0.3, 0.45);
     this.tick(0.04, 620, 0.22);
     this.tick(0.16, 940, 0.18);
@@ -264,7 +360,7 @@ export class AudioSystem {
   playMysteryBoxReveal(energy: boolean): void {
     const audio = this.context();
     if (!audio) return;
-    const t = audio.ctx.currentTime;
+    const t = Math.max(0, audio.ctx.currentTime - 0.08);
     if (energy) {
       this.tone(t, 'square', 523, 0.14, 0.12);
       this.tone(t + 0.1, 'square', 784, 0.14, 0.12);

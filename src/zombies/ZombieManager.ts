@@ -22,8 +22,28 @@ import {
   type ZombieModelSource,
   type ZombieVariantId,
 } from './ZombieVisual';
+import { selectChainTargets } from './ZombieConfig';
 
 const SEPARATION_PUSH = 2.2;
+
+/** Horizontal body radius used for wall collision (torso capsule is 0.38). */
+const ZOMBIE_BODY_RADIUS = 0.42;
+/** How far ahead (as a fraction of the body radius) the front probe looks. */
+const FRONT_PROBE = 1.3;
+/**
+ * While rounding an obstacle the zombie walks sideways along the wall at
+ * this fraction of its speed — fast enough to clear corners promptly,
+ * slow enough that the front probe can catch the corner before overshoot.
+ */
+const ROUND_SPEED_FACTOR = 0.85;
+/** Surfaces solid enough to stop a walking body (targets are steel/paper). */
+const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'metal']);
+/** A collider blocks movement only if it is tall enough to matter… */
+const MIN_OBSTACLE_HEIGHT = 0.5;
+/** …and starts low enough (the roof at y≈3 must not block anyone). */
+const MAX_OBSTACLE_BASE_Y = 1.2;
+/** Ground/berm-scale boxes are walkable scenery, never obstacles. */
+const MAX_OBSTACLE_FOOTPRINT = 20;
 
 /** GLB payloads per variant, keyed by variant id. Missing keys fall back. */
 export type ZombieModelSources = Partial<Record<ZombieVariantId, ZombieModelSource | null>>;
@@ -44,11 +64,19 @@ export class ZombieManager {
   private readonly spawner: ZombieSpawner;
   private readonly rng: () => number;
   private colliders: THREE.Object3D[] = [];
-
+  /** Static obstacle AABBs (walls, barriers, crates, posts) blocking movement. */
+  private readonly obstacles: THREE.Box3[] = [];
   // Reused temporaries: no allocations in the per-frame steering loop.
   private readonly tmpToPlayer = new THREE.Vector3();
   private readonly tmpSeparation = new THREE.Vector3();
   private readonly tmpDelta = new THREE.Vector3();
+  /**
+   * Per-zombie obstacle-rounding state, keyed by the zombie (pool slots are
+   * reused; spawn() leaves a stale, harmless entry). `rounding` is the
+   * perpendicular side (±1 rotated from the to-player direction) the zombie
+   * committed to when it hit a wall; null while it walks straight.
+   */
+  private readonly roundState = new Map<Zombie, { x: number; z: number }>();
 
   constructor(rng: () => number = Math.random, sources: ZombieModelSources = {}, castShadows = true) {
     this.rng = rng;
@@ -71,6 +99,29 @@ export class ZombieManager {
   /** The mutable collider array shared with ballistics (range + zombies). */
   registerColliders(colliders: THREE.Object3D[]): void {
     this.colliders = colliders;
+    this.rebuildObstacles();
+  }
+
+  /**
+   * Snapshots the static obstacles out of the shared collider array. The
+   * filters keep exactly the bulky, grounded, human-scale solids: walls,
+   * barriers, crates and posts block; the ground, platform slab, bench top
+   * and roof (wrong height/footprint), targets and zombie hitboxes (wrong
+   * surface, and they join the array after this snapshot anyway) do not.
+   */
+  private rebuildObstacles(): void {
+    this.obstacles.length = 0;
+    const box = new THREE.Box3();
+    const size = new THREE.Vector3();
+    for (const object of this.colliders) {
+      if (!BLOCKING_SURFACES.has(object.userData.surface as string)) continue;
+      box.setFromObject(object);
+      if (box.isEmpty()) continue;
+      box.getSize(size);
+      if (size.y < MIN_OBSTACLE_HEIGHT || box.min.y > MAX_OBSTACLE_BASE_Y) continue;
+      if (size.x > MAX_OBSTACLE_FOOTPRINT || size.z > MAX_OBSTACLE_FOOTPRINT) continue;
+      this.obstacles.push(box.clone());
+    }
   }
 
   get aliveCount(): number {
@@ -103,15 +154,56 @@ export class ZombieManager {
     return true;
   }
 
-  /** Bullet damage routed from the ballistics hit callback. */
+  /**
+   * Bullet damage routed from the ballistics hit callback. Returns true when
+   * the hit was LETHAL — the mode uses this to award the non-lethal hit
+   * points only when the zombie survives, keeping hit and kill rewards
+   * mutually exclusive for a single bullet.
+   */
   damageZombie(
     zombie: Zombie,
     part: ZombieHitPart,
     baseDamage: number,
     headshotMultiplier: number,
-  ): void {
+  ): boolean {
     const damage = computeDamage(baseDamage, part, headshotMultiplier);
-    if (zombie.applyDamage(damage, part === 'head')) this.kill(zombie, part === 'head');
+    if (zombie.applyDamage(damage, part === 'head')) {
+      this.kill(zombie, part === 'head');
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Tesla discharge: electrocutes the directly-hit zombie and chains the
+   * charge to the nearest living zombies (selectChainTargets), never the
+   * same one twice, at most CHAIN_MAX_TARGETS. Returns the electrocuted
+   * zombies in arc order (impact first) so the view can draw the bolts.
+   */
+  applyChainLightning(impact: Zombie, damage: number): Zombie[] {
+    // Snapshot living zombies once; the pure selection runs on plain data.
+    const candidates: { id: number; x: number; z: number; alive: boolean }[] = [];
+    const byId = new Map<number, Zombie>();
+    let nextId = 0;
+    for (const z of this.pool.actives) {
+      if (!z.isAlive) continue;
+      const id = nextId++;
+      byId.set(id, z);
+      candidates.push({ id, x: z.position.x, z: z.position.z, alive: true });
+    }
+    const impactId = [...byId.entries()].find(([, z]) => z === impact)?.[0];
+    if (impactId === undefined) return [impact];
+    const impactCandidate = candidates[impactId];
+
+    const chainIds = selectChainTargets(impactCandidate, candidates);
+    const chain: Zombie[] = [];
+    for (const id of chainIds) {
+      const zombie = byId.get(id);
+      if (!zombie) continue;
+      chain.push(zombie);
+      if (zombie.applyDamage(damage)) this.kill(zombie, false);
+    }
+    return chain;
   }
 
   /** Ray Gun splash: linear falloff around the impact point, XZ distance. */
@@ -167,7 +259,7 @@ export class ZombieManager {
       return;
     }
 
-    toPlayer.normalize().multiplyScalar(zombie.speed);
+    toPlayer.normalize();
 
     // Soft neighbor separation so the horde never stacks into one body.
     const separation = this.tmpSeparation.set(0, 0, 0);
@@ -181,8 +273,96 @@ export class ZombieManager {
       separation.addScaledVector(delta.multiplyScalar(1 / dist), ZOMBIE_SEPARATION_RADIUS - dist);
     }
 
-    zombie.position.x += (toPlayer.x + separation.x * SEPARATION_PUSH) * dt;
-    zombie.position.z += (toPlayer.z + separation.z * SEPARATION_PUSH) * dt;
+    const pos = zombie.position;
+    const seekX = toPlayer.x * zombie.speed + separation.x * SEPARATION_PUSH;
+    const seekZ = toPlayer.z * zombie.speed + separation.z * SEPARATION_PUSH;
+
+    let rounding = this.roundState.get(zombie) ?? null;
+
+    if (rounding === null) {
+      // Walking straight: only a wall right ahead triggers rounding.
+      const probeX = pos.x + toPlayer.x * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
+      const probeZ = pos.z + toPlayer.z * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
+      if (this.hitsObstacle(probeX, probeZ)) {
+        // Commit to the wall TANGENT that shortens the path to the player.
+        // The tangent is perpendicular to the approach direction; its sign
+        // is chosen so walking it reduces the lateral gap to the target.
+        const tanX = -toPlayer.z;
+        const tanZ = toPlayer.x;
+        const sign = tanX * (playerX - pos.x) + tanZ * (playerZ - pos.z) >= 0 ? 1 : -1;
+        rounding = { x: tanX * sign, z: tanZ * sign };
+        this.roundState.set(zombie, rounding);
+      }
+    } else if (this.lineOfSightClear(pos, playerX, playerZ, distance)) {
+      // Rounding ends only when the straight path to the player is clear.
+      // Checking the whole segment — not the immediate front — prevents
+      // dropping the state at the corner's edge and re-entering it a meter
+      // later, which read as jitter.
+      this.roundState.delete(zombie);
+      rounding = null;
+    }
+
+    if (rounding === null) {
+      this.moveWithCollision(zombie, seekX * dt, seekZ * dt);
+    } else {
+      // Follow the wall tangent and nothing else: mixing the to-player
+      // direction back in is what dragged zombies backwards off the wall on
+      // diagonal approaches. The tangent is axis-aligned for the (axis-
+      // aligned) range walls, so this slides cleanly along the face and
+      // around the corner. Collision resolution still guarantees no entry.
+      this.moveWithCollision(
+        zombie,
+        rounding.x * zombie.speed * ROUND_SPEED_FACTOR * dt,
+        rounding.z * zombie.speed * ROUND_SPEED_FACTOR * dt,
+      );
+    }
+  }
+
+  /**
+   * True when no obstacle intersects the straight segment from the zombie
+   * to the player. Sampled at body-radius steps: cheap, and exact enough
+   * for obstacles several times wider than the sample spacing.
+   */
+  private lineOfSightClear(
+    pos: THREE.Vector3,
+    targetX: number,
+    targetZ: number,
+    distance: number,
+  ): boolean {
+    const steps = Math.max(1, Math.ceil(distance / ZOMBIE_BODY_RADIUS));
+    const stepX = ((targetX - pos.x) / distance) * (distance / steps);
+    const stepZ = ((targetZ - pos.z) / distance) * (distance / steps);
+    for (let i = 1; i <= steps; i++) {
+      if (this.hitsObstacle(pos.x + stepX * i, pos.z + stepZ * i)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Axis-separated integration: each axis is applied only if its target
+   * spot is clear, so a blocked axis slides along the wall instead of
+   * stopping the zombie dead. The position never enters an obstacle, which
+   * means no tunneling, no corner cutting and no push-out vibration.
+   */
+  private moveWithCollision(zombie: Zombie, dx: number, dz: number): void {
+    const pos = zombie.position;
+    if (dx !== 0 && !this.hitsObstacle(pos.x + dx, pos.z)) pos.x += dx;
+    if (dz !== 0 && !this.hitsObstacle(pos.x, pos.z + dz)) pos.z += dz;
+  }
+
+  /** Circle-vs-AABB test in XZ, with the body radius folded into the box. */
+  private hitsObstacle(x: number, z: number): boolean {
+    for (const box of this.obstacles) {
+      if (
+        x > box.min.x - ZOMBIE_BODY_RADIUS &&
+        x < box.max.x + ZOMBIE_BODY_RADIUS &&
+        z > box.min.z - ZOMBIE_BODY_RADIUS &&
+        z < box.max.z + ZOMBIE_BODY_RADIUS
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private kill(zombie: Zombie, headshot: boolean): void {

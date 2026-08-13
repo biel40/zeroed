@@ -193,6 +193,129 @@ function buildRaygun(config: ViewModelConfig): BuiltProcedural {
 }
 
 /**
+ * ZEUS-77 "Tempest Coil" view model: an original electric Wonder Weapon
+ * built from primitives — a dark gunmetal receiver, two exposed copper
+ * accelerator coils wrapping the barrel, a glowing capacitor spine, and a
+ * fork emitter up front that the chain arcs read as the arc's origin. The
+ * capacitor cell on top is the reloadable part (cell-style choreography).
+ * Distinct silhouette from the Ray Gun: coils + fork vs. rings + sphere.
+ */
+function buildTesla(config: ViewModelConfig): BuiltProcedural {
+  const group = new THREE.Group();
+  const glowColor = config.energyColor ?? 0x7fd4ff;
+
+  const body = new THREE.MeshStandardMaterial({
+    color: config.bodyColor,
+    roughness: 0.4,
+    metalness: 0.8,
+  });
+  const copper = new THREE.MeshStandardMaterial({
+    color: 0xb0603a,
+    roughness: 0.32,
+    metalness: 0.9,
+  });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x11141a, roughness: 0.5, metalness: 0.5 });
+  const energyMaterials: THREE.MeshStandardMaterial[] = [];
+  const makeGlow = (intensity = 1.6): THREE.MeshStandardMaterial => {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x0a0e14,
+      roughness: 0.35,
+      metalness: 0.2,
+      emissive: glowColor,
+      emissiveIntensity: intensity,
+    });
+    energyMaterials.push(material);
+    return material;
+  };
+
+  const add = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    rx = 0,
+    rz = 0,
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = rx;
+    mesh.rotation.z = rz;
+    group.add(mesh);
+    return mesh;
+  };
+
+  const sy = config.sightHeight;
+
+  // Grip and receiver block.
+  add(new THREE.BoxGeometry(0.04, 0.11, 0.05), dark, 0, -0.08, 0.06, 0.3);
+  add(new THREE.BoxGeometry(0.06, 0.072, 0.24), body, 0, 0, -0.01);
+  // Angular shoulder stock.
+  add(new THREE.BoxGeometry(0.05, 0.08, 0.14), dark, 0, -0.02, 0.17, -0.12);
+
+  // Barrel core with twin copper accelerator coils wrapping it.
+  add(new THREE.CylinderGeometry(0.016, 0.016, 0.3, 12), dark, 0, 0.004, -0.22, Math.PI / 2);
+  for (const z of [-0.13, -0.19, -0.25, -0.31]) {
+    add(new THREE.TorusGeometry(0.032, 0.0075, 8, 16), copper, 0, 0.004, z);
+  }
+  // Insulating glow rings between the coils.
+  for (const z of [-0.16, -0.22, -0.28]) {
+    add(new THREE.TorusGeometry(0.03, 0.004, 6, 16), makeGlow(1.3), 0, 0.004, z);
+  }
+
+  // Fork emitter: two prongs splayed apart, arcing tips — the chain origin.
+  for (const side of [-1, 1]) {
+    add(
+      new THREE.BoxGeometry(0.008, 0.008, 0.09),
+      copper,
+      side * 0.02,
+      0.004,
+      -0.38,
+      0,
+      side * 0.18,
+    );
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), makeGlow(2.2));
+    tip.position.set(side * 0.033, 0.004, -0.415);
+    group.add(tip);
+  }
+
+  // Capacitor spine along the top: three glowing cells between copper ribs.
+  const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.09, 12), makeGlow(1.8));
+  cell.rotation.x = Math.PI / 2;
+  cell.position.set(0, 0.062, -0.02);
+  group.add(cell);
+  for (const z of [-0.055, 0.015]) {
+    add(new THREE.TorusGeometry(0.024, 0.005, 6, 14), copper, 0, 0.062, z);
+  }
+  // Cage posts holding the capacitor.
+  add(new THREE.BoxGeometry(0.006, 0.03, 0.006), dark, 0, 0.036, -0.05);
+  add(new THREE.BoxGeometry(0.006, 0.03, 0.006), dark, 0, 0.036, 0.012);
+
+  // Red-dot sight (the Tesla aims true: ADS aligns the dot to shot center).
+  add(new THREE.BoxGeometry(0.02, 0.012, 0.05), dark, 0, sy - 0.024, -0.13);
+  add(new THREE.BoxGeometry(0.003, 0.03, 0.004), dark, -0.011, sy - 0.006, -0.13);
+  add(new THREE.BoxGeometry(0.003, 0.03, 0.004), dark, 0.011, sy - 0.006, -0.13);
+  add(new THREE.BoxGeometry(0.026, 0.003, 0.004), dark, 0, sy + 0.008, -0.13);
+  const dot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.0035, 8, 6),
+    new THREE.MeshBasicMaterial({ color: glowColor, toneMapped: false }),
+  );
+  dot.position.set(0, sy, -0.13);
+  group.add(dot);
+
+  group.scale.setScalar(config.scale);
+  const sightY = sy * config.scale;
+  return {
+    group,
+    muzzlePosition: new THREE.Vector3(0, 0.004 * config.scale, -0.42 * config.scale),
+    ejectionPosition: new THREE.Vector3(0.035 * config.scale, 0, 0.02),
+    sightY,
+    energyMaterials,
+    reloadParts: { magazine: cell },
+  };
+}
+
+/**
  * M1911 view model built from primitives, detailed to hold up next to the
  * GLB rifles: a rounded slide with front + rear cocking serrations, an
  * ejection port, a barrel bushing and Novak-style sights (a REAL notch you
@@ -554,6 +677,24 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
     add(new THREE.CylinderGeometry(0.027, 0.027, 0.035, 12), dark, 0, config.sightHeight, -0.095, Math.PI / 2);
     add(new THREE.BoxGeometry(0.012, 0.03, 0.012), dark, 0, config.sightHeight - 0.034, 0.03);
     add(new THREE.BoxGeometry(0.012, 0.03, 0.012), dark, 0, config.sightHeight - 0.034, -0.05);
+  } else if (config.optic === 'reddot') {
+    // Compact reflex sight: a base and an upright window frame. The emissive
+    // dot sits exactly on the sight line (y = sightHeight, x = 0), so ADS —
+    // which aligns sightY to the camera center — puts the dot on the true
+    // shot center by construction. No per-frame math needed.
+    const sy = config.sightHeight;
+    add(new THREE.BoxGeometry(0.02, 0.012, 0.05), dark, 0, sy - 0.024, -0.02); // base rail
+    // Window frame: two posts + a top bar, leaving the middle open.
+    add(new THREE.BoxGeometry(0.003, 0.03, 0.004), dark, -0.011, sy - 0.006, -0.02);
+    add(new THREE.BoxGeometry(0.003, 0.03, 0.004), dark, 0.011, sy - 0.006, -0.02);
+    add(new THREE.BoxGeometry(0.026, 0.003, 0.004), dark, 0, sy + 0.008, -0.02);
+    // The red dot itself, floating in the window on the sight line.
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.0035, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xff2b2b, toneMapped: false }),
+    );
+    dot.position.set(0, sy, -0.02);
+    group.add(dot);
   } else {
     add(new THREE.BoxGeometry(0.03, 0.024, 0.014), dark, 0, config.sightHeight - 0.012, config.receiverLength / 2 - 0.01);
     add(new THREE.BoxGeometry(0.007, 0.026, 0.007), dark, 0, config.sightHeight - 0.013, barrelMidZ - config.barrelLength / 2 + 0.03);
@@ -596,11 +737,13 @@ export function buildWeaponDisplayModel(
     inner = oriented;
   } else {
     const built =
-      view.energyColor !== undefined
-        ? buildRaygun(view)
-        : view.frame === 'pistol'
-          ? buildPistol(view)
-          : buildProcedural(view);
+      view.teslaFrame === 'tesla'
+        ? buildTesla(view)
+        : view.energyColor !== undefined
+          ? buildRaygun(view)
+          : view.frame === 'pistol'
+            ? buildPistol(view)
+            : buildProcedural(view);
     inner = built.group;
   }
 
@@ -657,13 +800,19 @@ export class WeaponView {
       // GLBs are single-mesh: the detachable magazine and charging handle
       // are procedural add-ons anchored to the model bounds.
       reloadParts = this.buildGlbReloadParts(view, attached);
+      // A red-dot optic rides the GLB's sight line (box.max.y = sightY), so
+      // ADS — which aligns sightY to the camera center — puts the dot on the
+      // true shot center for free, exactly like the procedural builders.
+      if (view.optic === 'reddot') this.attachRedDot(attached.sightY);
     } else {
       const built =
-        view.energyColor !== undefined
-          ? buildRaygun(view)
-          : view.frame === 'pistol'
-            ? buildPistol(view)
-            : buildProcedural(view);
+        view.teslaFrame === 'tesla'
+          ? buildTesla(view)
+          : view.energyColor !== undefined
+            ? buildRaygun(view)
+            : view.frame === 'pistol'
+              ? buildPistol(view)
+              : buildProcedural(view);
       this.root.add(built.group);
       this.muzzle.position.copy(built.muzzlePosition);
       this.ejectionPort.position.copy(built.ejectionPosition);
@@ -704,6 +853,45 @@ export class WeaponView {
 
     this.root.position.copy(this.hipPosition);
     this.root.visible = false;
+  }
+
+  /**
+   * Red-dot reflex sight for GLB weapons: a compact window frame plus an
+   * emissive dot sitting exactly on the sight line (x = 0, y = sightY).
+   * Because ADS aligns the weapon's sightY with the camera center, the dot
+   * lands on the true raycast center by construction — no per-frame math.
+   */
+  private attachRedDot(sightY: number): void {
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x14161a,
+      roughness: 0.5,
+      metalness: 0.55,
+    });
+    const frame = new THREE.Group();
+    const addBar = (
+      w: number,
+      h: number,
+      d: number,
+      x: number,
+      y: number,
+      z: number,
+    ): void => {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), frameMat);
+      bar.position.set(x, y, z);
+      frame.add(bar);
+    };
+    const z = -0.06; // slightly forward of the receiver, on the sight line
+    addBar(0.02, 0.012, 0.05, 0, sightY - 0.024, z); // base rail
+    addBar(0.003, 0.03, 0.004, -0.011, sightY - 0.006, z); // left post
+    addBar(0.003, 0.03, 0.004, 0.011, sightY - 0.006, z); // right post
+    addBar(0.026, 0.003, 0.004, 0, sightY + 0.008, z); // top bar
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.0035, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xff2b2b, toneMapped: false }),
+    );
+    dot.position.set(0, sightY, z);
+    frame.add(dot);
+    this.root.add(frame);
   }
 
   /** Attaches the GLB normalized to real-world length; returns bounds info. */

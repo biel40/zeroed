@@ -27,38 +27,40 @@
       <div id="touch-controls" aria-label="Touch controls">
         <!-- Floating joystick visual: appears where the left-zone finger lands. -->
         <div id="joystick"><div id="joystick-knob"></div></div>
-        <div class="touch-actions">
-          <div class="touch-row">
-            <button type="button" data-action="reload">RLD</button>
-            <button type="button" data-action="mode">MODE</button>
-            <button type="button" data-action="swap-weapon">WPN</button>
-            <button type="button" data-action="interact">USE</button>
-          </div>
-          <div class="touch-row touch-row-main">
-            <button type="button" data-action="ads" id="btn-ads">ADS</button>
-            <button type="button" data-action="fire" id="btn-fire">FIRE</button>
-          </div>
+        <!-- Secondary actions: small, out of the aiming thumb's way. -->
+        <div class="touch-secondary">
+          <button type="button" data-action="reload">RLD</button>
+          <button type="button" data-action="swap-weapon">WPN</button>
+          <button type="button" data-action="interact">USE</button>
+          <button type="button" data-action="mode">MODE</button>
+          <button type="button" data-action="pause" id="btn-pause">| |</button>
+        </div>
+        <!-- Primary actions: right thumb rest position. -->
+        <div class="touch-primary">
+          <button type="button" data-action="ads" id="btn-ads">ADS</button>
+          <button type="button" data-action="fire" id="btn-fire">FIRE</button>
         </div>
       </div>
 
       <div id="hud-weapon" class="hud-panel">
         <div id="hud-weapon-name">M4A1</div>
         <div id="hud-ammo">30 / ∞</div>
-        <div class="hud-row"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
+        <div class="hud-row hud-row-secondary"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
       </div>
 
       <div id="hud-stats" class="hud-panel">
         <div class="hud-row"><span class="hud-label">ACCURACY</span><span id="hud-accuracy">0 %</span></div>
-        <div class="hud-row"><span class="hud-label">HITS</span><span id="hud-hits">0 / 0</span></div>
+        <div class="hud-row hud-row-secondary"><span class="hud-label">HITS</span><span id="hud-hits">0 / 0</span></div>
       </div>
 
       <div id="hud-zombies" class="hud-panel hidden">
         <div id="z-round">GET READY</div>
+        <div id="z-points">0 PTS</div>
         <div class="hud-row"><span class="hud-label">ZOMBIES</span><span id="z-count">0 LEFT</span></div>
         <div class="hud-row"><span class="hud-label">HP</span><span id="z-hp">100</span></div>
         <div id="z-hp-bar"><span id="z-hp-fill"></span></div>
         <div class="hud-row"><span class="hud-label">KILLS</span><span id="z-kills">0</span></div>
-        <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="z-headshots">0</span></div>
+        <div class="hud-row hud-row-secondary"><span class="hud-label">HEADSHOTS</span><span id="z-headshots">0</span></div>
       </div>
 
       <div id="round-banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
@@ -92,6 +94,17 @@
           <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="go-headshots">0</span></div>
         </div>
         <button type="button" id="go-restart">RESTART</button>
+      </div>
+    </div>
+
+    <div id="pause-menu" class="hidden">
+      <div class="start-panel">
+        <h1>PAUSED</h1>
+        <div class="pause-actions">
+          <button type="button" id="pause-resume">RESUME</button>
+          <button type="button" id="pause-restart">RESTART</button>
+          <button type="button" id="pause-menu-btn">MAIN MENU</button>
+        </div>
       </div>
     </div>
 

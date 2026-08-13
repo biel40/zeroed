@@ -53,10 +53,88 @@ export const ROUND_BREAK_SECONDS = 4;
 export const ROUND_START_DELAY = 2.5;
 
 /**
+ * Finite reserve ammunition per weapon in Zombies mode (generous tier).
+ * The mode table wins over the WeaponDefinition (see reserveAmmoFor), so
+ * the M1911 starts a run with 120 rounds total: 8 in the mag + 112 here.
+ * The Tesla (3/18) is not listed and keeps its definition value. The
+ * Shooting Range never consults this table — it stays bottomless.
+ */
+export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
+  m1911: 112,
+  m4a1: 300,
+  ak47: 300,
+  m60: 500,
+  l96: 60,
+  raygun: 160,
+};
+
+/**
  * Kills that auto-unlock the Ray Gun. 115 — the Element 115 nod — is high
  * enough to be an earned mid-run milestone, reachable around rounds 8-10.
  */
 export const RAYGUN_UNLOCK_KILLS = 115;
+
+/**
+ * Kills that auto-unlock the ZEUS-77 "Tempest Coil". 100 arrives earlier
+ * than the Ray Gun milestone on purpose: the Tesla is the horde-control
+ * answer to the mid-round density spike, the Ray Gun the raw-damage one.
+ */
+export const TESLA_UNLOCK_KILLS = 100;
+
+/** Maximum zombies one Tesla shot can electrocute, impact included. */
+export const CHAIN_MAX_TARGETS = 10;
+/** Maximum hop distance between two zombies in the same chain, meters. */
+export const CHAIN_RADIUS = 6;
+/**
+ * Damage per electrocuted zombie. Far above a walker's saturated HP: the
+ * Tesla is a horde DELETE button with scarce ammunition, not a DPS tool.
+ */
+export const CHAIN_ZAP_DAMAGE = 500;
+
+/** Minimal zombie snapshot the chain selection needs (keeps it Three-free). */
+export interface ChainCandidate {
+  readonly id: number;
+  readonly x: number;
+  readonly z: number;
+  readonly alive: boolean;
+}
+
+/**
+ * Picks the zombies electrocuted by one Tesla shot, in arc order. The
+ * directly-hit zombie is always first; each hop jumps to the NEAREST living
+ * candidate within CHAIN_RADIUS of the current tip that has not been struck
+ * yet — so a zombie can never be hit twice in the same chain, and the arc
+ * stops instead of wasting a hop on a far straggler. Returns at most
+ * CHAIN_MAX_TARGETS ids. Pure: unit-tested without a scene.
+ */
+export function selectChainTargets(
+  impact: ChainCandidate,
+  candidates: readonly ChainCandidate[],
+): number[] {
+  const chain: number[] = [impact.id];
+  const visited = new Set<number>([impact.id]);
+  let tip = impact;
+
+  while (chain.length < CHAIN_MAX_TARGETS) {
+    let nearest: ChainCandidate | null = null;
+    let nearestDistSq = CHAIN_RADIUS * CHAIN_RADIUS;
+    for (const c of candidates) {
+      if (!c.alive || visited.has(c.id)) continue;
+      const dx = c.x - tip.x;
+      const dz = c.z - tip.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearest = c;
+      }
+    }
+    if (!nearest) break;
+    visited.add(nearest.id);
+    chain.push(nearest.id);
+    tip = nearest;
+  }
+  return chain;
+}
 
 export const PLAYER_MAX_HP = 100;
 /**

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
+import { PlayerEconomy } from '../game/PlayerEconomy';
 import { PlayerHealth } from '../game/PlayerHealth';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
+import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
 import {
   MYSTERY_BOX_PLACEMENT,
@@ -17,11 +19,14 @@ import { RoundManager } from '../zombies/RoundManager';
 import { Zombie } from '../zombies/Zombie';
 import type { ZombieHitPart } from '../zombies/ZombieConfig';
 import {
+  CHAIN_ZAP_DAMAGE,
   PLAYER_HIT_INVULN,
   PLAYER_MAX_HP,
   PLAYER_REGEN_DELAY,
   PLAYER_REGEN_RATE,
   RAYGUN_UNLOCK_KILLS,
+  TESLA_UNLOCK_KILLS,
+  ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
 import { ZombieManager } from '../zombies/ZombieManager';
 import type { GameMode, ModeContext } from './GameMode';
@@ -51,9 +56,21 @@ export class ZombiesMode implements GameMode {
   /** Two-weapon carry limit, enforced by the shared inventory. */
   readonly maxWeapons = 2;
 
+  /**
+   * Every Zombies weapon runs a finite reserve (generous tier). The mode
+   * table ZOMBIES_RESERVE_AMMO wins over the shared definition (so the
+   * M1911 gets 112 in zombies while keeping 8/32 by definition); weapons
+   * not listed — the Tesla — keep their definition reserve. The range
+   * never calls this — it stays bottomless.
+   */
+  reserveAmmoFor(id: WeaponId): number | undefined {
+    return ZOMBIES_RESERVE_AMMO[id] ?? WEAPON_DEFINITIONS[id].reserveAmmo;
+  }
+
   private ctx!: ModeContext;
   private zombies!: ZombieManager;
   private energy!: EnergyProjectiles;
+  private chain!: ChainLightning;
   private night: NightEnvironment | null = null;
   private box: MysteryBoxMachine | null = null;
   private boxView: MysteryBoxView | null = null;
@@ -64,9 +81,12 @@ export class ZombiesMode implements GameMode {
     PLAYER_REGEN_DELAY,
     PLAYER_REGEN_RATE,
   );
+  /** Centralized Points wallet: every reward and purchase routes through it. */
+  private readonly economy = new PlayerEconomy();
   private kills = 0;
   private headshots = 0;
   private rayGunUnlocked = false;
+  private teslaUnlocked = false;
   private gameOver = false;
   private trauma = 0;
   private shakeSeed = 0;
@@ -92,13 +112,17 @@ export class ZombiesMode implements GameMode {
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
     this.energy.onImpact = (point, config, object, distance) =>
       this.onEnergyImpact(point, config, object, distance);
+    this.chain = new ChainLightning(ctx.scene);
 
     // Day → night: sky, fog, moonlight, practicals and the ambient bed.
     this.night = new NightEnvironment(ctx.scene, ctx.range, ctx.setExposure, ctx.profile);
     ctx.audio.startWind();
 
     // The Mystery Box: main weapon progression, exclusive to this mode.
-    this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, Math.random);
+    // The audio duration provider keeps the reveal synced to the real MP3.
+    this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, Math.random, () =>
+      ctx.audio.getMysteryBoxOpenDuration(),
+    );
     this.boxView = new MysteryBoxView(ctx.assets, MYSTERY_BOX_PLACEMENT.position, MYSTERY_BOX_POOL);
     ctx.scene.add(this.boxView.group);
 
@@ -121,6 +145,7 @@ export class ZombiesMode implements GameMode {
     const playerPos = this.ctx.player.rig.position;
     this.zombies.update(dt, playerPos.x, playerPos.z);
     this.energy.update(dt);
+    this.chain.update(dt);
     this.night?.update(dt);
     if (this.box && this.boxView) {
       this.box.update(dt);
@@ -155,12 +180,15 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.playZombieHit();
     this.ctx.effects.puff(point, 0x6e1d16, 0.2);
     const part = (object.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
-    this.zombies.damageZombie(
+    const lethal = this.zombies.damageZombie(
       zombie,
       part,
       weapon.definition.damage,
       weapon.definition.headshotMultiplier,
     );
+    // Non-lethal hits pay +10; a lethal hit pays its kill reward instead
+    // (via onZombieKilled), so one bullet never double-dips.
+    if (!lethal) this.economy.awardHit();
   }
 
   /** The Ray Gun bypasses hitscan ballistics and fires a visible bolt. */
@@ -180,8 +208,14 @@ export class ZombiesMode implements GameMode {
   onInteract(): void {
     if (this.gameOver || !this.box || !this.playerInBoxRange()) return;
     if (this.box.state === 'closed') {
-      // Free while no points economy exists; MYSTERY_BOX_TUNING.cost is the
-      // future hook and must be charged HERE, at activation time.
+      // Charge at activation time. spend() is atomic and tryActivate() only
+      // fires from 'closed', so repeated E presses during the animation can
+      // never double-charge: the box is no longer closed on the next press.
+      if (!this.economy.spend(MYSTERY_BOX_TUNING.cost)) {
+        this.ctx.hud.flashNotEnoughPoints();
+        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${MYSTERY_BOX_TUNING.cost} PTS NEEDED`);
+        return;
+      }
       this.box.tryActivate();
       return;
     }
@@ -280,7 +314,25 @@ export class ZombiesMode implements GameMode {
     this.kills++;
     if (headshot) this.headshots++;
     this.ctx.audio.playZombieDeath();
+    // Kill reward: headshot (+100) replaces the normal kill (+50); the two
+    // never stack for one death. Splash/chain kills arrive here too, so all
+    // kill points flow through this single call.
+    this.economy.awardKill(headshot);
+    if (!this.teslaUnlocked && this.kills >= TESLA_UNLOCK_KILLS) this.unlockTesla();
     if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) this.unlockRayGun();
+  }
+
+  /**
+   * 100-kill milestone: the ZEUS-77 is granted outright (the inventory's
+   * slot-cap rules apply), announced with the round banner and an electric
+   * sting. The flag makes the handout fire exactly once per run; restart()
+   * re-arms it. Same proven pattern as the Ray Gun milestone below.
+   */
+  private unlockTesla(): void {
+    this.teslaUnlocked = true;
+    this.ctx.grantWeapon('tesla');
+    this.ctx.hud.showRoundBanner('ZEUS-77 UNLOCKED', `${TESLA_UNLOCK_KILLS} KILLS`);
+    this.ctx.audio.playTeslaUnlock();
   }
 
   /**
@@ -335,16 +387,44 @@ export class ZombiesMode implements GameMode {
     object: THREE.Object3D | null,
     distance: number,
   ): void {
-    this.ctx.audio.playRayImpact();
     if (this.gameOver) return;
+    const zombie = object?.userData.zombie as Zombie | undefined;
+    const isTesla = config.color === WEAPON_DEFINITIONS.tesla.energy?.color;
+
+    // Tesla: electric discharge that chains to nearby zombies. No splash;
+    // the damage travels zombie-to-zombie, which is the whole point.
+    if (isTesla && zombie && zombie.isAlive) {
+      this.ctx.audio.playTeslaShot();
+      this.ctx.stats.registerHit(distance);
+      this.ctx.hud.showHitmarker();
+      const chain = this.zombies.applyChainLightning(zombie, CHAIN_ZAP_DAMAGE);
+      this.ctx.audio.playTeslaChain(chain.length);
+      // Arc from the muzzle through each electrocuted zombie in order.
+      const muzzle = this.ctx.player.camera.getWorldPosition(this.tmpDirection);
+      const points: THREE.Vector3[] = [muzzle.clone()];
+      for (const z of chain) {
+        points.push(new THREE.Vector3(z.position.x, z.position.y + 1.1, z.position.z));
+      }
+      this.chain.discharge(points);
+      return;
+    }
+
+    // A Tesla bolt that strikes the environment just grounds out: an electric
+    // crack, no chain (the design chains zombie-to-zombie, never from dirt).
+    if (isTesla) {
+      this.ctx.audio.playTeslaShot();
+      return;
+    }
+
+    this.ctx.audio.playRayImpact();
 
     const raygun = WEAPON_DEFINITIONS.raygun;
-    const zombie = object?.userData.zombie as Zombie | undefined;
     if (zombie && zombie.isAlive) {
       const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
       this.ctx.stats.registerHit(distance);
       this.ctx.hud.showHitmarker();
-      this.zombies.damageZombie(zombie, part, raygun.damage, raygun.headshotMultiplier);
+      const lethal = this.zombies.damageZombie(zombie, part, raygun.damage, raygun.headshotMultiplier);
+      if (!lethal) this.economy.awardHit();
     }
     // Splash includes the directly-hit zombie: the Ray Gun fantasy is that
     // a bullseye on a packed horde is devastating.
@@ -361,11 +441,18 @@ export class ZombiesMode implements GameMode {
     this.ctx.unlockPointer();
   }
 
+  /** Pause-menu RESTART: reset the run and resume (re-locks the pointer). */
+  onRestartRequested(): void {
+    this.restart();
+  }
+
   private restart(): void {
     this.gameOver = false;
     this.kills = 0;
     this.headshots = 0;
     this.rayGunUnlocked = false;
+    this.teslaUnlocked = false;
+    this.economy.reset();
     this.health.reset();
     this.rounds.reset();
     this.zombies.reset();
@@ -386,6 +473,7 @@ export class ZombiesMode implements GameMode {
       maxHp: this.health.maxHp,
       kills: this.kills,
       headshots: this.headshots,
+      points: this.economy.points,
     });
   }
 }

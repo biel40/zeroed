@@ -23,10 +23,21 @@ export const MYSTERY_BOX_POOL: readonly MysteryBoxEntry[] = [
 /** Timings (seconds) and behaviour knobs of the box sequence. */
 export const MYSTERY_BOX_TUNING = {
   /** Lid swing before the roll starts. */
-  openTime: 0.7,
-  /** Randomized roll duration window (~2–4 s of weapon cycling). */
-  rollTimeMin: 2.2,
-  rollTimeMax: 3.6,
+  openTime: 0.12,
+  /**
+   * Fallback roll window, used only while the opening theme is not decoded
+   * yet (or missing entirely). Once the real MP3 duration is known the roll
+   * is timed by `revealLeadTime` instead — see computeRollDuration.
+   */
+  rollTimeMin: 5.88,
+  rollTimeMax: 5.88,
+  /** The weapon reveal lands this many seconds before the opening theme ends. */
+  revealLeadTime: 1,
+  /**
+   * Lower bound for the roll, even if the decoded clip is oddly short: the
+   * roulette needs a minimum run to read as a roulette at all.
+   */
+  rollTimeFloor: 2,
   /** How long the result floats before the box takes it back. */
   pickupTime: 10,
   /** Lid swing back down. */
@@ -40,10 +51,10 @@ export const MYSTERY_BOX_TUNING = {
    */
   repeatFactor: 0.35,
   /**
-   * Reserved for the future points economy. 0 = free while zombies award
-   * no points; charging later is a tuning change, not a redesign.
+   * Price in Points, charged atomically at activation time (see
+   * ZombiesMode.onInteract). 950 is the classic CoD Zombies box cost.
    */
-  cost: 0,
+  cost: 950,
 } as const;
 
 /** Where the crate sits in the zombies arena and how interaction reaches. */
@@ -125,6 +136,12 @@ export class MysteryBoxMachine {
     private readonly pool: readonly MysteryBoxEntry[],
     private readonly tuning: typeof MYSTERY_BOX_TUNING,
     private readonly rng: () => number = Math.random,
+    /**
+     * Duration of the decoded opening theme in seconds, or null while the
+     * asset is still loading. Read fresh at every roll start, so a clip
+     * that finishes decoding mid-session syncs from the next activation.
+     */
+    private readonly openAudioDuration: () => number | null = () => null,
   ) {
     if (pool.length === 0) throw new Error('MysteryBoxMachine needs a non-empty pool');
     this.displayId = pool[0].weaponId;
@@ -153,6 +170,7 @@ export class MysteryBoxMachine {
     if (this.phase !== 'closed') return false;
     this.phase = 'opening';
     this.timer = this.tuning.openTime;
+    this.pendingEvents.push({ type: 'opened' });
     return true;
   }
 
@@ -174,10 +192,9 @@ export class MysteryBoxMachine {
         this.timer -= dt;
         if (this.timer <= 0) {
           this.phase = 'rolling';
-          this.rollDuration = lerp(this.tuning.rollTimeMin, this.tuning.rollTimeMax, this.rng());
+          this.rollDuration = this.computeRollDuration();
           this.timer = this.rollDuration;
           this.tickTimer = 0;
-          this.pendingEvents.push({ type: 'opened' });
         }
         break;
       case 'rolling': {
@@ -235,6 +252,23 @@ export class MysteryBoxMachine {
 
   clearEvents(): void {
     this.pendingEvents.length = 0;
+  }
+
+  /**
+   * Roll length for this activation. With the opening theme decoded, the
+   * reveal (openTime + roll) lands exactly `revealLeadTime` before the
+   * audio ends; without it, the fixed fallback window keeps the show
+   * running. The floor protects the roulette from degenerate clips.
+   */
+  private computeRollDuration(): number {
+    const audioDuration = this.openAudioDuration();
+    if (audioDuration !== null && Number.isFinite(audioDuration) && audioDuration > 0) {
+      return Math.max(
+        this.tuning.rollTimeFloor,
+        audioDuration - this.tuning.revealLeadTime - this.tuning.openTime,
+      );
+    }
+    return lerp(this.tuning.rollTimeMin, this.tuning.rollTimeMax, this.rng());
   }
 
   /** Next weapon shown on the wheel; never the same one twice in a row. */

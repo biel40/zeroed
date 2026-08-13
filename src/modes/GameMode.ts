@@ -68,6 +68,14 @@ export interface GameMode {
   readonly startingInventory?: readonly WeaponId[];
   /** Inventory slot cap; defaults to weaponIds.length (effectively uncapped). */
   readonly maxWeapons?: number;
+  /**
+   * Starting reserve ammunition per weapon, when the mode overrides the
+   * definition's default. Return undefined to keep the definition value
+   * (which itself may be undefined = bottomless). Zombies uses this to give
+   * every weapon a finite pool while the Shooting Range stays bottomless —
+   * the shared WeaponDefinition is never mutated per mode.
+   */
+  reserveAmmoFor?(id: WeaponId): number | undefined;
   init(ctx: ModeContext): void;
   update(dt: number): void;
   /** Routes ballistics hits on HitTargets (range plates, zombie hitboxes…). */
@@ -91,6 +99,13 @@ export interface GameMode {
   onPointerUnlock?(): boolean;
   /** Interact key (E) pressed while gameplay input is active. */
   onInteract?(): void;
+  /**
+   * The pause menu's RESTART action. The mode resets its own run state
+   * (health, rounds, kills, economy, arsenal) and resumes play. Optional:
+   * modes without run state (the Shooting Range) may omit it — Game falls
+   * back to re-locking the pointer.
+   */
+  onRestartRequested?(): void;
   /**
    * Center-screen interaction prompt ("MYSTERY BOX\nPress E"); polled every
    * frame by the shell. Return null to hide it.

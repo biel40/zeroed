@@ -24,6 +24,13 @@ describe('Zombies progression contract', () => {
     expect(WEAPON_DEFINITIONS.m1911.reserveAmmo).toBe(32);
   });
 
+  it('gives the M1911 a 120-round total in Zombies: 8 in the mag, 112 in reserve', () => {
+    const mode = new ZombiesMode();
+    // The shared definition stays 8/32; the mode table overrides the reserve.
+    expect(WEAPON_DEFINITIONS.m1911.magazineSize).toBe(8);
+    expect(mode.reserveAmmoFor?.('m1911')).toBe(112);
+  });
+
   it('preloads every Mystery Box reward (rolls never hit the network)', () => {
     const mode = new ZombiesMode();
     for (const entry of MYSTERY_BOX_POOL) {
@@ -43,8 +50,8 @@ describe('Zombies progression contract', () => {
     expect(MYSTERY_BOX_POOL.some((e) => e.weaponId === 'raygun')).toBe(true);
   });
 
-  it('keeps the box free for now but cost-ready', () => {
-    expect(MYSTERY_BOX_TUNING.cost).toBe(0);
+  it('prices the box at 950 points, charged at activation', () => {
+    expect(MYSTERY_BOX_TUNING.cost).toBe(950);
     expect(MYSTERY_BOX_TUNING.pickupTime).toBe(10);
   });
 
@@ -53,6 +60,8 @@ describe('Zombies progression contract', () => {
     const mode: GameMode = new ShootingRangeMode();
     expect(mode.startingInventory).toBeUndefined();
     expect(mode.maxWeapons).toBeUndefined();
+    // The range never overrides reserves: every weapon stays bottomless.
+    expect(mode.reserveAmmoFor).toBeUndefined();
     expect(mode.onInteract).toBeUndefined();
     expect(mode.getInteractPrompt).toBeUndefined();
     expect(mode.weaponIds).not.toContain('raygun');
@@ -86,6 +95,9 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
       audio: {
         playZombieDeath: () => undefined,
         playMysteryBoxReveal: (isRayGun: boolean) => void ctx.reveals.push(isRayGun),
+        // The 100-kill Tesla milestone fires before 115; the mock must
+        // acknowledge it even though these tests only assert the Ray Gun.
+        playTeslaUnlock: () => undefined,
       },
     };
     return { mode, ctx };
@@ -101,31 +113,34 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
     expect(RAYGUN_UNLOCK_KILLS).toBe(115);
   });
 
-  it('does not unlock before the milestone', () => {
+  it('does not unlock the Ray Gun before its milestone', () => {
     const { mode, ctx } = makeMode();
     kill(mode, RAYGUN_UNLOCK_KILLS - 1);
-    expect(ctx.granted).toEqual([]);
-    expect(ctx.banners).toEqual([]);
+    // The Tesla (100) is already unlocked by now — that milestone is lower.
+    // This test only pins the Ray Gun staying locked until 115.
+    expect(ctx.granted).not.toContain('raygun');
+    expect(ctx.banners).not.toContain('RAY GUN UNLOCKED');
     expect(ctx.reveals).toEqual([]);
   });
 
   it('grants the Ray Gun with a banner exactly at 115 kills, and only once', () => {
     const { mode, ctx } = makeMode();
     kill(mode, RAYGUN_UNLOCK_KILLS);
-    expect(ctx.granted).toEqual(['raygun']);
-    expect(ctx.banners).toEqual(['RAY GUN UNLOCKED']);
+    expect(ctx.granted.filter((w) => w === 'raygun')).toEqual(['raygun']);
+    expect(ctx.banners).toContain('RAY GUN UNLOCKED');
     expect(ctx.reveals).toEqual([true]);
 
     kill(mode, 50); // the horde keeps dying; the unlock must not repeat
-    expect(ctx.granted).toEqual(['raygun']);
-    expect(ctx.banners).toHaveLength(1);
+    expect(ctx.granted.filter((w) => w === 'raygun')).toHaveLength(1);
+    expect(ctx.banners.filter((b) => b === 'RAY GUN UNLOCKED')).toHaveLength(1);
     expect(ctx.reveals).toHaveLength(1);
   });
 
   it('re-arms the milestone after a restart (new run, fresh kill count)', () => {
     const { mode, ctx } = makeMode();
     kill(mode, RAYGUN_UNLOCK_KILLS);
-    expect(ctx.granted).toEqual(['raygun']);
+    // Both milestones fire on the way to 115: Tesla at 100, Ray Gun at 115.
+    expect(ctx.granted).toEqual(['tesla', 'raygun']);
 
     // Minimal shell surface restart() touches beyond what makeMode mocks.
     const shell = (mode as unknown as { ctx: Record<string, unknown> }).ctx;
@@ -139,9 +154,11 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
     };
 
     (mode as unknown as { restart(): void }).restart();
+    // After restart, kill up to just below the Ray Gun milestone: the Tesla
+    // re-arms too, but the Ray Gun must NOT re-grant until 115 again.
     kill(mode, RAYGUN_UNLOCK_KILLS - 1);
-    expect(ctx.granted).toEqual(['raygun']); // still re-armed, not early
+    expect(ctx.granted.filter((w) => w === 'raygun')).toHaveLength(1); // not re-armed early
     kill(mode, 1);
-    expect(ctx.granted).toEqual(['raygun', 'raygun']);
+    expect(ctx.granted.filter((w) => w === 'raygun')).toHaveLength(2);
   });
 });

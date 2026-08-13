@@ -35,10 +35,21 @@ export class Weapon {
   constructor(
     readonly definition: WeaponDefinition,
     rng: () => number = Math.random,
+    /**
+     * Mode-provided reserve override. When present (even as undefined →
+     * bottomless) it wins over definition.reserveAmmo, letting a mode make a
+     * weapon finite (Zombies) or bottomless (Range) without mutating the
+     * shared definition. Omit the argument to use the definition value.
+     */
+    reserveOverride?: number,
   ) {
     this.recoil = new RecoilController(definition.recoil, rng);
     this.ammoInMagazine = definition.magazineSize;
-    this.initialReserve = definition.reserveAmmo ?? null;
+    // arguments.length distinguishes "no override passed" from an explicit
+    // undefined override — the former keeps the definition, the latter
+    // forces a bottomless reserve.
+    this.initialReserve =
+      arguments.length >= 3 ? (reserveOverride ?? null) : (definition.reserveAmmo ?? null);
     this.reserveAmmo = this.initialReserve;
     this.fireMode = definition.defaultFireMode;
   }

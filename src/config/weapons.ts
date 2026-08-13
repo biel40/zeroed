@@ -134,7 +134,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       receiverLength: 0.24,
       stockLength: 0.2,
       magazine: 'straight',
-      optic: 'irons',
+      optic: 'reddot',
       sightHeight: 0.075,
       bulk: 1,
       reloadAnim: {
@@ -203,7 +203,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       receiverLength: 0.25,
       stockLength: 0.22,
       magazine: 'curved',
-      optic: 'irons',
+      optic: 'reddot',
       sightHeight: 0.07,
       bulk: 1.02,
       reloadAnim: {
@@ -432,16 +432,100 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       },
     },
   },
+  /**
+   * ZEUS-77 "Tempest Coil" — original electric Wonder Weapon, homage to the
+   * classic chain-lightning archetype without copying its name or design.
+   * A slow, visible arc bolt: the zombie it strikes is electrocuted and the
+   * charge chains to up to CHAIN_MAX_TARGETS nearby zombies (see
+   * ZombieConfig.selectChainTargets). Very high damage, scarce ammunition.
+   * Only unlocked at the TESLA_UNLOCK_KILLS milestone; never in the box.
+   */
+  tesla: {
+    id: 'tesla',
+    name: 'ZEUS-77',
+    fireModes: ['semi'],
+    defaultFireMode: 'semi',
+    rpm: 90,
+    magazineSize: 3,
+    reserveAmmo: 18,
+    reloadTime: 3.2,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    // The direct hit and every chained zap deal CHAIN_ZAP_DAMAGE via the
+    // mode; this base damage is what a NON-chained zombie would take.
+    damage: 500,
+    headshotMultiplier: 1,
+    // A visible arc bolt, fast but readable; the chain runs off the impact.
+    energy: { projectileSpeed: 90, splashRadius: 0, splashDamage: 0, color: 0x7fd4ff },
+    recoil: {
+      verticalKick: 0.014,
+      horizontalKick: 0.005,
+      horizontalBias: 0,
+      kickVariance: 0.2,
+      recoverySpeed: 10,
+      recoveryDelay: 0.06,
+      cameraShare: 0.55,
+      adsRecoilMultiplier: 0.8,
+    },
+    spread: {
+      hipBase: 0.004,
+      adsBase: 0.001,
+      bloomPerShot: 0.001,
+      maxBloom: 0.008,
+      bloomRecovery: 0.05,
+    },
+    ads: { fov: 60, speed: 10, sensitivity: 0.8 },
+    projectile: { muzzleVelocity: 90, gravity: 0, maxDistance: 80, drag: 0 },
+    moveSpeedMultiplier: 0.98,
+    equipTime: 0.45,
+    audio: { volume: 0.6, duration: 0.2, lowpass: 5200, thump: 240, energy: true },
+    view: {
+      // Dedicated procedural builder (WeaponView.buildTesla): twin coils,
+      // capacitor fins and a fork emitter. No GLB, like the Ray Gun.
+      teslaFrame: 'tesla',
+      energyColor: 0x7fd4ff,
+      hip: [0.24, -0.22, -0.44],
+      ads: [0, 0, -0.3],
+      sway: 0.95,
+      bob: 1,
+      visualRecoil: { kickImpulse: 0.9, pitchImpulse: 1.8, rollImpulse: 0.7, stiffness: 150, damping: 14 },
+      scale: 1.05,
+      bodyColor: 0x2e3844,
+      accentColor: 0xb87333,
+      barrelLength: 0.3,
+      barrelRadius: 0.016,
+      receiverLength: 0.26,
+      stockLength: 0.18,
+      magazine: 'internal',
+      optic: 'reddot',
+      sightHeight: 0.075,
+      bulk: 1.05,
+      reloadAnim: {
+        style: 'cell',
+        magOut: 0.1,
+        magDrop: 0.26,
+        magIn: 0.48,
+        magSeat: 0.62,
+        // No charging handle: the charge window drives the coil spin-up.
+        charge: 0.68,
+        chargeEnd: 0.95,
+        magSize: [0.05, 0.06, 0.05],
+        magColor: 0x7fd4ff,
+      },
+    },
+  },
 };
 
 export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96', 'm1911'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
- * pistol plus the whole Mystery Box pool — so box rolls never touch the
- * network. This is NOT the slot list: the zombies inventory starts with
- * the M1911 alone (see ZombiesMode.startingInventory) and the Ray Gun is
- * only obtainable from the Mystery Box.
+ * pistol plus the whole Mystery Box pool and the milestone unlocks — so
+ * rolls and unlocks never touch the network. This is NOT the slot list:
+ * the zombies inventory starts with the M1911 alone (see
+ * ZombiesMode.startingInventory); the Ray Gun comes from the Mystery Box
+ * and the ZEUS-77 from the 100-kill milestone.
  */
 export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm1911',
@@ -450,4 +534,5 @@ export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm60',
   'l96',
   'raygun',
+  'tesla',
 ];

@@ -162,3 +162,92 @@ describe('ZombieManager splash damage (Ray Gun)', () => {
     expect(kills).toEqual([false]); // splash kills are not headshots
   });
 });
+
+describe('ZombieManager wall collisions', () => {
+  /** Solid box collider like the range walls (concrete by default). */
+  function makeWall(
+    x: number,
+    z: number,
+    width: number,
+    depth: number,
+    surface = 'concrete',
+  ): THREE.Mesh {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, 2.3, depth));
+    mesh.position.set(x, 1.15, z);
+    mesh.userData.surface = surface;
+    mesh.updateMatrixWorld(true);
+    return mesh;
+  }
+
+  function onlyZombie(manager: ZombieManager): Zombie {
+    return [...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives][0];
+  }
+
+  it('walls are never penetrated, but a wide wall gets rounded', () => {
+    const colliders: THREE.Object3D[] = [makeWall(0, -10, 10, 0.4)];
+    const manager = new ZombieManager(() => 0);
+    manager.registerColliders(colliders);
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = onlyZombie(manager);
+    zombie.position.set(0, 0, -14); // straight line to the player goes through the wall
+
+    // Every frame: the body must NEVER enter the wall box (radius folded in).
+    // The old contract asserted the zombie stayed pressed against the wall
+    // forever — that frozen push IS the stuck bug this fixes. The new
+    // contract: the zombie rounds the wall and reaches the player's side,
+    // while never clipping through the geometry at any point.
+    const frames = Math.round(8 / DT);
+    for (let i = 0; i < frames; i++) {
+      manager.update(DT, 0, 4);
+      const inX = zombie.position.x > -5.21 && zombie.position.x < 5.21;
+      const inZ = zombie.position.z > -10.41 && zombie.position.z < -9.59;
+      expect(inX && inZ).toBe(false);
+    }
+    // Rounded: the straight-line distance to the player shrank far more
+    // than the wall's depth alone could account for by pressing.
+    expect(Math.hypot(zombie.position.x - 0, zombie.position.z - 4)).toBeLessThan(16);
+  });
+
+  it('slides along the wall and rounds the edge instead of getting stuck', () => {
+    // Narrow wall covering x ∈ [0, 3]; player offset to the left so the
+    // slide direction reaches the wall's left edge.
+    const colliders: THREE.Object3D[] = [makeWall(1.5, -10, 3, 0.4)];
+    const manager = new ZombieManager(() => 0);
+    manager.registerColliders(colliders);
+    manager.spawnZombie(roundConfig(1), -3, 4);
+    const zombie = onlyZombie(manager);
+    zombie.position.set(2.5, 0, -14);
+
+    const frames = Math.round(20 / DT);
+    for (let i = 0; i < frames; i++) {
+      manager.update(DT, -3, 4);
+      // Pressing against the wall face is legal; penetrating more than half
+      // the body radius into the actual wall box (x ∈ [0,3], z ∈ [-10.2,-9.8])
+      // is not: that would mean corner cutting or tunneling.
+      const inX = zombie.position.x > -0.21 && zombie.position.x < 3.21;
+      const inZ = zombie.position.z > -10.41 && zombie.position.z < -9.59;
+      expect(inX && inZ).toBe(false);
+    }
+    // Rounded the edge and kept walking towards the player.
+    expect(zombie.position.z).toBeGreaterThan(-9.5);
+  });
+
+  it('ignores non-blocking colliders (thin platforms, steel targets)', () => {
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(16.5, 0.16, 11));
+    platform.position.set(0, 0.08, 3.5);
+    platform.userData.surface = 'concrete';
+    platform.updateMatrixWorld(true);
+    const target = makeWall(0, -12, 1, 0.1, 'steel');
+    const colliders: THREE.Object3D[] = [platform, target];
+    const manager = new ZombieManager(() => 0);
+    manager.registerColliders(colliders);
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = onlyZombie(manager);
+    zombie.position.set(0, 0, -16);
+
+    step(manager, 6);
+
+    // Walked straight through both: distance to the player shrank a lot.
+    expect(zombie.position.z).toBeGreaterThan(-10);
+  });
+});

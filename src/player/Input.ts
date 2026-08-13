@@ -1,10 +1,9 @@
 import type { DeviceProfile } from '../core/DeviceProfile';
-import { analogStick } from '../utils/math';
+import { analogStick, clamp } from '../utils/math';
+import { resolveTouchZone } from './touchLayout';
 
 type ListenerTarget = Document | HTMLElement | Window;
 
-/** Left fraction of the canvas reserved for the movement joystick. */
-const MOVE_ZONE_RATIO = 0.45;
 /**
  * Touch look sensitivity relative to the mouse baseline: a comfortable
  * full-width swipe turns the player roughly 180°.
@@ -20,12 +19,12 @@ const JOYSTICK_DEAD_ZONE = 0.14;
  * Mouse buttons are only tracked while the pointer is locked; per-frame edge
  * detection is exposed through wasPressed() and cleared with endFrame().
  *
- * Touch layer (enabled by profile.useTouchControls): the left 45% of the
- * canvas hosts a floating analog joystick (moveAxisX/Y), the rest is the
- * camera zone. Each zone is owned by exactly one pointerId at a time, so
- * multitouch (move + look simultaneously) never mixes coordinates, and
- * pointer capture keeps every drag bound to the canvas until the finger
- * lifts — no camera jumps on press, move, or release.
+ * Touch layer (enabled by profile.useTouchControls): the bottom-left pad
+ * hosts a floating analog joystick (moveAxisX/Y) and the rest of the canvas
+ * drags the camera — see resolveTouchZone. Each zone is owned by exactly one
+ * pointerId at a time, so multitouch (move + look + fire simultaneously)
+ * never mixes coordinates, and pointer capture keeps every drag bound to the
+ * canvas until the finger lifts — no camera jumps on press, move, or release.
  */
 export class Input {
   mouseDeltaX = 0;
@@ -39,6 +38,8 @@ export class Input {
   onLockChange: ((locked: boolean) => void) | null = null;
   /** Edge action of the touch weapon-swap button (mobile has no 1–5 keys). */
   onWeaponSwap: (() => void) | null = null;
+  /** Edge action of the touch pause button (mobile has no ESC key). */
+  onPauseRequest: (() => void) | null = null;
 
   private readonly keysDown = new Set<string>();
   private readonly keysPressed = new Set<string>();
@@ -163,11 +164,15 @@ export class Input {
           this.onWeaponSwap?.();
           return;
         }
+        if (action === 'pause') {
+          this.onPauseRequest?.();
+          return;
+        }
         this.setVirtualAction(action, true);
       };
       const pointerUp = (event: Event) => {
         event.preventDefault();
-        if (action !== 'swap-weapon') this.setVirtualAction(action, false);
+        if (action !== 'swap-weapon' && action !== 'pause') this.setVirtualAction(action, false);
       };
       this.add(control, 'pointerdown', pointerDown as EventListener);
       this.add(control, 'pointerup', pointerUp as EventListener);
@@ -223,19 +228,24 @@ export class Input {
 
   /**
    * A touch claims its zone at pointerdown and keeps it until release. The
-   * left zone anchors the floating joystick; anywhere else claims the camera
-   * with the exact touchdown position as reference (no jump). Extra fingers
-   * beyond one per zone are ignored entirely — they can never corrupt the
-   * tracked positions (the old single-cursor bug).
+   * bottom-left pad anchors the floating joystick; anywhere else claims the
+   * camera with the exact touchdown position as reference (no jump). Extra
+   * fingers beyond one per zone are ignored entirely — they can never corrupt
+   * the tracked positions (the old single-cursor bug).
    */
   private readonly handleTouchDown = (event: PointerEvent): void => {
     if (event.pointerType !== 'touch') return;
     if (event.pointerId === this.lookPointerId || event.pointerId === this.movePointerId) return;
 
     const rect = this.lockElement.getBoundingClientRect();
-    const inMoveZone = event.clientX - rect.left < rect.width * MOVE_ZONE_RATIO;
+    const zone = resolveTouchZone(
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+      rect.width,
+      rect.height,
+    );
 
-    if (inMoveZone && this.movePointerId === null) {
+    if (zone === 'move' && this.movePointerId === null) {
       this.movePointerId = event.pointerId;
       this.moveOriginX = event.clientX;
       this.moveOriginY = event.clientY;
@@ -246,7 +256,7 @@ export class Input {
       return;
     }
 
-    if (!inMoveZone && this.lookPointerId === null) {
+    if (zone === 'look' && this.lookPointerId === null) {
       this.lookPointerId = event.pointerId;
       this.lookLastX = event.clientX;
       this.lookLastY = event.clientY;
@@ -312,8 +322,14 @@ export class Input {
 
   private showJoystick(clientX: number, clientY: number): void {
     if (!this.joystickBase || !this.joystickKnob) return;
-    this.joystickBase.style.transform =
-      `translate(${clientX}px, ${clientY}px) translate(-50%, -50%)`;
+    // The ring is drawn clamped inside the viewport while the stick still
+    // measures from the real touch point: a thumb resting in the very corner
+    // keeps full visual feedback instead of showing half a circle.
+    const radius = this.joystickBase.offsetWidth / 2;
+    const rect = this.lockElement.getBoundingClientRect();
+    const x = clamp(clientX, rect.left + radius, rect.right - radius);
+    const y = clamp(clientY, rect.top + radius, rect.bottom - radius);
+    this.joystickBase.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
     this.joystickKnob.style.transform = 'translate(-50%, -50%)';
     this.joystickBase.classList.add('active');
   }

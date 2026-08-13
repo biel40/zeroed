@@ -11,6 +11,7 @@ export interface ZombieHudState {
   readonly maxHp: number;
   readonly kills: number;
   readonly headshots: number;
+  readonly points: number;
 }
 
 export interface GameOverStats {
@@ -47,6 +48,7 @@ export class HUD {
   private readonly statsPanel = mustGet('hud-stats');
   private readonly zombiesPanel = mustGet('hud-zombies');
   private readonly zRound = mustGet('z-round');
+  private readonly zPoints = mustGet('z-points');
   private readonly zCount = mustGet('z-count');
   private readonly zHp = mustGet('z-hp');
   private readonly zHpFill = mustGet('z-hp-fill');
@@ -142,10 +144,11 @@ export class HUD {
 
   /** Zombies panel; the whole block only re-renders when something changed. */
   updateZombies(state: ZombieHudState): void {
-    const key = `${state.round}|${state.alive}|${state.pending}|${state.hp}|${state.kills}|${state.headshots}`;
+    const key = `${state.round}|${state.alive}|${state.pending}|${state.hp}|${state.kills}|${state.headshots}|${state.points}`;
     if (key === this.lastZombies) return;
     this.lastZombies = key;
     this.zRound.textContent = state.round > 0 ? `ROUND ${state.round}` : 'GET READY';
+    this.zPoints.textContent = `${state.points} PTS`;
     this.zCount.textContent = `${state.alive + state.pending} LEFT`;
     this.zHp.textContent = `${Math.ceil(state.hp)}`;
     const ratio = clamp(state.hp / state.maxHp, 0, 1);
@@ -153,6 +156,14 @@ export class HUD {
     this.zHpFill.classList.toggle('low', ratio <= 0.3);
     this.zKills.textContent = `${state.kills}`;
     this.zHeadshots.textContent = `${state.headshots}`;
+  }
+
+  /** Brief red flash on the points counter: a purchase was refused. */
+  flashNotEnoughPoints(): void {
+    this.zPoints.classList.remove('denied');
+    // Force reflow so the CSS animation restarts on rapid repeated attempts.
+    void this.zPoints.offsetWidth;
+    this.zPoints.classList.add('denied');
   }
 
   /** Big centered announcement; CSS animation auto-fades it. */
@@ -185,6 +196,29 @@ export class HUD {
 
   setZombiesRestartHandler(handler: () => void): void {
     mustGet('go-restart').addEventListener('click', handler);
+  }
+
+  /** Pause menu: shown while the game loop is halted (Game owns the state). */
+  showPauseMenu(): void {
+    mustGet('pause-menu').classList.remove('hidden');
+  }
+
+  hidePauseMenu(): void {
+    mustGet('pause-menu').classList.add('hidden');
+  }
+
+  /**
+   * Wires the three pause-menu actions. Handlers live in Game (it owns the
+   * loop, the pointer lock and the restart/menu flow).
+   */
+  setPauseHandlers(handlers: {
+    onResume: () => void;
+    onRestart: () => void;
+    onMainMenu: () => void;
+  }): void {
+    mustGet('pause-resume').addEventListener('click', handlers.onResume);
+    mustGet('pause-restart').addEventListener('click', handlers.onRestart);
+    mustGet('pause-menu-btn').addEventListener('click', handlers.onMainMenu);
   }
 
   showHitmarker(): void {

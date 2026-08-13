@@ -21,6 +21,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Fixed, not flow-sized: the canvas box can never be pushed around or
+   scrolled by the browser chrome collapsing and expanding. */
+#app {
+  position: fixed;
+  inset: 0;
+}
+
 #app,
 #app canvas {
   display: block;
@@ -205,37 +212,45 @@ body {
   will-change: transform;
 }
 
-.touch-actions {
+/* Action clusters. The wrappers stay transparent to pointers so the gaps
+   between buttons keep dragging the camera; only the buttons themselves
+   swallow touches. */
+.touch-primary,
+.touch-secondary {
   position: absolute;
-  right: calc(16px + env(safe-area-inset-right, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
-.touch-row {
-  display: flex;
+.touch-primary {
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  align-items: flex-end;
   gap: 10px;
 }
 
-.touch-row-main {
+/* Secondary actions ride above the fire button, in the same right-hand
+   column, so the aiming area stays one uninterrupted surface. */
+.touch-secondary {
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  flex-direction: column;
   align-items: flex-end;
+  gap: 8px;
 }
 
 #touch-controls button {
-  min-width: 58px;
-  height: 58px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 16px;
-  background: rgba(12, 17, 22, 0.62);
+  min-width: 46px;
+  height: 46px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 13px;
+  background: rgba(12, 17, 22, 0.5);
   color: #eef5ff;
-  font: 700 12px 'Segoe UI', sans-serif;
-  letter-spacing: 0.06em;
+  font: 700 11px 'Segoe UI', sans-serif;
+  letter-spacing: 0.05em;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
   /* 'none', not 'manipulation': no pan/zoom gesture may start on a button. */
   touch-action: none;
   user-select: none;
@@ -243,69 +258,27 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+#touch-controls button:active {
+  background: rgba(60, 78, 96, 0.7);
+}
+
+.touch-secondary button {
+  opacity: 0.72;
+}
+
 #btn-fire {
-  width: 92px;
-  height: 92px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
-  font-size: 15px;
-  background: rgba(178, 34, 34, 0.55);
-  border-color: rgba(255, 120, 100, 0.5);
+  font-size: 14px;
+  background: rgba(178, 34, 34, 0.5);
+  border-color: rgba(255, 120, 100, 0.45);
 }
 
 #btn-ads {
-  width: 68px;
-  height: 68px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-}
-
-@media (pointer: coarse) {
-  #touch-controls {
-    display: block;
-  }
-
-  /* Bottom corners are reserved for the joystick (left) and the action
-     buttons (right); the panels move to the top so nothing overlaps. */
-  #hud-weapon {
-    left: calc(12px + env(safe-area-inset-left, 0px));
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-    min-width: 132px;
-    padding: 8px 12px;
-  }
-
-  #hud-ammo {
-    font-size: 20px;
-  }
-
-  #hud-stats,
-  #hud-zombies {
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-  }
-
-  #interact-prompt {
-    top: 44%;
-  }
-
-  #banner-title {
-    font-size: 30px;
-  }
-
-  /* Keyboard legend and side-by-side cards do not fit small screens. */
-  .controls-grid {
-    display: none;
-  }
-
-  .mode-grid {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .mode-grid button {
-    width: min(300px, 82vw);
-    padding: 16px 14px;
-  }
 }
 
 @keyframes hitpop {
@@ -367,6 +340,26 @@ body {
   letter-spacing: 0.14em;
   color: #ff8a5c;
   margin-bottom: 6px;
+}
+
+#z-points {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #ffd25c;
+  margin-bottom: 8px;
+}
+
+/* Purchase refused: a quick red flash on the points counter. */
+#z-points.denied {
+  animation: pointsdenied 0.5s ease;
+}
+
+@keyframes pointsdenied {
+  0%, 100% { color: #ffd25c; transform: translateX(0); }
+  25% { color: #ff5c5c; transform: translateX(-3px); }
+  50% { color: #ff5c5c; transform: translateX(3px); }
+  75% { color: #ff5c5c; transform: translateX(-2px); }
 }
 
 #z-hp-bar {
@@ -560,6 +553,55 @@ body {
   background: rgba(255, 210, 103, 0.28);
 }
 
+/* ---------- Pause menu ---------- */
+
+#pause-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 9, 13, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+#pause-menu h1 {
+  color: #ffd267;
+  letter-spacing: 0.2em;
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 260px;
+  margin-top: 18px;
+}
+
+.pause-actions button {
+  padding: 13px 34px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(24, 31, 40, 0.9);
+  color: #e8ecf1;
+  font: 700 14px 'Consolas', monospace;
+  letter-spacing: 0.25em;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.pause-actions button:hover {
+  border-color: #ffd267;
+  background: rgba(255, 210, 103, 0.14);
+}
+
+#pause-resume {
+  border-color: #ffd267;
+  color: #ffd267;
+  background: rgba(255, 210, 103, 0.12);
+}
+
 .hud-row {
   display: flex;
   justify-content: space-between;
@@ -666,4 +708,209 @@ kbd {
   background: rgba(255, 255, 255, 0.06);
   font: 600 11px 'Consolas', monospace;
   color: #e8ecf1;
+}
+
+/* ---------- Touch / mobile ----------
+   These blocks live LAST on purpose. Every override here targets the same
+   selectors as the desktop rules above (same specificity), so only source
+   order decides the winner: anything placed earlier silently loses. That is
+   what used to leave the panels with both `top` and `bottom` set, stretching
+   them down the whole screen.
+
+   Three layers, broad to specific: any coarse pointer gets the touch controls
+   and top-anchored panels; narrow screens (phones upright) and short screens
+   (phones on their side) then shrink the HUD further. Desktop matches none. */
+
+@media (pointer: coarse) {
+  #touch-controls {
+    display: block;
+  }
+
+  /* Bottom corners are reserved for the joystick (left) and the action
+     buttons (right); the panels move to the top so nothing overlaps.
+     `bottom: auto` is what keeps a panel hugging its content. */
+  #hud-weapon {
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    min-width: 0;
+  }
+
+  #hud-stats,
+  #hud-zombies {
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: auto;
+    min-width: 0;
+  }
+
+  /* Keyboard legend and side-by-side cards do not fit small screens. */
+  .controls-grid {
+    display: none;
+  }
+
+  .mode-grid {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .mode-grid button {
+    width: min(300px, 82vw);
+    padding: 16px 14px;
+  }
+
+  .start-panel {
+    padding: 24px 22px;
+    max-width: 92vw;
+    max-height: 88dvh;
+    overflow-y: auto;
+  }
+}
+
+/* Phones upright: the panels become corner badges so the centre of the
+   screen — where the zombies and the crosshair live — stays clear. */
+@media (pointer: coarse) and (max-width: 560px) {
+  .hud-panel {
+    padding: 5px 8px;
+    border-radius: 5px;
+    line-height: 1.25;
+  }
+
+  /* Detail rows are desktop luxuries; the phone shows only what is acted on. */
+  .hud-row-secondary {
+    display: none;
+  }
+
+  .hud-row {
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .hud-label {
+    font-size: 8px;
+  }
+
+  #hud-weapon-name {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  #hud-ammo {
+    font-size: 17px;
+    margin: 0;
+  }
+
+  #hud-zombies {
+    max-width: 120px;
+  }
+
+  #z-round {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    margin-bottom: 2px;
+  }
+
+  #z-hp-bar {
+    height: 3px;
+    margin: 2px 0 3px;
+  }
+
+  #aim-distance {
+    top: calc(50% + 26px);
+    font-size: 11px;
+  }
+
+  #banner-title {
+    font-size: 26px;
+    letter-spacing: 0.2em;
+  }
+
+  #banner-sub {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+  }
+
+  #interact-prompt {
+    top: 56%;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+  }
+
+  #joystick {
+    width: 108px;
+    height: 108px;
+  }
+
+  #joystick-knob {
+    width: 46px;
+    height: 46px;
+  }
+}
+
+/* Phones on their side: width is plentiful, height is not. Everything
+   shrinks vertically and the buttons tuck into the bottom-right corner. */
+@media (pointer: coarse) and (max-height: 480px) {
+  .hud-panel {
+    padding: 4px 7px;
+  }
+
+  .hud-row-secondary {
+    display: none;
+  }
+
+  .hud-row {
+    font-size: 10px;
+  }
+
+  #hud-ammo {
+    font-size: 15px;
+    margin: 0;
+  }
+
+  #z-round {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .touch-secondary {
+    /* Two short columns instead of one tall one: a single column would run
+       into the HUD on a 380 px-tall viewport. */
+    flex-flow: column wrap;
+    max-height: 100px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    right: calc(108px + env(safe-area-inset-right, 0px));
+    gap: 6px;
+  }
+
+  #touch-controls button {
+    min-width: 42px;
+    height: 42px;
+    font-size: 10px;
+  }
+
+  #btn-fire {
+    width: 70px;
+    height: 70px;
+    font-size: 12px;
+  }
+
+  #btn-ads {
+    width: 52px;
+    height: 52px;
+  }
+
+  #joystick {
+    width: 96px;
+    height: 96px;
+  }
+
+  #joystick-knob {
+    width: 42px;
+    height: 42px;
+  }
+
+  #banner-title {
+    font-size: 24px;
+  }
 }

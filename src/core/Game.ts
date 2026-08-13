@@ -82,6 +82,18 @@ export class Game {
   private readonly debugElement: HTMLElement | null = null;
   private debugTimer = 0;
   private fpsEstimate = 60;
+  /**
+   * Real pause: while true the tick renders the frozen frame but advances
+   * NOTHING — no player, weapon, ballistics, mode, effects or timers. This
+   * is a simulation halt, not hidden UI or blocked input. Owned here because
+   * only Game controls the loop and the pointer lock.
+   */
+  private paused = false;
+
+  /** Last applied viewport size in CSS pixels; also drives the spread math. */
+  private viewportWidth = 1;
+  private viewportHeight = 1;
+  private resizeObserver: ResizeObserver | null = null;
 
   private readonly tmpOrigin = new THREE.Vector3();
   private readonly tmpDirection = new THREE.Vector3();
@@ -94,7 +106,7 @@ export class Game {
   private readonly frameInput = { trigger: false, ads: false };
 
   constructor(
-    container: HTMLElement,
+    private readonly container: HTMLElement,
     private readonly hud: HUD,
     private readonly assets: AssetManager,
     private readonly profile: DeviceProfile = getDeviceProfile(),
@@ -110,9 +122,15 @@ export class Game {
     };
 
     console.info('[Game] Initializing renderer with profile', this.profile.log);
+    this.viewportWidth = container.clientWidth || window.innerWidth || 1;
+    this.viewportHeight = container.clientHeight || window.innerHeight || 1;
     this.renderer = new THREE.WebGLRenderer(rendererOptions);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    // updateStyle=false everywhere: CSS owns the canvas box (100% of a
+    // dvh-sized container), the renderer only owns the drawing buffer. An
+    // inline px size here would freeze the arrangement of the first frame
+    // and survive every later resize — exactly what cropped mobile viewports.
+    this.renderer.setSize(this.viewportWidth, this.viewportHeight, false);
     this.renderer.shadowMap.enabled = !this.profile.useReducedEffects;
     this.renderer.shadowMap.type = this.profile.shadowQuality === 0 ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.autoUpdate = !this.profile.useReducedEffects;
@@ -132,7 +150,7 @@ export class Game {
     pmrem.dispose();
 
     this.input = new Input(this.renderer.domElement, this.profile);
-    this.player = new PlayerController(window.innerWidth / window.innerHeight);
+    this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
     this.scene.add(this.player.rig);
 
     this.range = new ShootingRange(this.assets);
@@ -172,7 +190,12 @@ export class Game {
     };
 
     for (const id of this.mode.weaponIds) {
-      const weapon = new Weapon(WEAPON_DEFINITIONS[id]);
+      // The mode decides the starting reserve (Zombies: finite; Range:
+      // bottomless). When the mode defines reserveAmmoFor, its return value
+      // wins over the shared definition — see Weapon's reserveOverride.
+      const weapon = this.mode.reserveAmmoFor
+        ? new Weapon(WEAPON_DEFINITIONS[id], Math.random, this.mode.reserveAmmoFor(id))
+        : new Weapon(WEAPON_DEFINITIONS[id]);
       const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops);
       view.onReloadPhase = (phase) =>
         this.audio.playReloadPhase(phase, !!weapon.definition.audio.energy);
@@ -216,10 +239,28 @@ export class Game {
       }
       // A mode with its own overlay (game over) suppresses the pause screen.
       if (this.mode.onPointerUnlock?.()) return;
-      this.hud.showStartScreen(true);
-      this.hud.setHudVisible(false);
+      // Desktop ESC released the pointer: open the real pause menu (the
+      // simulation is now halted) instead of the bare "click to resume".
+      if (!this.paused) this.pause();
     };
     this.hud.setStartHandler(() => this.start());
+
+    // Pause wiring. Desktop: ESC toggles (the pointer-lock release opens the
+    // menu via onLockChange; a keydown ESC while unlocked resumes). Mobile:
+    // the touch pause button. The menu buttons drive resume/restart/menu.
+    this.input.onPauseRequest = () => {
+      if (this.paused) this.resume();
+      else this.pause();
+    };
+    this.hud.setPauseHandlers({
+      onResume: () => this.resume(),
+      onRestart: () => this.restartRun(),
+      onMainMenu: () => window.location.reload(),
+    });
+    // ESC to resume while the menu is open and the pointer is unlocked.
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' && this.paused) this.resume();
+    });
 
     if (new URLSearchParams(window.location.search).has('debug')) {
       this.debugElement = document.createElement('div');
@@ -229,17 +270,55 @@ export class Game {
 
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('orientationchange', this.handleResize);
+    // orientationchange fires before the layout settles on several mobile
+    // browsers, and the URL bar collapsing resizes the container without any
+    // window event at all. Observing the container itself catches every case.
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(this.handleResize);
+      this.resizeObserver.observe(container);
+    }
+    window.visualViewport?.addEventListener('resize', this.handleResize);
     this.renderer.setAnimationLoop(this.tick);
   }
 
   /** Entry point for the first user gesture: resumes audio, locks the pointer. */
   start(): void {
     this.audio.resume();
+    void this.audio.loadMysteryBoxOpenAsset();
     this.input.requestPointerLock();
     if (this.profile.useTouchControls) {
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
     }
+  }
+
+  /**
+   * Pause/resume. Pausing halts the simulation (see `paused`) and releases
+   * the pointer on desktop; resuming re-locks it and continues from the exact
+   * same state — nothing is reset or advanced while paused.
+   */
+  private pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    this.hud.showPauseMenu();
+    // Release the pointer so the cursor can click the menu (desktop).
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+
+  private resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    this.hud.hidePauseMenu();
+    // Re-lock from this user gesture (the RESUME click / ESC press).
+    this.start();
+  }
+
+  private restartRun(): void {
+    this.paused = false;
+    this.hud.hidePauseMenu();
+    // The mode owns its run state; restart() re-arms health, rounds, kills,
+    // economy and re-locks the pointer.
+    this.mode.onRestartRequested?.();
   }
 
   /** Arsenal lookup; every WeaponId the modes reference is preloaded. */
@@ -258,9 +337,14 @@ export class Game {
   }
 
   private readonly handleResize = (): void => {
-    const viewport = window.visualViewport;
-    const width = viewport ? viewport.width : window.innerWidth || document.documentElement.clientWidth || 1;
-    const height = viewport ? viewport.height : window.innerHeight || document.documentElement.clientHeight || 1;
+    // The container is the single source of truth: it is laid out in dvh, so
+    // it already excludes the browser chrome, and unlike visualViewport it
+    // does not shrink with pinch zoom or the on-screen keyboard.
+    const width = this.container.clientWidth || window.innerWidth || 1;
+    const height = this.container.clientHeight || window.innerHeight || 1;
+    if (width === this.viewportWidth && height === this.viewportHeight) return;
+    this.viewportWidth = width;
+    this.viewportHeight = height;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit));
     this.renderer.setSize(width, height, false);
     this.player.resize(width / height);
@@ -413,7 +497,17 @@ export class Game {
   }
 
   private readonly tick = (): void => {
+    // Always consume the clock delta so resuming never sees a huge dt spike.
     const dt = Math.min(this.clock.getDelta(), MAX_DELTA);
+
+    // Paused: render the frozen frame and nothing else. No player, weapon,
+    // ballistics, mode, effects or timers advance — the simulation halts.
+    if (this.paused) {
+      this.renderer.render(this.scene, this.player.camera);
+      this.input.endFrame();
+      return;
+    }
+
     const weapon = this.currentWeapon;
     const allowGameplayInput = this.input.pointerLocked || this.profile.useTouchControls;
 
@@ -458,7 +552,7 @@ export class Game {
 
     const fovRadians = (this.player.camera.fov * Math.PI) / 180;
     const spreadPixels = clamp(
-      10 + (Math.tan(weapon.currentSpread()) / Math.tan(fovRadians / 2)) * (window.innerHeight / 2),
+      10 + (Math.tan(weapon.currentSpread()) / Math.tan(fovRadians / 2)) * (this.viewportHeight / 2),
       10,
       MAX_SPREAD_PIXELS,
     );

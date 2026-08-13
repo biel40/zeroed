@@ -1,4 +1,4 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911' | 'tesla';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -77,7 +77,12 @@ export interface EnergyWeaponConfig {
 }
 
 export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal';
-export type OpticStyle = 'irons' | 'scope';
+/**
+ * irons: classic post+notch. scope: telescopic sight (L96). reddot: a
+ * compact reflex sight whose emissive dot sits exactly on the sight line,
+ * so ADS aligns the dot with the true shot center for free.
+ */
+export type OpticStyle = 'irons' | 'scope' | 'reddot';
 
 /**
  * Reload choreography per weapon. All times are fractions of reloadTime
@@ -171,6 +176,8 @@ export interface ViewModelConfig {
   readonly energyColor?: number;
   /** 'pistol' uses the handgun builder (slide, hammer, grip magazine). Default: long gun. */
   readonly frame?: 'pistol';
+  /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
+  readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
   readonly reloadAnim?: ReloadAnimConfig;
 }

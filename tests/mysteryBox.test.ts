@@ -94,6 +94,13 @@ describe('MysteryBoxMachine state flow', () => {
     expect(machine.result).toBeNull();
   });
 
+  it('starts the open cue right when the player interacts so the audio is not delayed', () => {
+    const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => 0.5);
+    expect(machine.tryActivate()).toBe(true);
+    expect(machine.pendingEvents.map((event) => event.type)).toContain('opened');
+    expect(machine.state).toBe('opening');
+  });
+
   it('walks closed → opening → rolling → awaitingPickup with a pool result', () => {
     const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => 0.5);
     expect(machine.tryActivate()).toBe(true);
@@ -157,6 +164,12 @@ describe('MysteryBoxMachine state flow', () => {
     expect(machine.tryActivate()).toBe(true);
   });
 
+  it('reveals the weapon one second before the 7-second audio cue ends', () => {
+    const revealTime = MYSTERY_BOX_TUNING.openTime + MYSTERY_BOX_TUNING.rollTimeMin;
+    expect(revealTime).toBeCloseTo(6, 1);
+    expect(MYSTERY_BOX_TUNING.rollTimeMin).toBe(MYSTERY_BOX_TUNING.rollTimeMax);
+  });
+
   it('rolls for a randomized duration inside the configured window', () => {
     // rng = 0 → minimum roll time.
     const fast = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => 0);
@@ -183,6 +196,76 @@ describe('MysteryBoxMachine state flow', () => {
     expect(machine.pendingEvents).toHaveLength(0);
     // And a fresh roll works afterwards.
     expect(machine.tryActivate()).toBe(true);
+  });
+});
+
+describe('MysteryBoxMachine audio-synced reveal', () => {
+  /** Activates and steps until the result is offered; returns seconds since activation. */
+  function timeToReveal(machine: MysteryBoxMachine): number {
+    expect(machine.tryActivate()).toBe(true);
+    let elapsed = 0;
+    while (machine.state !== 'awaitingPickup' && elapsed < 30) {
+      machine.update(DT);
+      machine.clearEvents();
+      elapsed += DT;
+    }
+    expect(machine.state).toBe('awaitingPickup');
+    return elapsed;
+  }
+
+  it('lands the reveal exactly 1 s before the real audio duration ends', () => {
+    // Decoded theme of 7.4 s → the result must appear 6.4 s after interaction.
+    const machine = new MysteryBoxMachine(
+      MYSTERY_BOX_POOL,
+      MYSTERY_BOX_TUNING,
+      () => 0.5,
+      () => 7.4,
+    );
+    expect(timeToReveal(machine)).toBeCloseTo(6.4, 1);
+  });
+
+  it('re-reads the duration per roll, so a late-decoding asset syncs from the next use', () => {
+    let duration: number | null = null;
+    const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => 0, () => duration);
+    // First roll: asset still decoding → fixed fallback window.
+    expect(timeToReveal(machine)).toBeCloseTo(
+      MYSTERY_BOX_TUNING.openTime + MYSTERY_BOX_TUNING.rollTimeMin,
+      1,
+    );
+    // Grab the result, wait for the close, then roll again with the audio ready.
+    machine.tryPickup();
+    step(machine, MYSTERY_BOX_TUNING.closeTime + 0.1);
+    duration = 8;
+    expect(timeToReveal(machine)).toBeCloseTo(7, 1); // 8 s theme − 1 s lead
+  });
+
+  it('never rolls shorter than the floor, even with a suspiciously short clip', () => {
+    // A 2 s clip would imply a 0.88 s roll: clamped to the floor instead.
+    const machine = new MysteryBoxMachine(
+      MYSTERY_BOX_POOL,
+      MYSTERY_BOX_TUNING,
+      () => 0.5,
+      () => 2,
+    );
+    expect(timeToReveal(machine)).toBeCloseTo(
+      MYSTERY_BOX_TUNING.openTime + MYSTERY_BOX_TUNING.rollTimeFloor,
+      1,
+    );
+  });
+
+  it('emits the result exactly once per roll (no double delivery)', () => {
+    const machine = new MysteryBoxMachine(
+      MYSTERY_BOX_POOL,
+      MYSTERY_BOX_TUNING,
+      () => 0.5,
+      () => 7,
+    );
+    machine.tryActivate();
+    const events = step(machine, 12); // whole sequence + pickup window start
+    expect(events.filter((type) => type === 'result')).toHaveLength(1);
+    // Picking up consumes the single result; a second pickup is refused.
+    expect(machine.tryPickup()).not.toBeNull();
+    expect(machine.tryPickup()).toBeNull();
   });
 });
 
