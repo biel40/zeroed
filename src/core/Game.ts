@@ -201,7 +201,11 @@ export class Game {
         : new Weapon(WEAPON_DEFINITIONS[id]);
       const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops);
       view.onReloadPhase = (phase) =>
-        this.audio.playReloadPhase(phase, !!weapon.definition.audio.energy);
+        this.audio.playReloadPhase(
+          phase,
+          !!weapon.definition.audio.energy,
+          weapon.definition.view.reloadAnim?.style ?? 'rifle',
+        );
       this.player.camera.add(view.root);
       this.arsenal.set(id, { weapon, view });
     }

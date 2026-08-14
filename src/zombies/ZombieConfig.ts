@@ -23,6 +23,10 @@ export const ZOMBIE_BASE_SPEED = 1.9;
 export const ZOMBIE_ATTACK_DAMAGE = 25;
 /** Distance at which a zombie starts its attack lunge, meters. */
 export const ZOMBIE_ATTACK_RANGE = 1.9;
+/** Damage per attack against a window board. */
+export const ZOMBIE_BARRIER_ATTACK_DAMAGE = 50;
+/** Distance at which a zombie starts attacking a barrier board. */
+export const ZOMBIE_BARRIER_ATTACK_RANGE = 1.2;
 /** Seconds between the end of one attack and the next wind-up. */
 export const ZOMBIE_ATTACK_RECOVERY = 0.7;
 /** Zombies closer than this push each other apart (soft separation). */

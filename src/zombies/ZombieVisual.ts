@@ -34,6 +34,7 @@ export const ZOMBIE_VARIANTS: Record<ZombieVariantId, VariantConfig> = {
       spawn: ['ZombieCrawl', 'Crawl'],
       walk: ['ZombieWalk', 'Walk'],
       attack: ['ZombieBite', 'Bite', 'Punch'],
+      barrierAttack: ['ZombieBite', 'Bite', 'Punch'],
       hit: ['ZombieHit', 'HitReact', 'Hit'],
       death: ['ZombieDeath', 'Death'],
     },

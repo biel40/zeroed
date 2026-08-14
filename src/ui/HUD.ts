@@ -63,6 +63,7 @@ export class HUD {
   private readonly goKills = mustGet('go-kills');
   private readonly goHeadshots = mustGet('go-headshots');
   private readonly modeSelect = mustGet('mode-select');
+  private readonly mapSelect = mustGet('map-select');
   private readonly interactPrompt = mustGet('interact-prompt');
 
   private lastWeapon = '';
@@ -130,6 +131,18 @@ export class HUD {
       button.addEventListener('click', () => {
         this.modeSelect.classList.add('hidden');
         onSelect(button.dataset.mode === 'zombies' ? 'zombies' : 'range');
+      });
+    }
+  }
+
+  /** Map picker shown after choosing Zombies mode. */
+  showMapSelect(onSelect: (mapId: 'classic' | 'burned-mansion') => void): void {
+    this.mapSelect.classList.remove('hidden');
+    for (const button of this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]')) {
+      button.addEventListener('click', () => {
+        this.mapSelect.classList.add('hidden');
+        const mapId = button.dataset.map;
+        onSelect(mapId === 'burned-mansion' ? 'burned-mansion' : 'classic');
       });
     }
   }

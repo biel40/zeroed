@@ -47,6 +47,11 @@ estar verdes.** No hay CI que te salve.
    pero, si `paused`, solo renderiza el frame congelado: no avanza player,
    weapon, ballistics, mode, effects ni timers. No bases pausa en ocultar UI
    o bloquear inputs.
+8. **Visibilidad explícita en TypeScript.** Todos los métodos y propiedades de
+   clases deben declarar `public`, `private`, `protected` o `static` cuando
+   aplique, y el tipo de retorno siempre debe estar tipado. `static` solo se
+   usa para lógica que no depende de `this`; no conviertas funciones de
+   instancia en `public static` por costumbre.
 
 ## Mapa de la arquitectura
 

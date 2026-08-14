@@ -7,14 +7,8 @@ import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
 import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
-import {
-  MYSTERY_BOX_PLACEMENT,
-  MYSTERY_BOX_POOL,
-  MYSTERY_BOX_TUNING,
-  MysteryBoxMachine,
-} from '../zombies/MysteryBox';
+import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zombies/MysteryBox';
 import { MysteryBoxView } from '../zombies/MysteryBoxView';
-import { NightEnvironment } from '../zombies/NightEnvironment';
 import { RoundManager } from '../zombies/RoundManager';
 import { Zombie } from '../zombies/Zombie';
 import type { ZombieHitPart } from '../zombies/ZombieConfig';
@@ -29,6 +23,11 @@ import {
   ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
 import { ZombieManager } from '../zombies/ZombieManager';
+import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
+import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
+import { PointDoor } from '../zombies/doors/PointDoor';
+import { ClassicArena } from '../zombies/maps/ClassicArena';
+import type { ZombieArena } from '../zombies/maps/ZombieArena';
 import type { GameMode, ModeContext } from './GameMode';
 import { standardTargetHitEffects } from './hitEffects';
 
@@ -68,10 +67,10 @@ export class ZombiesMode implements GameMode {
   }
 
   private ctx!: ModeContext;
+  private arena!: ZombieArena;
   private zombies!: ZombieManager;
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
-  private night: NightEnvironment | null = null;
   private box: MysteryBoxMachine | null = null;
   private boxView: MysteryBoxView | null = null;
   private readonly rounds = new RoundManager();
@@ -91,11 +90,32 @@ export class ZombiesMode implements GameMode {
   private trauma = 0;
   private shakeSeed = 0;
   private moanTimer = MOAN_MIN_DELAY;
-  /** Reused by the box facing check; avoids per-frame allocation. */
+  /** Barrier the player is currently repairing, if any. */
+  private activeRepairBarrier: WindowBarrier | null = null;
+  /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
   private readonly tmpDirection = new THREE.Vector3();
+
+  constructor(private readonly mapId: 'classic' | 'burned-mansion' = 'classic') {}
 
   init(ctx: ModeContext): void {
     this.ctx = ctx;
+
+    if (this.mapId === 'burned-mansion') {
+      // Hide the default sunny range; the mansion brings its own geometry.
+      ctx.range.group.visible = false;
+      this.arena = new BurnedMansionArena(ctx.scene, ctx.profile);
+    } else {
+      this.arena = new ClassicArena(ctx.range, ctx.scene, ctx.setExposure, ctx.profile);
+    }
+
+    this.arena.init();
+    ctx.scene.add(this.arena.group);
+
+    // Replace ballistics colliders with the arena's geometry. For the classic
+    // map this is equivalent to the range colliders; for the mansion it swaps
+    // in the mansion walls.
+    ctx.hitColliders.length = 0;
+    ctx.hitColliders.push(...this.arena.colliders);
 
     this.zombies = new ZombieManager(
       Math.random,
@@ -103,6 +123,8 @@ export class ZombiesMode implements GameMode {
       { walker: ctx.assets.getZombieModel('walker') },
       // Static shadow maps (mobile) must not have moving casters.
       !ctx.profile.useReducedEffects,
+      this.arena.spawnPoints,
+      this.arena.barriers,
     );
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
@@ -114,17 +136,30 @@ export class ZombiesMode implements GameMode {
       this.onEnergyImpact(point, config, object, distance);
     this.chain = new ChainLightning(ctx.scene);
 
-    // Day → night: sky, fog, moonlight, practicals and the ambient bed.
-    this.night = new NightEnvironment(ctx.scene, ctx.range, ctx.setExposure, ctx.profile);
-    ctx.audio.startWind();
+    if (this.mapId === 'classic') {
+      ctx.audio.startWind();
+    }
 
     // The Mystery Box: main weapon progression, exclusive to this mode.
     // The audio duration provider keeps the reveal synced to the real MP3.
     this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, Math.random, () =>
       ctx.audio.getMysteryBoxOpenDuration(),
     );
-    this.boxView = new MysteryBoxView(ctx.assets, MYSTERY_BOX_PLACEMENT.position, MYSTERY_BOX_POOL);
+    this.boxView = new MysteryBoxView(
+      ctx.assets,
+      this.arena.mysteryBoxPlacement.position,
+      MYSTERY_BOX_POOL,
+    );
+    this.boxView.group.rotation.y = this.arena.mysteryBoxPlacement.yaw;
     ctx.scene.add(this.boxView.group);
+
+    // Player wall collision / floor transitions for the mansion.
+    if (this.arena.useWallCollision) {
+      if (this.arena.playerBounds) ctx.player.setBounds(this.arena.playerBounds);
+      if (this.arena.wallColliders) ctx.player.setWallColliders(this.arena.wallColliders);
+      if (this.arena.floorTransitions) ctx.player.setFloorTransitions(this.arena.floorTransitions);
+      ctx.player.teleport(0, 1.7, 0, 0, this.arena.playerBounds);
+    }
 
     ctx.hud.setRangeStatsVisible(false);
     ctx.hud.setZombiesPanelVisible(true);
@@ -139,6 +174,7 @@ export class ZombiesMode implements GameMode {
       this.health.update(dt);
       this.rounds.update(dt, this.zombies.aliveCount);
       this.processRoundEvents();
+      this.updateRepair(dt);
       this.updateAmbience(dt);
     }
 
@@ -146,7 +182,7 @@ export class ZombiesMode implements GameMode {
     this.zombies.update(dt, playerPos.x, playerPos.z);
     this.energy.update(dt);
     this.chain.update(dt);
-    this.night?.update(dt);
+    this.arena.update(dt);
     if (this.box && this.boxView) {
       this.box.update(dt);
       this.boxView.update(dt, this.box);
@@ -204,9 +240,23 @@ export class ZombiesMode implements GameMode {
     return this.gameOver;
   }
 
-  /** E pressed: use the box when closed, take the result when offered. */
+  /** E pressed: door unlock > box use > box pickup. */
   onInteract(): void {
-    if (this.gameOver || !this.box || !this.playerInBoxRange()) return;
+    if (this.gameOver) return;
+
+    const door = this.findFacingDoor();
+    if (door && door.isLocked) {
+      const result = door.tryUnlock((cost: number) => this.economy.spend(cost));
+      if (result.success) {
+        this.onDoorUnlocked(door);
+      } else {
+        this.ctx.hud.flashNotEnoughPoints();
+        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${result.cost} PTS NEEDED`);
+      }
+      return;
+    }
+
+    if (!this.box || !this.playerInBoxRange()) return;
     if (this.box.state === 'closed') {
       // Charge at activation time. spend() is atomic and tryActivate() only
       // fires from 'closed', so repeated E presses during the animation can
@@ -225,18 +275,31 @@ export class ZombiesMode implements GameMode {
     }
   }
 
-  /** Center-screen prompt: only near the box, and only when it is usable. */
+  /** Center-screen prompt: door > barrier repair > box. */
   getInteractPrompt(): string | null {
-    if (this.gameOver || !this.box || !this.playerInBoxRange()) return null;
-    const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
+    if (this.gameOver) return null;
+    const key = this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E';
+    const tapKey = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
+
+    const door = this.findFacingDoor();
+    if (door && door.isLocked) {
+      return `UNLOCK ${door.id.toUpperCase().replace(/-/g, ' ')}\n${tapKey} — ${door.cost} PTS`;
+    }
+
+    const barrier = this.findRepairableBarrier();
+    if (barrier && barrier.isDamaged) {
+      return `REPAIR BARRICADE\n${key}`;
+    }
+
+    if (!this.box || !this.playerInBoxRange()) return null;
     switch (this.box.state) {
       case 'closed':
         return MYSTERY_BOX_TUNING.cost > 0
-          ? `MYSTERY BOX\n${key} — ${MYSTERY_BOX_TUNING.cost} PTS`
-          : `MYSTERY BOX\n${key}`;
+          ? `MYSTERY BOX\n${tapKey} — ${MYSTERY_BOX_TUNING.cost} PTS`
+          : `MYSTERY BOX\n${tapKey}`;
       case 'awaitingPickup': {
         const result = this.box.result;
-        return result ? `${key} to take ${WEAPON_DEFINITIONS[result].name}` : null;
+        return result ? `${tapKey} to take ${WEAPON_DEFINITIONS[result].name}` : null;
       }
       default:
         return null;
@@ -248,19 +311,20 @@ export class ZombiesMode implements GameMode {
    * crate, so the box can never be triggered from across the map.
    */
   private playerInBoxRange(): boolean {
+    const placement = this.arena.mysteryBoxPlacement;
     const playerPos = this.ctx.player.rig.position;
-    const boxPos = MYSTERY_BOX_PLACEMENT.position;
+    const boxPos = placement.position;
     const dx = boxPos.x - playerPos.x;
     const dz = boxPos.z - playerPos.z;
     const distanceSq = dx * dx + dz * dz;
-    if (distanceSq > MYSTERY_BOX_PLACEMENT.useRange * MYSTERY_BOX_PLACEMENT.useRange) return false;
+    if (distanceSq > placement.useRange * placement.useRange) return false;
 
     const camera = this.ctx.player.camera;
     const forward = camera.getWorldDirection(this.tmpDirection);
     const distance = Math.sqrt(distanceSq);
     if (distance < 1e-3) return true; // standing on top of it counts as facing
     const dot = (forward.x * dx + forward.z * dz) / distance;
-    return dot >= MYSTERY_BOX_PLACEMENT.lookDotMin;
+    return dot >= placement.lookDotMin;
   }
 
   /** Box events drive only audio; visuals read the machine directly. */
@@ -289,6 +353,108 @@ export class ZombiesMode implements GameMode {
     this.box.clearEvents();
   }
 
+  private findFacingDoor(): PointDoor | null {
+    if (!this.arena || this.arena.doors.length === 0) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const camera = this.ctx.player.camera;
+    const forward = camera.getWorldDirection(this.tmpDirection);
+
+    let best: PointDoor | null = null;
+    let bestDot = 0.6;
+    for (const door of this.arena.doors) {
+      if (!door.isLocked) continue;
+      const dx = door.position.x - playerPos.x;
+      const dz = door.position.z - playerPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > 2.5 * 2.5) continue;
+      const distance = Math.sqrt(distSq);
+      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+      if (dot > bestDot) {
+        bestDot = dot;
+        best = door;
+      }
+    }
+    return best;
+  }
+
+  private findRepairableBarrier(): WindowBarrier | null {
+    if (!this.arena || this.arena.barriers.length === 0) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const camera = this.ctx.player.camera;
+    const forward = camera.getWorldDirection(this.tmpDirection);
+
+    let best: WindowBarrier | null = null;
+    let bestDot = 0.45;
+    for (const barrier of this.arena.barriers) {
+      if (!barrier.isDamaged) continue;
+      const dx = barrier.position.x - playerPos.x;
+      const dz = barrier.position.z - playerPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > 2.2 * 2.2) continue;
+      const distance = Math.sqrt(distSq);
+      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+      if (dot > bestDot) {
+        bestDot = dot;
+        best = barrier;
+      }
+    }
+    return best;
+  }
+
+  private updateRepair(dt: number): void {
+    const input = this.ctx.input;
+    const interacting = input.isDown('KeyE');
+
+    // Cancel repair on fire, weapon swap, or if the held button was released.
+    const cancel =
+      !interacting ||
+      input.leftButtonDown ||
+      input.wasPressed('Digit1') ||
+      input.wasPressed('Digit2') ||
+      input.wasPressed('TouchFire');
+
+    if (cancel) {
+      if (this.activeRepairBarrier) {
+        this.activeRepairBarrier.stopRepair();
+        this.activeRepairBarrier = null;
+      }
+      return;
+    }
+
+    const barrier = this.findRepairableBarrier();
+    if (!barrier) {
+      this.activeRepairBarrier?.stopRepair();
+      this.activeRepairBarrier = null;
+      return;
+    }
+
+    if (this.activeRepairBarrier && this.activeRepairBarrier !== barrier) {
+      this.activeRepairBarrier.stopRepair();
+    }
+    this.activeRepairBarrier = barrier;
+
+    const result = barrier.repair(dt);
+    for (let i = 0; i < result.rewardableBoards; i++) {
+      this.economy.awardRepair();
+    }
+    if (result.boardsRepaired > 0) {
+      this.ctx.audio.playRepairBoard();
+    }
+  }
+
+  private onDoorUnlocked(door: PointDoor): void {
+    this.ctx.audio.playDoorUnlock();
+    if (this.arena instanceof BurnedMansionArena) {
+      this.arena.activateDoor(door.id);
+      this.arena.refreshSpawnPoints();
+      this.arena.refreshColliders();
+      this.ctx.hitColliders.length = 0;
+      this.ctx.hitColliders.push(...this.arena.colliders);
+      this.zombies.setSpawnPoints(this.arena.spawnPoints);
+      this.zombies.registerColliders(this.ctx.hitColliders);
+    }
+  }
+
   private processRoundEvents(): void {
     const playerPos = this.ctx.player.rig.position;
     for (const event of this.rounds.pendingEvents) {
@@ -296,11 +462,14 @@ export class ZombiesMode implements GameMode {
         case 'roundStarted':
           this.ctx.hud.showRoundBanner(`ROUND ${event.round}`);
           this.ctx.audio.playRoundSting();
+          if (this.arena) {
+            for (const barrier of this.arena.barriers) barrier.resetRoundCap();
+          }
           break;
         case 'spawnDue':
           // The pool returning false means we are at the alive cap; the
           // RoundManager already accounts for that, so this never fails.
-          this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z);
+          if (this.zombies) this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z);
           break;
         case 'roundComplete':
           this.ctx.hud.showRoundBanner(`ROUND ${event.round} COMPLETE`, 'GET READY');
@@ -457,12 +626,17 @@ export class ZombiesMode implements GameMode {
     this.economy.reset();
     this.health.reset();
     this.rounds.reset();
-    this.zombies.reset();
+    if (this.zombies) this.zombies.reset();
+    if (this.arena) this.arena.reset();
+    this.activeRepairBarrier = null;
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
     // Fresh run: M1911 with 8 / 32, no box weapons, box back to closed.
     this.box?.reset();
     this.ctx.resetArsenal();
+    if (this.arena?.useWallCollision && this.arena.playerBounds && this.ctx.player?.teleport) {
+      this.ctx.player.teleport(0, 1.7, 0, 0, this.arena.playerBounds);
+    }
     this.ctx.hud.hideGameOver();
     this.pushHudState();
     this.ctx.lockPointer();

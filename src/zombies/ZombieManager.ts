@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { WindowBarrier } from './barriers/WindowBarrier';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
 import {
   computeDamage,
@@ -6,6 +7,8 @@ import {
   splashDamageAt,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_ATTACK_RANGE,
+  ZOMBIE_BARRIER_ATTACK_DAMAGE,
+  ZOMBIE_BARRIER_ATTACK_RANGE,
   ZOMBIE_BASE_HP,
   ZOMBIE_BASE_SPEED,
   ZOMBIE_SCALE_JITTER,
@@ -61,7 +64,7 @@ export class ZombieManager {
   onPlayerAttack: ((damage: number) => void) | null = null;
 
   private readonly pool: ZombiePool;
-  private readonly spawner: ZombieSpawner;
+  private spawner: ZombieSpawner;
   private readonly rng: () => number;
   private colliders: THREE.Object3D[] = [];
   /** Static obstacle AABBs (walls, barriers, crates, posts) blocking movement. */
@@ -78,9 +81,15 @@ export class ZombieManager {
    */
   private readonly roundState = new Map<Zombie, { x: number; z: number }>();
 
-  constructor(rng: () => number = Math.random, sources: ZombieModelSources = {}, castShadows = true) {
+  constructor(
+    rng: () => number = Math.random,
+    sources: ZombieModelSources = {},
+    castShadows = true,
+    spawnPoints: ReadonlyArray<readonly [number, number]> | null = null,
+    private barriers: ReadonlyArray<WindowBarrier> = [],
+  ) {
     this.rng = rng;
-    this.spawner = new ZombieSpawner(rng);
+    this.spawner = new ZombieSpawner(rng, spawnPoints ?? undefined);
     this.pool = new ZombiePool(MAX_ALIVE, () => {
       // Every zombie is the small walker: the variant mix was dropped (no
       // large zombies), so the pool is 24 pre-cloned walker bodies with
@@ -100,6 +109,11 @@ export class ZombieManager {
   registerColliders(colliders: THREE.Object3D[]): void {
     this.colliders = colliders;
     this.rebuildObstacles();
+  }
+
+  /** Replace spawn points when a new zone is unlocked. */
+  setSpawnPoints(spawnPoints: ReadonlyArray<readonly [number, number]>): void {
+    this.spawner = new ZombieSpawner(this.rng, spawnPoints);
   }
 
   /**
@@ -150,8 +164,15 @@ export class ZombieManager {
       Math.round(ZOMBIE_BASE_HP * config.healthMultiplier),
       ZOMBIE_BASE_SPEED * config.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
     );
+    zombie.barrierTarget = this.pickBarrierTarget();
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
     return true;
+  }
+
+  private pickBarrierTarget(): WindowBarrier | null {
+    const candidates = this.barriers.filter((b) => !b.isOpen);
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(this.rng() * candidates.length)];
   }
 
   /**
@@ -242,8 +263,37 @@ export class ZombieManager {
   }
 
   private steer(zombie: Zombie, dt: number, playerX: number, playerZ: number): void {
-    zombie.faceTowards(playerX, playerZ);
+    const target = zombie.barrierTarget;
+    if (target && target.isOpen) zombie.barrierTarget = null;
+
+    if (target) {
+      zombie.faceTowards(target.position.x, target.position.z);
+    } else {
+      zombie.faceTowards(playerX, playerZ);
+    }
+
     if (zombie.state !== 'walk') return;
+
+    if (target) {
+      const toBarrier = this.tmpToPlayer.set(
+        target.position.x - zombie.position.x,
+        0,
+        target.position.z - zombie.position.z,
+      );
+      const barrierDistance = toBarrier.length();
+      if (barrierDistance <= ZOMBIE_BARRIER_ATTACK_RANGE) {
+        if (zombie.tryBarrierAttack()) {
+          zombie.onAttackLanded = () => {
+            target.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE);
+            if (target.isOpen) zombie.barrierTarget = null;
+          };
+        }
+        return;
+      }
+      toBarrier.normalize();
+      this.seek(zombie, dt, toBarrier, target.position.x, target.position.z);
+      return;
+    }
 
     const toPlayer = this.tmpToPlayer.set(
       playerX - zombie.position.x,
@@ -260,7 +310,16 @@ export class ZombieManager {
     }
 
     toPlayer.normalize();
+    this.seek(zombie, dt, toPlayer, playerX, playerZ);
+  }
 
+  private seek(
+    zombie: Zombie,
+    dt: number,
+    toTarget: THREE.Vector3,
+    targetX: number,
+    targetZ: number,
+  ): void {
     // Soft neighbor separation so the horde never stacks into one body.
     const separation = this.tmpSeparation.set(0, 0, 0);
     for (const other of this.pool.actives) {
@@ -274,27 +333,28 @@ export class ZombieManager {
     }
 
     const pos = zombie.position;
-    const seekX = toPlayer.x * zombie.speed + separation.x * SEPARATION_PUSH;
-    const seekZ = toPlayer.z * zombie.speed + separation.z * SEPARATION_PUSH;
+    const distance = toTarget.length();
+    const seekX = toTarget.x * zombie.speed + separation.x * SEPARATION_PUSH;
+    const seekZ = toTarget.z * zombie.speed + separation.z * SEPARATION_PUSH;
 
     let rounding = this.roundState.get(zombie) ?? null;
 
     if (rounding === null) {
       // Walking straight: only a wall right ahead triggers rounding.
-      const probeX = pos.x + toPlayer.x * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
-      const probeZ = pos.z + toPlayer.z * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
+      const probeX = pos.x + toTarget.x * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
+      const probeZ = pos.z + toTarget.z * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
       if (this.hitsObstacle(probeX, probeZ)) {
-        // Commit to the wall TANGENT that shortens the path to the player.
+        // Commit to the wall TANGENT that shortens the path to the target.
         // The tangent is perpendicular to the approach direction; its sign
         // is chosen so walking it reduces the lateral gap to the target.
-        const tanX = -toPlayer.z;
-        const tanZ = toPlayer.x;
-        const sign = tanX * (playerX - pos.x) + tanZ * (playerZ - pos.z) >= 0 ? 1 : -1;
+        const tanX = -toTarget.z;
+        const tanZ = toTarget.x;
+        const sign = tanX * (targetX - pos.x) + tanZ * (targetZ - pos.z) >= 0 ? 1 : -1;
         rounding = { x: tanX * sign, z: tanZ * sign };
         this.roundState.set(zombie, rounding);
       }
-    } else if (this.lineOfSightClear(pos, playerX, playerZ, distance)) {
-      // Rounding ends only when the straight path to the player is clear.
+    } else if (this.lineOfSightClear(pos, targetX, targetZ, distance)) {
+      // Rounding ends only when the straight path to the target is clear.
       // Checking the whole segment — not the immediate front — prevents
       // dropping the state at the corner's edge and re-entering it a meter
       // later, which read as jitter.
@@ -305,7 +365,7 @@ export class ZombieManager {
     if (rounding === null) {
       this.moveWithCollision(zombie, seekX * dt, seekZ * dt);
     } else {
-      // Follow the wall tangent and nothing else: mixing the to-player
+      // Follow the wall tangent and nothing else: mixing the to-target
       // direction back in is what dragged zombies backwards off the wall on
       // diagonal approaches. The tangent is axis-aligned for the (axis-
       // aligned) range walls, so this slides cleanly along the face and

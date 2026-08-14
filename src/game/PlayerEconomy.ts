@@ -11,6 +11,8 @@ export const POINTS_HIT = 10;
 export const POINTS_KILL = 50;
 /** A lethal headshot. REPLACES the kill reward — never stacked with it. */
 export const POINTS_HEADSHOT_KILL = 100;
+/** Points granted for each rebuilt barrier board. */
+export const POINTS_REPAIR = 10;
 
 export class PlayerEconomy {
   private balance = 0;
@@ -30,6 +32,15 @@ export class PlayerEconomy {
    */
   awardKill(headshot: boolean): void {
     this.balance += headshot ? POINTS_HEADSHOT_KILL : POINTS_KILL;
+  }
+
+  /**
+   * Repair reward. The caller decides whether this repair still pays for the
+   * current round (barriers track their own per-round cap). This keeps the
+   * single-source-of-truth rule: points are only ever added here.
+   */
+  awardRepair(): void {
+    this.balance += POINTS_REPAIR;
   }
 
   canAfford(cost: number): boolean {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { HitTarget, SurfaceType } from '../shooting/HitTarget';
+import type { WindowBarrier } from './barriers/WindowBarrier';
 import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
@@ -13,7 +14,7 @@ import {
 } from './ZombieConfig';
 import { ZombieVisual } from './ZombieVisual';
 
-export type ZombieState = 'spawn' | 'walk' | 'attack' | 'hit' | 'death';
+export type ZombieState = 'spawn' | 'walk' | 'attack' | 'hit' | 'death' | 'barrierAttack';
 
 // Shared invisible hitbox geometry across every pooled zombie.
 let torsoGeometry: THREE.CapsuleGeometry | null = null;
@@ -64,6 +65,8 @@ export class Zombie implements HitTarget {
   hp = 0;
   maxHp = 0;
   speed = 0;
+  /** Optional barrier this zombie must breach before chasing the player. */
+  barrierTarget: WindowBarrier | null = null;
 
   private stateTimer = 0;
   private attackCooldown = 0;
@@ -163,6 +166,18 @@ export class Zombie implements HitTarget {
     return true;
   }
 
+  /** Starts the barrier-attack animation. Reuses the same timing. */
+  tryBarrierAttack(): boolean {
+    if (!this.isAlive || this.attackCooldown > 0 || this.state === 'barrierAttack') return false;
+    this.state = 'barrierAttack';
+    this.stateTimer = ZOMBIE_ATTACK_DURATION;
+    this.attackApplied = false;
+    this.attackCooldown = ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY;
+    this.visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
+    this.visual.setState('barrierAttack');
+    return true;
+  }
+
   faceTowards(x: number, z: number): void {
     this.group.rotation.y = Math.atan2(x - this.group.position.x, z - this.group.position.z);
   }
@@ -180,7 +195,8 @@ export class Zombie implements HitTarget {
         if (this.stateTimer <= 0) this.setWalk();
         break;
       }
-      case 'attack': {
+      case 'attack':
+      case 'barrierAttack': {
         this.stateTimer -= dt;
         const elapsed = ZOMBIE_ATTACK_DURATION - this.stateTimer;
         if (!this.attackApplied && elapsed >= ZOMBIE_ATTACK_HIT_MOMENT) {

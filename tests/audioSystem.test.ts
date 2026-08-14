@@ -209,6 +209,62 @@ describe('Game pause resume', () => {
   });
 });
 
+describe('AudioSystem reload sound profiles', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses a distinct reload profile for each weapon style', () => {
+    const audio = new AudioSystem() as any;
+    const fakeCtx = {
+      currentTime: 0,
+      sampleRate: 44100,
+      state: 'running',
+      destination: {},
+      createBufferSource: () => ({
+        buffer: null,
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      }),
+      createBuffer: () => ({ getChannelData: () => new Float32Array(1) }),
+      createBiquadFilter: () => ({
+        type: 'bandpass',
+        frequency: { value: 0 },
+        Q: { value: 0 },
+        connect: vi.fn(),
+      }),
+      createGain: () => ({
+        gain: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn(),
+      }),
+      createOscillator: () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      }),
+    };
+
+    audio.ctx = fakeCtx;
+    audio.master = { connect: vi.fn() };
+    audio.noiseBuffer = { getChannelData: () => new Float32Array(1) };
+
+    const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+
+    audio.playReloadPhase('magOut', false, 'pistol');
+    const pistol = tickSpy.mock.calls[0][1] as number;
+
+    tickSpy.mockClear();
+    audio.playReloadPhase('magOut', false, 'rock');
+    const rock = tickSpy.mock.calls[0][1] as number;
+
+    expect(rock).toBeLessThan(pistol);
+  });
+});
+
 describe('AudioSystem mystery box open sound', () => {
   afterEach(() => {
     vi.restoreAllMocks();
