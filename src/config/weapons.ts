@@ -196,8 +196,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bob: 1,
       visualRecoil: { kickImpulse: 1.25, pitchImpulse: 2.4, rollImpulse: 0.9, stiffness: 140, damping: 13 },
       scale: 1,
-      bodyColor: 0x33302c,
-      accentColor: 0x7a5230,
+      // Parkerized near-black steel + dark walnut furniture (real AK finish).
+      bodyColor: 0x1c1e21,
+      accentColor: 0x4a2e18,
       barrelLength: 0.34,
       barrelRadius: 0.011,
       receiverLength: 0.25,
@@ -215,7 +216,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         charge: 0.68,
         chargeEnd: 0.92,
         magSize: [0.05, 0.15, 0.06],
-        magColor: 0x2a2d31,
+        // Bakelite / steel magazine: dark, not grey-plastic.
+        magColor: 0x241a12,
       },
     },
   },
@@ -256,7 +258,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     equipTime: 0.55,
     audio: { volume: 0.65, duration: 0.11, lowpass: 2200, thump: 110 },
     view: {
-      // No GLB available: enhanced procedural model (see ASSETS.md).
+      // No GLB available: dedicated procedural builder (frame 'lmg', see ASSETS.md).
+      frame: 'lmg',
       hip: [0.28, -0.26, -0.52],
       ads: [0, 0, -0.34],
       sway: 0.7,

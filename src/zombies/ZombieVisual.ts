@@ -364,20 +364,45 @@ export class ZombieVisual {
     this.attackDuration = seconds;
   }
 
-  /** Crossfades into a state; one-shot states restart from the beginning. */
+  /**
+   * Crossfades into a state; one-shot states restart from the beginning.
+   * Two rules keep bullet impacts from breaking the base animation:
+   * looping locomotion NEVER resets (walk resumes the cycle phase frozen
+   * when the previous state interrupted it, so hit → walk does not snap
+   * the pose back to frame 0), and re-entering the state already driving
+   * the pose is a no-op (sustained automatic fire re-enters 'hit' every
+   * bullet — restarting the clip each time would strobe its first frames).
+   */
   setState(state: ZombieState): void {
+    const previous = this.state;
     this.state = state;
     if (state !== 'death') this.collapse = 0;
     const next = this.actions.get(state) ?? null;
     if (!next) {
       // Variants without a hit clip flinch by dipping the current cycle;
       // without a death clip the body collapses (owner drives setDeathProgress).
-      if (state === 'hit') this.hitDip = 1;
+      // The dip only triggers on a FRESH hit: re-pinning it on every bullet
+      // of a burst would hold the walk cycle in slow motion while the zombie
+      // keeps moving at full speed (visible foot sliding).
+      if (state === 'hit' && previous !== 'hit') this.hitDip = 1;
       if (state === 'death' && this.currentAction) this.currentAction.fadeOut(0.35);
       return;
     }
+    if (next === this.currentAction) {
+      // Already driving the pose (walk after a clipless hit, or a repeated
+      // one-shot under sustained fire): let the clip run, never reset.
+      if (state === 'walk') next.timeScale = this.walkJitter;
+      return;
+    }
+    if (state === 'walk') {
+      next.enabled = true;
+      next.timeScale = this.walkJitter;
+      if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
+      next.play();
+      this.currentAction = next;
+      return;
+    }
     next.reset();
-    if (state === 'walk') next.timeScale = this.walkJitter;
     if (state === 'attack') {
       const clip = next.getClip();
       const raw = clip.duration / Math.max(this.attackDuration, 1e-3);
@@ -392,9 +417,8 @@ export class ZombieVisual {
     if (state === 'spawn') next.timeScale = 1.15;
     if (state === 'hit') next.timeScale = 1.4;
     next.enabled = true;
-    if (this.currentAction && this.currentAction !== next) {
-      next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
-    }
+    // next !== currentAction here (the same-action case returned above).
+    if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
     next.play();
     this.currentAction = next;
   }

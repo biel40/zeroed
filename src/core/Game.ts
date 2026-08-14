@@ -89,6 +89,9 @@ export class Game {
    * only Game controls the loop and the pointer lock.
    */
   private paused = false;
+  /** Ignore stale unlock events while the browser is re-locking from a pause resume. */
+  private pointerLockResumeGuard = false;
+  private pointerLockGuardTimer: number | null = null;
 
   /** Last applied viewport size in CSS pixels; also drives the spread math. */
   private viewportWidth = 1;
@@ -231,18 +234,7 @@ export class Game {
       resetArsenal: () => this.resetArsenal(),
     });
 
-    this.input.onLockChange = (locked) => {
-      if (this.profile.useTouchControls || locked) {
-        this.hud.hideStartScreen();
-        this.hud.setHudVisible(true);
-        return;
-      }
-      // A mode with its own overlay (game over) suppresses the pause screen.
-      if (this.mode.onPointerUnlock?.()) return;
-      // Desktop ESC released the pointer: open the real pause menu (the
-      // simulation is now halted) instead of the bare "click to resume".
-      if (!this.paused) this.pause();
-    };
+    this.input.onLockChange = (locked) => this.handlePointerLockChange(locked);
     this.hud.setStartHandler(() => this.start());
 
     // Pause wiring. Desktop: ESC toggles (the pointer-lock release opens the
@@ -284,12 +276,44 @@ export class Game {
   /** Entry point for the first user gesture: resumes audio, locks the pointer. */
   start(): void {
     this.audio.resume();
+    this.audio.music.stopBackgroundLoop();
     void this.audio.loadMysteryBoxOpenAsset();
+    this.pointerLockResumeGuard = true;
+    if (this.pointerLockGuardTimer !== null) window.clearTimeout(this.pointerLockGuardTimer);
+    this.pointerLockGuardTimer = window.setTimeout(() => {
+      this.pointerLockResumeGuard = false;
+      this.pointerLockGuardTimer = null;
+    }, 160);
     this.input.requestPointerLock();
     if (this.profile.useTouchControls) {
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
     }
+  }
+
+  private handlePointerLockChange(locked: boolean): void {
+    if (this.pointerLockResumeGuard) {
+      // The guard only swallows STALE UNLOCK events racing a pause resume.
+      // A lock event is never stale — it is the fresh acquisition — so it
+      // clears the guard and falls through to hide the start screen. Without
+      // this, the first desktop CLICK TO START left the modal up forever.
+      if (!locked) return;
+      this.pointerLockResumeGuard = false;
+      if (this.pointerLockGuardTimer !== null) {
+        window.clearTimeout(this.pointerLockGuardTimer);
+        this.pointerLockGuardTimer = null;
+      }
+    }
+    if (this.profile.useTouchControls || locked) {
+      this.hud.hideStartScreen();
+      this.hud.setHudVisible(true);
+      return;
+    }
+    // A mode with its own overlay (game over) suppresses the pause screen.
+    if (this.mode.onPointerUnlock?.()) return;
+    // Desktop ESC released the pointer: open the real pause menu (the
+    // simulation is now halted) instead of the bare "click to resume".
+    if (!this.paused) this.pause();
   }
 
   /**
@@ -300,6 +324,8 @@ export class Game {
   private pause(): void {
     if (this.paused) return;
     this.paused = true;
+    this.audio.pauseMusic();
+    if (this.mode.id === 'zombies') this.audio.music.startBackgroundLoop();
     this.hud.showPauseMenu();
     // Release the pointer so the cursor can click the menu (desktop).
     if (document.pointerLockElement) document.exitPointerLock();
@@ -308,6 +334,7 @@ export class Game {
   private resume(): void {
     if (!this.paused) return;
     this.paused = false;
+    this.audio.music.stopBackgroundLoop();
     this.hud.hidePauseMenu();
     // Re-lock from this user gesture (the RESUME click / ESC press).
     this.start();
@@ -316,6 +343,7 @@ export class Game {
   private restartRun(): void {
     this.paused = false;
     this.hud.hidePauseMenu();
+    this.audio.stopMusic();
     // The mode owns its run state; restart() re-arms health, rounds, kills,
     // economy and re-locks the pointer.
     this.mode.onRestartRequested?.();

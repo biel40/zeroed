@@ -17,6 +17,8 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-14 — AK-47 y M60 a nivel M4A1](2026-08-14-ak47-m60-finish.md)
+- [2026-08-14 — Fix: animación zombie saltaba al recibir disparos](2026-08-14-zombie-hit-reaction.md)
 - [2026-08-13 — Red dot en armas convencionales](2026-08-13-red-dot.md)
 - [2026-08-13 — Wonder Weapon eléctrica ZEUS-77 (Tesla)](2026-08-13-tesla-weapon.md)
 - [2026-08-13 — Fix: zombies atascados en paredes](2026-08-13-zombie-wall-steering.md)

@@ -16,11 +16,16 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | M4A1 | "Assault Rifle" (AssaultRifle2_1) | https://poly.pizza/m/Bgvuu4CUMV | ~1.9k | 131 KB |
 | AK-47 | "Ak47" (AK) | https://poly.pizza/m/em1Hi9GuCv | ~1.1k | 59 KB |
 | L96 | "Sniper Rifle" (SniperRifle_3) | https://poly.pizza/m/TKaBjAEofL | ~1.7k | 93 KB |
-| M60 | — (placeholder procedural mejorado; no se encontró LMG CC0 adecuada) | — | — | — |
-| M1911 | — (modelo procedural detallado en `WeaponView.ts`; sin GLB CC0 adecuado) | — | — | — |
+| M60 | — (builder procedural dedicado `buildM60` en `WeaponView.ts`; no se encontró LMG CC0 adecuada) | — | ~40 meshes | — |
+| M1911 | — (modelo procedural detallado en `WeaponView.ts`; sin GLB CC0 adecuado) | — | ~30 meshes | — |
 
 Los materiales PBR (metalness/roughness por nombre de material) se ajustan en
-tiempo de carga en `src/weapons/WeaponView.ts`.
+tiempo de carga en `src/weapons/WeaponView.ts`. El AK-47 GLB recibe además un
+**detail pass procedural anclado a sus bounds** (guardamanos de nogal, gas tube,
+varilla de limpieza, freno de boca, alza tangente y cargador curvo "banana") y un
+**acabado de armas reales**: acero parkerizado casi negro (metalness alto,
+roughness bajo, `envMapIntensity` reforzado) y madera laminada oscura satinada —
+el naranja mate original leía como plástico de juguete bajo el env map.
 
 ## Modelos de zombies (`public/assets/zombies/`)
 

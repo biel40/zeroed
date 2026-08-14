@@ -66,16 +66,27 @@ function tuneGlbMaterials(root: THREE.Object3D): void {
         material.roughness = 0.38;
       } else if (name.includes('darkwood')) {
         material.metalness = 0;
-        material.roughness = 0.78;
+        material.roughness = 0.5;
+        material.color.setHex(0x3a2412);
       } else if (name.includes('wood')) {
+        // AK furniture: dark walnut laminate, satin sheen — NOT orange toy wood.
+        // The GLB ships a light orange baseColor; override to the real finish.
         material.metalness = 0;
-        material.roughness = 0.72;
+        material.roughness = 0.42;
+        material.color.setHex(0x4a2e18);
       } else if (name.includes('black')) {
         material.metalness = 0.3;
         material.roughness = 0.5;
+      } else if (name.includes('darkgrey')) {
+        // AK barrel + front-sight assembly: near-black blued steel.
+        material.metalness = 0.9;
+        material.roughness = 0.3;
+        material.color.multiplyScalar(0.55);
       } else if (name.includes('grey')) {
-        material.metalness = 0.55;
-        material.roughness = 0.5;
+        // AK receiver / handguard steel: parkerized near-black, like the M1911.
+        material.metalness = 0.82;
+        material.roughness = 0.38;
+        material.color.multiplyScalar(0.6);
       } else if (name.includes('green')) {
         material.metalness = 0.15;
         material.roughness = 0.6;
@@ -84,13 +95,15 @@ function tuneGlbMaterials(root: THREE.Object3D): void {
         material.metalness = 0.7;
         material.roughness = 0.48;
       }
-      material.envMapIntensity = name.includes('glass') ? 1.6 : 1.1;
+      // Metals capture the env map harder than polymer/glass so the finish
+      // reads as machined steel under the room IBL, not flat plastic.
+      material.envMapIntensity = name.includes('glass') ? 1.6 : material.metalness > 0.6 ? 1.35 : 1.1;
       material.needsUpdate = true;
     }
   });
 }
 
-interface BuiltProcedural {
+export interface BuiltProcedural {
   group: THREE.Group;
   muzzlePosition: THREE.Vector3;
   ejectionPosition: THREE.Vector3;
@@ -521,8 +534,215 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
 }
 
 /**
- * Procedural fallback / M60 model built from primitives. Kept deliberately
- * simple; the GLB path is the primary one for the other weapons.
+ * M60 view model built from primitives, detailed to buildPistol tier. The
+ * GPMG silhouette: long exposed barrel with a slotted flash hider, the gas
+ * cylinder slung underneath, a deployed bipod and the right-offset carry
+ * handle; the receiver carries the left-hung ammo box with a visible brass
+ * belt rising into the feed port, the rear-hinged feed cover (the rear
+ * sight aperture rides it, like the real gun), the right-flank charging
+ * handle and the skeleton shoulder stock. Reload contract (ReloadAnimator
+ * 'belt' style): the ammo box is the magazine (drops left+down), the cover
+ * pivots open on its rear hinge and the handle racks +Z. ~40 meshes built
+ * once at preload: cheap everywhere.
+ */
+function buildM60(config: ViewModelConfig): BuiltProcedural {
+  const group = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({
+    color: config.bodyColor,
+    roughness: 0.46,
+    metalness: 0.72,
+  });
+  const accent = new THREE.MeshStandardMaterial({
+    color: config.accentColor,
+    roughness: 0.5,
+    metalness: 0.6,
+  });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.55 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xc8a24a, roughness: 0.35, metalness: 0.85 });
+  const boxMat = new THREE.MeshStandardMaterial({
+    color: config.reloadAnim?.magColor ?? 0x3a3e42,
+    roughness: 0.5,
+    metalness: 0.55,
+  });
+
+  const add = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    rx = 0,
+    rz = 0,
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = rx;
+    mesh.rotation.z = rz;
+    group.add(mesh);
+    return mesh;
+  };
+
+  const width = 0.062 * config.bulk;
+  const height = 0.085 * config.bulk;
+  const halfW = width / 2;
+  const halfH = height / 2;
+  const receiverZ = config.receiverLength / 2;
+  const barrelTipZ = -receiverZ - config.barrelLength;
+  const barrelY = 0.02; // the M60 barrel rides the top half of the receiver
+  const sy = config.sightHeight;
+
+  // --- Receiver ---
+  add(new RoundedBoxGeometry(width, height, config.receiverLength, 2, 0.006), body, 0, 0, 0);
+  // Trigger housing under the receiver.
+  add(new THREE.BoxGeometry(width * 0.6, 0.03, 0.1), dark, 0, -halfH - 0.012, 0.02);
+  // Takedown pins on the left flank.
+  add(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 8), dark, -halfW - 0.001, 0.01, 0.1, 0, Math.PI / 2);
+  add(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 8), dark, -halfW - 0.001, 0.01, -0.11, 0, Math.PI / 2);
+  // Ejection port inset on the right flank.
+  add(new THREE.BoxGeometry(0.002, 0.028, 0.06), dark, halfW + 0.0005, -0.008, -0.02);
+
+  // --- Barrel group: exposed barrel, gas cylinder, slotted flash hider ---
+  add(
+    new THREE.CylinderGeometry(config.barrelRadius, config.barrelRadius, config.barrelLength, 12),
+    dark,
+    0,
+    barrelY,
+    -receiverZ - config.barrelLength / 2,
+    Math.PI / 2,
+  );
+  add(
+    new THREE.CylinderGeometry(0.012, 0.012, config.barrelLength * 0.55, 10),
+    dark,
+    0,
+    -0.006,
+    -receiverZ - config.barrelLength * 0.35,
+    Math.PI / 2,
+  );
+  // Gas collar joining barrel and gas tube at the front sight block.
+  add(new THREE.BoxGeometry(0.03, 0.05, 0.04), accent, 0, 0.006, -0.47);
+  // Flash hider protruding past the barrel tip; the muzzle moves to it.
+  add(new THREE.CylinderGeometry(0.011, 0.013, 0.05, 10), dark, 0, barrelY, barrelTipZ - 0.018, Math.PI / 2);
+  add(new THREE.BoxGeometry(0.028, 0.005, 0.006), body, 0, barrelY + 0.008, barrelTipZ - 0.008);
+  add(new THREE.BoxGeometry(0.028, 0.005, 0.006), body, 0, barrelY + 0.008, barrelTipZ - 0.026);
+  const muzzleZ = barrelTipZ - 0.043;
+
+  // --- Front sight: the post tops out exactly on the sight line ---
+  add(new THREE.BoxGeometry(0.014, 0.03, 0.024), dark, 0, 0.049, -0.52); // base ramp
+  add(new THREE.BoxGeometry(0.005, 0.026, 0.006), dark, 0, sy - 0.013, -0.52); // post
+  for (const side of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.004, 0.02, 0.01), dark, side * 0.011, sy - 0.012, -0.52); // ears
+  }
+
+  // --- Bipod (deployed) and right-offset carry handle ---
+  add(new THREE.BoxGeometry(0.04, 0.02, 0.03), dark, 0, barrelY, -0.5);
+  for (const side of [-1, 1]) {
+    add(new THREE.CylinderGeometry(0.004, 0.004, 0.17, 6), dark, side * 0.035, -0.05, -0.5, 0.15, side * 0.4);
+  }
+  // Carry handle on the right edge, kept BELOW the sight line so ADS stays clean.
+  add(new THREE.BoxGeometry(0.006, 0.026, 0.01), dark, 0.034, 0.056, -0.21);
+  add(new THREE.BoxGeometry(0.006, 0.026, 0.01), dark, 0.034, 0.056, -0.15);
+  add(new THREE.BoxGeometry(0.012, 0.012, 0.07), dark, 0.034, 0.072, -0.18);
+
+  // --- Feed cover: rear hinge, plate forward; the animator swings it open ---
+  const coverPivot = new THREE.Group();
+  coverPivot.position.set(0, halfH + 0.004, 0.06);
+  const coverPlate = new THREE.Mesh(new THREE.BoxGeometry(width * 0.86, 0.01, 0.21), accent);
+  coverPlate.position.z = -0.105;
+  coverPivot.add(coverPlate);
+  // Latch at the plate's front edge.
+  const latch = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.014, 0.012), dark);
+  latch.position.set(0, 0.006, -0.1);
+  coverPlate.add(latch);
+  // The rear sight aperture rides the cover (as on the real M60): two blocks
+  // leave a real notch whose gap sits exactly on the sightY line.
+  for (const side of [-1, 1]) {
+    const block = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.019, 0.01), dark);
+    block.position.set(side * 0.009, 0.0143, 0.085);
+    coverPlate.add(block);
+  }
+  group.add(coverPivot);
+
+  // --- Ammo box (the reload "magazine"): hangs left+below, belt rising ---
+  const [magW, magH, magD] = config.reloadAnim?.magSize ?? [0.1, 0.11, 0.13];
+  const magazine = new THREE.Group();
+  magazine.position.set(-(halfW + magW / 2 - 0.015), -(halfH + magH / 2 - 0.03), -0.03);
+  magazine.add(new THREE.Mesh(new RoundedBoxGeometry(magW, magH, magD, 2, 0.006), boxMat));
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(magW + 0.002, 0.012, magD + 0.002), dark);
+  lid.position.y = magH / 2 + 0.004;
+  magazine.add(lid);
+  const boxLatch = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.025, 0.008), dark);
+  boxLatch.position.set(0.03, 0.02, magD / 2 + 0.002);
+  magazine.add(boxLatch);
+  // Belt stub: brass rounds rising from the box into the left feed port.
+  // Children of the magazine so the belt leaves and returns with the box.
+  const roundGeometry = new THREE.CylinderGeometry(0.0045, 0.0045, 0.026, 6);
+  for (let i = 0; i < 4; i++) {
+    const round = new THREE.Mesh(roundGeometry, brass);
+    round.rotation.x = Math.PI / 2;
+    round.position.set(0.029, magH / 2 + 0.012 + i * 0.011, 0);
+    magazine.add(round);
+  }
+  group.add(magazine);
+
+  // --- Charging handle on the RIGHT flank (the animator racks it +Z) ---
+  const handle = new THREE.Group();
+  handle.position.set(halfW + 0.008, -0.02, -0.09);
+  handle.add(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.01, 0.06), dark));
+  const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.02, 8), dark);
+  knob.rotation.z = Math.PI / 2;
+  knob.position.set(0.012, 0, 0.01);
+  handle.add(knob);
+  group.add(handle);
+
+  // --- Grip, trigger guard, shoulder stock ---
+  add(new RoundedBoxGeometry(0.03, 0.09, 0.045, 2, 0.005), dark, 0, -0.098, 0.075, 0.3);
+  add(new THREE.BoxGeometry(0.024, 0.005, 0.07), dark, 0, -0.078, 0);
+  add(new THREE.BoxGeometry(0.024, 0.03, 0.006), dark, 0, -0.064, -0.033, -0.15);
+  add(new THREE.BoxGeometry(0.005, 0.02, 0.006), dark, 0, -0.062, -0.002, 0.15);
+  add(
+    new THREE.BoxGeometry(width * 0.75, height * 0.8, config.stockLength),
+    dark,
+    0,
+    -0.012,
+    receiverZ + config.stockLength / 2 - 0.01,
+    -0.04,
+  );
+  add(
+    new THREE.BoxGeometry(width * 0.7, height * 0.95, 0.015),
+    dark,
+    0,
+    -0.017,
+    receiverZ + config.stockLength - 0.02,
+    -0.04,
+  );
+  add(
+    new THREE.TorusGeometry(0.006, 0.0015, 6, 10),
+    dark,
+    0,
+    -0.055,
+    receiverZ + config.stockLength - 0.04,
+    Math.PI / 2,
+  );
+
+  group.scale.setScalar(config.scale);
+  const sightY = sy * config.scale;
+  return {
+    group,
+    muzzlePosition: new THREE.Vector3(0, barrelY * config.scale, muzzleZ * config.scale),
+    ejectionPosition: new THREE.Vector3(
+      (halfW + 0.004) * config.scale,
+      -0.008 * config.scale,
+      -0.02 * config.scale,
+    ),
+    sightY,
+    reloadParts: { magazine, cover: coverPivot, handle },
+  };
+}
+
+/**
+ * Procedural fallback for GLB weapons that failed to load. Kept deliberately
+ * simple; the GLB path is the primary one, and the M60/Ray Gun/Tesla/M1911
+ * have their own dedicated builders (see buildProceduralViewModel).
  */
 function buildProcedural(config: ViewModelConfig): BuiltProcedural {
   const group = new THREE.Group();
@@ -621,46 +841,6 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
       reloadParts.magazine = magGroup;
       break;
     }
-    case 'box': {
-      // M60: ammo box, feed tray with visible rounds, bipod and carry handle.
-      reloadParts.magazine = add(
-        new THREE.BoxGeometry(width * 1.35, 0.1, 0.12),
-        accent,
-        -0.025,
-        -height / 2 - 0.05,
-        -0.02,
-      );
-      const roundGeometry = new THREE.CylinderGeometry(0.004, 0.004, 0.02, 6);
-      const brass = new THREE.MeshStandardMaterial({ color: 0xc8a24a, roughness: 0.35, metalness: 0.85 });
-      for (let i = 0; i < 5; i++) {
-        add(roundGeometry, brass, -0.01 - i * 0.008, height / 2 + 0.004, -0.045, Math.PI / 2);
-      }
-      // Feed cover on a rear hinge: the animator swings it open.
-      const coverPivot = new THREE.Group();
-      coverPivot.position.set(0, height / 2 + 0.002, 0.055);
-      const coverPlate = new THREE.Mesh(
-        new THREE.BoxGeometry(width * 0.86, 0.008, 0.15),
-        accent,
-      );
-      coverPlate.position.z = -0.08;
-      coverPivot.add(coverPlate);
-      group.add(coverPivot);
-      reloadParts.cover = coverPivot;
-      // Charging handle nub on the right flank.
-      reloadParts.handle = add(
-        new THREE.BoxGeometry(0.016, 0.02, 0.05),
-        dark,
-        width / 2 + 0.012,
-        -0.01,
-        0.05,
-      );
-      add(new THREE.BoxGeometry(0.012, 0.05, 0.012), dark, 0, height / 2 + 0.028, -0.02); // carry handle post
-      add(new THREE.BoxGeometry(0.02, 0.012, 0.1), dark, 0, height / 2 + 0.056, -0.02); // carry handle grip
-      const legGeometry = new THREE.CylinderGeometry(0.004, 0.004, 0.16, 6);
-      add(legGeometry, dark, -0.02, -height / 2 - 0.07, barrelMidZ - 0.05, 0.35);
-      add(legGeometry, dark, 0.02, -height / 2 - 0.07, barrelMidZ - 0.05, 0.35);
-      break;
-    }
     case 'internal':
       reloadParts.magazine = add(
         new THREE.BoxGeometry(width * 0.8, 0.04, 0.09),
@@ -714,6 +894,193 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
 }
 
 /**
+ * Picks the procedural builder for a view config: dedicated builders for
+ * the Wonder Weapons (Ray Gun, Tesla), the M1911 pistol and the M60 GPMG;
+ * the generic long-gun fallback otherwise (a GLB that failed to load).
+ * Single dispatch shared by the first-person WeaponView and the world-space
+ * display models so both always build the same weapon.
+ */
+export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural {
+  if (view.teslaFrame === 'tesla') return buildTesla(view);
+  if (view.energyColor !== undefined) return buildRaygun(view);
+  if (view.frame === 'pistol') return buildPistol(view);
+  if (view.frame === 'lmg') return buildM60(view);
+  return buildProcedural(view);
+}
+
+/** Result of a GLB detail pass: static decor plus an optional muzzle move. */
+export interface GlbDetailPass {
+  /** Static decor meshes in view-model space. */
+  readonly group: THREE.Group;
+  /** New muzzle tip Z when the pass extends the muzzle, else null. */
+  readonly muzzleZ: number | null;
+}
+
+/**
+ * The shipped AK-47 GLB (1122 tris) lacks the silhouette details that read
+ * as "AK" up close: the cleaning rod under the barrel (verified by parsing
+ * the asset: nothing below the bore line), a muzzle brake and the tangent
+ * rear sight. Adds them procedurally, anchored to the normalized model
+ * bounds the same way buildGlbReloadParts anchors its parts, and reports
+ * the extended muzzle tip so the flash does not spawn inside the brake.
+ */
+export function buildAk47Details(box: THREE.Box3, sightY: number): GlbDetailPass {
+  const group = new THREE.Group();
+  // Blued/parkerized near-black steel and DARK walnut laminate — the real AK
+  // finish. Bright orange wood + dull grey steel is what read as "toy".
+  const steel = new THREE.MeshStandardMaterial({
+    color: 0x17181b,
+    roughness: 0.34,
+    metalness: 0.85,
+    envMapIntensity: 1.3,
+  });
+  const wood = new THREE.MeshStandardMaterial({
+    color: 0x4a2e18,
+    roughness: 0.42,
+    metalness: 0,
+    envMapIntensity: 1.15,
+  });
+
+  const add = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    rx = 0,
+    rz = 0,
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = rx;
+    mesh.rotation.z = rz;
+    group.add(mesh);
+    return mesh;
+  };
+
+  // Handguard zone: the front half of the model, between receiver and muzzle.
+  const hgFront = box.min.z * 0.94;
+  const hgRear = box.min.z * 0.32;
+  const hgLen = hgRear - hgFront;
+  const hgMid = (hgFront + hgRear) / 2;
+
+  // Lower + upper wooden handguards (chamfered slabs that catch the light).
+  add(new RoundedBoxGeometry(0.052, 0.04, hgLen, 2, 0.006), wood, 0, sightY * 0.44, hgMid);
+  add(new RoundedBoxGeometry(0.044, 0.024, hgLen, 2, 0.006), wood, 0, sightY * 0.72, hgMid);
+
+  // Gas tube above the upper handguard, running from receiver to gas block.
+  add(
+    new THREE.CylinderGeometry(0.008, 0.008, hgLen * 0.9, 8),
+    steel,
+    0,
+    sightY * 0.82,
+    hgMid,
+    Math.PI / 2,
+  );
+  // Gas block straddling barrel and tube, about 40% back from the muzzle.
+  add(new RoundedBoxGeometry(0.026, 0.05, 0.03, 2, 0.004), steel, 0, sightY * 0.72, box.min.z * 0.72);
+
+  // Cleaning rod under the lower handguard.
+  const rodFrontZ = box.min.z * 0.7;
+  const rodRearZ = box.min.z * 0.35;
+  add(
+    new THREE.CylinderGeometry(0.0022, 0.0022, rodFrontZ - rodRearZ, 8),
+    steel,
+    0,
+    sightY * 0.38,
+    (rodFrontZ + rodRearZ) / 2,
+    Math.PI / 2,
+  );
+
+  // Muzzle brake protruding past the GLB muzzle; the flash moves to its tip.
+  const boreY = sightY * 0.65;
+  const brake = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.024, 12), steel);
+  brake.rotation.x = Math.PI / 2;
+  brake.position.set(0, boreY, box.min.z - 0.011);
+  group.add(brake);
+  for (const z of [box.min.z - 0.006, box.min.z - 0.017]) {
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.004, 0.006), steel);
+    slot.position.set(0, boreY + 0.008, z);
+    group.add(slot);
+  }
+  const muzzleZ = box.min.z - 0.024;
+
+  // Dust cover: a chamfered lid over the receiver top, just below sightY.
+  const coverFront = box.min.z * 0.3;
+  const coverRear = box.max.z * 0.5;
+  add(
+    new RoundedBoxGeometry(0.056, 0.012, coverRear - coverFront, 2, 0.004),
+    steel,
+    0,
+    sightY * 0.93,
+    (coverFront + coverRear) / 2,
+  );
+
+  // Tangent rear sight on the receiver top, kept under the sight line.
+  const tangentZ = box.min.z * 0.45;
+  add(new THREE.BoxGeometry(0.032, 0.012, 0.05), steel, 0, sightY * 0.82, tangentZ);
+  add(new THREE.BoxGeometry(0.026, 0.018, 0.008), steel, 0, sightY * 0.82 + 0.013, tangentZ, -0.15);
+  add(new THREE.BoxGeometry(0.014, 0.008, 0.02), steel, 0, sightY * 0.82 + 0.008, tangentZ + 0.012);
+
+  // Pistol grip raking back under the receiver rear (the GLB has none).
+  add(
+    new RoundedBoxGeometry(0.026, 0.095, 0.038, 2, 0.008),
+    wood,
+    0,
+    box.min.y * 0.55,
+    box.max.z * 0.34,
+    0.32,
+  );
+
+  return { group, muzzleZ };
+}
+
+/**
+ * The AK's signature 30-round "banana" magazine as a tangential-arc stack of
+ * tapered boxes: each segment steps forward and down along the feed curve so
+ * the body sweeps a natural radius instead of hanging as a straight slab.
+ * Returned as a Group the ReloadAnimator's 'rock' style can pivot out of the
+ * well; the home pose hangs the feed lips just below the bore line.
+ */
+export function buildAk47Magazine(
+  box: THREE.Box3,
+  sightY: number,
+  magH: number,
+): THREE.Group {
+  const group = new THREE.Group();
+  // Bakelite/steel magazine: dark and faintly metallic, not grey plastic.
+  const steel = new THREE.MeshStandardMaterial({
+    color: 0x241a12,
+    roughness: 0.4,
+    metalness: 0.5,
+    envMapIntensity: 1.1,
+  });
+
+  // Five segments chasing a tangential arc (~46° total sweep), tapering
+  // toward the floor plate so the silhouette reads "banana", not "brick".
+  const segments = 5;
+  const segH = magH / segments;
+  const tiltPerSeg = 0.16;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < segments; i++) {
+    const t = i / (segments - 1);
+    const w = 0.044 - t * 0.012;
+    const seg = new THREE.Mesh(new RoundedBoxGeometry(w, segH, 0.056, 2, 0.004), steel);
+    seg.position.set(0, y - segH / 2, z);
+    seg.rotation.x = -(i + 0.5) * tiltPerSeg;
+    group.add(seg);
+    const stepAngle = (i + 1) * tiltPerSeg;
+    y -= Math.cos(stepAngle) * segH;
+    z -= Math.sin(stepAngle) * segH;
+  }
+
+  // Home pose: feed lips just under the bore line at the magazine well.
+  group.position.set(0, sightY * 0.35 - magH * 0.1, box.min.z * 0.45);
+  return group;
+}
+
+/**
  * World-space display model of a weapon (Mystery Box roulette, pickups).
  * GLB weapons CLONE the cached AssetManager scene — shared geometry and
  * materials, zero network. Procedural weapons (M60, Ray Gun) are rebuilt
@@ -736,15 +1103,7 @@ export function buildWeaponDisplayModel(
     oriented.add(inner);
     inner = oriented;
   } else {
-    const built =
-      view.teslaFrame === 'tesla'
-        ? buildTesla(view)
-        : view.energyColor !== undefined
-          ? buildRaygun(view)
-          : view.frame === 'pistol'
-            ? buildPistol(view)
-            : buildProcedural(view);
-    inner = built.group;
+    inner = buildProceduralViewModel(view).group;
   }
 
   // Center on the origin before scaling so the anchor can just rotate.
@@ -800,19 +1159,19 @@ export class WeaponView {
       // GLBs are single-mesh: the detachable magazine and charging handle
       // are procedural add-ons anchored to the model bounds.
       reloadParts = this.buildGlbReloadParts(view, attached);
+      // The low-poly AK GLB gets its missing signature hardware (cleaning
+      // rod, muzzle brake, tangent rear sight) as bounds-anchored decor.
+      if (definition.id === 'ak47') {
+        const details = buildAk47Details(attached.box, attached.sightY);
+        this.root.add(details.group);
+        if (details.muzzleZ !== null) this.muzzle.position.z = details.muzzleZ;
+      }
       // A red-dot optic rides the GLB's sight line (box.max.y = sightY), so
       // ADS — which aligns sightY to the camera center — puts the dot on the
       // true shot center for free, exactly like the procedural builders.
       if (view.optic === 'reddot') this.attachRedDot(attached.sightY);
     } else {
-      const built =
-        view.teslaFrame === 'tesla'
-          ? buildTesla(view)
-          : view.energyColor !== undefined
-            ? buildRaygun(view)
-            : view.frame === 'pistol'
-              ? buildPistol(view)
-              : buildProcedural(view);
+      const built = buildProceduralViewModel(view);
       this.root.add(built.group);
       this.muzzle.position.copy(built.muzzlePosition);
       this.ejectionPort.position.copy(built.ejectionPosition);
@@ -937,16 +1296,23 @@ export class WeaponView {
     const { sightY, box } = attached;
     const [magW, magH, magD] = anim.magSize;
 
-    const magazine = new THREE.Mesh(
-      new THREE.BoxGeometry(magW, magH, magD),
-      new THREE.MeshStandardMaterial({
-        color: anim.magColor,
-        roughness: 0.45,
-        metalness: 0.6,
-      }),
-    );
-    magazine.position.set(0, sightY * 0.35 - magH * 0.35, box.min.z * 0.45);
-    if (anim.style === 'rock') magazine.rotation.x = 0.22; // AK curve hint
+    let magazine: THREE.Object3D;
+    if (anim.style === 'rock' && this.definition.id === 'ak47') {
+      // The AK's banana magazine: tangential-arc stack, not a straight box.
+      magazine = buildAk47Magazine(box, sightY, magH);
+      magazine.rotation.x = 0.22; // rock-and-lock rake at the well
+    } else {
+      magazine = new THREE.Mesh(
+        new THREE.BoxGeometry(magW, magH, magD),
+        new THREE.MeshStandardMaterial({
+          color: anim.magColor,
+          roughness: 0.45,
+          metalness: 0.6,
+        }),
+      );
+      magazine.position.set(0, sightY * 0.35 - magH * 0.35, box.min.z * 0.45);
+      if (anim.style === 'rock') magazine.rotation.x = 0.22; // AK curve hint
+    }
     this.root.add(magazine);
 
     let handle: THREE.Mesh | null = null;

@@ -174,8 +174,12 @@ export interface ViewModelConfig {
   readonly bulk: number;
   /** When set, the dedicated Ray Gun procedural builder is used with this glow color. */
   readonly energyColor?: number;
-  /** 'pistol' uses the handgun builder (slide, hammer, grip magazine). Default: long gun. */
-  readonly frame?: 'pistol';
+  /**
+   * 'pistol' uses the handgun builder (slide, hammer, grip magazine);
+   * 'lmg' uses the dedicated M60 builder (belt box, feed cover, bipod).
+   * Default: generic long gun.
+   */
+  readonly frame?: 'pistol' | 'lmg';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */

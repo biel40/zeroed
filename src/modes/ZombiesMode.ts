@@ -433,6 +433,8 @@ export class ZombiesMode implements GameMode {
 
   private endGame(): void {
     this.gameOver = true;
+    if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
+    else this.ctx.audio.music?.stop?.();
     this.ctx.hud.showGameOver({
       round: this.rounds.round,
       kills: this.kills,
@@ -456,6 +458,8 @@ export class ZombiesMode implements GameMode {
     this.health.reset();
     this.rounds.reset();
     this.zombies.reset();
+    if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
+    else this.ctx.audio.music?.stop?.();
     // Fresh run: M1911 with 8 / 32, no box weapons, box back to closed.
     this.box?.reset();
     this.ctx.resetArsenal();

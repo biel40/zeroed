@@ -1,5 +1,6 @@
 import type { SurfaceType } from '../shooting/HitTarget';
 import type { ReloadPhase, WeaponAudioConfig } from '../weapons/WeaponTypes';
+import { MusicManager } from './MusicManager';
 
 const PING_THROTTLE = 0.045;
 
@@ -15,6 +16,7 @@ interface AudioContextParts {
  * assets required; the class is the only place that knows about sound.
  */
 export class AudioSystem {
+  readonly music = new MusicManager();
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -37,6 +39,20 @@ export class AudioSystem {
       for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
+    this.music.preload();
+    this.music.resume();
+  }
+
+  pauseMusic(): void {
+    this.music.pause();
+  }
+
+  resumeMusic(): void {
+    this.music.resume();
+  }
+
+  stopMusic(): void {
+    this.music.stop();
   }
 
   playShot(config: WeaponAudioConfig): void {
