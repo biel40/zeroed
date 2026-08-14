@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
+import { WindowBarrier, type WindowBarrierConfig } from '../src/zombies/barriers/WindowBarrier';
 
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: WindowBarrierConfig = {
   boardCount: 3,
   boardHp: 100,
   repairInterval: 0.5,
   repairRewardCap: 2,
-} as const;
+};
 
-const fastConfig = (cap: number): typeof DEFAULT_CONFIG => ({
+const fastConfig = (cap: number): WindowBarrierConfig => ({
   ...DEFAULT_CONFIG,
   repairRewardCap: cap,
 });
