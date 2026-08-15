@@ -18,13 +18,21 @@ type DeviceNavigator = Partial<Navigator> & {
 export function getDeviceProfile(navigatorLike: DeviceNavigator = navigator as DeviceNavigator): DeviceProfile {
   const userAgent = navigatorLike.userAgent ?? '';
   const touchPoints = navigatorLike.maxTouchPoints ?? 0;
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(userAgent) || touchPoints > 0;
-  const coarsePointer = typeof navigatorLike.matchMedia === 'function' ? navigatorLike.matchMedia('(pointer: coarse)').matches : false;
-  const reducedMotion = typeof navigatorLike.matchMedia === 'function' ? navigatorLike.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+  const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(userAgent);
+  const matchMedia = navigatorLike.matchMedia ??
+    (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia.bind(window)
+      : undefined);
+  const coarsePointer = matchMedia?.('(pointer: coarse)').matches ?? false;
+  const reducedMotion = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  // Capability is authoritative. The UA is only a fallback for old mobile
+  // WebViews that report touch points but do not expose pointer media queries.
+  const useTouchControls = coarsePointer || (touchPoints > 0 && mobileUserAgent);
+  const isMobile = useTouchControls;
   const deviceMemory = typeof navigatorLike.deviceMemory === 'number' ? navigatorLike.deviceMemory : 8;
   const hardwareConcurrency = navigatorLike.hardwareConcurrency ?? 8;
   const isLowMemory = deviceMemory <= 6 || hardwareConcurrency <= 4;
-  const isTouch = isMobile || touchPoints > 0 || coarsePointer;
+  const isTouch = touchPoints > 0 || coarsePointer;
   const useReducedEffects = isMobile || coarsePointer || isLowMemory || reducedMotion;
   const pixelRatioLimit = isMobile ? (isLowMemory ? 1 : 1.5) : 2;
   const shadowQuality: 0 | 1 | 2 = useReducedEffects ? (isLowMemory ? 0 : 1) : 2;
@@ -36,7 +44,7 @@ export function getDeviceProfile(navigatorLike: DeviceNavigator = navigator as D
     pixelRatioLimit,
     shadowQuality,
     useReducedEffects,
-    useTouchControls: isTouch,
+    useTouchControls,
     anisotropyLimit: useReducedEffects ? 2 : 8,
     log: {
       userAgent,
@@ -47,6 +55,7 @@ export function getDeviceProfile(navigatorLike: DeviceNavigator = navigator as D
       isTouch,
       isLowMemory,
       coarsePointer,
+      useTouchControls,
       reducedMotion,
       pixelRatioLimit,
       shadowQuality,

@@ -18,11 +18,11 @@ export function moveToward(current: number, target: number, maxDelta: number): n
 
 export interface AnalogStickResult {
   /** Normalized axes, -1..1 on both, dead-zone shaped. */
-  readonly x: number;
-  readonly y: number;
+  x: number;
+  y: number;
   /** Clamped knob offset in px, for positioning the joystick visual. */
-  readonly offsetX: number;
-  readonly offsetY: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 /**
@@ -36,6 +36,7 @@ export function analogStick(
   dy: number,
   radius: number,
   deadZone: number,
+  out?: AnalogStickResult,
 ): AnalogStickResult {
   const distance = Math.hypot(dx, dy);
   const travel = Math.min(distance, radius);
@@ -43,11 +44,11 @@ export function analogStick(
   const dirY = distance > 0 ? dy / distance : 0;
   const magnitude = travel / radius;
   const strength = magnitude < deadZone ? 0 : (magnitude - deadZone) / (1 - deadZone);
-  return {
-    // Guard against signed zero (-0) leaking into the axes.
-    x: strength === 0 ? 0 : dirX * strength,
-    y: strength === 0 ? 0 : dirY * strength,
-    offsetX: dirX * travel,
-    offsetY: dirY * travel,
-  };
+  const result = out ?? { x: 0, y: 0, offsetX: 0, offsetY: 0 };
+  // Guard against signed zero (-0) leaking into the axes.
+  result.x = strength === 0 ? 0 : dirX * strength;
+  result.y = strength === 0 ? 0 : dirY * strength;
+  result.offsetX = dirX * travel;
+  result.offsetY = dirY * travel;
+  return result;
 }

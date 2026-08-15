@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import type { WindowBarrier } from './WindowBarrier';
 
-const BOARD_WIDTH = 0.34;
-const BOARD_HEIGHT = 0.08;
-const BOARD_THICK = 0.03;
-const GAP = 0.02;
+const BOARD_WIDTH = 1.5;
+const BOARD_HEIGHT = 0.12;
+const BOARD_THICK = 0.045;
+const GAP = 0.07;
 
 let sharedGeometry: THREE.BoxGeometry | null = null;
 let sharedMaterial: THREE.MeshStandardMaterial | null = null;
@@ -33,7 +33,7 @@ export class WindowBarrierView {
 
   constructor(
     private readonly barrier: WindowBarrier,
-    scene: THREE.Scene,
+    parent: THREE.Object3D,
   ) {
     const geometry = getGeometry();
     const material = getMaterial();
@@ -50,10 +50,10 @@ export class WindowBarrierView {
       this.group.add(mesh);
     }
 
-    this.group.position.set(barrier.position.x, 0.6, barrier.position.z);
+    this.group.position.set(barrier.position.x, barrier.y, barrier.position.z);
     const angle = Math.atan2(barrier.outward.x, barrier.outward.z);
     this.group.rotation.y = angle;
-    scene.add(this.group);
+    parent.add(this.group);
   }
 
   public update(): void {

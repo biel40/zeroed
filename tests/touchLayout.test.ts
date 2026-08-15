@@ -20,9 +20,9 @@ describe('resolveTouchZone — portrait', () => {
     expect(resolveTouchZone(width - 5, height - 5, width, height)).toBe('look');
   });
 
-  it('leaves the upper-left region to the camera too, so drags there aim', () => {
-    expect(resolveTouchZone(40, 60, width, height)).toBe('look');
-    expect(resolveTouchZone(width * 0.2, height * 0.3, width, height)).toBe('look');
+  it('keeps the upper-left HUD area inert', () => {
+    expect(resolveTouchZone(40, 60, width, height)).toBe('none');
+    expect(resolveTouchZone(width * 0.2, height * 0.3, width, height)).toBe('none');
   });
 
   it('splits exactly on the configured fractions', () => {
@@ -30,7 +30,7 @@ describe('resolveTouchZone — portrait', () => {
     const edgeY = height * TOUCH_LAYOUT.moveZoneTop;
     expect(resolveTouchZone(edgeX - 1, edgeY + 1, width, height)).toBe('move');
     expect(resolveTouchZone(edgeX + 1, edgeY + 1, width, height)).toBe('look');
-    expect(resolveTouchZone(edgeX - 1, edgeY - 1, width, height)).toBe('look');
+    expect(resolveTouchZone(edgeX - 1, edgeY - 1, width, height)).toBe('none');
   });
 
   it('keeps a camera area far larger than the movement pad', () => {
@@ -43,10 +43,10 @@ describe('resolveTouchZone — landscape', () => {
   const { width, height } = LANDSCAPE;
 
   it('raises the movement pad, because a short viewport has no room below', () => {
-    // 35 % height in landscape is inside the pad, but would be camera in portrait.
+    // 35 % height in landscape is inside the pad, but remains inert in portrait.
     expect(resolveTouchZone(80, height * 0.35, width, height)).toBe('move');
     expect(resolveTouchZone(80, PORTRAIT.height * 0.35, PORTRAIT.width, PORTRAIT.height)).toBe(
-      'look',
+      'none',
     );
   });
 

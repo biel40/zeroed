@@ -12,6 +12,8 @@ export const EYE_HEIGHT = 1.7;
 const WALK_SPEED = 4.6;
 const ACCELERATION = 14;
 const ADS_MOVE_PENALTY = 0.45;
+const JUMP_SPEED = 5.2;
+const GRAVITY = 15;
 /** Body radius used for swept wall collision in arenas that enable it. */
 const BODY_RADIUS = 0.35;
 /** Vertical speed of stair transitions. */
@@ -22,8 +24,12 @@ export interface FloorTransitionZone {
   readonly box: THREE.Box3;
   /** Floor index after crossing. */
   readonly targetFloor: number;
+  /** Floor from which this trigger is valid, preventing trigger oscillation. */
+  readonly sourceFloor: number;
   /** Eye height for the destination floor. */
   readonly targetY: number;
+  readonly targetX?: number;
+  readonly targetZ?: number;
   /** New movement bounds once on the destination floor. */
   readonly bounds: PlayerBounds;
 }
@@ -61,7 +67,10 @@ export class PlayerController {
   private wallColliders: readonly THREE.Box3[] = [];
   private floorTransitions: readonly FloorTransitionZone[] = [];
   private currentFloor = 0;
+  private groundY = EYE_HEIGHT;
   private targetY = EYE_HEIGHT;
+  private jumpOffset = 0;
+  private jumpVelocity = 0;
   private readonly tmpBox = new THREE.Box3();
 
   constructor(aspect: number) {
@@ -98,7 +107,10 @@ export class PlayerController {
   /** Snap player to a spawn point and floor (used on restart). */
   public teleport(x: number, y: number, z: number, floor = 0, bounds?: PlayerBounds): void {
     this.rig.position.set(x, y, z);
+    this.groundY = y;
     this.targetY = y;
+    this.jumpOffset = 0;
+    this.jumpVelocity = 0;
     this.currentFloor = floor;
     if (bounds) this.bounds = bounds;
   }
@@ -159,14 +171,26 @@ export class PlayerController {
 
     // Floor transitions: automatic on contact with a stair trigger.
     for (const zone of this.floorTransitions) {
-      if (zone.box.containsPoint(this.rig.position)) {
+      if (zone.sourceFloor === this.currentFloor && zone.box.containsPoint(this.rig.position)) {
         this.currentFloor = zone.targetFloor;
         this.bounds = zone.bounds;
         this.targetY = zone.targetY;
+        if (zone.targetX !== undefined) this.rig.position.x = zone.targetX;
+        if (zone.targetZ !== undefined) this.rig.position.z = zone.targetZ;
         break;
       }
     }
-    this.rig.position.y = damp(this.rig.position.y, this.targetY, FLOOR_BLEND_SPEED, dt);
+    this.groundY = damp(this.groundY, this.targetY, FLOOR_BLEND_SPEED, dt);
+    if (input.wasPressed('Space') && this.jumpOffset === 0) this.jumpVelocity = JUMP_SPEED;
+    if (this.jumpVelocity !== 0 || this.jumpOffset > 0) {
+      this.jumpVelocity -= GRAVITY * dt;
+      this.jumpOffset += this.jumpVelocity * dt;
+      if (this.jumpOffset <= 0) {
+        this.jumpOffset = 0;
+        this.jumpVelocity = 0;
+      }
+    }
+    this.rig.position.y = this.groundY + this.jumpOffset;
 
     const targetFov = lerp(BASE_FOV, definition.ads.fov, weapon.adsAlpha);
     if (Math.abs(targetFov - this.fov) > 0.05) {
@@ -183,8 +207,8 @@ export class PlayerController {
 
   /** True if a body cylinder at (x,z) intersects any wall collider. */
   private wouldIntersectWall(x: number, z: number): boolean {
-    const minY = Math.min(this.rig.position.y, this.targetY) - 0.1;
-    const maxY = Math.max(this.rig.position.y, this.targetY) + 1.6;
+    const minY = Math.min(this.rig.position.y, this.groundY) - EYE_HEIGHT + 0.05;
+    const maxY = Math.max(this.rig.position.y, this.groundY) + 0.25;
     this.tmpBox.min.set(x - BODY_RADIUS, minY, z - BODY_RADIUS);
     this.tmpBox.max.set(x + BODY_RADIUS, maxY, z + BODY_RADIUS);
     for (const wall of this.wallColliders) {

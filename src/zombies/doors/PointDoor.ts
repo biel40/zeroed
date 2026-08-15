@@ -17,6 +17,8 @@ export class PointDoor {
   readonly id: string;
   readonly position: { readonly x: number; readonly z: number };
   readonly outward: { readonly x: number; readonly z: number };
+  readonly y: number;
+  readonly floor: number;
 
   private _state: DoorState = 'locked';
 
@@ -27,10 +29,14 @@ export class PointDoor {
     outwardX: number,
     outwardZ: number,
     private readonly config: PointDoorConfig,
+    y = 0,
+    floor = 0,
   ) {
     this.id = id;
     this.position = { x, z };
     this.outward = { x: outwardX, z: outwardZ };
+    this.y = y;
+    this.floor = floor;
   }
 
   get state(): DoorState {

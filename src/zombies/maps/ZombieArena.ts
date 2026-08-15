@@ -8,6 +8,14 @@ export interface MysteryBoxPlacement {
   readonly yaw: number;
   readonly useRange: number;
   readonly lookDotMin: number;
+  readonly floor?: number;
+}
+
+export interface ArenaPlayerSpawn {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly floor: number;
 }
 
 export interface PlayerBounds {
@@ -36,6 +44,8 @@ export interface ZombieArena {
   readonly barriers: ReadonlyArray<WindowBarrier>;
   readonly doors: ReadonlyArray<PointDoor>;
   readonly mysteryBoxPlacement: MysteryBoxPlacement;
+  /** Safe initial position owned by the map rather than the game mode. */
+  readonly playerSpawn?: ArenaPlayerSpawn;
   /** True when the arena wants swept wall collision for the player. */
   readonly useWallCollision: boolean;
   /** Optional movement bounds; classic arena leaves this undefined. */

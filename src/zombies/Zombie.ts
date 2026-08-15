@@ -67,6 +67,8 @@ export class Zombie implements HitTarget {
   speed = 0;
   /** Optional barrier this zombie must breach before chasing the player. */
   barrierTarget: WindowBarrier | null = null;
+  /** Logical map floor; Y is the corresponding physical floor elevation. */
+  floor = 0;
 
   private stateTimer = 0;
   private attackCooldown = 0;
@@ -108,7 +110,7 @@ export class Zombie implements HitTarget {
   }
 
   /** Resets the pooled zombie and places it at the spawn point. */
-  spawn(x: number, z: number, hp: number, speed: number): void {
+  spawn(x: number, z: number, hp: number, speed: number, y = 0, floor = 0): void {
     this.hp = hp;
     this.maxHp = hp;
     this.speed = speed;
@@ -116,7 +118,8 @@ export class Zombie implements HitTarget {
     this.stateTimer = ZOMBIE_SPAWN_DURATION;
     this.attackCooldown = 0;
     this.attackApplied = false;
-    this.group.position.set(x, 0, z);
+    this.floor = floor;
+    this.group.position.set(x, y, z);
     this.group.rotation.set(0, 0, 0);
     this.visual.setOpacity(1);
     this.visual.setSpawnRise(0);

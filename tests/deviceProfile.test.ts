@@ -34,4 +34,30 @@ describe('Device profile compatibility', () => {
     expect(profile.pixelRatioLimit).toBeGreaterThan(1);
     expect(profile.useTouchControls).toBe(false);
   });
+
+  it('uses coarse-pointer capability without relying on a mobile user agent', () => {
+    const profile = getDeviceProfile({
+      userAgent: 'Custom embedded browser',
+      maxTouchPoints: 2,
+      hardwareConcurrency: 8,
+      deviceMemory: 8,
+      matchMedia: (query) => ({ matches: query === '(pointer: coarse)' }),
+    });
+
+    expect(profile.useTouchControls).toBe(true);
+    expect(profile.isTouch).toBe(true);
+  });
+
+  it('keeps mouse controls on a fine-pointer desktop with a touch screen', () => {
+    const profile = getDeviceProfile({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      maxTouchPoints: 10,
+      hardwareConcurrency: 12,
+      deviceMemory: 16,
+      matchMedia: () => ({ matches: false }),
+    });
+
+    expect(profile.isTouch).toBe(true);
+    expect(profile.useTouchControls).toBe(false);
+  });
 });

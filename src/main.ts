@@ -12,6 +12,7 @@ const container: HTMLElement | null = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');
 
 const profile = getDeviceProfile();
+document.documentElement.classList.toggle('touch-controls-enabled', profile.useTouchControls);
 console.info('[Zeroed boot] Device profile', profile.log);
 
 const canvas: HTMLCanvasElement = document.createElement('canvas');

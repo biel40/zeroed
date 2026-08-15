@@ -30,6 +30,8 @@ export class WindowBarrier {
   readonly position: { readonly x: number; readonly z: number };
   /** Outward normal: zombies spawn on this side. */
   readonly outward: { readonly x: number; readonly z: number };
+  readonly y: number;
+  readonly floor: number;
   readonly boards: ReadonlyArray<BarrierBoard>;
 
   private _state: BarrierState = 'intact';
@@ -44,10 +46,14 @@ export class WindowBarrier {
     outwardX: number,
     outwardZ: number,
     private readonly config: WindowBarrierConfig,
+    y = 1.15,
+    floor = 0,
   ) {
     this.id = id;
     this.position = { x, z };
     this.outward = { x: outwardX, z: outwardZ };
+    this.y = y;
+    this.floor = floor;
     this.mutableBoards = Array.from({ length: config.boardCount }, () => ({
       hp: config.boardHp,
       maxHp: config.boardHp,

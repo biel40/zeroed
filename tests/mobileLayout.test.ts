@@ -18,27 +18,22 @@ describe('mobile stylesheet cascade', () => {
    * survived next to the mobile `top`, and the HUD panels stretched from the
    * top of the screen to the bottom. Order is the fix — and this guards it.
    */
-  it('declares every coarse-pointer block after the desktop panel rules', () => {
+  it('declares touch-profile overrides after the desktop panel rules', () => {
     const lastBaseRule = Math.max(
       ruleIndex('.hud-panel'),
       ruleIndex('#hud-weapon'),
       ruleIndex('#hud-stats'),
       ruleIndex('#hud-zombies'),
     );
-    const mediaBlocks = [...css.matchAll(/@media \(pointer: coarse\)/g)].map(
-      (match) => match.index ?? -1,
-    );
-
-    expect(mediaBlocks.length).toBeGreaterThanOrEqual(3);
-    for (const start of mediaBlocks) expect(start).toBeGreaterThan(lastBaseRule);
+    expect(css.indexOf('html.touch-controls-enabled #hud-weapon')).toBeGreaterThan(lastBaseRule);
   });
 
   it('releases the top-anchored panels from their desktop bottom offset', () => {
     // Without `bottom: auto` a panel is pinned top AND bottom: full-height.
-    const coarseBlock = css.slice(css.indexOf('@media (pointer: coarse) {'));
-    const weaponRule = coarseBlock.slice(
-      coarseBlock.indexOf('#hud-weapon {'),
-      coarseBlock.indexOf('}', coarseBlock.indexOf('#hud-weapon {')),
+    const touchBlock = css.slice(css.indexOf('html.touch-controls-enabled #hud-weapon'));
+    const weaponRule = touchBlock.slice(
+      touchBlock.indexOf('#hud-weapon {'),
+      touchBlock.indexOf('}', touchBlock.indexOf('#hud-weapon {')),
     );
     expect(weaponRule).toContain('bottom: auto');
   });
@@ -48,5 +43,12 @@ describe('mobile stylesheet cascade', () => {
     const wrappers = css.slice(css.indexOf('.touch-primary,'), css.indexOf('.touch-primary {'));
     expect(wrappers).toContain('pointer-events: none');
     expect(css).toMatch(/#touch-controls button \{[^}]*pointer-events: auto/);
+  });
+
+  it('limits browser gesture suppression to the game surface and controls', () => {
+    const bodyRule = css.slice(css.indexOf('html,\nbody {'), css.indexOf('}', css.indexOf('html,\nbody {')));
+    expect(bodyRule).not.toContain('touch-action: none');
+    expect(css).toMatch(/#app canvas \{[^}]*touch-action: none/);
+    expect(css).toMatch(/#touch-controls button \{[^}]*touch-action: none/);
   });
 });

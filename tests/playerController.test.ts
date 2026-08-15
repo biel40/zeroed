@@ -89,3 +89,22 @@ describe('PlayerController analog movement (virtual joystick)', () => {
     expect(player.rig.position.z).toBeLessThan(4);
   });
 });
+
+describe('PlayerController jump action', () => {
+  it('uses the shared Space action and lands at the original eye height', () => {
+    const player = new PlayerController(1);
+    const input = inputStub(new Set());
+    let pressed = true;
+    input.wasPressed = (code: string) => {
+      const result = code === 'Space' && pressed;
+      pressed = false;
+      return result;
+    };
+
+    player.update(DT, input, weaponStub);
+    const groundY = 1.7;
+    expect(player.rig.position.y).toBeGreaterThan(groundY);
+    step(player, input, 2);
+    expect(player.rig.position.y).toBeCloseTo(groundY, 5);
+  });
+});

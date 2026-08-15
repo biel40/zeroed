@@ -161,6 +161,18 @@ describe('ZombieManager splash damage (Ray Gun)', () => {
     expect(c.hp).toBe(ZOMBIE_BASE_HP);
     expect(kills).toEqual([false]); // splash kills are not headshots
   });
+
+  it('does not damage a zombie on another floor at the same XZ position', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = [...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives][0];
+    zombie.floor = 1;
+    zombie.position.set(0, 3.4, -20);
+
+    manager.applySplash(new THREE.Vector3(0, 1, -20), 2.5, 100);
+
+    expect(zombie.hp).toBe(ZOMBIE_BASE_HP);
+  });
 });
 
 describe('ZombieManager wall collisions', () => {

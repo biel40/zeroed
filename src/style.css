@@ -13,7 +13,6 @@ body {
   overscroll-behavior: none;
   background: #0b0e12;
   font-family: 'Segoe UI', system-ui, sans-serif;
-  touch-action: none;
   /* No text selection, link callouts, or tap highlights mid-gameplay. */
   user-select: none;
   -webkit-user-select: none;
@@ -223,20 +222,20 @@ body {
 }
 
 .touch-primary {
-  right: calc(14px + env(safe-area-inset-right, 0px));
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  right: calc(clamp(10px, 2vw, 22px) + env(safe-area-inset-right, 0px));
+  bottom: calc(clamp(10px, 2vh, 22px) + env(safe-area-inset-bottom, 0px));
   align-items: flex-end;
-  gap: 10px;
+  gap: clamp(8px, 1.4vw, 14px);
 }
 
 /* Secondary actions ride above the fire button, in the same right-hand
    column, so the aiming area stays one uninterrupted surface. */
 .touch-secondary {
-  right: calc(14px + env(safe-area-inset-right, 0px));
-  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  right: calc(clamp(14px, 2.5vw, 28px) + env(safe-area-inset-right, 0px));
+  bottom: calc(clamp(102px, 23vh, 138px) + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: clamp(6px, 1.2vmin, 10px);
 }
 
 #touch-controls button {
@@ -279,6 +278,12 @@ body {
   width: 60px;
   height: 60px;
   border-radius: 50%;
+}
+
+#btn-pause {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  right: calc(10px + env(safe-area-inset-right, 0px));
 }
 
 @keyframes hitpop {
@@ -464,6 +469,7 @@ body {
 }
 
 #mode-select,
+#map-select,
 #game-over {
   position: fixed;
   inset: 0;
@@ -509,6 +515,11 @@ body {
 .mode-grid button:hover {
   border-color: #ffd267;
   transform: translateY(-2px);
+}
+
+.mode-grid button:focus-visible {
+  outline: 2px solid #ffd267;
+  outline-offset: 3px;
 }
 
 .mode-name {
@@ -711,206 +722,88 @@ kbd {
 }
 
 /* ---------- Touch / mobile ----------
-   These blocks live LAST on purpose. Every override here targets the same
-   selectors as the desktop rules above (same specificity), so only source
-   order decides the winner: anything placed earlier silently loses. That is
-   what used to leave the panels with both `top` and `bottom` set, stretching
-   them down the whole screen.
+   The boot-time capability profile adds this class. Keeping it in every
+   selector prevents a narrow desktop window from receiving the mobile HUD. */
 
-   Three layers, broad to specific: any coarse pointer gets the touch controls
-   and top-anchored panels; narrow screens (phones upright) and short screens
-   (phones on their side) then shrink the HUD further. Desktop matches none. */
-
-@media (pointer: coarse) {
-  #touch-controls {
-    display: block;
-  }
-
-  /* Bottom corners are reserved for the joystick (left) and the action
-     buttons (right); the panels move to the top so nothing overlaps.
-     `bottom: auto` is what keeps a panel hugging its content. */
-  #hud-weapon {
-    left: calc(10px + env(safe-area-inset-left, 0px));
-    top: calc(10px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-    min-width: 0;
-  }
-
-  #hud-stats,
-  #hud-zombies {
-    right: calc(10px + env(safe-area-inset-right, 0px));
-    top: calc(10px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-    left: auto;
-    min-width: 0;
-  }
-
-  /* Keyboard legend and side-by-side cards do not fit small screens. */
-  .controls-grid {
-    display: none;
-  }
-
-  .mode-grid {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .mode-grid button {
-    width: min(300px, 82vw);
-    padding: 16px 14px;
-  }
-
-  .start-panel {
-    padding: 24px 22px;
-    max-width: 92vw;
-    max-height: 88dvh;
-    overflow-y: auto;
-  }
+html.touch-controls-enabled #touch-controls {
+  display: block;
 }
 
-/* Phones upright: the panels become corner badges so the centre of the
-   screen — where the zombies and the crosshair live — stays clear. */
-@media (pointer: coarse) and (max-width: 560px) {
-  .hud-panel {
+html.touch-controls-enabled #hud-weapon {
+  left: calc(10px + env(safe-area-inset-left, 0px));
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  min-width: 0;
+}
+
+html.touch-controls-enabled #hud-stats,
+html.touch-controls-enabled #hud-zombies {
+  right: calc(10px + env(safe-area-inset-right, 0px));
+  top: calc(62px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  left: auto;
+  min-width: 0;
+}
+
+html.touch-controls-enabled .controls-grid {
+  display: none;
+}
+
+html.touch-controls-enabled .mode-grid {
+  flex-direction: column;
+  align-items: center;
+}
+
+html.touch-controls-enabled .mode-grid button {
+  width: min(300px, 82vw);
+  padding: 16px 14px;
+}
+
+html.touch-controls-enabled .start-panel {
+  padding: 24px 22px;
+  max-width: 92vw;
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+
+@media (max-width: 560px) {
+  html.touch-controls-enabled .hud-panel {
     padding: 5px 8px;
     border-radius: 5px;
     line-height: 1.25;
   }
 
-  /* Detail rows are desktop luxuries; the phone shows only what is acted on. */
-  .hud-row-secondary {
-    display: none;
-  }
-
-  .hud-row {
-    gap: 8px;
-    font-size: 10px;
-  }
-
-  .hud-label {
-    font-size: 8px;
-  }
-
-  #hud-weapon-name {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-  }
-
-  #hud-ammo {
-    font-size: 17px;
-    margin: 0;
-  }
-
-  #hud-zombies {
-    max-width: 120px;
-  }
-
-  #z-round {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    margin-bottom: 2px;
-  }
-
-  #z-hp-bar {
-    height: 3px;
-    margin: 2px 0 3px;
-  }
-
-  #aim-distance {
-    top: calc(50% + 26px);
-    font-size: 11px;
-  }
-
-  #banner-title {
-    font-size: 26px;
-    letter-spacing: 0.2em;
-  }
-
-  #banner-sub {
-    font-size: 11px;
-    letter-spacing: 0.25em;
-  }
-
-  #interact-prompt {
-    top: 56%;
-    font-size: 13px;
-    letter-spacing: 0.16em;
-  }
-
-  #joystick {
-    width: 108px;
-    height: 108px;
-  }
-
-  #joystick-knob {
-    width: 46px;
-    height: 46px;
-  }
+  html.touch-controls-enabled .hud-row-secondary { display: none; }
+  html.touch-controls-enabled .hud-row { gap: 8px; font-size: 10px; }
+  html.touch-controls-enabled .hud-label { font-size: 8px; }
+  html.touch-controls-enabled #hud-weapon-name { font-size: 10px; letter-spacing: 0.08em; }
+  html.touch-controls-enabled #hud-ammo { font-size: 17px; margin: 0; }
+  html.touch-controls-enabled #hud-zombies { max-width: 120px; }
+  html.touch-controls-enabled #z-round { font-size: 11px; letter-spacing: 0.08em; margin-bottom: 2px; }
+  html.touch-controls-enabled #z-hp-bar { height: 3px; margin: 2px 0 3px; }
+  html.touch-controls-enabled #aim-distance { top: calc(50% + 26px); font-size: 11px; }
+  html.touch-controls-enabled #banner-title { font-size: 26px; letter-spacing: 0.2em; }
+  html.touch-controls-enabled #banner-sub { font-size: 11px; letter-spacing: 0.25em; }
+  html.touch-controls-enabled #interact-prompt { top: 56%; font-size: 13px; letter-spacing: 0.16em; }
+  html.touch-controls-enabled #joystick { width: 108px; height: 108px; }
+  html.touch-controls-enabled #joystick-knob { width: 46px; height: 46px; }
 }
 
-/* Phones on their side: width is plentiful, height is not. Everything
-   shrinks vertically and the buttons tuck into the bottom-right corner. */
-@media (pointer: coarse) and (max-height: 480px) {
-  .hud-panel {
-    padding: 4px 7px;
+@media (orientation: landscape) and (max-height: 480px) {
+  html.touch-controls-enabled .hud-panel { padding: 4px 7px; }
+  html.touch-controls-enabled .hud-row-secondary { display: none; }
+  html.touch-controls-enabled .hud-row { font-size: 10px; }
+  html.touch-controls-enabled #hud-ammo { font-size: 15px; margin: 0; }
+  html.touch-controls-enabled #z-round { font-size: 11px; margin-bottom: 2px; }
+  html.touch-controls-enabled .touch-secondary {
+    right: calc(150px + env(safe-area-inset-right, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    grid-template-columns: repeat(2, auto);
   }
-
-  .hud-row-secondary {
-    display: none;
-  }
-
-  .hud-row {
-    font-size: 10px;
-  }
-
-  #hud-ammo {
-    font-size: 15px;
-    margin: 0;
-  }
-
-  #z-round {
-    font-size: 11px;
-    margin-bottom: 2px;
-  }
-
-  .touch-secondary {
-    /* Two short columns instead of one tall one: a single column would run
-       into the HUD on a 380 px-tall viewport. */
-    flex-flow: column wrap;
-    max-height: 100px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    right: calc(108px + env(safe-area-inset-right, 0px));
-    gap: 6px;
-  }
-
-  #touch-controls button {
-    min-width: 42px;
-    height: 42px;
-    font-size: 10px;
-  }
-
-  #btn-fire {
-    width: 70px;
-    height: 70px;
-    font-size: 12px;
-  }
-
-  #btn-ads {
-    width: 52px;
-    height: 52px;
-  }
-
-  #joystick {
-    width: 96px;
-    height: 96px;
-  }
-
-  #joystick-knob {
-    width: 42px;
-    height: 42px;
-  }
-
-  #banner-title {
-    font-size: 24px;
-  }
+  html.touch-controls-enabled #touch-controls button { min-width: 42px; height: 42px; font-size: 10px; }
+  html.touch-controls-enabled #btn-fire { width: 70px; height: 70px; font-size: 12px; }
+  html.touch-controls-enabled #btn-ads { width: 52px; height: 52px; }
+  html.touch-controls-enabled #joystick { width: 96px; height: 96px; }
+  html.touch-controls-enabled #joystick-knob { width: 42px; height: 42px; }
+  html.touch-controls-enabled #banner-title { font-size: 24px; }
 }

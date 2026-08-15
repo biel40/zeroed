@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EYE_HEIGHT, type FloorTransitionZone } from '../player/PlayerController';
 import type { WindowBarrier } from './barriers/WindowBarrier';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
 import {
@@ -41,10 +42,8 @@ const FRONT_PROBE = 1.3;
 const ROUND_SPEED_FACTOR = 0.85;
 /** Surfaces solid enough to stop a walking body (targets are steel/paper). */
 const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'metal']);
-/** A collider blocks movement only if it is tall enough to matter… */
+/** A collider blocks movement only if it is tall enough to matter. */
 const MIN_OBSTACLE_HEIGHT = 0.5;
-/** …and starts low enough (the roof at y≈3 must not block anyone). */
-const MAX_OBSTACLE_BASE_Y = 1.2;
 /** Ground/berm-scale boxes are walkable scenery, never obstacles. */
 const MAX_OBSTACLE_FOOTPRINT = 20;
 
@@ -87,6 +86,7 @@ export class ZombieManager {
     castShadows = true,
     spawnPoints: ReadonlyArray<readonly [number, number]> | null = null,
     private barriers: ReadonlyArray<WindowBarrier> = [],
+    private readonly floorTransitions: ReadonlyArray<FloorTransitionZone> = [],
   ) {
     this.rng = rng;
     this.spawner = new ZombieSpawner(rng, spawnPoints ?? undefined);
@@ -116,6 +116,11 @@ export class ZombieManager {
     this.spawner = new ZombieSpawner(this.rng, spawnPoints);
   }
 
+  /** Replace the barriers eligible for newly spawned zombies after a zone unlock. */
+  setBarriers(barriers: ReadonlyArray<WindowBarrier>): void {
+    this.barriers = barriers;
+  }
+
   /**
    * Snapshots the static obstacles out of the shared collider array. The
    * filters keep exactly the bulky, grounded, human-scale solids: walls,
@@ -132,7 +137,7 @@ export class ZombieManager {
       box.setFromObject(object);
       if (box.isEmpty()) continue;
       box.getSize(size);
-      if (size.y < MIN_OBSTACLE_HEIGHT || box.min.y > MAX_OBSTACLE_BASE_Y) continue;
+      if (size.y < MIN_OBSTACLE_HEIGHT) continue;
       if (size.x > MAX_OBSTACLE_FOOTPRINT || size.z > MAX_OBSTACLE_FOOTPRINT) continue;
       this.obstacles.push(box.clone());
     }
@@ -153,6 +158,7 @@ export class ZombieManager {
     const zombie = this.pool.acquire();
     if (!zombie) return false;
     const [x, z] = this.spawner.pick(playerX, playerZ);
+    this.roundState.delete(zombie);
     // Cheap per-spawn variation: scale, ground speed and walk-cycle phase all
     // jitter so 24 zombies never read as synchronized clones.
     const jitter = (amount: number): number => 1 + (this.rng() * 2 - 1) * amount;
@@ -164,13 +170,13 @@ export class ZombieManager {
       Math.round(ZOMBIE_BASE_HP * config.healthMultiplier),
       ZOMBIE_BASE_SPEED * config.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
     );
-    zombie.barrierTarget = this.pickBarrierTarget();
+    zombie.barrierTarget = this.pickBarrierTarget(zombie.floor);
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
     return true;
   }
 
-  private pickBarrierTarget(): WindowBarrier | null {
-    const candidates = this.barriers.filter((b) => !b.isOpen);
+  private pickBarrierTarget(floor: number): WindowBarrier | null {
+    const candidates = this.barriers.filter((barrier) => !barrier.isOpen && barrier.floor === floor);
     if (candidates.length === 0) return null;
     return candidates[Math.floor(this.rng() * candidates.length)];
   }
@@ -208,6 +214,7 @@ export class ZombieManager {
     let nextId = 0;
     for (const z of this.pool.actives) {
       if (!z.isAlive) continue;
+      if (z.floor !== impact.floor) continue;
       const id = nextId++;
       byId.set(id, z);
       candidates.push({ id, x: z.position.x, z: z.position.z, alive: true });
@@ -231,6 +238,7 @@ export class ZombieManager {
   applySplash(center: THREE.Vector3, radius: number, splashDamage: number): void {
     for (const zombie of this.pool.actives) {
       if (!zombie.isAlive) continue;
+      if (Math.abs(zombie.position.y - center.y) > 2) continue;
       // Horizontal distance only: arcade splash should not punish zombies
       // for the impact happening at torso height instead of at their feet.
       const dx = zombie.position.x - center.x;
@@ -242,10 +250,11 @@ export class ZombieManager {
     }
   }
 
-  update(dt: number, playerX: number, playerZ: number): void {
+  update(dt: number, playerX: number, playerZ: number, playerFloor = 0): void {
     for (const zombie of this.pool.actives) {
       if (zombie.isAlive) {
-        this.steer(zombie, dt, playerX, playerZ);
+        this.steer(zombie, dt, playerX, playerZ, playerFloor);
+        this.applyFloorTransition(zombie);
       }
       zombie.update(dt);
     }
@@ -260,9 +269,10 @@ export class ZombieManager {
       this.removeColliders(zombie);
     }
     this.pool.releaseAll();
+    this.roundState.clear();
   }
 
-  private steer(zombie: Zombie, dt: number, playerX: number, playerZ: number): void {
+  private steer(zombie: Zombie, dt: number, playerX: number, playerZ: number, playerFloor: number): void {
     const target = zombie.barrierTarget;
     if (target && target.isOpen) zombie.barrierTarget = null;
 
@@ -295,6 +305,22 @@ export class ZombieManager {
       return;
     }
 
+    if (zombie.floor !== playerFloor) {
+      const portal = this.floorTransitions.find(
+        (transition) => transition.sourceFloor === zombie.floor && transition.targetFloor === playerFloor,
+      );
+      if (portal) {
+        const center = portal.box.getCenter(this.tmpToPlayer);
+        zombie.faceTowards(center.x, center.z);
+        const toPortal = this.tmpToPlayer.set(center.x - zombie.position.x, 0, center.z - zombie.position.z);
+        if (toPortal.lengthSq() > 0.01) {
+          toPortal.normalize();
+          this.seek(zombie, dt, toPortal, center.x, center.z);
+        }
+      }
+      return;
+    }
+
     const toPlayer = this.tmpToPlayer.set(
       playerX - zombie.position.x,
       0,
@@ -323,7 +349,7 @@ export class ZombieManager {
     // Soft neighbor separation so the horde never stacks into one body.
     const separation = this.tmpSeparation.set(0, 0, 0);
     for (const other of this.pool.actives) {
-      if (other === zombie || !other.isAlive) continue;
+      if (other === zombie || !other.isAlive || other.floor !== zombie.floor) continue;
       const delta = this.tmpDelta.copy(zombie.position).sub(other.position);
       delta.y = 0;
       const distSq = delta.lengthSq();
@@ -333,7 +359,7 @@ export class ZombieManager {
     }
 
     const pos = zombie.position;
-    const distance = toTarget.length();
+    const distance = Math.hypot(targetX - pos.x, targetZ - pos.z);
     const seekX = toTarget.x * zombie.speed + separation.x * SEPARATION_PUSH;
     const seekZ = toTarget.z * zombie.speed + separation.z * SEPARATION_PUSH;
 
@@ -343,17 +369,15 @@ export class ZombieManager {
       // Walking straight: only a wall right ahead triggers rounding.
       const probeX = pos.x + toTarget.x * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
       const probeZ = pos.z + toTarget.z * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
-      if (this.hitsObstacle(probeX, probeZ)) {
-        // Commit to the wall TANGENT that shortens the path to the target.
-        // The tangent is perpendicular to the approach direction; its sign
-        // is chosen so walking it reduces the lateral gap to the target.
+      const obstacle = this.findObstacle(probeX, probeZ, zombie.position.y);
+      if (obstacle) {
         const tanX = -toTarget.z;
         const tanZ = toTarget.x;
         const sign = tanX * (targetX - pos.x) + tanZ * (targetZ - pos.z) >= 0 ? 1 : -1;
         rounding = { x: tanX * sign, z: tanZ * sign };
         this.roundState.set(zombie, rounding);
       }
-    } else if (this.lineOfSightClear(pos, targetX, targetZ, distance)) {
+    } else if (this.lineOfSightClear(zombie, targetX, targetZ, distance)) {
       // Rounding ends only when the straight path to the target is clear.
       // Checking the whole segment — not the immediate front — prevents
       // dropping the state at the corner's edge and re-entering it a meter
@@ -384,16 +408,17 @@ export class ZombieManager {
    * for obstacles several times wider than the sample spacing.
    */
   private lineOfSightClear(
-    pos: THREE.Vector3,
+    zombie: Zombie,
     targetX: number,
     targetZ: number,
     distance: number,
   ): boolean {
+    const pos = zombie.position;
     const steps = Math.max(1, Math.ceil(distance / ZOMBIE_BODY_RADIUS));
     const stepX = ((targetX - pos.x) / distance) * (distance / steps);
     const stepZ = ((targetZ - pos.z) / distance) * (distance / steps);
     for (let i = 1; i <= steps; i++) {
-      if (this.hitsObstacle(pos.x + stepX * i, pos.z + stepZ * i)) return false;
+      if (this.hitsObstacle(pos.x + stepX * i, pos.z + stepZ * i, pos.y)) return false;
     }
     return true;
   }
@@ -404,25 +429,51 @@ export class ZombieManager {
    * stopping the zombie dead. The position never enters an obstacle, which
    * means no tunneling, no corner cutting and no push-out vibration.
    */
-  private moveWithCollision(zombie: Zombie, dx: number, dz: number): void {
+  private moveWithCollision(zombie: Zombie, dx: number, dz: number): boolean {
     const pos = zombie.position;
-    if (dx !== 0 && !this.hitsObstacle(pos.x + dx, pos.z)) pos.x += dx;
-    if (dz !== 0 && !this.hitsObstacle(pos.x, pos.z + dz)) pos.z += dz;
+    let moved = false;
+    if (dx !== 0 && !this.hitsObstacle(pos.x + dx, pos.z, pos.y)) {
+      pos.x += dx;
+      moved = true;
+    }
+    if (dz !== 0 && !this.hitsObstacle(pos.x, pos.z + dz, pos.y)) {
+      pos.z += dz;
+      moved = true;
+    }
+    return moved;
   }
 
   /** Circle-vs-AABB test in XZ, with the body radius folded into the box. */
-  private hitsObstacle(x: number, z: number): boolean {
+  private hitsObstacle(x: number, z: number, y: number): boolean {
+    return this.findObstacle(x, z, y) !== null;
+  }
+
+  private findObstacle(x: number, z: number, y: number): THREE.Box3 | null {
     for (const box of this.obstacles) {
       if (
+        box.max.y > y + 0.05 &&
+        box.min.y < y + 1.8 &&
         x > box.min.x - ZOMBIE_BODY_RADIUS &&
         x < box.max.x + ZOMBIE_BODY_RADIUS &&
         z > box.min.z - ZOMBIE_BODY_RADIUS &&
         z < box.max.z + ZOMBIE_BODY_RADIUS
       ) {
-        return true;
+        return box;
       }
     }
-    return false;
+    return null;
+  }
+
+  private applyFloorTransition(zombie: Zombie): void {
+    for (const transition of this.floorTransitions) {
+      if (transition.sourceFloor !== zombie.floor || !transition.box.containsPoint(zombie.position)) continue;
+      zombie.floor = transition.targetFloor;
+      zombie.position.y = transition.targetY - EYE_HEIGHT;
+      if (transition.targetX !== undefined) zombie.position.x = transition.targetX;
+      if (transition.targetZ !== undefined) zombie.position.z = transition.targetZ;
+      this.roundState.delete(zombie);
+      return;
+    }
   }
 
   private kill(zombie: Zombie, headshot: boolean): void {

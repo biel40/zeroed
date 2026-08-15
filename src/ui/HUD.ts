@@ -138,12 +138,15 @@ export class HUD {
   /** Map picker shown after choosing Zombies mode. */
   showMapSelect(onSelect: (mapId: 'classic' | 'burned-mansion') => void): void {
     this.mapSelect.classList.remove('hidden');
-    for (const button of this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]')) {
-      button.addEventListener('click', () => {
+    const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
+    for (const button of buttons) {
+      // Assignment replaces a previous handler if this menu is shown again.
+      button.onclick = () => {
+        for (const mapButton of buttons) mapButton.onclick = null;
         this.mapSelect.classList.add('hidden');
         const mapId = button.dataset.map;
         onSelect(mapId === 'burned-mansion' ? 'burned-mansion' : 'classic');
-      });
+      };
     }
   }
 

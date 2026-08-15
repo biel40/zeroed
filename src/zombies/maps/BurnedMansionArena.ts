@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { DeviceProfile } from '../../core/DeviceProfile';
-import type { FloorTransitionZone } from '../../player/PlayerController';
+import { EYE_HEIGHT, type FloorTransitionZone } from '../../player/PlayerController';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
 import { PointDoor } from '../doors/PointDoor';
@@ -8,101 +8,129 @@ import { PointDoorView } from '../doors/PointDoorView';
 import type { ZombieArena } from './ZombieArena';
 import {
   BARRIER_CONFIG,
+  DEBUG_MAP_COLLIDERS,
   MANSION_BARRIERS,
   MANSION_BOX_PLACEMENT,
   MANSION_DOORS,
   MANSION_GROUND_BOUNDS,
+  MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
   MANSION_UPPER_BOUNDS,
   MANSION_UPPER_Y,
 } from './BurnedMansionConfig';
 
-/** Shared mansion materials to keep draw calls low. */
-let burnedWoodMaterial: THREE.MeshStandardMaterial | null = null;
-let charredWallMaterial: THREE.MeshStandardMaterial | null = null;
-let floorMaterial: THREE.MeshStandardMaterial | null = null;
-let debrisMaterial: THREE.MeshStandardMaterial | null = null;
+const WALL_THICKNESS = 0.3;
+const LOWER_WALL_HEIGHT = 3.2;
+const UPPER_WALL_HEIGHT = 3;
+const DOOR_WIDTH = 1.6;
+const WINDOW_WIDTH = 1.5;
+// Low enough for a zombie body to step through after the boards break.
+const WINDOW_SILL = 0.3;
+const WINDOW_TOP = 1.9;
 
-function getBurnedWood(): THREE.MeshStandardMaterial {
-  burnedWoodMaterial ??= new THREE.MeshStandardMaterial({ color: 0x3b2f26, roughness: 0.92 });
-  return burnedWoodMaterial;
-}
+const materials = {
+  wall: new THREE.MeshStandardMaterial({
+    color: 0x5a4940,
+    roughness: 0.96,
+    emissive: 0x130907,
+    emissiveIntensity: 0.12,
+  }),
+  wood: new THREE.MeshStandardMaterial({ color: 0x493428, roughness: 0.9 }),
+  floor: new THREE.MeshStandardMaterial({ color: 0x5b5045, roughness: 0.84 }),
+  concrete: new THREE.MeshStandardMaterial({ color: 0x555452, roughness: 1 }),
+  metal: new THREE.MeshStandardMaterial({ color: 0x45484a, roughness: 0.72, metalness: 0.5 }),
+  debris: new THREE.MeshStandardMaterial({ color: 0x352c26, roughness: 1 }),
+};
 
-function getCharredWall(): THREE.MeshStandardMaterial {
-  charredWallMaterial ??= new THREE.MeshStandardMaterial({ color: 0x2a2522, roughness: 0.95 });
-  return charredWallMaterial;
-}
-
-function getFloorMaterial(): THREE.MeshStandardMaterial {
-  floorMaterial ??= new THREE.MeshStandardMaterial({ color: 0x4a423a, roughness: 0.88 });
-  return floorMaterial;
-}
-
-function getDebrisMaterial(): THREE.MeshStandardMaterial {
-  debrisMaterial ??= new THREE.MeshStandardMaterial({ color: 0x1f1b18, roughness: 1 });
-  return debrisMaterial;
-}
+type WallAxis = 'x' | 'z';
 
 /**
- * Compact, two-floor burned mansion. The geometry is deliberately low-poly:
- * shared materials, simple boxes, a few instanced debris piles. The second
- * floor is reached through an automatic stair trigger.
+ * Small two-storey mansion made from explicit visual meshes and a separate
+ * player-collision list. Exterior walls are segmented around real window
+ * openings; paid doors occupy real apertures rather than overlapping walls.
  */
 export class BurnedMansionArena implements ZombieArena {
   readonly id = 'burned-mansion';
   readonly group = new THREE.Group();
-  colliders: ReadonlyArray<THREE.Object3D>;
-  wallColliders: ReadonlyArray<THREE.Box3>;
-  readonly barriers: ReadonlyArray<WindowBarrier>;
-  readonly doors: ReadonlyArray<PointDoor>;
-  spawnPoints: ReadonlyArray<readonly [number, number]>;
   readonly mysteryBoxPlacement = MANSION_BOX_PLACEMENT;
+  readonly playerSpawn = MANSION_PLAYER_SPAWN;
   readonly useWallCollision = true;
   readonly playerBounds = MANSION_GROUND_BOUNDS;
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
 
+  colliders: ReadonlyArray<THREE.Object3D> = [];
+  wallColliders: ReadonlyArray<THREE.Box3> = [];
+  barriers: ReadonlyArray<WindowBarrier> = [];
+  readonly doors: ReadonlyArray<PointDoor>;
+  spawnPoints: ReadonlyArray<readonly [number, number]> = [];
+
+  private readonly structureMeshes: THREE.Mesh[] = [];
+  private readonly playerWallMeshes: THREE.Mesh[] = [];
+  private readonly allBarriers: ReadonlyArray<WindowBarrier>;
   private readonly barrierViews: WindowBarrierView[] = [];
   private readonly doorViews: PointDoorView[] = [];
+  private readonly doorMeshes: THREE.Mesh[] = [];
   private readonly activeSpawnZones = new Set<string>(['start']);
-  private readonly tmpBox = new THREE.Box3();
-  private readonly wallMeshes: THREE.Mesh[] = [];
-  private readonly doorMeshes: THREE.Group[] = [];
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly profile: DeviceProfile,
   ) {
-    this.buildExterior();
+    this.buildShell();
     this.buildInterior();
-    this.buildDebris();
+    this.buildStairs();
+    this.buildProps();
     this.buildLighting();
-    this.buildAtmosphere();
 
-    this.barriers = MANSION_BARRIERS.map(
-      (b) => new WindowBarrier(b.id, b.x, b.z, b.outwardX, b.outwardZ, BARRIER_CONFIG),
+    this.allBarriers = MANSION_BARRIERS.map(
+      (barrier) =>
+        new WindowBarrier(
+          barrier.id,
+          barrier.x,
+          barrier.z,
+          barrier.outwardX,
+          barrier.outwardZ,
+          BARRIER_CONFIG,
+        ),
     );
-    for (const barrier of this.barriers) {
-      this.barrierViews.push(new WindowBarrierView(barrier, this.scene));
+    for (const barrier of this.allBarriers) {
+      const view = new WindowBarrierView(barrier, this.group);
+      if (this.profile.useReducedEffects) {
+        view.group.traverse((object) => { object.castShadow = false; });
+      }
+      this.barrierViews.push(view);
     }
 
     this.doors = MANSION_DOORS.map(
-      (d) => new PointDoor(d.id, d.x, d.z, d.outwardX, d.outwardZ, { cost: d.cost }),
+      (door) =>
+        new PointDoor(
+          door.id,
+          door.x,
+          door.z,
+          door.outwardX,
+          door.outwardZ,
+          { cost: door.cost },
+          door.y,
+          door.floor,
+        ),
     );
     for (const door of this.doors) {
-      const view = new PointDoorView(door, this.scene);
+      const view = new PointDoorView(door, this.group);
+      if (this.profile.useReducedEffects) {
+        view.group.traverse((object) => { object.castShadow = false; });
+      }
       this.doorViews.push(view);
-      this.doorMeshes.push(view.group);
+      this.doorMeshes.push(view.collider);
     }
 
-    this.spawnPoints = this.computeSpawnPoints();
-    this.colliders = this.collectColliders();
-    this.wallColliders = this.wallMeshes.map((m) => this.tmpBox.setFromObject(m).clone());
     this.floorTransitions = this.buildFloorTransitions();
+    this.refreshProgressionState();
+    if (DEBUG_MAP_COLLIDERS) this.addDebugHelpers();
   }
 
   public init(): void {
-    this.scene.background = new THREE.Color(0x070504);
-    this.scene.fog = new THREE.FogExp2(0x070504, 0.022);
+    this.scene.background = new THREE.Color(0x0d0b0a);
+    this.scene.fog = new THREE.FogExp2(0x17110e, 0.018);
   }
 
   public update(dt: number): void {
@@ -111,186 +139,292 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   public reset(): void {
-    for (const barrier of this.barriers) {
-      // Reset boards to full HP (full repair on restart).
+    for (const barrier of this.allBarriers) {
       for (const board of barrier.boards) board.hp = board.maxHp;
     }
-    // Doors stay unlocked across restart; a full page reload rebuilds them.
   }
 
-  /** Unlock a door and add its zone spawns. */
+  /** Called after PointDoor changed to unlocked. */
   public activateDoor(doorId: string): boolean {
-    const door = this.doors.find((d) => d.id === doorId);
-    if (!door || door.state !== 'locked') return false;
-    // Unlock is handled by PointDoor; we just update spawns.
+    if (!this.doors.some((door) => door.id === doorId) || this.activeSpawnZones.has(doorId)) {
+      return false;
+    }
     this.activeSpawnZones.add(doorId);
+    this.refreshProgressionState();
     return true;
+  }
+
+  public refreshSpawnPoints(): void {
+    this.spawnPoints = this.computeSpawnPoints();
+  }
+
+  public refreshColliders(): void {
+    this.group.updateMatrixWorld(true);
+    this.colliders = this.collectBallisticColliders();
+    this.wallColliders = this.collectPlayerWallColliders();
+  }
+
+  private refreshProgressionState(): void {
+    this.refreshSpawnPoints();
+    this.barriers = this.allBarriers.filter((_, index) =>
+      this.activeSpawnZones.has(MANSION_BARRIERS[index].zone),
+    );
+    for (let index = 0; index < this.barrierViews.length; index++) {
+      this.barrierViews[index].group.visible = this.activeSpawnZones.has(MANSION_BARRIERS[index].zone);
+    }
+    this.refreshColliders();
   }
 
   private computeSpawnPoints(): ReadonlyArray<readonly [number, number]> {
     const points: Array<readonly [number, number]> = [];
     for (const zone of this.activeSpawnZones) {
-      const zoneSpawns = MANSION_SPAWNS[zone] ?? [];
-      for (const point of zoneSpawns) points.push(point);
+      for (const point of MANSION_SPAWNS[zone] ?? []) points.push(point);
     }
     return points;
   }
 
-  public refreshSpawnPoints(): void {
-    (this as { spawnPoints: ReadonlyArray<readonly [number, number]> }).spawnPoints =
-      this.computeSpawnPoints();
-  }
-
-  private collectColliders(): ReadonlyArray<THREE.Object3D> {
-    const list: THREE.Object3D[] = [];
-    for (const mesh of this.wallMeshes) list.push(mesh);
-    // Locked doors block movement and bullets.
+  private collectBallisticColliders(): ReadonlyArray<THREE.Object3D> {
+    const colliders: THREE.Object3D[] = [...this.structureMeshes];
     for (let i = 0; i < this.doors.length; i++) {
-      if (this.doors[i].isLocked) list.push(this.doorMeshes[i]);
+      if (this.doors[i].isLocked) colliders.push(this.doorMeshes[i]);
     }
-    return list;
+    return colliders;
   }
 
-  public refreshColliders(): void {
-    (this as { colliders: ReadonlyArray<THREE.Object3D> }).colliders = this.collectColliders();
+  private collectPlayerWallColliders(): ReadonlyArray<THREE.Box3> {
+    const boxes = this.playerWallMeshes.map((mesh) => new THREE.Box3().setFromObject(mesh));
+    for (let i = 0; i < this.doors.length; i++) {
+      if (this.doors[i].isLocked) boxes.push(new THREE.Box3().setFromObject(this.doorMeshes[i]));
+    }
+    return boxes;
   }
 
-  private buildExterior(): void {
-    const wallHeight = 3.2;
-    const thickness = 0.4;
-    const w = 16;
-    const d = 20;
+  private buildShell(): void {
+    this.addSlab('ground-floor', 0, -0.08, 0, 14, 0.16, 16, materials.concrete);
 
-    // Outer shell: front (south) is open for the main entrance feel.
-    const walls: Array<[number, number, number, number, number]> = [
-      [-w / 2 - thickness / 2, wallHeight / 2, 0, thickness, d], // west
-      [w / 2 + thickness / 2, wallHeight / 2, 0, thickness, d], // east
-      [0, wallHeight / 2, -d / 2 - thickness / 2, w + thickness * 2, thickness], // north
-      [0, wallHeight / 2, d / 2 + thickness / 2, w * 0.4, thickness], // south partial center
-      [-w * 0.45, wallHeight / 2, d / 2 + thickness / 2, w * 0.35, thickness], // south partial left
-      [w * 0.45, wallHeight / 2, d / 2 + thickness / 2, w * 0.35, thickness], // south partial right
-    ];
+    this.addWindowedWall('z', -7.15, -8, 8, [-3.2, 3.2, 5.4]);
+    this.addWindowedWall('z', 7.15, -8, 8, [-4.5]);
+    this.addWindowedWall('x', -8.15, -7, 7, [-3.5]);
+    this.addWindowedWall('x', 8.15, -7, 7, [-3.5]);
 
-    for (const [x, y, z, sx, sz] of walls) {
-      this.addWall(x, y, z, sx, wallHeight, sz);
-    }
+    // Continuous support: vertical movement is controlled by explicit stair
+    // portals, so a visual hole would leave the player hovering without gravity.
+    this.addSlab('upper-floor-north', 3.65, MANSION_UPPER_Y - 0.08, -3, 7, 0.16, 10, materials.floor);
 
-    // Floor.
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, d), getFloorMaterial());
-    floor.position.set(0, 0.08, 0);
-    floor.receiveShadow = true;
-    this.group.add(floor);
+    const upperCenterY = MANSION_UPPER_Y + UPPER_WALL_HEIGHT / 2;
+    this.addWall(0.15, upperCenterY, -3, WALL_THICKNESS, UPPER_WALL_HEIGHT, 10, materials.wall);
+    this.addWall(7.15, upperCenterY, -3, WALL_THICKNESS, UPPER_WALL_HEIGHT, 10, materials.wall);
+    this.addWall(3.65, upperCenterY, -8.15, 7, UPPER_WALL_HEIGHT, WALL_THICKNESS, materials.wall);
+    this.addWall(3.65, upperCenterY, 2.15, 7, UPPER_WALL_HEIGHT, WALL_THICKNESS, materials.wall);
 
-    // Roof with holes.
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), getCharredWall());
-    roof.position.set(0, wallHeight + 0.06, 0);
-    roof.castShadow = true;
-    this.group.add(roof);
+    this.addSlab('roof', 0, 6.48, 0, 14.6, 0.16, 16.6, materials.wall);
   }
 
   private buildInterior(): void {
-    const h = 3.0;
-    const t = 0.3;
-    // Main hall divider toward dining.
-    this.addWall(-2, h / 2, 2, t, h, 6);
-    // Dining/kitchen divider.
-    this.addWall(-4, h / 2, 4, 6, h, t);
-    // Upper floor slab.
-    const upper = new THREE.Mesh(new THREE.BoxGeometry(10, 0.16, 10), getFloorMaterial());
-    upper.position.set(3, MANSION_UPPER_Y - 0.08, -5);
-    upper.receiveShadow = true;
-    this.group.add(upper);
-    // Upper railing.
-    this.addWall(3, MANSION_UPPER_Y + 0.5, -0.2, 10, 1, 0.15);
-    // Staircase (visual ramp).
-    const stairs = new THREE.Mesh(new THREE.BoxGeometry(1.2, MANSION_UPPER_Y, 3), getBurnedWood());
-    stairs.position.set(3.8, MANSION_UPPER_Y / 2, 1.5);
-    stairs.rotation.y = Math.PI / 2;
-    stairs.receiveShadow = true;
-    this.group.add(stairs);
+    // Starting room -> box room. The opening is exactly occupied by to-dining.
+    this.addDoorWall('x', 2, -7, 0, -3.5, 0);
+    this.addWall(3.5, LOWER_WALL_HEIGHT / 2, 2, 7, LOWER_WALL_HEIGHT, WALL_THICKNESS, materials.wall);
+
+    // Box room -> stair hall, and stair hall -> bunker.
+    this.addDoorWall('z', 0, -8, 2, -2.5, 0);
+    this.addDoorWall('z', 3.2, -8, 2, -4.5, 0);
+
+    // Upper stairwell rails are low but collide using the corrected body box.
+    this.addWall(0.5, MANSION_UPPER_Y + 0.5, 0.15, 0.12, 1, 3.1, materials.wood);
+    this.addWall(2.4, MANSION_UPPER_Y + 0.5, 0.15, 0.12, 1, 3.1, materials.wood);
   }
 
-  private buildDebris(): void {
-    const debris = getDebrisMaterial();
-    const geometry = new THREE.DodecahedronGeometry(0.18, 0);
-    for (let i = 0; i < 18; i++) {
-      const mesh = new THREE.Mesh(geometry, debris);
-      mesh.position.set(
-        -6 + Math.random() * 12,
-        0.09 + Math.random() * 0.06,
-        -8 + Math.random() * 16,
-      );
-      mesh.scale.setScalar(0.7 + Math.random() * 0.8);
-      mesh.rotation.set(Math.random(), Math.random(), Math.random());
+  private buildStairs(): void {
+    const steps = 10;
+    const depth = 0.28;
+    for (let index = 0; index < steps; index++) {
+      const height = ((index + 1) / steps) * MANSION_UPPER_Y;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(1.55, height, depth), materials.wood);
+      step.position.set(1.45, height / 2, -1.2 + index * depth);
+      step.castShadow = !this.profile.useReducedEffects;
+      step.receiveShadow = true;
+      step.name = `stair-step-${index}`;
+      step.userData.mapRole = 'visual-stair';
+      this.group.add(step);
+    }
+  }
+
+  private buildProps(): void {
+    // Fixed placements keep the spawn and door approaches reproducibly clear.
+    this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, materials.wood);
+    this.addProp('start-table', -1.2, 0.42, 4.8, 1.1, 0.84, 0.7, materials.wood);
+    this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, materials.wood);
+    this.addProp('bunker-console', 5.5, 0.65, -6.6, 1.7, 1.3, 0.55, materials.metal);
+
+    const rubble = new THREE.DodecahedronGeometry(0.18, 0);
+    const positions: ReadonlyArray<readonly [number, number]> = [
+      [-5.8, 1.2], [-1.2, 6.6], [-4.5, -1.8], [-2.2, -6.8], [1.1, -5.8], [5.8, -2.2],
+    ];
+    for (let index = 0; index < positions.length; index++) {
+      const mesh = new THREE.Mesh(rubble, materials.debris);
+      mesh.position.set(positions[index][0], 0.15, positions[index][1]);
+      mesh.scale.setScalar(0.8 + (index % 3) * 0.25);
+      mesh.rotation.set(index * 0.4, index * 0.7, index * 0.2);
       mesh.castShadow = true;
+      mesh.userData.mapRole = 'visual-debris';
       this.group.add(mesh);
     }
   }
 
   private buildLighting(): void {
-    const profile = this.profile;
-    const ambient = new THREE.HemisphereLight(0x1a222b, 0x0a0806, profile.useReducedEffects ? 0.25 : 0.38);
-    this.group.add(ambient);
-
-    // Cold moonlight shafts.
-    this.addPointLight(-5, 2.4, -4, 0x8aa4c8, profile.useReducedEffects ? 1.8 : 2.8, 9, 0.25);
-    this.addPointLight(4, 2.4, 2, 0x8aa4c8, profile.useReducedEffects ? 1.8 : 2.8, 9, 0.25);
-
-    // Ember glow (warm/red).
-    this.addPointLight(0, 0.6, 5, 0xff4a22, profile.useReducedEffects ? 1.2 : 1.8, 6, 0.6);
-    this.addPointLight(-6, 0.6, -6, 0xff3a18, profile.useReducedEffects ? 1.0 : 1.5, 5, 0.5);
-  }
-
-  private addPointLight(
-    x: number,
-    y: number,
-    z: number,
-    color: number,
-    intensity: number,
-    distance: number,
-    instability: number,
-  ): void {
-    const light = new THREE.PointLight(color, intensity, distance, 1.8);
-    light.position.set(x, y, z);
-    this.group.add(light);
-    // Flicker handled simply by storing data on the light for future use.
-    (light.userData as { instability: number }).instability = instability;
-  }
-
-  private buildAtmosphere(): void {
-    // Light fog + ember particles could go here; kept minimal for mobile.
+    this.group.add(
+      new THREE.HemisphereLight(0x52647a, 0x21150f, this.profile.useReducedEffects ? 0.62 : 0.78),
+    );
+    this.addPointLight(-3.8, 2.2, 5, 0xff9b55, 2.1, 7);
+    this.addPointLight(-4.5, 2.1, -4.8, 0x7c9fc4, 2.3, 7);
+    this.addPointLight(5.2, 1.4, -5.5, 0xd6422e, 1.7, 6);
   }
 
   private buildFloorTransitions(): ReadonlyArray<FloorTransitionZone> {
     return [
       {
-        box: new THREE.Box3(
-          new THREE.Vector3(3.2, 0, 0.8),
-          new THREE.Vector3(4.4, 4, 2.2),
-        ),
+        box: new THREE.Box3(new THREE.Vector3(0.6, 0, 0.85), new THREE.Vector3(2.3, 2.6, 1.55)),
+        sourceFloor: 0,
         targetFloor: 1,
-        targetY: MANSION_UPPER_Y + 1.7,
+        targetY: MANSION_UPPER_Y + EYE_HEIGHT,
+        targetX: 3,
+        targetZ: 0.8,
         bounds: MANSION_UPPER_BOUNDS,
       },
       {
         box: new THREE.Box3(
-          new THREE.Vector3(3.2, MANSION_UPPER_Y, 0.8),
-          new THREE.Vector3(4.4, MANSION_UPPER_Y + 3, 2.2),
+          new THREE.Vector3(3.4, MANSION_UPPER_Y, 0.4),
+          new THREE.Vector3(4.2, MANSION_UPPER_Y + 2.4, 1.4),
         ),
+        sourceFloor: 1,
         targetFloor: 0,
-        targetY: 1.7,
+        targetY: EYE_HEIGHT,
+        targetX: 1.45,
+        targetZ: -1.7,
         bounds: MANSION_GROUND_BOUNDS,
       },
     ];
   }
 
-  private addWall(x: number, y: number, z: number, sx: number, sy: number, sz: number): void {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), getCharredWall());
+  private addWindowedWall(
+    axis: WallAxis,
+    fixed: number,
+    min: number,
+    max: number,
+    openingCenters: ReadonlyArray<number>,
+  ): void {
+    const span = max - min;
+    const center = (min + max) / 2;
+    const middleHeight = WINDOW_TOP - WINDOW_SILL;
+    this.addAxisWall(axis, fixed, center, WINDOW_SILL / 2, span, WINDOW_SILL);
+    this.addAxisWall(
+      axis,
+      fixed,
+      center,
+      WINDOW_TOP + (LOWER_WALL_HEIGHT - WINDOW_TOP) / 2,
+      span,
+      LOWER_WALL_HEIGHT - WINDOW_TOP,
+    );
+
+    let cursor = min;
+    for (const opening of [...openingCenters].sort((a, b) => a - b)) {
+      const start = opening - WINDOW_WIDTH / 2;
+      if (start > cursor) {
+        this.addAxisWall(axis, fixed, (cursor + start) / 2, WINDOW_SILL + middleHeight / 2, start - cursor, middleHeight);
+      }
+      cursor = opening + WINDOW_WIDTH / 2;
+    }
+    if (cursor < max) {
+      this.addAxisWall(axis, fixed, (cursor + max) / 2, WINDOW_SILL + middleHeight / 2, max - cursor, middleHeight);
+    }
+  }
+
+  private addDoorWall(axis: WallAxis, fixed: number, min: number, max: number, opening: number, baseY: number): void {
+    const openingStart = opening - DOOR_WIDTH / 2;
+    const openingEnd = opening + DOOR_WIDTH / 2;
+    this.addAxisWall(axis, fixed, (min + openingStart) / 2, baseY + LOWER_WALL_HEIGHT / 2, openingStart - min, LOWER_WALL_HEIGHT);
+    this.addAxisWall(axis, fixed, (openingEnd + max) / 2, baseY + LOWER_WALL_HEIGHT / 2, max - openingEnd, LOWER_WALL_HEIGHT);
+    this.addAxisWall(axis, fixed, opening, baseY + 2.65, DOOR_WIDTH, 1.1);
+  }
+
+  private addAxisWall(axis: WallAxis, fixed: number, along: number, y: number, length: number, height: number): void {
+    if (length <= 0.01 || height <= 0.01) return;
+    if (axis === 'x') this.addWall(along, y, fixed, length, height, WALL_THICKNESS, materials.wall);
+    else this.addWall(fixed, y, along, WALL_THICKNESS, height, length, materials.wall);
+  }
+
+  private addWall(
+    x: number,
+    y: number,
+    z: number,
+    width: number,
+    height: number,
+    depth: number,
+    material: THREE.Material,
+  ): void {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
     mesh.position.set(x, y, z);
-    mesh.castShadow = true;
+    mesh.castShadow = !this.profile.useReducedEffects;
     mesh.receiveShadow = true;
     mesh.userData.surface = 'wood';
-    this.wallMeshes.push(mesh);
+    mesh.userData.mapRole = 'wall';
+    this.structureMeshes.push(mesh);
+    this.playerWallMeshes.push(mesh);
     this.group.add(mesh);
+  }
+
+  private addSlab(
+    name: string,
+    x: number,
+    y: number,
+    z: number,
+    width: number,
+    height: number,
+    depth: number,
+    material: THREE.Material,
+  ): void {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    mesh.position.set(x, y, z);
+    mesh.name = name;
+    mesh.receiveShadow = true;
+    mesh.userData.surface = 'concrete';
+    mesh.userData.mapRole = 'slab';
+    this.structureMeshes.push(mesh);
+    this.group.add(mesh);
+  }
+
+  private addProp(
+    name: string,
+    x: number,
+    y: number,
+    z: number,
+    width: number,
+    height: number,
+    depth: number,
+    material: THREE.Material,
+  ): void {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    mesh.position.set(x, y, z);
+    mesh.name = name;
+    mesh.castShadow = !this.profile.useReducedEffects;
+    mesh.receiveShadow = true;
+    mesh.userData.mapRole = 'visual-prop';
+    this.group.add(mesh);
+  }
+
+  private addPointLight(x: number, y: number, z: number, color: number, intensity: number, distance: number): void {
+    const light = new THREE.PointLight(color, intensity, distance, 1.8);
+    light.position.set(x, y, z);
+    this.group.add(light);
+  }
+
+  private addDebugHelpers(): void {
+    for (const box of this.wallColliders) this.group.add(new THREE.Box3Helper(box, 0x00ff66));
+    const spawn = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }),
+    );
+    spawn.position.set(this.playerSpawn.x, this.playerSpawn.y, this.playerSpawn.z);
+    this.group.add(spawn);
   }
 }

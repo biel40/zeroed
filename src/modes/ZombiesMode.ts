@@ -125,6 +125,7 @@ export class ZombiesMode implements GameMode {
       !ctx.profile.useReducedEffects,
       this.arena.spawnPoints,
       this.arena.barriers,
+      this.arena.floorTransitions,
     );
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
@@ -158,7 +159,8 @@ export class ZombiesMode implements GameMode {
       if (this.arena.playerBounds) ctx.player.setBounds(this.arena.playerBounds);
       if (this.arena.wallColliders) ctx.player.setWallColliders(this.arena.wallColliders);
       if (this.arena.floorTransitions) ctx.player.setFloorTransitions(this.arena.floorTransitions);
-      ctx.player.teleport(0, 1.7, 0, 0, this.arena.playerBounds);
+      const spawn = this.arena.playerSpawn ?? { x: 0, y: 1.7, z: 0, floor: 0 };
+      ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
     }
 
     ctx.hud.setRangeStatsVisible(false);
@@ -179,7 +181,7 @@ export class ZombiesMode implements GameMode {
     }
 
     const playerPos = this.ctx.player.rig.position;
-    this.zombies.update(dt, playerPos.x, playerPos.z);
+    this.zombies.update(dt, playerPos.x, playerPos.z, this.ctx.player.floor);
     this.energy.update(dt);
     this.chain.update(dt);
     this.arena.update(dt);
@@ -312,6 +314,7 @@ export class ZombiesMode implements GameMode {
    */
   private playerInBoxRange(): boolean {
     const placement = this.arena.mysteryBoxPlacement;
+    if (placement.floor !== undefined && placement.floor !== this.ctx.player.floor) return false;
     const playerPos = this.ctx.player.rig.position;
     const boxPos = placement.position;
     const dx = boxPos.x - playerPos.x;
@@ -363,6 +366,7 @@ export class ZombiesMode implements GameMode {
     let bestDot = 0.6;
     for (const door of this.arena.doors) {
       if (!door.isLocked) continue;
+      if (door.floor !== this.ctx.player.floor) continue;
       const dx = door.position.x - playerPos.x;
       const dz = door.position.z - playerPos.z;
       const distSq = dx * dx + dz * dz;
@@ -387,6 +391,7 @@ export class ZombiesMode implements GameMode {
     let bestDot = 0.45;
     for (const barrier of this.arena.barriers) {
       if (!barrier.isDamaged) continue;
+      if (barrier.floor !== this.ctx.player.floor) continue;
       const dx = barrier.position.x - playerPos.x;
       const dz = barrier.position.z - playerPos.z;
       const distSq = dx * dx + dz * dz;
@@ -445,12 +450,21 @@ export class ZombiesMode implements GameMode {
   private onDoorUnlocked(door: PointDoor): void {
     this.ctx.audio.playDoorUnlock();
     if (this.arena instanceof BurnedMansionArena) {
+      const previousStaticColliders = new Set(this.arena.colliders);
       this.arena.activateDoor(door.id);
       this.arena.refreshSpawnPoints();
       this.arena.refreshColliders();
-      this.ctx.hitColliders.length = 0;
+      // Remove only the old static map objects. Zombie hitboxes share this
+      // array and must survive a door unlock.
+      for (let index = this.ctx.hitColliders.length - 1; index >= 0; index--) {
+        if (previousStaticColliders.has(this.ctx.hitColliders[index])) {
+          this.ctx.hitColliders.splice(index, 1);
+        }
+      }
       this.ctx.hitColliders.push(...this.arena.colliders);
+      this.ctx.player.setWallColliders(this.arena.wallColliders);
       this.zombies.setSpawnPoints(this.arena.spawnPoints);
+      this.zombies.setBarriers(this.arena.barriers);
       this.zombies.registerColliders(this.ctx.hitColliders);
     }
   }
@@ -635,7 +649,8 @@ export class ZombiesMode implements GameMode {
     this.box?.reset();
     this.ctx.resetArsenal();
     if (this.arena?.useWallCollision && this.arena.playerBounds && this.ctx.player?.teleport) {
-      this.ctx.player.teleport(0, 1.7, 0, 0, this.arena.playerBounds);
+      const spawn = this.arena.playerSpawn ?? { x: 0, y: 1.7, z: 0, floor: 0 };
+      this.ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
     }
     this.ctx.hud.hideGameOver();
     this.pushHudState();

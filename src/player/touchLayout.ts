@@ -3,7 +3,7 @@
  * layout can be reasoned about (and tested) without a DOM: Input only feeds
  * it pointer coordinates local to the canvas.
  */
-export type TouchZone = 'move' | 'look';
+export type TouchZone = 'move' | 'look' | 'none';
 
 export const TOUCH_LAYOUT = {
   /** Left fraction of the canvas that can host the movement joystick. */
@@ -17,11 +17,9 @@ export const TOUCH_LAYOUT = {
 } as const;
 
 /**
- * Movement owns only the bottom-left pad; everything else — the whole right
- * side and the upper-left region — drags the camera. Keeping the pad small
- * is what makes simultaneous move + look comfortable: the aiming thumb has
- * most of the screen, and a stray tap high on the left aims instead of
- * yanking the player sideways.
+ * Movement owns the bottom-left pad and camera dragging owns the right side.
+ * The upper-left HUD area is deliberately inert, preventing accidental look
+ * gestures while a thumb enters the movement zone or touches status panels.
  */
 export function resolveTouchZone(
   localX: number,
@@ -34,6 +32,7 @@ export function resolveTouchZone(
     width / height >= TOUCH_LAYOUT.landscapeAspect
       ? TOUCH_LAYOUT.landscapeMoveZoneTop
       : TOUCH_LAYOUT.moveZoneTop;
-  const inPad = localX < width * TOUCH_LAYOUT.moveZoneWidth && localY > height * topFraction;
-  return inPad ? 'move' : 'look';
+  const onLeft = localX < width * TOUCH_LAYOUT.moveZoneWidth;
+  if (!onLeft) return 'look';
+  return localY > height * topFraction ? 'move' : 'none';
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { PointDoor } from './PointDoor';
 
-const DOOR_WIDTH = 1.4;
+const DOOR_WIDTH = 1.6;
 const DOOR_HEIGHT = 2.1;
 const DOOR_THICK = 0.12;
 
@@ -11,12 +11,13 @@ const DOOR_THICK = 0.12;
  */
 export class PointDoorView {
   readonly group = new THREE.Group();
+  readonly collider: THREE.Mesh;
   private readonly mesh: THREE.Mesh;
   private readonly sign: THREE.Mesh;
 
   constructor(
     private readonly door: PointDoor,
-    scene: THREE.Scene,
+    parent: THREE.Object3D,
   ) {
     const geometry = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICK);
     const material = new THREE.MeshStandardMaterial({
@@ -25,9 +26,12 @@ export class PointDoorView {
       metalness: 0.05,
     });
     this.mesh = new THREE.Mesh(geometry, material);
+    this.collider = this.mesh;
+    this.mesh.name = `point-door-collider:${door.id}`;
     this.mesh.position.y = DOOR_HEIGHT / 2;
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
+    this.mesh.userData.surface = 'wood';
 
     // Cost label floating in front of the door.
     const signGeometry = new THREE.PlaneGeometry(0.5, 0.25);
@@ -41,19 +45,19 @@ export class PointDoorView {
     this.mesh.add(this.sign);
 
     this.group.add(this.mesh);
-    this.group.position.set(door.position.x, 0, door.position.z);
+    this.group.position.set(door.position.x, door.y, door.position.z);
     this.group.userData.surface = 'wood';
     const angle = Math.atan2(door.outward.x, door.outward.z);
     this.group.rotation.y = angle;
-    scene.add(this.group);
+    parent.add(this.group);
   }
 
   public update(dt: number): void {
     if (this.door.state === 'unlocked') {
       // Slide outward and sink slightly, then hide.
       const speed = 2.2;
-      this.mesh.position.x += this.door.outward.x * speed * dt;
-      this.mesh.position.z += this.door.outward.z * speed * dt;
+      // The group's local +Z is aligned with the configured outward normal.
+      this.mesh.position.z += speed * dt;
       this.mesh.position.y -= 0.4 * dt;
       const material = this.mesh.material as THREE.MeshStandardMaterial;
       if (material.opacity > 0.02) {

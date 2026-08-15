@@ -29,10 +29,11 @@
         <div id="joystick"><div id="joystick-knob"></div></div>
         <!-- Secondary actions: small, out of the aiming thumb's way. -->
         <div class="touch-secondary">
-          <button type="button" data-action="reload">RLD</button>
-          <button type="button" data-action="swap-weapon">WPN</button>
-          <button type="button" data-action="interact">USE</button>
-          <button type="button" data-action="mode">MODE</button>
+          <button type="button" data-action="jump" id="btn-jump" aria-label="Jump">JUMP</button>
+          <button type="button" data-action="reload" id="btn-reload" aria-label="Reload">RLD</button>
+          <button type="button" data-action="interact" id="btn-interact" aria-label="Interact">USE</button>
+          <button type="button" data-action="swap-weapon" id="btn-weapon" aria-label="Swap weapon">WPN</button>
+          <button type="button" data-action="mode" id="btn-mode" aria-label="Change fire mode">MODE</button>
           <button type="button" data-action="pause" id="btn-pause">| |</button>
         </div>
         <!-- Primary actions: right thumb rest position. -->
@@ -92,11 +93,11 @@
         <div class="mode-grid">
           <button type="button" data-map="classic">
             <span class="mode-name">OUTDOOR RANGE</span>
-            <span class="mode-desc">Classic night arena</span>
+            <span class="mode-desc">Classic outdoor shooting range but night ambience</span>
           </button>
           <button type="button" data-map="burned-mansion">
             <span class="mode-name">BURNED MANSION</span>
-            <span class="mode-desc">Compact two-floor mansion · barricades</span>
+            <span class="mode-desc">Compact two-floor mansion map with barricades</span>
           </button>
         </div>
       </div>
@@ -138,6 +139,7 @@
           <span><kbd>R</kbd></span><span>Reload</span>
           <span><kbd>X</kbd></span><span>Fire mode</span>
           <span><kbd>E</kbd></span><span>Interact</span>
+          <span><kbd>Space</kbd></span><span>Jump</span>
           <span><kbd>1</kbd>–<kbd>5</kbd></span><span>Weapons</span>
           <span><kbd>ESC</kbd></span><span>Release mouse</span>
         </div>
