@@ -181,8 +181,13 @@ export class Zombie implements HitTarget {
     return true;
   }
 
-  faceTowards(x: number, z: number): void {
-    this.group.rotation.y = Math.atan2(x - this.group.position.x, z - this.group.position.z);
+  faceTowards(x: number, z: number, maxTurn = Infinity): void {
+    const target = Math.atan2(x - this.group.position.x, z - this.group.position.z);
+    const delta = Math.atan2(
+      Math.sin(target - this.group.rotation.y),
+      Math.cos(target - this.group.rotation.y),
+    );
+    this.group.rotation.y += Math.max(-maxTurn, Math.min(maxTurn, delta));
   }
 
   update(dt: number): void {

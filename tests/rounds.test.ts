@@ -55,9 +55,10 @@ describe('roundConfig', () => {
     expect(roundConfig(30).healthMultiplier * ZOMBIE_BASE_HP).toBeLessThan(400);
   });
 
-  it('caps the speed multiplier', () => {
-    expect(roundConfig(10).speedMultiplier).toBeGreaterThan(1.2);
-    expect(roundConfig(100).speedMultiplier).toBe(1.6);
+  it('increases speed progressively and caps it at a fair late-round limit', () => {
+    expect(roundConfig(5).speedMultiplier).toBeCloseTo(1.2);
+    expect(roundConfig(10).speedMultiplier).toBeCloseTo(1.45);
+    expect(roundConfig(100).speedMultiplier).toBe(1.8);
   });
 
   it('clamps invalid round numbers to round 1', () => {

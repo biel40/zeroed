@@ -26,8 +26,10 @@ import { ZombieManager } from '../zombies/ZombieManager';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
+import type { WallBuy } from '../zombies/wallbuys/WallBuy';
 import { ClassicArena } from '../zombies/maps/ClassicArena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
+import type { ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
 import type { GameMode, ModeContext } from './GameMode';
 import { standardTargetHitEffects } from './hitEffects';
 
@@ -242,7 +244,7 @@ export class ZombiesMode implements GameMode {
     return this.gameOver;
   }
 
-  /** E pressed: door unlock > box use > box pickup. */
+  /** E pressed: door unlock > barrier repair > wall buy > box use > box pickup. */
   onInteract(): void {
     if (this.gameOver) return;
 
@@ -253,7 +255,31 @@ export class ZombiesMode implements GameMode {
         this.onDoorUnlocked(door);
       } else {
         this.ctx.hud.flashNotEnoughPoints();
-        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${result.cost} PTS NEEDED`);
+        if (door.requiredMessage) this.ctx.hud.showRoundBanner(door.requiredMessage);
+        else this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${result.cost} PTS NEEDED`);
+      }
+      return;
+    }
+
+    // Repair is processed while USE is held in updateRepair(); consuming the
+    // press here keeps activation priority identical to the visible prompt.
+    const barrier = this.findRepairableBarrier();
+    if (barrier && barrier.isDamaged) return;
+
+    const wallBuy = this.findFacingWallBuy();
+    if (wallBuy) {
+      this.purchaseWallBuy(wallBuy);
+      return;
+    }
+
+    const pickup = this.findFacingWeaponPickup();
+    if (pickup) {
+      if (!this.ctx.canGrantWeapon(pickup.weaponId)) {
+        throw new Error(`Map pickup "${pickup.id}" references a weapon that is not preloaded`);
+      }
+      if (this.ctx.grantWeapon(pickup.weaponId)) {
+        pickup.claim();
+        this.ctx.audio.playMysteryBoxPickup();
       }
       return;
     }
@@ -277,7 +303,7 @@ export class ZombiesMode implements GameMode {
     }
   }
 
-  /** Center-screen prompt: door > barrier repair > box. */
+  /** Center-screen prompt: door > barrier repair > wall buy > box. */
   getInteractPrompt(): string | null {
     if (this.gameOver) return null;
     const key = this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E';
@@ -285,6 +311,7 @@ export class ZombiesMode implements GameMode {
 
     const door = this.findFacingDoor();
     if (door && door.isLocked) {
+      if (door.prompt) return `USE — ${door.prompt} — ${door.cost} PTS`;
       return `UNLOCK ${door.id.toUpperCase().replace(/-/g, ' ')}\n${tapKey} — ${door.cost} PTS`;
     }
 
@@ -292,6 +319,18 @@ export class ZombiesMode implements GameMode {
     if (barrier && barrier.isDamaged) {
       return `REPAIR BARRICADE\n${key}`;
     }
+
+    const wallBuy = this.findFacingWallBuy();
+    if (wallBuy) {
+      const owned = this.ctx.hasWeapon(wallBuy.weaponId);
+      const label = WEAPON_DEFINITIONS[wallBuy.weaponId].name;
+      return owned
+        ? `${tapKey} — ${label} Ammo — ${wallBuy.ammoPrice} PTS`
+        : `${tapKey} — Buy ${label} — ${wallBuy.price} PTS`;
+    }
+
+    const pickup = this.findFacingWeaponPickup();
+    if (pickup) return `USE — Take ${WEAPON_DEFINITIONS[pickup.weaponId].name}`;
 
     if (!this.box || !this.playerInBoxRange()) return null;
     switch (this.box.state) {
@@ -381,6 +420,78 @@ export class ZombiesMode implements GameMode {
     return best;
   }
 
+  private findFacingWallBuy(): WallBuy | null {
+    if (!this.arena || this.arena.wallBuys.length === 0) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    let best: WallBuy | null = null;
+    let bestDot = -1;
+    for (const wallBuy of this.arena.wallBuys) {
+      if (wallBuy.floor !== this.ctx.player.floor) continue;
+      const dx = wallBuy.position.x - playerPos.x;
+      const dz = wallBuy.position.z - playerPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > wallBuy.useRange * wallBuy.useRange) continue;
+      const distance = Math.sqrt(distSq);
+      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+      if (dot >= wallBuy.lookDotMin && dot > bestDot) {
+        bestDot = dot;
+        best = wallBuy;
+      }
+    }
+    return best;
+  }
+
+  private findFacingWeaponPickup(): ArenaWeaponPickup | null {
+    if (!this.arena) return null;
+    const pickups = this.arena.weaponPickups ?? [];
+    if (pickups.length === 0) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    let best: ArenaWeaponPickup | null = null;
+    let bestDot = -1;
+    for (const pickup of pickups) {
+      if (!pickup.available || pickup.floor !== this.ctx.player.floor) continue;
+      if (pickup.requiredDoorId) {
+        const door = this.arena.doors.find((candidate) => candidate.id === pickup.requiredDoorId);
+        if (!door || door.isLocked) continue;
+      }
+      const dx = pickup.position.x - playerPos.x;
+      const dz = pickup.position.z - playerPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > pickup.useRange * pickup.useRange) continue;
+      const distance = Math.sqrt(distSq);
+      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+      if (dot >= pickup.lookDotMin && dot > bestDot) {
+        bestDot = dot;
+        best = pickup;
+      }
+    }
+    return best;
+  }
+
+  private purchaseWallBuy(wallBuy: WallBuy): void {
+    const owned = this.ctx.hasWeapon(wallBuy.weaponId);
+    if (!owned && !this.ctx.canGrantWeapon(wallBuy.weaponId)) {
+      throw new Error(`Wall buy "${wallBuy.id}" references a weapon that is not preloaded`);
+    }
+    if (owned && !this.ctx.canRefillWeaponAmmo(wallBuy.weaponId)) {
+      this.ctx.hud.showRoundBanner('AMMO FULL', WEAPON_DEFINITIONS[wallBuy.weaponId].name);
+      return;
+    }
+    const cost = owned ? wallBuy.ammoPrice : wallBuy.price;
+    if (!this.economy.spend(cost)) {
+      this.ctx.hud.flashNotEnoughPoints();
+      this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${cost} PTS NEEDED`);
+      return;
+    }
+    const delivered = owned
+      ? this.ctx.refillWeaponAmmo(wallBuy.weaponId)
+      : this.ctx.grantWeapon(wallBuy.weaponId);
+    if (!delivered) throw new Error(`Wall buy "${wallBuy.id}" could not deliver after validation`);
+    this.pushHudState();
+  }
+
   private findRepairableBarrier(): WindowBarrier | null {
     if (!this.arena || this.arena.barriers.length === 0) return null;
     const playerPos = this.ctx.player.rig.position;
@@ -452,21 +563,25 @@ export class ZombiesMode implements GameMode {
     if (this.arena instanceof BurnedMansionArena) {
       const previousStaticColliders = new Set(this.arena.colliders);
       this.arena.activateDoor(door.id);
-      this.arena.refreshSpawnPoints();
-      this.arena.refreshColliders();
-      // Remove only the old static map objects. Zombie hitboxes share this
-      // array and must survive a door unlock.
-      for (let index = this.ctx.hitColliders.length - 1; index >= 0; index--) {
-        if (previousStaticColliders.has(this.ctx.hitColliders[index])) {
-          this.ctx.hitColliders.splice(index, 1);
-        }
-      }
-      this.ctx.hitColliders.push(...this.arena.colliders);
-      this.ctx.player.setWallColliders(this.arena.wallColliders);
-      this.zombies.setSpawnPoints(this.arena.spawnPoints);
-      this.zombies.setBarriers(this.arena.barriers);
-      this.zombies.registerColliders(this.ctx.hitColliders);
+      this.syncMansionArena(previousStaticColliders);
     }
+  }
+
+  private syncMansionArena(previousStaticColliders: ReadonlySet<THREE.Object3D>): void {
+    if (!(this.arena instanceof BurnedMansionArena)) return;
+    this.arena.refreshSpawnPoints();
+    this.arena.refreshColliders();
+    // Remove only old static map objects: live zombie hitboxes share this array.
+    for (let index = this.ctx.hitColliders.length - 1; index >= 0; index--) {
+      if (previousStaticColliders.has(this.ctx.hitColliders[index])) {
+        this.ctx.hitColliders.splice(index, 1);
+      }
+    }
+    this.ctx.hitColliders.push(...this.arena.colliders);
+    this.ctx.player.setWallColliders(this.arena.wallColliders);
+    this.zombies.setSpawnPoints(this.arena.spawnPoints);
+    this.zombies.setBarriers(this.arena.barriers);
+    this.zombies.registerColliders(this.ctx.hitColliders);
   }
 
   private processRoundEvents(): void {
@@ -641,7 +756,13 @@ export class ZombiesMode implements GameMode {
     this.health.reset();
     this.rounds.reset();
     if (this.zombies) this.zombies.reset();
-    if (this.arena) this.arena.reset();
+    if (this.arena instanceof BurnedMansionArena) {
+      const previousStaticColliders = new Set(this.arena.colliders);
+      this.arena.reset();
+      this.syncMansionArena(previousStaticColliders);
+    } else if (this.arena) {
+      this.arena.reset();
+    }
     this.activeRepairBarrier = null;
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
@@ -660,8 +781,6 @@ export class ZombiesMode implements GameMode {
   private pushHudState(): void {
     this.ctx.hud.updateZombies({
       round: this.rounds.round,
-      alive: this.zombies.aliveCount,
-      pending: this.rounds.pendingSpawnCount,
       hp: this.health.hp,
       maxHp: this.health.maxHp,
       kills: this.kills,

@@ -2,6 +2,9 @@ import type * as THREE from 'three';
 import type { FloorTransitionZone } from '../../player/PlayerController';
 import type { WindowBarrier } from '../barriers/WindowBarrier';
 import type { PointDoor } from '../doors/PointDoor';
+import type { WallBuy } from '../wallbuys/WallBuy';
+import type { ZombieSpawnDefinition } from '../ZombieSpawner';
+import type { WeaponId } from '../../weapons/WeaponTypes';
 
 export interface MysteryBoxPlacement {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -16,6 +19,19 @@ export interface ArenaPlayerSpawn {
   readonly y: number;
   readonly z: number;
   readonly floor: number;
+}
+
+export interface ArenaWeaponPickup {
+  readonly id: string;
+  readonly weaponId: WeaponId;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  readonly requiredDoorId?: string;
+  readonly available: boolean;
+  claim(): boolean;
+  reset(): void;
 }
 
 export interface PlayerBounds {
@@ -40,9 +56,11 @@ export interface ZombieArena {
   /** Axis-aligned wall boxes for optional player wall collision. */
   readonly wallColliders?: ReadonlyArray<THREE.Box3>;
   /** Spawn points active at the start of the run. */
-  readonly spawnPoints: ReadonlyArray<readonly [number, number]>;
+  readonly spawnPoints: ReadonlyArray<ZombieSpawnDefinition>;
   readonly barriers: ReadonlyArray<WindowBarrier>;
   readonly doors: ReadonlyArray<PointDoor>;
+  readonly wallBuys: ReadonlyArray<WallBuy>;
+  readonly weaponPickups?: ReadonlyArray<ArenaWeaponPickup>;
   readonly mysteryBoxPlacement: MysteryBoxPlacement;
   /** Safe initial position owned by the map rather than the game mode. */
   readonly playerSpawn?: ArenaPlayerSpawn;

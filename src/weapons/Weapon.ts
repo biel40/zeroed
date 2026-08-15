@@ -136,6 +136,21 @@ export class Weapon {
     this.pendingEvents.length = 0;
   }
 
+  get isAmmoFull(): boolean {
+    return (
+      this.ammoInMagazine === this.definition.magazineSize &&
+      (this.reserveAmmo === null || this.reserveAmmo === this.initialReserve)
+    );
+  }
+
+  /** Replenishes only ammunition, preserving the current firing/reload state. */
+  refillAmmo(): boolean {
+    if (this.isAmmoFull) return false;
+    this.ammoInMagazine = this.definition.magazineSize;
+    this.reserveAmmo = this.initialReserve;
+    return true;
+  }
+
   clearEvents(): void {
     this.pendingEvents.length = 0;
   }
@@ -162,6 +177,8 @@ export class Weapon {
 
     if (this.definition.boltAction) {
       this.enterState('cycling', this.definition.boltCycleTime, 'boltStart');
+    } else if (this.ammoInMagazine === 0) {
+      this.reload();
     }
   }
 
@@ -173,7 +190,8 @@ export class Weapon {
   }
 
   private completeState(): void {
-    switch (this.weaponState) {
+    const completedState = this.weaponState;
+    switch (completedState) {
       case 'reloading': {
         // Draw only what the magazine needs from the reserve; bottomless
         // reserves (null) always refill to full.
@@ -191,6 +209,8 @@ export class Weapon {
         break;
     }
     this.weaponState = 'ready';
+    this.stateTimer = 0;
     this.stateDuration = 0;
+    if (completedState === 'cycling' && this.ammoInMagazine === 0) this.reload();
   }
 }

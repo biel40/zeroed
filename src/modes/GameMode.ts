@@ -44,10 +44,14 @@ export interface ModeContext {
   lockPointer(): void;
   unlockPointer(): void;
   /**
-   * Adds a weapon to the player inventory, honouring the mode's slot cap
-   * (Mystery Box pickups). The granted weapon arrives with fresh ammo.
+   * Adds a weapon to the player inventory, honouring the mode's slot cap.
+   * Mystery Box and Wall Buy grants arrive with fresh ammo.
    */
-  grantWeapon(id: WeaponId): void;
+  grantWeapon(id: WeaponId): boolean;
+  canGrantWeapon(id: WeaponId): boolean;
+  hasWeapon(id: WeaponId): boolean;
+  canRefillWeaponAmmo(id: WeaponId): boolean;
+  refillWeaponAmmo(id: WeaponId): boolean;
   /** Restores the starting inventory with fresh ammo (zombies restart). */
   resetArsenal(): void;
 }
@@ -61,6 +65,8 @@ export interface GameMode {
   readonly id: GameModeId;
   /** Weapons instantiated and preloaded for this mode (no runtime loads). */
   readonly weaponIds: readonly WeaponId[];
+  /** Enables the center-screen rangefinder and its periodic aim raycast. */
+  readonly showsAimDistance?: boolean;
   /**
    * Loadout the player starts with. Defaults to weaponIds (the Shooting
    * Range keeps one slot per weapon; Zombies starts with the M1911 alone).

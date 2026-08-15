@@ -217,6 +217,7 @@ export class Game {
     // Touch-only weapon swap button (mobile keyboards have no 1–5 row).
     this.input.onWeaponSwap = () => this.cycleWeapon();
 
+    this.hud.setAimDistanceVisible(this.mode.showsAimDistance === true);
     this.mode.init({
       scene: this.scene,
       player: this.player,
@@ -235,6 +236,16 @@ export class Game {
       lockPointer: () => this.start(),
       unlockPointer: () => document.exitPointerLock(),
       grantWeapon: (id) => this.grantWeapon(id),
+      canGrantWeapon: (id) => this.arsenal.has(id),
+      hasWeapon: (id) => this.inventory.has(id),
+      canRefillWeaponAmmo: (id) => {
+        const entry = this.arsenal.get(id);
+        return this.inventory.has(id) && !!entry && !entry.weapon.isAmmoFull;
+      },
+      refillWeaponAmmo: (id) => {
+        const entry = this.arsenal.get(id);
+        return this.inventory.has(id) && !!entry && entry.weapon.refillAmmo();
+      },
       resetArsenal: () => this.resetArsenal(),
     });
 
@@ -279,6 +290,15 @@ export class Game {
 
   /** Entry point for the first user gesture: resumes audio, locks the pointer. */
   start(): void {
+    if (
+      this.profile.isMobile &&
+      document.fullscreenElement === null &&
+      typeof document.documentElement.requestFullscreen === 'function'
+    ) {
+      try {
+        void document.documentElement.requestFullscreen().catch(() => undefined);
+      } catch {}
+    }
     this.audio.resume();
     this.audio.music.stopBackgroundLoop();
     void this.audio.loadMysteryBoxOpenAsset();
@@ -399,14 +419,14 @@ export class Game {
   }
 
   /**
-   * Mystery Box pickup: the weapon enters the inventory (slot cap rules
+   * Weapon pickup/purchase: the weapon enters the inventory (slot cap rules
    * live in WeaponInventory), arrives with fresh ammo, and is equipped.
    */
-  private grantWeapon(id: WeaponId): void {
+  private grantWeapon(id: WeaponId): boolean {
     const entry = this.arsenal.get(id);
     if (!entry) {
       console.warn(`[Game] Cannot grant "${id}": not preloaded in mode "${this.mode.id}"`);
-      return;
+      return false;
     }
     const previousId = this.inventory.currentWeapon;
     const { equipped, dropped } = this.inventory.grant(id);
@@ -417,6 +437,7 @@ export class Game {
     console.info(
       `[Game] Weapon granted: ${equipped}` + (dropped ? ` (replaced ${dropped})` : ''),
     );
+    return true;
   }
 
   /** Zombies restart: starting loadout, every weapon back to full ammo. */
@@ -540,7 +561,7 @@ export class Game {
       return;
     }
 
-    const weapon = this.currentWeapon;
+    let weapon = this.currentWeapon;
     const allowGameplayInput = this.input.pointerLocked || this.profile.useTouchControls;
 
     if (allowGameplayInput) {
@@ -551,6 +572,9 @@ export class Game {
       if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
     }
+
+    // Interactions may equip a purchased/picked-up weapon in this same frame.
+    weapon = this.currentWeapon;
 
     this.player.update(dt, this.input, weapon);
     this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown;
@@ -576,10 +600,12 @@ export class Game {
         ? this.flashLight.intensity * Math.exp(-FLASH_LIGHT_DECAY * dt)
         : 0;
 
-    this.aimTimer -= dt;
-    if (this.aimTimer <= 0) {
-      this.aimTimer = AIM_QUERY_INTERVAL;
-      this.updateAimDistance();
+    if (this.mode.showsAimDistance === true) {
+      this.aimTimer -= dt;
+      if (this.aimTimer <= 0) {
+        this.aimTimer = AIM_QUERY_INTERVAL;
+        this.updateAimDistance();
+      }
     }
 
     const fovRadians = (this.player.camera.fov * Math.PI) / 180;
@@ -588,7 +614,12 @@ export class Game {
       10,
       MAX_SPREAD_PIXELS,
     );
-    this.hud.update(weapon, this.stats, this.aimDistance, spreadPixels);
+    this.hud.update(
+      weapon,
+      this.stats,
+      this.mode.showsAimDistance === true ? this.aimDistance : undefined,
+      spreadPixels,
+    );
     this.hud.setInteractionPrompt(
       allowGameplayInput ? (this.mode.getInteractPrompt?.() ?? null) : null,
     );

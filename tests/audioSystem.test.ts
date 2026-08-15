@@ -183,6 +183,33 @@ describe('Game pause resume', () => {
     vi.unstubAllGlobals();
   });
 
+  it('requests fullscreen from the mobile start gesture', () => {
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('document', {
+      fullscreenElement: null,
+      documentElement: { requestFullscreen },
+    });
+    vi.stubGlobal('window', {
+      setTimeout: vi.fn().mockReturnValue(1),
+      clearTimeout: vi.fn(),
+    });
+
+    const game: any = Object.create((Game as any).prototype);
+    game.audio = {
+      resume: vi.fn(),
+      music: { stopBackgroundLoop: vi.fn() },
+      loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
+    };
+    game.profile = { isMobile: true, useTouchControls: true };
+    game.input = { requestPointerLock: vi.fn() };
+    game.hud = { hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
+    game.pointerLockGuardTimer = null;
+
+    game.start();
+
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+  });
+
   it('ignores stale pointer unlock events while the pause menu is resuming', () => {
     const game: any = Object.create((Game as any).prototype);
     game.paused = false;

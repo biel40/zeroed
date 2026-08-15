@@ -177,7 +177,7 @@ export function roundConfig(round: number): RoundConfig {
     spawnInterval: Math.max(0.35, 2.1 * Math.pow(0.9, r - 1)),
     // Saturating curve: 1 → ~1.85 (R5) → ~2.6 (R10) → ~3.4 (R20) → asymptote 4.
     healthMultiplier: 1 + 3 * (1 - Math.exp(-(r - 1) / 12)),
-    speedMultiplier: Math.min(1.6, 1 + 0.035 * (r - 1)),
+    speedMultiplier: Math.min(1.8, 1 + 0.05 * (r - 1)),
   };
 }
 

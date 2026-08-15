@@ -85,3 +85,22 @@ describe('ZombieVisual procedural fallback', () => {
     expect(box.min.y).toBeGreaterThanOrEqual(-0.02);
   });
 });
+
+describe('ZombieVisual barrier attack', () => {
+  it('plays the attack clip while breaking a window barrier', () => {
+    const arm = new THREE.Object3D();
+    arm.name = 'Arm';
+    const scene = new THREE.Group();
+    scene.add(arm);
+    const attack = new THREE.AnimationClip('ZombieBite', 0.9, [
+      new THREE.NumberKeyframeTrack('Arm.rotation[x]', [0, 0.9], [0, 1]),
+    ]);
+    const visual = new ZombieVisual('walker', { scene, clips: [attack] }, 0xffffff, false);
+
+    visual.setAttackDuration(0.9);
+    visual.setState('barrierAttack');
+    visual.update(0.5, 1.9);
+
+    expect(visual.root.getObjectByName('Arm')?.rotation.x).toBeGreaterThan(0.2);
+  });
+});

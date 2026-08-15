@@ -20,10 +20,11 @@ export class PointDoorView {
     parent: THREE.Object3D,
   ) {
     const geometry = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICK);
+    const sealed = door.id === 'nuclear-bunker';
     const material = new THREE.MeshStandardMaterial({
-      color: 0x4a3c32,
-      roughness: 0.85,
-      metalness: 0.05,
+      color: sealed ? 0x252d2f : 0x4a3c32,
+      roughness: sealed ? 0.48 : 0.85,
+      metalness: sealed ? 0.82 : 0.05,
     });
     this.mesh = new THREE.Mesh(geometry, material);
     this.collider = this.mesh;
@@ -31,7 +32,22 @@ export class PointDoorView {
     this.mesh.position.y = DOOR_HEIGHT / 2;
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
-    this.mesh.userData.surface = 'wood';
+    this.mesh.userData.surface = sealed ? 'metal' : 'wood';
+    this.mesh.userData.mapRole = sealed ? 'sealed-bunker-door' : 'point-door';
+    if (sealed) {
+      const wheel = new THREE.Mesh(
+        new THREE.TorusGeometry(0.3, 0.045, 8, 20),
+        new THREE.MeshStandardMaterial({ color: 0x596164, metalness: 0.9, roughness: 0.38 }),
+      );
+      wheel.position.set(0, 0.95, DOOR_THICK / 2 + 0.06);
+      const viewport = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.12, 0.035),
+        new THREE.MeshBasicMaterial({ color: 0x5c0906 }),
+      );
+      viewport.position.set(0, 1.55, DOOR_THICK / 2 + 0.04);
+      viewport.userData.mapRole = 'bunker-red-leak';
+      this.mesh.add(wheel, viewport);
+    }
 
     // Cost label floating in front of the door.
     const signGeometry = new THREE.PlaneGeometry(0.5, 0.25);
@@ -46,7 +62,7 @@ export class PointDoorView {
 
     this.group.add(this.mesh);
     this.group.position.set(door.position.x, door.y, door.position.z);
-    this.group.userData.surface = 'wood';
+    this.group.userData.surface = sealed ? 'metal' : 'wood';
     const angle = Math.atan2(door.outward.x, door.outward.z);
     this.group.rotation.y = angle;
     parent.add(this.group);
@@ -67,6 +83,14 @@ export class PointDoorView {
         this.mesh.visible = false;
       }
     }
+  }
+
+  public reset(): void {
+    this.mesh.position.set(0, DOOR_HEIGHT / 2, 0);
+    this.mesh.visible = true;
+    const material = this.mesh.material as THREE.MeshStandardMaterial;
+    material.opacity = 1;
+    material.transparent = false;
   }
 
   private makeCostTexture(cost: number): THREE.CanvasTexture {

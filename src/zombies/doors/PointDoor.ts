@@ -2,6 +2,8 @@ export type DoorState = 'locked' | 'unlocked';
 
 export interface PointDoorConfig {
   readonly cost: number;
+  readonly prompt?: string;
+  readonly requiredMessage?: string;
 }
 
 export interface PointDoorActivation {
@@ -61,5 +63,17 @@ export class PointDoor {
     const success = spend(this.config.cost);
     if (success) this._state = 'unlocked';
     return { cost: this.config.cost, success };
+  }
+
+  get prompt(): string | undefined {
+    return this.config.prompt;
+  }
+
+  get requiredMessage(): string | undefined {
+    return this.config.requiredMessage;
+  }
+
+  reset(): void {
+    this._state = 'locked';
   }
 }

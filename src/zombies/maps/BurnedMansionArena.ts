@@ -5,47 +5,74 @@ import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
 import { PointDoor } from '../doors/PointDoor';
 import { PointDoorView } from '../doors/PointDoorView';
-import type { ZombieArena } from './ZombieArena';
+import type { ZombieSpawnDefinition, ZombieSpawnPoint } from '../ZombieSpawner';
+import { WallBuy } from '../wallbuys/WallBuy';
+import { WallBuyView } from '../wallbuys/WallBuyView';
+import { WEAPON_DEFINITIONS } from '../../config/weapons';
+import type { ArenaWeaponPickup, ZombieArena } from './ZombieArena';
+import {
+  createMansionSurfaceMaterials,
+  projectBoxUVs,
+  type MansionSurfaceMaterials,
+} from './BurnedMansionMaterials';
 import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
   MANSION_BARRIERS,
+  MANSION_BUNKER_BOUNDS,
+  MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
   MANSION_DOORS,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
-  MANSION_UPPER_BOUNDS,
-  MANSION_UPPER_Y,
+  MANSION_SECRET_AREAS,
+  MANSION_WALL_BUYS,
 } from './BurnedMansionConfig';
 
 const WALL_THICKNESS = 0.3;
 const LOWER_WALL_HEIGHT = 3.2;
-const UPPER_WALL_HEIGHT = 3;
 const DOOR_WIDTH = 1.6;
 const WINDOW_WIDTH = 1.5;
 // Low enough for a zombie body to step through after the boards break.
 const WINDOW_SILL = 0.3;
 const WINDOW_TOP = 1.9;
 
-const materials = {
-  wall: new THREE.MeshStandardMaterial({
-    color: 0x5a4940,
-    roughness: 0.96,
-    emissive: 0x130907,
-    emissiveIntensity: 0.12,
-  }),
-  wood: new THREE.MeshStandardMaterial({ color: 0x493428, roughness: 0.9 }),
-  floor: new THREE.MeshStandardMaterial({ color: 0x5b5045, roughness: 0.84 }),
-  concrete: new THREE.MeshStandardMaterial({ color: 0x555452, roughness: 1 }),
-  metal: new THREE.MeshStandardMaterial({ color: 0x45484a, roughness: 0.72, metalness: 0.5 }),
-  debris: new THREE.MeshStandardMaterial({ color: 0x352c26, roughness: 1 }),
-};
-
 type WallAxis = 'x' | 'z';
 
+class MansionWeaponPickup implements ArenaWeaponPickup {
+  private claimed = false;
+
+  constructor(
+    readonly id: string,
+    readonly weaponId: 'raygun',
+    readonly position: { readonly x: number; readonly y: number; readonly z: number },
+    readonly floor: number,
+    readonly useRange: number,
+    readonly lookDotMin: number,
+    readonly requiredDoorId: string,
+    private readonly view: THREE.Object3D,
+  ) {}
+
+  get available(): boolean {
+    return !this.claimed;
+  }
+
+  claim(): boolean {
+    if (this.claimed) return false;
+    this.claimed = true;
+    this.view.visible = false;
+    return true;
+  }
+
+  reset(): void {
+    this.claimed = false;
+    this.view.visible = true;
+  }
+}
+
 /**
- * Small two-storey mansion made from explicit visual meshes and a separate
+ * Compact mansion and hidden underground bunker made from explicit meshes and
  * player-collision list. Exterior walls are segmented around real window
  * openings; paid doors occupy real apertures rather than overlapping walls.
  */
@@ -62,7 +89,9 @@ export class BurnedMansionArena implements ZombieArena {
   wallColliders: ReadonlyArray<THREE.Box3> = [];
   barriers: ReadonlyArray<WindowBarrier> = [];
   readonly doors: ReadonlyArray<PointDoor>;
-  spawnPoints: ReadonlyArray<readonly [number, number]> = [];
+  readonly wallBuys: ReadonlyArray<WallBuy>;
+  readonly weaponPickups: ReadonlyArray<ArenaWeaponPickup>;
+  spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = [];
 
   private readonly structureMeshes: THREE.Mesh[] = [];
   private readonly playerWallMeshes: THREE.Mesh[] = [];
@@ -71,15 +100,24 @@ export class BurnedMansionArena implements ZombieArena {
   private readonly doorViews: PointDoorView[] = [];
   private readonly doorMeshes: THREE.Mesh[] = [];
   private readonly activeSpawnZones = new Set<string>(['start']);
+  private readonly materials: MansionSurfaceMaterials;
+  private wallMaterialIndex = 0;
+  private bunkerEmergencyLight: THREE.PointLight | null = null;
+  private ambienceTime = 0;
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly profile: DeviceProfile,
   ) {
+    this.materials = createMansionSurfaceMaterials(profile.anisotropyLimit);
     this.buildShell();
     this.buildInterior();
     this.buildStairs();
     this.buildProps();
+    this.buildBunkerDetails();
+    this.weaponPickups = this.buildSecretPickup();
+    this.buildDamageDetails();
+    this.buildWindowFrames();
     this.buildLighting();
 
     this.allBarriers = MANSION_BARRIERS.map(
@@ -109,7 +147,7 @@ export class BurnedMansionArena implements ZombieArena {
           door.z,
           door.outwardX,
           door.outwardZ,
-          { cost: door.cost },
+          { cost: door.cost, prompt: door.prompt, requiredMessage: door.requiredMessage },
           door.y,
           door.floor,
         ),
@@ -121,6 +159,11 @@ export class BurnedMansionArena implements ZombieArena {
       }
       this.doorViews.push(view);
       this.doorMeshes.push(view.collider);
+    }
+
+    this.wallBuys = MANSION_WALL_BUYS.map((config) => new WallBuy(config));
+    for (const wallBuy of this.wallBuys) {
+      new WallBuyView(wallBuy, WEAPON_DEFINITIONS[wallBuy.weaponId], this.group);
     }
 
     this.floorTransitions = this.buildFloorTransitions();
@@ -136,12 +179,20 @@ export class BurnedMansionArena implements ZombieArena {
   public update(dt: number): void {
     for (const view of this.barrierViews) view.update();
     for (const view of this.doorViews) view.update(dt);
+    this.ambienceTime += dt;
+    if (this.bunkerEmergencyLight) {
+      this.bunkerEmergencyLight.intensity = 1.05 + Math.sin(this.ambienceTime * 3.1) * 0.18;
+    }
   }
 
   public reset(): void {
-    for (const barrier of this.allBarriers) {
-      for (const board of barrier.boards) board.hp = board.maxHp;
-    }
+    for (const barrier of this.allBarriers) barrier.reset();
+    for (const door of this.doors) door.reset();
+    for (const view of this.doorViews) view.reset();
+    for (const pickup of this.weaponPickups) pickup.reset();
+    this.activeSpawnZones.clear();
+    this.activeSpawnZones.add('start');
+    this.refreshProgressionState();
   }
 
   /** Called after PointDoor changed to unlocked. */
@@ -175,12 +226,41 @@ export class BurnedMansionArena implements ZombieArena {
     this.refreshColliders();
   }
 
-  private computeSpawnPoints(): ReadonlyArray<readonly [number, number]> {
-    const points: Array<readonly [number, number]> = [];
+  private computeSpawnPoints(): ReadonlyArray<ZombieSpawnDefinition> {
+    const points: ZombieSpawnPoint[] = [];
     for (const zone of this.activeSpawnZones) {
-      for (const point of MANSION_SPAWNS[zone] ?? []) points.push(point);
+      for (const point of MANSION_SPAWNS[zone] ?? []) {
+        if (this.isValidExteriorSpawn(point)) points.push(point);
+      }
     }
     return points;
+  }
+
+  private isValidExteriorSpawn(point: ZombieSpawnPoint): boolean {
+    if (
+      !point.exterior ||
+      !point.barrierId ||
+      point.approachX === undefined ||
+      point.approachZ === undefined ||
+      point.breachX === undefined ||
+      point.breachZ === undefined
+    ) return false;
+    const outside = point.x < -7.45 || point.x > 7.45 || point.z < -8.45 || point.z > 8.45;
+    if (!outside) return false;
+    const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === point.barrierId);
+    if (!barrier) return false;
+    const approachSide =
+      (point.approachX - barrier.x) * barrier.outwardX +
+      (point.approachZ - barrier.z) * barrier.outwardZ;
+    const breachSide =
+      (point.breachX - barrier.x) * barrier.outwardX +
+      (point.breachZ - barrier.z) * barrier.outwardZ;
+    if (approachSide <= 0.4 || breachSide >= -0.4) return false;
+    const body = new THREE.Box3(
+      new THREE.Vector3(point.x - 0.42, 0.05, point.z - 0.42),
+      new THREE.Vector3(point.x + 0.42, 1.8, point.z + 0.42),
+    );
+    return !this.structureMeshes.some((mesh) => new THREE.Box3().setFromObject(mesh).intersectsBox(body));
   }
 
   private collectBallisticColliders(): ReadonlyArray<THREE.Object3D> {
@@ -200,107 +280,278 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   private buildShell(): void {
-    this.addSlab('ground-floor', 0, -0.08, 0, 14, 0.16, 16, materials.concrete);
+    this.addSlab('ground-floor', -1.425, -0.08, 0, 11.15, 0.16, 16, this.materials.floorConcrete);
+    this.addSlab('ground-floor-east', 6.575, -0.08, 0, 0.85, 0.16, 16, this.materials.floorConcrete);
+    this.addSlab('ground-floor-stair-north', 5.15, -0.08, -7.45, 2, 0.16, 1.1, this.materials.floorConcrete);
+    this.addSlab('ground-floor-stair-south', 5.15, -0.08, 2.5, 2, 0.16, 11, this.materials.floorConcrete);
 
     this.addWindowedWall('z', -7.15, -8, 8, [-3.2, 3.2, 5.4]);
-    this.addWindowedWall('z', 7.15, -8, 8, [-4.5]);
+    this.addWindowedWall('z', 7.15, -8, 8, [-2.5]);
     this.addWindowedWall('x', -8.15, -7, 7, [-3.5]);
     this.addWindowedWall('x', 8.15, -7, 7, [-3.5]);
 
-    // Continuous support: vertical movement is controlled by explicit stair
-    // portals, so a visual hole would leave the player hovering without gravity.
-    this.addSlab('upper-floor-north', 3.65, MANSION_UPPER_Y - 0.08, -3, 7, 0.16, 10, materials.floor);
+    this.addSlab('mansion-roof', 0, 3.28, 0, 14.6, 0.16, 16.6, this.materials.ceilingBurned);
 
-    const upperCenterY = MANSION_UPPER_Y + UPPER_WALL_HEIGHT / 2;
-    this.addWall(0.15, upperCenterY, -3, WALL_THICKNESS, UPPER_WALL_HEIGHT, 10, materials.wall);
-    this.addWall(7.15, upperCenterY, -3, WALL_THICKNESS, UPPER_WALL_HEIGHT, 10, materials.wall);
-    this.addWall(3.65, upperCenterY, -8.15, 7, UPPER_WALL_HEIGHT, WALL_THICKNESS, materials.wall);
-    this.addWall(3.65, upperCenterY, 2.15, 7, UPPER_WALL_HEIGHT, WALL_THICKNESS, materials.wall);
-
-    this.addSlab('roof', 0, 6.48, 0, 14.6, 0.16, 16.6, materials.wall);
+    this.addSlab('bunker-floor', 5.15, MANSION_BUNKER_Y - 0.08, -4.5, 3.7, 0.16, 6.4, this.materials.floorConcrete);
+    this.addSlab('bunker-ceiling', 5.15, -0.22, -4.5, 3.7, 0.16, 6.4, this.materials.ceilingBurned);
+    const bunkerWallY = MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2;
+    this.addWall(3.3, bunkerWallY, -4.5, WALL_THICKNESS, LOWER_WALL_HEIGHT, 6.4, this.materials.concreteDirty);
+    this.addWall(7, bunkerWallY, -4.5, WALL_THICKNESS, LOWER_WALL_HEIGHT, 6.4, this.materials.concreteDirty);
+    this.addWall(5.15, bunkerWallY, -7.7, 3.7, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
+    this.addWall(5.15, bunkerWallY, -1.3, 3.7, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
   }
 
   private buildInterior(): void {
     // Starting room -> box room. The opening is exactly occupied by to-dining.
     this.addDoorWall('x', 2, -7, 0, -3.5, 0);
-    this.addWall(3.5, LOWER_WALL_HEIGHT / 2, 2, 7, LOWER_WALL_HEIGHT, WALL_THICKNESS, materials.wall);
+    this.addWall(3.5, LOWER_WALL_HEIGHT / 2, 2, 7, LOWER_WALL_HEIGHT, WALL_THICKNESS);
 
-    // Box room -> stair hall, and stair hall -> bunker.
+    // Open arch into the east hall, followed by the sealed bunker vestibule.
     this.addDoorWall('z', 0, -8, 2, -2.5, 0);
-    this.addDoorWall('z', 3.2, -8, 2, -4.5, 0);
-
-    // Upper stairwell rails are low but collide using the corrected body box.
-    this.addWall(0.5, MANSION_UPPER_Y + 0.5, 0.15, 0.12, 1, 3.1, materials.wood);
-    this.addWall(2.4, MANSION_UPPER_Y + 0.5, 0.15, 0.12, 1, 3.1, materials.wood);
+    this.addDoorWall('z', 3.2, -8, 2, -2.5, 0);
   }
 
   private buildStairs(): void {
-    const steps = 10;
-    const depth = 0.28;
+    const steps = 12;
+    const depth = 0.32;
     for (let index = 0; index < steps; index++) {
-      const height = ((index + 1) / steps) * MANSION_UPPER_Y;
-      const step = new THREE.Mesh(new THREE.BoxGeometry(1.55, height, depth), materials.wood);
-      step.position.set(1.45, height / 2, -1.2 + index * depth);
+      const top = MANSION_BUNKER_Y + ((index + 1) / steps) * Math.abs(MANSION_BUNKER_Y);
+      const height = top - MANSION_BUNKER_Y;
+      const geometry = new THREE.BoxGeometry(1.65, Math.max(0.12, height), depth);
+      this.projectSurfaceUVs(geometry, 1.65, Math.max(0.12, height), depth, this.materials.metal, index);
+      const step = new THREE.Mesh(geometry, this.materials.metal);
+      step.position.set(5.15, MANSION_BUNKER_Y + height / 2, -6.7 + index * depth);
       step.castShadow = !this.profile.useReducedEffects;
       step.receiveShadow = true;
-      step.name = `stair-step-${index}`;
+      step.name = `bunker-stair-step-${index}`;
       step.userData.mapRole = 'visual-stair';
       this.group.add(step);
     }
+    const portal = new THREE.Object3D();
+    portal.name = 'bunker-stair-navigation-ramp';
+    portal.userData.mapRole = 'simplified-stair-portal';
+    this.group.add(portal);
   }
 
   private buildProps(): void {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
-    this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, materials.wood);
-    this.addProp('start-table', -1.2, 0.42, 4.8, 1.1, 0.84, 0.7, materials.wood);
-    this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, materials.wood);
-    this.addProp('bunker-console', 5.5, 0.65, -6.6, 1.7, 1.3, 0.55, materials.metal);
+    this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, this.materials.charredWood);
+    this.addProp('start-table', -1.2, 0.42, 4.8, 1.1, 0.84, 0.7, this.materials.charredWood);
+    this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, this.materials.charredWood);
+    this.addProp('bunker-console', 6.3, MANSION_BUNKER_Y + 0.65, -4.5, 0.55, 1.3, 1.7, this.materials.metal);
+    this.addProp('research-table', 5.65, MANSION_BUNKER_Y + 0.42, -2.35, 1.7, 0.84, 0.7, this.materials.metal);
+    this.addProp('military-crate', 4.1, MANSION_BUNKER_Y + 0.35, -4.7, 0.8, 0.7, 1.1, this.materials.charredWood);
 
     const rubble = new THREE.DodecahedronGeometry(0.18, 0);
     const positions: ReadonlyArray<readonly [number, number]> = [
       [-5.8, 1.2], [-1.2, 6.6], [-4.5, -1.8], [-2.2, -6.8], [1.1, -5.8], [5.8, -2.2],
     ];
     for (let index = 0; index < positions.length; index++) {
-      const mesh = new THREE.Mesh(rubble, materials.debris);
+      const mesh = new THREE.Mesh(rubble, this.materials.debris);
       mesh.position.set(positions[index][0], 0.15, positions[index][1]);
       mesh.scale.setScalar(0.8 + (index % 3) * 0.25);
       mesh.rotation.set(index * 0.4, index * 0.7, index * 0.2);
-      mesh.castShadow = true;
+      mesh.castShadow = !this.profile.useReducedEffects;
       mesh.userData.mapRole = 'visual-debris';
       this.group.add(mesh);
     }
   }
 
+  private buildSecretPickup(): ReadonlyArray<ArenaWeaponPickup> {
+    const secret = MANSION_SECRET_AREAS[0];
+    const pickupGroup = new THREE.Group();
+    pickupGroup.name = secret.reward.id;
+    pickupGroup.position.set(
+      secret.reward.position.x,
+      secret.reward.position.y,
+      secret.reward.position.z,
+    );
+    pickupGroup.userData.mapRole = 'secret-weapon-pickup';
+
+    const metal = new THREE.MeshStandardMaterial({ color: 0x172025, metalness: 0.75, roughness: 0.3 });
+    const glow = new THREE.MeshBasicMaterial({ color: 0x79ff86 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.16, 0.2), metal);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, 0.42, 10), metal);
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.x = 0.44;
+    const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.32, 8), glow);
+    cell.rotation.z = Math.PI / 2;
+    cell.position.set(-0.1, 0.12, 0);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.14), metal);
+    grip.position.set(-0.12, -0.2, 0);
+    grip.rotation.z = -0.25;
+    pickupGroup.add(body, barrel, cell, grip);
+    this.group.add(pickupGroup);
+
+    const phrase = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.9, 0.28),
+      new THREE.MeshBasicMaterial({ color: 0x542020, transparent: true, opacity: 0.65, side: THREE.DoubleSide }),
+    );
+    phrase.position.set(5.15, MANSION_BUNKER_Y + 1.25, -1.47);
+    phrase.rotation.y = Math.PI;
+    phrase.name = 'THIS IS ONLY THE BEGINNING OF THE END...';
+    phrase.userData.mapRole = 'environmental-story-text';
+    this.group.add(phrase);
+
+    return [
+      new MansionWeaponPickup(
+        secret.reward.id,
+        secret.reward.weaponId,
+        secret.reward.position,
+        secret.floor,
+        secret.reward.useRange,
+        secret.reward.lookDotMin,
+        secret.doorId,
+        pickupGroup,
+      ),
+    ];
+  }
+
+  private buildBunkerDetails(): void {
+    const pipeMaterial = new THREE.MeshStandardMaterial({ color: 0x384044, metalness: 0.78, roughness: 0.55 });
+    for (let index = 0; index < 3; index++) {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 5.4, 8), pipeMaterial);
+      pipe.rotation.x = Math.PI / 2;
+      pipe.position.set(6.82 - index * 0.16, MANSION_BUNKER_Y + 2.15 - index * 0.22, -4.5);
+      pipe.userData.mapRole = 'bunker-pipe';
+      this.group.add(pipe);
+    }
+
+    const screenMaterial = new THREE.MeshBasicMaterial({ color: 0x07100d });
+    for (let index = 0; index < 3; index++) {
+      const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 0.04), screenMaterial);
+      monitor.position.set(6.65, MANSION_BUNKER_Y + 1.05 + index * 0.32, -4.95 + index * 0.48);
+      monitor.rotation.y = -Math.PI / 2;
+      monitor.userData.mapRole = 'dead-monitor';
+      this.group.add(monitor);
+    }
+
+    const radiationMark = new THREE.Mesh(
+      new THREE.CircleGeometry(0.26, 18),
+      new THREE.MeshBasicMaterial({ color: 0x756b26, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+    );
+    radiationMark.position.set(3.46, MANSION_BUNKER_Y + 1.55, -2.3);
+    radiationMark.rotation.y = Math.PI / 2;
+    radiationMark.name = 'faded-radiation-symbol';
+    radiationMark.userData.mapRole = 'bunker-clue';
+    this.group.add(radiationMark);
+  }
+
+  private buildDamageDetails(): void {
+    const details: ReadonlyArray<{
+      readonly x: number;
+      readonly y: number;
+      readonly z: number;
+      readonly width: number;
+      readonly height: number;
+      readonly rotationY: number;
+      readonly material: THREE.MeshStandardMaterial;
+      readonly role: string;
+    }> = [
+      { x: -5.4, y: 1.35, z: 1.835, width: 1.45, height: 1.7, rotationY: 0, material: this.materials.exposedBrick, role: 'exposed-brick' },
+      { x: -1.2, y: 1.25, z: 1.835, width: 0.8, height: 1.5, rotationY: 0, material: this.materials.crack, role: 'wall-crack' },
+      { x: -0.165, y: 1.45, z: -5.9, width: 1.1, height: 1.8, rotationY: Math.PI / 2, material: this.materials.damp, role: 'damp-stain' },
+      { x: 3.035, y: 1.45, z: -6.15, width: 1.15, height: 1.8, rotationY: Math.PI / 2, material: this.materials.exposedBrick, role: 'exposed-brick' },
+      { x: -7.0, y: 2.42, z: 5.4, width: 1.7, height: 1.35, rotationY: Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
+      { x: -7.0, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: -3.5, y: 2.42, z: 8.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
+      { x: -3.5, y: 2.4, z: -8.0, width: 1.8, height: 1.25, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: 7.0, y: 2.45, z: -4.5, width: 1.9, height: 1.35, rotationY: -Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
+      { x: -3.5, y: 2.55, z: 1.835, width: 2.05, height: 1.15, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: 0.165, y: 2.52, z: -2.5, width: 1.9, height: 1.1, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
+    ];
+    for (const detail of details) {
+      const patch = new THREE.Mesh(new THREE.PlaneGeometry(detail.width, detail.height), detail.material);
+      patch.position.set(detail.x, detail.y, detail.z);
+      patch.rotation.y = detail.rotationY;
+      patch.userData.mapRole = detail.role;
+      this.group.add(patch);
+    }
+
+    const ceilingScorch = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 3.3), this.materials.sootSoft);
+    ceilingScorch.position.set(-3.7, 3.185, 3.8);
+    ceilingScorch.rotation.x = Math.PI / 2;
+    ceilingScorch.rotation.z = 0.35;
+    ceilingScorch.userData.mapRole = 'ceiling-soot';
+    this.group.add(ceilingScorch);
+  }
+
+  private buildWindowFrames(): void {
+    const verticalGeometry = new THREE.BoxGeometry(0.12, 1.9, 0.12);
+    const horizontalGeometry = new THREE.BoxGeometry(1.8, 0.12, 0.12);
+    this.projectSurfaceUVs(verticalGeometry, 0.12, 1.9, 0.12, this.materials.charredWood, 3);
+    this.projectSurfaceUVs(horizontalGeometry, 1.8, 0.12, 0.12, this.materials.charredWood, 7);
+    const verticals = new THREE.InstancedMesh(verticalGeometry, this.materials.charredWood, MANSION_BARRIERS.length * 2);
+    const horizontals = new THREE.InstancedMesh(horizontalGeometry, this.materials.charredWood, MANSION_BARRIERS.length * 2);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+    for (let index = 0; index < MANSION_BARRIERS.length; index++) {
+      const barrier = MANSION_BARRIERS[index];
+      const angle = Math.atan2(barrier.outwardX, barrier.outwardZ);
+      quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      const rightX = Math.cos(angle);
+      const rightZ = -Math.sin(angle);
+      for (const side of [-1, 1]) {
+        position.set(barrier.x + rightX * 0.84 * side, 1.1, barrier.z + rightZ * 0.84 * side);
+        verticals.setMatrixAt(index * 2 + (side > 0 ? 1 : 0), matrix.compose(position, quaternion, scale));
+      }
+      for (const edge of [0.22, 2.0]) {
+        position.set(barrier.x, edge, barrier.z);
+        horizontals.setMatrixAt(index * 2 + (edge > 1 ? 1 : 0), matrix.compose(position, quaternion, scale));
+      }
+    }
+    verticals.castShadow = !this.profile.useReducedEffects;
+    horizontals.castShadow = !this.profile.useReducedEffects;
+    verticals.userData.mapRole = 'window-frames';
+    horizontals.userData.mapRole = 'window-frames';
+    this.group.add(verticals, horizontals);
+  }
+
   private buildLighting(): void {
     this.group.add(
-      new THREE.HemisphereLight(0x52647a, 0x21150f, this.profile.useReducedEffects ? 0.62 : 0.78),
+      new THREE.HemisphereLight(0x34465e, 0x110d0a, this.profile.useReducedEffects ? 0.18 : 0.25),
     );
-    this.addPointLight(-3.8, 2.2, 5, 0xff9b55, 2.1, 7);
-    this.addPointLight(-4.5, 2.1, -4.8, 0x7c9fc4, 2.3, 7);
-    this.addPointLight(5.2, 1.4, -5.5, 0xd6422e, 1.7, 6);
+    this.addPointLight(-3.8, 2.55, 5, 0xffad68, 2.4, 6.5);
+    this.addPointLight(-4.5, 2.35, -4.8, 0x839db7, 1.7, 6.5);
+    this.addPointLight(5.2, 1.85, -5.5, 0x6e120d, 0.35, 4.5);
+    this.bunkerEmergencyLight = this.addPointLight(
+      5.2,
+      MANSION_BUNKER_Y + 2.45,
+      -4.4,
+      0xff2418,
+      1.05,
+      5.5,
+    );
+
+    const exteriorLight = new THREE.DirectionalLight(0x9ebbd2, this.profile.useReducedEffects ? 0.18 : 0.3);
+    exteriorLight.position.set(-8, 5, 7);
+    exteriorLight.target.position.set(-2, 1.2, 2);
+    this.group.add(exteriorLight, exteriorLight.target);
   }
 
   private buildFloorTransitions(): ReadonlyArray<FloorTransitionZone> {
     return [
       {
-        box: new THREE.Box3(new THREE.Vector3(0.6, 0, 0.85), new THREE.Vector3(2.3, 2.6, 1.55)),
+        box: new THREE.Box3(new THREE.Vector3(4.2, 0, -2.95), new THREE.Vector3(6.1, 2.6, -2.65)),
         sourceFloor: 0,
-        targetFloor: 1,
-        targetY: MANSION_UPPER_Y + EYE_HEIGHT,
-        targetX: 3,
-        targetZ: 0.8,
-        bounds: MANSION_UPPER_BOUNDS,
+        targetFloor: -1,
+        targetY: MANSION_BUNKER_Y + EYE_HEIGHT,
+        targetX: 5.15,
+        targetZ: -7.1,
+        bounds: MANSION_BUNKER_BOUNDS,
       },
       {
         box: new THREE.Box3(
-          new THREE.Vector3(3.4, MANSION_UPPER_Y, 0.4),
-          new THREE.Vector3(4.2, MANSION_UPPER_Y + 2.4, 1.4),
+          new THREE.Vector3(4.25, MANSION_BUNKER_Y, -6.75),
+          new THREE.Vector3(6.05, MANSION_BUNKER_Y + 2.4, -5.9),
         ),
-        sourceFloor: 1,
+        sourceFloor: -1,
         targetFloor: 0,
         targetY: EYE_HEIGHT,
-        targetX: 1.45,
-        targetZ: -1.7,
+        targetX: 5.15,
+        targetZ: -4.15,
         bounds: MANSION_GROUND_BOUNDS,
       },
     ];
@@ -349,8 +600,8 @@ export class BurnedMansionArena implements ZombieArena {
 
   private addAxisWall(axis: WallAxis, fixed: number, along: number, y: number, length: number, height: number): void {
     if (length <= 0.01 || height <= 0.01) return;
-    if (axis === 'x') this.addWall(along, y, fixed, length, height, WALL_THICKNESS, materials.wall);
-    else this.addWall(fixed, y, along, WALL_THICKNESS, height, length, materials.wall);
+    if (axis === 'x') this.addWall(along, y, fixed, length, height, WALL_THICKNESS);
+    else this.addWall(fixed, y, along, WALL_THICKNESS, height, length);
   }
 
   private addWall(
@@ -360,13 +611,16 @@ export class BurnedMansionArena implements ZombieArena {
     width: number,
     height: number,
     depth: number,
-    material: THREE.Material,
+    material?: THREE.MeshStandardMaterial,
   ): void {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    const surfaceMaterial = material ?? this.nextWallMaterial();
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    this.projectSurfaceUVs(geometry, width, height, depth, surfaceMaterial, this.wallMaterialIndex);
+    const mesh = new THREE.Mesh(geometry, surfaceMaterial);
     mesh.position.set(x, y, z);
     mesh.castShadow = !this.profile.useReducedEffects;
     mesh.receiveShadow = true;
-    mesh.userData.surface = 'wood';
+    mesh.userData.surface = surfaceMaterial === this.materials.charredWood ? 'wood' : 'concrete';
     mesh.userData.mapRole = 'wall';
     this.structureMeshes.push(mesh);
     this.playerWallMeshes.push(mesh);
@@ -383,7 +637,9 @@ export class BurnedMansionArena implements ZombieArena {
     depth: number,
     material: THREE.Material,
   ): void {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    this.projectSurfaceUVs(geometry, width, height, depth, material as THREE.MeshStandardMaterial, name.length);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);
     mesh.name = name;
     mesh.receiveShadow = true;
@@ -403,19 +659,58 @@ export class BurnedMansionArena implements ZombieArena {
     depth: number,
     material: THREE.Material,
   ): void {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    this.projectSurfaceUVs(geometry, width, height, depth, material as THREE.MeshStandardMaterial, name.length);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);
     mesh.name = name;
     mesh.castShadow = !this.profile.useReducedEffects;
     mesh.receiveShadow = true;
-    mesh.userData.mapRole = 'visual-prop';
+    mesh.userData.surface = material === this.materials.metal ? 'metal' : 'wood';
+    mesh.userData.mapRole = 'solid-prop';
+    this.structureMeshes.push(mesh);
+    this.playerWallMeshes.push(mesh);
     this.group.add(mesh);
   }
 
-  private addPointLight(x: number, y: number, z: number, color: number, intensity: number, distance: number): void {
+  private addPointLight(x: number, y: number, z: number, color: number, intensity: number, distance: number): THREE.PointLight {
     const light = new THREE.PointLight(color, intensity, distance, 1.8);
     light.position.set(x, y, z);
-    this.group.add(light);
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 8, 6),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    bulb.position.copy(light.position);
+    bulb.userData.mapRole = 'damaged-bulb';
+    this.group.add(light, bulb);
+    return light;
+  }
+
+  private nextWallMaterial(): THREE.MeshStandardMaterial {
+    const material = this.materials.wallVariants[this.wallMaterialIndex % this.materials.wallVariants.length];
+    this.wallMaterialIndex++;
+    return material;
+  }
+
+  private projectSurfaceUVs(
+    geometry: THREE.BoxGeometry,
+    width: number,
+    height: number,
+    depth: number,
+    material: THREE.MeshStandardMaterial,
+    seed: number,
+  ): void {
+    const metersPerTile = material.userData.metersPerTile as number | undefined;
+    if (!metersPerTile) return;
+    projectBoxUVs(
+      geometry,
+      width,
+      height,
+      depth,
+      metersPerTile,
+      (seed * 0.37) % 1,
+      (seed * 0.61) % 1,
+    );
   }
 
   private addDebugHelpers(): void {
@@ -426,5 +721,31 @@ export class BurnedMansionArena implements ZombieArena {
     );
     spawn.position.set(this.playerSpawn.x, this.playerSpawn.y, this.playerSpawn.z);
     this.group.add(spawn);
+    for (const zone of Object.values(MANSION_SPAWNS)) {
+      for (const point of zone) {
+        const marker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.16, 8, 6),
+          new THREE.MeshBasicMaterial({ color: 0xff3355, wireframe: true }),
+        );
+        marker.position.set(point.x, 0.2, point.z);
+        this.group.add(marker);
+        if (
+          point.approachX !== undefined &&
+          point.approachZ !== undefined &&
+          point.breachX !== undefined &&
+          point.breachZ !== undefined
+        ) {
+          const route = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(point.x, 0.25, point.z),
+              new THREE.Vector3(point.approachX, 0.25, point.approachZ),
+              new THREE.Vector3(point.breachX, 0.25, point.breachZ),
+            ]),
+            new THREE.LineBasicMaterial({ color: 0xffcc33 }),
+          );
+          this.group.add(route);
+        }
+      }
+    }
   }
 }

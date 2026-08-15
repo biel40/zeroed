@@ -15,6 +15,28 @@ interface MobileInputActions {
   readonly onPauseRequest: () => void;
 }
 
+/** Maps touch actions onto the shared desktop-compatible player state. */
+export function applyMobileAction(state: InputState, action: string, pressed: boolean): void {
+  switch (action) {
+    case 'fire':
+      // 1-Tap ADS Fire: Weapon still owns semi/auto cadence and ADS blending.
+      state.leftButtonDown = pressed;
+      state.rightButtonDown = pressed;
+      break;
+    case 'reload':
+      state.setKey('KeyR', pressed);
+      break;
+    case 'mode':
+      state.setKey('KeyX', pressed);
+      break;
+    case 'interact':
+      state.setKey('KeyE', pressed);
+      break;
+    default:
+      break;
+  }
+}
+
 /** Pointer-event adapter for analog movement, touch look and action buttons. */
 export class MobileInput {
   private readonly listeners: Array<[ListenerTarget, string, EventListener]> = [];
@@ -68,7 +90,7 @@ export class MobileInput {
         this.capturePointer(control, pointerEvent.pointerId);
         if (action === 'swap-weapon') this.actions.onWeaponSwap();
         else if (action === 'pause') this.actions.onPauseRequest();
-        else this.setAction(action, true);
+        else applyMobileAction(this.state, action, true);
       };
       const pointerEnd = (event: Event): void => {
         const pointerEvent = event as PointerEvent;
@@ -76,38 +98,15 @@ export class MobileInput {
         event.preventDefault();
         event.stopPropagation();
         this.buttonOwners.delete(control);
-        if (action !== 'swap-weapon' && action !== 'pause') this.setAction(action, false);
+        if (action !== 'swap-weapon' && action !== 'pause') {
+          applyMobileAction(this.state, action, false);
+        }
       };
 
       this.add(control, 'pointerdown', pointerDown as EventListener);
       this.add(control, 'pointerup', pointerEnd as EventListener);
       this.add(control, 'pointercancel', pointerEnd as EventListener);
       this.add(control, 'lostpointercapture', pointerEnd as EventListener);
-    }
-  }
-
-  private setAction(action: string, pressed: boolean): void {
-    switch (action) {
-      case 'fire':
-        this.state.leftButtonDown = pressed;
-        break;
-      case 'ads':
-        this.state.rightButtonDown = pressed;
-        break;
-      case 'reload':
-        this.state.setKey('KeyR', pressed);
-        break;
-      case 'jump':
-        this.state.setKey('Space', pressed);
-        break;
-      case 'mode':
-        this.state.setKey('KeyX', pressed);
-        break;
-      case 'interact':
-        this.state.setKey('KeyE', pressed);
-        break;
-      default:
-        break;
     }
   }
 

@@ -139,6 +139,13 @@ export class WindowBarrier {
     this.repairedThisRound = 0;
   }
 
+  reset(): void {
+    for (const board of this.mutableBoards) board.hp = board.maxHp;
+    this._state = 'intact';
+    this.repairTimer = 0;
+    this.repairedThisRound = 0;
+  }
+
   private rebuildOneBoard(): boolean {
     for (const board of this.mutableBoards) {
       if (board.hp <= 0) {

@@ -30,7 +30,11 @@ function fireOnce(weapon: Weapon): WeaponEventType[] {
 }
 
 function finishReload(weapon: Weapon): void {
-  expect(weapon.reload()).toBe(true);
+  if (weapon.state === 'ready') {
+    expect(weapon.reload()).toBe(true);
+  } else {
+    expect(weapon.state).toBe('reloading');
+  }
   step(weapon, weapon.definition.reloadTime + 0.1);
   expect(weapon.state).toBe('ready');
 }
@@ -97,8 +101,8 @@ describe('M1911 reserve ammo', () => {
 
   it('never drives the reserve negative and refuses to reload at 0 / 0', () => {
     const m1911 = makeM1911();
-    // Burn the full 40-round supply (8 in the mag + 32 reserve), reloading
-    // manually each time the magazine runs dry.
+    // Burn the full 40-round supply (8 in the mag + 32 reserve), completing
+    // each automatic reload when the magazine runs dry.
     let shots = 0;
     while (m1911.ammoInMagazine > 0 || (m1911.reserveAmmo ?? 0) > 0) {
       if (m1911.ammoInMagazine === 0) finishReload(m1911);

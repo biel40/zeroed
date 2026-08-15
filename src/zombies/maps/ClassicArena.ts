@@ -18,6 +18,7 @@ export class ClassicArena implements ZombieArena {
   readonly spawnPoints = SPAWN_POINTS;
   readonly barriers = [] as const;
   readonly doors = [] as const;
+  readonly wallBuys = [] as const;
   readonly mysteryBoxPlacement = MYSTERY_BOX_PLACEMENT;
   readonly useWallCollision = false;
 

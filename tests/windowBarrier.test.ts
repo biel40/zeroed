@@ -110,4 +110,14 @@ describe('WindowBarrier pure logic', () => {
     expect(barrier.state).toBe('intact');
     expect(barrier.isDamaged).toBe(false);
   });
+
+  it('clears damage and partial repair timing on map reset', () => {
+    const barrier = new WindowBarrier('w1', 0, 0, 0, 1, DEFAULT_CONFIG);
+    barrier.damage(100);
+    barrier.repair(0.3);
+    barrier.reset();
+    barrier.damage(100);
+    expect(barrier.repair(0.2).boardsRepaired).toBe(0);
+    expect(barrier.state).toBe('repairing');
+  });
 });

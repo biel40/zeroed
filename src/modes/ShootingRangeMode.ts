@@ -13,6 +13,7 @@ import { standardTargetHitEffects } from './hitEffects';
 export class ShootingRangeMode implements GameMode {
   readonly id = 'range' as const;
   readonly weaponIds: readonly WeaponId[] = WEAPON_ORDER;
+  readonly showsAimDistance = true;
 
   private ctx!: ModeContext;
 

@@ -19,10 +19,30 @@ export const SPAWN_POINTS: ReadonlyArray<readonly [number, number]> = [
 /** Never spawn closer than this to the player, in meters. */
 export const MIN_PLAYER_DISTANCE = 10;
 
+export interface ZombieSpawnPoint {
+  readonly x: number;
+  readonly z: number;
+  /** Entry assigned by the map; absent on the classic open arena. */
+  readonly barrierId?: string;
+  readonly approachX?: number;
+  readonly approachZ?: number;
+  readonly breachX?: number;
+  readonly breachZ?: number;
+  readonly exterior?: boolean;
+}
+
+export type ZombieSpawnDefinition = readonly [number, number] | ZombieSpawnPoint;
+
+function normalizeSpawn(point: ZombieSpawnDefinition): ZombieSpawnPoint {
+  return Array.isArray(point)
+    ? { x: point[0], z: point[1] }
+    : point as ZombieSpawnPoint;
+}
+
 export class ZombieSpawner {
   constructor(
     private readonly rng: () => number = Math.random,
-    private readonly spawnPoints: ReadonlyArray<readonly [number, number]> = SPAWN_POINTS,
+    private readonly spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = SPAWN_POINTS,
   ) {}
 
   /**
@@ -30,13 +50,20 @@ export class ZombieSpawner {
    * player. Falls back to the farthest point if none qualifies.
    */
   pick(playerX: number, playerZ: number): readonly [number, number] {
-    let farthest = this.spawnPoints[0] ?? [0, 0];
-    let farthestDistSq = -1;
-    const candidates: Array<readonly [number, number]> = [];
+    const point = this.pickSpawn(playerX, playerZ);
+    return [point.x, point.z];
+  }
 
-    for (const point of this.spawnPoints) {
-      const dx = point[0] - playerX;
-      const dz = point[1] - playerZ;
+  /** Metadata-preserving selection used by routed indoor maps. */
+  pickSpawn(playerX: number, playerZ: number): ZombieSpawnPoint {
+    let farthest = normalizeSpawn(this.spawnPoints[0] ?? [0, 0]);
+    let farthestDistSq = -1;
+    const candidates: ZombieSpawnPoint[] = [];
+
+    for (const definition of this.spawnPoints) {
+      const point = normalizeSpawn(definition);
+      const dx = point.x - playerX;
+      const dz = point.z - playerZ;
       const distSq = dx * dx + dz * dz;
       if (distSq > farthestDistSq) {
         farthestDistSq = distSq;

@@ -222,19 +222,18 @@ body {
 }
 
 .touch-primary {
-  right: calc(clamp(10px, 2vw, 22px) + env(safe-area-inset-right, 0px));
-  bottom: calc(clamp(10px, 2vh, 22px) + env(safe-area-inset-bottom, 0px));
+  right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
+  bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
   align-items: flex-end;
-  gap: clamp(8px, 1.4vw, 14px);
 }
 
 /* Secondary actions ride above the fire button, in the same right-hand
    column, so the aiming area stays one uninterrupted surface. */
 .touch-secondary {
-  right: calc(clamp(14px, 2.5vw, 28px) + env(safe-area-inset-right, 0px));
-  bottom: calc(clamp(102px, 23vh, 138px) + env(safe-area-inset-bottom, 0px));
+  right: calc(clamp(14px, 2.2vw, 26px) + env(safe-area-inset-right, 0px));
+  bottom: calc(clamp(122px, 25vh, 154px) + env(safe-area-inset-bottom, 0px));
   display: grid;
-  grid-template-columns: repeat(3, auto);
+  grid-template-columns: repeat(2, auto);
   gap: clamp(6px, 1.2vmin, 10px);
 }
 
@@ -266,18 +265,12 @@ body {
 }
 
 #btn-fire {
-  width: 84px;
-  height: 84px;
+  width: clamp(88px, 13vmin, 104px);
+  height: clamp(88px, 13vmin, 104px);
   border-radius: 50%;
   font-size: 14px;
   background: rgba(178, 34, 34, 0.5);
   border-color: rgba(255, 120, 100, 0.45);
-}
-
-#btn-ads {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
 }
 
 #btn-pause {
@@ -796,13 +789,12 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled #hud-ammo { font-size: 15px; margin: 0; }
   html.touch-controls-enabled #z-round { font-size: 11px; margin-bottom: 2px; }
   html.touch-controls-enabled .touch-secondary {
-    right: calc(150px + env(safe-area-inset-right, 0px));
+    right: calc(126px + env(safe-area-inset-right, 0px));
     bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     grid-template-columns: repeat(2, auto);
   }
   html.touch-controls-enabled #touch-controls button { min-width: 42px; height: 42px; font-size: 10px; }
   html.touch-controls-enabled #btn-fire { width: 70px; height: 70px; font-size: 12px; }
-  html.touch-controls-enabled #btn-ads { width: 52px; height: 52px; }
   html.touch-controls-enabled #joystick { width: 96px; height: 96px; }
   html.touch-controls-enabled #joystick-knob { width: 42px; height: 42px; }
   html.touch-controls-enabled #banner-title { font-size: 24px; }

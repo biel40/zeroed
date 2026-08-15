@@ -5,8 +5,6 @@ import type { Weapon } from '../weapons/Weapon';
 /** Live state shown on the Zombies mode panel. */
 export interface ZombieHudState {
   readonly round: number;
-  readonly alive: number;
-  readonly pending: number;
   readonly hp: number;
   readonly maxHp: number;
   readonly kills: number;
@@ -49,7 +47,6 @@ export class HUD {
   private readonly zombiesPanel = mustGet('hud-zombies');
   private readonly zRound = mustGet('z-round');
   private readonly zPoints = mustGet('z-points');
-  private readonly zCount = mustGet('z-count');
   private readonly zHp = mustGet('z-hp');
   private readonly zHpFill = mustGet('z-hp-fill');
   private readonly zKills = mustGet('z-kills');
@@ -160,12 +157,11 @@ export class HUD {
 
   /** Zombies panel; the whole block only re-renders when something changed. */
   updateZombies(state: ZombieHudState): void {
-    const key = `${state.round}|${state.alive}|${state.pending}|${state.hp}|${state.kills}|${state.headshots}|${state.points}`;
+    const key = `${state.round}|${state.hp}|${state.kills}|${state.headshots}|${state.points}`;
     if (key === this.lastZombies) return;
     this.lastZombies = key;
     this.zRound.textContent = state.round > 0 ? `ROUND ${state.round}` : 'GET READY';
     this.zPoints.textContent = `${state.points} PTS`;
-    this.zCount.textContent = `${state.alive + state.pending} LEFT`;
     this.zHp.textContent = `${Math.ceil(state.hp)}`;
     const ratio = clamp(state.hp / state.maxHp, 0, 1);
     this.zHpFill.style.width = `${ratio * 100}%`;
@@ -244,6 +240,10 @@ export class HUD {
     this.hitmarker.classList.add('active');
   }
 
+  setAimDistanceVisible(visible: boolean): void {
+    this.distance.classList.toggle('hidden', !visible);
+  }
+
   /** Center-screen interaction prompt ("MYSTERY BOX\nPress E"); null hides it. */
   setInteractionPrompt(text: string | null): void {
     if (text === this.lastPrompt) return;
@@ -252,7 +252,7 @@ export class HUD {
     if (text !== null) this.interactPrompt.textContent = text;
   }
 
-  update(weapon: Weapon, stats: Stats, aimDistance: number | null, spreadPixels: number): void {
+  update(weapon: Weapon, stats: Stats, aimDistance: number | null | undefined, spreadPixels: number): void {
     const definition = weapon.definition;
 
     if (definition.name !== this.lastWeapon) {
@@ -273,10 +273,12 @@ export class HUD {
       this.mode.textContent = mode;
       this.lastMode = mode;
     }
-    const distance = aimDistance === null ? '—' : `${Math.round(aimDistance)} m`;
-    if (distance !== this.lastDistance) {
-      this.distance.textContent = distance;
-      this.lastDistance = distance;
+    if (aimDistance !== undefined) {
+      const distance = aimDistance === null ? '—' : `${Math.round(aimDistance)} m`;
+      if (distance !== this.lastDistance) {
+        this.distance.textContent = distance;
+        this.lastDistance = distance;
+      }
     }
     const accuracy = `${Math.round(stats.accuracy * 100)} %`;
     if (accuracy !== this.lastAccuracy) {

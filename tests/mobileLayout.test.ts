@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 /** Index of the first line that opens a rule for the given selector. */
 function ruleIndex(selector: string): number {
@@ -50,5 +51,15 @@ describe('mobile stylesheet cascade', () => {
     expect(bodyRule).not.toContain('touch-action: none');
     expect(css).toMatch(/#app canvas \{[^}]*touch-action: none/);
     expect(css).toMatch(/#touch-controls button \{[^}]*touch-action: none/);
+  });
+
+  it('keeps only the compact mobile action set with one combined fire button', () => {
+    expect(html).not.toContain('id="btn-jump"');
+    expect(html).not.toContain('id="btn-ads"');
+    for (const action of ['fire', 'reload', 'interact', 'swap-weapon', 'mode', 'pause']) {
+      expect(html).toContain(`data-action="${action}"`);
+    }
+    const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('</div>\n\n      <div id="hud-weapon"'));
+    expect(touchControls.match(/data-action=/g)).toHaveLength(6);
   });
 });

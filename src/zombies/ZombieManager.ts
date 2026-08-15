@@ -20,6 +20,7 @@ import {
 import { Zombie } from './Zombie';
 import { ZombiePool } from './ZombiePool';
 import { ZombieSpawner } from './ZombieSpawner';
+import type { ZombieSpawnDefinition } from './ZombieSpawner';
 import {
   ZombieVisual,
   ZOMBIE_VARIANTS,
@@ -40,6 +41,10 @@ const FRONT_PROBE = 1.3;
  * slow enough that the front probe can catch the corner before overshoot.
  */
 const ROUND_SPEED_FACTOR = 0.85;
+const TURN_SPEED = 5.5;
+const WAYPOINT_EPSILON = 0.16;
+const STUCK_CHECK_INTERVAL = 1.5;
+const STUCK_MIN_PROGRESS = 0.14;
 /** Surfaces solid enough to stop a walking body (targets are steel/paper). */
 const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'metal']);
 /** A collider blocks movement only if it is tall enough to matter. */
@@ -49,6 +54,22 @@ const MAX_OBSTACLE_FOOTPRINT = 20;
 
 /** GLB payloads per variant, keyed by variant id. Missing keys fall back. */
 export type ZombieModelSources = Partial<Record<ZombieVariantId, ZombieModelSource | null>>;
+
+interface EntryRoute {
+  readonly barrierId: string;
+  readonly approachX: number;
+  readonly approachZ: number;
+  readonly breachX: number;
+  readonly breachZ: number;
+  stage: 'approach' | 'breach';
+}
+
+interface StuckState {
+  x: number;
+  z: number;
+  elapsed: number;
+  recoveries: number;
+}
 
 /**
  * Owns the zombie population: pooling, spawning, steering (seek + soft
@@ -79,12 +100,15 @@ export class ZombieManager {
    * committed to when it hit a wall; null while it walks straight.
    */
   private readonly roundState = new Map<Zombie, { x: number; z: number }>();
+  private readonly entryRoutes = new Map<Zombie, EntryRoute>();
+  private readonly stuckState = new Map<Zombie, StuckState>();
+  private recoveryCount = 0;
 
   constructor(
     rng: () => number = Math.random,
     sources: ZombieModelSources = {},
     castShadows = true,
-    spawnPoints: ReadonlyArray<readonly [number, number]> | null = null,
+    spawnPoints: ReadonlyArray<ZombieSpawnDefinition> | null = null,
     private barriers: ReadonlyArray<WindowBarrier> = [],
     private readonly floorTransitions: ReadonlyArray<FloorTransitionZone> = [],
   ) {
@@ -112,7 +136,7 @@ export class ZombieManager {
   }
 
   /** Replace spawn points when a new zone is unlocked. */
-  setSpawnPoints(spawnPoints: ReadonlyArray<readonly [number, number]>): void {
+  setSpawnPoints(spawnPoints: ReadonlyArray<ZombieSpawnDefinition>): void {
     this.spawner = new ZombieSpawner(this.rng, spawnPoints);
   }
 
@@ -153,24 +177,52 @@ export class ZombieManager {
     return this.pool.activeCount;
   }
 
+  get stuckRecoveryCount(): number {
+    return this.recoveryCount;
+  }
+
   /** Spawns one zombie for the round; false when the pool is exhausted. */
   spawnZombie(config: RoundConfig, playerX: number, playerZ: number): boolean {
     const zombie = this.pool.acquire();
     if (!zombie) return false;
-    const [x, z] = this.spawner.pick(playerX, playerZ);
+    const spawn = this.spawner.pickSpawn(playerX, playerZ);
     this.roundState.delete(zombie);
+    this.stuckState.delete(zombie);
     // Cheap per-spawn variation: scale, ground speed and walk-cycle phase all
     // jitter so 24 zombies never read as synchronized clones.
     const jitter = (amount: number): number => 1 + (this.rng() * 2 - 1) * amount;
     zombie.group.scale.setScalar(jitter(ZOMBIE_SCALE_JITTER));
     zombie.visual.setWalkJitter(jitter(ZOMBIE_WALK_JITTER));
     zombie.spawn(
-      x,
-      z,
+      spawn.x,
+      spawn.z,
       Math.round(ZOMBIE_BASE_HP * config.healthMultiplier),
       ZOMBIE_BASE_SPEED * config.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
     );
-    zombie.barrierTarget = this.pickBarrierTarget(zombie.floor);
+    const assignedBarrier = spawn.barrierId
+      ? this.barriers.find((barrier) => barrier.id === spawn.barrierId) ?? null
+      : null;
+    zombie.barrierTarget = assignedBarrier && !assignedBarrier.isOpen
+      ? assignedBarrier
+      : this.pickBarrierTarget(zombie.floor);
+    if (
+      spawn.barrierId &&
+      spawn.approachX !== undefined &&
+      spawn.approachZ !== undefined &&
+      spawn.breachX !== undefined &&
+      spawn.breachZ !== undefined
+    ) {
+      this.entryRoutes.set(zombie, {
+        barrierId: spawn.barrierId,
+        approachX: spawn.approachX,
+        approachZ: spawn.approachZ,
+        breachX: spawn.breachX,
+        breachZ: spawn.breachZ,
+        stage: 'approach',
+      });
+    } else {
+      this.entryRoutes.delete(zombie);
+    }
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
     return true;
   }
@@ -255,6 +307,7 @@ export class ZombieManager {
       if (zombie.isAlive) {
         this.steer(zombie, dt, playerX, playerZ, playerFloor);
         this.applyFloorTransition(zombie);
+        this.updateStuckRecovery(zombie, dt, playerX, playerZ, playerFloor);
       }
       zombie.update(dt);
     }
@@ -270,16 +323,82 @@ export class ZombieManager {
     }
     this.pool.releaseAll();
     this.roundState.clear();
+    this.entryRoutes.clear();
+    this.stuckState.clear();
+    this.recoveryCount = 0;
+  }
+
+  private updateStuckRecovery(
+    zombie: Zombie,
+    dt: number,
+    playerX: number,
+    playerZ: number,
+    playerFloor: number,
+  ): void {
+    if (zombie.state !== 'walk') {
+      this.stuckState.delete(zombie);
+      return;
+    }
+
+    let targetX = playerX;
+    let targetZ = playerZ;
+    const route = this.entryRoutes.get(zombie);
+    if (route) {
+      targetX = route.stage === 'approach' ? route.approachX : route.breachX;
+      targetZ = route.stage === 'approach' ? route.approachZ : route.breachZ;
+    } else if (zombie.barrierTarget && !zombie.barrierTarget.isOpen) {
+      targetX = zombie.barrierTarget.position.x;
+      targetZ = zombie.barrierTarget.position.z;
+    } else if (zombie.floor !== playerFloor) {
+      const portal = this.floorTransitions.find(
+        (transition) => transition.sourceFloor === zombie.floor && transition.targetFloor === playerFloor,
+      );
+      if (!portal) return;
+      const center = portal.box.getCenter(this.tmpDelta);
+      targetX = center.x;
+      targetZ = center.z;
+    }
+
+    if (Math.hypot(targetX - zombie.position.x, targetZ - zombie.position.z) <= ZOMBIE_ATTACK_RANGE) {
+      this.stuckState.delete(zombie);
+      return;
+    }
+
+    let state = this.stuckState.get(zombie);
+    if (!state) {
+      state = { x: zombie.position.x, z: zombie.position.z, elapsed: 0, recoveries: 0 };
+      this.stuckState.set(zombie, state);
+    }
+    state.elapsed += dt;
+    if (state.elapsed < STUCK_CHECK_INTERVAL) return;
+
+    const progress = Math.hypot(zombie.position.x - state.x, zombie.position.z - state.z);
+    state.x = zombie.position.x;
+    state.z = zombie.position.z;
+    state.elapsed = 0;
+    if (progress >= STUCK_MIN_PROGRESS) {
+      state.recoveries = 0;
+      return;
+    }
+
+    const dx = targetX - zombie.position.x;
+    const dz = targetZ - zombie.position.z;
+    const length = Math.hypot(dx, dz) || 1;
+    const side = state.recoveries % 2 === 0 ? 1 : -1;
+    this.roundState.set(zombie, { x: (-dz / length) * side, z: (dx / length) * side });
+    state.recoveries++;
+    this.recoveryCount++;
   }
 
   private steer(zombie: Zombie, dt: number, playerX: number, playerZ: number, playerFloor: number): void {
+    if (this.followEntryRoute(zombie, dt)) return;
     const target = zombie.barrierTarget;
     if (target && target.isOpen) zombie.barrierTarget = null;
 
     if (target) {
-      zombie.faceTowards(target.position.x, target.position.z);
+      zombie.faceTowards(target.position.x, target.position.z, TURN_SPEED * dt);
     } else {
-      zombie.faceTowards(playerX, playerZ);
+      zombie.faceTowards(playerX, playerZ, TURN_SPEED * dt);
     }
 
     if (zombie.state !== 'walk') return;
@@ -311,7 +430,7 @@ export class ZombieManager {
       );
       if (portal) {
         const center = portal.box.getCenter(this.tmpToPlayer);
-        zombie.faceTowards(center.x, center.z);
+        zombie.faceTowards(center.x, center.z, TURN_SPEED * dt);
         const toPortal = this.tmpToPlayer.set(center.x - zombie.position.x, 0, center.z - zombie.position.z);
         if (toPortal.lengthSq() > 0.01) {
           toPortal.normalize();
@@ -443,6 +562,50 @@ export class ZombieManager {
     return moved;
   }
 
+  private followEntryRoute(zombie: Zombie, dt: number): boolean {
+    const route = this.entryRoutes.get(zombie);
+    if (!route) return false;
+    const barrier = this.barriers.find((candidate) => candidate.id === route.barrierId) ?? null;
+
+    if (route.stage === 'approach') {
+      const dx = route.approachX - zombie.position.x;
+      const dz = route.approachZ - zombie.position.z;
+      if (dx * dx + dz * dz > WAYPOINT_EPSILON * WAYPOINT_EPSILON) {
+        zombie.faceTowards(route.approachX, route.approachZ, TURN_SPEED * dt);
+        if (zombie.state === 'walk') {
+          const direction = this.tmpToPlayer.set(dx, 0, dz).normalize();
+          this.seek(zombie, dt, direction, route.approachX, route.approachZ);
+        }
+        return true;
+      }
+
+      if (barrier && !barrier.isOpen) {
+        zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
+        if (zombie.state === 'walk' && zombie.tryBarrierAttack()) {
+          zombie.onAttackLanded = () => barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE);
+        }
+        return true;
+      }
+      route.stage = 'breach';
+      zombie.barrierTarget = null;
+      this.roundState.delete(zombie);
+    }
+
+    const dx = route.breachX - zombie.position.x;
+    const dz = route.breachZ - zombie.position.z;
+    if (dx * dx + dz * dz <= WAYPOINT_EPSILON * WAYPOINT_EPSILON) {
+      this.entryRoutes.delete(zombie);
+      this.roundState.delete(zombie);
+      return false;
+    }
+    zombie.faceTowards(route.breachX, route.breachZ, TURN_SPEED * dt);
+    if (zombie.state === 'walk') {
+      const direction = this.tmpToPlayer.set(dx, 0, dz).normalize();
+      this.seek(zombie, dt, direction, route.breachX, route.breachZ);
+    }
+    return true;
+  }
+
   /** Circle-vs-AABB test in XZ, with the body radius folded into the box. */
   private hitsObstacle(x: number, z: number, y: number): boolean {
     return this.findObstacle(x, z, y) !== null;
@@ -483,6 +646,9 @@ export class ZombieManager {
   }
 
   private finishDeath(zombie: Zombie): void {
+    this.entryRoutes.delete(zombie);
+    this.roundState.delete(zombie);
+    this.stuckState.delete(zombie);
     this.pool.release(zombie);
   }
 

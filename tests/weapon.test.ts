@@ -59,32 +59,63 @@ describe('Weapon fire cadence', () => {
 });
 
 describe('Weapon ammo and reload', () => {
-  it('empties the magazine, dry fires, then reloads to full', () => {
+  it('refills magazine and reserve to their configured maxima without exceeding them', () => {
+    const m4 = new Weapon(WEAPON_DEFINITIONS.m4a1, () => 0.5, 300);
+    m4.ammoInMagazine = 4;
+    m4.reserveAmmo = 12;
+
+    expect(m4.refillAmmo()).toBe(true);
+    expect(m4.ammoInMagazine).toBe(m4.definition.magazineSize);
+    expect(m4.reserveAmmo).toBe(300);
+    expect(m4.isAmmoFull).toBe(true);
+    expect(m4.refillAmmo()).toBe(false);
+    expect(m4.reserveAmmo).toBe(300);
+  });
+
+  it('starts reloading automatically after firing the last round', () => {
+    const m4 = makeWeapon('m4a1');
+    m4.ammoInMagazine = 1;
+
+    const lastShot = step(m4, DT, { trigger: true, ads: false });
+
+    expect(count(lastShot.events, 'shot')).toBe(1);
+    expect(count(lastShot.events, 'reloadStart')).toBe(1);
+    expect(m4.ammoInMagazine).toBe(0);
+    expect(m4.state).toBe('reloading');
+  });
+
+  it('empties the magazine and reloads to full automatically', () => {
     const m4 = makeWeapon('m4a1');
     m4.cycleFireMode(); // semi for precise counting
     let shots = 0;
-    let dryFires = 0;
 
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < m4.definition.magazineSize; i++) {
       shots += count(step(m4, DT, { trigger: true, ads: false }).events, 'shot');
-      dryFires += count(step(m4, DT, IDLE).events, 'dryFire');
+      step(m4, DT, IDLE);
       step(m4, 0.09); // let the cooldown expire between presses
     }
 
     expect(shots).toBe(30);
     expect(m4.ammoInMagazine).toBe(0);
-
-    const dry = step(m4, DT, { trigger: true, ads: false });
-    expect(count(dry.events, 'dryFire')).toBe(1);
-    expect(count(dry.events, 'shot')).toBe(0);
-
-    expect(m4.reload()).toBe(true);
     expect(m4.state).toBe('reloading');
+
     const reload = step(m4, m4.definition.reloadTime + 0.05);
-    expect(count(reload.events, 'reloadStart')).toBe(1);
     expect(count(reload.events, 'reloadEnd')).toBe(1);
     expect(m4.ammoInMagazine).toBe(m4.definition.magazineSize);
     expect(m4.state).toBe('ready');
+  });
+
+  it('dry fires instead of auto-reloading when the reserve is empty', () => {
+    const m4 = new Weapon(WEAPON_DEFINITIONS.m4a1, () => 0.5, 0);
+    m4.ammoInMagazine = 1;
+
+    const lastShot = step(m4, DT, { trigger: true, ads: false });
+    expect(count(lastShot.events, 'reloadStart')).toBe(0);
+    expect(m4.state).toBe('ready');
+
+    step(m4, 0.1, IDLE);
+    const dry = step(m4, DT, { trigger: true, ads: false });
+    expect(count(dry.events, 'dryFire')).toBe(1);
   });
 
   it('refuses to reload a full magazine', () => {
@@ -119,6 +150,20 @@ describe('Fire modes', () => {
 });
 
 describe('Bolt action', () => {
+  it('auto-reloads an empty magazine after completing the bolt cycle', () => {
+    const l96 = makeWeapon('l96');
+    l96.ammoInMagazine = 1;
+
+    const lastShot = step(l96, DT, { trigger: true, ads: false });
+    expect(count(lastShot.events, 'boltStart')).toBe(1);
+    expect(l96.state).toBe('cycling');
+
+    const cycle = step(l96, l96.definition.boltCycleTime + DT);
+    expect(count(cycle.events, 'boltEnd')).toBe(1);
+    expect(count(cycle.events, 'reloadStart')).toBe(1);
+    expect(l96.state).toBe('reloading');
+  });
+
   it('cycles the bolt after each shot and blocks firing meanwhile', () => {
     const l96 = makeWeapon('l96');
 

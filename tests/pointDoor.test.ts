@@ -50,4 +50,11 @@ describe('PointDoor pure logic', () => {
     expect(second.cost).toBe(0);
     expect(balance).toBe(250);
   });
+
+  it('returns to the locked state on map reset', () => {
+    const door = new PointDoor('d1', 0, 0, 0, 1, { cost: 750 });
+    door.tryUnlock(() => true);
+    door.reset();
+    expect(door.isLocked).toBe(true);
+  });
 });

@@ -308,7 +308,7 @@ export class ZombieVisual {
       this.headTop = findByName(model, HEAD_TOP_BONE_NAMES);
 
       this.mixer = new THREE.AnimationMixer(model);
-      for (const state of ['spawn', 'walk', 'attack', 'hit', 'death'] as const) {
+      for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'hit', 'death'] as const) {
         const clip = resolveClip(source.clips, this.variant.clips[state]);
         if (!clip) continue;
         const action = this.mixer.clipAction(clip);
@@ -404,7 +404,7 @@ export class ZombieVisual {
       return;
     }
     next.reset();
-    if (state === 'attack') {
+    if (state === 'attack' || state === 'barrierAttack') {
       const clip = next.getClip();
       const raw = clip.duration / Math.max(this.attackDuration, 1e-3);
       if (raw > 2.5) {
@@ -497,7 +497,7 @@ export class ZombieVisual {
     this.bobPhase += dt * 4.8 * Math.max(0.4, speed / this.variant.walkReferenceSpeed);
     const p = this.bobPhase;
 
-    if (this.state === 'attack') {
+    if (this.state === 'attack' || this.state === 'barrierAttack') {
       // Both arms swing forward and down over the player.
       rig.armL.rotation.x = -1.9;
       rig.armR.rotation.x = -1.9;

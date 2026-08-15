@@ -27,6 +27,30 @@ function onlyZombie(manager: ZombieManager): Zombie {
  * moves continuously, never penetrates the obstacle box.
  */
 describe('ZombieManager stuck recovery', () => {
+  it('detects negligible real displacement and alternates its escape route', () => {
+    const colliders: THREE.Object3D[] = [
+      makeWall(0, -8.5, 1.4, 0.2),
+      makeWall(0, -7.5, 1.4, 0.2),
+      makeWall(-0.5, -8, 0.2, 1.4),
+      makeWall(0.5, -8, 0.2, 1.4),
+    ];
+    const manager = new ZombieManager(() => 0);
+    manager.registerColliders(colliders);
+    manager.spawnZombie(roundConfig(1), 0, -14);
+    const zombie = onlyZombie(manager);
+    zombie.position.set(0, 0, -8);
+
+    let maxStep = 0;
+    for (let frame = 0; frame < Math.round(4 / DT); frame++) {
+      const before = zombie.position.clone();
+      manager.update(DT, 0, -14);
+      maxStep = Math.max(maxStep, zombie.position.distanceTo(before));
+    }
+
+    expect(manager.stuckRecoveryCount).toBeGreaterThan(0);
+    expect(maxStep).toBeLessThan(0.1);
+  });
+
   it('rounds a wall dead-ahead of the player line instead of pushing forever', () => {
     // Wall x ∈ [-2, 2] at z = -10 (0.4 deep). Player at (0, -14), directly
     // behind the wall from a zombie at (0, -6): the straight line to the
