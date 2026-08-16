@@ -86,5 +86,6 @@ describe('DesktopInput pointer lock lifecycle', () => {
     input.dispose();
     expect(windowTarget.listenerCount('focus')).toBe(0);
     expect(documentTarget.listenerCount('pointerlockchange')).toBe(0);
+    expect(documentTarget.listenerCount('pointerlockerror')).toBe(0);
   });
 });

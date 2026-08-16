@@ -14,10 +14,12 @@ pausa desincronizados cuando la adquisicion fallaba o los eventos se cruzaban.
 ## Donde
 
 - `src/player/DesktopInput.ts` mantiene `document.pointerLockElement` como
-  fuente de verdad, reconcilia el estado al recuperar visibilidad/foco y libera
-  teclas y botones retenidos al ocultarse o perder foco.
+  fuente de verdad, procesa errores, reconcilia el estado al recuperar
+  visibilidad/foco y libera teclas y botones retenidos al ocultarse o perder
+  foco.
 - `src/core/Game.ts` conserva la pausa y su menu hasta que
-  `pointerlockchange` confirma el canvas; nunca intenta relock sin gesto.
+  `pointerlockchange` confirma el canvas, tambien en START y restart; nunca
+  intenta relock sin gesto.
 - `tests/desktopInput.test.ts` y `tests/audioSystem.test.ts` cubren perdida,
   reconciliacion, ausencia de listeners duplicados y reanudacion confirmada.
 

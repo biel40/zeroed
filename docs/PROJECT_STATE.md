@@ -5,7 +5,7 @@ Estado inspeccionado: 2026-08-16. La fuente de verdad es el codigo actual; `READ
 ## Sistemas funcionales
 
 - Arranque WebGL, carga de GLB/texturas con fallback, selector de modo y selector de mapa (`src/main.ts`, `src/assets/AssetManager.ts`).
-- Shell FPS compartido con render, input desktop/tactil, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
+- Shell FPS compartido con render, input desktop/tactil, recuperacion de Pointer Lock, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
 - Campo de tiro con cinco armas, blancos a 25/50/100/200 m, estadisticas y telemetro (`src/modes/ShootingRangeMode.ts`, `src/range/`).
 - Armas declarativas con cadencia, modos de fuego, municion, recarga, ADS, dispersion, recoil y view models GLB/procedurales (`src/config/weapons.ts`, `src/weapons/`).
 - Balistica con gravedad/drag, raycast segmentado y prioridad de hitbox de cabeza (`src/shooting/`).
@@ -13,7 +13,7 @@ Estado inspeccionado: 2026-08-16. La fuente de verdad es el codigo actual; `READ
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickup de Ray Gun en el bunker.
 - Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, zonas desbloqueables y transiciones de planta (`src/zombies/maps/`).
-- Suite Vitest de logica determinista: 44 archivos y 353 tests pasan. `npm run typecheck` tambien pasa.
+- Suite Vitest de logica determinista: 45 archivos y 366 tests pasan. `npm run typecheck` tambien pasa.
 
 ## Sistemas parciales o limitados
 
@@ -29,9 +29,7 @@ Estado inspeccionado: 2026-08-16. La fuente de verdad es el codigo actual; `READ
 
 ## Bugs relevantes detectados
 
-- La simulacion empieza al construir `Game`, antes de pulsar START; rondas y zombies pueden avanzar tras el overlay (`src/core/Game.ts:91`, `src/core/Game.ts:288`, `src/core/Game.ts:552`).
 - Una barrera totalmente destruida no puede seleccionarse para reparacion porque `isDamaged` excluye el estado abierto (`src/zombies/barriers/WindowBarrier.ts:81`, `src/modes/ZombiesMode.ts:495`).
-- RESTART en el campo de tiro cierra la pausa sin volver a pedir pointer lock (`src/core/Game.ts:367`, `src/modes/ShootingRangeMode.ts`).
 - La M1911 conserva reserva finita en el campo de tiro, aunque el contrato del modo declara reserva ilimitada (`src/config/weapons.ts`, `src/modes/ShootingRangeMode.ts`).
 - La distancia reportada por balas cuenta dos veces parte del segmento de impacto (`src/shooting/BallisticsSystem.ts:172`, `src/shooting/trajectory.ts:47`).
 - La muerte de un zombie asigna una Y absoluta durante el fade; los cadaveres del bunker suben hacia Y=0 (`src/zombies/Zombie.ts:232`).

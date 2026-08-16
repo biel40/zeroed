@@ -36,6 +36,7 @@ export class DesktopInput {
       if (button === 2) this.state.rightButtonDown = false;
     });
     this.add(document, 'pointerlockchange', () => this.syncPointerLock(true));
+    this.add(document, 'pointerlockerror', () => this.syncPointerLock(true));
     this.add(document, 'visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.state.releaseAll();
       else this.syncPointerLock(false);

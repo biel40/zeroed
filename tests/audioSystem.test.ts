@@ -207,13 +207,16 @@ describe('Game pause resume', () => {
   it('keeps gameplay paused until pointer lock is confirmed', () => {
     const game: any = Object.create((Game as any).prototype);
     game.paused = true;
+    game.gameplayStarted = true;
     game.profile = { isMobile: false, useTouchControls: false };
     game.audio = {
       resume: vi.fn(),
+      pauseMusic: vi.fn(),
       music: { stopBackgroundLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };
+    game.hud = { showPauseMenu: vi.fn() };
 
     (Game as any).prototype.resume.call(game);
 
@@ -222,24 +225,53 @@ describe('Game pause resume', () => {
     expect(game.input.requestPointerLock).toHaveBeenCalledOnce();
   });
 
-  it('resumes gameplay only when the requested canvas lock is confirmed', () => {
+  it('resumes only after a fresh lock, even if an older unlock arrives first', () => {
     const game: any = Object.create((Game as any).prototype);
     game.paused = true;
     game.pointerLockRequested = true;
     game.gameplayStarted = true;
     game.profile = { useTouchControls: false };
     game.audio = { music: { stopBackgroundLoop: vi.fn() } };
+    game.audio.resumeMusic = vi.fn();
     game.hud = {
       hidePauseMenu: vi.fn(),
       hideStartScreen: vi.fn(),
       setHudVisible: vi.fn(),
     };
 
+    (Game as any).prototype.handlePointerLockChange.call(game, false);
+
+    expect(game.paused).toBe(true);
+    expect(game.pointerLockRequested).toBe(true);
+
     (Game as any).prototype.handlePointerLockChange.call(game, true);
 
     expect(game.paused).toBe(false);
     expect(game.pointerLockRequested).toBe(false);
     expect(game.hud.hidePauseMenu).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a restart recoverable until desktop lock is confirmed', () => {
+    const game: any = Object.create((Game as any).prototype);
+    game.paused = true;
+    game.gameplayStarted = true;
+    game.profile = { isMobile: false, useTouchControls: false };
+    game.audio = {
+      resume: vi.fn(),
+      pauseMusic: vi.fn(),
+      stopMusic: vi.fn(),
+      music: { stopBackgroundLoop: vi.fn() },
+      loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
+    };
+    game.input = { requestPointerLock: vi.fn() };
+    game.hud = { showPauseMenu: vi.fn() };
+    game.mode = {};
+
+    (Game as any).prototype.restartRun.call(game);
+
+    expect(game.paused).toBe(true);
+    expect(game.hud.showPauseMenu).toHaveBeenCalledOnce();
+    expect(game.input.requestPointerLock).toHaveBeenCalledOnce();
   });
 
   it('pauses an active desktop game when the real pointer lock is lost', () => {

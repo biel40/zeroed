@@ -88,7 +88,7 @@ export class Game {
    * is a simulation halt, not hidden UI or blocked input. Owned here because
    * only Game controls the loop and the pointer lock.
    */
-  private paused = false;
+  private paused = true;
   /** Desktop lock requests only complete after the browser confirms the canvas. */
   private pointerLockRequested = false;
   private gameplayStarted = false;
@@ -266,7 +266,7 @@ export class Game {
     });
     // ESC to resume while the menu is open and the pointer is unlocked.
     document.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' && this.paused) this.resume();
+      if (e.code === 'Escape' && this.paused && this.gameplayStarted) this.resume();
     });
 
     if (new URLSearchParams(window.location.search).has('debug')) {
@@ -300,15 +300,20 @@ export class Game {
       } catch {}
     }
     this.audio.resume();
-    this.audio.music.stopBackgroundLoop();
     void this.audio.loadMysteryBoxOpenAsset();
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
       this.paused = false;
+      this.audio.music.stopBackgroundLoop();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
       return;
+    }
+    if (this.gameplayStarted) {
+      this.paused = true;
+      this.audio.pauseMusic();
+      this.hud.showPauseMenu();
     }
     this.pointerLockRequested = true;
     this.input.requestPointerLock();
@@ -319,7 +324,7 @@ export class Game {
 
     if (locked) {
       // Never accept a delayed/unexpected lock behind a pause or mode menu.
-      if (!this.pointerLockRequested && this.paused) {
+      if (!this.pointerLockRequested) {
         document.exitPointerLock();
         return;
       }
@@ -327,14 +332,16 @@ export class Game {
       this.gameplayStarted = true;
       this.paused = false;
       this.audio.music.stopBackgroundLoop();
+      this.audio.resumeMusic();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
       return;
     }
 
-    // A failed/in-flight request leaves its blocking overlay in place. The
-    // next click may request lock again; browsers require that user gesture.
+    // While a request is pending, an older unlock notification may still be
+    // delivered. Current browser truth remains unlocked, so keep the overlay
+    // and wait for either a fresh lock or another user-gesture retry.
     if (this.pointerLockRequested) return;
     if (!this.gameplayStarted) return;
     // A mode with its own overlay (game over) suppresses the pause screen.
@@ -367,12 +374,11 @@ export class Game {
   }
 
   private restartRun(): void {
-    this.paused = false;
-    this.hud.hidePauseMenu();
     this.audio.stopMusic();
     // The mode owns its run state; restart() re-arms health, rounds, kills,
-    // economy and re-locks the pointer.
-    this.mode.onRestartRequested?.();
+    // economy and re-locks the pointer. Modes without run state still relock.
+    if (this.mode.onRestartRequested) this.mode.onRestartRequested();
+    else this.start();
   }
 
   /** Arsenal lookup; every WeaponId the modes reference is preloaded. */

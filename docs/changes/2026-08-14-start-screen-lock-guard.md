@@ -1,5 +1,8 @@
 # 2026-08-14 — Start screen bloqueada por el guard de pointer lock
 
+> Nota historica: el guard temporal descrito aqui fue eliminado por
+> `2026-08-16-pointer-lock-recovery.md`, que usa el estado real del navegador.
+
 ## Qué
 
 El modal CLICK TO START no se ocultaba nunca en desktop: el puntero quedaba
