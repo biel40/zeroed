@@ -53,6 +53,11 @@ export class RoundManager {
     this.pendingEvents.length = 0;
   }
 
+  /** Requeues an emitted spawn that the population pool/map could not place. */
+  requeueSpawn(): void {
+    if (this.phase === 'active') this.pendingSpawns++;
+  }
+
   /** Back to the pre-round-1 state (used by the game-over restart). */
   reset(startDelay = ROUND_START_DELAY): void {
     this.phase = 'break';

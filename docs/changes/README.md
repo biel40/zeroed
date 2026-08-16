@@ -17,6 +17,7 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-16 — Failsafe de navegacion zombie](2026-08-16-zombie-navigation-failsafe.md)
 - [2026-08-14 — AK-47 y M60 a nivel M4A1](2026-08-14-ak47-m60-finish.md)
 - [2026-08-14 — Fix: animación zombie saltaba al recibir disparos](2026-08-14-zombie-hit-reaction.md)
 - [2026-08-13 — Red dot en armas convencionales](2026-08-13-red-dot.md)

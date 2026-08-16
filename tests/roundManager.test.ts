@@ -28,6 +28,18 @@ function stepUntil(
 }
 
 describe('RoundManager', () => {
+  it('requeues a spawn that could not be placed instead of shortening the round', () => {
+    const manager = new RoundManager(4, 0);
+    manager.update(0, 0);
+    manager.clearEvents();
+    manager.update(0, 0);
+    const pendingAfterIssue = manager.pendingSpawnCount;
+
+    manager.requeueSpawn();
+
+    expect(manager.pendingSpawnCount).toBe(pendingAfterIssue + 1);
+  });
+
   it('starts round 1 after the initial delay', () => {
     const manager = new RoundManager(4, 2);
     manager.update(1, 0);

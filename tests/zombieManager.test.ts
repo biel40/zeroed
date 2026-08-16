@@ -52,6 +52,32 @@ describe('ZombieManager spawning and pooling', () => {
     expect(manager.aliveCount).toBe(0);
     expect(colliders).toHaveLength(0);
   });
+
+  it('rejects blocked spawn points and uses a clear map spawn instead', () => {
+    const blocked = new THREE.Mesh(new THREE.BoxGeometry(2, 2.3, 2));
+    blocked.position.set(0, 1.15, 0);
+    blocked.userData.surface = 'concrete';
+    blocked.updateMatrixWorld(true);
+    const manager = new ZombieManager(() => 0, {}, false, [[0, 0], [12, 0]]);
+    manager.registerColliders([blocked]);
+
+    expect(manager.spawnZombie(roundConfig(1), 30, 0)).toBe(true);
+    const zombie = [...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives][0];
+    expect(zombie.position.x).toBe(12);
+    expect(zombie.position.z).toBe(0);
+  });
+
+  it('does not spawn when every configured point intersects geometry', () => {
+    const blocked = new THREE.Mesh(new THREE.BoxGeometry(4, 2.3, 4));
+    blocked.position.set(0, 1.15, 0);
+    blocked.userData.surface = 'concrete';
+    blocked.updateMatrixWorld(true);
+    const manager = new ZombieManager(() => 0, {}, false, [[0, 0]]);
+    manager.registerColliders([blocked]);
+
+    expect(manager.spawnZombie(roundConfig(1), 20, 0)).toBe(false);
+    expect(manager.activeCount).toBe(0);
+  });
 });
 
 describe('ZombieManager movement', () => {
@@ -80,6 +106,41 @@ describe('ZombieManager movement', () => {
     // Separation pushes them apart towards the separation radius (1.15 m)
     // even while both converge on the player.
     expect(after).toBeGreaterThan(0.9);
+  });
+
+  it('bounds crowded separation so a horde cannot tunnel through a wall', () => {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(8, 2.3, 0.2));
+    wall.position.set(0, 1.15, 0);
+    wall.userData.surface = 'concrete';
+    wall.updateMatrixWorld(true);
+    const manager = new ZombieManager(() => 0);
+    manager.registerColliders([wall]);
+    for (let index = 0; index < MAX_ALIVE; index++) {
+      manager.spawnZombie(roundConfig(1), 0, 4);
+    }
+    const zombies = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ];
+    for (let index = 0; index < zombies.length; index++) {
+      zombies[index].position.set((index % 3) * 0.02, 0, -0.55 - Math.floor(index / 3) * 0.02);
+      zombies[index].state = 'walk';
+    }
+
+    let maxStep = 0;
+    for (let frame = 0; frame < 60; frame++) {
+      const previous = zombies.map((zombie) => zombie.position.clone());
+      manager.update(0.05, 0, 4);
+      for (let index = 0; index < zombies.length; index++) {
+        maxStep = Math.max(maxStep, zombies[index].position.distanceTo(previous[index]));
+        const nearestX = Math.max(-4, Math.min(4, zombies[index].position.x));
+        const nearestZ = Math.max(-0.1, Math.min(0.1, zombies[index].position.z));
+        const dx = zombies[index].position.x - nearestX;
+        const dz = zombies[index].position.z - nearestZ;
+        expect(dx * dx + dz * dz).toBeGreaterThanOrEqual(0.42 * 0.42 - 1e-6);
+      }
+    }
+
+    expect(maxStep).toBeLessThan(0.15);
   });
 
   it('attacks the player when in range and deals damage at the hit moment', () => {

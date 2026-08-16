@@ -293,6 +293,76 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
   });
 
+  it('retargets stairs when the player changes floors repeatedly', () => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(() => 0, {}, false, [[1.45, -2.5]], [], arena.floorTransitions);
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), 5, -2);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+
+    for (let frame = 0; frame < 180; frame++) {
+      const bunker = Math.floor(frame / 15) % 2 === 0;
+      manager.update(1 / 60, 5.5, bunker ? -2 : -4.2, bunker ? -1 : 0);
+    }
+    for (let frame = 0; frame < 900 && zombie.floor !== -1; frame++) {
+      manager.update(1 / 60, 5.5, -2, -1);
+    }
+
+    expect(zombie.floor).toBe(-1);
+    expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+  });
+
+  it('refreshes navigation for an active zombie when a paid door opens', () => {
+    const arena = makeArena();
+    const manager = new ZombieManager(() => 0, {}, false, [[-3.5, 4.5]]);
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), -3.5, -0.5);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+
+    for (let frame = 0; frame < 240; frame++) manager.update(1 / 60, -3.5, -0.5, 0);
+    expect(zombie.position.z).toBeGreaterThan(2.35);
+
+    zombie.position.set(-3.5, 0, 2.7);
+    unlock(arena, 'to-dining');
+    manager.registerColliders([...arena.colliders]);
+    for (let frame = 0; frame < 600; frame++) manager.update(1 / 60, -3.5, -0.5, 0);
+
+    expect(zombie.position.z).toBeLessThan(1.5);
+  });
+
+  it('routes around solid furniture instead of attacking through it', () => {
+    const arena = makeArena();
+    const manager = new ZombieManager(() => 0, {}, false, [[-5.5, 7.55]]);
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), -5.5, 5.4);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+    let damage = 0;
+    manager.onPlayerAttack = (amount) => {
+      damage += amount;
+    };
+
+    let maxStep = 0;
+    for (let frame = 0; frame < 480; frame++) {
+      const previous = zombie.position.clone();
+      manager.update(1 / 60, -5.5, 5.4, 0);
+      maxStep = Math.max(maxStep, zombie.position.distanceTo(previous));
+    }
+
+    expect(damage).toBeGreaterThan(0);
+    expect(Math.abs(zombie.position.x + 5.5)).toBeGreaterThan(0.4);
+    expect(maxStep).toBeLessThan(0.1);
+  });
+
   it('lets a zombie cross a destroyed window without crossing solid wall segments', () => {
     const arena = makeArena();
     const barrier = arena.barriers.find((candidate) => candidate.id === 'start-west-a')!;

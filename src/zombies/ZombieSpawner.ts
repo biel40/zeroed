@@ -45,6 +45,11 @@ export class ZombieSpawner {
     private readonly spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = SPAWN_POINTS,
   ) {}
 
+  /** Normalized map-owned points used by validated spawn/recovery placement. */
+  get points(): readonly ZombieSpawnPoint[] {
+    return this.spawnPoints.map(normalizeSpawn);
+  }
+
   /**
    * Picks a random spawn point at least MIN_PLAYER_DISTANCE away from the
    * player. Falls back to the farthest point if none qualifies.

@@ -130,6 +130,7 @@ export class ZombiesMode implements GameMode {
       this.arena.floorTransitions,
     );
     this.zombies.registerColliders(ctx.hitColliders);
+    this.zombies.setNavigationDebug(new URLSearchParams(window.location.search).has('zombieNavDebug'));
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
     ctx.scene.add(this.zombies.group);
@@ -183,7 +184,16 @@ export class ZombiesMode implements GameMode {
     }
 
     const playerPos = this.ctx.player.rig.position;
-    this.zombies.update(dt, playerPos.x, playerPos.z, this.ctx.player.floor);
+    this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    this.zombies.update(
+      dt,
+      playerPos.x,
+      playerPos.z,
+      this.ctx.player.floor,
+      playerPos.y,
+      this.tmpDirection.x,
+      this.tmpDirection.z,
+    );
     this.energy.update(dt);
     this.chain.update(dt);
     this.arena.update(dt);
@@ -596,9 +606,14 @@ export class ZombiesMode implements GameMode {
           }
           break;
         case 'spawnDue':
-          // The pool returning false means we are at the alive cap; the
-          // RoundManager already accounts for that, so this never fails.
-          if (this.zombies) this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z);
+          if (
+            this.zombies &&
+            !this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z)
+          ) {
+            // Corpses still occupy pool slots and invalid map spawns are
+            // rejected. Neither case may silently shorten the round.
+            this.rounds.requeueSpawn();
+          }
           break;
         case 'roundComplete':
           this.ctx.hud.showRoundBanner(`ROUND ${event.round} COMPLETE`, 'GET READY');
