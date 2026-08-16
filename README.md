@@ -1,4 +1,4 @@
-# Three.js Shooting Range
+# Three.js Shooting Range - Zeroed.ts
 
 Pequeño campo de tiro FPS de navegador construido con Three.js y TypeScript.
 Cuatro armas con personalidad propia (M4A1, AK-47, M60, L96), balística con
