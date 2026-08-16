@@ -35,8 +35,16 @@ function step(weapon: Weapon, animator: ReloadAnimator, seconds: number): void {
 }
 
 describe('ReloadAnimator phases', () => {
-  it('fires every phase once, in timeline order', () => {
+  it('skips the action phase during a tactical reload', () => {
     const { weapon, animator, phases } = makeRig();
+    expect(weapon.reload()).toBe(true);
+    step(weapon, animator, weapon.definition.reloadTime + 0.1);
+    expect(phases).toEqual(['magOut', 'magDrop', 'magIn', 'magSeat']);
+  });
+
+  it('works the action after the magazine swap during an empty reload', () => {
+    const { weapon, animator, phases } = makeRig();
+    weapon.ammoInMagazine = 0;
     expect(weapon.reload()).toBe(true);
     step(weapon, animator, weapon.definition.reloadTime + 0.1);
     expect(phases).toEqual(['magOut', 'magDrop', 'magIn', 'magSeat', 'chargeStart', 'chargeEnd']);

@@ -4,6 +4,7 @@ export class InputState {
   mouseDeltaY = 0;
   leftButtonDown = false;
   rightButtonDown = false;
+  repeatSemiAuto = false;
   pointerLocked = false;
   moveAxisX = 0;
   moveAxisY = 0;
@@ -39,6 +40,7 @@ export class InputState {
     this.keysPressed.clear();
     this.leftButtonDown = false;
     this.rightButtonDown = false;
+    this.repeatSemiAuto = false;
     this.moveAxisX = 0;
     this.moveAxisY = 0;
   }

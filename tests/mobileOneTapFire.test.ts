@@ -13,6 +13,7 @@ function updateWeapon(weapon: Weapon, state: InputState, seconds: number): numbe
     weapon.update(DT, {
       trigger: state.leftButtonDown,
       ads: state.rightButtonDown,
+      repeatSemiAuto: state.repeatSemiAuto,
     });
     shots += weapon.pendingEvents.filter((event) => event.type === 'shot').length;
     weapon.clearEvents();
@@ -32,20 +33,19 @@ describe('mobile 1-Tap ADS Fire', () => {
   });
 
   it.each<WeaponId>(['m1911', 'raygun', 'tesla'])(
-    '%s fires once per touch even when held',
+    '%s repeats at its real cadence while the mobile fire button is held',
     (weaponId) => {
       const state = new InputState();
       const weapon = new Weapon(WEAPON_DEFINITIONS[weaponId]);
       applyMobileAction(state, 'fire', true);
-      expect(updateWeapon(weapon, state, 3)).toBe(1);
+      const shots = updateWeapon(weapon, state, 1);
+      expect(shots).toBeGreaterThan(1);
+      expect(shots).toBeLessThanOrEqual(weapon.definition.rpm / 60 + 1);
       expect(weapon.adsAlpha).toBe(1);
 
       applyMobileAction(state, 'fire', false);
       updateWeapon(weapon, state, 0.5);
       expect(weapon.adsAlpha).toBe(0);
-
-      applyMobileAction(state, 'fire', true);
-      expect(updateWeapon(weapon, state, DT)).toBe(1);
     },
   );
 

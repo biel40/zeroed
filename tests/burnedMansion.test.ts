@@ -293,6 +293,32 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
   });
 
+  it.each([4.35, 5.95])('routes a zombie entering the stair edge at x=%s', (stairX) => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(
+      () => 0,
+      {},
+      false,
+      [[stairX, -2.8]],
+      [],
+      arena.floorTransitions,
+    );
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), 5.5, -2);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+
+    for (let frame = 0; frame < 600 && zombie.floor === 0; frame++) {
+      manager.update(1 / 60, 5.5, -2, -1);
+    }
+
+    expect(zombie.floor).toBe(-1);
+    expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+  });
+
   it('retargets stairs when the player changes floors repeatedly', () => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');

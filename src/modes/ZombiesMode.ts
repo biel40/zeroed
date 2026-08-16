@@ -129,6 +129,7 @@ export class ZombiesMode implements GameMode {
       this.arena.barriers,
       this.arena.floorTransitions,
     );
+    this.zombies.setNavigationBounds(this.arena.navigationBounds);
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.setNavigationDebug(new URLSearchParams(window.location.search).has('zombieNavDebug'));
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);

@@ -43,6 +43,10 @@ export interface PlayerBounds {
   readonly maxY?: number;
 }
 
+export interface ZombieNavigationBounds extends PlayerBounds {
+  readonly floor: number;
+}
+
 /**
  * Contract for a Zombies map. The arena owns the physical environment,
  * spawn points, interactive objects and ambience. `ZombiesMode` owns the
@@ -68,6 +72,8 @@ export interface ZombieArena {
   readonly useWallCollision: boolean;
   /** Optional movement bounds; classic arena leaves this undefined. */
   readonly playerBounds?: PlayerBounds;
+  /** Per-floor envelope containing valid zombie spawns and pursuit routes. */
+  readonly navigationBounds: ReadonlyArray<ZombieNavigationBounds>;
   /** Stair/zone transitions that swap player floor/bounds. */
   readonly floorTransitions?: ReadonlyArray<FloorTransitionZone>;
   /** Called once after the arena is added to the scene. */

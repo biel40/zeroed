@@ -77,9 +77,9 @@ export class WindowBarrier {
     return this.mutableBoards.reduce((acc, b) => acc + (b.hp <= 0 ? 1 : 0), 0);
   }
 
-  /** True when at least one board is destroyed but not all. */
+  /** True when at least one board needs to be rebuilt. */
   get isDamaged(): boolean {
-    return this.destroyedCount > 0 && !this.isOpen;
+    return this.destroyedCount > 0;
   }
 
   /**

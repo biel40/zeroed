@@ -50,6 +50,7 @@ export class Input {
   get mouseDeltaY(): number { return this.state.mouseDeltaY; }
   get leftButtonDown(): boolean { return this.state.leftButtonDown; }
   get rightButtonDown(): boolean { return this.state.rightButtonDown; }
+  get repeatSemiAuto(): boolean { return this.state.repeatSemiAuto; }
   get pointerLocked(): boolean { return this.state.pointerLocked; }
   get moveAxisX(): number { return this.state.moveAxisX; }
   get moveAxisY(): number { return this.state.moveAxisY; }

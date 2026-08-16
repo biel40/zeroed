@@ -264,7 +264,7 @@ body {
   opacity: 0.72;
 }
 
-#btn-fire {
+#touch-controls #btn-fire {
   width: clamp(88px, 13vmin, 104px);
   height: clamp(88px, 13vmin, 104px);
   border-radius: 50%;
@@ -794,7 +794,7 @@ html.touch-controls-enabled .start-panel {
     grid-template-columns: repeat(2, auto);
   }
   html.touch-controls-enabled #touch-controls button { min-width: 42px; height: 42px; font-size: 10px; }
-  html.touch-controls-enabled #btn-fire { width: 70px; height: 70px; font-size: 12px; }
+  html.touch-controls-enabled #touch-controls #btn-fire { width: 70px; height: 70px; font-size: 12px; }
   html.touch-controls-enabled #joystick { width: 96px; height: 96px; }
   html.touch-controls-enabled #joystick-knob { width: 42px; height: 42px; }
   html.touch-controls-enabled #banner-title { font-size: 24px; }

@@ -1,6 +1,7 @@
 import { RecoilController } from './RecoilController';
 import type {
   FireMode,
+  ReloadType,
   WeaponDefinition,
   WeaponEvent,
   WeaponFrameInput,
@@ -29,6 +30,7 @@ export class Weapon {
   private cooldown = 0;
   private stateTimer = 0;
   private stateDuration = 0;
+  private activeReloadType: ReloadType | null = null;
   private bloom = 0;
   private prevTrigger = false;
 
@@ -56,6 +58,10 @@ export class Weapon {
 
   get state(): WeaponState {
     return this.weaponState;
+  }
+
+  get reloadType(): ReloadType | null {
+    return this.activeReloadType;
   }
 
   /** 0 → 1 progress of the current timed state (reload, bolt cycle, equip). */
@@ -90,7 +96,8 @@ export class Weapon {
     const triggerEdge = input.trigger && !this.prevTrigger;
     this.prevTrigger = input.trigger;
 
-    const wantsFire = this.fireMode === 'auto' ? input.trigger : triggerEdge;
+    const repeatsWhileHeld = this.fireMode === 'auto' || input.repeatSemiAuto === true;
+    const wantsFire = repeatsWhileHeld ? input.trigger : triggerEdge;
     if (wantsFire) this.tryFire(triggerEdge);
   }
 
@@ -99,11 +106,17 @@ export class Weapon {
     if (this.ammoInMagazine >= this.definition.magazineSize) return false;
     // A finite, empty reserve makes the reload impossible.
     if (this.reserveAmmo !== null && this.reserveAmmo <= 0) return false;
-    this.enterState('reloading', this.definition.reloadTime, 'reloadStart');
+    this.activeReloadType = this.ammoInMagazine === 0 ? 'empty' : 'tactical';
+    const duration =
+      this.activeReloadType === 'empty'
+        ? this.definition.reloadTime
+        : this.definition.tacticalReloadTime;
+    this.enterState('reloading', duration, 'reloadStart');
     return true;
   }
 
   equip(): void {
+    this.activeReloadType = null;
     this.prevTrigger = false;
     this.adsAlpha = 0;
     this.bloom = 0;
@@ -128,6 +141,7 @@ export class Weapon {
     this.weaponState = 'ready';
     this.stateTimer = 0;
     this.stateDuration = 0;
+    this.activeReloadType = null;
     this.cooldown = 0;
     this.bloom = 0;
     this.adsAlpha = 0;
@@ -211,6 +225,7 @@ export class Weapon {
     this.weaponState = 'ready';
     this.stateTimer = 0;
     this.stateDuration = 0;
+    this.activeReloadType = null;
     if (completedState === 'cycling' && this.ammoInMagazine === 0) this.reload();
   }
 }

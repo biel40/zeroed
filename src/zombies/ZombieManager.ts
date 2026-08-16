@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EYE_HEIGHT, type FloorTransitionZone } from '../player/PlayerController';
 import type { WindowBarrier } from './barriers/WindowBarrier';
+import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
 import {
   computeDamage,
@@ -150,6 +151,7 @@ export class ZombieManager {
   private nextZombieId = 1;
   private recoveryCount = 0;
   private navigationDebug = false;
+  private navigationBounds: ReadonlyArray<ZombieNavigationBounds> = [];
 
   constructor(
     rng: () => number = Math.random,
@@ -190,6 +192,10 @@ export class ZombieManager {
   /** Replace spawn points when a new zone is unlocked. */
   setSpawnPoints(spawnPoints: ReadonlyArray<ZombieSpawnDefinition>): void {
     this.spawner = new ZombieSpawner(this.rng, spawnPoints);
+  }
+
+  public setNavigationBounds(bounds: ReadonlyArray<ZombieNavigationBounds>): void {
+    this.navigationBounds = bounds;
   }
 
   /** Replace the barriers eligible for newly spawned zombies after a zone unlock. */
@@ -397,6 +403,25 @@ export class ZombieManager {
   ): void {
     for (const zombie of this.pool.actives) {
       if (zombie.isAlive) {
+        if (
+          this.isOutsideNavigationBounds(zombie) &&
+          this.relocateZombie(
+            zombie,
+            playerX,
+            playerZ,
+            playerFloor,
+            playerY,
+            playerFacingX,
+            playerFacingZ,
+          )
+        ) {
+          zombie.resumePursuit();
+          this.roundState.delete(zombie);
+          this.stuckState.delete(zombie);
+          this.recoveryPaths.delete(zombie);
+          this.recoveryCount++;
+          this.debugNavigation(zombie, 'out-of-bounds-relocated', null, 0, 0, 'valid-placement');
+        }
         this.steer(zombie, dt, playerX, playerZ, playerFloor);
         this.applyFloorTransition(zombie);
         this.updateStuckRecovery(
@@ -1057,6 +1082,7 @@ export class ZombieManager {
     let bestScore = -Infinity;
     const facingLength = Math.hypot(playerFacingX, playerFacingZ);
     for (const spawn of this.spawner.points) {
+      if (!this.isWithinNavigationBounds(spawn.x, spawn.z, 0)) continue;
       if (this.hitsObstacle(spawn.x, spawn.z, 0)) continue;
       if (this.isOccupiedByZombie(spawn.x, spawn.z, 0, zombie)) continue;
       const dx = spawn.x - playerX;
@@ -1088,6 +1114,7 @@ export class ZombieManager {
         const angle = (index / 16) * Math.PI * 2;
         const x = playerX + Math.cos(angle) * radius;
         const z = playerZ + Math.sin(angle) * radius;
+        if (!this.isWithinNavigationBounds(x, z, playerFloor)) continue;
         if (this.hitsObstacle(x, z, feetY)) continue;
         if (this.isOccupiedByZombie(x, z, playerFloor, zombie)) continue;
         if (!this.lineOfSightClearFrom(x, z, playerX, playerZ, feetY)) continue;
@@ -1103,6 +1130,21 @@ export class ZombieManager {
       }
     }
     return false;
+  }
+
+  private isOutsideNavigationBounds(zombie: Zombie): boolean {
+    return !this.isWithinNavigationBounds(
+      zombie.position.x,
+      zombie.position.z,
+      zombie.floor,
+    );
+  }
+
+  private isWithinNavigationBounds(x: number, z: number, floor: number): boolean {
+    if (this.navigationBounds.length === 0) return true;
+    const bounds = this.navigationBounds.find((candidate) => candidate.floor === floor);
+    if (!bounds) return false;
+    return x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
   }
 
   private isOccupiedByZombie(x: number, z: number, floor: number, ignored: Zombie): boolean {

@@ -59,6 +59,23 @@ describe('Weapon fire cadence', () => {
 });
 
 describe('Weapon ammo and reload', () => {
+  it('completes a tactical reload sooner than an empty reload', () => {
+    const tactical = makeWeapon('m4a1');
+    const empty = makeWeapon('m4a1');
+    tactical.ammoInMagazine = 1;
+    empty.ammoInMagazine = 0;
+
+    expect(tactical.reload()).toBe(true);
+    expect(empty.reload()).toBe(true);
+    expect(tactical.reloadType).toBe('tactical');
+    expect(empty.reloadType).toBe('empty');
+
+    step(tactical, tactical.definition.tacticalReloadTime + DT);
+    step(empty, tactical.definition.tacticalReloadTime + DT);
+    expect(tactical.state).toBe('ready');
+    expect(empty.state).toBe('reloading');
+  });
+
   it('refills magazine and reserve to their configured maxima without exceeding them', () => {
     const m4 = new Weapon(WEAPON_DEFINITIONS.m4a1, () => 0.5, 300);
     m4.ammoInMagazine = 4;

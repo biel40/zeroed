@@ -181,6 +181,15 @@ export class Zombie implements HitTarget {
     return true;
   }
 
+  /** Resume pursuit after navigation recovery without changing combat stats. */
+  resumePursuit(): void {
+    if (!this.isAlive) return;
+    this.stateTimer = 0;
+    this.attackCooldown = 0;
+    this.attackApplied = false;
+    this.setWalk();
+  }
+
   faceTowards(x: number, z: number, maxTurn = Infinity): void {
     const target = Math.atan2(x - this.group.position.x, z - this.group.position.z);
     const delta = Math.atan2(

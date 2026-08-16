@@ -19,9 +19,10 @@ interface MobileInputActions {
 export function applyMobileAction(state: InputState, action: string, pressed: boolean): void {
   switch (action) {
     case 'fire':
-      // 1-Tap ADS Fire: Weapon still owns semi/auto cadence and ADS blending.
+      // 1-Tap ADS Fire: held touch repeats semi-auto at the weapon's real cadence.
       state.leftButtonDown = pressed;
       state.rightButtonDown = pressed;
+      state.repeatSemiAuto = pressed;
       break;
     case 'reload':
       state.setKey('KeyR', pressed);

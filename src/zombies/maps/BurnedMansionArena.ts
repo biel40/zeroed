@@ -83,6 +83,10 @@ export class BurnedMansionArena implements ZombieArena {
   readonly playerSpawn = MANSION_PLAYER_SPAWN;
   readonly useWallCollision = true;
   readonly playerBounds = MANSION_GROUND_BOUNDS;
+  readonly navigationBounds = [
+    { floor: 0, minX: -16, maxX: 16, minZ: -18, maxZ: 18 },
+    { floor: -1, ...MANSION_BUNKER_BOUNDS },
+  ] as const;
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];

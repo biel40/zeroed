@@ -89,9 +89,9 @@ export class Game {
    * only Game controls the loop and the pointer lock.
    */
   private paused = false;
-  /** Ignore stale unlock events while the browser is re-locking from a pause resume. */
-  private pointerLockResumeGuard = false;
-  private pointerLockGuardTimer: number | null = null;
+  /** Desktop lock requests only complete after the browser confirms the canvas. */
+  private pointerLockRequested = false;
+  private gameplayStarted = false;
 
   /** Last applied viewport size in CSS pixels; also drives the spread math. */
   private viewportWidth = 1;
@@ -106,7 +106,7 @@ export class Game {
   private readonly spreadRight = new THREE.Vector3();
   private readonly spreadUp = new THREE.Vector3();
   /** Reused every frame to avoid per-frame allocations in the loop. */
-  private readonly frameInput = { trigger: false, ads: false };
+  private readonly frameInput = { trigger: false, ads: false, repeatSemiAuto: false };
 
   constructor(
     private readonly container: HTMLElement,
@@ -302,41 +302,45 @@ export class Game {
     this.audio.resume();
     this.audio.music.stopBackgroundLoop();
     void this.audio.loadMysteryBoxOpenAsset();
-    this.pointerLockResumeGuard = true;
-    if (this.pointerLockGuardTimer !== null) window.clearTimeout(this.pointerLockGuardTimer);
-    this.pointerLockGuardTimer = window.setTimeout(() => {
-      this.pointerLockResumeGuard = false;
-      this.pointerLockGuardTimer = null;
-    }, 160);
-    this.input.requestPointerLock();
     if (this.profile.useTouchControls) {
-      this.hud.hideStartScreen();
-      this.hud.setHudVisible(true);
-    }
-  }
-
-  private handlePointerLockChange(locked: boolean): void {
-    if (this.pointerLockResumeGuard) {
-      // The guard only swallows STALE UNLOCK events racing a pause resume.
-      // A lock event is never stale — it is the fresh acquisition — so it
-      // clears the guard and falls through to hide the start screen. Without
-      // this, the first desktop CLICK TO START left the modal up forever.
-      if (!locked) return;
-      this.pointerLockResumeGuard = false;
-      if (this.pointerLockGuardTimer !== null) {
-        window.clearTimeout(this.pointerLockGuardTimer);
-        this.pointerLockGuardTimer = null;
-      }
-    }
-    if (this.profile.useTouchControls || locked) {
+      this.gameplayStarted = true;
+      this.paused = false;
+      this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
       return;
     }
+    this.pointerLockRequested = true;
+    this.input.requestPointerLock();
+  }
+
+  private handlePointerLockChange(locked: boolean): void {
+    if (this.profile.useTouchControls) return;
+
+    if (locked) {
+      // Never accept a delayed/unexpected lock behind a pause or mode menu.
+      if (!this.pointerLockRequested && this.paused) {
+        document.exitPointerLock();
+        return;
+      }
+      this.pointerLockRequested = false;
+      this.gameplayStarted = true;
+      this.paused = false;
+      this.audio.music.stopBackgroundLoop();
+      this.hud.hidePauseMenu();
+      this.hud.hideStartScreen();
+      this.hud.setHudVisible(true);
+      return;
+    }
+
+    // A failed/in-flight request leaves its blocking overlay in place. The
+    // next click may request lock again; browsers require that user gesture.
+    if (this.pointerLockRequested) return;
+    if (!this.gameplayStarted) return;
     // A mode with its own overlay (game over) suppresses the pause screen.
     if (this.mode.onPointerUnlock?.()) return;
-    // Desktop ESC released the pointer: open the real pause menu (the
-    // simulation is now halted) instead of the bare "click to resume".
+    // ESC, Alt+Tab, tab changes and focus loss all converge here, based on
+    // document.pointerLockElement as reported by DesktopInput.
     if (!this.paused) this.pause();
   }
 
@@ -357,10 +361,8 @@ export class Game {
 
   private resume(): void {
     if (!this.paused) return;
-    this.paused = false;
-    this.audio.music.stopBackgroundLoop();
-    this.hud.hidePauseMenu();
-    // Re-lock from this user gesture (the RESUME click / ESC press).
+    // Keep the simulation and overlay paused until pointerlockchange confirms
+    // the canvas. A rejected request therefore remains recoverable by click.
     this.start();
   }
 
@@ -579,6 +581,7 @@ export class Game {
     this.player.update(dt, this.input, weapon);
     this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown;
     this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown;
+    this.frameInput.repeatSemiAuto = allowGameplayInput && this.input.repeatSemiAuto;
     weapon.update(dt, this.frameInput);
     this.processWeaponEvents();
 

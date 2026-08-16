@@ -1,15 +1,15 @@
 import type { InputState } from './InputState';
 
-type ListenerTarget = Document | HTMLElement;
+type ListenerTarget = Document | HTMLElement | Window;
 
-/** Keyboard, mouse and pointer-lock adapter. It is never created on touch profiles. */
+/** Keyboard, mouse and pointer-lock adapter; mouse input still requires a real lock. */
 export class DesktopInput {
   private readonly listeners: Array<[ListenerTarget, string, EventListener]> = [];
 
   constructor(
     private readonly lockElement: HTMLElement,
     private readonly state: InputState,
-    onLockChange: (locked: boolean) => void,
+    private readonly onLockChange: (locked: boolean) => void,
   ) {
     this.add(document, 'keydown', (event) => {
       const keyboardEvent = event as KeyboardEvent;
@@ -35,11 +35,13 @@ export class DesktopInput {
       if (button === 0) this.state.leftButtonDown = false;
       if (button === 2) this.state.rightButtonDown = false;
     });
-    this.add(document, 'pointerlockchange', () => {
-      this.state.pointerLocked = document.pointerLockElement === this.lockElement;
-      if (!this.state.pointerLocked) this.state.releaseAll();
-      onLockChange(this.state.pointerLocked);
+    this.add(document, 'pointerlockchange', () => this.syncPointerLock(true));
+    this.add(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.state.releaseAll();
+      else this.syncPointerLock(false);
     });
+    this.add(window, 'blur', () => this.state.releaseAll());
+    this.add(window, 'focus', () => this.syncPointerLock(false));
     this.add(this.lockElement, 'contextmenu', (event) => event.preventDefault());
   }
 
@@ -57,6 +59,14 @@ export class DesktopInput {
       target.removeEventListener(type, listener);
     }
     this.listeners.length = 0;
+  }
+
+  private syncPointerLock(notifyEvenIfUnchanged: boolean): void {
+    const locked = document.pointerLockElement === this.lockElement;
+    const changed = locked !== this.state.pointerLocked;
+    this.state.pointerLocked = locked;
+    if (!locked) this.state.releaseAll();
+    if (changed || notifyEvenIfUnchanged) this.onLockChange(locked);
   }
 
   private add(target: ListenerTarget, type: string, listener: EventListener): void {

@@ -189,11 +189,6 @@ describe('Game pause resume', () => {
       fullscreenElement: null,
       documentElement: { requestFullscreen },
     });
-    vi.stubGlobal('window', {
-      setTimeout: vi.fn().mockReturnValue(1),
-      clearTimeout: vi.fn(),
-    });
-
     const game: any = Object.create((Game as any).prototype);
     game.audio = {
       resume: vi.fn(),
@@ -202,37 +197,77 @@ describe('Game pause resume', () => {
     };
     game.profile = { isMobile: true, useTouchControls: true };
     game.input = { requestPointerLock: vi.fn() };
-    game.hud = { hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
-    game.pointerLockGuardTimer = null;
+    game.hud = { hidePauseMenu: vi.fn(), hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
 
     game.start();
 
     expect(requestFullscreen).toHaveBeenCalledOnce();
   });
 
-  it('ignores stale pointer unlock events while the pause menu is resuming', () => {
+  it('keeps gameplay paused until pointer lock is confirmed', () => {
+    const game: any = Object.create((Game as any).prototype);
+    game.paused = true;
+    game.profile = { isMobile: false, useTouchControls: false };
+    game.audio = {
+      resume: vi.fn(),
+      music: { stopBackgroundLoop: vi.fn() },
+      loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
+    };
+    game.input = { requestPointerLock: vi.fn() };
+
+    (Game as any).prototype.resume.call(game);
+
+    expect(game.paused).toBe(true);
+    expect(game.pointerLockRequested).toBe(true);
+    expect(game.input.requestPointerLock).toHaveBeenCalledOnce();
+  });
+
+  it('resumes gameplay only when the requested canvas lock is confirmed', () => {
+    const game: any = Object.create((Game as any).prototype);
+    game.paused = true;
+    game.pointerLockRequested = true;
+    game.gameplayStarted = true;
+    game.profile = { useTouchControls: false };
+    game.audio = { music: { stopBackgroundLoop: vi.fn() } };
+    game.hud = {
+      hidePauseMenu: vi.fn(),
+      hideStartScreen: vi.fn(),
+      setHudVisible: vi.fn(),
+    };
+
+    (Game as any).prototype.handlePointerLockChange.call(game, true);
+
+    expect(game.paused).toBe(false);
+    expect(game.pointerLockRequested).toBe(false);
+    expect(game.hud.hidePauseMenu).toHaveBeenCalledOnce();
+  });
+
+  it('pauses an active desktop game when the real pointer lock is lost', () => {
     const game: any = Object.create((Game as any).prototype);
     game.paused = false;
-    game.pointerLockResumeGuard = true;
+    game.pointerLockRequested = false;
+    game.gameplayStarted = true;
+    game.profile = { useTouchControls: false };
+    game.mode = { onPointerUnlock: vi.fn().mockReturnValue(false) };
+    game.pause = vi.fn();
+
+    (Game as any).prototype.handlePointerLockChange.call(game, false);
+
+    expect(game.pause).toHaveBeenCalledOnce();
+  });
+
+  it('does not open pause over a mode-owned game-over screen', () => {
+    const game: any = Object.create((Game as any).prototype);
+    game.paused = false;
+    game.pointerLockRequested = false;
+    game.gameplayStarted = true;
+    game.profile = { useTouchControls: false };
+    game.mode = { onPointerUnlock: vi.fn().mockReturnValue(true) };
     game.pause = vi.fn();
 
     (Game as any).prototype.handlePointerLockChange.call(game, false);
 
     expect(game.pause).not.toHaveBeenCalled();
-  });
-
-  it('hides the start screen when the lock is granted inside the guard window', () => {
-    const game: any = Object.create((Game as any).prototype);
-    game.paused = false;
-    game.pointerLockResumeGuard = true;
-    game.pointerLockGuardTimer = null;
-    game.profile = { useTouchControls: false };
-    game.hud = { hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
-    game.pause = vi.fn();
-
-    (Game as any).prototype.handlePointerLockChange.call(game, true);
-
-    expect(game.hud.hideStartScreen).toHaveBeenCalled();
   });
 });
 

@@ -26,6 +26,27 @@ function onlyZombie(manager: ZombieManager): Zombie {
  * a bounded path recovery before the final safe relocation fallback.
  */
 describe('ZombieManager stuck recovery', () => {
+  it('relocates the same out-of-bounds zombie without restoring health or advancing the round', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[5, 5]]);
+    manager.setNavigationBounds([
+      { floor: 0, minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
+    ]);
+    manager.registerColliders([]);
+    manager.spawnZombie(roundConfig(1), 0, 0);
+    const zombie = onlyZombie(manager);
+    zombie.applyDamage(25);
+    const damagedHp = zombie.hp;
+    zombie.position.set(100, 0, 100);
+
+    manager.update(DT, 0, 0);
+
+    expect(manager.aliveCount).toBe(1);
+    expect(zombie.hp).toBe(damagedHp);
+    expect(zombie.position.x).toBeCloseTo(5, 1);
+    expect(zombie.position.z).toBeCloseTo(5, 1);
+    expect(zombie.state).toBe('walk');
+  });
+
   it('recovers a routed zombie even when its blocked waypoint is inside attack range', () => {
     const colliders: THREE.Object3D[] = [
       makeWall(0, -8.85, 2, 0.2),

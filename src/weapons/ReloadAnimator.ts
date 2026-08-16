@@ -92,7 +92,7 @@ export class ReloadAnimator {
     this.cross(p, c.magDrop, 'magDrop');
     this.cross(p, c.magIn, 'magIn');
     this.cross(p, c.magSeat, 'magSeat');
-    if (c.charge >= 0) {
+    if (weapon.reloadType === 'empty' && c.charge >= 0) {
       this.cross(p, c.charge, 'chargeStart');
       this.cross(p, c.chargeEnd, 'chargeEnd');
     }
@@ -100,7 +100,7 @@ export class ReloadAnimator {
     if (c.coverClose !== undefined) this.cross(p, c.coverClose, 'coverClose');
 
     this.animateMagazine(p);
-    this.animateHandle(p);
+    this.animateHandle(p, weapon.reloadType === 'empty');
     this.animateCover(p);
     this.animateBody(p);
   }
@@ -207,11 +207,11 @@ export class ReloadAnimator {
     }
   }
 
-  private animateHandle(p: number): void {
+  private animateHandle(p: number, workAction: boolean): void {
     const handle = this.parts.handle;
     if (!handle || !this.handleHome) return;
     const c = this.config;
-    if (c.charge < 0 || p < c.charge || p > c.chargeEnd) {
+    if (!workAction || c.charge < 0 || p < c.charge || p > c.chargeEnd) {
       restoreHome(handle, this.handleHome);
       return;
     }

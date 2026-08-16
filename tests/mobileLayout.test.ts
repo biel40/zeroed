@@ -62,4 +62,9 @@ describe('mobile stylesheet cascade', () => {
     const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('</div>\n\n      <div id="hud-weapon"'));
     expect(touchControls.match(/data-action=/g)).toHaveLength(6);
   });
+
+  it('keeps the primary fire button square instead of inheriting the generic button height', () => {
+    expect(css).toContain('#touch-controls #btn-fire {');
+    expect(css).toContain('html.touch-controls-enabled #touch-controls #btn-fire {');
+  });
 });

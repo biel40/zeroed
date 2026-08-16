@@ -16,6 +16,9 @@ export class ClassicArena implements ZombieArena {
   readonly group = new THREE.Group();
   readonly colliders: ReadonlyArray<THREE.Object3D>;
   readonly spawnPoints = SPAWN_POINTS;
+  readonly navigationBounds = [
+    { floor: 0, minX: -26, maxX: 26, minZ: -48, maxZ: 10 },
+  ] as const;
   readonly barriers = [] as const;
   readonly doors = [] as const;
   readonly wallBuys = [] as const;

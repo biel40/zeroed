@@ -4,6 +4,8 @@ export type FireMode = 'auto' | 'semi';
 
 export type WeaponState = 'ready' | 'reloading' | 'cycling' | 'equipping';
 
+export type ReloadType = 'tactical' | 'empty';
+
 /** All angular values are radians, times are seconds, velocities are m/s. */
 export interface RecoilConfig {
   /** Upward camera pitch added per shot. */
@@ -199,7 +201,10 @@ export interface WeaponDefinition {
    * pool that reloads draw from.
    */
   readonly reserveAmmo?: number;
+  /** Empty reload duration, including the weapon action. */
   readonly reloadTime: number;
+  /** Faster reload that preserves the chambered round and skips the action. */
+  readonly tacticalReloadTime: number;
   readonly boltAction: boolean;
   readonly boltCycleTime: number;
   readonly scoped: boolean;
@@ -235,4 +240,6 @@ export interface WeaponEvent {
 export interface WeaponFrameInput {
   readonly trigger: boolean;
   readonly ads: boolean;
+  /** Mobile fire-button hold; desktop semi-auto remains edge-triggered. */
+  readonly repeatSemiAuto?: boolean;
 }

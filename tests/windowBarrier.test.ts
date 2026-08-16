@@ -38,7 +38,7 @@ describe('WindowBarrier pure logic', () => {
     barrier.damage(100);
     expect(barrier.state).toBe('destroyed');
     expect(barrier.isOpen).toBe(true);
-    expect(barrier.isDamaged).toBe(false);
+    expect(barrier.isDamaged).toBe(true);
   });
 
   it('ignores damage once open', () => {
