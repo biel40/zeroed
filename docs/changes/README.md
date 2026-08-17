@@ -17,6 +17,7 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-17 — Ventana de esquiva en el ataque cuerpo a cuerpo del zombie](2026-08-17-zombie-attack-dodge-window.md)
 - [2026-08-16 - Recuperacion de Pointer Lock en escritorio](2026-08-16-pointer-lock-recovery.md)
 - [2026-08-16 — Failsafe de navegacion zombie](2026-08-16-zombie-navigation-failsafe.md)
 - [2026-08-14 — AK-47 y M60 a nivel M4A1](2026-08-14-ak47-m60-finish.md)

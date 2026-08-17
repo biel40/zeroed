@@ -4,12 +4,16 @@ import {
   MAX_ALIVE,
   roundConfig,
   ZOMBIE_ATTACK_DAMAGE,
+  ZOMBIE_ATTACK_DURATION,
+  ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_BASE_HP,
 } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { Zombie } from '../src/zombies/Zombie';
 
 const DT = 1 / 60;
+/** Mirrors the player's ground speed (WALK_SPEED in PlayerController). */
+const RETREAT_SPEED = 4.6;
 
 function makeManager(): { manager: ZombieManager; colliders: THREE.Object3D[] } {
   const manager = new ZombieManager(() => 0); // deterministic spawn picks
@@ -153,9 +157,137 @@ describe('ZombieManager movement', () => {
     manager.onPlayerAttack = (amount) => {
       damage += amount;
     };
-    // Spawn rise (1.1 s) + wind-up (0.45 s) → exactly one hit in 2 seconds.
+    // Spawn rise (1.1 s) + wind-up (0.57 s) → exactly one hit in 2 seconds.
     step(manager, 2);
     expect(damage).toBe(ZOMBIE_ATTACK_DAMAGE);
+  });
+});
+
+describe('ZombieManager attack dodge window', () => {
+  interface TestPlayer {
+    x: number;
+    z: number;
+  }
+
+  function actives(manager: ZombieManager): Zombie[] {
+    return [...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives];
+  }
+
+  /** Steps frame by frame, moving the player before each manager update. */
+  function stepWith(
+    manager: ZombieManager,
+    seconds: number,
+    player: TestPlayer,
+    move?: (player: TestPlayer, dt: number) => void,
+  ): void {
+    const frames = Math.round(seconds / DT);
+    for (let i = 0; i < frames; i++) {
+      move?.(player, DT);
+      manager.update(DT, player.x, player.z);
+    }
+  }
+
+  /** Advances until the zombie commits to its attack wind-up. */
+  function stepUntilAttack(manager: ZombieManager, zombie: Zombie, player: TestPlayer): boolean {
+    const frames = Math.round(3 / DT);
+    for (let i = 0; i < frames; i++) {
+      manager.update(DT, player.x, player.z);
+      if (zombie.state === 'attack') return true;
+    }
+    return false;
+  }
+
+  function trackDamage(manager: ZombieManager): () => number {
+    let damage = 0;
+    manager.onPlayerAttack = (amount) => {
+      damage += amount;
+    };
+    return () => damage;
+  }
+
+  it('lets a player who retreats during the wind-up dodge the bite', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.2); // 1.8 m: inside attack range
+    const player: TestPlayer = { x: 0, z: 4 };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    // Immediate reaction: retreat through the whole wind-up. At 4.6 m/s the
+    // player leaves the 1.9 m attack range well before the bite lands.
+    stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player, (p, dt) => {
+      p.z += RETREAT_SPEED * dt;
+    });
+
+    expect(damage()).toBe(0);
+    // A missed bite never cancels the swing: the zombie finishes and resumes.
+    expect(zombie.state).toBe('walk');
+  });
+
+  it('still hits a player who reacts too late', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.8); // 1.2 m: deep inside attack range
+    const player: TestPlayer = { x: 0, z: 4 };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    // Frozen until the bite is about to land: the final 0.1 s of retreat is
+    // not enough to leave the 1.9 m range from 1.2 m.
+    stepWith(manager, ZOMBIE_ATTACK_HIT_MOMENT - 0.1, player);
+    stepWith(manager, ZOMBIE_ATTACK_DURATION, player, (p, dt) => {
+      p.z += RETREAT_SPEED * dt;
+    });
+
+    expect(damage()).toBe(ZOMBIE_ATTACK_DAMAGE);
+  });
+
+  it('lets a player stepping sideways out of range dodge the bite', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.2);
+    const player: TestPlayer = { x: 0, z: 4 };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player, (p, dt) => {
+      p.x += RETREAT_SPEED * dt;
+    });
+
+    expect(damage()).toBe(0);
+  });
+
+  it('each zombie manages its own hit window when attacking together', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const [a, b] = actives(manager);
+    a.position.set(0.5, 0, 3.4);
+    b.position.set(-0.5, 0, 3.4);
+    const damage = trackDamage(manager);
+
+    // Player never moves: both bites connect, exactly once each.
+    step(manager, ZOMBIE_ATTACK_DURATION + 2, 0, 4);
+    expect(damage()).toBe(2 * ZOMBIE_ATTACK_DAMAGE);
+  });
+
+  it('a zombie killed during the wind-up never lands the bite', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.2);
+    const player: TestPlayer = { x: 0, z: 4 };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    manager.damageZombie(zombie, 'torso', 1000, 1);
+    stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player);
+
+    expect(zombie.isAlive).toBe(false);
+    expect(damage()).toBe(0);
   });
 });
 

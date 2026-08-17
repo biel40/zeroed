@@ -79,7 +79,7 @@ describe('Zombies progression contract', () => {
  * context surface mocked here (grant + banner + audio), exactly as the
  * real ZombieManager callback invokes it in-game.
  */
-describe('Ray Gun unlock at the 115-kill milestone', () => {
+describe('Ray Gun unlock at the 75-kill milestone', () => {
   interface MockContext {
     granted: WeaponId[];
     banners: string[];
@@ -95,7 +95,7 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
       audio: {
         playZombieDeath: () => undefined,
         playMysteryBoxReveal: (isRayGun: boolean) => void ctx.reveals.push(isRayGun),
-        // The 100-kill Tesla milestone fires before 115; the mock must
+        // The 115-kill Tesla milestone fires after the Ray Gun; the mock must
         // acknowledge it even though these tests only assert the Ray Gun.
         playTeslaUnlock: () => undefined,
       },
@@ -109,21 +109,21 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
     for (let i = 0; i < count; i++) onKilled.call(mode, false);
   }
 
-  it('pins the milestone at exactly 115 kills', () => {
-    expect(RAYGUN_UNLOCK_KILLS).toBe(115);
+  it('pins the milestone at exactly 75 kills', () => {
+    expect(RAYGUN_UNLOCK_KILLS).toBe(75);
   });
 
   it('does not unlock the Ray Gun before its milestone', () => {
     const { mode, ctx } = makeMode();
     kill(mode, RAYGUN_UNLOCK_KILLS - 1);
-    // The Tesla (100) is already unlocked by now — that milestone is lower.
-    // This test only pins the Ray Gun staying locked until 115.
+    // At 74 kills no milestone has fired yet (the Tesla's is higher, at 115).
+    // This test only pins the Ray Gun staying locked until 75.
     expect(ctx.granted).not.toContain('raygun');
     expect(ctx.banners).not.toContain('RAY GUN UNLOCKED');
     expect(ctx.reveals).toEqual([]);
   });
 
-  it('grants the Ray Gun with a banner exactly at 115 kills, and only once', () => {
+  it('grants the Ray Gun with a banner exactly at 75 kills, and only once', () => {
     const { mode, ctx } = makeMode();
     kill(mode, RAYGUN_UNLOCK_KILLS);
     expect(ctx.granted.filter((w) => w === 'raygun')).toEqual(['raygun']);
@@ -139,8 +139,8 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
   it('re-arms the milestone after a restart (new run, fresh kill count)', () => {
     const { mode, ctx } = makeMode();
     kill(mode, RAYGUN_UNLOCK_KILLS);
-    // Both milestones fire on the way to 115: Tesla at 100, Ray Gun at 115.
-    expect(ctx.granted).toEqual(['tesla', 'raygun']);
+    // Only the Ray Gun (75) has fired; the Tesla (115) is not reached here.
+    expect(ctx.granted).toEqual(['raygun']);
 
     // Minimal shell surface restart() touches beyond what makeMode mocks.
     const shell = (mode as unknown as { ctx: Record<string, unknown> }).ctx;
@@ -154,8 +154,8 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
     };
 
     (mode as unknown as { restart(): void }).restart();
-    // After restart, kill up to just below the Ray Gun milestone: the Tesla
-    // re-arms too, but the Ray Gun must NOT re-grant until 115 again.
+    // After restart, kill up to just below the Ray Gun milestone: milestones
+    // re-arm, but the Ray Gun must NOT re-grant until 75 again.
     kill(mode, RAYGUN_UNLOCK_KILLS - 1);
     expect(ctx.granted.filter((w) => w === 'raygun')).toHaveLength(1); // not re-armed early
     kill(mode, 1);

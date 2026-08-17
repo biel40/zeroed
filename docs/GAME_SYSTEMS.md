@@ -54,7 +54,7 @@ Impacto en Zombie
   -> dano torso/cabeza
   -> PlayerEconomy: hit o baja
   -> contador de bajas
-  -> hitos: ZEUS-77 (100), Ray Gun (115)
+  -> hitos: Ray Gun (75), ZEUS-77 (115)
 
 Points
   -> PointDoor -> zonas, colliders y spawns activos

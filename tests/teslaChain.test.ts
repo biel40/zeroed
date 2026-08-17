@@ -85,8 +85,8 @@ describe('selectChainTargets', () => {
 });
 
 describe('Tesla weapon tuning contract', () => {
-  it('unlocks at exactly 100 kills', () => {
-    expect(TESLA_UNLOCK_KILLS).toBe(100);
+  it('unlocks at exactly 115 kills', () => {
+    expect(TESLA_UNLOCK_KILLS).toBe(115);
   });
 
   it('is an energy weapon (visible bolt path) with limited ammunition', () => {

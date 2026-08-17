@@ -96,7 +96,6 @@ estados de la box (solo activa desde `closed`) evita dobles cobros.
 
 | Arma | Desbloqueo | Mecánica |
 | --- | --- | --- |
-| **Ray Gun** | `RAYGUN_UNLOCK_KILLS = 115` | Bolt de energía con splash radial. |
 | **ZEUS-77 Tesla** | `TESLA_UNLOCK_KILLS = 100` | Descarga que **encadena** entre zombies. |
 
 El patrón de desbloqueo es idéntico para ambas: un flag `*Unlocked` en

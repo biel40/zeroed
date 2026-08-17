@@ -152,6 +152,15 @@ export class ZombieManager {
   private recoveryCount = 0;
   private navigationDebug = false;
   private navigationBounds: ReadonlyArray<ZombieNavigationBounds> = [];
+  /**
+   * Latest player snapshot, refreshed every update(). The attack callback
+   * fires ~0.6 s after steer() started the wind-up, so it must validate
+   * against where the player IS at the hit moment — not where they WERE
+   * when the animation began.
+   */
+  private lastPlayerX = 0;
+  private lastPlayerZ = 0;
+  private lastPlayerFloor = 0;
 
   constructor(
     rng: () => number = Math.random,
@@ -401,6 +410,9 @@ export class ZombieManager {
     playerFacingX = 0,
     playerFacingZ = 0,
   ): void {
+    this.lastPlayerX = playerX;
+    this.lastPlayerZ = playerZ;
+    this.lastPlayerFloor = playerFloor;
     for (const zombie of this.pool.actives) {
       if (zombie.isAlive) {
         if (
@@ -657,7 +669,15 @@ export class ZombieManager {
       this.attackLineClear(zombie.position.x, zombie.position.z, playerX, playerZ, zombie.position.y)
     ) {
       if (zombie.tryAttack()) {
-        zombie.onAttackLanded = () => this.onPlayerAttack?.(ZOMBIE_ATTACK_DAMAGE);
+        // The wind-up only SCHEDULES the bite: whether it connects is decided
+        // at the hit moment, against the player's current position. A player
+        // who retreats out of range during the wind-up dodges the hit while
+        // the zombie finishes its swing; each attack lands at most once.
+        zombie.onAttackLanded = () => {
+          if (this.attackStillConnects(zombie)) {
+            this.onPlayerAttack?.(ZOMBIE_ATTACK_DAMAGE);
+          }
+        };
       }
       return;
     }
@@ -910,6 +930,28 @@ export class ZombieManager {
       zombie.position.z,
       objective.x,
       objective.z,
+      zombie.position.y,
+    );
+  }
+
+  /**
+   * Hit-window validation, run when the bite visually lands — never at
+   * wind-up start. The attack connects only if the player is still on the
+   * same floor, still inside ZOMBIE_ATTACK_RANGE and still reachable in a
+   * straight line (the same predicates that allowed the wind-up to begin).
+   * The zombie side is already guaranteed alive by the state machine: the
+   * callback only fires from the attack state, and death leaves it.
+   */
+  private attackStillConnects(zombie: Zombie): boolean {
+    if (zombie.floor !== this.lastPlayerFloor) return false;
+    const dx = this.lastPlayerX - zombie.position.x;
+    const dz = this.lastPlayerZ - zombie.position.z;
+    if (dx * dx + dz * dz > ZOMBIE_ATTACK_RANGE * ZOMBIE_ATTACK_RANGE) return false;
+    return this.attackLineClear(
+      zombie.position.x,
+      zombie.position.z,
+      this.lastPlayerX,
+      this.lastPlayerZ,
       zombie.position.y,
     );
   }

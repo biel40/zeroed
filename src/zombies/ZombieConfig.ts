@@ -37,8 +37,13 @@ export const ZOMBIE_SEPARATION_RADIUS = 1.15;
 export const ZOMBIE_SPAWN_DURATION = 1.1;
 /** Full attack lunge; the damage lands at the hit moment below. */
 export const ZOMBIE_ATTACK_DURATION = 0.9;
-/** Wind-up before the blow connects — the player's dodge window. */
-export const ZOMBIE_ATTACK_HIT_MOMENT = 0.45;
+/**
+ * Wind-up before the blow connects — the player's dodge window. 0.57 s is
+ * ~63 % of the attack: the measured peak of the head's forward extension in
+ * the ZombieBite clip (played from 30 % at 2.5× over the 5.04 s take), so
+ * the hit check fires exactly when the bite visually reaches the player.
+ */
+export const ZOMBIE_ATTACK_HIT_MOMENT = 0.57;
 /** Brief stagger on non-lethal hits; movement resumes right after. */
 export const ZOMBIE_HIT_DURATION = 0.28;
 /** Headshot stagger lasts longer: precision should feel impactful. */
@@ -73,17 +78,17 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
 };
 
 /**
- * Kills that auto-unlock the Ray Gun. 115 — the Element 115 nod — is high
- * enough to be an earned mid-run milestone, reachable around rounds 8-10.
+ * Kills that auto-unlock the Ray Gun. 75 makes it the first wonder-weapon
+ * milestone: an early-to-mid-run raw-damage spike.
  */
-export const RAYGUN_UNLOCK_KILLS = 115;
+export const RAYGUN_UNLOCK_KILLS = 75;
 
 /**
- * Kills that auto-unlock the ZEUS-77 "Tempest Coil". 100 arrives earlier
- * than the Ray Gun milestone on purpose: the Tesla is the horde-control
- * answer to the mid-round density spike, the Ray Gun the raw-damage one.
+ * Kills that auto-unlock the ZEUS-77 "Tempest Coil". 115 — the Element 115
+ * nod — keeps the Tesla as the late-run horde-control capstone, after the
+ * Ray Gun.
  */
-export const TESLA_UNLOCK_KILLS = 100;
+export const TESLA_UNLOCK_KILLS = 115;
 
 /** Maximum zombies one Tesla shot can electrocute, impact included. */
 export const CHAIN_MAX_TARGETS = 10;

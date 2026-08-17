@@ -637,7 +637,7 @@ export class ZombiesMode implements GameMode {
   }
 
   /**
-   * 100-kill milestone: the ZEUS-77 is granted outright (the inventory's
+   * 115-kill milestone: the ZEUS-77 is granted outright (the inventory's
    * slot-cap rules apply), announced with the round banner and an electric
    * sting. The flag makes the handout fire exactly once per run; restart()
    * re-arms it. Same proven pattern as the Ray Gun milestone below.
@@ -650,7 +650,7 @@ export class ZombiesMode implements GameMode {
   }
 
   /**
-   * 115-kill milestone: the Ray Gun is granted outright (the inventory's
+   * 75-kill milestone: the Ray Gun is granted outright (the inventory's
    * slot-cap rules apply), announced with the round banner and the box's
    * Ray Gun reveal sting. The flag makes the handout fire exactly once per
    * run; restart() re-arms it.
