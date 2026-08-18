@@ -9,6 +9,8 @@ import type { ZombieSpawnDefinition, ZombieSpawnPoint } from '../ZombieSpawner';
 import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
+import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
+import type { WeaponId } from '../../weapons/WeaponTypes';
 import type { ArenaWeaponPickup, ZombieArena } from './ZombieArena';
 import {
   createMansionSurfaceMaterials,
@@ -37,6 +39,10 @@ const WINDOW_WIDTH = 1.5;
 // Low enough for a zombie body to step through after the boards break.
 const WINDOW_SILL = 0.3;
 const WINDOW_TOP = 1.9;
+// Underside of the ground-floor roof slab (center 3.28, thickness 0.16).
+const GROUND_CEILING_Y = 3.2;
+// Underside of the bunker ceiling slab (center -0.22, thickness 0.16).
+const BUNKER_CEILING_Y = -0.3;
 
 type WallAxis = 'x' | 'z';
 
@@ -45,7 +51,7 @@ class MansionWeaponPickup implements ArenaWeaponPickup {
 
   constructor(
     readonly id: string,
-    readonly weaponId: 'raygun',
+    readonly weaponId: WeaponId,
     readonly position: { readonly x: number; readonly y: number; readonly z: number },
     readonly floor: number,
     readonly useRange: number,
@@ -119,7 +125,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.buildStairs();
     this.buildProps();
     this.buildBunkerDetails();
-    this.weaponPickups = this.buildSecretPickup();
+    this.weaponPickups = this.buildSecretPickups();
     this.buildDamageDetails();
     this.buildWindowFrames();
     this.buildLighting();
@@ -291,18 +297,22 @@ export class BurnedMansionArena implements ZombieArena {
 
     this.addWindowedWall('z', -7.15, -8, 8, [-3.2, 3.2, 5.4]);
     this.addWindowedWall('z', 7.15, -8, 8, [-2.5]);
-    this.addWindowedWall('x', -8.15, -7, 7, [-3.5]);
+    this.addWindowedWall('x', -8.15, -7, 7, [-3.5, 1.6]);
     this.addWindowedWall('x', 8.15, -7, 7, [-3.5]);
 
     this.addSlab('mansion-roof', 0, 3.28, 0, 14.6, 0.16, 16.6, this.materials.ceilingBurned);
 
-    this.addSlab('bunker-floor', 5.15, MANSION_BUNKER_Y - 0.08, -4.5, 3.7, 0.16, 6.4, this.materials.floorConcrete);
-    this.addSlab('bunker-ceiling', 5.15, -0.22, -4.5, 3.7, 0.16, 6.4, this.materials.ceilingBurned);
+    this.addSlab('bunker-floor', 1.9, MANSION_BUNKER_Y - 0.08, -3.5, 10.2, 0.16, 9, this.materials.floorConcrete);
+    // Mirror the ground-floor stair opening instead of sealing the stairs behind a ceiling slab.
+    this.addSlab('bunker-ceiling', 0.475, -0.22, -3.5, 7.35, 0.16, 9, this.materials.ceilingBurned);
+    this.addSlab('bunker-ceiling-east', 6.575, -0.22, -3.5, 0.85, 0.16, 9, this.materials.ceilingBurned);
+    this.addSlab('bunker-ceiling-stair-north', 5.15, -0.22, -7.45, 2, 0.16, 1.1, this.materials.ceilingBurned);
+    this.addSlab('bunker-ceiling-stair-south', 5.15, -0.22, -1, 2, 0.16, 4, this.materials.ceilingBurned);
     const bunkerWallY = MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2;
-    this.addWall(3.3, bunkerWallY, -4.5, WALL_THICKNESS, LOWER_WALL_HEIGHT, 6.4, this.materials.concreteDirty);
-    this.addWall(7, bunkerWallY, -4.5, WALL_THICKNESS, LOWER_WALL_HEIGHT, 6.4, this.materials.concreteDirty);
-    this.addWall(5.15, bunkerWallY, -7.7, 3.7, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
-    this.addWall(5.15, bunkerWallY, -1.3, 3.7, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
+    this.addWall(-3.2, bunkerWallY, -3.5, WALL_THICKNESS, LOWER_WALL_HEIGHT, 9, this.materials.concreteDirty);
+    this.addWall(7, bunkerWallY, -3.5, WALL_THICKNESS, LOWER_WALL_HEIGHT, 9, this.materials.concreteDirty);
+    this.addWall(1.9, bunkerWallY, -8, 10.2, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
+    this.addWall(1.9, bunkerWallY, 1, 10.2, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
   }
 
   private buildInterior(): void {
@@ -310,7 +320,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.addDoorWall('x', 2, -7, 0, -3.5, 0);
     this.addWall(3.5, LOWER_WALL_HEIGHT / 2, 2, 7, LOWER_WALL_HEIGHT, WALL_THICKNESS);
 
-    // Open arch into the east hall, followed by the sealed bunker vestibule.
+    // The east hall is the third room between its paid entrance and the sealed bunker.
     this.addDoorWall('z', 0, -8, 2, -2.5, 0);
     this.addDoorWall('z', 3.2, -8, 2, -2.5, 0);
   }
@@ -331,6 +341,18 @@ export class BurnedMansionArena implements ZombieArena {
       step.userData.mapRole = 'visual-stair';
       this.group.add(step);
     }
+    const railLength = 5.1;
+    for (const x of [4.25, 6.05]) {
+      const rail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.035, railLength, 8),
+        this.materials.metal,
+      );
+      rail.position.set(x, MANSION_BUNKER_Y + 1.95, -4.9);
+      rail.rotation.x = -0.82;
+      rail.name = 'bunker-stair-handrail';
+      rail.userData.mapRole = 'visual-stair-rail';
+      this.group.add(rail);
+    }
     const portal = new THREE.Object3D();
     portal.name = 'bunker-stair-navigation-ramp';
     portal.userData.mapRole = 'simplified-stair-portal';
@@ -342,13 +364,16 @@ export class BurnedMansionArena implements ZombieArena {
     this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, this.materials.charredWood);
     this.addProp('start-table', -1.2, 0.42, 4.8, 1.1, 0.84, 0.7, this.materials.charredWood);
     this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, this.materials.charredWood);
-    this.addProp('bunker-console', 6.3, MANSION_BUNKER_Y + 0.65, -4.5, 0.55, 1.3, 1.7, this.materials.metal);
-    this.addProp('research-table', 5.65, MANSION_BUNKER_Y + 0.42, -2.35, 1.7, 0.84, 0.7, this.materials.metal);
-    this.addProp('military-crate', 4.1, MANSION_BUNKER_Y + 0.35, -4.7, 0.8, 0.7, 1.1, this.materials.charredWood);
+    this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
+    this.addProp('bunker-console', 6.3, MANSION_BUNKER_Y + 0.65, -1, 0.55, 1.3, 1.7, this.materials.metal);
+    this.addProp('research-table', -1.2, MANSION_BUNKER_Y + 0.42, -2.2, 1.7, 0.84, 0.7, this.materials.metal);
+    this.addProp('zeus-containment-pedestal', -1.7, MANSION_BUNKER_Y + 0.55, -6.1, 0.9, 1.1, 0.9, this.materials.metal);
+    this.addProp('military-crate', 1.4, MANSION_BUNKER_Y + 0.35, -6.35, 0.8, 0.7, 1.1, this.materials.charredWood);
 
     const rubble = new THREE.DodecahedronGeometry(0.18, 0);
+    // Starting room stays clear of debris: it sat in the spawn walkway and read as a stray floating rock.
     const positions: ReadonlyArray<readonly [number, number]> = [
-      [-5.8, 1.2], [-1.2, 6.6], [-4.5, -1.8], [-2.2, -6.8], [1.1, -5.8], [5.8, -2.2],
+      [-5.8, 1.2], [-4.5, -1.8], [-2.2, -6.8], [1.1, -5.8], [5.8, -2.2],
     ];
     for (let index = 0; index < positions.length; index++) {
       const mesh = new THREE.Mesh(rubble, this.materials.debris);
@@ -361,62 +386,69 @@ export class BurnedMansionArena implements ZombieArena {
     }
   }
 
-  private buildSecretPickup(): ReadonlyArray<ArenaWeaponPickup> {
+  private buildSecretPickups(): ReadonlyArray<ArenaWeaponPickup> {
     const secret = MANSION_SECRET_AREAS[0];
-    const pickupGroup = new THREE.Group();
-    pickupGroup.name = secret.reward.id;
-    pickupGroup.position.set(
-      secret.reward.position.x,
-      secret.reward.position.y,
-      secret.reward.position.z,
-    );
-    pickupGroup.userData.mapRole = 'secret-weapon-pickup';
+    const pickups: MansionWeaponPickup[] = [];
+    for (const reward of secret.rewards) {
+      const pickupGroup = buildWeaponDisplayModel(
+        WEAPON_DEFINITIONS[reward.weaponId],
+        null,
+        reward.weaponId === 'tesla' ? 0.9 : 0.75,
+      );
+      pickupGroup.name = reward.id;
+      pickupGroup.position.set(reward.position.x, reward.position.y, reward.position.z);
+      pickupGroup.rotation.y = reward.weaponId === 'tesla' ? -0.25 : Math.PI / 2;
+      pickupGroup.userData.mapRole = 'secret-weapon-pickup';
+      pickupGroup.userData.weaponId = reward.weaponId;
 
-    const metal = new THREE.MeshStandardMaterial({ color: 0x172025, metalness: 0.75, roughness: 0.3 });
-    const glow = new THREE.MeshBasicMaterial({ color: 0x79ff86 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.16, 0.2), metal);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, 0.42, 10), metal);
-    barrel.rotation.z = Math.PI / 2;
-    barrel.position.x = 0.44;
-    const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.32, 8), glow);
-    cell.rotation.z = Math.PI / 2;
-    cell.position.set(-0.1, 0.12, 0);
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.14), metal);
-    grip.position.set(-0.12, -0.2, 0);
-    grip.rotation.z = -0.25;
-    pickupGroup.add(body, barrel, cell, grip);
-    this.group.add(pickupGroup);
+      const halo = new THREE.Mesh(
+        new THREE.RingGeometry(0.25, 0.42, 24),
+        new THREE.MeshBasicMaterial({
+          color: reward.weaponId === 'tesla' ? 0x66dfff : 0x79ff86,
+          transparent: true,
+          opacity: 0.38,
+          side: THREE.DoubleSide,
+        }),
+      );
+      halo.rotation.x = -Math.PI / 2;
+      halo.position.y = -0.18;
+      halo.userData.mapRole = 'secret-pickup-halo';
+      pickupGroup.add(halo);
+      this.group.add(pickupGroup);
+
+      pickups.push(
+        new MansionWeaponPickup(
+          reward.id,
+          reward.weaponId,
+          reward.position,
+          secret.floor,
+          reward.useRange,
+          reward.lookDotMin,
+          secret.doorId,
+          pickupGroup,
+        ),
+      );
+    }
 
     const phrase = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.9, 0.28),
+      new THREE.PlaneGeometry(2.5, 0.34),
       new THREE.MeshBasicMaterial({ color: 0x542020, transparent: true, opacity: 0.65, side: THREE.DoubleSide }),
     );
-    phrase.position.set(5.15, MANSION_BUNKER_Y + 1.25, -1.47);
+    phrase.position.set(1.9, MANSION_BUNKER_Y + 1.35, 0.82);
     phrase.rotation.y = Math.PI;
     phrase.name = 'THIS IS ONLY THE BEGINNING OF THE END...';
     phrase.userData.mapRole = 'environmental-story-text';
     this.group.add(phrase);
 
-    return [
-      new MansionWeaponPickup(
-        secret.reward.id,
-        secret.reward.weaponId,
-        secret.reward.position,
-        secret.floor,
-        secret.reward.useRange,
-        secret.reward.lookDotMin,
-        secret.doorId,
-        pickupGroup,
-      ),
-    ];
+    return pickups;
   }
 
   private buildBunkerDetails(): void {
     const pipeMaterial = new THREE.MeshStandardMaterial({ color: 0x384044, metalness: 0.78, roughness: 0.55 });
     for (let index = 0; index < 3; index++) {
-      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 5.4, 8), pipeMaterial);
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 7.6, 8), pipeMaterial);
       pipe.rotation.x = Math.PI / 2;
-      pipe.position.set(6.82 - index * 0.16, MANSION_BUNKER_Y + 2.15 - index * 0.22, -4.5);
+      pipe.position.set(6.82 - index * 0.16, MANSION_BUNKER_Y + 2.15 - index * 0.22, -3.5);
       pipe.userData.mapRole = 'bunker-pipe';
       this.group.add(pipe);
     }
@@ -424,21 +456,47 @@ export class BurnedMansionArena implements ZombieArena {
     const screenMaterial = new THREE.MeshBasicMaterial({ color: 0x07100d });
     for (let index = 0; index < 3; index++) {
       const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 0.04), screenMaterial);
-      monitor.position.set(6.65, MANSION_BUNKER_Y + 1.05 + index * 0.32, -4.95 + index * 0.48);
+      monitor.position.set(6.65, MANSION_BUNKER_Y + 1.05 + index * 0.32, -1.45 + index * 0.48);
       monitor.rotation.y = -Math.PI / 2;
       monitor.userData.mapRole = 'dead-monitor';
       this.group.add(monitor);
     }
 
-    const radiationMark = new THREE.Mesh(
-      new THREE.CircleGeometry(0.26, 18),
-      new THREE.MeshBasicMaterial({ color: 0x756b26, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+    const radiationSign = new THREE.Group();
+    radiationSign.position.set(-3.035, MANSION_BUNKER_Y + 1.55, -4.4);
+    radiationSign.rotation.y = Math.PI / 2;
+    radiationSign.name = 'radiation-warning-symbol';
+    radiationSign.userData.mapRole = 'bunker-clue';
+    const signBack = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.15, 1.15),
+      new THREE.MeshBasicMaterial({ color: 0xb69b2f, side: THREE.DoubleSide }),
     );
-    radiationMark.position.set(3.46, MANSION_BUNKER_Y + 1.55, -2.3);
-    radiationMark.rotation.y = Math.PI / 2;
-    radiationMark.name = 'faded-radiation-symbol';
-    radiationMark.userData.mapRole = 'bunker-clue';
-    this.group.add(radiationMark);
+    signBack.userData.mapRole = 'radiation-sign-background';
+    radiationSign.add(signBack);
+    const symbolMaterial = new THREE.MeshBasicMaterial({ color: 0x181713, side: THREE.DoubleSide });
+    const center = new THREE.Mesh(new THREE.CircleGeometry(0.105, 18), symbolMaterial);
+    center.position.z = 0.012;
+    center.userData.mapRole = 'radiation-symbol-part';
+    radiationSign.add(center);
+    for (let index = 0; index < 3; index++) {
+      const blade = new THREE.Mesh(
+        new THREE.RingGeometry(0.16, 0.43, 20, 1, index * (Math.PI * 2 / 3) - 0.43, 0.86),
+        symbolMaterial,
+      );
+      blade.position.z = 0.012;
+      blade.userData.mapRole = 'radiation-symbol-part';
+      radiationSign.add(blade);
+    }
+    this.group.add(radiationSign);
+
+    const containmentGlow = new THREE.Mesh(
+      new THREE.TorusGeometry(0.58, 0.035, 8, 32),
+      new THREE.MeshBasicMaterial({ color: 0x36c7e8, transparent: true, opacity: 0.7 }),
+    );
+    containmentGlow.position.set(-1.7, MANSION_BUNKER_Y + 0.04, -6.1);
+    containmentGlow.rotation.x = Math.PI / 2;
+    containmentGlow.userData.mapRole = 'zeus-containment-ring';
+    this.group.add(containmentGlow);
   }
 
   private buildDamageDetails(): void {
@@ -463,6 +521,7 @@ export class BurnedMansionArena implements ZombieArena {
       { x: 7.0, y: 2.45, z: -4.5, width: 1.9, height: 1.35, rotationY: -Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.5, y: 2.55, z: 1.835, width: 2.05, height: 1.15, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: 0.165, y: 2.52, z: -2.5, width: 1.9, height: 1.1, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: 1.6, y: 2.45, z: 1.835, width: 2.1, height: 1.25, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
     ];
     for (const detail of details) {
       const patch = new THREE.Mesh(new THREE.PlaneGeometry(detail.width, detail.height), detail.material);
@@ -517,9 +576,10 @@ export class BurnedMansionArena implements ZombieArena {
     this.group.add(
       new THREE.HemisphereLight(0x34465e, 0x110d0a, this.profile.useReducedEffects ? 0.18 : 0.25),
     );
-    this.addPointLight(-3.8, 2.55, 5, 0xffad68, 2.4, 6.5);
-    this.addPointLight(-4.5, 2.35, -4.8, 0x839db7, 1.7, 6.5);
-    this.addPointLight(5.2, 1.85, -5.5, 0x6e120d, 0.35, 4.5);
+    this.addPointLight(-3.8, 2.55, 5, 0xffad68, 2.4, 6.5, GROUND_CEILING_Y);
+    this.addPointLight(-4.5, 2.35, -4.8, 0x839db7, 1.7, 6.5, GROUND_CEILING_Y);
+    this.addPointLight(1.6, 2.35, -4.8, 0xb35b32, 1.1, 5.2, GROUND_CEILING_Y);
+    this.addPointLight(5.2, 1.85, -5.5, 0x6e120d, 0.35, 4.5, GROUND_CEILING_Y);
     this.bunkerEmergencyLight = this.addPointLight(
       5.2,
       MANSION_BUNKER_Y + 2.45,
@@ -527,6 +587,16 @@ export class BurnedMansionArena implements ZombieArena {
       0xff2418,
       1.05,
       5.5,
+      BUNKER_CEILING_Y,
+    );
+    this.addPointLight(
+      -1.4,
+      MANSION_BUNKER_Y + 2.35,
+      -4.6,
+      0x5eabc4,
+      1.35,
+      7,
+      BUNKER_CEILING_Y,
     );
 
     const exteriorLight = new THREE.DirectionalLight(0x9ebbd2, this.profile.useReducedEffects ? 0.18 : 0.3);
@@ -538,24 +608,24 @@ export class BurnedMansionArena implements ZombieArena {
   private buildFloorTransitions(): ReadonlyArray<FloorTransitionZone> {
     return [
       {
-        box: new THREE.Box3(new THREE.Vector3(4.2, 0, -2.95), new THREE.Vector3(6.1, 2.6, -2.65)),
+        box: new THREE.Box3(new THREE.Vector3(4.15, 0, -3.2), new THREE.Vector3(6.15, 2.6, -2.6)),
         sourceFloor: 0,
         targetFloor: -1,
         targetY: MANSION_BUNKER_Y + EYE_HEIGHT,
-        targetX: 5.15,
-        targetZ: -7.1,
+        targetX: 3.75,
+        targetZ: -6.4,
         bounds: MANSION_BUNKER_BOUNDS,
       },
       {
         box: new THREE.Box3(
-          new THREE.Vector3(4.25, MANSION_BUNKER_Y, -6.75),
-          new THREE.Vector3(6.05, MANSION_BUNKER_Y + 2.4, -5.9),
+          new THREE.Vector3(4.15, MANSION_BUNKER_Y, -7.45),
+          new THREE.Vector3(6.15, MANSION_BUNKER_Y + 2.4, -6.82),
         ),
         sourceFloor: -1,
         targetFloor: 0,
         targetY: EYE_HEIGHT,
         targetX: 5.15,
-        targetZ: -4.15,
+        targetZ: -2.25,
         bounds: MANSION_GROUND_BOUNDS,
       },
     ];
@@ -677,7 +747,15 @@ export class BurnedMansionArena implements ZombieArena {
     this.group.add(mesh);
   }
 
-  private addPointLight(x: number, y: number, z: number, color: number, intensity: number, distance: number): THREE.PointLight {
+  private addPointLight(
+    x: number,
+    y: number,
+    z: number,
+    color: number,
+    intensity: number,
+    distance: number,
+    ceilingY: number = GROUND_CEILING_Y,
+  ): THREE.PointLight {
     const light = new THREE.PointLight(color, intensity, distance, 1.8);
     light.position.set(x, y, z);
     const bulb = new THREE.Mesh(
@@ -686,7 +764,18 @@ export class BurnedMansionArena implements ZombieArena {
     );
     bulb.position.copy(light.position);
     bulb.userData.mapRole = 'damaged-bulb';
-    this.group.add(light, bulb);
+
+    // Bare bulb hanging from a wire off a ceiling mount — no bulb should float unattached.
+    const cordHeight = Math.max(0.05, ceilingY - y);
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, cordHeight, 6), this.materials.metal);
+    cord.position.set(x, y + cordHeight / 2, z);
+    cord.userData.mapRole = 'light-cord';
+
+    const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.05, 8), this.materials.metal);
+    mount.position.set(x, ceilingY - 0.025, z);
+    mount.userData.mapRole = 'light-mount';
+
+    this.group.add(light, cord, mount, bulb);
     return light;
   }
 

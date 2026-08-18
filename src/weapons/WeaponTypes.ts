@@ -110,6 +110,9 @@ export interface ReloadAnimConfig {
   /** Procedural magazine dimensions [w, h, d] in meters and color. */
   readonly magSize: readonly [number, number, number];
   readonly magColor: number;
+  /** Optional local-space magazine pose for a single-mesh GLB weapon. */
+  readonly magAnchor?: readonly [number, number, number];
+  readonly magRotation?: readonly [number, number, number];
 }
 
 /** Events the ReloadAnimator emits as thresholds are crossed. */
@@ -196,9 +199,8 @@ export interface WeaponDefinition {
   readonly rpm: number;
   readonly magazineSize: number;
   /**
-   * Starting reserve ammunition. Absent means a bottomless reserve (the
-   * classic Shooting Range behaviour); zombies-mode weapons set a finite
-   * pool that reloads draw from.
+   * Starting reserve ammunition. Absent means a bottomless reserve; Zombies
+   * supplies finite mode-specific pools that reloads draw from.
    */
   readonly reserveAmmo?: number;
   /** Empty reload duration, including the weapon action. */

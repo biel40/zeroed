@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Small browser FPS shooting range built with Three.js and TypeScript",
+  "description": "Browser Zombies FPS with two arenas, built with Three.js and TypeScript",
   "scripts": {
     "dev": "vite",
     "start": "vite",

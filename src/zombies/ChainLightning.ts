@@ -17,7 +17,7 @@ interface ArcBolt {
  * between consecutive electrocuted zombies. Each bolt is a single
  * TubeGeometry rebuilt on fire along a randomized zigzag path — pooled so
  * counts are hard-capped and nothing allocates per shot after warm-up.
- * Zombies mode only; the shooting range never constructs this.
+ * Zombies-only system constructed for ZEUS-77 projectiles.
  */
 export class ChainLightning {
   private readonly arcs: ArcBolt[] = [];

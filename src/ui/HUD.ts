@@ -1,4 +1,3 @@
-import type { Stats } from '../game/Stats';
 import { clamp } from '../utils/math';
 import type { Weapon } from '../weapons/Weapon';
 
@@ -33,9 +32,6 @@ export class HUD {
   private readonly weaponName = mustGet('hud-weapon-name');
   private readonly ammo = mustGet('hud-ammo');
   private readonly mode = mustGet('hud-mode');
-  private readonly distance = mustGet('aim-distance');
-  private readonly accuracy = mustGet('hud-accuracy');
-  private readonly hits = mustGet('hud-hits');
   private readonly crosshair = mustGet('crosshair');
   private readonly scope = mustGet('scope-overlay');
   private readonly hitmarker = mustGet('hitmarker');
@@ -43,7 +39,6 @@ export class HUD {
   private readonly startHint = mustGet('start-hint');
   private readonly loadingBar = mustGet('loading-bar');
   private readonly loadingBarFill: HTMLElement;
-  private readonly statsPanel = mustGet('hud-stats');
   private readonly zombiesPanel = mustGet('hud-zombies');
   private readonly zRound = mustGet('z-round');
   private readonly zPoints = mustGet('z-points');
@@ -59,16 +54,12 @@ export class HUD {
   private readonly goRound = mustGet('go-round');
   private readonly goKills = mustGet('go-kills');
   private readonly goHeadshots = mustGet('go-headshots');
-  private readonly modeSelect = mustGet('mode-select');
   private readonly mapSelect = mustGet('map-select');
   private readonly interactPrompt = mustGet('interact-prompt');
 
   private lastWeapon = '';
   private lastAmmo = '';
   private lastMode = '';
-  private lastDistance = '';
-  private lastAccuracy = '';
-  private lastHits = '';
   private lastZombies = '';
   private lastPrompt: string | null = null;
   private ready = false;
@@ -120,20 +111,9 @@ export class HUD {
     });
   }
 
-  /** Mode picker shown once assets are ready, before the pointer-lock screen. */
-  showModeSelect(onSelect: (mode: 'range' | 'zombies') => void): void {
-    this.startScreen.classList.add('hidden');
-    this.modeSelect.classList.remove('hidden');
-    for (const button of this.modeSelect.querySelectorAll<HTMLButtonElement>('[data-mode]')) {
-      button.addEventListener('click', () => {
-        this.modeSelect.classList.add('hidden');
-        onSelect(button.dataset.mode === 'zombies' ? 'zombies' : 'range');
-      });
-    }
-  }
-
-  /** Map picker shown after choosing Zombies mode. */
+  /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
   showMapSelect(onSelect: (mapId: 'classic' | 'burned-mansion') => void): void {
+    this.startScreen.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
     for (const button of buttons) {
@@ -145,10 +125,6 @@ export class HUD {
         onSelect(mapId === 'burned-mansion' ? 'burned-mansion' : 'classic');
       };
     }
-  }
-
-  setRangeStatsVisible(visible: boolean): void {
-    this.statsPanel.classList.toggle('hidden', !visible);
   }
 
   setZombiesPanelVisible(visible: boolean): void {
@@ -240,10 +216,6 @@ export class HUD {
     this.hitmarker.classList.add('active');
   }
 
-  setAimDistanceVisible(visible: boolean): void {
-    this.distance.classList.toggle('hidden', !visible);
-  }
-
   /** Center-screen interaction prompt ("MYSTERY BOX\nPress E"); null hides it. */
   setInteractionPrompt(text: string | null): void {
     if (text === this.lastPrompt) return;
@@ -252,14 +224,14 @@ export class HUD {
     if (text !== null) this.interactPrompt.textContent = text;
   }
 
-  update(weapon: Weapon, stats: Stats, aimDistance: number | null | undefined, spreadPixels: number): void {
+  update(weapon: Weapon, spreadPixels: number): void {
     const definition = weapon.definition;
 
     if (definition.name !== this.lastWeapon) {
       this.weaponName.textContent = definition.name;
       this.lastWeapon = definition.name;
     }
-    // Finite-reserve weapons show the real pool; range weapons keep the ∞.
+    // Finite-reserve weapons show the real pool; generic bottomless definitions keep the infinity symbol.
     const ammoText =
       weapon.reserveAmmo === null
         ? `${weapon.ammoInMagazine} / ∞`
@@ -273,24 +245,6 @@ export class HUD {
       this.mode.textContent = mode;
       this.lastMode = mode;
     }
-    if (aimDistance !== undefined) {
-      const distance = aimDistance === null ? '—' : `${Math.round(aimDistance)} m`;
-      if (distance !== this.lastDistance) {
-        this.distance.textContent = distance;
-        this.lastDistance = distance;
-      }
-    }
-    const accuracy = `${Math.round(stats.accuracy * 100)} %`;
-    if (accuracy !== this.lastAccuracy) {
-      this.accuracy.textContent = accuracy;
-      this.lastAccuracy = accuracy;
-    }
-    const hits = `${stats.hits} / ${stats.shots}`;
-    if (hits !== this.lastHits) {
-      this.hits.textContent = hits;
-      this.lastHits = hits;
-    }
-
     this.crosshair.style.setProperty('--gap', `${spreadPixels.toFixed(1)}px`);
     this.crosshair.style.opacity = (1 - weapon.adsAlpha).toFixed(2);
 

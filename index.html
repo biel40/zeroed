@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1220" />
-    <meta name="description" content="Zeroed — a browser FPS shooting range built with Three.js and TypeScript." />
+    <meta name="description" content="Zeroed — a browser Zombies FPS built with Three.js and TypeScript." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Zeroed</title>
   </head>
@@ -18,7 +18,6 @@
         <span class="arm arm-bottom"></span>
         <span class="arm arm-left"></span>
       </div>
-      <div id="aim-distance">—</div>
       <div id="scope-overlay"></div>
       <div id="hitmarker">
         <span></span><span></span><span></span><span></span>
@@ -47,11 +46,6 @@
         <div class="hud-row hud-row-secondary"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
       </div>
 
-      <div id="hud-stats" class="hud-panel">
-        <div class="hud-row"><span class="hud-label">ACCURACY</span><span id="hud-accuracy">0 %</span></div>
-        <div class="hud-row hud-row-secondary"><span class="hud-label">HITS</span><span id="hud-hits">0 / 0</span></div>
-      </div>
-
       <div id="hud-zombies" class="hud-panel hidden">
         <div id="z-round">GET READY</div>
         <div id="z-points">0 PTS</div>
@@ -66,35 +60,18 @@
       <div id="interact-prompt" class="hidden"></div>
     </div>
 
-    <div id="mode-select" class="hidden">
-      <div class="start-panel">
-        <h1>ZEROED</h1>
-        <p class="mode-hint">SELECT MODE</p>
-        <div class="mode-grid">
-          <button type="button" data-mode="range">
-            <span class="mode-name">SHOOTING RANGE</span>
-            <span class="mode-desc">Classic target practice · 5 weapons</span>
-          </button>
-          <button type="button" data-mode="zombies">
-            <span class="mode-name">ZOMBIES</span>
-            <span class="mode-desc">Endless rounds · M1911 start · Mystery Box</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
     <div id="map-select" class="hidden">
       <div class="start-panel">
         <h1>ZOMBIES</h1>
         <p class="mode-hint">SELECT MAP</p>
         <div class="mode-grid">
           <button type="button" data-map="classic">
-            <span class="mode-name">OUTDOOR RANGE</span>
-            <span class="mode-desc">Classic outdoor shooting range but night ambience</span>
+            <span class="mode-name">CLASSIC ZOMBIES</span>
+            <span class="mode-desc">Outdoor survival · Endless rounds · Mystery Box</span>
           </button>
           <button type="button" data-map="burned-mansion">
             <span class="mode-name">BURNED MANSION</span>
-            <span class="mode-desc">Compact two-floor mansion map with barricades</span>
+            <span class="mode-desc">Burned estate · Paid progression · Secret bunker</span>
           </button>
         </div>
       </div>
@@ -137,7 +114,7 @@
           <span><kbd>X</kbd></span><span>Fire mode</span>
           <span><kbd>E</kbd></span><span>Interact</span>
           <span><kbd>Space</kbd></span><span>Jump</span>
-          <span><kbd>1</kbd>–<kbd>5</kbd></span><span>Weapons</span>
+          <span><kbd>1</kbd>–<kbd>2</kbd></span><span>Weapon slots</span>
           <span><kbd>ESC</kbd></span><span>Release mouse</span>
         </div>
       </div>

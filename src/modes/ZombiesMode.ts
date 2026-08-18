@@ -167,7 +167,6 @@ export class ZombiesMode implements GameMode {
       ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
     }
 
-    ctx.hud.setRangeStatsVisible(false);
     ctx.hud.setZombiesPanelVisible(true);
     ctx.hud.setZombiesRestartHandler(() => this.restart());
     this.pushHudState();
@@ -290,6 +289,8 @@ export class ZombiesMode implements GameMode {
       }
       if (this.ctx.grantWeapon(pickup.weaponId)) {
         pickup.claim();
+        if (pickup.weaponId === 'raygun') this.rayGunUnlocked = true;
+        if (pickup.weaponId === 'tesla') this.teslaUnlocked = true;
         this.ctx.audio.playMysteryBoxPickup();
       }
       return;

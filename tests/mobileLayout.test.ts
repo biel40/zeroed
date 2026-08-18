@@ -23,7 +23,6 @@ describe('mobile stylesheet cascade', () => {
     const lastBaseRule = Math.max(
       ruleIndex('.hud-panel'),
       ruleIndex('#hud-weapon'),
-      ruleIndex('#hud-stats'),
       ruleIndex('#hud-zombies'),
     );
     expect(css.indexOf('html.touch-controls-enabled #hud-weapon')).toBeGreaterThan(lastBaseRule);

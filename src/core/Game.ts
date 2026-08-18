@@ -26,7 +26,6 @@ interface ArsenalEntry {
 }
 
 const MAX_DELTA = 0.05;
-const AIM_QUERY_INTERVAL = 0.1;
 const FLASH_LIGHT_DECAY = 26;
 const MAX_SPREAD_PIXELS = 130;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -74,10 +73,6 @@ export class Game {
   /** Range colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
   private readonly hitColliders: THREE.Object3D[];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
-  private readonly aimRaycaster = new THREE.Raycaster();
-  private readonly aimHits: THREE.Intersection[] = [];
-  private aimTimer = 0;
-  private aimDistance: number | null = null;
 
   private readonly debugElement: HTMLElement | null = null;
   private debugTimer = 0;
@@ -217,7 +212,6 @@ export class Game {
     // Touch-only weapon swap button (mobile keyboards have no 1–5 row).
     this.input.onWeaponSwap = () => this.cycleWeapon();
 
-    this.hud.setAimDistanceVisible(this.mode.showsAimDistance === true);
     this.mode.init({
       scene: this.scene,
       player: this.player,
@@ -517,7 +511,17 @@ export class Game {
           this.audio.playDryFire();
           break;
         case 'reloadStart':
-          break; // per-phase foley kicks in via WeaponView.onReloadPhase
+          this.audio.playReloadStart(
+            !!weapon.definition.audio.energy,
+            weapon.definition.view.reloadAnim?.style ?? 'rifle',
+          );
+          break;
+        case 'reloadEnd':
+          this.audio.playReloadComplete(
+            !!weapon.definition.audio.energy,
+            weapon.definition.view.reloadAnim?.style ?? 'rifle',
+          );
+          break;
         case 'boltStart':
           this.audio.playBolt();
           break;
@@ -529,17 +533,6 @@ export class Game {
       }
     }
     weapon.clearEvents();
-  }
-
-  private updateAimDistance(): void {
-    this.player.camera.getWorldPosition(this.tmpOrigin);
-    this.player.camera.getWorldDirection(this.tmpDirection);
-    this.aimRaycaster.set(this.tmpOrigin, this.tmpDirection);
-    this.aimRaycaster.near = 0;
-    this.aimRaycaster.far = 600;
-    this.aimHits.length = 0;
-    this.aimRaycaster.intersectObjects(this.hitColliders, false, this.aimHits);
-    this.aimDistance = this.aimHits.length > 0 ? this.aimHits[0].distance : null;
   }
 
   private updateDebug(dt: number): void {
@@ -576,6 +569,9 @@ export class Game {
       for (let i = 0; i < this.inventory.weapons.length; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
+      // Selection is processed before actions, so reload/fire-mode apply to
+      // the weapon visible in this frame rather than the stale pre-switch one.
+      weapon = this.currentWeapon;
       if (this.input.wasPressed('KeyR')) weapon.reload();
       if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
@@ -609,26 +605,13 @@ export class Game {
         ? this.flashLight.intensity * Math.exp(-FLASH_LIGHT_DECAY * dt)
         : 0;
 
-    if (this.mode.showsAimDistance === true) {
-      this.aimTimer -= dt;
-      if (this.aimTimer <= 0) {
-        this.aimTimer = AIM_QUERY_INTERVAL;
-        this.updateAimDistance();
-      }
-    }
-
     const fovRadians = (this.player.camera.fov * Math.PI) / 180;
     const spreadPixels = clamp(
       10 + (Math.tan(weapon.currentSpread()) / Math.tan(fovRadians / 2)) * (this.viewportHeight / 2),
       10,
       MAX_SPREAD_PIXELS,
     );
-    this.hud.update(
-      weapon,
-      this.stats,
-      this.mode.showsAimDistance === true ? this.aimDistance : undefined,
-      spreadPixels,
-    );
+    this.hud.update(weapon, spreadPixels);
     this.hud.setInteractionPrompt(
       allowGameplayInput ? (this.mode.getInteractPrompt?.() ?? null) : null,
     );

@@ -147,7 +147,7 @@ describe('M1911 reset (zombies restart / fresh pickup)', () => {
   });
 });
 
-describe('Reserve-less weapons keep infinite ammo (Shooting Range untouched)', () => {
+describe('Reserve-less definitions retain generic infinite-ammo behavior', () => {
   it('reloads to full without any reserve bookkeeping', () => {
     const m4 = new Weapon(WEAPON_DEFINITIONS.m4a1, () => 0.5);
     expect(m4.reserveAmmo).toBeNull();

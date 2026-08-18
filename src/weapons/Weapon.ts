@@ -17,7 +17,7 @@ import { lerp, moveToward } from '../utils/math';
 export class Weapon {
   readonly recoil: RecoilController;
   ammoInMagazine: number;
-  /** Remaining reserve rounds; null = bottomless reserve (Shooting Range). */
+  /** Remaining reserve rounds; null means a bottomless reserve. */
   reserveAmmo: number | null;
   fireMode: FireMode;
   /** 0 = hip fire, 1 = fully aimed. */

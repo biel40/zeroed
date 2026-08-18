@@ -58,7 +58,7 @@ function makeStarsTexture(): THREE.CanvasTexture {
  * directional is restyled into moonlight (no extra shadow-casting light),
  * and a few practical fixtures (sodium floods, a failing tube, an emergency
  * beacon) add warm/cold pools of light. Dust motes drift through the air.
- * Shooting Range mode never sees any of this: a mode owns its environment.
+ * Classic Zombies owns this treatment of the shared outdoor range geometry.
  */
 export class NightEnvironment {
   private readonly group = new THREE.Group();

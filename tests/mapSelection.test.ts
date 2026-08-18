@@ -7,10 +7,17 @@ const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 
 class FakeElement {
+  private readonly classes = new Set<string>();
   readonly classList = {
-    add: () => undefined,
-    remove: () => undefined,
-    toggle: () => false,
+    add: (name: string) => this.classes.add(name),
+    remove: (name: string) => this.classes.delete(name),
+    toggle: (name: string, force?: boolean) => {
+      const add = force ?? !this.classes.has(name);
+      if (add) this.classes.add(name);
+      else this.classes.delete(name);
+      return add;
+    },
+    contains: (name: string) => this.classes.has(name),
   };
   readonly dataset: Record<string, string> = {};
   readonly style = { setProperty: () => undefined };
@@ -34,11 +41,14 @@ describe('Zombies map selection flow', () => {
   it('exposes one semantic button for each supported map id', () => {
     expect(html).toMatch(/<button type="button" data-map="classic">/);
     expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
+    expect(html.match(/data-map=/g)).toHaveLength(2);
+    expect(html).not.toContain('data-mode=');
+    expect(html).not.toContain('SHOOTING RANGE');
   });
 
   it('keeps the map picker above the fixed game canvas', () => {
     expect(css).toMatch(
-      /#mode-select,\s*#map-select,\s*#game-over \{[^}]*position: fixed;[^}]*z-index: 20;/,
+      /#map-select,\s*#game-over \{[^}]*position: fixed;[^}]*z-index: 20;/,
     );
   });
 
@@ -48,6 +58,7 @@ describe('Zombies map selection flow', () => {
     const mansion = new FakeElement();
     mansion.dataset.map = 'burned-mansion';
     const mapSelect = new FakeElement([outdoor, mansion]);
+    const startScreen = new FakeElement();
     const loadingBar = new FakeElement([new FakeElement()]);
     const generic = new FakeElement();
     const previousDocument = globalThis.document;
@@ -55,7 +66,13 @@ describe('Zombies map selection flow', () => {
       configurable: true,
       value: {
         getElementById: (id: string) =>
-          id === 'map-select' ? mapSelect : id === 'loading-bar' ? loadingBar : generic,
+          id === 'map-select'
+            ? mapSelect
+            : id === 'start-screen'
+              ? startScreen
+              : id === 'loading-bar'
+                ? loadingBar
+                : generic,
       },
     });
 
@@ -63,6 +80,7 @@ describe('Zombies map selection flow', () => {
       const selected: string[] = [];
       const ui = new HUD();
       ui.showMapSelect((mapId) => selected.push(mapId));
+      expect(startScreen.classList.contains('hidden')).toBe(true);
       outdoor.onclick?.();
 
       ui.showMapSelect((mapId) => selected.push(mapId));
@@ -81,6 +99,9 @@ describe('Zombies map selection flow', () => {
   });
 
   it('forwards the selected id to Zombies game initialization', () => {
-    expect(main).toContain("startGame(new ZombiesMode(mapId as 'classic' | 'burned-mansion'))");
+    expect(main).toContain('hud.showMapSelect((mapId) =>');
+    expect(main).toContain('startGame(new ZombiesMode(mapId))');
+    expect(main).not.toContain('showModeSelect');
+    expect(main).not.toContain('ShootingRangeMode');
   });
 });

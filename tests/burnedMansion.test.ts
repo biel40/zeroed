@@ -1,14 +1,20 @@
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DeviceProfile } from '../src/core/DeviceProfile';
+import type { Input } from '../src/player/Input';
+import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
+import type { Weapon } from '../src/weapons/Weapon';
+import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { Zombie } from '../src/zombies/Zombie';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from '../src/zombies/ZombieSpawner';
 import {
   MANSION_BARRIERS,
+  MANSION_BUNKER_BOUNDS,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
+  MANSION_DOOR_COSTS,
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
   MANSION_SECRET_AREAS,
@@ -65,6 +71,8 @@ function canWalk(
   start: readonly [number, number],
   target: readonly [number, number],
   obstacles: ReadonlyArray<THREE.Box3>,
+  bounds = { minX: -6.6, maxX: 6.6, minZ: -7.6, maxZ: 7.6 },
+  floorY = 0,
 ): boolean {
   const step = 0.25;
   const radius = 0.35;
@@ -72,8 +80,8 @@ function canWalk(
   const blocked = (x: number, z: number): boolean =>
     obstacles.some(
       (box) =>
-        box.max.y > 0.05 &&
-        box.min.y < 1.95 &&
+        box.max.y > floorY + 0.05 &&
+        box.min.y < floorY + 1.95 &&
         x > box.min.x - radius &&
         x < box.max.x + radius &&
         z > box.min.z - radius &&
@@ -88,7 +96,7 @@ function canWalk(
     for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]] as const) {
       const nextX = x + dx;
       const nextZ = z + dz;
-      if (nextX < -6.6 || nextX > 6.6 || nextZ < -7.6 || nextZ > 7.6) continue;
+      if (nextX < bounds.minX || nextX > bounds.maxX || nextZ < bounds.minZ || nextZ > bounds.maxZ) continue;
       const nextKey = key(nextX, nextZ);
       if (visited.has(nextKey) || blocked(nextX, nextZ)) continue;
       visited.add(nextKey);
@@ -106,6 +114,21 @@ function unlock(arena: BurnedMansionArena, id: string): void {
   arena.refreshColliders();
 }
 
+const idleInput = {
+  isDown: () => false,
+  wasPressed: () => false,
+  mouseDeltaX: 0,
+  mouseDeltaY: 0,
+  moveAxisX: 0,
+  moveAxisY: 0,
+} as unknown as Input;
+
+const weaponStub = {
+  definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
+  adsAlpha: 0,
+  recoil: { pitch: 0, yaw: 0 },
+} as unknown as Weapon;
+
 describe('Burned Mansion topology', () => {
   it('spawns the player clear of every wall collider', () => {
     const arena = makeArena();
@@ -120,15 +143,20 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
     const boxRoom = [MANSION_BOX_PLACEMENT.position.x, MANSION_BOX_PLACEMENT.position.z] as const;
+    const eastHall = [1.6, -5] as const;
     const bunkerVestibule = [5.2, -3.3] as const;
 
     expect(canWalk(spawn, boxRoom, arena.wallColliders)).toBe(false);
     unlock(arena, 'to-dining');
     expect(canWalk(spawn, boxRoom, arena.wallColliders)).toBe(true);
 
-    expect(canWalk(boxRoom, bunkerVestibule, arena.wallColliders)).toBe(false);
+    expect(canWalk(boxRoom, eastHall, arena.wallColliders)).toBe(false);
+    unlock(arena, 'to-east-hall');
+    expect(canWalk(boxRoom, eastHall, arena.wallColliders)).toBe(true);
+
+    expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(false);
     unlock(arena, 'nuclear-bunker');
-    expect(canWalk(boxRoom, bunkerVestibule, arena.wallColliders)).toBe(true);
+    expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(true);
   });
 
   it('keeps the Mystery Box behind the first paid divider', () => {
@@ -137,7 +165,7 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_BOX_PLACEMENT.floor).toBe(0);
   });
 
-  it('removes the old upper storey and encloses the underground bunker', () => {
+  it('builds a large enclosed underground bunker with an open stairwell', () => {
     const arena = makeArena();
     const roof = arena.group.getObjectByName('mansion-roof');
     const bunkerFloor = arena.group.getObjectByName('bunker-floor');
@@ -153,6 +181,17 @@ describe('Burned Mansion topology', () => {
     expect(roofBox.min.y).toBeCloseTo(3.2);
     expect(bunkerFloorBox.min.y).toBeLessThan(MANSION_BUNKER_Y);
     expect(bunkerCeilingBox.max.y).toBeLessThan(0);
+    const bunkerSize = bunkerFloorBox.getSize(new THREE.Vector3());
+    expect(bunkerSize.x).toBeGreaterThanOrEqual(10);
+    expect(bunkerSize.z).toBeGreaterThanOrEqual(8.9);
+
+    const stairwell = new THREE.Box3(
+      new THREE.Vector3(4.2, -0.31, -6.85),
+      new THREE.Vector3(6.1, -0.13, -3.05),
+    );
+    const ceilingSegments = arena.group.children.filter((child) => child.name.startsWith('bunker-ceiling'));
+    expect(ceilingSegments).toHaveLength(4);
+    expect(ceilingSegments.some((segment) => new THREE.Box3().setFromObject(segment).intersectsBox(stairwell))).toBe(false);
   });
 
   it('keeps one-way floor triggers outside their destinations', () => {
@@ -172,32 +211,80 @@ describe('Burned Mansion topology', () => {
     expect(arena.floorTransitions[0].box.containsPoint(downDestination)).toBe(false);
   });
 
-  it('declares only standard weapons as visible wall buys', () => {
+  it('moves the real player controller down and up through safe non-oscillating landings', () => {
     const arena = makeArena();
-    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m4a1', 'ak47', 'm60']);
-    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([1500, 1750, 2500]);
-    expect(MANSION_WALL_BUYS.every((buy) => buy.ammoPrice > 0)).toBe(true);
-    expect(arena.wallBuys).toHaveLength(3);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(3);
+    const player = new PlayerController(1);
+    player.setFloorTransitions(arena.floorTransitions);
+    player.setWallColliders(arena.wallColliders);
+
+    player.teleport(5.15, EYE_HEIGHT, -2.8, 0, arena.playerBounds);
+    player.update(1 / 60, idleInput, weaponStub);
+    expect(player.floor).toBe(-1);
+    expect(player.rig.position.x).toBeCloseTo(3.75);
+    expect(player.rig.position.z).toBeCloseTo(-6.4);
+    const landingBody = new THREE.Box3(
+      new THREE.Vector3(3.4, MANSION_BUNKER_Y, -6.75),
+      new THREE.Vector3(4.1, MANSION_BUNKER_Y + 1.9, -6.05),
+    );
+    const steps = arena.group.children.filter((child) => child.name.startsWith('bunker-stair-step-'));
+    expect(steps.some((step) => new THREE.Box3().setFromObject(step).intersectsBox(landingBody))).toBe(false);
+    player.update(1 / 60, idleInput, weaponStub);
+    expect(player.floor).toBe(-1);
+
+    player.teleport(5.15, MANSION_BUNKER_Y + EYE_HEIGHT, -7.1, -1, MANSION_BUNKER_BOUNDS);
+    player.update(1 / 60, idleInput, weaponStub);
+    expect(player.floor).toBe(0);
+    expect(player.rig.position.z).toBeCloseTo(-2.25);
+    player.update(1 / 60, idleInput, weaponStub);
+    expect(player.floor).toBe(0);
   });
 
-  it('centralizes the sealed bunker cost and guaranteed Ray Gun pickup', () => {
+  it('places each standard wall buy in its intended progression zone', () => {
+    const arena = makeArena();
+    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'ak47', 'm4a1', 'm60']);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 1750, 1500, 2500]);
+    expect(MANSION_WALL_BUYS.every((buy) => buy.ammoPrice > 0)).toBe(true);
+    expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm1911')!.position.z).toBeGreaterThan(2);
+    expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'ak47')!.position.x).toBeLessThan(0);
+    const m4a1 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm4a1')!;
+    expect(m4a1.position.x).toBeGreaterThan(0);
+    expect(m4a1.position.x).toBeLessThan(3.2);
+    expect(m4a1.position.x - 0.35).toBeGreaterThan(2.2);
+    expect(arena.wallBuys).toHaveLength(4);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(4);
+  });
+
+  it('keeps the paid room sequence and bunker price centralized', () => {
+    const arena = makeArena();
+    expect(arena.doors.map((door) => [door.id, door.cost])).toEqual([
+      ['to-dining', MANSION_DOOR_COSTS.diningHall],
+      ['to-east-hall', MANSION_DOOR_COSTS.eastHall],
+      ['nuclear-bunker', 9999],
+    ]);
+    expect(MANSION_DOOR_COSTS.nuclearBunker).toBe(9999);
+  });
+
+  it('centralizes the bunker cost and exposes both secret Wonder Weapons', () => {
     const arena = makeArena();
     const secret = MANSION_SECRET_AREAS[0];
     const door = arena.doors.find((candidate) => candidate.id === secret.doorId)!;
-    const pickup = arena.weaponPickups[0];
+    const pickups = arena.weaponPickups;
 
     expect(secret.unlockCost).toBe(9999);
     expect(door.cost).toBe(9999);
     expect(door.prompt).toBe('Open sealed bunker');
     expect(door.requiredMessage).toBe('9999 PTS REQUIRED');
-    expect(pickup.weaponId).toBe('raygun');
-    expect(pickup.requiredDoorId).toBe(secret.doorId);
-    expect(pickup.available).toBe(true);
-    expect(pickup.claim()).toBe(true);
-    expect(pickup.claim()).toBe(false);
+    expect(secret.rewards.map((reward) => reward.weaponId)).toEqual(['raygun', 'tesla']);
+    expect(pickups.map((pickup) => pickup.weaponId)).toEqual(['raygun', 'tesla']);
+    expect(pickups.every((pickup) => pickup.requiredDoorId === secret.doorId)).toBe(true);
+    for (const pickup of pickups) {
+      expect(pickup.available).toBe(true);
+      expect(pickup.claim()).toBe(true);
+      expect(pickup.claim()).toBe(false);
+    }
     arena.reset();
-    expect(pickup.available).toBe(true);
+    expect(pickups.every((pickup) => pickup.available)).toBe(true);
+    expect(arena.group.getObjectByName('bunker-zeus')?.userData.weaponId).toBe('tesla');
   });
 
   it('uses a wide twelve-step visual stair and one simplified navigation portal', () => {
@@ -211,6 +298,51 @@ describe('Burned Mansion topology', () => {
     expect(arena.group.getObjectByName('bunker-stair-navigation-ramp')?.userData.mapRole).toBe(
       'simplified-stair-portal',
     );
+    expect(arena.group.children.filter((child) => child.name === 'bunker-stair-handrail')).toHaveLength(2);
+  });
+
+  it('uses an actual radiation trefoil and a marked ZEUS containment station', () => {
+    const arena = makeArena();
+    const sign = arena.group.getObjectByName('radiation-warning-symbol');
+    expect(sign?.userData.mapRole).toBe('bunker-clue');
+    expect(sign?.children.filter((child) => child.userData.mapRole === 'radiation-symbol-part')).toHaveLength(4);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'zeus-containment-ring')).toHaveLength(1);
+    expect(arena.group.getObjectByName('zeus-containment-pedestal')).toBeDefined();
+  });
+
+  it('keeps clear walking routes from the stair landing to both Wonder Weapon stations', () => {
+    const arena = makeArena();
+    const landing = [3.75, -6.4] as const;
+    const rayGunApproach = [-1.2, -3] as const;
+    const zeusApproach = [-0.8, -6.1] as const;
+
+    expect(canWalk(landing, rayGunApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    expect(canWalk(landing, zeusApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    expect(canWalk(rayGunApproach, zeusApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+  });
+
+  it('exposes the real Ray Gun and ZEUS pickups only after the nuclear door opens', () => {
+    const arena = makeArena();
+    const mode = new ZombiesMode('burned-mansion');
+    const player = {
+      floor: -1,
+      rig: { position: new THREE.Vector3() },
+      camera: {
+        getWorldDirection: (out: THREE.Vector3) => out.set(0, 0, -1),
+      },
+    };
+    (mode as unknown as { arena: BurnedMansionArena }).arena = arena;
+    (mode as unknown as { ctx: unknown }).ctx = { player };
+    const findPickup = () =>
+      (mode as unknown as { findFacingWeaponPickup(): { id: string } | null }).findFacingWeaponPickup();
+
+    player.rig.position.set(-1.2, MANSION_BUNKER_Y + EYE_HEIGHT, -0.9);
+    expect(findPickup()).toBeNull();
+
+    unlock(arena, 'nuclear-bunker');
+    expect(findPickup()?.id).toBe('bunker-raygun');
+    player.rig.position.set(-1.7, MANSION_BUNKER_Y + EYE_HEIGHT, -4.8);
+    expect(findPickup()?.id).toBe('bunker-zeus');
   });
 
   it('activates only windows and spawns belonging to unlocked zones', () => {
@@ -220,9 +352,12 @@ describe('Burned Mansion topology', () => {
     unlock(arena, 'to-dining');
     expect(arena.barriers).toHaveLength(5);
     expect(arena.spawnPoints).toHaveLength(5);
-    unlock(arena, 'nuclear-bunker');
+    unlock(arena, 'to-east-hall');
     expect(arena.barriers).toHaveLength(6);
     expect(arena.spawnPoints).toHaveLength(6);
+    unlock(arena, 'nuclear-bunker');
+    expect(arena.barriers).toHaveLength(7);
+    expect(arena.spawnPoints).toHaveLength(7);
   });
 
   it('defines every zombie spawn outside with a route through its assigned barricade', () => {
@@ -363,6 +498,32 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.z).toBeLessThan(1.5);
   });
 
+  it('lets zombies pursue through the full ground-floor room sequence', () => {
+    const arena = makeArena();
+    const manager = new ZombieManager(() => 0, {}, false, [[-3.5, 4.8]]);
+    manager.spawnZombie(roundConfig(1), -3.5, -2.5);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+
+    unlock(arena, 'to-dining');
+    manager.registerColliders([...arena.colliders]);
+    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, -3.5, -2.5, 0);
+    expect(zombie.position.z).toBeLessThan(2);
+
+    unlock(arena, 'to-east-hall');
+    manager.registerColliders([...arena.colliders]);
+    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, 2.5, -5, 0);
+    expect(zombie.position.x).toBeGreaterThan(0);
+
+    unlock(arena, 'nuclear-bunker');
+    manager.registerColliders([...arena.colliders]);
+    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, 5.5, -2.5, 0);
+    expect(zombie.position.x).toBeGreaterThan(3.2);
+    expect(zombie.position.z).toBeLessThan(0);
+  });
+
   it('routes around solid furniture instead of attacking through it', () => {
     const arena = makeArena();
     const manager = new ZombieManager(() => 0, {}, false, [[-5.5, 7.55]]);
@@ -436,7 +597,7 @@ describe('Burned Mansion topology', () => {
     expect(maxStep).toBeLessThan(0.1);
   });
 
-  it('uses scaled PBR surfaces, instanced frames and four unshadowed point lights', () => {
+  it('uses scaled PBR surfaces, instanced frames and room-specific unshadowed point lights', () => {
     const arena = makeArena();
     const walls = arena.group.children.filter((child) => child.userData.mapRole === 'wall') as THREE.Mesh[];
     const wall = walls[0];
@@ -467,13 +628,14 @@ describe('Burned Mansion topology', () => {
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
-    expect(pointLights).toHaveLength(4);
+    expect(pointLights).toHaveLength(6);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
   });
 
   it('restores doors, active zones, colliders and barrier state on restart', () => {
     const arena = makeArena();
     unlock(arena, 'to-dining');
+    unlock(arena, 'to-east-hall');
     unlock(arena, 'nuclear-bunker');
     const barrier = arena.barriers[0];
     barrier.damage(100);
@@ -488,7 +650,7 @@ describe('Burned Mansion topology', () => {
     expect(barrier.boards.every((board) => board.hp === board.maxHp)).toBe(true);
     expect(
       arena.colliders.filter((object) => object.name.startsWith('point-door-collider:')),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
   });
 
   it('registers the actual locked door mesh for non-recursive projectile raycasts', () => {

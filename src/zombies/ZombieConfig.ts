@@ -36,14 +36,16 @@ export const ZOMBIE_SEPARATION_RADIUS = 1.15;
 /** Rise-from-the-ground spawn sequence. */
 export const ZOMBIE_SPAWN_DURATION = 1.1;
 /** Full attack lunge; the damage lands at the hit moment below. */
-export const ZOMBIE_ATTACK_DURATION = 0.9;
+export const ZOMBIE_ATTACK_DURATION = 0.75;
 /**
- * Wind-up before the blow connects — the player's dodge window. 0.57 s is
- * ~63 % of the attack: the measured peak of the head's forward extension in
- * the ZombieBite clip (played from 30 % at 2.5× over the 5.04 s take), so
- * the hit check fires exactly when the bite visually reaches the player.
+ * Wind-up before the blow connects — the player's dodge window. 0.475 s is
+ * still ~63 % of the attack: the ZombieBite clip (played from 30 % at 3.0×,
+ * up from 2.5×, over the 5.04 s take) now reaches the same head-extension
+ * peak sooner in real time, so the hit still fires exactly when the bite
+ * visually reaches the player — just quicker, giving the player less time
+ * to back out of range.
  */
-export const ZOMBIE_ATTACK_HIT_MOMENT = 0.57;
+export const ZOMBIE_ATTACK_HIT_MOMENT = 0.475;
 /** Brief stagger on non-lethal hits; movement resumes right after. */
 export const ZOMBIE_HIT_DURATION = 0.28;
 /** Headshot stagger lasts longer: precision should feel impactful. */
@@ -66,7 +68,7 @@ export const ROUND_START_DELAY = 2.5;
  * The mode table wins over the WeaponDefinition (see reserveAmmoFor), so
  * the M1911 starts a run with 120 rounds total: 8 in the mag + 112 here.
  * The Tesla (3/18) is not listed and keeps its definition value. The
- * Shooting Range never consults this table — it stays bottomless.
+ * These overrides keep every Zombies weapon on a finite reserve.
  */
 export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   m1911: 112,

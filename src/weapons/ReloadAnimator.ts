@@ -170,6 +170,17 @@ export class ReloadAnimator {
         mag.position.y += t * height * 1.5;
         mag.rotateY(t * 2.2);
         break;
+      case 'rifle':
+        // STANAG magazine clears the well down and slightly rearward.
+        mag.position.y -= t * height * 1.2;
+        mag.position.z += t * height * 0.25;
+        mag.rotateX(t * 0.18);
+        break;
+      case 'pistol':
+        mag.position.y -= t * height * 1.25;
+        mag.position.z += t * height * 0.12;
+        mag.rotateX(t * 0.12);
+        break;
       default:
         mag.position.y -= t * height * 1.15;
         mag.rotateX(t * 0.25);
@@ -196,6 +207,16 @@ export class ReloadAnimator {
       case 'cell':
         mag.position.y += inv * height * 1.5;
         mag.rotateY(t * 0.6);
+        break;
+      case 'rifle':
+        mag.position.y -= inv * height * 1.45;
+        mag.position.z += inv * height * 0.25;
+        mag.rotateX(inv * 0.12);
+        break;
+      case 'pistol':
+        mag.position.y -= inv * height * 1.5;
+        mag.position.z += inv * height * 0.12;
+        mag.rotateX(inv * 0.08);
         break;
       default:
         mag.position.y -= inv * height * 1.4;
@@ -280,6 +301,15 @@ export class ReloadAnimator {
         this.bodyTilt = -base * 0.3;
         this.bodyRoll = pulse(p, c.magOut, c.magSeat) * 0.45 + base * 0.08;
         break;
+      case 'rifle': {
+        const swap = pulse(p, c.magOut, c.magSeat);
+        const action = c.charge >= 0 ? pulse(p, c.charge, c.chargeEnd) : 0;
+        const seat = pulse(p, c.magIn, Math.min(1, c.magSeat + 0.06));
+        this.bodyDip = -base * 0.035 - seat * 0.008;
+        this.bodyTilt = -base * 0.18 - action * 0.08;
+        this.bodyRoll = swap * 0.18 - action * 0.06;
+        break;
+      }
       default:
         this.bodyTilt = -base * 0.34;
         this.bodyRoll = base * 0.26;

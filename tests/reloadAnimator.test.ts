@@ -71,6 +71,33 @@ describe('ReloadAnimator phases', () => {
     expect(dropPool.activeCount).toBe(1);
   });
 
+  it('pulls rifle magazines down and rearward before inserting along the same path', () => {
+    const outgoing = makeRig();
+    const outgoingMag = outgoing.parts.magazine!;
+    const outgoingHome = outgoingMag.position.clone();
+    outgoing.weapon.reload();
+    step(
+      outgoing.weapon,
+      outgoing.animator,
+      outgoing.weapon.definition.tacticalReloadTime * 0.17,
+    );
+    expect(outgoingMag.position.y).toBeLessThan(outgoingHome.y);
+    expect(outgoingMag.position.z).toBeGreaterThan(outgoingHome.z);
+
+    const incoming = makeRig();
+    const incomingMag = incoming.parts.magazine!;
+    const incomingHome = incomingMag.position.clone();
+    incoming.weapon.reload();
+    step(
+      incoming.weapon,
+      incoming.animator,
+      incoming.weapon.definition.tacticalReloadTime * 0.55,
+    );
+    expect(incomingMag.visible).toBe(true);
+    expect(incomingMag.position.y).toBeLessThan(incomingHome.y);
+    expect(incomingMag.position.z).toBeGreaterThan(incomingHome.z);
+  });
+
   it('never grants ammunition before the state completes', () => {
     const { weapon, animator, phases } = makeRig();
     weapon.reload();

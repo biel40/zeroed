@@ -1,9 +1,8 @@
-# Three.js Shooting Range - Zeroed.ts
+# Zeroed - Three.js Zombies FPS
 
-Pequeño campo de tiro FPS de navegador construido con Three.js y TypeScript.
-Cuatro armas con personalidad propia (M4A1, AK-47, M60, L96), balística con
-tiempo de vuelo y caída, recoil con componente aprendible, ADS con scope para
-el francotirador y blancos reactivos a 25/50/100/200 m.
+FPS Zombies de navegador construido con Three.js y TypeScript. El juego permite
+elegir directamente entre `Classic Zombies` y `Burned Mansion`, con rondas
+infinitas, economía, Mystery Box, armas de pared y Wonder Weapons.
 
 ## Tecnologías
 
@@ -21,8 +20,8 @@ npm install
 npm run dev
 ```
 
-Abre la URL que indica Vite (por defecto `http://localhost:5173`), pulsa
-**CLICK TO START** y el navegador bloqueará el puntero.
+Abre la URL que indica Vite (por defecto `http://localhost:5173`), selecciona
+un mapa, pulsa **CLICK TO START** y el navegador bloqueará el puntero.
 
 ## Controles
 
@@ -34,7 +33,9 @@ Abre la URL que indica Vite (por defecto `http://localhost:5173`), pulsa
 | `RMB` | Apuntar (ADS) |
 | `R` | Recargar |
 | `X` | Cambiar modo de fuego (M4A1 / AK-47) |
-| `1` `2` `3` `4` | M4A1 / AK-47 / M60 / L96 |
+| `1` `2` | Slots de arma |
+| `E` | Interactuar / comprar / abrir puertas |
+| `Space` | Saltar |
 | `ESC` | Liberar el puntero |
 
 ## Comandos disponibles

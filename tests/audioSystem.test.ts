@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { MusicManager } from '../src/audio/MusicManager';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Game } from '../src/core/Game';
 
 describe('MusicManager', () => {
@@ -356,6 +357,70 @@ describe('AudioSystem reload sound profiles', () => {
     const rock = tickSpy.mock.calls[0][1] as number;
 
     expect(rock).toBeLessThan(pistol);
+  });
+
+  it('layers a low receiver clack and crisp latch when a reload completes', () => {
+    const audio = new AudioSystem() as any;
+    const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    const sweepSpy = vi.spyOn(audio, 'sweep').mockImplementation(() => {});
+
+    audio.playReloadComplete(false, 'rifle');
+
+    expect(tickSpy).toHaveBeenCalledTimes(2);
+    expect(tickSpy.mock.calls[1][0] as number).toBeGreaterThan(tickSpy.mock.calls[0][0] as number);
+    expect(tickSpy.mock.calls[1][1] as number).toBeGreaterThan(tickSpy.mock.calls[0][1] as number);
+    expect(sweepSpy).toHaveBeenCalledOnce();
+  });
+
+  it('routes the authoritative reloadEnd event to the completion sound', () => {
+    const playReloadComplete = vi.fn();
+    const clearEvents = vi.fn();
+    const weapon = {
+      definition: WEAPON_DEFINITIONS.m4a1,
+      pendingEvents: [{ type: 'reloadEnd' }],
+      clearEvents,
+    };
+    const game: any = Object.create((Game as any).prototype);
+    game.mode = { id: 'test' };
+    game.inventory = { currentWeapon: 'm4a1' };
+    game.arsenal = new Map([['m4a1', { weapon, view: {} }]]);
+    game.audio = { playReloadComplete };
+
+    game.processWeaponEvents();
+
+    expect(playReloadComplete).toHaveBeenCalledWith(false, 'rifle');
+    expect(clearEvents).toHaveBeenCalledOnce();
+  });
+
+  it('gives the M1911 immediate pistol handling audio when reload starts', () => {
+    const playReloadStart = vi.fn();
+    const clearEvents = vi.fn();
+    const weapon = {
+      definition: WEAPON_DEFINITIONS.m1911,
+      pendingEvents: [{ type: 'reloadStart' }],
+      clearEvents,
+    };
+    const game: any = Object.create((Game as any).prototype);
+    game.mode = { id: 'test' };
+    game.inventory = { currentWeapon: 'm1911' };
+    game.arsenal = new Map([['m1911', { weapon, view: {} }]]);
+    game.audio = { playReloadStart };
+
+    game.processWeaponEvents();
+
+    expect(playReloadStart).toHaveBeenCalledWith(false, 'pistol');
+    expect(clearEvents).toHaveBeenCalledOnce();
+  });
+
+  it('synthesizes two audible mechanical transients for the pistol reload start', () => {
+    const audio = new AudioSystem() as any;
+    const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+
+    audio.playReloadStart(false, 'pistol');
+
+    expect(tickSpy).toHaveBeenCalledTimes(2);
+    expect(tickSpy.mock.calls[0][2]).toBeGreaterThanOrEqual(0.4);
+    expect(tickSpy.mock.calls[1][2]).toBeGreaterThanOrEqual(0.3);
   });
 });
 

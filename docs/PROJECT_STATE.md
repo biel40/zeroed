@@ -1,19 +1,18 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-08-16. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+Estado inspeccionado: 2026-08-18. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
 
 ## Sistemas funcionales
 
-- Arranque WebGL, carga de GLB/texturas con fallback, selector de modo y selector de mapa (`src/main.ts`, `src/assets/AssetManager.ts`).
+- Arranque WebGL, carga de GLB/texturas con fallback y selector directo entre los dos mapas Zombies (`src/main.ts`, `src/assets/AssetManager.ts`).
 - Shell FPS compartido con render, input desktop/tactil, recuperacion de Pointer Lock, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
-- Campo de tiro con cinco armas, blancos a 25/50/100/200 m, estadisticas y telemetro (`src/modes/ShootingRangeMode.ts`, `src/range/`).
 - Armas declarativas con cadencia, modos de fuego, municion, recarga, ADS, dispersion, recoil y view models GLB/procedurales (`src/config/weapons.ts`, `src/weapons/`).
 - Balistica con gravedad/drag, raycast segmentado y prioridad de hitbox de cabeza (`src/shooting/`).
 - Zombies con salud, Points, inventario de dos slots, rondas infinitas, pool de 24 enemigos, ataques y navegacion con steering local, rutas de recuperacion y failsafe de recolocacion (`src/modes/ZombiesMode.ts`, `src/zombies/`).
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
-- Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickup de Ray Gun en el bunker.
-- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, zonas desbloqueables y transiciones de planta (`src/zombies/maps/`).
-- Suite Vitest de logica determinista: 45 archivos y 366 tests pasan. `npm run typecheck` tambien pasa.
+- Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
+- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, zonas desbloqueables y transiciones de planta (`src/zombies/maps/`).
+- Suite Vitest de logica determinista: 46 archivos y 388 tests pasan. `npm run typecheck` tambien pasa.
 
 ## Sistemas parciales o limitados
 
@@ -30,7 +29,6 @@ Estado inspeccionado: 2026-08-16. La fuente de verdad es el codigo actual; `READ
 ## Bugs relevantes detectados
 
 - Una barrera totalmente destruida no puede seleccionarse para reparacion porque `isDamaged` excluye el estado abierto (`src/zombies/barriers/WindowBarrier.ts:81`, `src/modes/ZombiesMode.ts:495`).
-- La M1911 conserva reserva finita en el campo de tiro, aunque el contrato del modo declara reserva ilimitada (`src/config/weapons.ts`, `src/modes/ShootingRangeMode.ts`).
 - La distancia reportada por balas cuenta dos veces parte del segmento de impacto (`src/shooting/BallisticsSystem.ts:172`, `src/shooting/trajectory.ts:47`).
 - La muerte de un zombie asigna una Y absoluta durante el fade; los cadaveres del bunker suben hacia Y=0 (`src/zombies/Zombie.ts:232`).
 - En tactil, movimiento y disparo siguen activos detras de la pantalla de game over (`src/core/Game.ts:565`, `src/modes/ZombiesMode.ts:174`).

@@ -5,6 +5,7 @@ import { MusicManager } from './MusicManager';
 const PING_THROTTLE = 0.045;
 
 interface ReloadProfile {
+  start: number;
   magOut: number;
   magDrop: number;
   magIn: number;
@@ -13,10 +14,12 @@ interface ReloadProfile {
   chargeEnd: number;
   coverOpen: number;
   coverClose: number;
+  complete: number;
 }
 
 const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
   pistol: {
+    start: 1750,
     magOut: 1100,
     magDrop: 480,
     magIn: 700,
@@ -25,8 +28,10 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     chargeEnd: 1850,
     coverOpen: 900,
     coverClose: 1150,
+    complete: 2100,
   },
   rifle: {
+    start: 1550,
     magOut: 1200,
     magDrop: 520,
     magIn: 780,
@@ -35,8 +40,10 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     chargeEnd: 2000,
     coverOpen: 980,
     coverClose: 1240,
+    complete: 2300,
   },
   rock: {
+    start: 1250,
     magOut: 900,
     magDrop: 430,
     magIn: 650,
@@ -45,8 +52,10 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     chargeEnd: 1700,
     coverOpen: 820,
     coverClose: 1060,
+    complete: 1900,
   },
   belt: {
+    start: 820,
     magOut: 760,
     magDrop: 360,
     magIn: 560,
@@ -55,8 +64,10 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     chargeEnd: 1540,
     coverOpen: 700,
     coverClose: 920,
+    complete: 1650,
   },
   bolt: {
+    start: 1100,
     magOut: 850,
     magDrop: 410,
     magIn: 620,
@@ -65,8 +76,10 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     chargeEnd: 1600,
     coverOpen: 800,
     coverClose: 1010,
+    complete: 1800,
   },
   cell: {
+    start: 1900,
     magOut: 1500,
     magDrop: 620,
     magIn: 900,
@@ -75,6 +88,7 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     chargeEnd: 2200,
     coverOpen: 1100,
     coverClose: 1380,
+    complete: 2600,
   },
 };
 
@@ -233,6 +247,31 @@ export class AudioSystem {
       default:
         break;
     }
+  }
+
+  /** Immediate handling sound so every accepted reload has audible feedback. */
+  public playReloadStart(energy: boolean = false, style: ReloadStyle = 'rifle'): void {
+    const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
+    if (energy) {
+      this.sweep(0, 'sine', profile.start * 0.3, profile.start * 0.7, 0.18, 0.09);
+      return;
+    }
+    this.tick(0, profile.start * 0.55, style === 'pistol' ? 0.42 : 0.32);
+    this.tick(0.022, profile.start, style === 'pistol' ? 0.34 : 0.24);
+  }
+
+  /** Authoritative reload completion: a compact mechanical lock, never fired on cancellation. */
+  public playReloadComplete(energy: boolean = false, style: ReloadStyle = 'rifle'): void {
+    const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
+    if (energy) {
+      this.sweep(0, 'sine', profile.complete * 0.28, profile.complete * 0.72, 0.16, 0.1);
+      this.tick(0.045, profile.complete, 0.24);
+      return;
+    }
+    // Original two-stage lock: low receiver clack followed by a crisp latch.
+    this.tick(0, profile.complete * 0.42, 0.24);
+    this.tick(0.018, profile.complete, 0.4);
+    this.sweep(0, 'triangle', profile.complete * 0.16, profile.complete * 0.09, 0.08, 0.065);
   }
 
   /** Ray Gun shot: bright descending zap with a short high sizzle. */

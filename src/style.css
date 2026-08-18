@@ -89,17 +89,6 @@ body {
   left: var(--gap);
 }
 
-#aim-distance {
-  position: absolute;
-  left: 50%;
-  top: calc(50% + 32px);
-  transform: translateX(-50%);
-  color: #e8ecf1;
-  font: 600 13px 'Consolas', 'SF Mono', monospace;
-  letter-spacing: 0.08em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
 #scope-overlay {
   position: absolute;
   inset: 0;
@@ -318,12 +307,6 @@ body {
   margin: 2px 0 6px;
 }
 
-#hud-stats {
-  right: 24px;
-  bottom: 24px;
-  min-width: 160px;
-}
-
 /* ---------- Zombies mode ---------- */
 
 #hud-zombies {
@@ -461,7 +444,6 @@ body {
   }
 }
 
-#mode-select,
 #map-select,
 #game-over {
   position: fixed;
@@ -729,7 +711,6 @@ html.touch-controls-enabled #hud-weapon {
   min-width: 0;
 }
 
-html.touch-controls-enabled #hud-stats,
 html.touch-controls-enabled #hud-zombies {
   right: calc(10px + env(safe-area-inset-right, 0px));
   top: calc(62px + env(safe-area-inset-top, 0px));
@@ -774,7 +755,6 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled #hud-zombies { max-width: 120px; }
   html.touch-controls-enabled #z-round { font-size: 11px; letter-spacing: 0.08em; margin-bottom: 2px; }
   html.touch-controls-enabled #z-hp-bar { height: 3px; margin: 2px 0 3px; }
-  html.touch-controls-enabled #aim-distance { top: calc(50% + 26px); font-size: 11px; }
   html.touch-controls-enabled #banner-title { font-size: 26px; letter-spacing: 0.2em; }
   html.touch-controls-enabled #banner-sub { font-size: 11px; letter-spacing: 0.25em; }
   html.touch-controls-enabled #interact-prompt { top: 56%; font-size: 13px; letter-spacing: 0.16em; }

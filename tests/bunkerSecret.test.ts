@@ -58,12 +58,15 @@ describe('Burned Mansion secret bunker interaction', () => {
     expect(unlocks).toBe(1);
   });
 
-  it('grants the existing Ray Gun only when its in-room pickup is used', () => {
+  it.each([
+    ['raygun', 'rayGunUnlocked'],
+    ['tesla', 'teslaUnlocked'],
+  ] as const)('grants %s and marks its existing milestone when the bunker pickup is used', (weaponId, flag) => {
     const mode = new ZombiesMode('burned-mansion');
     let claimed = false;
     const pickup: ArenaWeaponPickup = {
-      id: 'bunker-raygun',
-      weaponId: 'raygun',
+      id: `bunker-${weaponId}`,
+      weaponId,
       position: { x: 0, y: 0, z: 0 },
       floor: -1,
       useRange: 2,
@@ -85,7 +88,8 @@ describe('Burned Mansion secret bunker interaction', () => {
 
     mode.onInteract();
 
-    expect(grants).toEqual(['raygun']);
+    expect(grants).toEqual([weaponId]);
     expect(claimed).toBe(true);
+    expect((mode as unknown as Record<string, boolean>)[flag]).toBe(true);
   });
 });

@@ -9,7 +9,7 @@ export interface GrantResult {
 
 /**
  * Pure slot-based weapon inventory. Zombies caps it at two weapons; the
- * Shooting Range runs one slot per weapon. Contains no Three.js code so the
+ * Supports configurable slot caps. Contains no Three.js code so the
  * pickup/replace rules are unit-testable on their own.
  *
  * Grant rules:

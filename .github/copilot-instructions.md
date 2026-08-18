@@ -58,8 +58,7 @@ estar verdes.** No hay CI que te salve.
 ```
 src/
   core/Game.ts            Raíz: renderer, loop, cableado. Mode-agnóstico.
-  modes/GameMode.ts       Contrato de modos + ModeContext (lo que un modo ve).
-  modes/ShootingRangeMode.ts  Campo de tiro clásico.
+  modes/GameMode.ts       Contrato de ZombiesMode + ModeContext.
   modes/ZombiesMode.ts    Rondas, salud, Mystery Box, Ray Gun, Tesla.
   weapons/                Weapon (lógica) + WeaponView (visual) + configs.
   shooting/               BallisticsSystem (segmentos) + trajectory (puro).

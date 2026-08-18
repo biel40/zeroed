@@ -1,5 +1,11 @@
 # Decisiones arquitectonicas
 
+## [2026-08-18] Exponer unicamente mapas Zombies
+
+- Contexto: el producto ya no ofrece el modo de practica normal y debe arrancar con los dos mapas Zombies desarrollados.
+- Decision: `main.ts` abre directamente el selector `classic` / `burned-mansion`; se elimina `ShootingRangeMode`, pero se conserva `ShootingRange` como geometria reutilizada por `ClassicArena`.
+- Motivo: eliminar una ruta de producto sin duplicar ni romper la infraestructura fisica del mapa Classic Zombies.
+
 ## [2026-08-16] Mantener un shell comun con modos aislados
 
 - Contexto: campo de tiro y Zombies comparten render, jugador, armas, balistica, audio y HUD, pero no su estado de juego.

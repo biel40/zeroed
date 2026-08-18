@@ -345,13 +345,13 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   // Parkerized frame, blued slide (a touch lighter), walnut grip panels.
   const frameMat = new THREE.MeshStandardMaterial({
     color: config.bodyColor,
-    roughness: 0.42,
-    metalness: 0.78,
+    roughness: 0.5,
+    metalness: 0.68,
   });
   const slideMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(config.bodyColor).offsetHSL(0, 0, 0.045),
-    roughness: 0.3,
-    metalness: 0.9,
+    color: new THREE.Color(config.bodyColor).offsetHSL(0, 0, 0.025),
+    roughness: 0.4,
+    metalness: 0.78,
   });
   const gripMat = new THREE.MeshStandardMaterial({
     color: config.accentColor,
@@ -389,8 +389,10 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   // --- Frame (static): rails, trigger-guard loop, controls, grip ---
   add(new RoundedBoxGeometry(0.03, 0.032, length, 2, 0.004), frameMat, 0, 0, 0);
   // Trigger guard: bottom bar + curved front strap form the classic loop.
-  add(new RoundedBoxGeometry(0.024, 0.006, 0.064, 2, 0.003), frameMat, 0, -0.032, -0.013);
-  add(new RoundedBoxGeometry(0.024, 0.026, 0.007, 2, 0.003), frameMat, 0, -0.021, -0.044, -0.12);
+  const triggerGuardBottom = add(new RoundedBoxGeometry(0.024, 0.006, 0.064, 2, 0.003), frameMat, 0, -0.032, -0.013);
+  triggerGuardBottom.name = 'm1911-trigger-guard';
+  const triggerGuardFront = add(new RoundedBoxGeometry(0.024, 0.026, 0.007, 2, 0.003), frameMat, 0, -0.021, -0.044, -0.12);
+  triggerGuardFront.name = 'm1911-trigger-guard';
   // Curved trigger shoe inside the guard.
   add(new RoundedBoxGeometry(0.005, 0.018, 0.007, 2, 0.002), dark, 0, -0.023, -0.012, 0.18);
   // Beavertail grip safety sweeping over the web of the hand.
@@ -415,9 +417,10 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   // Grip: steel core, walnut panels and a steel mainspring housing, on the
   // classic 1911 rake. Screws sit on the panel faces along that same rake
   // (offsets are the panel-center ± the rotated grip axis).
-  add(new RoundedBoxGeometry(0.028, 0.098, 0.036, 2, 0.005), frameMat, 0, -0.062, 0.048, 0.28);
+  const gripCore = add(new RoundedBoxGeometry(0.028, 0.098, 0.036, 2, 0.005), frameMat, 0, -0.062, 0.048, 0.28);
+  gripCore.name = 'm1911-grip-core';
   for (const side of [-1, 1]) {
-    add(
+    const panel = add(
       new RoundedBoxGeometry(0.0045, 0.088, 0.032, 2, 0.002),
       gripMat,
       side * 0.0158,
@@ -425,6 +428,7 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
       0.048,
       0.28,
     );
+    panel.name = 'm1911-walnut-grip-panel';
     add(new THREE.CylinderGeometry(0.0028, 0.0028, 0.002, 8), dark, side * 0.0182, -0.037, 0.0554, 0, Math.PI / 2);
     add(new THREE.CylinderGeometry(0.0028, 0.0028, 0.002, 8), dark, side * 0.0182, -0.087, 0.0406, 0, Math.PI / 2);
   }
@@ -442,11 +446,13 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
 
   // --- SLIDE GROUP — everything in here moves with the blowback / racking ---
   const slide = new THREE.Group();
+  slide.name = 'm1911-slide';
   slide.position.set(0, slideY, 0);
   const slideBody = new THREE.Mesh(
     new RoundedBoxGeometry(0.034, 0.03, length * 1.02, 2, 0.006),
     slideMat,
   );
+  slideBody.name = 'm1911-slide-body';
   slide.add(slideBody);
 
   const slideAdd = (
@@ -462,20 +468,28 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     return mesh;
   };
 
-  // Cocking serrations: dark raised ribs read as grooves. Rear AND front,
-  // like a modern 1911.
-  for (let i = 0; i < 5; i++) {
-    slideAdd(new THREE.BoxGeometry(0.036, 0.026, 0.0028), dark, 0, 0, length / 2 - 0.016 - i * 0.006);
-  }
-  for (let i = 0; i < 3; i++) {
-    slideAdd(new THREE.BoxGeometry(0.036, 0.026, 0.0028), dark, 0, 0, -length / 2 + 0.014 + i * 0.006);
+  // Shallow side grooves preserve the 1911 slide silhouette from the rear;
+  // full-width ribs read as a ladder when seen down the sights.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 5; i++) {
+      const serration = slideAdd(
+        new THREE.BoxGeometry(0.0022, 0.018, 0.0028),
+        dark,
+        side * 0.0174,
+        -0.001,
+        length / 2 - 0.016 - i * 0.006,
+      );
+      serration.name = 'm1911-slide-serration';
+    }
   }
   // Ejection port: a dark inset plate on the top-right of the slide.
-  slideAdd(new RoundedBoxGeometry(0.015, 0.002, 0.032, 2, 0.001), dark, 0.0075, 0.0152, -0.03);
+  const ejectionPort = slideAdd(new RoundedBoxGeometry(0.015, 0.002, 0.032, 2, 0.001), dark, 0.0075, 0.0152, -0.03);
+  ejectionPort.name = 'm1911-ejection-port';
   // Barrel bushing ringing the muzzle at the slide face.
   const bushing = new THREE.Mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.006, 12), dark);
   bushing.rotation.x = Math.PI / 2;
   bushing.position.set(0, 0.001, -length / 2 + 0.0005);
+  bushing.name = 'm1911-barrel-bushing';
   slide.add(bushing);
 
   // Novak-style sights ON the slide: two rear blocks leave a REAL notch you
@@ -1119,6 +1133,22 @@ export function buildWeaponDisplayModel(
   return wrapper;
 }
 
+/** Resolves a detachable GLB magazine pose, with bounds fallback for legacy definitions. */
+export function resolveGlbMagazinePose(
+  view: ViewModelConfig,
+  box: THREE.Box3,
+  sightY: number,
+): { readonly position: THREE.Vector3; readonly rotation: THREE.Euler } {
+  const anim = view.reloadAnim;
+  if (!anim) throw new Error('Reload animation config required for GLB magazine pose');
+  const [x, y, z] = anim.magAnchor ?? [0, sightY * 0.35 - anim.magSize[1] * 0.35, box.min.z * 0.45];
+  const [rx, ry, rz] = anim.magRotation ?? [0, 0, 0];
+  return {
+    position: new THREE.Vector3(x, y, z),
+    rotation: new THREE.Euler(rx, ry, rz),
+  };
+}
+
 /**
  * First-person view model. Purely visual: hip/ADS pose blending, mouse sway,
  * movement bob, spring-based visual recoil and state animations. All values
@@ -1310,9 +1340,12 @@ export class WeaponView {
           metalness: 0.6,
         }),
       );
-      magazine.position.set(0, sightY * 0.35 - magH * 0.35, box.min.z * 0.45);
-      if (anim.style === 'rock') magazine.rotation.x = 0.22; // AK curve hint
+      const pose = resolveGlbMagazinePose(view, box, sightY);
+      magazine.position.copy(pose.position);
+      magazine.rotation.copy(pose.rotation);
+      if (anim.style === 'rock' && !anim.magRotation) magazine.rotation.x = 0.22;
     }
+    magazine.name = `reload-magazine:${this.definition.id}`;
     this.root.add(magazine);
 
     let handle: THREE.Mesh | null = null;

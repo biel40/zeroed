@@ -10,6 +10,13 @@ export interface ZombieModelSource {
 
 export type ZombieVariantId = 'walker';
 
+/**
+ * Playback rate cap for the long ZombieBite mocap take. Bumped from 2.5 to
+ * 3.0 alongside the shorter gameplay attack duration (see ZombieConfig) so
+ * the bite genuinely plays faster instead of just cutting the tail earlier.
+ */
+const ATTACK_TIME_SCALE_CAP = 3.0;
+
 interface VariantConfig {
   /** World height the model is normalized to, meters. */
   readonly height: number;
@@ -407,10 +414,10 @@ export class ZombieVisual {
     if (state === 'attack' || state === 'barrierAttack') {
       const clip = next.getClip();
       const raw = clip.duration / Math.max(this.attackDuration, 1e-3);
-      if (raw > 2.5) {
+      if (raw > ATTACK_TIME_SCALE_CAP) {
         // Long mocap take: skip the idle wind-up, cap the playback rate.
         next.time = clip.duration * 0.3;
-        next.timeScale = 2.5;
+        next.timeScale = ATTACK_TIME_SCALE_CAP;
       } else {
         next.timeScale = raw;
       }

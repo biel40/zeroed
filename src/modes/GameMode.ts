@@ -12,8 +12,6 @@ import type { HUD } from '../ui/HUD';
 import type { Weapon } from '../weapons/Weapon';
 import type { WeaponId } from '../weapons/WeaponTypes';
 
-export type GameModeId = 'range' | 'zombies';
-
 /** Everything a mode needs from the shared Game shell. */
 export interface ModeContext {
   readonly scene: THREE.Scene;
@@ -59,17 +57,14 @@ export interface ModeContext {
 /**
  * A game mode plugged into the shared shell (renderer, player, weapons,
  * ballistics, HUD). Implementations keep mode-specific systems isolated so
- * the shooting range never learns what a zombie is, and vice versa.
+ * the shared shell never learns map-specific Zombies behavior.
  */
 export interface GameMode {
-  readonly id: GameModeId;
+  readonly id: 'zombies';
   /** Weapons instantiated and preloaded for this mode (no runtime loads). */
   readonly weaponIds: readonly WeaponId[];
-  /** Enables the center-screen rangefinder and its periodic aim raycast. */
-  readonly showsAimDistance?: boolean;
   /**
-   * Loadout the player starts with. Defaults to weaponIds (the Shooting
-   * Range keeps one slot per weapon; Zombies starts with the M1911 alone).
+   * Loadout the player starts with. Zombies starts with the M1911 alone.
    */
   readonly startingInventory?: readonly WeaponId[];
   /** Inventory slot cap; defaults to weaponIds.length (effectively uncapped). */
@@ -78,8 +73,7 @@ export interface GameMode {
    * Starting reserve ammunition per weapon, when the mode overrides the
    * definition's default. Return undefined to keep the definition value
    * (which itself may be undefined = bottomless). Zombies uses this to give
-   * every weapon a finite pool while the Shooting Range stays bottomless —
-   * the shared WeaponDefinition is never mutated per mode.
+   * every weapon a finite pool without mutating the shared definition.
    */
   reserveAmmoFor?(id: WeaponId): number | undefined;
   init(ctx: ModeContext): void;
@@ -108,8 +102,7 @@ export interface GameMode {
   /**
    * The pause menu's RESTART action. The mode resets its own run state
    * (health, rounds, kills, economy, arsenal) and resumes play. Optional:
-   * modes without run state (the Shooting Range) may omit it — Game falls
-   * back to re-locking the pointer.
+   * a future mode without run state may omit it; Game then only re-locks.
    */
   onRestartRequested?(): void;
   /**

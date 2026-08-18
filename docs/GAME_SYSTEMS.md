@@ -10,9 +10,7 @@ Entrada desktop/tactil
        -> BallisticsSystem ----------------------+
        -> EnergyProjectiles (solo Zombies)       |
                                                   v
-GameMode <- impactos <- HitTarget / entorno / Zombie
-  -> ShootingRangeMode -> Targets -> Stats -> HUD
-  -> ZombiesMode
+ZombiesMode <- impactos <- HitTarget / entorno / Zombie
        -> PlayerHealth -> game over/restart
        -> PlayerEconomy -> Points
        -> RoundManager -> ZombieManager -> ZombiePool
@@ -25,20 +23,9 @@ GameMode <- impactos <- HitTarget / entorno / Zombie
 
 - `Input` unifica teclado/raton y controles tactiles mediante `InputState`.
 - `PlayerController` aplica look, recoil de camara, movimiento, salto y colision opcional del mapa.
-- `WeaponInventory` selecciona slots; `Weapon` gobierna gameplay; `WeaponView` representa el arma.
+- `WeaponInventory` selecciona slots; `Weapon` gobierna gameplay; `WeaponView` anima recargas por fases y `AudioSystem` sincroniza el foley hasta el cierre confirmado.
 - `BallisticsSystem` consume el array vivo de colliders y envia impactos al modo activo.
 - `Stats`, `AudioSystem`, `Effects`, `HUD` y `AssetManager` son servicios compartidos por `ModeContext`.
-
-## Campo de tiro
-
-```text
-WEAPON_ORDER (M4A1, AK-47, M60, L96, M1911)
-  -> disparo balistico
-  -> Target de acero/papel
-  -> reaccion + efectos
-  -> Stats (disparos, impactos, precision, distancia)
-  -> HUD + telemetro
-```
 
 ## Zombies
 
@@ -66,7 +53,7 @@ Points
 ## Mapas Zombies
 
 - `ClassicArena`: adapta `ShootingRange`, aplica noche, usa spawns abiertos y Mystery Box; no tiene puertas, barreras ni wall buys.
-- `BurnedMansionArena`: sustituye el range visible; aporta paredes, cinco barreras iniciales mas una de bunker, dos puertas, tres wall buys, bunker, pickup Ray Gun y transiciones de planta.
+- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; el bunker es una sala amplia con acceso por rellanos seguros, Ray Gun, ZEUS-77, M60 y navegacion compartida por jugador/zombies.
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
 - `ZombieManager` invalida decisiones de navegacion al cambiar colliders, por lo que puertas y zonas abiertas se reflejan inmediatamente.
 

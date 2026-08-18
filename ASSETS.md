@@ -50,8 +50,9 @@ Notas:
 - Variedad por instancia: tinte de piel/ropa, escala ±5 %, walk jitter ±7 %
   (sin cargar modelos adicionales).
 - Cargadores, cerrojos y tapas de alimentación de las armas son meshes
-  procedurales propios (los GLB de armas de Quaternius son mono-mesh); los
-  cargadores soltados se reciclan en un pool de 12 (`src/weapons/MagazineDrop.ts`).
+  procedurales propios (los GLB de armas de Quaternius son mono-mesh). Sus
+  anclas locales pueden declararse por arma; los cargadores soltados se
+  reciclan en un pool de 12 (`src/weapons/MagazineDrop.ts`).
 
 ## Texturas PBR (`public/assets/textures/`)
 

@@ -17,6 +17,11 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-18 — Entrada exclusiva de Zombies](2026-08-18-zombies-only-entry.md)
+- [2026-08-18 — Bunker ampliado y audio M1911](2026-08-18-bunker-expansion-m1911-audio.md)
+- [2026-08-18 — Animacion y audio de recarga](2026-08-18-reload-animation-audio.md)
+- [2026-08-18 — Identidad visual de la M1911](2026-08-18-m1911-visual-identity.md)
+- [2026-08-18 — Progresion de armas en Burned Mansion](2026-08-18-burned-mansion-progression.md)
 - [2026-08-17 — Ventana de esquiva en el ataque cuerpo a cuerpo del zombie](2026-08-17-zombie-attack-dodge-window.md)
 - [2026-08-16 - Recuperacion de Pointer Lock en escritorio](2026-08-16-pointer-lock-recovery.md)
 - [2026-08-16 — Failsafe de navegacion zombie](2026-08-16-zombie-navigation-failsafe.md)

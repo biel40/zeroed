@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
-import { ShootingRangeMode } from '../src/modes/ShootingRangeMode';
 import type { GameMode } from '../src/modes/GameMode';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING } from '../src/zombies/MysteryBox';
 import { RAYGUN_UNLOCK_KILLS } from '../src/zombies/ZombieConfig';
@@ -55,22 +54,6 @@ describe('Zombies progression contract', () => {
     expect(MYSTERY_BOX_TUNING.pickupTime).toBe(10);
   });
 
-  it('does not touch the Shooting Range: no box, no cap, no finite reserve', () => {
-    // Typed as the GameMode interface: the contract is what matters here.
-    const mode: GameMode = new ShootingRangeMode();
-    expect(mode.startingInventory).toBeUndefined();
-    expect(mode.maxWeapons).toBeUndefined();
-    // The range never overrides reserves: every weapon stays bottomless.
-    expect(mode.reserveAmmoFor).toBeUndefined();
-    expect(mode.onInteract).toBeUndefined();
-    expect(mode.getInteractPrompt).toBeUndefined();
-    expect(mode.weaponIds).not.toContain('raygun');
-    // Every range weapon keeps a bottomless reserve.
-    for (const id of mode.weaponIds) {
-      if (id === 'm1911') continue; // the pistol keeps its 32 everywhere
-      expect(WEAPON_DEFINITIONS[id].reserveAmmo).toBeUndefined();
-    }
-  });
 });
 
 /**

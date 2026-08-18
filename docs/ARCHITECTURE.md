@@ -7,18 +7,17 @@ FPS de navegador en TypeScript estricto, Three.js, Vite y Vitest. No usa framewo
 ```text
 index.html / src/main.ts
   -> DeviceProfile + AssetManager + HUD
-  -> selector de GameMode/mapa
+  -> selector directo de mapa Zombies
   -> core/Game.ts                    shell y composition root
        -> player/                    input y controlador FPS
        -> weapons/ + config/         logica, datos y vista de armas
        -> shooting/                  balistica compartida
        -> range/                     escenario y HitTargets
        -> rendering/ + audio/ + ui/ efectos laterales
-       -> modes/GameMode.ts          frontera del modo
-            -> ShootingRangeMode
-            -> ZombiesMode
-                 -> zombies/         run, enemigos e interacciones
-                 -> zombies/maps/    entorno fisico por ZombieArena
+        -> modes/GameMode.ts          frontera del modo Zombies
+             -> ZombiesMode
+                  -> zombies/         run, enemigos e interacciones
+                  -> zombies/maps/    ClassicArena / BurnedMansionArena
 ```
 
 ## Flujo de ejecucion
@@ -27,7 +26,7 @@ index.html / src/main.ts
 main.ts
   -> detecta WebGL y perfil
   -> precarga manifest
-  -> selecciona modo/mapa
+  -> selecciona mapa Zombies
   -> new Game(..., mode)
   -> mode.init(ModeContext)
   -> renderer.setAnimationLoop(Game.tick)

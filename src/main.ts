@@ -4,7 +4,6 @@ import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
-import { ShootingRangeMode } from './modes/ShootingRangeMode';
 import { ZombiesMode } from './modes/ZombiesMode';
 import { HUD } from './ui/HUD';
 
@@ -41,16 +40,9 @@ try {
   await assets.loadAll(manifest, (loaded, total) => hud.setLoadProgress(loaded / total));
   hud.setReady();
 
-  // Mode selection comes first: each mode only initializes what it needs.
-  // Zombies then asks for a map before the classic click-to-start screen.
-  hud.showModeSelect((modeId: string) => {
-    if (modeId === 'zombies') {
-      hud.showMapSelect((mapId: string) => {
-        startGame(new ZombiesMode(mapId as 'classic' | 'burned-mansion'));
-      });
-      return;
-    }
-    startGame(new ShootingRangeMode());
+  // Zombies is the only game mode; the player chooses its arena directly.
+  hud.showMapSelect((mapId) => {
+    startGame(new ZombiesMode(mapId));
   });
 
   function startGame(mode: GameMode): void {
