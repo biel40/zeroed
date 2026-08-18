@@ -11,14 +11,14 @@ Estado inspeccionado: 2026-08-18. La fuente de verdad es el codigo actual; `READ
 - Zombies con salud, Points, inventario de dos slots, rondas infinitas, pool de 24 enemigos, ataques y navegacion con steering local, rutas de recuperacion y failsafe de recolocacion (`src/modes/ZombiesMode.ts`, `src/zombies/`).
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
-- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, zonas desbloqueables y transiciones de planta (`src/zombies/maps/`).
+- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, escalera continua compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
 - Suite Vitest de logica determinista: 46 archivos y 388 tests pasan. `npm run typecheck` tambien pasa.
 
 ## Sistemas parciales o limitados
 
 - Los tests se ejecutan en Node: no cubren WebGL, DOM real, pointer lock, fullscreen, audio real ni flujos end-to-end de arranque/pausa/reinicio.
 - La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding acotado solo se activa al detectar falta de progreso; los spawns siguen definidos en planta 0.
-- Las escaleras de la mansion son zonas de transicion, no superficies navegables continuas.
+- La escalera del bunker usa escalones visuales uniformes sobre una pendiente de navegacion continua; la identidad de planta cambia en los rellanos, sin teletransporte.
 - Tablas de barrera, Mystery Box, wall buys y pickups son principalmente visuales/logicos; varios no forman parte de la colision fisica o balistica.
 - Solo existe la variante zombie `walker`. M60, M1911, Ray Gun y ZEUS-77 usan modelos procedurales.
 - Los proyectiles de energia comparten un alcance fijo de 80 m y su comportamiento solo distingue Tesla de Ray Gun por color.
@@ -32,7 +32,6 @@ Estado inspeccionado: 2026-08-18. La fuente de verdad es el codigo actual; `READ
 - La distancia reportada por balas cuenta dos veces parte del segmento de impacto (`src/shooting/BallisticsSystem.ts:172`, `src/shooting/trajectory.ts:47`).
 - La muerte de un zombie asigna una Y absoluta durante el fade; los cadaveres del bunker suben hacia Y=0 (`src/zombies/Zombie.ts:232`).
 - En tactil, movimiento y disparo siguen activos detras de la pantalla de game over (`src/core/Game.ts:565`, `src/modes/ZombiesMode.ts:174`).
-- La musica de inicio de ronda no tiene caller de produccion; el loop de fondo se usa durante la pausa, no durante la partida (`src/audio/MusicManager.ts`, `src/core/Game.ts:348`).
 
 ## Funcionalidad pendiente representada en el codigo
 

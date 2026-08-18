@@ -4,6 +4,9 @@ import type { PointDoor } from './PointDoor';
 const DOOR_WIDTH = 1.6;
 const DOOR_HEIGHT = 2.1;
 const DOOR_THICK = 0.12;
+const BUNKER_OPEN_DURATION = 2.4;
+
+export type DoorOpeningState = 'CLOSED' | 'OPENING' | 'OPEN';
 
 /**
  * Simple wooden door visual. On unlock it slides outward and fades so the
@@ -14,6 +17,10 @@ export class PointDoorView {
   readonly collider: THREE.Mesh;
   private readonly mesh: THREE.Mesh;
   private readonly sign: THREE.Mesh;
+  private readonly sealed: boolean;
+  private wheel: THREE.Mesh | null = null;
+  private openingState: DoorOpeningState = 'CLOSED';
+  private openingElapsed = 0;
 
   constructor(
     private readonly door: PointDoor,
@@ -21,6 +28,7 @@ export class PointDoorView {
   ) {
     const geometry = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICK);
     const sealed = door.id === 'nuclear-bunker';
+    this.sealed = sealed;
     const material = new THREE.MeshStandardMaterial({
       color: sealed ? 0x252d2f : 0x4a3c32,
       roughness: sealed ? 0.48 : 0.85,
@@ -40,6 +48,7 @@ export class PointDoorView {
         new THREE.MeshStandardMaterial({ color: 0x596164, metalness: 0.9, roughness: 0.38 }),
       );
       wheel.position.set(0, 0.95, DOOR_THICK / 2 + 0.06);
+      this.wheel = wheel;
       const viewport = new THREE.Mesh(
         new THREE.BoxGeometry(0.4, 0.12, 0.035),
         new THREE.MeshBasicMaterial({ color: 0x5c0906 }),
@@ -68,8 +77,34 @@ export class PointDoorView {
     parent.add(this.group);
   }
 
-  public update(dt: number): void {
-    if (this.door.state === 'unlocked') {
+  public get state(): DoorOpeningState {
+    return this.openingState;
+  }
+
+  public beginOpening(): boolean {
+    if (!this.sealed || this.door.isLocked || this.openingState !== 'CLOSED') return false;
+    this.openingState = 'OPENING';
+    this.openingElapsed = 0;
+    return true;
+  }
+
+  /** Returns true only on the frame where the sealed door reaches OPEN. */
+  public update(dt: number): boolean {
+    if (this.sealed) {
+      if (this.openingState !== 'OPENING') return false;
+      this.openingElapsed = Math.min(BUNKER_OPEN_DURATION, this.openingElapsed + dt);
+      const progress = this.openingElapsed / BUNKER_OPEN_DURATION;
+      const eased = progress * progress * (3 - 2 * progress);
+      if (this.wheel) this.wheel.rotation.z = -Math.PI * 2 * Math.min(1, progress / 0.45);
+      const slide = Math.max(0, (eased - 0.22) / 0.78);
+      this.mesh.position.z = slide * 2.25;
+      if (progress < 1) return false;
+      this.mesh.visible = false;
+      this.openingState = 'OPEN';
+      return true;
+    }
+
+    if (this.door.state === 'unlocked' && this.openingState !== 'OPEN') {
       // Slide outward and sink slightly, then hide.
       const speed = 2.2;
       // The group's local +Z is aligned with the configured outward normal.
@@ -81,13 +116,18 @@ export class PointDoorView {
         material.opacity = Math.max(0, material.opacity - 1.5 * dt);
       } else {
         this.mesh.visible = false;
+        this.openingState = 'OPEN';
       }
     }
+    return false;
   }
 
   public reset(): void {
     this.mesh.position.set(0, DOOR_HEIGHT / 2, 0);
     this.mesh.visible = true;
+    this.openingState = 'CLOSED';
+    this.openingElapsed = 0;
+    if (this.wheel) this.wheel.rotation.z = 0;
     const material = this.mesh.material as THREE.MeshStandardMaterial;
     material.opacity = 1;
     material.transparent = false;

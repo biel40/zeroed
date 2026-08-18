@@ -241,6 +241,7 @@ export class Game {
         return this.inventory.has(id) && !!entry && entry.weapon.refillAmmo();
       },
       resetArsenal: () => this.resetArsenal(),
+      returnToMainMenu: () => this.returnToMainMenu(),
     });
 
     this.input.onLockChange = (locked) => this.handlePointerLockChange(locked);
@@ -256,7 +257,7 @@ export class Game {
     this.hud.setPauseHandlers({
       onResume: () => this.resume(),
       onRestart: () => this.restartRun(),
-      onMainMenu: () => window.location.reload(),
+      onMainMenu: () => this.returnToMainMenu(),
     });
     // ESC to resume while the menu is open and the pointer is unlocked.
     document.addEventListener('keydown', (e) => {
@@ -299,6 +300,7 @@ export class Game {
       this.gameplayStarted = true;
       this.paused = false;
       this.audio.music.stopBackgroundLoop();
+      if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
@@ -327,6 +329,7 @@ export class Game {
       this.paused = false;
       this.audio.music.stopBackgroundLoop();
       this.audio.resumeMusic();
+      if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
@@ -373,6 +376,25 @@ export class Game {
     // economy and re-locks the pointer. Modes without run state still relock.
     if (this.mode.onRestartRequested) this.mode.onRestartRequested();
     else this.start();
+  }
+
+  private returnToMainMenu(): void {
+    this.paused = true;
+    this.gameplayStarted = false;
+    this.pointerLockRequested = false;
+    this.renderer.setAnimationLoop(null);
+    this.audio.stopMusic();
+    this.audio.stopWind();
+    this.hud.hideEnding();
+    this.hud.hideGameOver();
+    this.hud.hidePauseMenu();
+    this.hud.setHudVisible(false);
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.hud.showMapSelect((mapId) => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('map', mapId);
+      window.location.assign(url);
+    });
   }
 
   /** Arsenal lookup; every WeaponId the modes reference is preloaded. */
@@ -563,7 +585,9 @@ export class Game {
     }
 
     let weapon = this.currentWeapon;
-    const allowGameplayInput = this.input.pointerLocked || this.profile.useTouchControls;
+    let allowGameplayInput =
+      (this.input.pointerLocked || this.profile.useTouchControls) &&
+      (this.mode.isGameplayInputEnabled?.() ?? true);
 
     if (allowGameplayInput) {
       for (let i = 0; i < this.inventory.weapons.length; i++) {
@@ -575,20 +599,25 @@ export class Game {
       if (this.input.wasPressed('KeyR')) weapon.reload();
       if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
+      allowGameplayInput =
+        (this.input.pointerLocked || this.profile.useTouchControls) &&
+        (this.mode.isGameplayInputEnabled?.() ?? true);
     }
 
     // Interactions may equip a purchased/picked-up weapon in this same frame.
     weapon = this.currentWeapon;
 
-    this.player.update(dt, this.input, weapon);
+    this.player.update(dt, this.input, weapon, allowGameplayInput);
     this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown;
     this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown;
     this.frameInput.repeatSemiAuto = allowGameplayInput && this.input.repeatSemiAuto;
-    weapon.update(dt, this.frameInput);
-    this.processWeaponEvents();
+    if (allowGameplayInput) {
+      weapon.update(dt, this.frameInput);
+      this.processWeaponEvents();
+      this.ballistics.update(dt);
+      this.range.update(dt);
+    }
 
-    this.ballistics.update(dt);
-    this.range.update(dt);
     this.mode.update(dt);
     this.currentView.update(
       dt,

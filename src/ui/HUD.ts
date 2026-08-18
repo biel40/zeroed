@@ -56,6 +56,7 @@ export class HUD {
   private readonly goHeadshots = mustGet('go-headshots');
   private readonly mapSelect = mustGet('map-select');
   private readonly interactPrompt = mustGet('interact-prompt');
+  private readonly endingScreen = mustGet('ending-screen');
 
   private lastWeapon = '';
   private lastAmmo = '';
@@ -184,6 +185,27 @@ export class HUD {
 
   setZombiesRestartHandler(handler: () => void): void {
     mustGet('go-restart').addEventListener('click', handler);
+  }
+
+  showEnding(): void {
+    this.setInteractionPrompt(null);
+    this.endingScreen.classList.remove('hidden', 'credits');
+    this.endingScreen.classList.add('ending');
+  }
+
+  showCredits(): void {
+    this.root.classList.add('hidden');
+    this.endingScreen.classList.remove('ending');
+    this.endingScreen.classList.add('credits');
+  }
+
+  hideEnding(): void {
+    this.endingScreen.classList.add('hidden');
+    this.endingScreen.classList.remove('ending', 'credits');
+  }
+
+  setCreditsMainMenuHandler(handler: () => void): void {
+    (mustGet('credits-main-menu') as HTMLButtonElement).onclick = handler;
   }
 
   /** Pause menu: shown while the game loop is halted (Game owns the state). */

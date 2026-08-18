@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { DeviceProfile } from '../../core/DeviceProfile';
-import { EYE_HEIGHT, type FloorTransitionZone } from '../../player/PlayerController';
+import { EYE_HEIGHT, type FloorTransitionZone, type StairRamp } from '../../player/PlayerController';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
 import { PointDoor } from '../doors/PointDoor';
@@ -11,7 +11,7 @@ import { WallBuyView } from '../wallbuys/WallBuyView';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
-import type { ArenaWeaponPickup, ZombieArena } from './ZombieArena';
+import type { ArenaCompletionInteraction, ArenaWeaponPickup, ZombieArena } from './ZombieArena';
 import {
   createMansionSurfaceMaterials,
   projectBoxUVs,
@@ -22,6 +22,7 @@ import {
   DEBUG_MAP_COLLIDERS,
   MANSION_BARRIERS,
   MANSION_BUNKER_BOUNDS,
+  MANSION_BUNKER_ENDING,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
   MANSION_DOORS,
@@ -94,6 +95,8 @@ export class BurnedMansionArena implements ZombieArena {
     { floor: -1, ...MANSION_BUNKER_BOUNDS },
   ] as const;
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
+  readonly completionInteraction: ArenaCompletionInteraction = MANSION_BUNKER_ENDING;
+  onTopologyChanged: (() => void) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -110,6 +113,7 @@ export class BurnedMansionArena implements ZombieArena {
   private readonly doorViews: PointDoorView[] = [];
   private readonly doorMeshes: THREE.Mesh[] = [];
   private readonly activeSpawnZones = new Set<string>(['start']);
+  private readonly openDoorIds = new Set<string>();
   private readonly materials: MansionSurfaceMaterials;
   private wallMaterialIndex = 0;
   private bunkerEmergencyLight: THREE.PointLight | null = null;
@@ -188,7 +192,14 @@ export class BurnedMansionArena implements ZombieArena {
 
   public update(dt: number): void {
     for (const view of this.barrierViews) view.update();
-    for (const view of this.doorViews) view.update(dt);
+    for (let index = 0; index < this.doorViews.length; index++) {
+      if (!this.doorViews[index].update(dt)) continue;
+      const doorId = this.doors[index].id;
+      this.openDoorIds.add(doorId);
+      this.activeSpawnZones.add(doorId);
+      this.refreshProgressionState();
+      this.onTopologyChanged?.();
+    }
     this.ambienceTime += dt;
     if (this.bunkerEmergencyLight) {
       this.bunkerEmergencyLight.intensity = 1.05 + Math.sin(this.ambienceTime * 3.1) * 0.18;
@@ -202,6 +213,7 @@ export class BurnedMansionArena implements ZombieArena {
     for (const pickup of this.weaponPickups) pickup.reset();
     this.activeSpawnZones.clear();
     this.activeSpawnZones.add('start');
+    this.openDoorIds.clear();
     this.refreshProgressionState();
   }
 
@@ -210,6 +222,9 @@ export class BurnedMansionArena implements ZombieArena {
     if (!this.doors.some((door) => door.id === doorId) || this.activeSpawnZones.has(doorId)) {
       return false;
     }
+    const index = this.doors.findIndex((door) => door.id === doorId);
+    if (doorId === 'nuclear-bunker') return this.doorViews[index].beginOpening();
+    this.openDoorIds.add(doorId);
     this.activeSpawnZones.add(doorId);
     this.refreshProgressionState();
     return true;
@@ -276,7 +291,7 @@ export class BurnedMansionArena implements ZombieArena {
   private collectBallisticColliders(): ReadonlyArray<THREE.Object3D> {
     const colliders: THREE.Object3D[] = [...this.structureMeshes];
     for (let i = 0; i < this.doors.length; i++) {
-      if (this.doors[i].isLocked) colliders.push(this.doorMeshes[i]);
+      if (!this.openDoorIds.has(this.doors[i].id)) colliders.push(this.doorMeshes[i]);
     }
     return colliders;
   }
@@ -284,7 +299,7 @@ export class BurnedMansionArena implements ZombieArena {
   private collectPlayerWallColliders(): ReadonlyArray<THREE.Box3> {
     const boxes = this.playerWallMeshes.map((mesh) => new THREE.Box3().setFromObject(mesh));
     for (let i = 0; i < this.doors.length; i++) {
-      if (this.doors[i].isLocked) boxes.push(new THREE.Box3().setFromObject(this.doorMeshes[i]));
+      if (!this.openDoorIds.has(this.doors[i].id)) boxes.push(new THREE.Box3().setFromObject(this.doorMeshes[i]));
     }
     return boxes;
   }
@@ -326,43 +341,54 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   private buildStairs(): void {
-    const steps = 12;
-    const depth = 0.32;
+    const steps = 17;
+    const topZ = -2.85;
+    const bottomZ = -6.75;
+    const run = topZ - bottomZ;
+    const depth = run / steps;
+    const rise = Math.abs(MANSION_BUNKER_Y) / steps;
     for (let index = 0; index < steps; index++) {
-      const top = MANSION_BUNKER_Y + ((index + 1) / steps) * Math.abs(MANSION_BUNKER_Y);
+      const top = MANSION_BUNKER_Y + (index + 1) * rise;
       const height = top - MANSION_BUNKER_Y;
       const geometry = new THREE.BoxGeometry(1.65, Math.max(0.12, height), depth);
       this.projectSurfaceUVs(geometry, 1.65, Math.max(0.12, height), depth, this.materials.metal, index);
       const step = new THREE.Mesh(geometry, this.materials.metal);
-      step.position.set(5.15, MANSION_BUNKER_Y + height / 2, -6.7 + index * depth);
+      step.position.set(5.15, MANSION_BUNKER_Y + height / 2, bottomZ + (index + 0.5) * depth);
       step.castShadow = !this.profile.useReducedEffects;
       step.receiveShadow = true;
       step.name = `bunker-stair-step-${index}`;
       step.userData.mapRole = 'visual-stair';
       this.group.add(step);
     }
-    const railLength = 5.1;
+
+    const slopeLength = Math.hypot(run, Math.abs(MANSION_BUNKER_Y));
+    const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.08, slopeLength), this.materials.metal);
+    ramp.position.set(5.15, MANSION_BUNKER_Y / 2 - 0.04, (topZ + bottomZ) / 2);
+    ramp.rotation.x = -Math.atan2(Math.abs(MANSION_BUNKER_Y), run);
+    ramp.name = 'bunker-stair-navigation-ramp';
+    ramp.userData.surface = 'metal';
+    ramp.userData.mapRole = 'walkable-stair-ramp';
+    ramp.userData.walkableSurface = true;
+    this.structureMeshes.push(ramp);
+    this.group.add(ramp);
+
+    const railLength = slopeLength;
     for (const x of [4.25, 6.05]) {
       const rail = new THREE.Mesh(
         new THREE.CylinderGeometry(0.035, 0.035, railLength, 8),
         this.materials.metal,
       );
-      rail.position.set(x, MANSION_BUNKER_Y + 1.95, -4.9);
-      rail.rotation.x = -0.82;
+      rail.position.set(x, MANSION_BUNKER_Y / 2 + 1.05, (topZ + bottomZ) / 2);
+      rail.rotation.x = -Math.atan2(run, Math.abs(MANSION_BUNKER_Y));
       rail.name = 'bunker-stair-handrail';
       rail.userData.mapRole = 'visual-stair-rail';
       this.group.add(rail);
     }
-    const portal = new THREE.Object3D();
-    portal.name = 'bunker-stair-navigation-ramp';
-    portal.userData.mapRole = 'simplified-stair-portal';
-    this.group.add(portal);
   }
 
   private buildProps(): void {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
     this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, this.materials.charredWood);
-    this.addProp('start-table', -1.2, 0.42, 4.8, 1.1, 0.84, 0.7, this.materials.charredWood);
     this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, this.materials.charredWood);
     this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
     this.addProp('bunker-console', 6.3, MANSION_BUNKER_Y + 0.65, -1, 0.55, 1.3, 1.7, this.materials.metal);
@@ -463,10 +489,14 @@ export class BurnedMansionArena implements ZombieArena {
     }
 
     const radiationSign = new THREE.Group();
-    radiationSign.position.set(-3.035, MANSION_BUNKER_Y + 1.55, -4.4);
+    radiationSign.position.set(
+      MANSION_BUNKER_ENDING.position.x,
+      MANSION_BUNKER_ENDING.position.y,
+      MANSION_BUNKER_ENDING.position.z,
+    );
     radiationSign.rotation.y = Math.PI / 2;
     radiationSign.name = 'radiation-warning-symbol';
-    radiationSign.userData.mapRole = 'bunker-clue';
+    radiationSign.userData.mapRole = 'bunker-ending-interaction';
     const signBack = new THREE.Mesh(
       new THREE.PlaneGeometry(1.15, 1.15),
       new THREE.MeshBasicMaterial({ color: 0xb69b2f, side: THREE.DoubleSide }),
@@ -606,27 +636,36 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   private buildFloorTransitions(): ReadonlyArray<FloorTransitionZone> {
+    const ramp: StairRamp = {
+      box: new THREE.Box3(
+        new THREE.Vector3(4.25, MANSION_BUNKER_Y - 0.2, -6.78),
+        new THREE.Vector3(6.05, 2.1, -2.82),
+      ),
+      top: { x: 5.15, y: 0, z: -2.85 },
+      bottom: { x: 5.15, y: MANSION_BUNKER_Y, z: -6.75 },
+    };
     return [
       {
-        box: new THREE.Box3(new THREE.Vector3(4.15, 0, -3.2), new THREE.Vector3(6.15, 2.6, -2.6)),
+        box: new THREE.Box3(
+          new THREE.Vector3(4.2, MANSION_BUNKER_Y - 0.2, -7.1),
+          new THREE.Vector3(6.1, 1, -6.6),
+        ),
         sourceFloor: 0,
         targetFloor: -1,
         targetY: MANSION_BUNKER_Y + EYE_HEIGHT,
-        targetX: 3.75,
-        targetZ: -6.4,
         bounds: MANSION_BUNKER_BOUNDS,
+        ramp,
       },
       {
         box: new THREE.Box3(
-          new THREE.Vector3(4.15, MANSION_BUNKER_Y, -7.45),
-          new THREE.Vector3(6.15, MANSION_BUNKER_Y + 2.4, -6.82),
+          new THREE.Vector3(4.2, -0.5, -3.05),
+          new THREE.Vector3(6.1, 2.2, -2.7),
         ),
         sourceFloor: -1,
         targetFloor: 0,
         targetY: EYE_HEIGHT,
-        targetX: 5.15,
-        targetZ: -2.25,
         bounds: MANSION_GROUND_BOUNDS,
+        ramp,
       },
     ];
   }

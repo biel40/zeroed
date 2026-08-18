@@ -53,9 +53,10 @@ Points
 ## Mapas Zombies
 
 - `ClassicArena`: adapta `ShootingRange`, aplica noche, usa spawns abiertos y Mystery Box; no tiene puertas, barreras ni wall buys.
-- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; el bunker es una sala amplia con acceso por rellanos seguros, Ray Gun, ZEUS-77, M60 y navegacion compartida por jugador/zombies.
+- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; la compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece escalera continua, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos.
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
 - `ZombieManager` invalida decisiones de navegacion al cambiar colliders, por lo que puertas y zonas abiertas se reflejan inmediatamente.
+- `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
 
 ## Armas especiales
 

@@ -39,6 +39,16 @@ export const MANSION_BUNKER_BOUNDS = {
 
 export const MANSION_BUNKER_Y = -3.4;
 
+export const MANSION_BUNKER_ENDING = {
+  id: 'radiation-ending',
+  cost: 30000,
+  position: { x: -3.035, y: MANSION_BUNKER_Y + 1.55, z: -4.4 },
+  floor: -1,
+  useRange: 2.1,
+  lookDotMin: 0.5,
+  requiredDoorId: 'nuclear-bunker',
+} as const;
+
 export const MANSION_SECRET_AREAS = [
   {
     id: 'nuclear_bunker',

@@ -32,6 +32,25 @@ export interface FloorTransitionZone {
   readonly targetZ?: number;
   /** New movement bounds once on the destination floor. */
   readonly bounds: PlayerBounds;
+  /** Continuous walkable surface joining both floors, when this is a stair transition. */
+  readonly ramp?: StairRamp;
+}
+
+export interface StairRamp {
+  readonly box: THREE.Box3;
+  readonly top: { readonly x: number; readonly y: number; readonly z: number };
+  readonly bottom: { readonly x: number; readonly y: number; readonly z: number };
+}
+
+/** Ground height on a linear stair ramp, clamped to its two landings. */
+export function stairGroundY(ramp: StairRamp, x: number, z: number): number {
+  const dx = ramp.bottom.x - ramp.top.x;
+  const dz = ramp.bottom.z - ramp.top.z;
+  const lengthSq = dx * dx + dz * dz;
+  const progress = lengthSq > 0
+    ? clamp(((x - ramp.top.x) * dx + (z - ramp.top.z) * dz) / lengthSq, 0, 1)
+    : 0;
+  return lerp(ramp.top.y, ramp.bottom.y, progress);
 }
 
 /**
@@ -115,12 +134,12 @@ export class PlayerController {
     if (bounds) this.bounds = bounds;
   }
 
-  update(dt: number, input: Input, weapon: Weapon): void {
+  update(dt: number, input: Input, weapon: Weapon, allowMovement = true): void {
     const definition = weapon.definition;
 
     const sensitivity = SENSITIVITY * lerp(1, definition.ads.sensitivity, weapon.adsAlpha);
-    this.yaw -= input.mouseDeltaX * sensitivity;
-    this.pitch = clamp(this.pitch - input.mouseDeltaY * sensitivity, -PITCH_LIMIT, PITCH_LIMIT);
+    this.yaw -= (allowMovement ? input.mouseDeltaX : 0) * sensitivity;
+    this.pitch = clamp(this.pitch - (allowMovement ? input.mouseDeltaY : 0) * sensitivity, -PITCH_LIMIT, PITCH_LIMIT);
     this.rig.rotation.y = this.yaw;
     this.pitchNode.rotation.x = this.pitch;
     this.camera.rotation.set(weapon.recoil.pitch, weapon.recoil.yaw, 0);
@@ -129,12 +148,12 @@ export class PlayerController {
     // keeps combined input from exceeding full deflection, and desktop is
     // untouched because both axes stay 0 without touch controls.
     const strafe = clamp(
-      (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0) + input.moveAxisX,
+      allowMovement ? (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0) + input.moveAxisX : 0,
       -1,
       1,
     );
     const forward = clamp(
-      (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0) + input.moveAxisY,
+      allowMovement ? (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0) + input.moveAxisY : 0,
       -1,
       1,
     );
@@ -169,7 +188,17 @@ export class PlayerController {
     this.rig.position.x = nextX;
     this.rig.position.z = nextZ;
 
-    // Floor transitions: automatic on contact with a stair trigger.
+    const ramp = this.floorTransitions
+      .map((zone) => zone.ramp)
+      .find((candidate) => candidate && this.containsXZ(candidate.box, nextX, nextZ));
+    if (ramp) {
+      // The camera follows the physical slope exactly, so stopping or turning
+      // on the stairs cannot produce delayed vertical motion or a snap.
+      this.groundY = stairGroundY(ramp, nextX, nextZ) + EYE_HEIGHT;
+      this.targetY = this.groundY;
+    }
+
+    // Floor identity changes only on the far landing; the stair itself stays continuous.
     for (const zone of this.floorTransitions) {
       if (zone.sourceFloor === this.currentFloor && zone.box.containsPoint(this.rig.position)) {
         this.currentFloor = zone.targetFloor;
@@ -180,8 +209,8 @@ export class PlayerController {
         break;
       }
     }
-    this.groundY = damp(this.groundY, this.targetY, FLOOR_BLEND_SPEED, dt);
-    if (input.wasPressed('Space') && this.jumpOffset === 0) this.jumpVelocity = JUMP_SPEED;
+    if (!ramp) this.groundY = damp(this.groundY, this.targetY, FLOOR_BLEND_SPEED, dt);
+    if (allowMovement && input.wasPressed('Space') && this.jumpOffset === 0) this.jumpVelocity = JUMP_SPEED;
     if (this.jumpVelocity !== 0 || this.jumpOffset > 0) {
       this.jumpVelocity -= GRAVITY * dt;
       this.jumpOffset += this.jumpVelocity * dt;
@@ -215,5 +244,9 @@ export class PlayerController {
       if (this.tmpBox.intersectsBox(wall)) return true;
     }
     return false;
+  }
+
+  private containsXZ(box: THREE.Box3, x: number, z: number): boolean {
+    return x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z;
   }
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EYE_HEIGHT, type FloorTransitionZone } from '../player/PlayerController';
+import { EYE_HEIGHT, stairGroundY, type FloorTransitionZone } from '../player/PlayerController';
 import type { WindowBarrier } from './barriers/WindowBarrier';
 import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
@@ -224,6 +224,7 @@ export class ZombieManager {
     const box = new THREE.Box3();
     const size = new THREE.Vector3();
     for (const object of this.colliders) {
+      if (object.userData.walkableSurface === true) continue;
       if (!BLOCKING_SURFACES.has(object.userData.surface as string)) continue;
       box.setFromObject(object);
       if (box.isEmpty()) continue;
@@ -646,7 +647,20 @@ export class ZombieManager {
     if (zombie.floor !== playerFloor) {
       const portal = this.findNextFloorTransition(zombie.floor, playerFloor);
       if (portal) {
-        const center = portal.box.getCenter(this.tmpToPlayer);
+        let center: THREE.Vector3;
+        if (portal.ramp) {
+          const destinationY = portal.targetY - EYE_HEIGHT;
+          const destination = Math.abs(destinationY - portal.ramp.bottom.y) < 0.05
+            ? portal.ramp.bottom
+            : portal.ramp.top;
+          const entrance = destination === portal.ramp.bottom ? portal.ramp.top : portal.ramp.bottom;
+          const target = this.containsXZ(portal.ramp.box, zombie.position.x, zombie.position.z)
+            ? destination
+            : entrance;
+          center = this.tmpToPlayer.set(target.x, target.y, target.z);
+        } else {
+          center = portal.box.getCenter(this.tmpToPlayer);
+        }
         zombie.faceTowards(center.x, center.z, TURN_SPEED * dt);
         const toPortal = this.tmpToPlayer.set(center.x - zombie.position.x, 0, center.z - zombie.position.z);
         if (toPortal.lengthSq() > 0.01) {
@@ -1296,6 +1310,11 @@ export class ZombieManager {
   }
 
   private applyFloorTransition(zombie: Zombie): void {
+    const ramp = this.floorTransitions
+      .map((transition) => transition.ramp)
+      .find((candidate) => candidate && this.containsXZ(candidate.box, zombie.position.x, zombie.position.z));
+    if (ramp) zombie.position.y = stairGroundY(ramp, zombie.position.x, zombie.position.z);
+
     for (const transition of this.floorTransitions) {
       if (transition.sourceFloor !== zombie.floor || !transition.box.containsPoint(zombie.position)) continue;
       zombie.floor = transition.targetFloor;
@@ -1306,6 +1325,10 @@ export class ZombieManager {
       this.recoveryPaths.delete(zombie);
       return;
     }
+  }
+
+  private containsXZ(box: THREE.Box3, x: number, z: number): boolean {
+    return x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z;
   }
 
   private kill(zombie: Zombie, headshot: boolean): void {

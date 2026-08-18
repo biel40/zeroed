@@ -52,6 +52,8 @@ export interface ModeContext {
   refillWeaponAmmo(id: WeaponId): boolean;
   /** Restores the starting inventory with fresh ammo (zombies restart). */
   resetArsenal(): void;
+  /** Leaves the current run through the shell's established main-menu route. */
+  returnToMainMenu(): void;
 }
 
 /**
@@ -97,6 +99,8 @@ export interface GameMode {
    * its own UI (game over) and the default pause screen should be skipped.
    */
   onPointerUnlock?(): boolean;
+  /** Shell-level gate for movement, weapons and interactions. */
+  isGameplayInputEnabled?(): boolean;
   /** Interact key (E) pressed while gameplay input is active. */
   onInteract?(): void;
   /**

@@ -10,7 +10,7 @@ describe('MusicManager', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not trigger the round-start music track from the roundStarted event', async () => {
+  it('triggers the round-start music track on every roundStarted event', async () => {
     const { ZombiesMode } = await import('../src/modes/ZombiesMode');
     const mode: any = new ZombiesMode();
     const playRoundStartOnce = vi.fn();
@@ -31,7 +31,7 @@ describe('MusicManager', () => {
     mode['processRoundEvents']();
 
     expect(mode.ctx.audio.playRoundSting).toHaveBeenCalledTimes(1);
-    expect(playRoundStartOnce).not.toHaveBeenCalled();
+    expect(playRoundStartOnce).toHaveBeenCalledTimes(1);
   });
 
   it('preloads both zombie music tracks as soon as the audio system resumes', () => {
@@ -130,8 +130,7 @@ describe('MusicManager', () => {
     );
   });
 
-  it('reuses a single intro and loop player while slicing the intro to 3 seconds', () => {
-    vi.useFakeTimers();
+  it('reuses a single intro and loop player and lets the round-start track play out uncut', () => {
     const plays: string[] = [];
     const pauses: string[] = [];
 
@@ -163,6 +162,9 @@ describe('MusicManager', () => {
     music.playRoundStartOnce();
     music.playRoundStartOnce();
     expect(plays.filter((src) => src.includes('zombies_round_start.mp3'))).toHaveLength(1);
+    // No auto-cut timer: the round-start track is left alone until something
+    // else (pause/stop) touches it.
+    expect(pauses.filter((src) => src.includes('zombies_round_start.mp3'))).toHaveLength(0);
 
     music.startBackgroundLoop();
     music.startBackgroundLoop();
@@ -172,9 +174,43 @@ describe('MusicManager', () => {
     music.resume();
     expect(pauses.length).toBeGreaterThan(0);
     expect(plays.length).toBeGreaterThanOrEqual(2);
+  });
 
-    vi.advanceTimersByTime(3000);
-    expect(pauses.filter((src) => src.includes('zombies_round_start.mp3'))).toHaveLength(2);
+  it('does not resume the background loop after stopBackgroundLoop is followed by resume', () => {
+    const plays: string[] = [];
+
+    class FakeAudio {
+      public currentTime = 0;
+      public volume = 1;
+      public loop = false;
+      public paused = true;
+      public ended = false;
+
+      constructor(public readonly src: string) {}
+
+      play = vi.fn(() => {
+        this.paused = false;
+        this.ended = false;
+        plays.push(this.src);
+        return Promise.resolve();
+      });
+
+      pause = vi.fn(() => {
+        this.paused = true;
+      });
+    }
+
+    vi.stubGlobal('Audio', FakeAudio);
+    const music = new MusicManager();
+
+    // Pause menu music starts, then the player resumes gameplay: stopping the
+    // loop must not leave it eligible for the generic resume() call right
+    // after (that was the bug that kept it playing through the whole match).
+    music.startBackgroundLoop();
+    music.stopBackgroundLoop();
+    music.resume();
+
+    expect(plays.filter((src) => src.includes('zombies_background_loop.mp3'))).toHaveLength(1);
   });
 });
 

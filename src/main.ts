@@ -40,10 +40,13 @@ try {
   await assets.loadAll(manifest, (loaded, total) => hud.setLoadProgress(loaded / total));
   hud.setReady();
 
-  // Zombies is the only game mode; the player chooses its arena directly.
-  hud.showMapSelect((mapId) => {
-    startGame(new ZombiesMode(mapId));
-  });
+  const requestedMap = new URLSearchParams(window.location.search).get('map');
+  if (requestedMap === 'classic' || requestedMap === 'burned-mansion') {
+    startGame(new ZombiesMode(requestedMap));
+  } else {
+    // Zombies is the only game mode; the player chooses its arena directly.
+    hud.showMapSelect((mapId) => startGame(new ZombiesMode(mapId)));
+  }
 
   function startGame(mode: GameMode): void {
     const game: Game = new Game(container!, hud, assets, profile, mode);

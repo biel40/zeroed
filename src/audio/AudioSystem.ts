@@ -3,6 +3,8 @@ import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/Wea
 import { MusicManager } from './MusicManager';
 
 const PING_THROTTLE = 0.045;
+// Reload foley was hard to hear over gunfire/music; boost it above the raw profile values.
+const RELOAD_VOLUME_BOOST = 1.9;
 
 interface ReloadProfile {
   start: number;
@@ -190,27 +192,28 @@ export class AudioSystem {
    */
   public playReloadPhase(phase: ReloadPhase, energy: boolean = false, style: ReloadStyle = 'rifle'): void {
     const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
+    const boost = AudioSystem.boostReloadVolume;
 
     if (energy) {
       switch (phase) {
         case 'magOut':
-          this.sweep(0, 'sine', profile.magOut * 0.22, profile.magOut * 0.12, 0.2, 0.14);
+          this.sweep(0, 'sine', profile.magOut * 0.22, profile.magOut * 0.12, boost(0.2), 0.14);
           break;
         case 'magDrop':
-          this.tick(0, profile.magDrop, 0.08);
+          this.tick(0, profile.magDrop, boost(0.08));
           break;
         case 'magIn':
-          this.sweep(0, 'sine', profile.magIn * 0.3, profile.magIn, 0.2, 0.16);
+          this.sweep(0, 'sine', profile.magIn * 0.3, profile.magIn, boost(0.2), 0.16);
           break;
         case 'magSeat':
-          this.tick(0, profile.magSeat, 0.24);
-          this.sweep(0, 'sine', profile.magSeat * 0.22, profile.magSeat * 0.52, 0.16, 0.12);
+          this.tick(0, profile.magSeat, boost(0.24));
+          this.sweep(0, 'sine', profile.magSeat * 0.22, profile.magSeat * 0.52, boost(0.16), 0.12);
           break;
         case 'chargeStart':
-          this.sweep(0, 'sine', profile.chargeStart * 0.2, profile.chargeStart, 0.2, 0.5);
+          this.sweep(0, 'sine', profile.chargeStart * 0.2, profile.chargeStart, boost(0.2), 0.5);
           break;
         case 'chargeEnd':
-          this.tick(0, profile.chargeEnd, 0.3);
+          this.tick(0, profile.chargeEnd, boost(0.3));
           break;
         default:
           break;
@@ -219,30 +222,30 @@ export class AudioSystem {
     }
     switch (phase) {
       case 'magOut':
-        this.tick(0, profile.magOut, 0.24);
+        this.tick(0, profile.magOut, boost(0.24));
         break;
       case 'magDrop':
-        this.tick(0, profile.magDrop, 0.1);
+        this.tick(0, profile.magDrop, boost(0.1));
         break;
       case 'magIn':
-        this.tick(0, profile.magIn, 0.28);
+        this.tick(0, profile.magIn, boost(0.28));
         break;
       case 'magSeat':
-        this.tick(0, profile.magSeat, 0.34);
-        this.tick(0.015, profile.magIn * 1.2, 0.22);
+        this.metalClang(0, profile.magSeat, boost(0.34), 0.11);
+        this.tick(0.015, profile.magIn * 1.2, boost(0.22));
         break;
       case 'chargeStart':
-        this.tick(0, profile.chargeStart, 0.3);
-        this.tick(0.05, profile.magIn, 0.18);
+        this.tick(0, profile.chargeStart, boost(0.3));
+        this.tick(0.05, profile.magIn, boost(0.18));
         break;
       case 'chargeEnd':
-        this.tick(0, profile.chargeEnd, 0.36);
+        this.metalClang(0, profile.chargeEnd, boost(0.36), 0.1);
         break;
       case 'coverOpen':
-        this.tick(0, profile.coverOpen, 0.26);
+        this.tick(0, profile.coverOpen, boost(0.26));
         break;
       case 'coverClose':
-        this.tick(0, profile.coverClose, 0.3);
+        this.metalClang(0, profile.coverClose, boost(0.3), 0.09);
         break;
       default:
         break;
@@ -252,26 +255,37 @@ export class AudioSystem {
   /** Immediate handling sound so every accepted reload has audible feedback. */
   public playReloadStart(energy: boolean = false, style: ReloadStyle = 'rifle'): void {
     const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
+    const boost = AudioSystem.boostReloadVolume;
     if (energy) {
-      this.sweep(0, 'sine', profile.start * 0.3, profile.start * 0.7, 0.18, 0.09);
+      this.sweep(0, 'sine', profile.start * 0.3, profile.start * 0.7, boost(0.18), 0.09);
       return;
     }
-    this.tick(0, profile.start * 0.55, style === 'pistol' ? 0.42 : 0.32);
-    this.tick(0.022, profile.start, style === 'pistol' ? 0.34 : 0.24);
+    // A low body thump under the ticks so the cue reads as a mechanical
+    // handling sound, not just a faint click lost under gunfire/music.
+    this.sweep(0, 'triangle', 150, 50, boost(style === 'pistol' ? 0.65 : 0.58), 0.12);
+    this.metalClang(0, profile.start * 0.55, boost(style === 'pistol' ? 0.55 : 0.45), 0.08);
+    this.metalClang(0.022, profile.start, boost(style === 'pistol' ? 0.46 : 0.36), 0.08);
   }
 
   /** Authoritative reload completion: a compact mechanical lock, never fired on cancellation. */
   public playReloadComplete(energy: boolean = false, style: ReloadStyle = 'rifle'): void {
     const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
+    const boost = AudioSystem.boostReloadVolume;
     if (energy) {
-      this.sweep(0, 'sine', profile.complete * 0.28, profile.complete * 0.72, 0.16, 0.1);
-      this.tick(0.045, profile.complete, 0.24);
+      this.sweep(0, 'sine', profile.complete * 0.28, profile.complete * 0.72, boost(0.16), 0.1);
+      this.tick(0.045, profile.complete, boost(0.24));
       return;
     }
-    // Original two-stage lock: low receiver clack followed by a crisp latch.
-    this.tick(0, profile.complete * 0.42, 0.24);
-    this.tick(0.018, profile.complete, 0.4);
-    this.sweep(0, 'triangle', profile.complete * 0.16, profile.complete * 0.09, 0.08, 0.065);
+    // Original two-stage lock: low receiver clack followed by a crisp latch,
+    // louder than the phase ticks so the confirmation is unmistakable.
+    this.metalClang(0, profile.complete * 0.42, boost(0.48), 0.12);
+    this.metalClang(0.018, profile.complete, boost(0.7), 0.13);
+    this.sweep(0, 'triangle', profile.complete * 0.18, profile.complete * 0.05, boost(0.26), 0.13);
+  }
+
+  /** Clamped multiplier applied to every reload sound so it reads clearly over gunfire/music. */
+  private static boostReloadVolume(volume: number): number {
+    return Math.min(1, volume * RELOAD_VOLUME_BOOST);
   }
 
   /** Ray Gun shot: bright descending zap with a short high sizzle. */
@@ -624,7 +638,7 @@ export class AudioSystem {
     osc.stop(t + duration + 0.02);
   }
 
-  private tick(offset: number, frequency: number, volume: number): void {
+  private tick(offset: number, frequency: number, volume: number, q: number = 6, duration: number = 0.05): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     const { ctx, master, noise } = audio;
@@ -635,14 +649,20 @@ export class AudioSystem {
     const filter: BiquadFilterNode = ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.value = frequency;
-    filter.Q.value = 6;
+    filter.Q.value = q;
     const gain: GainNode = ctx.createGain();
     gain.gain.setValueAtTime(volume, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     source.connect(filter);
     filter.connect(gain);
     gain.connect(master);
-    source.start(t, Math.random() * 0.5, 0.06);
+    source.start(t, Math.random() * 0.5, Math.max(0.06, duration + 0.02));
+  }
+
+  /** Resonant core tone plus a detuned overtone, for a metal-on-metal clang instead of a plain click. */
+  private metalClang(offset: number, frequency: number, volume: number, duration: number = 0.1): void {
+    this.tick(offset, frequency, volume, 16, duration);
+    this.tick(offset + 0.006, frequency * 1.85, volume * 0.42, 22, duration * 0.6);
   }
 
   private context(): AudioContextParts | null {

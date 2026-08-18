@@ -111,6 +111,7 @@ function unlock(arena: BurnedMansionArena, id: string): void {
   expect(door).toBeDefined();
   door!.tryUnlock(() => true);
   expect(arena.activateDoor(id)).toBe(true);
+  if (id === 'nuclear-bunker') arena.update(3);
   arena.refreshColliders();
 }
 
@@ -122,6 +123,13 @@ const idleInput = {
   moveAxisX: 0,
   moveAxisY: 0,
 } as unknown as Input;
+
+function movementInput(code: 'KeyW' | 'KeyS'): Input {
+  return {
+    ...idleInput,
+    isDown: (candidate: string) => candidate === code,
+  } as unknown as Input;
+}
 
 const weaponStub = {
   definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
@@ -139,7 +147,7 @@ describe('Burned Mansion topology', () => {
     expect(arena.wallColliders.some((box) => box.intersectsBox(body))).toBe(false);
   });
 
-  it('gates each ground-floor zone and clears the paid doorway immediately', () => {
+  it('gates each ground-floor zone and clears the bunker only after its animation', () => {
     const arena = makeArena();
     const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
     const boxRoom = [MANSION_BOX_PLACEMENT.position.x, MANSION_BOX_PLACEMENT.position.z] as const;
@@ -155,7 +163,15 @@ describe('Burned Mansion topology', () => {
     expect(canWalk(boxRoom, eastHall, arena.wallColliders)).toBe(true);
 
     expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(false);
-    unlock(arena, 'nuclear-bunker');
+    const bunkerDoor = arena.doors.find((door) => door.id === 'nuclear-bunker')!;
+    bunkerDoor.tryUnlock(() => true);
+    expect(arena.activateDoor('nuclear-bunker')).toBe(true);
+    expect(arena.activateDoor('nuclear-bunker')).toBe(false);
+    arena.refreshColliders();
+    expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(false);
+    arena.update(1);
+    expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(false);
+    arena.update(2);
     expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(true);
   });
 
@@ -211,32 +227,37 @@ describe('Burned Mansion topology', () => {
     expect(arena.floorTransitions[0].box.containsPoint(downDestination)).toBe(false);
   });
 
-  it('moves the real player controller down and up through safe non-oscillating landings', () => {
+  it('moves continuously down, stops, turns and returns up without teleporting', () => {
     const arena = makeArena();
     const player = new PlayerController(1);
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
 
-    player.teleport(5.15, EYE_HEIGHT, -2.8, 0, arena.playerBounds);
-    player.update(1 / 60, idleInput, weaponStub);
+    player.teleport(5.15, EYE_HEIGHT, -2.7, 0, arena.playerBounds);
+    let previousZ = player.rig.position.z;
+    let previousY = player.rig.position.y;
+    for (let frame = 0; frame < 150 && player.floor === 0; frame++) {
+      player.update(1 / 60, movementInput('KeyW'), weaponStub);
+      expect(player.rig.position.z).toBeLessThanOrEqual(previousZ + 1e-6);
+      expect(player.rig.position.y).toBeLessThanOrEqual(previousY + 1e-6);
+      expect(Math.abs(player.rig.position.z - previousZ)).toBeLessThan(0.1);
+      previousZ = player.rig.position.z;
+      previousY = player.rig.position.y;
+    }
     expect(player.floor).toBe(-1);
-    expect(player.rig.position.x).toBeCloseTo(3.75);
-    expect(player.rig.position.z).toBeCloseTo(-6.4);
-    const landingBody = new THREE.Box3(
-      new THREE.Vector3(3.4, MANSION_BUNKER_Y, -6.75),
-      new THREE.Vector3(4.1, MANSION_BUNKER_Y + 1.9, -6.05),
-    );
-    const steps = arena.group.children.filter((child) => child.name.startsWith('bunker-stair-step-'));
-    expect(steps.some((step) => new THREE.Box3().setFromObject(step).intersectsBox(landingBody))).toBe(false);
-    player.update(1 / 60, idleInput, weaponStub);
-    expect(player.floor).toBe(-1);
+    for (let frame = 0; frame < 10; frame++) player.update(1 / 60, movementInput('KeyW'), weaponStub);
+    expect(player.rig.position.y).toBeCloseTo(MANSION_BUNKER_Y + EYE_HEIGHT, 1);
 
-    player.teleport(5.15, MANSION_BUNKER_Y + EYE_HEIGHT, -7.1, -1, MANSION_BUNKER_BOUNDS);
-    player.update(1 / 60, idleInput, weaponStub);
+    const stopped = player.rig.position.clone();
+    for (let frame = 0; frame < 20; frame++) player.update(1 / 60, idleInput, weaponStub);
+    expect(player.rig.position.distanceTo(stopped)).toBeLessThan(0.35);
+
+    for (let frame = 0; frame < 180 && player.floor === -1; frame++) {
+      player.update(1 / 60, movementInput('KeyS'), weaponStub);
+    }
     expect(player.floor).toBe(0);
-    expect(player.rig.position.z).toBeCloseTo(-2.25);
-    player.update(1 / 60, idleInput, weaponStub);
-    expect(player.floor).toBe(0);
+    for (let frame = 0; frame < 20; frame++) player.update(1 / 60, movementInput('KeyS'), weaponStub);
+    expect(player.rig.position.y).toBeCloseTo(EYE_HEIGHT, 1);
   });
 
   it('places each standard wall buy in its intended progression zone', () => {
@@ -287,24 +308,25 @@ describe('Burned Mansion topology', () => {
     expect(arena.group.getObjectByName('bunker-zeus')?.userData.weaponId).toBe('tesla');
   });
 
-  it('uses a wide twelve-step visual stair and one simplified navigation portal', () => {
+  it('uses comfortable uniform steps over one continuous navigation ramp', () => {
     const arena = makeArena();
     const steps = arena.group.children.filter((child) => child.name.startsWith('bunker-stair-step-'));
-    expect(steps).toHaveLength(12);
+    expect(steps).toHaveLength(17);
     for (const step of steps) {
       const size = new THREE.Box3().setFromObject(step).getSize(new THREE.Vector3());
       expect(size.x).toBeGreaterThanOrEqual(1.6);
     }
-    expect(arena.group.getObjectByName('bunker-stair-navigation-ramp')?.userData.mapRole).toBe(
-      'simplified-stair-portal',
-    );
+    const ramp = arena.group.getObjectByName('bunker-stair-navigation-ramp');
+    expect(ramp?.userData.mapRole).toBe('walkable-stair-ramp');
+    expect(ramp?.userData.walkableSurface).toBe(true);
     expect(arena.group.children.filter((child) => child.name === 'bunker-stair-handrail')).toHaveLength(2);
   });
 
   it('uses an actual radiation trefoil and a marked ZEUS containment station', () => {
     const arena = makeArena();
     const sign = arena.group.getObjectByName('radiation-warning-symbol');
-    expect(sign?.userData.mapRole).toBe('bunker-clue');
+    expect(sign?.userData.mapRole).toBe('bunker-ending-interaction');
+    expect(arena.completionInteraction.cost).toBe(30000);
     expect(sign?.children.filter((child) => child.userData.mapRole === 'radiation-symbol-part')).toHaveLength(4);
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'zeus-containment-ring')).toHaveLength(1);
     expect(arena.group.getObjectByName('zeus-containment-pedestal')).toBeDefined();

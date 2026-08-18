@@ -1,5 +1,11 @@
 # Decisiones arquitectonicas
 
+## [2026-08-18] Sincronizar acceso fisico y final del bunker
+
+- Contexto: la escalera teletransportaba entre plantas, la compuerta retiraba su collider antes de acabar la vista y no existia un cierre explicito de la run.
+- Decision: representar la escalera mediante una pendiente continua compartida, mantener el collider de la compuerta hasta `OPEN` y gobernar el objetivo de 30000 puntos con `PLAYING -> ENDING -> CREDITS -> FINISHED`.
+- Motivo: eliminar estados fisicos/visuales contradictorios y garantizar que el final detenga todos los productores de gameplay una sola vez.
+
 ## [2026-08-18] Exponer unicamente mapas Zombies
 
 - Contexto: el producto ya no ofrece el modo de practica normal y debe arrancar con los dos mapas Zombies desarrollados.

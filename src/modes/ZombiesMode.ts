@@ -30,6 +30,8 @@ import type { WallBuy } from '../zombies/wallbuys/WallBuy';
 import { ClassicArena } from '../zombies/maps/ClassicArena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
 import type { ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
+import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
+import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
 import { standardTargetHitEffects } from './hitEffects';
 
@@ -89,6 +91,8 @@ export class ZombiesMode implements GameMode {
   private rayGunUnlocked = false;
   private teslaUnlocked = false;
   private gameOver = false;
+  private readonly runFlow = new ZombiesRunFlow();
+  private mansionStaticColliders = new Set<THREE.Object3D>();
   private trauma = 0;
   private shakeSeed = 0;
   private moanTimer = MOAN_MIN_DELAY;
@@ -118,6 +122,7 @@ export class ZombiesMode implements GameMode {
     // in the mansion walls.
     ctx.hitColliders.length = 0;
     ctx.hitColliders.push(...this.arena.colliders);
+    this.mansionStaticColliders = new Set(this.arena.colliders);
 
     this.zombies = new ZombieManager(
       Math.random,
@@ -135,6 +140,9 @@ export class ZombiesMode implements GameMode {
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
     ctx.scene.add(this.zombies.group);
+    if (this.arena instanceof BurnedMansionArena) {
+      this.arena.onTopologyChanged = () => this.syncMansionArena(this.mansionStaticColliders);
+    }
 
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
     this.energy.onImpact = (point, config, object, distance) =>
@@ -169,13 +177,21 @@ export class ZombiesMode implements GameMode {
 
     ctx.hud.setZombiesPanelVisible(true);
     ctx.hud.setZombiesRestartHandler(() => this.restart());
+    ctx.hud.setCreditsMainMenuHandler(() => this.finishRun());
     this.pushHudState();
   }
 
   update(dt: number): void {
+    if (this.runFlow.state === 'ENDING') {
+      this.arena.update(dt);
+      if (this.runFlow.update(dt)) this.ctx.hud.showCredits();
+      return;
+    }
+    if (this.runFlow.state === 'CREDITS' || this.runFlow.state === 'FINISHED') return;
+
     // The horde keeps shambling behind the game-over screen; it just can't
     // hurt anyone anymore.
-    if (!this.gameOver) {
+    if (this.isGameplayInputEnabled()) {
       this.health.update(dt);
       this.rounds.update(dt, this.zombies.aliveCount);
       this.processRoundEvents();
@@ -214,7 +230,7 @@ export class ZombiesMode implements GameMode {
     object: THREE.Object3D,
     weapon: Weapon,
   ): void {
-    if (this.gameOver) return;
+    if (!this.isGameplayInputEnabled()) return;
     const zombie = object.userData.zombie as Zombie | undefined;
 
     // Range props stay decorative and keep their classic feedback.
@@ -243,6 +259,7 @@ export class ZombiesMode implements GameMode {
 
   /** The Ray Gun bypasses hitscan ballistics and fires a visible bolt. */
   onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
+    if (!this.isGameplayInputEnabled()) return true;
     const energy = weapon.definition.energy;
     if (!energy) return false;
     this.energy.fire(origin, direction, energy);
@@ -251,12 +268,16 @@ export class ZombiesMode implements GameMode {
 
   /** Skip the pause screen while the game-over panel is up. */
   onPointerUnlock(): boolean {
-    return this.gameOver;
+    return this.gameOver || !this.runFlow.acceptsGameplay;
+  }
+
+  isGameplayInputEnabled(): boolean {
+    return !this.gameOver && this.runFlow.acceptsGameplay;
   }
 
   /** E pressed: door unlock > barrier repair > wall buy > box use > box pickup. */
   onInteract(): void {
-    if (this.gameOver) return;
+    if (!this.isGameplayInputEnabled()) return;
 
     const door = this.findFacingDoor();
     if (door && door.isLocked) {
@@ -296,6 +317,19 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
+    const completion = this.findFacingCompletionInteraction();
+    if (completion) {
+      if (!this.economy.canAfford(completion.cost)) {
+        this.ctx.hud.flashNotEnoughPoints();
+        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${completion.cost} PTS NEEDED`);
+        return;
+      }
+      if (!this.runFlow.beginEnding()) return;
+      if (!this.economy.spend(completion.cost)) throw new Error('Completion purchase became unaffordable');
+      this.beginEnding();
+      return;
+    }
+
     if (!this.box || !this.playerInBoxRange()) return;
     if (this.box.state === 'closed') {
       // Charge at activation time. spend() is atomic and tryActivate() only
@@ -317,7 +351,7 @@ export class ZombiesMode implements GameMode {
 
   /** Center-screen prompt: door > barrier repair > wall buy > box. */
   getInteractPrompt(): string | null {
-    if (this.gameOver) return null;
+    if (!this.isGameplayInputEnabled()) return null;
     const key = this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E';
     const tapKey = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
 
@@ -343,6 +377,9 @@ export class ZombiesMode implements GameMode {
 
     const pickup = this.findFacingWeaponPickup();
     if (pickup) return `USE — Take ${WEAPON_DEFINITIONS[pickup.weaponId].name}`;
+
+    const completion = this.findFacingCompletionInteraction();
+    if (completion) return `ACTIVATE FINAL\n${tapKey} — ${completion.cost} PTS`;
 
     if (!this.box || !this.playerInBoxRange()) return null;
     switch (this.box.state) {
@@ -482,6 +519,24 @@ export class ZombiesMode implements GameMode {
     return best;
   }
 
+  private findFacingCompletionInteraction(): ArenaCompletionInteraction | null {
+    const interaction = this.arena?.completionInteraction;
+    if (!interaction || interaction.floor !== this.ctx.player.floor) return null;
+    if (interaction.requiredDoorId) {
+      const door = this.arena.doors.find((candidate) => candidate.id === interaction.requiredDoorId);
+      if (!door || door.isLocked) return null;
+    }
+    const playerPos = this.ctx.player.rig.position;
+    const dx = interaction.position.x - playerPos.x;
+    const dz = interaction.position.z - playerPos.z;
+    const distanceSq = dx * dx + dz * dz;
+    if (distanceSq > interaction.useRange * interaction.useRange) return null;
+    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    const distance = Math.sqrt(distanceSq);
+    const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+    return dot >= interaction.lookDotMin ? interaction : null;
+  }
+
   private purchaseWallBuy(wallBuy: WallBuy): void {
     const owned = this.ctx.hasWeapon(wallBuy.weaponId);
     if (!owned && !this.ctx.canGrantWeapon(wallBuy.weaponId)) {
@@ -574,8 +629,9 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.playDoorUnlock();
     if (this.arena instanceof BurnedMansionArena) {
       const previousStaticColliders = new Set(this.arena.colliders);
-      this.arena.activateDoor(door.id);
-      this.syncMansionArena(previousStaticColliders);
+      if (this.arena.activateDoor(door.id) && door.id !== 'nuclear-bunker') {
+        this.syncMansionArena(previousStaticColliders);
+      }
     }
   }
 
@@ -590,6 +646,7 @@ export class ZombiesMode implements GameMode {
       }
     }
     this.ctx.hitColliders.push(...this.arena.colliders);
+    this.mansionStaticColliders = new Set(this.arena.colliders);
     this.ctx.player.setWallColliders(this.arena.wallColliders);
     this.zombies.setSpawnPoints(this.arena.spawnPoints);
     this.zombies.setBarriers(this.arena.barriers);
@@ -603,6 +660,7 @@ export class ZombiesMode implements GameMode {
         case 'roundStarted':
           this.ctx.hud.showRoundBanner(`ROUND ${event.round}`);
           this.ctx.audio.playRoundSting();
+          this.ctx.audio.music.playRoundStartOnce();
           if (this.arena) {
             for (const barrier of this.arena.barriers) barrier.resetRoundCap();
           }
@@ -626,6 +684,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private onZombieKilled(headshot: boolean): void {
+    if (!this.isGameplayInputEnabled()) return;
     this.kills++;
     if (headshot) this.headshots++;
     this.ctx.audio.playZombieDeath();
@@ -664,7 +723,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private onPlayerHit(damage: number): void {
-    if (this.gameOver) return;
+    if (!this.isGameplayInputEnabled()) return;
     if (!this.health.damage(damage)) return;
     this.ctx.audio.playPlayerHurt();
     this.ctx.hud.flashDamage();
@@ -702,7 +761,7 @@ export class ZombiesMode implements GameMode {
     object: THREE.Object3D | null,
     distance: number,
   ): void {
-    if (this.gameOver) return;
+    if (!this.isGameplayInputEnabled()) return;
     const zombie = object?.userData.zombie as Zombie | undefined;
     const isTesla = config.color === WEAPON_DEFINITIONS.tesla.energy?.color;
 
@@ -747,6 +806,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private endGame(): void {
+    if (!this.runFlow.gameOver()) return;
     this.gameOver = true;
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
@@ -765,6 +825,7 @@ export class ZombiesMode implements GameMode {
 
   private restart(): void {
     this.gameOver = false;
+    this.runFlow.reset();
     this.kills = 0;
     this.headshots = 0;
     this.rayGunUnlocked = false;
@@ -791,8 +852,29 @@ export class ZombiesMode implements GameMode {
       this.ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
     }
     this.ctx.hud.hideGameOver();
+    this.ctx.hud.hideEnding?.();
+    this.ctx.hud.setHudVisible?.(true);
     this.pushHudState();
     this.ctx.lockPointer();
+  }
+
+  private beginEnding(): void {
+    this.activeRepairBarrier?.stopRepair();
+    this.activeRepairBarrier = null;
+    this.rounds.clearEvents();
+    this.zombies.reset();
+    if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
+    else this.ctx.audio.music?.stop?.();
+    this.ctx.audio.stopWind?.();
+    this.ctx.hud.setInteractionPrompt(null);
+    this.pushHudState();
+    this.ctx.hud.showEnding();
+    this.ctx.unlockPointer();
+  }
+
+  private finishRun(): void {
+    if (!this.runFlow.finish()) return;
+    this.ctx.returnToMainMenu();
   }
 
   private pushHudState(): void {

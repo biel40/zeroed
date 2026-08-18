@@ -34,6 +34,16 @@ export interface ArenaWeaponPickup {
   reset(): void;
 }
 
+export interface ArenaCompletionInteraction {
+  readonly id: string;
+  readonly cost: number;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  readonly requiredDoorId?: string;
+}
+
 export interface PlayerBounds {
   readonly minX: number;
   readonly maxX: number;
@@ -65,6 +75,7 @@ export interface ZombieArena {
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly weaponPickups?: ReadonlyArray<ArenaWeaponPickup>;
+  readonly completionInteraction?: ArenaCompletionInteraction;
   readonly mysteryBoxPlacement: MysteryBoxPlacement;
   /** Safe initial position owned by the map rather than the game mode. */
   readonly playerSpawn?: ArenaPlayerSpawn;
