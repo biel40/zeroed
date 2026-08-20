@@ -17,6 +17,8 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-20 — Buff de Wonder Weapons (Ray Gun y ZEUS-77)](2026-08-20-wonder-weapon-buff.md)
+- [2026-08-20 — Pasos 3D de zombies y limpieza de debris poligonal](2026-08-20-zombie-footsteps-debris-cleanup.md)
 - [2026-08-18 — Entrada exclusiva de Zombies](2026-08-18-zombies-only-entry.md)
 - [2026-08-18 — Bunker ampliado y audio M1911](2026-08-18-bunker-expansion-m1911-audio.md)
 - [2026-08-18 — Animacion y audio de recarga](2026-08-18-reload-animation-audio.md)

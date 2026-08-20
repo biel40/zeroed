@@ -71,6 +71,30 @@ https://polyhaven.com/license
 Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 + `PMREMGenerator`. Sin descarga externa.
 
+## Audio (`public/assets/audio/`)
+
+| Archivo | Uso |
+| --- | --- |
+| `zombies_round_start.mp3` | Sting de inicio de ronda |
+| `zombies_background_loop.mp3` | Cama ambiental del menú/pausa de Zombies |
+| `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
+
+### Opcional: pasos de zombie
+
+`src/zombies/ZombieFootsteps.ts` reproduce pasos posicionales 3D. Sin asset usa
+un buffer sintetizado en runtime (thump grave + shuffle de ruido, sin base64 ni
+dependencias). Para sustituirlo, coloca:
+
+- **Ruta**: `public/assets/audio/zombies/footsteps.mp3`
+- **Contenido**: UN solo paso de zombie, seco y corto (~0.2–0.5 s), mono,
+  sin silencio largo al inicio. La variación la aporta el motor
+  (playbackRate 0.9–1.12 y jitter de cadencia), así que basta un sample.
+- **Licencia**: CC0 o equivalente, como el resto de assets; anota aquí la
+  fuente cuando lo añadas.
+
+Si el archivo falta o no decodifica, el juego registra un `console.warn` y sigue
+con el fallback: la ausencia nunca rompe nada.
+
 ## Resto
 
 Muzzle flash, bullet holes, humo, señales de distancia y dianas se generan

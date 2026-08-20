@@ -107,6 +107,15 @@ interface AudioContextParts {
  */
 export class AudioSystem {
   public readonly music: MusicManager = new MusicManager();
+  /**
+   * The shared AudioContext, created on the first user gesture (resume()).
+   * Positional consumers (a THREE.AudioListener) MUST share this context via
+   * THREE.AudioContext.setContext(): one context per page keeps mobile
+   * browsers within their context limits.
+   */
+  public get rawContext(): AudioContext | null {
+    return this.ctx;
+  }
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;

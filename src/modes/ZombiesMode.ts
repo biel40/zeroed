@@ -22,6 +22,7 @@ import {
   TESLA_UNLOCK_KILLS,
   ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
+import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
 import { ZombieManager } from '../zombies/ZombieManager';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
@@ -75,6 +76,7 @@ export class ZombiesMode implements GameMode {
   private zombies!: ZombieManager;
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
+  private footsteps!: ZombieFootsteps;
   private box: MysteryBoxMachine | null = null;
   private boxView: MysteryBoxView | null = null;
   private readonly rounds = new RoundManager();
@@ -148,6 +150,7 @@ export class ZombiesMode implements GameMode {
     this.energy.onImpact = (point, config, object, distance) =>
       this.onEnergyImpact(point, config, object, distance);
     this.chain = new ChainLightning(ctx.scene);
+    this.footsteps = new ZombieFootsteps(ctx.scene, ctx.player.camera);
 
     if (this.mapId === 'classic') {
       ctx.audio.startWind();
@@ -212,6 +215,7 @@ export class ZombiesMode implements GameMode {
     );
     this.energy.update(dt);
     this.chain.update(dt);
+    this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
     this.arena.update(dt);
     if (this.box && this.boxView) {
       this.box.update(dt);
@@ -676,7 +680,7 @@ export class ZombiesMode implements GameMode {
           }
           break;
         case 'roundComplete':
-          this.ctx.hud.showRoundBanner(`ROUND ${event.round} COMPLETE`, 'GET READY');
+          this.ctx.hud.showRoundBanner(`ROUND ${event.round} COMPLETE`);
           break;
       }
     }
@@ -834,6 +838,7 @@ export class ZombiesMode implements GameMode {
     this.health.reset();
     this.rounds.reset();
     if (this.zombies) this.zombies.reset();
+    this.footsteps?.reset();
     if (this.arena instanceof BurnedMansionArena) {
       const previousStaticColliders = new Set(this.arena.colliders);
       this.arena.reset();

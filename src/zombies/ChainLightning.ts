@@ -1,6 +1,11 @@
 import * as THREE from 'three';
+import { CHAIN_MAX_TARGETS } from './ZombieConfig';
 
-const MAX_CHAINS = 10;
+// One pooled arc per possible hop: a full chain is CHAIN_MAX_TARGETS zombies
+// plus the muzzle, i.e. CHAIN_MAX_TARGETS consecutive segments. Keeping the
+// pool derived from the tuning constant prevents the visuals from silently
+// truncating a long chain.
+const MAX_CHAINS = CHAIN_MAX_TARGETS;
 const SEGMENTS_PER_CHAIN = 9;
 const ARC_LIFETIME = 0.28;
 const ARC_COLOR = 0x9fe0ff;

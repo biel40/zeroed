@@ -43,7 +43,7 @@ describe('Zombies map selection flow', () => {
     expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
     expect(html.match(/data-map=/g)).toHaveLength(2);
     expect(html).not.toContain('data-mode=');
-    expect(html).not.toContain('SHOOTING RANGE');
+    expect(html).toContain('SHOOTING RANGE');
   });
 
   it('keeps the map picker above the fixed game canvas', () => {

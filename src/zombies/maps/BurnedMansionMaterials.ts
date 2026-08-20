@@ -8,7 +8,6 @@ export type MansionSurfaceMaterials = {
   readonly floorWood: THREE.MeshStandardMaterial;
   readonly charredWood: THREE.MeshStandardMaterial;
   readonly metal: THREE.MeshStandardMaterial;
-  readonly debris: THREE.MeshStandardMaterial;
   readonly sootSoft: THREE.MeshStandardMaterial;
   readonly sootHeavy: THREE.MeshStandardMaterial;
   readonly exposedBrick: THREE.MeshStandardMaterial;
@@ -205,7 +204,6 @@ export function createMansionSurfaceMaterials(anisotropyLimit: number): MansionS
     floorWood: makeSurfaceMaterial('deteriorated_wood_floor', wood, 0x706355, 0.94, 0.45, 1.25),
     charredWood: makeSurfaceMaterial('charred_wood', wood, 0x443a31, 0.98, 0.55, 0.9),
     metal: new THREE.MeshStandardMaterial({ name: 'oxidized_metal', color: 0x454849, roughness: 0.82, metalness: 0.35 }),
-    debris: new THREE.MeshStandardMaterial({ name: 'fire_debris', color: 0x3a3530, roughness: 1 }),
     sootSoft: makeDecalMaterial('soot_soft', 'soot', 17),
     sootHeavy: makeDecalMaterial('soot_heavy', 'soot', 83),
     exposedBrick: makeDecalMaterial('exposed_brick', 'brick', 41),

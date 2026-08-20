@@ -12,6 +12,7 @@ Estado inspeccionado: 2026-08-20. La fuente de verdad es el codigo actual; `READ
 - Zombies con salud, Points, inventario de dos slots, rondas infinitas, pool de 24 enemigos, ataques y navegacion con steering local, rutas de recuperacion y failsafe de recolocacion (`src/modes/ZombiesMode.ts`, `src/zombies/`).
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
+- Pasos de zombie posicionales 3D con pool de 8 fuentes sobre un unico `AudioListener`, prioridad al mas cercano y asset opcional con fallback sintetizado (`src/zombies/ZombieFootsteps.ts`).
 - Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, escalera continua compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
 - Suite Vitest de logica determinista y contratos estaticos PWA. `npm run typecheck` pasa; la validacion completa conserva fallos preexistentes detectados en audio y seleccion de mapa.
 

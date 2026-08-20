@@ -58,9 +58,11 @@ Points
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
 - `ZombieManager` delega el pathfinding en `ZombieNavigationService`: un grid A* por planta derivado de los colliders del mapa (puertas cerradas y barreras atrincheradas sellan sus vanos; al abrirse, el rebuild invalida las rutas). La persecucion decide el objetivo, el servicio decide la ruta, `moveWithCollision` ejecuta sin atravesar geometria y el anti-stuck es la red de seguridad. Detalles en `docs/changes/2026-08-20-zombie-navigation-service.md`.
 - `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
+- `ZombieFootsteps` da pasos posicionales 3D: un unico `AudioListener` en la camara (sobre el AudioContext compartido de `AudioSystem`) y un pool de 8 `PositionalAudio` reasignados cada 0.25 s a los zombies vivos mas cercanos; la cadencia sale de la velocidad medida y solo suenan en `walk` con desplazamiento real.
 
 ## Armas especiales
 
-- Ray Gun: bolt visible -> impacto directo -> splash radial -> bajas/economia.
+- Ray Gun: bolt visible -> impacto directo -> splash radial con falloff lineal -> bajas/economia.
 - ZEUS-77: bolt visible -> objetivo inicial -> seleccion pura de cadena -> dano y arcos visuales.
+- Jerarquia de potencia buscada: armas normales < Ray Gun << ZEUS-77; parametros de splash y cadena centralizados en `weapons.ts` y `ZombieConfig.ts` (`CHAIN_*`).
 - Ambas pasan por `EnergyProjectiles`, no por `BallisticsSystem`.

@@ -52,6 +52,8 @@ describe('PWA contract', () => {
     expect(html).toMatch(/id="pwa-install" class="pwa-action hidden"/);
     expect(html).toMatch(/id="pwa-update-menu" class="pwa-action hidden"/);
     expect(html).toMatch(/id="pwa-update-pause" class="hidden"/);
+    expect(pwa).toContain('getDeviceProfile()');
+    expect(pwa).toContain("installButton.classList.toggle('hidden', isStandalone() || !profile.isMobile)");
     expect(pwa).toContain("window.addEventListener('beforeinstallprompt'");
     expect(pwa).toContain("window.addEventListener('appinstalled'");
   });

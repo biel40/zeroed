@@ -1,4 +1,5 @@
 import { registerSW } from 'virtual:pwa-register';
+import { getDeviceProfile } from './core/DeviceProfile';
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -17,12 +18,14 @@ function isStandalone(): boolean {
 
 /** Browser-only PWA lifecycle. Gameplay state remains owned by Game. */
 export function setupPWA(): void {
+  const profile = getDeviceProfile();
   const installButton = button('pwa-install');
   const menuUpdateButton = button('pwa-update-menu');
   const pauseUpdateButton = button('pwa-update-pause');
   const mapSelect = document.getElementById('map-select');
   const pauseMenu = document.getElementById('pause-menu');
   if (!mapSelect || !pauseMenu) throw new Error('Missing safe PWA update menus');
+  installButton.classList.toggle('hidden', !profile.isMobile || isStandalone());
   const updateButtons = [menuUpdateButton, pauseUpdateButton];
   let installPrompt: InstallPromptEvent | null = null;
   let updateAvailable = false;
@@ -83,13 +86,14 @@ export function setupPWA(): void {
   }
 
   window.addEventListener('beforeinstallprompt', (event) => {
+    if (!profile.isMobile) return;
     event.preventDefault();
     installPrompt = event as InstallPromptEvent;
-    installButton.classList.toggle('hidden', isStandalone());
+    installButton.classList.toggle('hidden', isStandalone() || !profile.isMobile);
   });
 
   installButton.addEventListener('click', async () => {
-    if (!installPrompt || isStandalone()) return;
+    if (!profile.isMobile || !installPrompt || isStandalone()) return;
     const prompt = installPrompt;
     installPrompt = null;
     installButton.classList.add('hidden');

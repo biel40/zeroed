@@ -402,9 +402,10 @@ describe('AudioSystem reload sound profiles', () => {
 
     audio.playReloadComplete(false, 'rifle');
 
-    expect(tickSpy).toHaveBeenCalledTimes(2);
-    expect(tickSpy.mock.calls[1][0] as number).toBeGreaterThan(tickSpy.mock.calls[0][0] as number);
+    expect(tickSpy).toHaveBeenCalledTimes(4);
     expect(tickSpy.mock.calls[1][1] as number).toBeGreaterThan(tickSpy.mock.calls[0][1] as number);
+    expect(tickSpy.mock.calls[2][0] as number).toBeGreaterThan(tickSpy.mock.calls[0][0] as number);
+    expect(tickSpy.mock.calls[3][1] as number).toBeGreaterThan(tickSpy.mock.calls[2][1] as number);
     expect(sweepSpy).toHaveBeenCalledOnce();
   });
 
@@ -451,12 +452,14 @@ describe('AudioSystem reload sound profiles', () => {
   it('synthesizes two audible mechanical transients for the pistol reload start', () => {
     const audio = new AudioSystem() as any;
     const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    const sweepSpy = vi.spyOn(audio, 'sweep').mockImplementation(() => {});
 
     audio.playReloadStart(false, 'pistol');
 
-    expect(tickSpy).toHaveBeenCalledTimes(2);
+    expect(tickSpy).toHaveBeenCalledTimes(4);
+    expect(sweepSpy).toHaveBeenCalledOnce();
     expect(tickSpy.mock.calls[0][2]).toBeGreaterThanOrEqual(0.4);
-    expect(tickSpy.mock.calls[1][2]).toBeGreaterThanOrEqual(0.3);
+    expect(tickSpy.mock.calls[2][2]).toBeGreaterThanOrEqual(0.3);
   });
 });
 

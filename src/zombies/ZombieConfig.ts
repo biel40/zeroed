@@ -92,15 +92,25 @@ export const RAYGUN_UNLOCK_KILLS = 75;
  */
 export const TESLA_UNLOCK_KILLS = 115;
 
-/** Maximum zombies one Tesla shot can electrocute, impact included. */
-export const CHAIN_MAX_TARGETS = 10;
-/** Maximum hop distance between two zombies in the same chain, meters. */
-export const CHAIN_RADIUS = 6;
 /**
- * Damage per electrocuted zombie. Far above a walker's saturated HP: the
- * Tesla is a horde DELETE button with scarce ammunition, not a DPS tool.
+ * Maximum zombies one Tesla shot can electrocute, impact included. 20 out of
+ * MAX_ALIVE (24) means a bullseye on a packed horde deletes most of it: the
+ * ZEUS-77 is the capstone Wonder Weapon and must feel clearly above the
+ * Ray Gun. The visual arc pool in ChainLightning derives from this value.
  */
-export const CHAIN_ZAP_DAMAGE = 500;
+export const CHAIN_MAX_TARGETS = 20;
+/**
+ * Maximum hop distance between two zombies in the same chain, meters. 9 m
+ * lets the arc walk through a whole horde without cutting early, while the
+ * per-hop radius still stops it from crossing the map to a far straggler.
+ */
+export const CHAIN_RADIUS = 9;
+/**
+ * Damage per electrocuted zombie. Far above a walker's saturated HP (~4x
+ * base): the Tesla is a horde DELETE button with scarce ammunition, not a
+ * DPS tool.
+ */
+export const CHAIN_ZAP_DAMAGE = 750;
 
 /** Minimal zombie snapshot the chain selection needs (keeps it Three-free). */
 export interface ChainCandidate {
@@ -116,7 +126,9 @@ export interface ChainCandidate {
  * candidate within CHAIN_RADIUS of the current tip that has not been struck
  * yet — so a zombie can never be hit twice in the same chain, and the arc
  * stops instead of wasting a hop on a far straggler. Returns at most
- * CHAIN_MAX_TARGETS ids. Pure: unit-tested without a scene.
+ * CHAIN_MAX_TARGETS ids. O(targets x candidates) squared-distance checks on
+ * plain data: with MAX_ALIVE candidates this stays trivial even on mobile.
+ * Pure: unit-tested without a scene.
  */
 export function selectChainTargets(
   impact: ChainCandidate,

@@ -387,7 +387,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 150,
     headshotMultiplier: 1.5,
-    energy: { projectileSpeed: 48, splashRadius: 2.5, splashDamage: 100, color: 0x63f2a4 },
+    energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 150, color: 0x63f2a4 },
     recoil: {
       verticalKick: 0.012,
       horizontalKick: 0.004,
@@ -466,7 +466,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     // The direct hit and every chained zap deal CHAIN_ZAP_DAMAGE via the
     // mode; this base damage is what a NON-chained zombie would take.
-    damage: 500,
+    damage: 750,
     headshotMultiplier: 1,
     // A visible arc bolt, fast but readable; the chain runs off the impact.
     energy: { projectileSpeed: 90, splashRadius: 0, splashDamage: 0, color: 0x7fd4ff },

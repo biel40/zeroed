@@ -14,7 +14,7 @@ import { WEAPON_DEFINITIONS } from '../src/config/weapons';
  * Three.js. The rules pinned here come straight from the design contract:
  *  - the directly-hit zombie is always first,
  *  - the arc jumps to the NEAREST not-yet-hit neighbor within the radius,
- *  - at most CHAIN_MAX_TARGETS (10) zombies per shot,
+ *  - at most CHAIN_MAX_TARGETS (20) zombies per shot,
  *  - a zombie is never struck twice in the same chain (visited set),
  *  - far stragglers are not worth a hop.
  */
@@ -43,9 +43,9 @@ describe('selectChainTargets', () => {
   });
 
   it('caps the chain at CHAIN_MAX_TARGETS even in a dense horde', () => {
-    expect(CHAIN_MAX_TARGETS).toBe(10);
+    expect(CHAIN_MAX_TARGETS).toBe(20);
     const zombies = [candidate(0, 0, 0)];
-    for (let i = 1; i <= 20; i++) zombies.push(candidate(i, i * 2, 0));
+    for (let i = 1; i <= 30; i++) zombies.push(candidate(i, i * 2, 0));
     const chain = selectChainTargets(zombies[0], zombies);
     expect(chain).toHaveLength(CHAIN_MAX_TARGETS);
   });

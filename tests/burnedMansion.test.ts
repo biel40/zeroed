@@ -412,16 +412,6 @@ describe('Burned Mansion topology', () => {
     ).toBeGreaterThanOrEqual(MIN_PLAYER_DISTANCE);
   });
 
-  it('keeps decorative debris out of player collision', () => {
-    const arena = makeArena();
-    const debris = arena.group.children.filter((child) => child.userData.mapRole === 'visual-debris');
-    expect(debris.length).toBeGreaterThan(0);
-    for (const piece of debris) {
-      const box = new THREE.Box3().setFromObject(piece);
-      expect(arena.wallColliders.some((wall) => wall.equals(box))).toBe(false);
-    }
-  });
-
   it('gives every large visible prop a matching simplified player collider', () => {
     const arena = makeArena();
     const props = arena.group.children.filter((child) => child.userData.mapRole === 'solid-prop');

@@ -395,21 +395,6 @@ export class BurnedMansionArena implements ZombieArena {
     this.addProp('research-table', -1.2, MANSION_BUNKER_Y + 0.42, -2.2, 1.7, 0.84, 0.7, this.materials.metal);
     this.addProp('zeus-containment-pedestal', -1.7, MANSION_BUNKER_Y + 0.55, -6.1, 0.9, 1.1, 0.9, this.materials.metal);
     this.addProp('military-crate', 1.4, MANSION_BUNKER_Y + 0.35, -6.35, 0.8, 0.7, 1.1, this.materials.charredWood);
-
-    const rubble = new THREE.DodecahedronGeometry(0.18, 0);
-    // Starting room stays clear of debris: it sat in the spawn walkway and read as a stray floating rock.
-    const positions: ReadonlyArray<readonly [number, number]> = [
-      [-5.8, 1.2], [-4.5, -1.8], [-2.2, -6.8], [1.1, -5.8], [5.8, -2.2],
-    ];
-    for (let index = 0; index < positions.length; index++) {
-      const mesh = new THREE.Mesh(rubble, this.materials.debris);
-      mesh.position.set(positions[index][0], 0.15, positions[index][1]);
-      mesh.scale.setScalar(0.8 + (index % 3) * 0.25);
-      mesh.rotation.set(index * 0.4, index * 0.7, index * 0.2);
-      mesh.castShadow = !this.profile.useReducedEffects;
-      mesh.userData.mapRole = 'visual-debris';
-      this.group.add(mesh);
-    }
   }
 
   private buildSecretPickups(): ReadonlyArray<ArenaWeaponPickup> {

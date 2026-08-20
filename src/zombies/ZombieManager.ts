@@ -312,6 +312,11 @@ export class ZombieManager {
     return count;
   }
 
+  /** Read-only view of the pooled actives (footstep sources pick from it). */
+  get actives(): ReadonlySet<Zombie> {
+    return this.pool.actives;
+  }
+
   get activeCount(): number {
     return this.pool.activeCount;
   }
