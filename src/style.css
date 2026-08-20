@@ -622,11 +622,18 @@ body {
 }
 
 .credits-panel h1 {
-  margin: 0 0 40px;
+  margin: 0 0 18px;
   color: #e9e8df;
   font: 700 clamp(32px, 7vw, 58px) 'Consolas', monospace;
   letter-spacing: 0.28em;
   text-indent: 0.28em;
+}
+
+.credits-panel .credits-round {
+  margin: 0 0 40px;
+  color: #e5cf71;
+  font: 700 clamp(24px, 5vw, 40px) 'Consolas', monospace;
+  letter-spacing: 0.18em;
 }
 
 .credits-panel p {

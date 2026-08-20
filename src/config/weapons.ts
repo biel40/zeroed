@@ -387,7 +387,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 150,
     headshotMultiplier: 1.5,
-    energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 150, color: 0x63f2a4 },
+    energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 400, color: 0x63f2a4 },
     recoil: {
       verticalKick: 0.012,
       horizontalKick: 0.004,

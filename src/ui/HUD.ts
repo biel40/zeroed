@@ -57,6 +57,7 @@ export class HUD {
   private readonly mapSelect = mustGet('map-select');
   private readonly interactPrompt = mustGet('interact-prompt');
   private readonly endingScreen = mustGet('ending-screen');
+  private readonly endingRound = mustGet('ending-round');
 
   private lastWeapon = '';
   private lastAmmo = '';
@@ -187,8 +188,9 @@ export class HUD {
     mustGet('go-restart').addEventListener('click', handler);
   }
 
-  showEnding(): void {
+  showEnding(round: number): void {
     this.setInteractionPrompt(null);
+    this.endingRound.textContent = `${round}`;
     this.endingScreen.classList.remove('hidden', 'credits');
     this.endingScreen.classList.add('ending');
   }

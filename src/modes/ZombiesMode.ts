@@ -873,7 +873,7 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.stopWind?.();
     this.ctx.hud.setInteractionPrompt(null);
     this.pushHudState();
-    this.ctx.hud.showEnding();
+    this.ctx.hud.showEnding(this.rounds.round);
     this.ctx.unlockPointer();
   }
 
