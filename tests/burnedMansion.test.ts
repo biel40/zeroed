@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DeviceProfile } from '../src/core/DeviceProfile';
 import type { Input } from '../src/player/Input';
-import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
+import { EYE_HEIGHT, PlayerController, stairGroundY } from '../src/player/PlayerController';
 import type { Weapon } from '../src/weapons/Weapon';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { Zombie } from '../src/zombies/Zombie';
@@ -438,6 +438,57 @@ describe('Burned Mansion topology', () => {
     }
     expect(zombie.floor).toBe(-1);
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+  });
+
+  it.each([
+    { direction: 'down', zombieFloor: 0, playerFloor: -1, startZ: -2.45, expectedFloor: -1 },
+    { direction: 'up', zombieFloor: -1, playerFloor: 0, startZ: -7.0, expectedFloor: 0 },
+  ])('keeps a moving horde on the stair ramp while travelling $direction', ({ zombieFloor, playerFloor, startZ, expectedFloor }) => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(() => 0, {}, false, [[5.15, startZ]], [], arena.floorTransitions);
+    manager.registerColliders([...arena.colliders]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    for (let index = 0; index < 6; index++) manager.spawnZombie(roundConfig(1), 0, 0);
+
+    const zombies = [...manager.actives];
+    for (let index = 0; index < zombies.length; index++) {
+      const zombie = zombies[index];
+      zombie.state = 'walk';
+      zombie.floor = zombieFloor;
+      const row = Math.floor(index / 3);
+      const queuedZ = zombieFloor === 0 ? startZ + row * 0.45 : startZ - row * 0.35;
+      zombie.position.set(4.65 + (index % 3) * 0.5, zombieFloor === -1 ? MANSION_BUNKER_Y : 0, queuedZ);
+    }
+
+    const ramp = arena.floorTransitions[0].ramp!;
+    const enteredRamp = new Set<Zombie>();
+    for (let frame = 0; frame < 1200 && zombies.some((zombie) => zombie.floor !== expectedFloor); frame++) {
+      const movingPlayerX = 0.8 + Math.sin(frame / 45) * 0.7;
+      manager.update(1 / 60, movingPlayerX, -4.2, playerFloor, playerFloor === -1 ? MANSION_BUNKER_Y + EYE_HEIGHT : EYE_HEIGHT);
+      for (const zombie of zombies) {
+        if (
+          zombie.position.x >= ramp.box.min.x && zombie.position.x <= ramp.box.max.x &&
+          zombie.position.z >= ramp.box.min.z && zombie.position.z <= ramp.box.max.z
+        ) enteredRamp.add(zombie);
+        if (
+          enteredRamp.has(zombie) &&
+          zombie.floor === zombieFloor &&
+          zombie.position.z >= ramp.box.min.z && zombie.position.z <= ramp.box.max.z
+        ) {
+          expect(zombie.position.x).toBeGreaterThanOrEqual(ramp.box.min.x);
+          expect(zombie.position.x).toBeLessThanOrEqual(ramp.box.max.x);
+          const expectedY = stairGroundY(ramp, zombie.position.x, zombie.position.z);
+          if (Math.abs(expectedY) > 0.1 && Math.abs(expectedY - MANSION_BUNKER_Y) > 0.1) {
+            expect(zombie.position.y).toBeCloseTo(expectedY, 4);
+          }
+        }
+      }
+    }
+
+    expect(enteredRamp.size).toBe(zombies.length);
+    expect(zombies.every((zombie) => zombie.floor === expectedFloor)).toBe(true);
+    expect(manager.stuckRecoveryCount).toBe(0);
   });
 
   it.each([4.35, 5.95])('routes a zombie entering the stair edge at x=%s', (stairX) => {

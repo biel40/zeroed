@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { EYE_HEIGHT, stairGroundY, type FloorTransitionZone } from '../player/PlayerController';
+import {
+  EYE_HEIGHT,
+  stairGroundY,
+  type FloorTransitionZone,
+  type StairRamp,
+} from '../player/PlayerController';
 import type { WindowBarrier } from './barriers/WindowBarrier';
 import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
@@ -34,6 +39,11 @@ import { ZombieNavigationService } from './navigation/ZombieNavigationService';
 const SEPARATION_PUSH = 2.2;
 const MAX_SEPARATION_SPEED_FACTOR = 0.65;
 const MAX_MOVE_SPEED_FACTOR = 1.15;
+/** Pulls stair traffic toward the center without snapping or teleporting it. */
+const STAIR_CENTERING_GAIN = 4;
+const MAX_STAIR_CENTERING_SPEED_FACTOR = 0.7;
+/** Funnel distance on each landing so a crowd queues before the narrow ramp. */
+const STAIR_APPROACH_LENGTH = 0.9;
 
 /** Horizontal body radius used for wall collision (torso capsule is 0.38). */
 const ZOMBIE_BODY_RADIUS = 0.42;
@@ -756,25 +766,15 @@ export class ZombieManager {
     if (zombie.floor !== playerFloor) {
       const portal = this.findNextFloorTransition(zombie.floor, playerFloor);
       if (portal) {
-        let center: THREE.Vector3;
-        if (portal.ramp) {
-          const destinationY = portal.targetY - EYE_HEIGHT;
-          const destination = Math.abs(destinationY - portal.ramp.bottom.y) < 0.05
-            ? portal.ramp.bottom
-            : portal.ramp.top;
-          const entrance = destination === portal.ramp.bottom ? portal.ramp.top : portal.ramp.bottom;
-          const target = this.containsXZ(portal.ramp.box, zombie.position.x, zombie.position.z)
-            ? destination
-            : entrance;
-          center = this.tmpToPlayer.set(target.x, target.y, target.z);
-        } else {
-          center = portal.box.getCenter(this.tmpToPlayer);
-        }
+        const center = this.resolveTransitionTarget(portal, zombie, this.tmpToPlayer);
         zombie.faceTowards(center.x, center.z, TURN_SPEED * dt);
         const toPortal = this.tmpToPlayer.set(center.x - zombie.position.x, 0, center.z - zombie.position.z);
-        if (toPortal.lengthSq() > 0.01) {
+        // Ramp endpoints sit only 3 cm inside their volume. The generic
+        // 10 cm tolerance stopped centered bodies before they reached it.
+        const portalEpsilonSq = portal.ramp ? 0.0001 : 0.01;
+        if (toPortal.lengthSq() > portalEpsilonSq) {
           toPortal.normalize();
-          this.seek(zombie, dt, toPortal, center.x, center.z);
+          this.seek(zombie, dt, toPortal, center.x, center.z, true);
         }
       }
       return;
@@ -815,7 +815,10 @@ export class ZombieManager {
     toTarget: THREE.Vector3,
     targetX: number,
     targetZ: number,
+    useStairCorridor = false,
   ): void {
+    const stairRamp = useStairCorridor ? this.findRampAt(zombie.position.x, zombie.position.z) : null;
+    if (stairRamp) this.navPaths.delete(zombie);
     let path = this.navPaths.get(zombie);
     if (
       path &&
@@ -841,7 +844,7 @@ export class ZombieManager {
       this.navPaths.delete(zombie);
       path = undefined;
     }
-    if (!path && this.shouldPathfind(zombie, targetX, targetZ)) {
+    if (!stairRamp && !path && this.shouldPathfind(zombie, targetX, targetZ)) {
       path = this.tryComputePath(zombie, targetX, targetZ);
     }
     if (path) {
@@ -867,7 +870,10 @@ export class ZombieManager {
     // Soft neighbor separation so the horde never stacks into one body.
     const separation = this.tmpSeparation.set(0, 0, 0);
     for (const other of this.pool.actives) {
-      if (other === zombie || !other.isAlive || other.floor !== zombie.floor) continue;
+      if (other === zombie || !other.isAlive) continue;
+      const sharesFloor = other.floor === zombie.floor;
+      const sharesRamp = stairRamp !== null && this.findRampAt(other.position.x, other.position.z) === stairRamp;
+      if (!sharesFloor && !sharesRamp) continue;
       const delta = this.tmpDelta.copy(zombie.position).sub(other.position);
       delta.y = 0;
       const distSq = delta.lengthSq();
@@ -888,10 +894,43 @@ export class ZombieManager {
     const maxSeparation = (zombie.speed * MAX_SEPARATION_SPEED_FACTOR) / SEPARATION_PUSH;
     if (separation.lengthSq() > maxSeparation * maxSeparation) separation.setLength(maxSeparation);
 
+    // A stair is a narrow corridor, not an open floor. Lateral separation
+    // used to push bodies beyond the ramp volume, where they lost continuous
+    // height tracking. Keep spacing along the slope and steer toward its
+    // centerline instead; this remains ordinary velocity, never a position snap.
+    let stairCenterX = 0;
+    let stairCenterZ = 0;
+    if (stairRamp) {
+      const axisX = stairRamp.bottom.x - stairRamp.top.x;
+      const axisZ = stairRamp.bottom.z - stairRamp.top.z;
+      const axisLength = Math.hypot(axisX, axisZ);
+      if (axisLength > 1e-6) {
+        const directionX = axisX / axisLength;
+        const directionZ = axisZ / axisLength;
+        const separationAlongRamp = separation.x * directionX + separation.z * directionZ;
+        separation.x = directionX * separationAlongRamp;
+        separation.z = directionZ * separationAlongRamp;
+
+        const normalX = -directionZ;
+        const normalZ = directionX;
+        const lateralOffset =
+          (zombie.position.x - stairRamp.top.x) * normalX +
+          (zombie.position.z - stairRamp.top.z) * normalZ;
+        const maxCenteringSpeed = zombie.speed * MAX_STAIR_CENTERING_SPEED_FACTOR;
+        const centeringSpeed = THREE.MathUtils.clamp(
+          -lateralOffset * STAIR_CENTERING_GAIN,
+          -maxCenteringSpeed,
+          maxCenteringSpeed,
+        );
+        stairCenterX = normalX * centeringSpeed;
+        stairCenterZ = normalZ * centeringSpeed;
+      }
+    }
+
     const pos = zombie.position;
     const distance = Math.hypot(targetX - pos.x, targetZ - pos.z);
-    let seekX = toTarget.x * zombie.speed + separation.x * SEPARATION_PUSH;
-    let seekZ = toTarget.z * zombie.speed + separation.z * SEPARATION_PUSH;
+    let seekX = toTarget.x * zombie.speed + separation.x * SEPARATION_PUSH + stairCenterX;
+    let seekZ = toTarget.z * zombie.speed + separation.z * SEPARATION_PUSH + stairCenterZ;
     const seekSpeed = Math.hypot(seekX, seekZ);
     const maxMoveSpeed = zombie.speed * MAX_MOVE_SPEED_FACTOR;
     if (seekSpeed > maxMoveSpeed) {
@@ -899,9 +938,13 @@ export class ZombieManager {
       seekZ = (seekZ / seekSpeed) * maxMoveSpeed;
     }
 
-    let rounding = this.roundState.get(zombie) ?? null;
+    // The explicit stair corridor already supplies a valid route. Reactive
+    // wall rounding near its lip can mistake the stairwell edge for a wall
+    // and send the zombie sideways away from the portal.
+    if (stairRamp) this.roundState.delete(zombie);
+    let rounding = stairRamp ? null : (this.roundState.get(zombie) ?? null);
 
-    if (rounding === null) {
+    if (!stairRamp && rounding === null) {
       // Walking straight: only a wall right ahead triggers rounding.
       const probeX = pos.x + toTarget.x * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
       const probeZ = pos.z + toTarget.z * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
@@ -929,7 +972,7 @@ export class ZombieManager {
         rounding = { x: tanX * sign, z: tanZ * sign };
         this.roundState.set(zombie, rounding);
       }
-    } else if (this.lineOfSightClear(zombie, targetX, targetZ, distance)) {
+    } else if (!stairRamp && rounding && this.lineOfSightClear(zombie, targetX, targetZ, distance)) {
       // Rounding ends only when the straight path to the target is clear.
       // Checking the whole segment — not the immediate front — prevents
       // dropping the state at the corner's edge and re-entering it a meter
@@ -1130,7 +1173,7 @@ export class ZombieManager {
           radius: 0,
         };
       }
-      const center = transition.box.getCenter(this.tmpDelta);
+      const center = this.resolveTransitionTarget(transition, zombie, this.tmpDelta);
       return {
         key: `portal:${transition.sourceFloor}:${transition.targetFloor}`,
         kind: 'portal',
@@ -1235,6 +1278,47 @@ export class ZombieManager {
     return null;
   }
 
+  /** Same portal target for steering, queued A* and anti-stuck progress. */
+  private resolveTransitionTarget(
+    transition: FloorTransitionZone,
+    zombie: Zombie,
+    out: THREE.Vector3,
+  ): THREE.Vector3 {
+    const ramp = transition.ramp;
+    if (!ramp) return transition.box.getCenter(out);
+    const destinationY = transition.targetY - EYE_HEIGHT;
+    const destination = Math.abs(destinationY - ramp.bottom.y) < 0.05 ? ramp.bottom : ramp.top;
+    const target = this.containsXZ(ramp.box, zombie.position.x, zombie.position.z)
+      ? destination
+      : (destination === ramp.bottom ? ramp.top : ramp.bottom);
+    return out.set(target.x, target.y, target.z);
+  }
+
+  private findRampAt(x: number, z: number): StairRamp | null {
+    for (const transition of this.floorTransitions) {
+      const ramp = transition.ramp;
+      if (!ramp) continue;
+      const axisX = ramp.bottom.x - ramp.top.x;
+      const axisZ = ramp.bottom.z - ramp.top.z;
+      const length = Math.hypot(axisX, axisZ);
+      if (length <= 1e-6) continue;
+      const directionX = axisX / length;
+      const directionZ = axisZ / length;
+      const normalX = -directionZ;
+      const normalZ = directionX;
+      const offsetX = x - ramp.top.x;
+      const offsetZ = z - ramp.top.z;
+      const along = offsetX * directionX + offsetZ * directionZ;
+      if (along < -STAIR_APPROACH_LENGTH || along > length + STAIR_APPROACH_LENGTH) continue;
+      const boxWidth =
+        Math.abs(normalX) * (ramp.box.max.x - ramp.box.min.x) +
+        Math.abs(normalZ) * (ramp.box.max.z - ramp.box.min.z);
+      const lateral = Math.abs(offsetX * normalX + offsetZ * normalZ);
+      if (lateral <= boxWidth / 2 + ZOMBIE_BODY_RADIUS) return ramp;
+    }
+    return null;
+  }
+
   /**
    * Recovery routing reuses the central navigation service — a forced,
    * budget-exempt query issued only after a progress check fails. Returns
@@ -1264,6 +1348,7 @@ export class ZombieManager {
         const x = zombie.position.x + Math.cos(angle) * radius;
         const z = zombie.position.z + Math.sin(angle) * radius;
         if (this.hitsObstacle(x, z, zombie.position.y)) continue;
+        if (this.isOccupiedByZombie(x, z, zombie.floor, zombie)) continue;
         if (!this.lineOfSightClearFrom(zombie.position.x, zombie.position.z, x, z, zombie.position.y)) continue;
         const distance = Math.hypot(objective.x - x, objective.z - z);
         if (distance < bestDistance) {
@@ -1360,8 +1445,13 @@ export class ZombieManager {
 
   private isOccupiedByZombie(x: number, z: number, floor: number, ignored: Zombie): boolean {
     const minimumDistance = ZOMBIE_BODY_RADIUS * 2;
+    const candidateRamp = this.findRampAt(x, z);
     for (const other of this.pool.actives) {
-      if (other === ignored || !other.isAlive || other.floor !== floor) continue;
+      if (other === ignored || !other.isAlive) continue;
+      if (
+        other.floor !== floor &&
+        (!candidateRamp || this.findRampAt(other.position.x, other.position.z) !== candidateRamp)
+      ) continue;
       if (Math.hypot(other.position.x - x, other.position.z - z) < minimumDistance) return true;
     }
     return false;

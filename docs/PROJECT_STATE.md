@@ -20,8 +20,8 @@ Estado inspeccionado: 2026-08-20. La fuente de verdad es el codigo actual; `READ
 
 - Los tests se ejecutan en Node: no cubren WebGL, DOM real, pointer lock, fullscreen, audio real ni flujos end-to-end de arranque/pausa/reinicio.
 - La instalacion, el modo standalone y el Service Worker real requieren validacion manual en un build de produccion servido por HTTPS; Vitest solo verifica sus contratos estaticos.
-- La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding acotado solo se activa al detectar falta de progreso; los spawns siguen definidos en planta 0.
-- La escalera del bunker usa escalones visuales uniformes sobre una pendiente de navegacion continua; la identidad de planta cambia en los rellanos, sin teletransporte.
+- La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding A* por planta se activa cuando no existe linea de vision navegable y el anti-stuck fuerza una consulta posterior como fallback; los spawns siguen definidos en planta 0.
+- La escalera del bunker usa escalones visuales sobre una pendiente continua y un corredor zombie que forma la cola en ambos rellanos, proyecta la separacion sobre la pendiente y cambia la identidad de planta sin teletransporte.
 - Tablas de barrera, Mystery Box, wall buys y pickups son principalmente visuales/logicos; varios no forman parte de la colision fisica o balistica.
 - Solo existe la variante zombie `walker`. M60, M1911, Ray Gun y ZEUS-77 usan modelos procedurales.
 - Los proyectiles de energia comparten un alcance fijo de 80 m y su comportamiento solo distingue Tesla de Ray Gun por color.

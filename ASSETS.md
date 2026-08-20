@@ -17,7 +17,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | AK-47 | "Ak47" (AK) | https://poly.pizza/m/em1Hi9GuCv | ~1.1k | 59 KB |
 | L96 | "Sniper Rifle" (SniperRifle_3) | https://poly.pizza/m/TKaBjAEofL | ~1.7k | 93 KB |
 | M60 | — (builder procedural dedicado `buildM60` en `WeaponView.ts`; no se encontró LMG CC0 adecuada) | — | ~40 meshes | — |
-| M1911 | — (modelo procedural detallado en `WeaponView.ts`; sin GLB CC0 adecuado) | — | ~30 meshes | — |
+| M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
 
 Los materiales PBR (metalness/roughness por nombre de material) se ajustan en
 tiempo de carga en `src/weapons/WeaponView.ts`. El AK-47 GLB recibe además un
