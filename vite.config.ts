@@ -10,7 +10,7 @@ export default defineConfig({
       manifest: {
         name: 'Zeroed',
         short_name: 'Zeroed',
-        description: 'A browser Zombies FPS built with Three.js and TypeScript.',
+        description: 'A browser round-based Zombies FPS game.',
         start_url: '/',
         scope: '/',
         display: 'standalone',
