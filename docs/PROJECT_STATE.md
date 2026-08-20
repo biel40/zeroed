@@ -1,10 +1,11 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-08-18. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+Estado inspeccionado: 2026-08-20. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
 
 ## Sistemas funcionales
 
 - Arranque WebGL, carga de GLB/texturas con fallback y selector directo entre los dos mapas Zombies (`src/main.ts`, `src/assets/AssetManager.ts`).
+- PWA instalable con manifest, iconos, app shell offline, cache runtime de texturas/modelos/audio y actualizaciones diferidas hasta selector o pausa (`vite.config.ts`, `src/pwa.ts`, `docs/PWA.md`).
 - Shell FPS compartido con render, input desktop/tactil, recuperacion de Pointer Lock, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
 - Armas declarativas con cadencia, modos de fuego, municion, recarga, ADS, dispersion, recoil y view models GLB/procedurales (`src/config/weapons.ts`, `src/weapons/`).
 - Balistica con gravedad/drag, raycast segmentado y prioridad de hitbox de cabeza (`src/shooting/`).
@@ -12,11 +13,12 @@ Estado inspeccionado: 2026-08-18. La fuente de verdad es el codigo actual; `READ
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
 - Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, escalera continua compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
-- Suite Vitest de logica determinista: 46 archivos y 388 tests pasan. `npm run typecheck` tambien pasa.
+- Suite Vitest de logica determinista y contratos estaticos PWA. `npm run typecheck` pasa; la validacion completa conserva fallos preexistentes detectados en audio y seleccion de mapa.
 
 ## Sistemas parciales o limitados
 
 - Los tests se ejecutan en Node: no cubren WebGL, DOM real, pointer lock, fullscreen, audio real ni flujos end-to-end de arranque/pausa/reinicio.
+- La instalacion, el modo standalone y el Service Worker real requieren validacion manual en un build de produccion servido por HTTPS; Vitest solo verifica sus contratos estaticos.
 - La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding acotado solo se activa al detectar falta de progreso; los spawns siguen definidos en planta 0.
 - La escalera del bunker usa escalones visuales uniformes sobre una pendiente de navegacion continua; la identidad de planta cambia en los rellanos, sin teletransporte.
 - Tablas de barrera, Mystery Box, wall buys y pickups son principalmente visuales/logicos; varios no forman parte de la colision fisica o balistica.

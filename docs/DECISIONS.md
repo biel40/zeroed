@@ -1,5 +1,11 @@
 # Decisiones arquitectonicas
 
+## [2026-08-20] Mantener PWA y actualizaciones fuera del gameplay
+
+- Contexto: Zeroed debe instalarse y reutilizar assets offline sin precachear todo el peso de mapas/audio ni perder una run cuando aparece una version nueva.
+- Decision: usar `vite-plugin-pwa`/Workbox con shell en precache, assets pesados en caches runtime y activacion manual del worker pendiente solo desde selector o pausa.
+- Motivo: conservar Vite, Vercel, Three.js y los ciclos de Pointer Lock/fullscreen/audio, dejando una frontera web reutilizable por una futura envoltura Capacitor.
+
 ## [2026-08-18] Sincronizar acceso fisico y final del bunker
 
 - Contexto: la escalera teletransportaba entre plantas, la compuerta retiraba su collider antes de acabar la vista y no existia un cierre explicito de la run.

@@ -6,7 +6,7 @@ FPS de navegador en TypeScript estricto, Three.js, Vite y Vitest. No usa framewo
 
 ```text
 index.html / src/main.ts
-  -> DeviceProfile + AssetManager + HUD
+  -> PWA lifecycle + DeviceProfile + AssetManager + HUD
   -> selector directo de mapa Zombies
   -> core/Game.ts                    shell y composition root
        -> player/                    input y controlador FPS
@@ -42,6 +42,8 @@ Game.tick
 ```
 
 La pausa corta el `tick` tras renderizar el frame congelado. El `dt` esta limitado a 50 ms.
+
+La capa PWA vive en `src/pwa.ts` y `vite.config.ts`, fuera de `Game` y de los modos. Workbox precachea el shell y cachea assets pesados bajo demanda; una actualizacion pendiente solo puede aplicarse desde selector o pausa. La estrategia completa se documenta en `docs/PWA.md`.
 
 ## Responsabilidades y dependencias
 

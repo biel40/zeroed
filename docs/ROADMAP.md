@@ -24,3 +24,7 @@ Solo incluye trabajo respaldado por defectos, limitaciones o contratos presentes
 - Agregar pruebas de integracion del arranque, pausa/reinicio, game over, spawn con pool ocupado, reparacion total y distancia de impacto.
 - Mantener `README.md`, `ASSETS.md` y el indice de `docs/changes/` alineados con los dos modos, siete armas y assets de audio actuales.
 - Documentar procedencia/licencia de los MP3 y resolver la afirmacion incompatible de que todos los assets externos son CC0 frente al zombie CC-BY 3.0.
+
+## Distribucion
+
+- Empaquetar el build Vite como aplicacion Android mediante Capacitor, manteniendo la PWA y la web de `zeroed.es` como canales independientes.

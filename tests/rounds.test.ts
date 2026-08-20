@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   computeDamage,
   MAX_ALIVE,
+  ROUND_BREAK_SECONDS,
   roundConfig,
   splashDamageAt,
   ZOMBIE_BASE_HP,
 } from '../src/zombies/ZombieConfig';
 
 describe('roundConfig', () => {
+  it('gives the player six seconds to recover between rounds', () => {
+    expect(ROUND_BREAK_SECONDS).toBe(6);
+  });
+
   it('round 1 is a gentle introduction', () => {
     const config = roundConfig(1);
     expect(config.zombieCount).toBe(6);

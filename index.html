@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1220" />
     <meta name="description" content="Zeroed — a browser Zombies FPS built with Three.js and TypeScript." />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
     <title>Zeroed</title>
   </head>
   <body>
@@ -74,6 +76,10 @@
             <span class="mode-desc">First official map in the zombies Series</span>
           </button>
         </div>
+        <div class="pwa-actions" aria-live="polite">
+          <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
+          <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
+        </div>
       </div>
     </div>
 
@@ -96,6 +102,7 @@
           <button type="button" id="pause-resume">RESUME</button>
           <button type="button" id="pause-restart">RESTART</button>
           <button type="button" id="pause-menu-btn">MAIN MENU</button>
+          <button type="button" id="pwa-update-pause" class="hidden">UPDATE ZEROED</button>
         </div>
       </div>
     </div>

@@ -520,6 +520,98 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.z).toBeLessThan(1.5);
   });
 
+  it('requests a grid path the moment a wall blocks the straight line', () => {
+    // Zombie in the start room south-west, player in the dining room: the
+    // direct line crosses the z = 2 wall, so pursuit must adopt a navigation
+    // path immediately instead of pushing the wall until the failsafe fires.
+    const arena = makeArena();
+    unlock(arena, 'to-dining');
+    const manager = new ZombieManager(() => 0.5, {}, false, [[-6, 5.5]]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), -6, -5);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+
+    for (let frame = 0; frame < 30; frame++) manager.update(1 / 60, -6, -5, 0);
+
+    expect(manager.navigationComputationCount).toBeGreaterThan(0);
+    expect(manager.navigationPathCount).toBeGreaterThan(0);
+  });
+
+  it('routes from the start room to the east hall only through the open doors', () => {
+    const arena = makeArena();
+    unlock(arena, 'to-dining');
+    unlock(arena, 'to-east-hall');
+    const manager = new ZombieManager(() => 0.5, {}, false, [[-6, 5.5]]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), 2, -4);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+    let damage = 0;
+    manager.onPlayerAttack = (amount) => {
+      damage += amount;
+    };
+
+    let crossedDining = false;
+    let crossedEastHall = false;
+    const previous = zombie.position.clone();
+    for (let frame = 0; frame < 1200 && damage === 0; frame++) {
+      manager.update(1 / 60, 2, -4, 0);
+      const { x, z } = zombie.position;
+      if (previous.z >= 2 && z < 2) {
+        // The only z = 2 crossing available is the dining door aperture.
+        expect(Math.abs(x + 3.5)).toBeLessThan(1.1);
+        crossedDining = true;
+      }
+      if (previous.x <= 0 && x > 0) {
+        // The only x = 0 crossing available is the east hall door aperture.
+        expect(Math.abs(z + 2.5)).toBeLessThan(1.1);
+        crossedEastHall = true;
+      }
+      previous.copy(zombie.position);
+    }
+
+    expect(crossedDining).toBe(true);
+    expect(crossedEastHall).toBe(true);
+    expect(damage).toBeGreaterThan(0);
+  });
+
+  it('never routes through a locked door or a boarded window', () => {
+    // Post-breach chaser (no barrier assignment): every passage into the
+    // dining room is sealed — locked door plus boarded windows — so there is
+    // no walkable route and the zombie must press the wall without ever
+    // crossing it, until the anti-stuck net decides otherwise (outside this
+    // six-second window).
+    const arena = makeArena();
+    const manager = new ZombieManager(() => 0.5, {}, false, [[-6, 5.5]], arena.barriers);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.registerColliders([...arena.colliders]);
+    manager.spawnZombie(roundConfig(1), -6, -5);
+    const zombie = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ][0];
+    zombie.state = 'walk';
+    zombie.barrierTarget = null;
+    let damage = 0;
+    manager.onPlayerAttack = (amount) => {
+      damage += amount;
+    };
+
+    // Six seconds: long enough to prove no sealed passage is ever crossed,
+    // short enough to stay before the anti-stuck last-resort relocation.
+    for (let frame = 0; frame < 360; frame++) {
+      manager.update(1 / 60, -6, -5, 0);
+      expect(zombie.position.z).toBeGreaterThan(1.3);
+    }
+    expect(damage).toBe(0);
+  });
+
   it('lets zombies pursue through the full ground-floor room sequence', () => {
     const arena = makeArena();
     const manager = new ZombieManager(() => 0, {}, false, [[-3.5, 4.8]]);

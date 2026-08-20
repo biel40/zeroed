@@ -31,6 +31,7 @@ ZombiesMode <- impactos <- HitTarget / entorno / Zombie
 
 ```text
 RoundManager
+  -> descanso de 6 s entre rondas
   -> eventos spawnDue
   -> ZombieSpawner -> ZombiePool -> ZombieManager
   -> Zombie busca ruta/barrera/portal/jugador
@@ -55,7 +56,7 @@ Points
 - `ClassicArena`: adapta `ShootingRange`, aplica noche, usa spawns abiertos y Mystery Box; no tiene puertas, barreras ni wall buys.
 - `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; la compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece escalera continua, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos.
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
-- `ZombieManager` invalida decisiones de navegacion al cambiar colliders, por lo que puertas y zonas abiertas se reflejan inmediatamente.
+- `ZombieManager` delega el pathfinding en `ZombieNavigationService`: un grid A* por planta derivado de los colliders del mapa (puertas cerradas y barreras atrincheradas sellan sus vanos; al abrirse, el rebuild invalida las rutas). La persecucion decide el objetivo, el servicio decide la ruta, `moveWithCollision` ejecuta sin atravesar geometria y el anti-stuck es la red de seguridad. Detalles en `docs/changes/2026-08-20-zombie-navigation-service.md`.
 - `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
 
 ## Armas especiales

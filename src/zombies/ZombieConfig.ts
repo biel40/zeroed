@@ -60,7 +60,7 @@ export const ZOMBIE_SPEED_JITTER = 0.08;
 export const ZOMBIE_SCALE_JITTER = 0.05;
 export const ZOMBIE_WALK_JITTER = 0.07;
 
-export const ROUND_BREAK_SECONDS = 4;
+export const ROUND_BREAK_SECONDS = 6;
 export const ROUND_START_DELAY = 2.5;
 
 /**

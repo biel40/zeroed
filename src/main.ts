@@ -4,8 +4,11 @@ import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
+import { setupPWA } from './pwa';
 import { ZombiesMode } from './modes/ZombiesMode';
 import { HUD } from './ui/HUD';
+
+setupPWA();
 
 const container: HTMLElement | null = document.getElementById('app');
 if (!container) throw new Error('Missing #app container');

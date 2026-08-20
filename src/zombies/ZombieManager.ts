@@ -29,6 +29,7 @@ import {
   type ZombieVariantId,
 } from './ZombieVisual';
 import { selectChainTargets } from './ZombieConfig';
+import { ZombieNavigationService } from './navigation/ZombieNavigationService';
 
 const SEPARATION_PUSH = 2.2;
 const MAX_SEPARATION_SPEED_FACTOR = 0.65;
@@ -50,10 +51,21 @@ const STUCK_CHECK_INTERVAL = 1.5;
 const STUCK_MIN_PROGRESS = 0.2;
 const STUCK_NUDGE_AFTER = 4.5;
 const STUCK_RELOCATE_AFTER = 9;
-const RECOVERY_GRID_SIZE = 0.7;
-const RECOVERY_GRID_MARGIN = 6;
-const RECOVERY_GRID_MAX_CELLS = 6000;
 const RECOVERY_WAYPOINT_EPSILON = 0.3;
+/** Navigation grid resolution; fine enough that a 1.6 m door keeps free columns. */
+const NAV_CELL_SIZE = 0.35;
+/** A* computations allowed per update; the rest queue for the next frames. */
+const PATH_BUDGET_PER_FRAME = 2;
+/** Frames before retrying a path query that found no route. */
+const PATH_RETRY_COOLDOWN = 45;
+/** Frames before re-pathing after a path ran out with the target still blocked. */
+const PATH_EXHAUSTED_COOLDOWN = 15;
+/** Re-path when the objective drifted farther than this from the path target. */
+const PATH_TARGET_TOLERANCE = 1.5;
+const PORTAL_OBJECTIVE_RADIUS = 0.7;
+/** Closed barriers seal their window aperture for navigation (boards are gameplay-only). */
+const BARRIER_VOLUME_LENGTH = 1.5;
+const BARRIER_VOLUME_THICKNESS = 0.34;
 const MOVEMENT_SUBSTEP = ZOMBIE_BODY_RADIUS * 0.45;
 /** Surfaces solid enough to stop a walking body (targets are steel/paper). */
 const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'metal']);
@@ -61,11 +73,6 @@ const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'met
 const MIN_OBSTACLE_HEIGHT = 0.5;
 /** Ground/berm-scale boxes are walkable scenery, never obstacles. */
 const MAX_OBSTACLE_FOOTPRINT = 20;
-const GRID_DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
-  [1, 0], [-1, 0], [0, 1], [0, -1],
-  [1, 1], [1, -1], [-1, 1], [-1, -1],
-];
-
 /** GLB payloads per variant, keyed by variant id. Missing keys fall back. */
 export type ZombieModelSources = Partial<Record<ZombieVariantId, ZombieModelSource | null>>;
 
@@ -107,8 +114,12 @@ interface RecoveryWaypoint {
   readonly z: number;
 }
 
-interface RecoveryPath {
-  readonly objectiveKey: string;
+interface NavPath {
+  readonly floor: number;
+  /** Topology revision the path was computed against (doors open/close). */
+  readonly version: number;
+  readonly targetX: number;
+  readonly targetZ: number;
   readonly points: readonly RecoveryWaypoint[];
   index: number;
 }
@@ -146,7 +157,19 @@ export class ZombieManager {
   private readonly roundState = new Map<Zombie, { x: number; z: number }>();
   private readonly entryRoutes = new Map<Zombie, EntryRoute>();
   private readonly stuckState = new Map<Zombie, StuckState>();
-  private readonly recoveryPaths = new Map<Zombie, RecoveryPath>();
+  private readonly navPaths = new Map<Zombie, NavPath>();
+  /** Central per-floor navigation grids; doors open/close via rebuild(). */
+  private readonly navigation = new ZombieNavigationService(NAV_CELL_SIZE, ZOMBIE_BODY_RADIUS);
+  /** Zombies waiting for an A* budget slot, FIFO; recomputed with fresh data. */
+  private readonly pathQueue: Zombie[] = [];
+  private readonly pathQueued = new Set<Zombie>();
+  /** Frame index until which a zombie may not re-request a path. */
+  private readonly pathCooldowns = new Map<Zombie, number>();
+  /** Open/closed bitmask of the barriers at the last navigation rebuild. */
+  private lastBarrierSignature = -1;
+  private frameIndex = 0;
+  private pathBudget = 0;
+  private navigationComputations = 0;
   private readonly zombieIds = new Map<Zombie, number>();
   private nextZombieId = 1;
   private recoveryCount = 0;
@@ -194,8 +217,8 @@ export class ZombieManager {
     this.rebuildObstacles();
     // Door/map topology changed: discard decisions made against old solids.
     this.roundState.clear();
-    this.recoveryPaths.clear();
     this.stuckState.clear();
+    this.rebuildNavigation();
   }
 
   /** Replace spawn points when a new zone is unlocked. */
@@ -205,11 +228,59 @@ export class ZombieManager {
 
   public setNavigationBounds(bounds: ReadonlyArray<ZombieNavigationBounds>): void {
     this.navigationBounds = bounds;
+    this.rebuildNavigation();
   }
 
   /** Replace the barriers eligible for newly spawned zombies after a zone unlock. */
   setBarriers(barriers: ReadonlyArray<WindowBarrier>): void {
     this.barriers = barriers;
+    this.rebuildNavigation();
+  }
+
+  /**
+   * Rebuilds the per-floor navigation grids from the current topology. Runs
+   * on init and on every door/zone/barrier change — never per frame — and
+   * invalidates every cached route via the service version bump. Barrier
+   * boards have no physical collider, so closed windows are appended here as
+   * navigation-only blockers; an open barrier simply stops contributing one.
+   */
+  private rebuildNavigation(): void {
+    const volumes = this.obstacles.map((box) => ({
+      minX: box.min.x,
+      minY: box.min.y,
+      minZ: box.min.z,
+      maxX: box.max.x,
+      maxY: box.max.y,
+      maxZ: box.max.z,
+    }));
+    for (const barrier of this.barriers) {
+      if (barrier.isOpen) continue;
+      const bounds = this.navigationBounds.find((entry) => entry.floor === barrier.floor);
+      const baseY = bounds?.baseY ?? 0;
+      const halfLength = BARRIER_VOLUME_LENGTH / 2;
+      const halfThick = BARRIER_VOLUME_THICKNESS / 2;
+      const outwardIsX = barrier.outward.x !== 0;
+      volumes.push({
+        minX: barrier.position.x - (outwardIsX ? halfThick : halfLength),
+        minY: baseY + 0.1,
+        minZ: barrier.position.z - (outwardIsX ? halfLength : halfThick),
+        maxX: barrier.position.x + (outwardIsX ? halfThick : halfLength),
+        maxY: baseY + 1.7,
+        maxZ: barrier.position.z + (outwardIsX ? halfLength : halfThick),
+      });
+    }
+    this.navigation.rebuild(
+      this.navigationBounds.map((entry) => ({
+        floor: entry.floor,
+        bounds: entry,
+        baseY: entry.baseY,
+      })),
+      volumes,
+    );
+    this.navPaths.clear();
+    this.pathQueue.length = 0;
+    this.pathQueued.clear();
+    this.pathCooldowns.clear();
   }
 
   /**
@@ -249,6 +320,16 @@ export class ZombieManager {
     return this.recoveryCount;
   }
 
+  /** Active navigation paths right now (diagnostics, like stuckRecoveryCount). */
+  get navigationPathCount(): number {
+    return this.navPaths.size;
+  }
+
+  /** Total A* computations since construction (diagnostics). */
+  get navigationComputationCount(): number {
+    return this.navigationComputations;
+  }
+
   /** Event-only navigation diagnostics. Disabled by default for production. */
   setNavigationDebug(enabled: boolean): void {
     this.navigationDebug = enabled;
@@ -266,7 +347,8 @@ export class ZombieManager {
     }
     this.roundState.delete(zombie);
     this.stuckState.delete(zombie);
-    this.recoveryPaths.delete(zombie);
+    this.navPaths.delete(zombie);
+    this.pathCooldowns.delete(zombie);
     // Cheap per-spawn variation: scale, ground speed and walk-cycle phase all
     // jitter so 24 zombies never read as synchronized clones.
     const jitter = (amount: number): number => 1 + (this.rng() * 2 - 1) * amount;
@@ -414,6 +496,18 @@ export class ZombieManager {
     this.lastPlayerX = playerX;
     this.lastPlayerZ = playerZ;
     this.lastPlayerFloor = playerFloor;
+    this.frameIndex++;
+    this.pathBudget = PATH_BUDGET_PER_FRAME;
+    let barrierSignature = 0;
+    for (const barrier of this.barriers) {
+      barrierSignature = (barrierSignature << 1) | (barrier.isOpen ? 1 : 0);
+    }
+    if (barrierSignature !== this.lastBarrierSignature) {
+      // A window finished breaking (or got repaired): sealed passages change.
+      this.lastBarrierSignature = barrierSignature;
+      this.rebuildNavigation();
+    }
+    this.drainPathQueue();
     for (const zombie of this.pool.actives) {
       if (zombie.isAlive) {
         if (
@@ -431,7 +525,7 @@ export class ZombieManager {
           zombie.resumePursuit();
           this.roundState.delete(zombie);
           this.stuckState.delete(zombie);
-          this.recoveryPaths.delete(zombie);
+          this.navPaths.delete(zombie);
           this.recoveryCount++;
           this.debugNavigation(zombie, 'out-of-bounds-relocated', null, 0, 0, 'valid-placement');
         }
@@ -464,7 +558,10 @@ export class ZombieManager {
     this.roundState.clear();
     this.entryRoutes.clear();
     this.stuckState.clear();
-    this.recoveryPaths.clear();
+    this.navPaths.clear();
+    this.pathQueue.length = 0;
+    this.pathQueued.clear();
+    this.pathCooldowns.clear();
     this.recoveryCount = 0;
   }
 
@@ -487,7 +584,7 @@ export class ZombieManager {
     const distance = Math.hypot(objective.x - zombie.position.x, objective.z - zombie.position.z);
     if (this.objectiveReached(zombie, objective, distance)) {
       this.stuckState.delete(zombie);
-      this.recoveryPaths.delete(zombie);
+      this.navPaths.delete(zombie);
       return;
     }
 
@@ -509,7 +606,7 @@ export class ZombieManager {
         pathFailed: false,
       };
       this.stuckState.set(zombie, state);
-      this.recoveryPaths.delete(zombie);
+      this.navPaths.delete(zombie);
     }
     if (Math.hypot(objective.x - state.objectiveX, objective.z - state.objectiveZ) > 1.5) {
       state.objectiveX = objective.x;
@@ -522,7 +619,7 @@ export class ZombieManager {
       state.travelled = 0;
       state.elapsed = 0;
       this.roundState.delete(zombie);
-      this.recoveryPaths.delete(zombie);
+      this.navPaths.delete(zombie);
       return;
     }
     state.travelled += Math.hypot(zombie.position.x - state.x, zombie.position.z - state.z);
@@ -554,7 +651,7 @@ export class ZombieManager {
     this.recoveryCount++;
     this.roundState.delete(zombie);
 
-    const existingPath = this.recoveryPaths.get(zombie);
+    const existingPath = this.navPaths.get(zombie);
     let pathResult = existingPath ? `${existingPath.points.length - existingPath.index}-waypoints-active` : 'not-needed';
     if (objective.kind === 'unreachable-player') {
       state.pathFailed = true;
@@ -567,7 +664,14 @@ export class ZombieManager {
     ) {
       const path = this.buildRecoveryPath(zombie, objective);
       if (path.length > 0) {
-        this.recoveryPaths.set(zombie, { objectiveKey: objective.key, points: path, index: 0 });
+        this.navPaths.set(zombie, {
+          floor: zombie.floor,
+          version: this.navigation.version,
+          targetX: objective.x,
+          targetZ: objective.z,
+          points: path,
+          index: 0,
+        });
         pathResult = `${path.length}-waypoints`;
       } else {
         state.pathFailed = true;
@@ -606,7 +710,7 @@ export class ZombieManager {
     ) {
       this.debugNavigation(zombie, 'relocated', objective, 0, state.stuckFor, 'valid-placement');
       this.stuckState.delete(zombie);
-      this.recoveryPaths.delete(zombie);
+      this.navPaths.delete(zombie);
     }
   }
 
@@ -707,10 +811,37 @@ export class ZombieManager {
     targetX: number,
     targetZ: number,
   ): void {
-    const recovery = this.recoveryPaths.get(zombie);
-    if (recovery) {
-      while (recovery.index < recovery.points.length) {
-        const waypoint = recovery.points[recovery.index];
+    let path = this.navPaths.get(zombie);
+    if (
+      path &&
+      (path.version !== this.navigation.version ||
+        path.floor !== zombie.floor ||
+        Math.hypot(path.targetX - targetX, path.targetZ - targetZ) > PATH_TARGET_TOLERANCE)
+    ) {
+      // Topology changed (a door opened/closed) or the objective moved on.
+      this.navPaths.delete(zombie);
+      path = undefined;
+    }
+    if (
+      path &&
+      this.navigation.hasLineOfSight(
+        zombie.floor,
+        zombie.position.x,
+        zombie.position.z,
+        targetX,
+        targetZ,
+      )
+    ) {
+      // A clear straight line to the final target beats any routed detour.
+      this.navPaths.delete(zombie);
+      path = undefined;
+    }
+    if (!path && this.shouldPathfind(zombie, targetX, targetZ)) {
+      path = this.tryComputePath(zombie, targetX, targetZ);
+    }
+    if (path) {
+      while (path.index < path.points.length) {
+        const waypoint = path.points[path.index];
         if (
           Math.hypot(waypoint.x - zombie.position.x, waypoint.z - zombie.position.z) >
           RECOVERY_WAYPOINT_EPSILON
@@ -720,9 +851,12 @@ export class ZombieManager {
           toTarget.set(targetX - zombie.position.x, 0, targetZ - zombie.position.z).normalize();
           break;
         }
-        recovery.index++;
+        path.index++;
       }
-      if (recovery.index >= recovery.points.length) this.recoveryPaths.delete(zombie);
+      if (path.index >= path.points.length) {
+        this.navPaths.delete(zombie);
+        this.pathCooldowns.set(zombie, this.frameIndex + PATH_EXHAUSTED_COOLDOWN);
+      }
     }
 
     // Soft neighbor separation so the horde never stacks into one body.
@@ -812,6 +946,85 @@ export class ZombieManager {
         rounding.x * zombie.speed * ROUND_SPEED_FACTOR * dt,
         rounding.z * zombie.speed * ROUND_SPEED_FACTOR * dt,
       );
+    }
+  }
+
+  /**
+   * Pathfinding engages only when both ends sit on a declared walkable floor
+   * and the straight line is blocked. Exterior entry routes and wall-mounted
+   * barrier targets live outside the grids by design and keep direct steering.
+   */
+  private shouldPathfind(zombie: Zombie, targetX: number, targetZ: number): boolean {
+    if (!this.navigation.contains(zombie.floor, zombie.position.x, zombie.position.z)) {
+      return false;
+    }
+    if (!this.navigation.contains(zombie.floor, targetX, targetZ)) return false;
+    return !this.navigation.hasLineOfSight(
+      zombie.floor,
+      zombie.position.x,
+      zombie.position.z,
+      targetX,
+      targetZ,
+    );
+  }
+
+  /**
+   * Budgeted A* request: computes immediately when a slot is free, otherwise
+   * queues the zombie for a future frame. Failures cool down so unreachable
+   * objectives are retried periodically without burning the budget.
+   */
+  private tryComputePath(zombie: Zombie, targetX: number, targetZ: number): NavPath | undefined {
+    const cooldownUntil = this.pathCooldowns.get(zombie) ?? -1;
+    if (this.frameIndex < cooldownUntil) return undefined;
+    if (this.pathBudget <= 0) {
+      if (!this.pathQueued.has(zombie)) {
+        this.pathQueued.add(zombie);
+        this.pathQueue.push(zombie);
+      }
+      return undefined;
+    }
+    this.pathBudget--;
+    this.navigationComputations++;
+    const points = this.navigation.findPath(
+      zombie.floor,
+      zombie.position.x,
+      zombie.position.z,
+      targetX,
+      targetZ,
+    );
+    if (!points || points.length === 0) {
+      this.pathCooldowns.set(zombie, this.frameIndex + PATH_RETRY_COOLDOWN);
+      this.debugNavigation(zombie, 'nav-path-failed', null, 0, 0, 'no-path');
+      return undefined;
+    }
+    const path: NavPath = {
+      floor: zombie.floor,
+      version: this.navigation.version,
+      targetX,
+      targetZ,
+      points,
+      index: 0,
+    };
+    this.navPaths.set(zombie, path);
+    this.debugNavigation(zombie, 'nav-path-computed', null, 0, 0, `${points.length}-waypoints`);
+    return path;
+  }
+
+  /** Drains deferred path requests within the per-frame A* budget. */
+  private drainPathQueue(): void {
+    while (this.pathBudget > 0 && this.pathQueue.length > 0) {
+      const zombie = this.pathQueue.shift()!;
+      this.pathQueued.delete(zombie);
+      if (!zombie.isAlive || zombie.state !== 'walk' || this.navPaths.has(zombie)) continue;
+      const objective = this.resolveObjective(
+        zombie,
+        this.lastPlayerX,
+        this.lastPlayerZ,
+        this.lastPlayerFloor,
+      );
+      if (!objective || objective.kind === 'unreachable-player') continue;
+      if (!this.shouldPathfind(zombie, objective.x, objective.z)) continue;
+      this.tryComputePath(zombie, objective.x, objective.z);
     }
   }
 
@@ -918,7 +1131,7 @@ export class ZombieManager {
         kind: 'portal',
         x: center.x,
         z: center.z,
-        radius: RECOVERY_GRID_SIZE,
+        radius: PORTAL_OBJECTIVE_RADIUS,
         trigger: transition.box,
       };
     }
@@ -1018,84 +1231,21 @@ export class ZombieManager {
   }
 
   /**
-   * Bounded grid search used only after a progress check fails. Normal frames
-   * retain the cheap local steering; this path is a recovery route, not a
-   * per-zombie navmesh query.
+   * Recovery routing reuses the central navigation service — a forced,
+   * budget-exempt query issued only after a progress check fails. Returns
+   * [] when the objective has no walkable route (e.g. every door closed).
    */
-  private buildRecoveryPath(
-    zombie: Zombie,
-    objective: NavigationObjective,
-  ): RecoveryWaypoint[] {
-    const minX = Math.min(zombie.position.x, objective.x) - RECOVERY_GRID_MARGIN;
-    const minZ = Math.min(zombie.position.z, objective.z) - RECOVERY_GRID_MARGIN;
-    const width = Math.ceil((Math.abs(objective.x - zombie.position.x) + RECOVERY_GRID_MARGIN * 2) / RECOVERY_GRID_SIZE) + 1;
-    const height = Math.ceil((Math.abs(objective.z - zombie.position.z) + RECOVERY_GRID_MARGIN * 2) / RECOVERY_GRID_SIZE) + 1;
-    const total = width * height;
-    if (total <= 0 || total > RECOVERY_GRID_MAX_CELLS) return [];
-
-    const toIndex = (column: number, row: number): number => row * width + column;
-    const startColumn = Math.max(0, Math.min(width - 1, Math.round((zombie.position.x - minX) / RECOVERY_GRID_SIZE)));
-    const startRow = Math.max(0, Math.min(height - 1, Math.round((zombie.position.z - minZ) / RECOVERY_GRID_SIZE)));
-    const start = toIndex(startColumn, startRow);
-    const parents = new Int32Array(total);
-    parents.fill(-2);
-    parents[start] = -1;
-    const queue = new Int32Array(total);
-    queue[0] = start;
-    let read = 0;
-    let write = 1;
-    let goal = -1;
-
-    while (read < write) {
-      const current = queue[read++];
-      const column = current % width;
-      const row = Math.floor(current / width);
-      const x = minX + column * RECOVERY_GRID_SIZE;
-      const z = minZ + row * RECOVERY_GRID_SIZE;
-      const closeEnough = Math.hypot(objective.x - x, objective.z - z) <= Math.max(
-        objective.radius,
-        RECOVERY_GRID_SIZE * 0.8,
-      );
-      if (
-        (objective.trigger && x >= objective.trigger.min.x && x <= objective.trigger.max.x &&
-          z >= objective.trigger.min.z && z <= objective.trigger.max.z) ||
-        (closeEnough && this.lineOfSightClearFrom(x, z, objective.x, objective.z, zombie.position.y))
-      ) {
-        goal = current;
-        break;
-      }
-
-      for (const [columnStep, rowStep] of GRID_DIRECTIONS) {
-        const nextColumn = column + columnStep;
-        const nextRow = row + rowStep;
-        if (nextColumn < 0 || nextColumn >= width || nextRow < 0 || nextRow >= height) continue;
-        const next = toIndex(nextColumn, nextRow);
-        if (parents[next] !== -2) continue;
-        const nextX = minX + nextColumn * RECOVERY_GRID_SIZE;
-        const nextZ = minZ + nextRow * RECOVERY_GRID_SIZE;
-        if (this.hitsObstacle(nextX, nextZ, zombie.position.y)) continue;
-        if (
-          columnStep !== 0 && rowStep !== 0 &&
-          (this.hitsObstacle(minX + nextColumn * RECOVERY_GRID_SIZE, z, zombie.position.y) ||
-            this.hitsObstacle(x, minZ + nextRow * RECOVERY_GRID_SIZE, zombie.position.y))
-        ) continue;
-        parents[next] = current;
-        queue[write++] = next;
-      }
-    }
-
-    if (goal < 0) return [];
-    const reversed: RecoveryWaypoint[] = [];
-    for (let current = goal; current !== start && current >= 0; current = parents[current]) {
-      const column = current % width;
-      const row = Math.floor(current / width);
-      reversed.push({
-        x: minX + column * RECOVERY_GRID_SIZE,
-        z: minZ + row * RECOVERY_GRID_SIZE,
-      });
-    }
-    reversed.reverse();
-    return reversed;
+  private buildRecoveryPath(zombie: Zombie, objective: NavigationObjective): RecoveryWaypoint[] {
+    if (!this.navigation.contains(zombie.floor, zombie.position.x, zombie.position.z)) return [];
+    this.navigationComputations++;
+    const path = this.navigation.findPath(
+      zombie.floor,
+      zombie.position.x,
+      zombie.position.z,
+      objective.x,
+      objective.z,
+    );
+    return path ?? [];
   }
 
   private nudgeToNearbyClearPoint(zombie: Zombie, objective: NavigationObjective): boolean {
@@ -1322,7 +1472,7 @@ export class ZombieManager {
       if (transition.targetX !== undefined) zombie.position.x = transition.targetX;
       if (transition.targetZ !== undefined) zombie.position.z = transition.targetZ;
       this.roundState.delete(zombie);
-      this.recoveryPaths.delete(zombie);
+      this.navPaths.delete(zombie);
       return;
     }
   }
@@ -1341,7 +1491,8 @@ export class ZombieManager {
     this.entryRoutes.delete(zombie);
     this.roundState.delete(zombie);
     this.stuckState.delete(zombie);
-    this.recoveryPaths.delete(zombie);
+    this.navPaths.delete(zombie);
+    this.pathCooldowns.delete(zombie);
     this.pool.release(zombie);
   }
 

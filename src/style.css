@@ -507,6 +507,31 @@ body {
   color: #9aa7b4;
 }
 
+.pwa-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  min-height: 34px;
+  margin-top: 22px;
+}
+
+.pwa-action {
+  padding: 8px 12px;
+  cursor: pointer;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 210, 103, 0.5);
+  background: transparent;
+  color: #b8c0ca;
+  font: 700 11px 'Consolas', monospace;
+  letter-spacing: 0.12em;
+}
+
+.pwa-action:hover,
+.pwa-action:focus-visible {
+  color: #ffd267;
+  border-color: #ffd267;
+}
+
 #game-over h1 {
   color: #ff5b4d;
   text-shadow: 0 0 22px rgba(255, 60, 40, 0.5);

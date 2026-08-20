@@ -55,6 +55,8 @@ export interface PlayerBounds {
 
 export interface ZombieNavigationBounds extends PlayerBounds {
   readonly floor: number;
+  /** Feet height of this floor's walking surface (default 0). */
+  readonly baseY?: number;
 }
 
 /**
