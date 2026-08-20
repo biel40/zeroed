@@ -1,0 +1,9 @@
+# Bunker ampliado y cuerpos flotantes en la escalera
+
+**Que**: el bunker pasa a ocupar la huella completa de la mansion (14 x 10 frente a 10,2 x 9), con su techo repitiendo exactamente la apertura de escalera del forjado superior, dos luces mas y tres props nuevos. La rampa de navegacion cubre ahora esa apertura entera y todo zombi fuera de ella se asienta sobre el plano de su planta. La lampara de emergencia roja cuelga de un techo real.
+
+**Por que**: `applyFloorTransition` solo escribia `position.y` cuando el cuerpo estaba dentro de `ramp.box`; al ser expulsado lateralmente por la separacion, la altura quedaba congelada a media pendiente y el zombi recorria el bunker flotando metros por encima del suelo. Ademas el corredor de escalera solo se activaba al cruzar de planta, asi que un zombi persiguiendo al jugador en la misma planta no recibia el centrado que lo mantiene sobre la rampa. La lampara de emergencia estaba colocada en (5.2, -4.4), justo en el hueco de la escalera, donde no hay losa de techo: su cordon y su anclaje quedaban suspendidos en el aire.
+
+**Donde**: `src/zombies/ZombieManager.ts`, `src/zombies/maps/BurnedMansionArena.ts`, `src/zombies/maps/BurnedMansionConfig.ts`, `tests/burnedMansion.test.ts`.
+
+**Aprendido**: en un mapa multiplanta la altura no puede ser un efecto secundario de estar dentro de un volumen; hace falta resolverla siempre, con la rampa como caso particular y el plano de la planta como caso base (amortiguado, no un salto). El volumen de la rampa debe coincidir con el hueco fisico del forjado: si es mas pequeno queda un reborde donde los cuerpos pisan el vacio, y si es mas grande hunde a quien camina sobre suelo solido. Cualquier bombilla colgante necesita una losa bajo la que anclarse, y eso ahora lo verifica un test sobre los `light-mount`.

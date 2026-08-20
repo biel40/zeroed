@@ -5,6 +5,7 @@ import {
   type FloorTransitionZone,
   type StairRamp,
 } from '../player/PlayerController';
+import { damp } from '../utils/math';
 import type { WindowBarrier } from './barriers/WindowBarrier';
 import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
@@ -44,6 +45,8 @@ const STAIR_CENTERING_GAIN = 4;
 const MAX_STAIR_CENTERING_SPEED_FACTOR = 0.7;
 /** Funnel distance on each landing so a crowd queues before the narrow ramp. */
 const STAIR_APPROACH_LENGTH = 0.9;
+/** Vertical settle rate back onto the floor plane after leaving a ramp. */
+const FLOOR_SETTLE_SPEED = 8;
 
 /** Horizontal body radius used for wall collision (torso capsule is 0.38). */
 const ZOMBIE_BODY_RADIUS = 0.42;
@@ -545,7 +548,7 @@ export class ZombieManager {
           this.debugNavigation(zombie, 'out-of-bounds-relocated', null, 0, 0, 'valid-placement');
         }
         this.steer(zombie, dt, playerX, playerZ, playerFloor);
-        this.applyFloorTransition(zombie);
+        this.applyFloorTransition(zombie, dt);
         this.updateStuckRecovery(
           zombie,
           dt,
@@ -817,7 +820,12 @@ export class ZombieManager {
     targetZ: number,
     useStairCorridor = false,
   ): void {
-    const stairRamp = useStairCorridor ? this.findRampAt(zombie.position.x, zombie.position.z) : null;
+    // A body already standing on the stairwell needs the corridor too: plain
+    // lateral separation used to eject it sideways off the slope.
+    const stairRamp =
+      useStairCorridor || this.rampContaining(zombie.position.x, zombie.position.z)
+        ? this.findRampAt(zombie.position.x, zombie.position.z)
+        : null;
     if (stairRamp) this.navPaths.delete(zombie);
     let path = this.navPaths.get(zombie);
     if (
@@ -1294,6 +1302,14 @@ export class ZombieManager {
     return out.set(target.x, target.y, target.z);
   }
 
+  /** Strict stairwell volume: the only place where height follows the slope. */
+  private rampContaining(x: number, z: number): StairRamp | null {
+    for (const transition of this.floorTransitions) {
+      if (transition.ramp && this.containsXZ(transition.ramp.box, x, z)) return transition.ramp;
+    }
+    return null;
+  }
+
   private findRampAt(x: number, z: number): StairRamp | null {
     for (const transition of this.floorTransitions) {
       const ramp = transition.ramp;
@@ -1554,11 +1570,21 @@ export class ZombieManager {
     return null;
   }
 
-  private applyFloorTransition(zombie: Zombie): void {
-    const ramp = this.floorTransitions
-      .map((transition) => transition.ramp)
-      .find((candidate) => candidate && this.containsXZ(candidate.box, zombie.position.x, zombie.position.z));
-    if (ramp) zombie.position.y = stairGroundY(ramp, zombie.position.x, zombie.position.z);
+  private applyFloorTransition(zombie: Zombie, dt: number): void {
+    const ramp = this.rampContaining(zombie.position.x, zombie.position.z);
+    if (ramp) {
+      zombie.position.y = stairGroundY(ramp, zombie.position.x, zombie.position.z);
+    } else {
+      // Outside the stairwell the body belongs to its floor plane. Without
+      // this a zombie pushed off the ramp kept its slope height forever and
+      // walked the bunker floating metres above the ground.
+      zombie.position.y = damp(
+        zombie.position.y,
+        this.floorBaseY(zombie.floor),
+        FLOOR_SETTLE_SPEED,
+        dt,
+      );
+    }
 
     for (const transition of this.floorTransitions) {
       if (transition.sourceFloor !== zombie.floor || !transition.box.containsPoint(zombie.position)) continue;
@@ -1574,6 +1600,14 @@ export class ZombieManager {
 
   private containsXZ(box: THREE.Box3, x: number, z: number): boolean {
     return x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z;
+  }
+
+  /** Physical elevation of a floor: navigation bounds first, portal as fallback. */
+  private floorBaseY(floor: number): number {
+    const bounds = this.navigationBounds.find((entry) => entry.floor === floor);
+    if (bounds?.baseY !== undefined) return bounds.baseY;
+    const portal = this.floorTransitions.find((transition) => transition.targetFloor === floor);
+    return portal ? portal.targetY - EYE_HEIGHT : 0;
   }
 
   private kill(zombie: Zombie, headshot: boolean): void {

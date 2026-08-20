@@ -31,10 +31,10 @@ export const MANSION_GROUND_BOUNDS = {
 
 /** Large underground bunker bounds, inset by the player body radius. */
 export const MANSION_BUNKER_BOUNDS = {
-  minX: -2.7,
+  minX: -6.5,
   maxX: 6.5,
   minZ: -7.5,
-  maxZ: 0.5,
+  maxZ: 1.5,
 } as const;
 
 export const MANSION_BUNKER_Y = -3.4;
@@ -42,7 +42,7 @@ export const MANSION_BUNKER_Y = -3.4;
 export const MANSION_BUNKER_ENDING = {
   id: 'radiation-ending',
   cost: 30000,
-  position: { x: -3.035, y: MANSION_BUNKER_Y + 1.55, z: -4.4 },
+  position: { x: -6.835, y: MANSION_BUNKER_Y + 1.55, z: -4.4 },
   floor: -1,
   useRange: 2.1,
   lookDotMin: 0.5,

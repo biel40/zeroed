@@ -517,6 +517,40 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
   });
 
+  it('settles a body pushed off the stair ramp back onto its own floor plane', () => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(() => 0, {}, false, [[1.45, -2.5]], [], arena.floorTransitions);
+    manager.registerColliders([...arena.colliders]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.spawnZombie(roundConfig(1), 0, 0);
+    const zombie = [...manager.actives][0];
+    zombie.state = 'walk';
+    zombie.floor = -1;
+    // Standing on the bunker floor but still carrying a mid-slope height.
+    zombie.position.set(2.5, -1.5, -4.5);
+
+    for (let frame = 0; frame < 120; frame++) {
+      manager.update(1 / 60, 2.5, -4.5, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
+    }
+
+    expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 2);
+  });
+
+  it('anchors every hanging bulb to a real ceiling slab', () => {
+    const arena = makeArena();
+    const slabs = arena.group.children
+      .filter((child) => child.userData.mapRole === 'slab')
+      .map((slab) => new THREE.Box3().setFromObject(slab));
+    const mounts = arena.group.children.filter((child) => child.userData.mapRole === 'light-mount');
+
+    expect(mounts.length).toBeGreaterThan(0);
+    for (const mount of mounts) {
+      const box = new THREE.Box3().setFromObject(mount).expandByScalar(0.02);
+      expect(slabs.some((slab) => slab.intersectsBox(box))).toBe(true);
+    }
+  });
+
   it('retargets stairs when the player changes floors repeatedly', () => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
@@ -783,7 +817,7 @@ describe('Burned Mansion topology', () => {
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
-    expect(pointLights).toHaveLength(6);
+    expect(pointLights).toHaveLength(8);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
   });
 
