@@ -177,6 +177,12 @@ describe('Fire modes', () => {
 });
 
 describe('Bolt action', () => {
+  it('uses a one-shot sniper profile with fast reload cadence', () => {
+    expect(WEAPON_DEFINITIONS.l96.damage).toBeGreaterThanOrEqual(1000);
+    expect(WEAPON_DEFINITIONS.l96.reloadTime).toBeLessThan(1.5);
+    expect(WEAPON_DEFINITIONS.l96.tacticalReloadTime).toBeLessThan(1.25);
+  });
+
   it('auto-reloads an empty magazine after completing the bolt cycle', () => {
     const l96 = makeWeapon('l96');
     l96.ammoInMagazine = 1;
@@ -215,6 +221,11 @@ describe('Bolt action', () => {
 });
 
 describe('ADS and spread', () => {
+  it('gives the Ray Gun a devastating direct hit and splash profile', () => {
+    expect(WEAPON_DEFINITIONS.raygun.damage).toBeGreaterThan(250);
+    expect(WEAPON_DEFINITIONS.raygun.energy?.splashDamage ?? 0).toBeGreaterThan(500);
+  });
+
   it('blends adsAlpha at the configured speed and drops it while reloading', () => {
     const m4 = makeWeapon('m4a1');
     step(m4, 1 / m4.definition.ads.speed, { trigger: false, ads: true });
