@@ -50,6 +50,7 @@ export interface ModeContext {
   hasWeapon(id: WeaponId): boolean;
   canRefillWeaponAmmo(id: WeaponId): boolean;
   refillWeaponAmmo(id: WeaponId): boolean;
+  setWeaponInfiniteReserve(id: WeaponId): boolean;
   /** Restores the starting inventory with fresh ammo (zombies restart). */
   resetArsenal(): void;
   /** Leaves the current run through the shell's established main-menu route. */
@@ -101,6 +102,8 @@ export interface GameMode {
   onPointerUnlock?(): boolean;
   /** Shell-level gate for movement, weapons and interactions. */
   isGameplayInputEnabled?(): boolean;
+  /** Ordered desktop keyboard input for mode-owned developer commands. */
+  onKeyInput?(key: string): void;
   /** Interact key (E) pressed while gameplay input is active. */
   onInteract?(): void;
   /**

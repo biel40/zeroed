@@ -1330,7 +1330,7 @@ export class ZombieManager {
         Math.abs(normalX) * (ramp.box.max.x - ramp.box.min.x) +
         Math.abs(normalZ) * (ramp.box.max.z - ramp.box.min.z);
       const lateral = Math.abs(offsetX * normalX + offsetZ * normalZ);
-      if (lateral <= boxWidth / 2 + ZOMBIE_BODY_RADIUS) return ramp;
+      if (lateral <= boxWidth / 2) return ramp;
     }
     return null;
   }

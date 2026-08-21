@@ -65,6 +65,24 @@ describe('PlayerEconomy points', () => {
 });
 
 describe('PlayerEconomy spending (Mystery Box)', () => {
+  it('allows unlimited spending without changing the balance', () => {
+    const eco = new PlayerEconomy();
+    eco.awardKill(false);
+    eco.setUnlimitedSpending(true);
+
+    expect(eco.canAfford(5000)).toBe(true);
+    expect(eco.spend(5000)).toBe(true);
+    expect(eco.points).toBe(50);
+  });
+
+  it('reset disables unlimited spending', () => {
+    const eco = new PlayerEconomy();
+    eco.setUnlimitedSpending(true);
+    eco.reset();
+
+    expect(eco.canAfford(1)).toBe(false);
+  });
+
   it('canAfford / spend: deducts exactly when the balance covers the cost', () => {
     const eco = new PlayerEconomy();
     for (let i = 0; i < 19; i++) eco.awardKill(false); // 19 * 50 = 950

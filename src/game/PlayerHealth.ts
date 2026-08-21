@@ -7,6 +7,7 @@
 export class PlayerHealth {
   hp: number;
   private invulnTimer = 0;
+  private invincible = false;
   /** Seconds since the last landed hit; regen starts once it passes the delay. */
   private regenTimer = 0;
 
@@ -29,6 +30,10 @@ export class PlayerHealth {
     return this.invulnTimer > 0;
   }
 
+  public setInvincible(enabled: boolean): void {
+    this.invincible = enabled;
+  }
+
   update(dt: number): void {
     if (this.invulnTimer > 0) this.invulnTimer -= dt;
     if (this.regenRate <= 0 || this.isDead || this.hp >= this.maxHp) return;
@@ -46,7 +51,7 @@ export class PlayerHealth {
    * A landed hit also restarts the regeneration delay.
    */
   damage(amount: number): boolean {
-    if (this.isDead || this.isInvulnerable) return false;
+    if (this.invincible || this.isDead || this.isInvulnerable) return false;
     this.hp = Math.max(0, this.hp - amount);
     this.invulnTimer = this.invulnDuration;
     this.regenTimer = 0;
@@ -57,5 +62,6 @@ export class PlayerHealth {
     this.hp = this.maxHp;
     this.invulnTimer = 0;
     this.regenTimer = 0;
+    this.invincible = false;
   }
 }

@@ -362,6 +362,23 @@ export class BurnedMansionArena implements ZombieArena {
       this.group.add(step);
     }
 
+    const sideHeight = Math.abs(MANSION_BUNKER_Y) + 1;
+    const sideY = MANSION_BUNKER_Y + sideHeight / 2;
+    // Each landing keeps 0.8 m clear so radius-inflated navigation can turn
+    // into the ramp without treating the side panels as a closed portal.
+    const sideDepth = topZ - bottomZ - 1.6;
+    for (const x of [4.15, 6.15]) {
+      this.addWall(
+        x,
+        sideY,
+        (topZ + bottomZ) / 2,
+        0.15,
+        sideHeight,
+        sideDepth,
+        this.materials.concreteDirty,
+      );
+    }
+
     const slopeLength = Math.hypot(run, Math.abs(MANSION_BUNKER_Y));
     const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.08, slopeLength), this.materials.metal);
     ramp.position.set(5.15, MANSION_BUNKER_Y / 2 - 0.04, (topZ + bottomZ) / 2);
@@ -392,13 +409,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, this.materials.charredWood);
     this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, this.materials.charredWood);
     this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
-    this.addProp('bunker-console', 6.3, MANSION_BUNKER_Y + 0.65, -1, 0.55, 1.3, 1.7, this.materials.metal);
-    this.addProp('research-table', -1.2, MANSION_BUNKER_Y + 0.42, -2.2, 1.7, 0.84, 0.7, this.materials.metal);
     this.addProp('zeus-containment-pedestal', -1.7, MANSION_BUNKER_Y + 0.55, -6.1, 0.9, 1.1, 0.9, this.materials.metal);
-    this.addProp('military-crate', 1.4, MANSION_BUNKER_Y + 0.35, -6.35, 0.8, 0.7, 1.1, this.materials.charredWood);
-    this.addProp('bunker-generator', -5.6, MANSION_BUNKER_Y + 0.75, -1.6, 1.6, 1.5, 1.1, this.materials.metal);
-    this.addProp('bunker-supply-rack', -5.9, MANSION_BUNKER_Y + 0.9, -6.2, 1.2, 1.8, 0.6, this.materials.metal);
-    this.addProp('bunker-crate-stack', 3.2, MANSION_BUNKER_Y + 0.45, 1.2, 1, 0.9, 0.9, this.materials.charredWood);
   }
 
   private buildSecretPickups(): ReadonlyArray<ArenaWeaponPickup> {
@@ -459,24 +470,6 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   private buildBunkerDetails(): void {
-    const pipeMaterial = new THREE.MeshStandardMaterial({ color: 0x384044, metalness: 0.78, roughness: 0.55 });
-    for (let index = 0; index < 3; index++) {
-      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 7.6, 8), pipeMaterial);
-      pipe.rotation.x = Math.PI / 2;
-      pipe.position.set(6.82 - index * 0.16, MANSION_BUNKER_Y + 2.15 - index * 0.22, -3.5);
-      pipe.userData.mapRole = 'bunker-pipe';
-      this.group.add(pipe);
-    }
-
-    const screenMaterial = new THREE.MeshBasicMaterial({ color: 0x07100d });
-    for (let index = 0; index < 3; index++) {
-      const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 0.04), screenMaterial);
-      monitor.position.set(6.65, MANSION_BUNKER_Y + 1.05 + index * 0.32, -1.45 + index * 0.48);
-      monitor.rotation.y = -Math.PI / 2;
-      monitor.userData.mapRole = 'dead-monitor';
-      this.group.add(monitor);
-    }
-
     const radiationSign = new THREE.Group();
     radiationSign.position.set(
       MANSION_BUNKER_ENDING.position.x,

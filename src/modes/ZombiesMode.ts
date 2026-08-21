@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
 import { PlayerHealth } from '../game/PlayerHealth';
+import { DeveloperCommand } from '../game/DeveloperCommand';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
@@ -92,6 +93,8 @@ export class ZombiesMode implements GameMode {
   private headshots = 0;
   private rayGunUnlocked = false;
   private teslaUnlocked = false;
+  private godModeEnabled = false;
+  private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private gameOver = false;
   private readonly runFlow = new ZombiesRunFlow();
   private mansionStaticColliders = new Set<THREE.Object3D>();
@@ -726,6 +729,21 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.playMysteryBoxReveal(true);
   }
 
+  public onKeyInput(key: string): void {
+    if (!this.godModeEnabled && this.godModeCommand.push(key)) this.activateGodMode();
+  }
+
+  private activateGodMode(): void {
+    this.godModeEnabled = true;
+    this.teslaUnlocked = true;
+    this.health.setInvincible(true);
+    this.economy.setUnlimitedSpending(true);
+    this.ctx.grantWeapon('tesla');
+    this.ctx.setWeaponInfiniteReserve('tesla');
+    this.ctx.hud.showRoundBanner('GOD MODE ENABLED', 'MOTDRULES');
+    this.ctx.audio.playTeslaUnlock();
+  }
+
   private onPlayerHit(damage: number): void {
     if (!this.isGameplayInputEnabled()) return;
     if (!this.health.damage(damage)) return;
@@ -834,6 +852,8 @@ export class ZombiesMode implements GameMode {
     this.headshots = 0;
     this.rayGunUnlocked = false;
     this.teslaUnlocked = false;
+    this.godModeEnabled = false;
+    this.godModeCommand.reset();
     this.economy.reset();
     this.health.reset();
     this.rounds.reset();

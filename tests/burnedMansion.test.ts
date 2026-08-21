@@ -124,7 +124,7 @@ const idleInput = {
   moveAxisY: 0,
 } as unknown as Input;
 
-function movementInput(code: 'KeyW' | 'KeyS'): Input {
+function movementInput(code: 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD'): Input {
   return {
     ...idleInput,
     isDown: (candidate: string) => candidate === code,
@@ -260,6 +260,34 @@ describe('Burned Mansion topology', () => {
     expect(player.rig.position.y).toBeCloseTo(EYE_HEIGHT, 1);
   });
 
+  it.each([
+    { floor: 0, startX: 3.7, key: 'KeyD' as const, groundY: EYE_HEIGHT },
+    { floor: 0, startX: 6.6, key: 'KeyA' as const, groundY: EYE_HEIGHT },
+    { floor: -1, startX: 3.7, key: 'KeyD' as const, groundY: MANSION_BUNKER_Y + EYE_HEIGHT },
+    { floor: -1, startX: 6.6, key: 'KeyA' as const, groundY: MANSION_BUNKER_Y + EYE_HEIGHT },
+  ])('keeps lateral stair contact solid and level from floor $floor at x=$startX', ({ floor, startX, key, groundY }) => {
+    const arena = makeArena();
+    const player = new PlayerController(1);
+    player.setFloorTransitions(arena.floorTransitions);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(
+      startX,
+      groundY,
+      -4.8,
+      floor,
+      floor === 0 ? arena.playerBounds : MANSION_BUNKER_BOUNDS,
+    );
+
+    for (let frame = 0; frame < 120; frame++) {
+      player.update(1 / 60, movementInput(key), weaponStub);
+      expect(player.rig.position.y).toBeCloseTo(groundY, 5);
+      expect(Number.isFinite(player.rig.position.y)).toBe(true);
+    }
+
+    expect(player.floor).toBe(floor);
+    expect(Math.abs(player.rig.position.x - 5.15)).toBeGreaterThan(1.25);
+  });
+
   it('places each standard wall buy in its intended progression zone', () => {
     const arena = makeArena();
     expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'ak47', 'm4a1', 'm60']);
@@ -320,6 +348,24 @@ describe('Burned Mansion topology', () => {
     expect(ramp?.userData.mapRole).toBe('walkable-stair-ramp');
     expect(ramp?.userData.walkableSurface).toBe(true);
     expect(arena.group.children.filter((child) => child.name === 'bunker-stair-handrail')).toHaveLength(2);
+  });
+
+  it('removes non-functional bunker placeholder meshes', () => {
+    const arena = makeArena();
+    const removedNames = [
+      'bunker-console',
+      'research-table',
+      'military-crate',
+      'bunker-generator',
+      'bunker-supply-rack',
+      'bunker-crate-stack',
+    ];
+
+    expect(removedNames.filter((name) => arena.group.getObjectByName(name))).toEqual([]);
+    expect(arena.group.children.some((child) => child.userData.mapRole === 'bunker-pipe')).toBe(false);
+    expect(arena.group.children.some((child) => child.userData.mapRole === 'dead-monitor')).toBe(false);
+    expect(arena.group.getObjectByName('zeus-containment-pedestal')).toBeDefined();
+    expect(arena.group.getObjectByName('radiation-warning-symbol')).toBeDefined();
   });
 
   it('uses an actual radiation trefoil and a marked ZEUS containment station', () => {
@@ -415,7 +461,6 @@ describe('Burned Mansion topology', () => {
   it('gives every large visible prop a matching simplified player collider', () => {
     const arena = makeArena();
     const props = arena.group.children.filter((child) => child.userData.mapRole === 'solid-prop');
-    expect(props.length).toBeGreaterThanOrEqual(6);
     for (const prop of props) {
       const box = new THREE.Box3().setFromObject(prop);
       expect(arena.wallColliders.some((collider) => collider.equals(box))).toBe(true);
@@ -515,6 +560,27 @@ describe('Burned Mansion topology', () => {
 
     expect(zombie.floor).toBe(-1);
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+  });
+
+  it.each([3.7, 6.6])('routes a zombie around the solid stair side from x=%s', (startX) => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(() => 0, {}, false, [[1.45, -2.5]], [], arena.floorTransitions);
+    manager.registerColliders([...arena.colliders]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.spawnZombie(roundConfig(1), 0, 0);
+    const zombie = [...manager.actives][0];
+    zombie.state = 'walk';
+    zombie.floor = 0;
+    zombie.position.set(startX, 0, -4.8);
+
+    for (let frame = 0; frame < 1200 && zombie.floor === 0; frame++) {
+      manager.update(1 / 60, 0, -4.8, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
+      expect(Number.isFinite(zombie.position.y)).toBe(true);
+    }
+
+    expect(zombie.floor).toBe(-1);
+    expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 2);
   });
 
   it('settles a body pushed off the stair ramp back onto its own floor plane', () => {

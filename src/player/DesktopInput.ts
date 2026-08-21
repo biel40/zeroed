@@ -10,10 +10,14 @@ export class DesktopInput {
     private readonly lockElement: HTMLElement,
     private readonly state: InputState,
     private readonly onLockChange: (locked: boolean) => void,
+    private readonly onKeyInput: (key: string) => void = () => undefined,
   ) {
     this.add(document, 'keydown', (event) => {
       const keyboardEvent = event as KeyboardEvent;
-      if (!keyboardEvent.repeat) this.state.setKey(keyboardEvent.code, true);
+      if (!keyboardEvent.repeat) {
+        this.state.setKey(keyboardEvent.code, true);
+        this.onKeyInput(keyboardEvent.key);
+      }
     });
     this.add(document, 'keyup', (event) => {
       this.state.setKey((event as KeyboardEvent).code, false);

@@ -47,6 +47,23 @@ describe('PlayerHealth', () => {
     expect(health.hp).toBe(0);
   });
 
+  it('blocks all damage while invincible', () => {
+    const health = new PlayerHealth(100, 0.5);
+    health.setInvincible(true);
+
+    expect(health.damage(1000)).toBe(false);
+    expect(health.hp).toBe(100);
+  });
+
+  it('reset disables invincibility', () => {
+    const health = new PlayerHealth(100, 0.5);
+    health.setInvincible(true);
+    health.reset();
+
+    expect(health.damage(10)).toBe(true);
+    expect(health.hp).toBe(90);
+  });
+
   it('resets for a restart', () => {
     const health = new PlayerHealth(100, 0.5);
     health.damage(100);

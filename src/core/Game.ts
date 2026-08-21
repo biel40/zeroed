@@ -240,11 +240,20 @@ export class Game {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && entry.weapon.refillAmmo();
       },
+      setWeaponInfiniteReserve: (id) => {
+        const entry = this.arsenal.get(id);
+        if (!entry) return false;
+        entry.weapon.setInfiniteReserve();
+        return true;
+      },
       resetArsenal: () => this.resetArsenal(),
       returnToMainMenu: () => this.returnToMainMenu(),
     });
 
     this.input.onLockChange = (locked) => this.handlePointerLockChange(locked);
+    this.input.onKeyInput = (key) => {
+      if (this.gameplayStarted && !this.paused) this.mode.onKeyInput?.(key);
+    };
     this.hud.setStartHandler(() => this.start());
 
     // Pause wiring. Desktop: ESC toggles (the pointer-lock release opens the

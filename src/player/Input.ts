@@ -28,6 +28,7 @@ export class Input {
   onLockChange: ((locked: boolean) => void) | null = null;
   onWeaponSwap: (() => void) | null = null;
   onPauseRequest: (() => void) | null = null;
+  public onKeyInput: ((key: string) => void) | null = null;
 
   constructor(lockElement: HTMLElement, profile: DeviceProfile = DESKTOP_PROFILE) {
     this.useTouchControls = profile.useTouchControls;
@@ -35,6 +36,8 @@ export class Input {
     // requires pointer lock, which requestPointerLock() suppresses on mobile.
     this.desktop = new DesktopInput(lockElement, this.state, (locked) => {
       this.onLockChange?.(locked);
+    }, (key) => {
+      this.onKeyInput?.(key);
     });
     if (profile.useTouchControls) {
       this.mobile = new MobileInput(lockElement, this.state, {

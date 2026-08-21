@@ -89,6 +89,16 @@ describe('Weapon ammo and reload', () => {
     expect(m4.reserveAmmo).toBe(300);
   });
 
+  it('can make its reserve infinite until ammo is reset', () => {
+    const tesla = new Weapon(WEAPON_DEFINITIONS.tesla, () => 0.5, 42);
+
+    tesla.setInfiniteReserve();
+    expect(tesla.reserveAmmo).toBeNull();
+
+    tesla.resetAmmo();
+    expect(tesla.reserveAmmo).toBe(42);
+  });
+
   it('starts reloading automatically after firing the last round', () => {
     const m4 = makeWeapon('m4a1');
     m4.ammoInMagazine = 1;

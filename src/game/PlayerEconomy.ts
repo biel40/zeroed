@@ -16,6 +16,7 @@ export const POINTS_REPAIR = 10;
 
 export class PlayerEconomy {
   private balance = 0;
+  private unlimitedSpending = false;
 
   get points(): number {
     return this.balance;
@@ -43,8 +44,12 @@ export class PlayerEconomy {
     this.balance += POINTS_REPAIR;
   }
 
+  public setUnlimitedSpending(enabled: boolean): void {
+    this.unlimitedSpending = enabled;
+  }
+
   canAfford(cost: number): boolean {
-    return this.balance >= cost;
+    return this.unlimitedSpending || this.balance >= cost;
   }
 
   /**
@@ -54,12 +59,13 @@ export class PlayerEconomy {
    */
   spend(cost: number): boolean {
     if (!this.canAfford(cost)) return false;
-    this.balance -= cost;
+    if (!this.unlimitedSpending) this.balance -= cost;
     return true;
   }
 
   /** Zombies restart: back to a fresh wallet. */
   reset(): void {
     this.balance = 0;
+    this.unlimitedSpending = false;
   }
 }

@@ -165,6 +165,10 @@ export class Weapon {
     return true;
   }
 
+  public setInfiniteReserve(): void {
+    this.reserveAmmo = null;
+  }
+
   clearEvents(): void {
     this.pendingEvents.length = 0;
   }

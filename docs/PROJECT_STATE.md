@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-08-20. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+Estado inspeccionado: 2026-08-21. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
 
 ## Sistemas funcionales
 
@@ -13,7 +13,7 @@ Estado inspeccionado: 2026-08-20. La fuente de verdad es el codigo actual; `READ
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
 - Pasos de zombie posicionales 3D con pool de 8 fuentes sobre un unico `AudioListener`, prioridad al mas cercano y asset opcional con fallback sintetizado (`src/zombies/ZombieFootsteps.ts`).
-- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, escalera continua compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
+- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, escalera continua con costados solidos compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
 - Suite Vitest de logica determinista y contratos estaticos PWA. `npm run typecheck` pasa; la validacion completa conserva fallos preexistentes detectados en audio y seleccion de mapa.
 
 ## Sistemas parciales o limitados
@@ -21,7 +21,7 @@ Estado inspeccionado: 2026-08-20. La fuente de verdad es el codigo actual; `READ
 - Los tests se ejecutan en Node: no cubren WebGL, DOM real, pointer lock, fullscreen, audio real ni flujos end-to-end de arranque/pausa/reinicio.
 - La instalacion, el modo standalone y el Service Worker real requieren validacion manual en un build de produccion servido por HTTPS; Vitest solo verifica sus contratos estaticos.
 - La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding A* por planta se activa cuando no existe linea de vision navegable y el anti-stuck fuerza una consulta posterior como fallback; los spawns siguen definidos en planta 0.
-- La escalera del bunker usa escalones visuales sobre una pendiente continua y un corredor zombie que forma la cola en ambos rellanos, proyecta la separacion sobre la pendiente y cambia la identidad de planta sin teletransporte.
+- La escalera del bunker usa escalones visuales sobre una pendiente continua, costados fisicos que impiden entradas laterales a media altura y un corredor zombie que forma la cola en ambos rellanos, proyecta la separacion sobre la pendiente y cambia la identidad de planta sin teletransporte.
 - Tablas de barrera, Mystery Box, wall buys y pickups son principalmente visuales/logicos; varios no forman parte de la colision fisica o balistica.
 - Solo existe la variante zombie `walker`. M60, M1911, Ray Gun y ZEUS-77 usan modelos procedurales.
 - Los proyectiles de energia comparten un alcance fijo de 80 m y su comportamiento solo distingue Tesla de Ray Gun por color.

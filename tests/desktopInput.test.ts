@@ -15,8 +15,8 @@ class FakeEventTarget {
     this.listeners.get(type)?.delete(listener);
   }
 
-  dispatch(type: string): void {
-    for (const listener of this.listeners.get(type) ?? []) listener({ type } as Event);
+  dispatch(type: string, event: Event = { type } as Event): void {
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
   }
 
   listenerCount(type: string): number {
@@ -87,5 +87,29 @@ describe('DesktopInput pointer lock lifecycle', () => {
     expect(windowTarget.listenerCount('focus')).toBe(0);
     expect(documentTarget.listenerCount('pointerlockchange')).toBe(0);
     expect(documentTarget.listenerCount('pointerlockerror')).toBe(0);
+  });
+
+  it('forwards non-repeated keyboard characters in event order', () => {
+    const documentTarget = new FakeEventTarget() as FakeEventTarget & {
+      pointerLockElement: HTMLElement | null;
+      visibilityState: DocumentVisibilityState;
+    };
+    const windowTarget = new FakeEventTarget();
+    const canvas = new FakeEventTarget() as unknown as HTMLElement;
+    documentTarget.pointerLockElement = canvas;
+    documentTarget.visibilityState = 'visible';
+    vi.stubGlobal('document', documentTarget);
+    vi.stubGlobal('window', windowTarget);
+    const characters: string[] = [];
+    const input = new DesktopInput(canvas, new InputState(), () => undefined, (key) => {
+      characters.push(key);
+    });
+
+    documentTarget.dispatch('keydown', { code: 'KeyM', key: 'm', repeat: false } as KeyboardEvent);
+    documentTarget.dispatch('keydown', { code: 'KeyO', key: 'o', repeat: false } as KeyboardEvent);
+    documentTarget.dispatch('keydown', { code: 'KeyO', key: 'o', repeat: true } as KeyboardEvent);
+
+    expect(characters).toEqual(['m', 'o']);
+    input.dispose();
   });
 });
