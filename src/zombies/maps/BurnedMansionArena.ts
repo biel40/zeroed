@@ -11,7 +11,7 @@ import { WallBuyView } from '../wallbuys/WallBuyView';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
-import type { ArenaCompletionInteraction, ArenaWeaponPickup, ZombieArena } from './ZombieArena';
+import type { ArenaAmmoRefill, ArenaCompletionInteraction, ArenaWeaponPickup, ZombieArena } from './ZombieArena';
 import {
   createMansionSurfaceMaterials,
   projectBoxUVs,
@@ -20,6 +20,7 @@ import {
 import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
+  MANSION_AMMO_REFILLS,
   MANSION_BARRIERS,
   MANSION_BUNKER_BOUNDS,
   MANSION_BUNKER_ENDING,
@@ -30,6 +31,7 @@ import {
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
   MANSION_SECRET_AREAS,
+  MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
 } from './BurnedMansionConfig';
 
@@ -49,6 +51,7 @@ type WallAxis = 'x' | 'z';
 
 class MansionWeaponPickup implements ArenaWeaponPickup {
   private claimed = false;
+  private openProgress = 0;
 
   constructor(
     readonly id: string,
@@ -58,7 +61,11 @@ class MansionWeaponPickup implements ArenaWeaponPickup {
     readonly useRange: number,
     readonly lookDotMin: number,
     readonly requiredDoorId: string,
-    private readonly view: THREE.Object3D,
+    readonly cost: number,
+    readonly interactionLabel: string,
+    private readonly view: THREE.Group,
+    private readonly weaponDisplay: THREE.Object3D,
+    private readonly glassDoor: THREE.Object3D,
   ) {}
 
   get available(): boolean {
@@ -68,13 +75,61 @@ class MansionWeaponPickup implements ArenaWeaponPickup {
   claim(): boolean {
     if (this.claimed) return false;
     this.claimed = true;
-    this.view.visible = false;
+    this.weaponDisplay.visible = false;
+    this.view.userData.purchased = true;
     return true;
+  }
+
+  update(dt: number): void {
+    if (!this.claimed || this.openProgress >= 1) return;
+    this.openProgress = Math.min(1, this.openProgress + dt * 2.8);
+    this.glassDoor.position.y = 1.05 + this.openProgress * 1.15;
   }
 
   reset(): void {
     this.claimed = false;
-    this.view.visible = true;
+    this.openProgress = 0;
+    this.weaponDisplay.visible = true;
+    this.glassDoor.position.y = 1.05;
+    this.view.userData.purchased = false;
+  }
+}
+
+class MansionAmmoRefill implements ArenaAmmoRefill {
+  private feedbackTimer = 0;
+
+  constructor(
+    readonly id: string,
+    readonly cost: number,
+    readonly interactionLabel: string,
+    readonly position: { readonly x: number; readonly y: number; readonly z: number },
+    readonly floor: number,
+    readonly useRange: number,
+    readonly lookDotMin: number,
+    private readonly view: THREE.Group,
+    private readonly lid: THREE.Object3D,
+    private readonly glow: THREE.PointLight,
+  ) {}
+
+  activate(): void {
+    this.feedbackTimer = 0.45;
+    this.view.userData.activeFeedback = true;
+  }
+
+  update(dt: number): void {
+    if (this.feedbackTimer <= 0) return;
+    this.feedbackTimer = Math.max(0, this.feedbackTimer - dt);
+    const active = this.feedbackTimer > 0;
+    this.lid.rotation.x = active ? -0.16 : 0;
+    this.glow.intensity = active ? 1.4 : 0.35;
+    this.view.userData.activeFeedback = active;
+  }
+
+  reset(): void {
+    this.feedbackTimer = 0;
+    this.lid.rotation.x = 0;
+    this.glow.intensity = 0.35;
+    this.view.userData.activeFeedback = false;
   }
 }
 
@@ -104,6 +159,7 @@ export class BurnedMansionArena implements ZombieArena {
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly weaponPickups: ReadonlyArray<ArenaWeaponPickup>;
+  readonly ammoRefills: ReadonlyArray<ArenaAmmoRefill>;
   spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = [];
 
   private readonly structureMeshes: THREE.Mesh[] = [];
@@ -130,6 +186,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.buildProps();
     this.buildBunkerDetails();
     this.weaponPickups = this.buildSecretPickups();
+    this.ammoRefills = this.buildAmmoRefills();
     this.buildDamageDetails();
     this.buildWindowFrames();
     this.buildLighting();
@@ -191,6 +248,8 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   public update(dt: number): void {
+    for (const pickup of this.weaponPickups) pickup.update?.(dt);
+    for (const refill of this.ammoRefills) refill.update?.(dt);
     for (const view of this.barrierViews) view.update();
     for (let index = 0; index < this.doorViews.length; index++) {
       if (!this.doorViews[index].update(dt)) continue;
@@ -211,6 +270,7 @@ export class BurnedMansionArena implements ZombieArena {
     for (const door of this.doors) door.reset();
     for (const view of this.doorViews) view.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
+    for (const refill of this.ammoRefills) refill.reset();
     this.activeSpawnZones.clear();
     this.activeSpawnZones.add('start');
     this.openDoorIds.clear();
@@ -270,7 +330,7 @@ export class BurnedMansionArena implements ZombieArena {
       point.breachX === undefined ||
       point.breachZ === undefined
     ) return false;
-    const outside = point.x < -7.45 || point.x > 7.45 || point.z < -8.45 || point.z > 8.45;
+    const outside = point.x < -7.45 || point.x > 7.45 || point.z < -8.45 || point.z > 10.45;
     if (!outside) return false;
     const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === point.barrierId);
     if (!barrier) return false;
@@ -305,17 +365,17 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   private buildShell(): void {
-    this.addSlab('ground-floor', -1.425, -0.08, 0, 11.15, 0.16, 16, this.materials.floorConcrete);
-    this.addSlab('ground-floor-east', 6.575, -0.08, 0, 0.85, 0.16, 16, this.materials.floorConcrete);
+    this.addSlab('ground-floor', -1.425, -0.08, 1, 11.15, 0.16, 18, this.materials.floorConcrete);
+    this.addSlab('ground-floor-east', 6.575, -0.08, 1, 0.85, 0.16, 18, this.materials.floorConcrete);
     this.addSlab('ground-floor-stair-north', 5.15, -0.08, -7.45, 2, 0.16, 1.1, this.materials.floorConcrete);
-    this.addSlab('ground-floor-stair-south', 5.15, -0.08, 2.5, 2, 0.16, 11, this.materials.floorConcrete);
+    this.addSlab('ground-floor-stair-south', 5.15, -0.08, 3.5, 2, 0.16, 13, this.materials.floorConcrete);
 
-    this.addWindowedWall('z', -7.15, -8, 8, [-3.2, 3.2, 5.4]);
-    this.addWindowedWall('z', 7.15, -8, 8, [-2.5]);
+    this.addWindowedWall('z', -7.15, -8, 10, [-3.2, 3.2, 5.4]);
+    this.addWindowedWall('z', 7.15, -8, 10, [-2.5]);
     this.addWindowedWall('x', -8.15, -7, 7, [-3.5, 1.6]);
-    this.addWindowedWall('x', 8.15, -7, 7, [-3.5]);
+    this.addWindowedWall('x', 10.15, -7, 7, [-3.5]);
 
-    this.addSlab('mansion-roof', 0, 3.28, 0, 14.6, 0.16, 16.6, this.materials.ceilingBurned);
+    this.addSlab('mansion-roof', 0, 3.28, 1, 14.6, 0.16, 18.6, this.materials.ceilingBurned);
 
     // The bunker mirrors the whole mansion footprint, and its ceiling repeats
     // the exact stair aperture of the ground slab so the stairwell stays open.
@@ -364,9 +424,7 @@ export class BurnedMansionArena implements ZombieArena {
 
     const sideHeight = Math.abs(MANSION_BUNKER_Y) + 1;
     const sideY = MANSION_BUNKER_Y + sideHeight / 2;
-    // Each landing keeps 0.8 m clear so radius-inflated navigation can turn
-    // into the ramp without treating the side panels as a closed portal.
-    const sideDepth = topZ - bottomZ - 1.6;
+    const sideDepth = topZ - bottomZ;
     for (const x of [4.15, 6.15]) {
       this.addWall(
         x,
@@ -375,9 +433,20 @@ export class BurnedMansionArena implements ZombieArena {
         0.15,
         sideHeight,
         sideDepth,
-        this.materials.concreteDirty,
+        this.materials.charredWood,
       );
     }
+    const backWallTopY = -0.5;
+    const backWallHeight = backWallTopY - MANSION_BUNKER_Y;
+    this.addWall(
+      5.15,
+      MANSION_BUNKER_Y + backWallHeight / 2,
+      topZ,
+      2.15,
+      backWallHeight,
+      0.15,
+      this.materials.charredWood,
+    );
 
     const slopeLength = Math.hypot(run, Math.abs(MANSION_BUNKER_Y));
     const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.08, slopeLength), this.materials.metal);
@@ -406,25 +475,67 @@ export class BurnedMansionArena implements ZombieArena {
 
   private buildProps(): void {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
-    this.addProp('burned-sofa', -5.5, 0.35, 6.8, 1.8, 0.7, 0.65, this.materials.charredWood);
+    this.addProp('burned-sofa', -5.5, 0.35, 8.8, 1.8, 0.7, 0.65, this.materials.charredWood);
     this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, this.materials.charredWood);
     this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
-    this.addProp('zeus-containment-pedestal', -1.7, MANSION_BUNKER_Y + 0.55, -6.1, 0.9, 1.1, 0.9, this.materials.metal);
   }
 
   private buildSecretPickups(): ReadonlyArray<ArenaWeaponPickup> {
     const secret = MANSION_SECRET_AREAS[0];
     const pickups: MansionWeaponPickup[] = [];
-    for (const reward of secret.rewards) {
+    for (const reward of MANSION_SPECIAL_WEAPON_CASES) {
+      const caseGroup = new THREE.Group();
+      caseGroup.name = `${reward.id}-case`;
+      caseGroup.position.set(reward.position.x, MANSION_BUNKER_Y, reward.position.z);
+      caseGroup.userData.mapRole = 'special-weapon-case';
+      caseGroup.userData.weaponId = reward.weaponId;
+      caseGroup.userData.purchased = false;
+
+      const frame = new THREE.Group();
+      frame.userData.mapRole = 'case-frame';
+      const frameGeometry = new THREE.BoxGeometry(0.08, 1.85, 0.08);
+      for (const x of [-0.55, 0.55]) {
+        for (const z of [-0.4, 0.4]) {
+          const post = new THREE.Mesh(frameGeometry, this.materials.metal);
+          post.position.set(x, 1.05, z);
+          frame.add(post);
+        }
+      }
+      const capGeometry = new THREE.BoxGeometry(1.2, 0.12, 0.9);
+      const base = new THREE.Mesh(capGeometry, this.materials.metal);
+      base.position.y = 0.12;
+      base.userData.surface = 'metal';
+      base.userData.mapRole = 'case-base';
+      const cap = new THREE.Mesh(capGeometry, this.materials.metal);
+      cap.position.y = 1.98;
+      frame.add(base, cap);
+      caseGroup.add(frame);
+      this.structureMeshes.push(base);
+      this.playerWallMeshes.push(base);
+
+      const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: reward.weaponId === 'tesla' ? 0x72d8e8 : 0x8ddca0,
+        transparent: true,
+        opacity: 0.2,
+        roughness: 0.12,
+        metalness: 0.05,
+        transmission: this.profile.useReducedEffects ? 0 : 0.35,
+        depthWrite: false,
+      });
+      const glassDoor = new THREE.Mesh(new THREE.BoxGeometry(1.04, 1.62, 0.035), glassMaterial);
+      glassDoor.position.set(0, 1.05, 0.42);
+      glassDoor.userData.mapRole = 'case-glass';
+      caseGroup.add(glassDoor);
+
       const pickupGroup = buildWeaponDisplayModel(
         WEAPON_DEFINITIONS[reward.weaponId],
         null,
-        reward.weaponId === 'tesla' ? 0.9 : 0.75,
+        reward.weaponId === 'tesla' ? 0.72 : 0.62,
       );
       pickupGroup.name = reward.id;
-      pickupGroup.position.set(reward.position.x, reward.position.y, reward.position.z);
+      pickupGroup.position.set(0, 1.05, 0);
       pickupGroup.rotation.y = reward.weaponId === 'tesla' ? -0.25 : Math.PI / 2;
-      pickupGroup.userData.mapRole = 'secret-weapon-pickup';
+      pickupGroup.userData.mapRole = 'case-weapon-display';
       pickupGroup.userData.weaponId = reward.weaponId;
 
       const halo = new THREE.Mesh(
@@ -440,7 +551,17 @@ export class BurnedMansionArena implements ZombieArena {
       halo.position.y = -0.18;
       halo.userData.mapRole = 'secret-pickup-halo';
       pickupGroup.add(halo);
-      this.group.add(pickupGroup);
+      caseGroup.add(pickupGroup);
+
+      const light = new THREE.PointLight(
+        reward.weaponId === 'tesla' ? 0x49cce8 : 0x69db7c,
+        this.profile.useReducedEffects ? 0.35 : 0.65,
+        2.6,
+        2,
+      );
+      light.position.set(0, 1.45, 0);
+      caseGroup.add(light);
+      this.group.add(caseGroup);
 
       pickups.push(
         new MansionWeaponPickup(
@@ -451,7 +572,11 @@ export class BurnedMansionArena implements ZombieArena {
           reward.useRange,
           reward.lookDotMin,
           secret.doorId,
+          reward.cost,
+          reward.interactionLabel,
+          caseGroup,
           pickupGroup,
+          glassDoor,
         ),
       );
     }
@@ -467,6 +592,66 @@ export class BurnedMansionArena implements ZombieArena {
     this.group.add(phrase);
 
     return pickups;
+  }
+
+  private buildAmmoRefills(): ReadonlyArray<ArenaAmmoRefill> {
+    return MANSION_AMMO_REFILLS.map((config) => {
+      const group = new THREE.Group();
+      group.name = config.id;
+      group.position.set(config.position.x, 0, config.position.z);
+      group.userData.mapRole = 'ammo-refill';
+      group.userData.activeFeedback = false;
+
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.58, 0.68), this.materials.metal);
+      base.position.y = 0.29;
+      base.userData.surface = 'metal';
+      base.userData.mapRole = 'ammo-box-body';
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.12, 0.72), this.materials.metal);
+      lid.position.set(0, 0.64, 0);
+      lid.userData.mapRole = 'ammo-box-lid';
+      const iconPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.72, 0.015, 0.3),
+        new THREE.MeshBasicMaterial({ color: 0xd2bd3f }),
+      );
+      iconPlate.position.set(0, 0.705, 0);
+      iconPlate.userData.mapRole = 'ammo-box-marking';
+
+      const ammoIcon = new THREE.Group();
+      ammoIcon.position.y = 0.745;
+      ammoIcon.userData.mapRole = 'ammo-box-icon';
+      const casingMaterial = new THREE.MeshStandardMaterial({ color: 0xb8862d, metalness: 0.75, roughness: 0.28 });
+      const projectileMaterial = new THREE.MeshStandardMaterial({ color: 0x40362b, metalness: 0.45, roughness: 0.4 });
+      for (const x of [-0.2, 0, 0.2]) {
+        const casing = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.25, 10), casingMaterial);
+        casing.position.set(x, 0, 0.025);
+        casing.rotation.x = Math.PI / 2;
+        casing.userData.mapRole = 'ammo-icon-casing';
+        const projectile = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 10), projectileMaterial);
+        projectile.position.set(x, 0, -0.16);
+        projectile.rotation.x = -Math.PI / 2;
+        projectile.userData.mapRole = 'ammo-icon-projectile';
+        ammoIcon.add(casing, projectile);
+      }
+      const glow = new THREE.PointLight(0xe4cd4e, 0.35, 2.2, 2);
+      glow.position.set(0, 0.85, 0);
+      group.add(base, lid, iconPlate, ammoIcon, glow);
+      this.group.add(group);
+      this.structureMeshes.push(base);
+      this.playerWallMeshes.push(base);
+
+      return new MansionAmmoRefill(
+        config.id,
+        config.cost,
+        config.interactionLabel,
+        config.position,
+        config.floor,
+        config.useRange,
+        config.lookDotMin,
+        group,
+        lid,
+        glow,
+      );
+    });
   }
 
   private buildBunkerDetails(): void {
@@ -501,14 +686,6 @@ export class BurnedMansionArena implements ZombieArena {
     }
     this.group.add(radiationSign);
 
-    const containmentGlow = new THREE.Mesh(
-      new THREE.TorusGeometry(0.58, 0.035, 8, 32),
-      new THREE.MeshBasicMaterial({ color: 0x36c7e8, transparent: true, opacity: 0.7 }),
-    );
-    containmentGlow.position.set(-1.7, MANSION_BUNKER_Y + 0.04, -6.1);
-    containmentGlow.rotation.x = Math.PI / 2;
-    containmentGlow.userData.mapRole = 'zeus-containment-ring';
-    this.group.add(containmentGlow);
   }
 
   private buildDamageDetails(): void {
@@ -528,7 +705,7 @@ export class BurnedMansionArena implements ZombieArena {
       { x: 3.035, y: 1.45, z: -6.15, width: 1.15, height: 1.8, rotationY: Math.PI / 2, material: this.materials.exposedBrick, role: 'exposed-brick' },
       { x: -7.0, y: 2.42, z: 5.4, width: 1.7, height: 1.35, rotationY: Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -7.0, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
-      { x: -3.5, y: 2.42, z: 8.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
+      { x: -3.5, y: 2.42, z: 10.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.5, y: 2.4, z: -8.0, width: 1.8, height: 1.25, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: 7.0, y: 2.45, z: -4.5, width: 1.9, height: 1.35, rotationY: -Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.5, y: 2.55, z: 1.835, width: 2.05, height: 1.15, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
@@ -544,7 +721,7 @@ export class BurnedMansionArena implements ZombieArena {
     }
 
     const ceilingScorch = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 3.3), this.materials.sootSoft);
-    ceilingScorch.position.set(-3.7, 3.185, 3.8);
+    ceilingScorch.position.set(-3.7, 3.185, 5.2);
     ceilingScorch.rotation.x = Math.PI / 2;
     ceilingScorch.rotation.z = 0.35;
     ceilingScorch.userData.mapRole = 'ceiling-soot';
@@ -588,7 +765,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.group.add(
       new THREE.HemisphereLight(0x34465e, 0x110d0a, this.profile.useReducedEffects ? 0.18 : 0.25),
     );
-    this.addPointLight(-3.8, 2.55, 5, 0xffad68, 2.4, 6.5, GROUND_CEILING_Y);
+    this.addPointLight(-3.8, 2.55, 6.5, 0xffad68, 2.4, 6.5, GROUND_CEILING_Y);
     this.addPointLight(-4.5, 2.35, -4.8, 0x839db7, 1.7, 6.5, GROUND_CEILING_Y);
     this.addPointLight(1.6, 2.35, -4.8, 0xb35b32, 1.1, 5.2, GROUND_CEILING_Y);
     this.addPointLight(3.6, 1.85, -5.5, 0x6e120d, 0.35, 4.5, GROUND_CEILING_Y);

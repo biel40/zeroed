@@ -31,7 +31,7 @@ import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
 import { ClassicArena } from '../zombies/maps/ClassicArena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
-import type { ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
+import type { ArenaAmmoRefill, ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
 import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
@@ -315,12 +315,26 @@ export class ZombiesMode implements GameMode {
       if (!this.ctx.canGrantWeapon(pickup.weaponId)) {
         throw new Error(`Map pickup "${pickup.id}" references a weapon that is not preloaded`);
       }
+      if (!this.economy.spend(pickup.cost)) {
+        this.ctx.hud.flashNotEnoughPoints();
+        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${pickup.cost} PTS NEEDED`);
+        return;
+      }
       if (this.ctx.grantWeapon(pickup.weaponId)) {
         pickup.claim();
         if (pickup.weaponId === 'raygun') this.rayGunUnlocked = true;
         if (pickup.weaponId === 'tesla') this.teslaUnlocked = true;
         this.ctx.audio.playMysteryBoxPickup();
+        this.pushHudState();
+      } else {
+        throw new Error(`Map pickup "${pickup.id}" could not deliver after validation`);
       }
+      return;
+    }
+
+    const ammoRefill = this.findFacingAmmoRefill();
+    if (ammoRefill) {
+      this.purchaseAmmoRefill(ammoRefill);
       return;
     }
 
@@ -383,7 +397,10 @@ export class ZombiesMode implements GameMode {
     }
 
     const pickup = this.findFacingWeaponPickup();
-    if (pickup) return `USE — Take ${WEAPON_DEFINITIONS[pickup.weaponId].name}`;
+    if (pickup) return `${pickup.interactionLabel}\n${tapKey}`;
+
+    const ammoRefill = this.findFacingAmmoRefill();
+    if (ammoRefill) return `${ammoRefill.interactionLabel}\n${tapKey}`;
 
     const completion = this.findFacingCompletionInteraction();
     if (completion) return `ACTIVATE FINAL\n${tapKey} — ${completion.cost} PTS`;
@@ -526,6 +543,30 @@ export class ZombiesMode implements GameMode {
     return best;
   }
 
+  private findFacingAmmoRefill(): ArenaAmmoRefill | null {
+    if (!this.arena) return null;
+    const refills = this.arena.ammoRefills ?? [];
+    if (refills.length === 0) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    let best: ArenaAmmoRefill | null = null;
+    let bestDot = -1;
+    for (const refill of refills) {
+      if (refill.floor !== this.ctx.player.floor) continue;
+      const dx = refill.position.x - playerPos.x;
+      const dz = refill.position.z - playerPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > refill.useRange * refill.useRange) continue;
+      const distance = Math.sqrt(distSq);
+      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+      if (dot >= refill.lookDotMin && dot > bestDot) {
+        bestDot = dot;
+        best = refill;
+      }
+    }
+    return best;
+  }
+
   private findFacingCompletionInteraction(): ArenaCompletionInteraction | null {
     const interaction = this.arena?.completionInteraction;
     if (!interaction || interaction.floor !== this.ctx.player.floor) return null;
@@ -563,6 +604,24 @@ export class ZombiesMode implements GameMode {
       ? this.ctx.refillWeaponAmmo(wallBuy.weaponId)
       : this.ctx.grantWeapon(wallBuy.weaponId);
     if (!delivered) throw new Error(`Wall buy "${wallBuy.id}" could not deliver after validation`);
+    this.pushHudState();
+  }
+
+  private purchaseAmmoRefill(refill: ArenaAmmoRefill): void {
+    if (!this.ctx.canRefillEquippedWeaponAmmo()) {
+      this.ctx.hud.showRoundBanner('AMMO FULL');
+      return;
+    }
+    if (!this.economy.spend(refill.cost)) {
+      this.ctx.hud.flashNotEnoughPoints();
+      this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${refill.cost} PTS NEEDED`);
+      return;
+    }
+    if (!this.ctx.refillEquippedWeaponAmmo()) {
+      throw new Error(`Ammo refill "${refill.id}" could not deliver after validation`);
+    }
+    refill.activate();
+    this.ctx.audio.playMysteryBoxPickup();
     this.pushHudState();
   }
 

@@ -18,15 +18,15 @@ export const MANSION_DOOR_COSTS = {
   nuclearBunker: 9999,
 } as const;
 
-/** Safe player spawn in the south-west starting room. */
-export const MANSION_PLAYER_SPAWN = { x: -3.5, y: 1.72, z: 5.8, floor: 0 } as const;
+/** Safe player spawn in the expanded south starting room. */
+export const MANSION_PLAYER_SPAWN = { x: -3.5, y: 1.72, z: 7.2, floor: 0 } as const;
 
 /** Ground-floor movement bounds. */
 export const MANSION_GROUND_BOUNDS = {
   minX: -6.6,
   maxX: 6.6,
   minZ: -7.6,
-  maxZ: 7.6,
+  maxZ: 9.6,
 } as const;
 
 /** Large underground bunker bounds, inset by the player body radius. */
@@ -49,6 +49,39 @@ export const MANSION_BUNKER_ENDING = {
   requiredDoorId: 'nuclear-bunker',
 } as const;
 
+export const MANSION_SPECIAL_WEAPON_CASES = [
+  {
+    id: 'bunker-raygun',
+    weaponId: 'raygun' as const,
+    cost: 2000,
+    interactionLabel: 'RAY GUN — 2000',
+    position: { x: -2.2, y: MANSION_BUNKER_Y + 1.1, z: -2.35 },
+    useRange: 2,
+    lookDotMin: 0.42,
+  },
+  {
+    id: 'bunker-zeus',
+    weaponId: 'tesla' as const,
+    cost: 3000,
+    interactionLabel: 'ZEUS-99 — 3000',
+    position: { x: -2.2, y: MANSION_BUNKER_Y + 1.1, z: -6.05 },
+    useRange: 2,
+    lookDotMin: 0.42,
+  },
+] as const;
+
+export const MANSION_AMMO_REFILLS = [
+  {
+    id: 'start-ammo-refill',
+    cost: 800,
+    interactionLabel: 'REFILL AMMO — 800',
+    position: { x: 6.25, y: 0.45, z: 9.45 },
+    floor: 0,
+    useRange: 1.9,
+    lookDotMin: 0.4,
+  },
+] as const;
+
 export const MANSION_SECRET_AREAS = [
   {
     id: 'nuclear_bunker',
@@ -56,22 +89,7 @@ export const MANSION_SECRET_AREAS = [
     unlockCost: MANSION_DOOR_COSTS.nuclearBunker,
     prompt: 'Open sealed bunker',
     floor: -1,
-    rewards: [
-      {
-        id: 'bunker-raygun',
-        weaponId: 'raygun' as const,
-        position: { x: -1.2, y: MANSION_BUNKER_Y + 1.05, z: -2.2 },
-        useRange: 1.8,
-        lookDotMin: 0.45,
-      },
-      {
-        id: 'bunker-zeus',
-        weaponId: 'tesla' as const,
-        position: { x: -1.7, y: MANSION_BUNKER_Y + 1.25, z: -6.1 },
-        useRange: 1.9,
-        lookDotMin: 0.42,
-      },
-    ],
+    rewards: MANSION_SPECIAL_WEAPON_CASES,
   },
 ] as const;
 
@@ -86,7 +104,7 @@ export const MANSION_BARRIERS: ReadonlyArray<{
 }> = [
   { id: 'start-west-a', x: -7.15, z: 5.4, outwardX: -1, outwardZ: 0, zone: 'start' },
   { id: 'start-west-b', x: -7.15, z: 3.2, outwardX: -1, outwardZ: 0, zone: 'start' },
-  { id: 'start-south', x: -3.5, z: 8.15, outwardX: 0, outwardZ: 1, zone: 'start' },
+  { id: 'start-south', x: -3.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
   { id: 'box-west', x: -7.15, z: -3.2, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
   { id: 'box-north', x: -3.5, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-dining' },
   { id: 'east-hall-north', x: 1.6, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-east-hall' },
@@ -167,7 +185,7 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
   start: [
     { x: -14, z: 5.4, barrierId: 'start-west-a', approachX: -8.05, approachZ: 5.4, breachX: -6.55, breachZ: 5.4, exterior: true },
     { x: -14, z: 3.2, barrierId: 'start-west-b', approachX: -8.05, approachZ: 3.2, breachX: -6.55, breachZ: 3.2, exterior: true },
-    { x: -3.5, z: 16, barrierId: 'start-south', approachX: -3.5, approachZ: 9.05, breachX: -3.5, breachZ: 7.55, exterior: true },
+    { x: -3.5, z: 18, barrierId: 'start-south', approachX: -3.5, approachZ: 11.05, breachX: -3.5, breachZ: 9.55, exterior: true },
   ],
   'to-dining': [
     { x: -14, z: -3.2, barrierId: 'box-west', approachX: -8.05, approachZ: -3.2, breachX: -6.55, breachZ: -3.2, exterior: true },

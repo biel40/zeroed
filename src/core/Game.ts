@@ -240,6 +240,8 @@ export class Game {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && entry.weapon.refillAmmo();
       },
+      canRefillEquippedWeaponAmmo: () => !this.currentWeapon.isAmmoFull,
+      refillEquippedWeaponAmmo: () => this.currentWeapon.refillAmmo(),
       setWeaponInfiniteReserve: (id) => {
         const entry = this.arsenal.get(id);
         if (!entry) return false;

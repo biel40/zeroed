@@ -76,6 +76,8 @@ describe('Burned Mansion secret bunker interaction', () => {
     const pickup: ArenaWeaponPickup = {
       id: `bunker-${weaponId}`,
       weaponId,
+      cost: 0,
+      interactionLabel: weaponId.toUpperCase(),
       position: { x: 0, y: 0, z: 0 },
       floor: -1,
       useRange: 2,
@@ -89,6 +91,7 @@ describe('Burned Mansion secret bunker interaction', () => {
       canGrantWeapon: () => true,
       grantWeapon: (id: string) => { grants.push(id); return true; },
       audio: { playMysteryBoxPickup: () => undefined },
+      hud: { updateZombies: () => undefined },
     };
     (mode as unknown as { findFacingDoor(): null }).findFacingDoor = () => null;
     (mode as unknown as { findRepairableBarrier(): null }).findRepairableBarrier = () => null;

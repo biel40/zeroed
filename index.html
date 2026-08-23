@@ -1,145 +1,155 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1220" />
-    <meta name="description" content="Zeroed — A browser round-based Zombies FPS game." />
-    <link rel="icon" href="/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <title>Zeroed</title>
-  </head>
-  <body>
-    <div id="app"></div>
 
-    <div id="hud" class="hidden">
-      <div id="crosshair">
-        <span class="arm arm-top"></span>
-        <span class="arm arm-right"></span>
-        <span class="arm arm-bottom"></span>
-        <span class="arm arm-left"></span>
-      </div>
-      <div id="scope-overlay"></div>
-      <div id="hitmarker">
-        <span></span><span></span><span></span><span></span>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="description" content="Zeroed — A browser round-based Zombies FPS game." />
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
+  <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+  <title>Zeroed</title>
+</head>
 
-      <div id="touch-controls" aria-label="Touch controls">
-        <!-- Floating joystick visual: appears where the left-zone finger lands. -->
-        <div id="joystick"><div id="joystick-knob"></div></div>
-        <!-- Secondary actions: small, out of the aiming thumb's way. -->
-        <div class="touch-secondary">
-          <button type="button" data-action="reload" id="btn-reload" aria-label="Reload">RLD</button>
-          <button type="button" data-action="interact" id="btn-interact" aria-label="Interact">USE</button>
-          <button type="button" data-action="swap-weapon" id="btn-weapon" aria-label="Swap weapon">WPN</button>
-          <button type="button" data-action="mode" id="btn-mode" aria-label="Change fire mode">MODE</button>
-          <button type="button" data-action="pause" id="btn-pause">| |</button>
-        </div>
-        <!-- Primary actions: right thumb rest position. -->
-        <div class="touch-primary">
-          <button type="button" data-action="fire" id="btn-fire" aria-label="Aim and fire">FIRE</button>
-        </div>
-      </div>
+<body>
+  <div id="app"></div>
 
-      <div id="hud-weapon" class="hud-panel">
-        <div id="hud-weapon-name">M4A1</div>
-        <div id="hud-ammo">30 / ∞</div>
-        <div class="hud-row hud-row-secondary"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
-      </div>
-
-      <div id="hud-zombies" class="hud-panel hidden">
-        <div id="z-round"></div>
-        <div id="z-points">0 PTS</div>
-        <div class="hud-row"><span class="hud-label">HP</span><span id="z-hp">100</span></div>
-        <div id="z-hp-bar"><span id="z-hp-fill"></span></div>
-        <div class="hud-row"><span class="hud-label">KILLS</span><span id="z-kills">0</span></div>
-        <div class="hud-row hud-row-secondary"><span class="hud-label">HEADSHOTS</span><span id="z-headshots">0</span></div>
-      </div>
-
-      <div id="round-banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
-      <div id="damage-overlay"></div>
-      <div id="interact-prompt" class="hidden"></div>
+  <div id="hud" class="hidden">
+    <div id="crosshair">
+      <span class="arm arm-top"></span>
+      <span class="arm arm-right"></span>
+      <span class="arm arm-bottom"></span>
+      <span class="arm arm-left"></span>
+    </div>
+    <div id="scope-overlay"></div>
+    <div id="hitmarker">
+      <span></span><span></span><span></span><span></span>
     </div>
 
-    <div id="map-select" class="hidden">
-      <div class="start-panel">
-        <h1>ZOMBIES</h1>
-        <p class="mode-hint">SELECT A MAP</p>
-        <div class="mode-grid">
-          <button type="button" data-map="classic">
-            <span class="mode-name">SHOOTING RANGE</span>
-            <span class="mode-desc">Simple tutorial map</span>
-          </button>
-          <button type="button" data-map="burned-mansion">
-            <span class="mode-name">BURNED MANSION</span>
-            <span class="mode-desc">First official map in the zombies Series</span>
-          </button>
-        </div>
-        <div class="pwa-actions" aria-live="polite">
-          <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
-          <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
-        </div>
+    <div id="touch-controls" aria-label="Touch controls">
+      <!-- Floating joystick visual: appears where the left-zone finger lands. -->
+      <div id="joystick">
+        <div id="joystick-knob"></div>
+      </div>
+      <!-- Secondary actions: small, out of the aiming thumb's way. -->
+      <div class="touch-secondary">
+        <button type="button" data-action="reload" id="btn-reload" aria-label="Reload">RLD</button>
+        <button type="button" data-action="interact" id="btn-interact" aria-label="Interact">USE</button>
+        <button type="button" data-action="swap-weapon" id="btn-weapon" aria-label="Swap weapon">WPN</button>
+        <button type="button" data-action="mode" id="btn-mode" aria-label="Change fire mode">MODE</button>
+        <button type="button" data-action="pause" id="btn-pause">| |</button>
+      </div>
+      <!-- Primary actions: right thumb rest position. -->
+      <div class="touch-primary">
+        <button type="button" data-action="fire" id="btn-fire" aria-label="Aim and fire">FIRE</button>
       </div>
     </div>
 
-    <div id="game-over" class="hidden">
-      <div class="start-panel">
-        <h1>GAME OVER</h1>
-        <div class="go-stats">
-          <div class="hud-row"><span class="hud-label">ROUND REACHED</span><span id="go-round">1</span></div>
-          <div class="hud-row"><span class="hud-label">KILLS</span><span id="go-kills">0</span></div>
-          <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="go-headshots">0</span></div>
-        </div>
-        <button type="button" id="go-restart">RESTART</button>
+    <div id="hud-weapon" class="hud-panel">
+      <div id="hud-weapon-name">M4A1</div>
+      <div id="hud-ammo">30 / ∞</div>
+      <div class="hud-row hud-row-secondary"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
+    </div>
+
+    <div id="hud-zombies" class="hud-panel hidden">
+      <div id="z-round"></div>
+      <div id="z-points">0 PTS</div>
+      <div class="hud-row"><span class="hud-label">HP</span><span id="z-hp">100</span></div>
+      <div id="z-hp-bar"><span id="z-hp-fill"></span></div>
+      <div class="hud-row"><span class="hud-label">KILLS</span><span id="z-kills">0</span></div>
+      <div class="hud-row hud-row-secondary"><span class="hud-label">HEADSHOTS</span><span id="z-headshots">0</span>
       </div>
     </div>
 
-    <div id="pause-menu" class="hidden">
-      <div class="start-panel">
-        <h1>PAUSED</h1>
-        <div class="pause-actions">
-          <button type="button" id="pause-resume">RESUME</button>
-          <button type="button" id="pause-restart">RESTART</button>
-          <button type="button" id="pause-menu-btn">MAIN MENU</button>
-          <button type="button" id="pwa-update-pause" class="hidden">UPDATE ZEROED</button>
-        </div>
+    <div id="round-banner">
+      <div id="banner-title"></div>
+      <div id="banner-sub"></div>
+    </div>
+    <div id="damage-overlay"></div>
+    <div id="interact-prompt" class="hidden"></div>
+  </div>
+
+  <div id="map-select" class="hidden">
+    <div class="start-panel">
+      <h1>ZOMBIES</h1>
+      <p class="mode-hint">SELECT A MAP</p>
+      <div class="mode-grid">
+        <button type="button" data-map="classic">
+          <span class="mode-name">SHOOTING RANGE</span>
+          <span class="mode-desc">Simple tutorial map</span>
+        </button>
+        <button type="button" data-map="burned-mansion">
+          <span class="mode-name">BURNED MANSION</span>
+          <span class="mode-desc">First official map in the zombies Series</span>
+        </button>
+      </div>
+      <div class="pwa-actions" aria-live="polite">
+        <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
+        <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
       </div>
     </div>
+  </div>
 
-    <div id="ending-screen" class="hidden" aria-live="polite">
-      <div class="credits-panel">
-        <h1>ZEROED</h1>
-        <p class="credits-round">ROUND <span id="ending-round">1</span></p>
-        <p class="credits-role">Created by</p>
-        <p>Gabriel Borràs Serra (Biel40)</p>
-        <p class="credits-role">Official Beta Tester</p>
-        <p>Gabriel Frau Fuster</p>
-        <p class="credits-thanks">Thank you for playing.</p>
-        <button type="button" id="credits-main-menu">RETURN TO MAIN MENU</button>
+  <div id="game-over" class="hidden">
+    <div class="start-panel">
+      <h1>GAME OVER</h1>
+      <div class="go-stats">
+        <div class="hud-row"><span class="hud-label">ROUND REACHED</span><span id="go-round">1</span></div>
+        <div class="hud-row"><span class="hud-label">KILLS</span><span id="go-kills">0</span></div>
+        <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="go-headshots">0</span></div>
+      </div>
+      <button type="button" id="go-restart">RESTART</button>
+    </div>
+  </div>
+
+  <div id="pause-menu" class="hidden">
+    <div class="start-panel">
+      <h1>PAUSED</h1>
+      <div class="pause-actions">
+        <button type="button" id="pause-resume">RESUME</button>
+        <button type="button" id="pause-restart">RESTART</button>
+        <button type="button" id="pause-menu-btn">MAIN MENU</button>
+        <button type="button" id="pwa-update-pause" class="hidden">UPDATE ZEROED</button>
       </div>
     </div>
+  </div>
 
-    <div id="start-screen">
-      <div class="start-panel">
-        <h1>Zeroed</h1>
-        <p id="start-hint">LOADING ASSETS</p>
-        <div id="loading-bar"><span></span></div>
-        <div class="controls-grid">
-          <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Move</span>
-          <span><kbd>Mouse</kbd></span><span>Aim</span>
-          <span><kbd>LMB</kbd></span><span>Fire</span>
-          <span><kbd>RMB</kbd></span><span>ADS</span>
-          <span><kbd>R</kbd></span><span>Reload</span>
-          <span><kbd>X</kbd></span><span>Fire mode</span>
-          <span><kbd>E</kbd></span><span>Interact</span>
-          <span><kbd>Space</kbd></span><span>Jump</span>
-          <span><kbd>1</kbd>–<kbd>2</kbd></span><span>Weapon slots</span>
-          <span><kbd>ESC</kbd></span><span>Release mouse</span>
-        </div>
+  <div id="ending-screen" class="hidden" aria-live="polite">
+    <div class="credits-panel">
+      <h1>ZEROED</h1>
+      <p class="credits-round">ROUND <span id="ending-round">1</span></p>
+      <p class="credits-role">Designed and developed by</p>
+      <p>Gabriel Borràs (Biel40)</p>
+      <p class="credits-role">Official Beta Tester</p>
+      <p>Gabriel Frau Fuster</p>
+      <p class="credits-thanks">Thank you for playing!</p>
+      <button type="button" id="credits-main-menu">RETURN TO MAIN MENU</button>
+    </div>
+  </div>
+
+  <div id="start-screen">
+    <div class="start-panel">
+      <h1>Zeroed</h1>
+      <p id="start-hint">LOADING ASSETS</p>
+      <div id="loading-bar"><span></span></div>
+      <div class="controls-grid">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Move</span>
+        <span><kbd>Mouse</kbd></span><span>Aim</span>
+        <span><kbd>LMB</kbd></span><span>Fire</span>
+        <span><kbd>RMB</kbd></span><span>ADS</span>
+        <span><kbd>R</kbd></span><span>Reload</span>
+        <span><kbd>X</kbd></span><span>Fire mode</span>
+        <span><kbd>E</kbd></span><span>Interact</span>
+        <span><kbd>Space</kbd></span><span>Jump</span>
+        <span><kbd>1</kbd>–<kbd>2</kbd></span><span>Weapon slots</span>
+        <span><kbd>ESC</kbd></span><span>Release mouse</span>
       </div>
     </div>
+  </div>
 
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
 </html>

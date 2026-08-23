@@ -11,13 +11,16 @@ import { ZombieManager } from '../src/zombies/ZombieManager';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from '../src/zombies/ZombieSpawner';
 import {
   MANSION_BARRIERS,
+  MANSION_AMMO_REFILLS,
   MANSION_BUNKER_BOUNDS,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
   MANSION_DOOR_COSTS,
+  MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
   MANSION_SECRET_AREAS,
+  MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
 } from '../src/zombies/maps/BurnedMansionConfig';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
@@ -324,7 +327,13 @@ describe('Burned Mansion topology', () => {
     expect(door.prompt).toBe('Open sealed bunker');
     expect(door.requiredMessage).toBe('9999 PTS REQUIRED');
     expect(secret.rewards.map((reward) => reward.weaponId)).toEqual(['raygun', 'tesla']);
+    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([2000, 3000]);
+    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.interactionLabel)).toEqual([
+      'RAY GUN — 2000',
+      'ZEUS-99 — 3000',
+    ]);
     expect(pickups.map((pickup) => pickup.weaponId)).toEqual(['raygun', 'tesla']);
+    expect(pickups.map((pickup) => pickup.cost)).toEqual([2000, 3000]);
     expect(pickups.every((pickup) => pickup.requiredDoorId === secret.doorId)).toBe(true);
     for (const pickup of pickups) {
       expect(pickup.available).toBe(true);
@@ -334,6 +343,62 @@ describe('Burned Mansion topology', () => {
     arena.reset();
     expect(pickups.every((pickup) => pickup.available)).toBe(true);
     expect(arena.group.getObjectByName('bunker-zeus')?.userData.weaponId).toBe('tesla');
+  });
+
+  it('presents both Wonder Weapons in separate reinforced glass cases without blocking bunker routes', () => {
+    const arena = makeArena();
+    const cases = arena.group.children.filter((child) => child.userData.mapRole === 'special-weapon-case');
+    expect(cases).toHaveLength(2);
+    expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-glass'))).toBe(true);
+    expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-frame'))).toBe(true);
+    expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-weapon-display'))).toBe(true);
+    expect(cases[0].position.distanceTo(cases[1].position)).toBeGreaterThan(2.5);
+
+    unlock(arena, 'nuclear-bunker');
+    const bunkerObstacles = arena.wallColliders;
+    expect(canWalk([5.15, -6.9], [-5.8, -4.4], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    for (const weaponCase of MANSION_SPECIAL_WEAPON_CASES) {
+      expect(canWalk([5.15, -6.9], [weaponCase.position.x + 1.2, weaponCase.position.z], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    }
+  });
+
+  it('places a reusable 800-point ammo refill in the starting room and resets its feedback', () => {
+    const arena = makeArena();
+    expect(MANSION_AMMO_REFILLS).toHaveLength(1);
+    expect(MANSION_AMMO_REFILLS[0].cost).toBe(800);
+    expect(MANSION_AMMO_REFILLS[0].interactionLabel).toBe('REFILL AMMO — 800');
+    expect(MANSION_AMMO_REFILLS[0].floor).toBe(0);
+    expect(MANSION_AMMO_REFILLS[0].position.z).toBeGreaterThan(2);
+    expect(arena.ammoRefills).toHaveLength(1);
+    const ammoBox = arena.group.getObjectByName('start-ammo-refill');
+    expect(ammoBox?.userData.mapRole).toBe('ammo-refill');
+    expect(ammoBox?.children.some((child) => child.userData.mapRole === 'ammo-box-lid')).toBe(true);
+    const ammoIcon = ammoBox?.children.find((child) => child.userData.mapRole === 'ammo-box-icon');
+    expect(ammoIcon).toBeDefined();
+    expect(ammoIcon?.children.filter((child) => child.userData.mapRole === 'ammo-icon-casing')).toHaveLength(3);
+    expect(MANSION_GROUND_BOUNDS.maxX - MANSION_AMMO_REFILLS[0].position.x).toBeLessThan(0.5);
+    expect(MANSION_GROUND_BOUNDS.maxZ - MANSION_AMMO_REFILLS[0].position.z).toBeLessThan(0.5);
+
+    arena.ammoRefills[0].activate();
+    arena.update(0.1);
+    expect(ammoBox?.userData.activeFeedback).toBe(true);
+    arena.reset();
+    expect(ammoBox?.userData.activeFeedback).toBe(false);
+    expect(canWalk(
+      [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z],
+      [-1, 2.6],
+      arena.wallColliders,
+    )).toBe(true);
+  });
+
+  it('extends the starting room two metres toward its south wall', () => {
+    const arena = makeArena();
+    const floor = arena.group.getObjectByName('ground-floor');
+    const roof = arena.group.getObjectByName('mansion-roof');
+    expect(MANSION_GROUND_BOUNDS.maxZ).toBe(9.6);
+    expect(new THREE.Box3().setFromObject(floor!).max.z).toBeCloseTo(10);
+    expect(new THREE.Box3().setFromObject(roof!).max.z).toBeCloseTo(10.3);
+    expect(MANSION_BARRIERS.find((barrier) => barrier.id === 'start-south')?.z).toBe(10.15);
   });
 
   it('uses comfortable uniform steps over one continuous navigation ramp', () => {
@@ -350,6 +415,47 @@ describe('Burned Mansion topology', () => {
     expect(arena.group.children.filter((child) => child.name === 'bunker-stair-handrail')).toHaveLength(2);
   });
 
+  it('encloses both stair sides continuously between the lower and upper entrances', () => {
+    const arena = makeArena();
+    const sideWalls = arena.wallColliders.filter((collider) => {
+      const width = collider.max.x - collider.min.x;
+      const centerX = (collider.min.x + collider.max.x) / 2;
+      return width <= 0.2 && (Math.abs(centerX - 4.15) < 0.01 || Math.abs(centerX - 6.15) < 0.01);
+    });
+
+    expect(sideWalls).toHaveLength(2);
+    for (const wall of sideWalls) {
+      expect(wall.min.z).toBeLessThanOrEqual(-6.75);
+      expect(wall.max.z).toBeGreaterThanOrEqual(-2.85);
+      expect(wall.min.y).toBeLessThanOrEqual(MANSION_BUNKER_Y);
+      expect(wall.max.y).toBeGreaterThanOrEqual(1);
+    }
+
+    const stairSideMeshes = arena.group.children.filter((child) => {
+      return child.userData.mapRole === 'wall' && child.userData.surface === 'wood'
+        && (Math.abs(child.position.x - 4.15) < 0.01 || Math.abs(child.position.x - 6.15) < 0.01)
+        && Math.abs(child.position.z + 4.8) < 0.01;
+    }) as THREE.Mesh[];
+    expect(stairSideMeshes).toHaveLength(2);
+    expect(stairSideMeshes.every((mesh) => (mesh.material as THREE.Material).name === 'charred_wood')).toBe(true);
+  });
+
+  it('blocks the lower floor from crossing through the back of the stairs', () => {
+    const arena = makeArena();
+    const player = new PlayerController(1);
+    player.setFloorTransitions(arena.floorTransitions);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(5.15, MANSION_BUNKER_Y + EYE_HEIGHT, -2.2, -1, MANSION_BUNKER_BOUNDS);
+
+    for (let frame = 0; frame < 120; frame++) {
+      player.update(1 / 60, movementInput('KeyW'), weaponStub);
+    }
+
+    expect(player.floor).toBe(-1);
+    expect(player.rig.position.z).toBeGreaterThan(-2.5);
+    expect(player.rig.position.y).toBeCloseTo(MANSION_BUNKER_Y + EYE_HEIGHT, 5);
+  });
+
   it('removes non-functional bunker placeholder meshes', () => {
     const arena = makeArena();
     const removedNames = [
@@ -364,18 +470,19 @@ describe('Burned Mansion topology', () => {
     expect(removedNames.filter((name) => arena.group.getObjectByName(name))).toEqual([]);
     expect(arena.group.children.some((child) => child.userData.mapRole === 'bunker-pipe')).toBe(false);
     expect(arena.group.children.some((child) => child.userData.mapRole === 'dead-monitor')).toBe(false);
-    expect(arena.group.getObjectByName('zeus-containment-pedestal')).toBeDefined();
+    expect(arena.group.getObjectByName('bunker-zeus-case')).toBeDefined();
     expect(arena.group.getObjectByName('radiation-warning-symbol')).toBeDefined();
   });
 
-  it('uses an actual radiation trefoil and a marked ZEUS containment station', () => {
+  it('uses an actual radiation trefoil and a marked ZEUS glass case', () => {
     const arena = makeArena();
     const sign = arena.group.getObjectByName('radiation-warning-symbol');
     expect(sign?.userData.mapRole).toBe('bunker-ending-interaction');
     expect(arena.completionInteraction.cost).toBe(30000);
     expect(sign?.children.filter((child) => child.userData.mapRole === 'radiation-symbol-part')).toHaveLength(4);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'zeus-containment-ring')).toHaveLength(1);
-    expect(arena.group.getObjectByName('zeus-containment-pedestal')).toBeDefined();
+    const zeusCase = arena.group.getObjectByName('bunker-zeus-case');
+    expect(zeusCase?.userData.mapRole).toBe('special-weapon-case');
+    expect(zeusCase?.children.some((child) => child.userData.mapRole === 'case-glass')).toBe(true);
   });
 
   it('keeps clear walking routes from the stair landing to both Wonder Weapon stations', () => {
@@ -432,7 +539,7 @@ describe('Burned Mansion topology', () => {
     for (const point of Object.values(MANSION_SPAWNS).flat()) {
       expect(point.exterior).toBe(true);
       expect(
-        point.x < -7.45 || point.x > 7.45 || point.z < -8.45 || point.z > 8.45,
+        point.x < -7.45 || point.x > 7.45 || point.z < -8.45 || point.z > 10.45,
       ).toBe(true);
       const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === point.barrierId);
       expect(barrier).toBeDefined();
@@ -536,7 +643,7 @@ describe('Burned Mansion topology', () => {
     expect(manager.stuckRecoveryCount).toBe(0);
   });
 
-  it.each([4.35, 5.95])('routes a zombie entering the stair edge at x=%s', (stairX) => {
+  it.each([4.65, 5.65])('routes a zombie entering the valid upper stair opening at x=%s', (stairX) => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
     const manager = new ZombieManager(
@@ -781,9 +888,11 @@ describe('Burned Mansion topology', () => {
 
   it('routes around solid furniture instead of attacking through it', () => {
     const arena = makeArena();
-    const manager = new ZombieManager(() => 0, {}, false, [[-5.5, 7.55]]);
+    const sofa = arena.group.getObjectByName('burned-sofa')!;
+    const playerZ = sofa.position.z - 1.4;
+    const manager = new ZombieManager(() => 0, {}, false, [[sofa.position.x, sofa.position.z + 0.75]]);
     manager.registerColliders([...arena.colliders]);
-    manager.spawnZombie(roundConfig(1), -5.5, 5.4);
+    manager.spawnZombie(roundConfig(1), sofa.position.x, playerZ);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
@@ -796,12 +905,12 @@ describe('Burned Mansion topology', () => {
     let maxStep = 0;
     for (let frame = 0; frame < 480; frame++) {
       const previous = zombie.position.clone();
-      manager.update(1 / 60, -5.5, 5.4, 0);
+      manager.update(1 / 60, sofa.position.x, playerZ, 0);
       maxStep = Math.max(maxStep, zombie.position.distanceTo(previous));
     }
 
     expect(damage).toBeGreaterThan(0);
-    expect(Math.abs(zombie.position.x + 5.5)).toBeGreaterThan(0.4);
+    expect(Math.abs(zombie.position.x - sofa.position.x)).toBeGreaterThan(0.4);
     expect(maxStep).toBeLessThan(0.1);
   });
 
@@ -862,10 +971,10 @@ describe('Burned Mansion topology', () => {
     expect(wallMaterial.roughnessMap).toBeInstanceOf(THREE.DataTexture);
     expect(wallMaterial.aoMap).toBeInstanceOf(THREE.DataTexture);
     expect(new Set(walls.map((mesh) => (mesh.material as THREE.Material).name))).toEqual(
-      new Set(['plaster_damaged', 'concrete_dirty', 'burned_wall']),
+      new Set(['plaster_damaged', 'concrete_dirty', 'burned_wall', 'charred_wood']),
     );
     expect(new Set(walls.map((mesh) => mesh.userData.surface))).toEqual(
-      new Set(['concrete']),
+      new Set(['concrete', 'wood']),
     );
     const wallUvs = wall.geometry.getAttribute('uv');
     expect(Math.max(...Array.from({ length: wallUvs.count }, (_, index) => wallUvs.getX(index)))).toBeGreaterThan(2);

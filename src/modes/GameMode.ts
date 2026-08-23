@@ -50,6 +50,8 @@ export interface ModeContext {
   hasWeapon(id: WeaponId): boolean;
   canRefillWeaponAmmo(id: WeaponId): boolean;
   refillWeaponAmmo(id: WeaponId): boolean;
+  canRefillEquippedWeaponAmmo(): boolean;
+  refillEquippedWeaponAmmo(): boolean;
   setWeaponInfiniteReserve(id: WeaponId): boolean;
   /** Restores the starting inventory with fresh ammo (zombies restart). */
   resetArsenal(): void;

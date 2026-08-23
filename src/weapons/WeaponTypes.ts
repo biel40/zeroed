@@ -181,10 +181,11 @@ export interface ViewModelConfig {
   readonly energyColor?: number;
   /**
    * 'pistol' uses the handgun builder (slide, hammer, grip magazine);
-   * 'lmg' uses the dedicated M60 builder (belt box, feed cover, bipod).
-   * Default: generic long gun.
+   * 'lmg' uses the dedicated M60 builder (belt box, feed cover, bipod);
+   * 'ak47' uses the dedicated Type-3 AK builder (wood furniture, gas tube,
+   * banana magazine). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
