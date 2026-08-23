@@ -24,7 +24,10 @@ npx pwa-assets-generator --preset minimal-2023 public/favicon.svg
 produccion. `src/pwa.ts` controla su ciclo de vida y deja el modo de desarrollo
 sin Service Worker para que una cache anterior no oculte cambios locales.
 
-El precache contiene solamente el app shell versionado por Workbox:
+El precache contiene solamente el app shell versionado por Workbox. JS, CSS y
+HTML se descubren mediante `globPatterns`; los favicon se declaran en
+`includeAssets`, y el manifest junto con los iconos PWA se incorpora desde la
+configuracion PWA, sin entradas duplicadas:
 
 - `index.html`, JS y CSS generados por Vite;
 - manifest, favicon e iconos de instalacion;
@@ -51,17 +54,28 @@ nombres estables, revalidan texturas/modelos con la red y aplican expiracion y
 ## Actualizaciones seguras
 
 El registro usa `registerType: 'prompt'`, `skipWaiting: false` y
-`clientsClaim: false`. Una version nueva queda esperando y solo muestra
-`ACTUALIZAR ZEROED` en el selector de mapa y en el menu de pausa. No se activa
-ni recarga automaticamente durante gameplay.
+`clientsClaim: true`. `src/pwa.ts` distingue el navegador normal del modo
+`standalone` (incluido el indicador de iOS) sin crear otro registro ni otro
+Service Worker.
 
-Al pulsar la accion, `src/pwa.ts` vuelve a comprobar que el selector o la pausa
-sean visibles. El selector puede actualizar directamente; desde pausa se pide
-confirmacion porque recargar descarta la run en memoria. Cada pestana decide su
-propia recarga mediante `onNeedReload`: una pestana que siga jugando conserva
-la version actual hasta que el usuario llegue a un menu y acepte actualizar.
-Pointer Lock, fullscreen y audio mantienen asi el mismo ciclo de gesto de
-usuario que en una carga web normal.
+En navegador normal, cada entrada ejecuta `registration.update()`. Si aparece
+un worker nuevo, el callback `onNeedRefresh` usa el `skipWaiting` de
+`registerSW`; al activarse, `clientsClaim` permite que tome control de la pagina.
+Un unico listener `controllerchange`, compartido con `onNeedReload`, realiza la
+recarga y un guard por carga evita procesar dos veces el mismo cambio de control.
+Esto tambien cubre una activacion iniciada desde otra pestana. Si la comprobacion
+falla o no encuentra una version nueva, Zeroed continua con la version actual
+sin recargar. El boton permanece como fallback si la aplicacion automatica no
+puede completarse.
+
+En PWA instalada, una version nueva permanece esperando y muestra `UPDATE
+ZEROED` en el selector de mapa y en el menu de pausa. Al pulsar la accion,
+`src/pwa.ts` vuelve a comprobar que el selector o la pausa sean visibles. El
+selector puede actualizar directamente; desde pausa se pide confirmacion porque
+recargar descarta la run en memoria. Si otra pestana activa el worker, standalone
+muestra el fallback pero no recarga hasta que el usuario lo pulse. Pointer Lock,
+fullscreen y audio mantienen asi el mismo ciclo de
+gesto de usuario que en una carga web normal.
 
 ## Probar instalacion y offline
 
@@ -74,8 +88,11 @@ usuario que en una carga web normal.
 5. Abrir Zeroed desde su icono y comprobar `display-mode: standalone`.
 6. Visitar ambos mapas online, activar Offline en DevTools y comprobar de nuevo
    los assets que ya fueron descargados.
-7. Publicar otra version durante una partida: debe aparecer la accion al pausar,
-   sin recarga previa. Aplicarla desde pausa o desde el selector.
+7. En navegador normal, publicar otra version y volver a entrar: debe comprobar,
+   activar y recargar una sola vez automaticamente.
+8. En la PWA instalada, publicar otra version durante una partida: debe aparecer
+   la accion al pausar, sin recarga previa. Aplicarla desde pausa o desde el
+   selector.
 
 La instalabilidad real de `zeroed.es` requiere HTTPS y que Vercel publique el
 contenido actual de `dist/`. No se necesitan rewrites ni cambios de bundler: el

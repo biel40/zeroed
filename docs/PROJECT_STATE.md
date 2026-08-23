@@ -1,11 +1,11 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-08-21. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+Estado inspeccionado: 2026-08-23. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
 
 ## Sistemas funcionales
 
 - Arranque WebGL, carga de GLB/texturas con fallback y selector directo entre los dos mapas Zombies (`src/main.ts`, `src/assets/AssetManager.ts`).
-- PWA instalable con manifest, iconos, app shell offline, cache runtime de texturas/modelos/audio y actualizaciones diferidas hasta selector o pausa (`vite.config.ts`, `src/pwa.ts`, `docs/PWA.md`).
+- PWA instalable con manifest, iconos, app shell offline, cache runtime de texturas/modelos/audio, actualizacion automatica al entrar desde navegador y actualizacion diferida hasta selector o pausa en standalone (`vite.config.ts`, `src/pwa.ts`, `docs/PWA.md`).
 - Shell FPS compartido con render, input desktop/tactil, recuperacion de Pointer Lock, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
 - Armas declarativas con cadencia, modos de fuego, municion, recarga, ADS, dispersion, recoil y view models GLB/procedurales (`src/config/weapons.ts`, `src/weapons/`).
 - Balistica con gravedad/drag, raycast segmentado y prioridad de hitbox de cabeza (`src/shooting/`).

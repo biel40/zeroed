@@ -6,6 +6,12 @@
 - Decision: usar `vite-plugin-pwa`/Workbox con shell en precache, assets pesados en caches runtime y activacion manual del worker pendiente solo desde selector o pausa.
 - Motivo: conservar Vite, Vercel, Three.js y los ciclos de Pointer Lock/fullscreen/audio, dejando una frontera web reutilizable por una futura envoltura Capacitor.
 
+## [2026-08-23] Actualizar automaticamente solo el canal web
+
+- Contexto: una build nueva permanecia esperando tambien al entrar desde navegador, aunque el riesgo de interrumpir una run solo exige el flujo manual en la PWA instalada.
+- Decision: conservar un unico registro `prompt`; comprobar y aplicar inmediatamente el worker en navegador, reclamar sus clientes y recargar una vez, manteniendo `UPDATE ZEROED` y la activacion manual en standalone.
+- Motivo: entregar la ultima build al visitar `zeroed.es` sin perder el control explicito de actualizaciones durante una partida instalada ni degradar cache u offline.
+
 ## [2026-08-18] Sincronizar acceso fisico y final del bunker
 
 - Contexto: la escalera teletransportaba entre plantas, la compuerta retiraba su collider antes de acabar la vista y no existia un cierre explicito de la run.

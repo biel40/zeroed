@@ -46,10 +46,10 @@ export default defineConfig({
       workbox: {
         cacheId: 'zeroed',
         cleanupOutdatedCaches: true,
-        clientsClaim: false,
+        clientsClaim: true,
         skipWaiting: false,
         navigateFallback: 'index.html',
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html}'],
         runtimeCaching: [
           {
             urlPattern: /\/assets\/.*\.(?:jpg|jpeg|png|webp)$/i,

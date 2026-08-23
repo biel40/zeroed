@@ -13,40 +13,93 @@ function button(id: string): HTMLButtonElement {
 }
 
 function isStandalone(): boolean {
-  return window.matchMedia('(display-mode: standalone)').matches;
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+  return window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone === true;
 }
 
 /** Browser-only PWA lifecycle. Gameplay state remains owned by Game. */
 export function setupPWA(): void {
   const profile = getDeviceProfile();
+  const standalone = isStandalone();
   const installButton = button('pwa-install');
   const menuUpdateButton = button('pwa-update-menu');
   const pauseUpdateButton = button('pwa-update-pause');
   const mapSelect = document.getElementById('map-select');
   const pauseMenu = document.getElementById('pause-menu');
   if (!mapSelect || !pauseMenu) throw new Error('Missing safe PWA update menus');
-  installButton.classList.toggle('hidden', !profile.isMobile || isStandalone());
+  installButton.classList.toggle('hidden', !profile.isMobile || standalone);
   const updateButtons = [menuUpdateButton, pauseUpdateButton];
   let installPrompt: InstallPromptEvent | null = null;
   let updateAvailable = false;
   let applyingUpdate = false;
-  let reloadApproved = false;
   let reloadPending = false;
+  let reloadStarted = false;
+  let updateSW: () => Promise<void> = async () => {};
+  let swRegistration: ServiceWorkerRegistration | null = null;
+  let approvedWorker: ServiceWorker | null = null;
+  const serviceWorker = 'serviceWorker' in navigator ? navigator.serviceWorker : null;
+  let controllerSeen = serviceWorker?.controller != null;
 
   const setUpdateAvailable = (available: boolean): void => {
     updateAvailable = available;
     for (const updateButton of updateButtons) updateButton.classList.toggle('hidden', !available);
   };
 
-  const updateSW = registerSW({
+  const reloadOnce = (): void => {
+    if (reloadStarted) return;
+    reloadStarted = true;
+    window.location.reload();
+  };
+
+  const applyBrowserUpdate = async (): Promise<void> => {
+    if (standalone || applyingUpdate) return;
+    applyingUpdate = true;
+    try {
+      await updateSW();
+    } catch (error: unknown) {
+      console.error('[Zeroed PWA] Could not apply the browser update.', error);
+    } finally {
+      applyingUpdate = false;
+    }
+  };
+
+  const handleWorkerControl = (): void => {
+    const controller = serviceWorker?.controller;
+    if (!controller) return;
+    if (!controllerSeen) {
+      controllerSeen = true;
+      return;
+    }
+    if (!standalone || controller === approvedWorker) {
+      reloadOnce();
+      return;
+    }
+    reloadPending = true;
+    setUpdateAvailable(true);
+  };
+
+  serviceWorker?.addEventListener('controllerchange', handleWorkerControl);
+
+  updateSW = registerSW({
     immediate: true,
-    onNeedRefresh: () => setUpdateAvailable(true),
-    onNeedReload: () => {
-      if (reloadApproved || !mapSelect.classList.contains('hidden')) window.location.reload();
-      else {
-        reloadPending = true;
-        setUpdateAvailable(true);
-      }
+    onNeedRefresh: () => {
+      setUpdateAvailable(true);
+      void applyBrowserUpdate();
+    },
+    onNeedReload: handleWorkerControl,
+    onRegisteredSW: (_swScriptUrl, registration) => {
+      swRegistration = registration ?? null;
+      if (standalone || !registration) return;
+      void registration
+        .update()
+        .then(() => {
+          if (!registration.waiting) return;
+          setUpdateAvailable(true);
+          return applyBrowserUpdate();
+        })
+        .catch((error: unknown) =>
+          console.error('[Zeroed PWA] Immediate update check failed; using the current version.', error),
+        );
     },
     onOfflineReady: () => console.info('[Zeroed PWA] Offline app shell is ready.'),
     onRegisterError: (error) => console.error('[Zeroed PWA] Service worker registration failed.', error),
@@ -64,20 +117,21 @@ export function setupPWA(): void {
       return;
     }
 
-    reloadApproved = true;
     if (reloadPending) {
-      window.location.reload();
+      reloadOnce();
       return;
     }
 
+    approvedWorker = swRegistration?.waiting ?? null;
     applyingUpdate = true;
     for (const updateButton of updateButtons) updateButton.disabled = true;
     try {
       await updateSW();
     } catch (error: unknown) {
+      console.error('[Zeroed PWA] Could not apply the waiting update.', error);
+    } finally {
       applyingUpdate = false;
       for (const updateButton of updateButtons) updateButton.disabled = false;
-      console.error('[Zeroed PWA] Could not apply the waiting update.', error);
     }
   };
 

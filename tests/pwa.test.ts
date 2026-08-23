@@ -29,7 +29,7 @@ describe('PWA contract', () => {
   });
 
   it('keeps large game assets out of precache and handles them at runtime', () => {
-    expect(config).toContain("globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}']");
+    expect(config).toContain("globPatterns: ['**/*.{js,css,html}']");
     expect(config).not.toContain('maximumFileSizeToCacheInBytes');
     expect(config).toContain("cacheName: 'zeroed-textures'");
     expect(config).toContain("cacheName: 'zeroed-models'");
@@ -37,11 +37,25 @@ describe('PWA contract', () => {
     expect(config).toContain('rangeRequests: true');
   });
 
-  it('requires a visible safe menu before applying a waiting update', () => {
+  it('automatically checks and applies updates in a browser', () => {
     expect(config).toContain("registerType: 'prompt'");
     expect(config).toContain('skipWaiting: false');
-    expect(pwa).toContain("onNeedRefresh: () => setUpdateAvailable(true)");
-    expect(pwa).toContain('onNeedReload: () =>');
+    expect(config).toContain('clientsClaim: true');
+    expect(pwa).toContain('void registration');
+    expect(pwa).toContain('.update()');
+    expect(pwa).toContain('if (!registration.waiting) return');
+    expect(pwa).toContain('void applyBrowserUpdate()');
+    expect(pwa).toContain('if (reloadStarted) return');
+    expect(pwa).toContain("serviceWorker?.addEventListener('controllerchange', handleWorkerControl)");
+    expect(pwa).toContain('onNeedReload: handleWorkerControl');
+    expect(pwa).toContain('controllerSeen = true');
+  });
+
+  it('requires a visible safe menu before applying a waiting update in standalone mode', () => {
+    expect(pwa).toContain('if (standalone || applyingUpdate) return');
+    expect(pwa).toContain('if (!standalone || controller === approvedWorker)');
+    expect(pwa).toContain('approvedWorker = swRegistration?.waiting ?? null');
+    expect(pwa).toContain('reloadPending = true');
     expect(pwa).toContain("!mapSelect.classList.contains('hidden')");
     expect(pwa).toContain("!pauseMenu.classList.contains('hidden')");
     expect(pwa).toContain("window.confirm('Actualizar reiniciara la partida actual. Continuar?')");
