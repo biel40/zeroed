@@ -20,9 +20,6 @@ npm install
 npm run dev
 ```
 
-Abre la URL que indica Vite (por defecto `http://localhost:5173`), selecciona
-un mapa, pulsa **CLICK TO START** y el navegador bloqueará el puntero.
-
 ## Controles
 
 | Entrada | Acción |
@@ -92,22 +89,6 @@ Decisiones clave:
   una placa de acero tenga 3 cm. Sin rigid bodies ni objetos por bala: pool
   fijo de 32 proyectiles con una trazadora reutilizada cada uno.
 
-## Sistema de armas
-
-| | M4A1 | AK-47 | M60 | L96 |
-| --- | --- | --- | --- | --- |
-| Modos | AUTO/SEMI | AUTO/SEMI | AUTO | SEMI (bolt-action) |
-| Cadencia | 800 rpm | 600 rpm | 550 rpm | Cerrojo 1.35 s |
-| Cargador | 30 | 30 | 100 | 5 |
-| Recoil | Moderado | Alto, deriva | Muy alto | Unico fuerte |
-| Bloom sostenido | Bajo | Medio | Muy alto | — |
-| ADS | Rápido | Rápido | Lento, FOV 62 | Scope FOV 16 |
-| Movimiento | 100 % | 96 % | 82 % | 90 % |
-
-La dispersión tiene base (hip/ADS) + **bloom** que crece por disparo y se
-recupera linealmente: las ráfagas cortas son precisas, el fuego sostenido con
-la M60 castiga. El ADS reduce sensibilidad, spread y recoil según cada arma.
-
 ### Añadir un arma nueva
 
 1. Añade su `WeaponId` en `src/weapons/WeaponTypes.ts`.
@@ -115,8 +96,6 @@ la M60 castiga. El ADS reduce sensibilidad, spread y recoil según cada arma.
    `WEAPON_ORDER` (la posición define la tecla 1-4).
 3. Opcionalmente ajusta `view` (colores, cargador, óptica) para el placeholder
    procedural.
-
-No hay que tocar ninguna clase: la definición lo gobierna todo.
 
 ### Pipeline de assets (GLB + fallback)
 
@@ -180,17 +159,6 @@ npm run test
 ```
 
 ## Limitaciones conocidas / trabajo futuro
-
-- La M60 sigue siendo procedural (no hay LMG CC0 adecuada en fuentes
-  verificables); los GLB de Quaternius son low-poly estilizado (~1-2k tris):
-  siluetas reconocibles y ligeras, pero se pueden reemplazar por modelos
-  más detallados con el mismo pipeline (`modelLength`/`modelYaw`/trims).
-- La alineación de ADS en GLBs se deriva del bounding box (heurística de
-  línea de mira); cada arma tiene trim manual en `view.ads[1]` si hiciera
-  falta ajuste fino visual.
-- La recuperación de recoil devuelve la cámara al punto original; juegos
-  tipo CS usan recuperación parcial. Decisión arcade consciente.
-- Sin colisión contra props más allá del clamp de la zona del jugador.
 - Los sonidos son sintetizados; sustituir por samples solo requiere tocar
   `AudioSystem`.
 - Sin modo multijugador, IA ni puntuación persistente: fuera de alcance.
