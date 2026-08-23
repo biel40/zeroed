@@ -18,16 +18,20 @@ describe('Zombies progression contract', () => {
     expect(mode.maxWeapons).toBe(2);
   });
 
-  it('starts the M1911 at 8 / 32 by definition', () => {
+  it('starts the M1911 at 8 / 64 by definition', () => {
     expect(WEAPON_DEFINITIONS.m1911.magazineSize).toBe(8);
-    expect(WEAPON_DEFINITIONS.m1911.reserveAmmo).toBe(32);
+    expect(WEAPON_DEFINITIONS.m1911.reserveAmmo).toBe(64);
   });
 
-  it('gives the M1911 a 120-round total in Zombies: 8 in the mag, 112 in reserve', () => {
+  it('gives the M1911 a 72-round total in Zombies: 8 in the mag, 64 in reserve', () => {
     const mode = new ZombiesMode();
-    // The shared definition stays 8/32; the mode table overrides the reserve.
     expect(WEAPON_DEFINITIONS.m1911.magazineSize).toBe(8);
-    expect(mode.reserveAmmoFor?.('m1911')).toBe(112);
+    expect(mode.reserveAmmoFor?.('m1911')).toBe(64);
+  });
+
+  it('keeps the ZEUS-77 at 5 / 25 as a full 30-shot capacity', () => {
+    expect(WEAPON_DEFINITIONS.tesla.magazineSize).toBe(5);
+    expect(WEAPON_DEFINITIONS.tesla.reserveAmmo).toBe(25);
   });
 
   it('preloads every Mystery Box reward (rolls never hit the network)', () => {

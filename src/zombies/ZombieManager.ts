@@ -443,9 +443,8 @@ export class ZombieManager {
     zombie: Zombie,
     part: ZombieHitPart,
     baseDamage: number,
-    headshotMultiplier: number,
   ): boolean {
-    const damage = computeDamage(baseDamage, part, headshotMultiplier);
+    const damage = computeDamage(baseDamage, part);
     if (zombie.applyDamage(damage, part === 'head')) {
       this.kill(zombie, part === 'head');
       return true;
@@ -459,7 +458,11 @@ export class ZombieManager {
    * same one twice, at most CHAIN_MAX_TARGETS. Returns the electrocuted
    * zombies in arc order (impact first) so the view can draw the bolts.
    */
-  applyChainLightning(impact: Zombie, damage: number): Zombie[] {
+  applyChainLightning(
+    impact: Zombie,
+    damage: number,
+    directPart: ZombieHitPart = 'torso',
+  ): Zombie[] {
     // Snapshot living zombies once; the pure selection runs on plain data.
     const candidates: { id: number; x: number; z: number; alive: boolean }[] = [];
     const byId = new Map<number, Zombie>();
@@ -481,7 +484,10 @@ export class ZombieManager {
       const zombie = byId.get(id);
       if (!zombie) continue;
       chain.push(zombie);
-      if (zombie.applyDamage(damage)) this.kill(zombie, false);
+      const isDirectHit = zombie === impact;
+      const headshot = isDirectHit && directPart === 'head';
+      const appliedDamage = isDirectHit ? computeDamage(damage, directPart) : damage;
+      if (zombie.applyDamage(appliedDamage, headshot)) this.kill(zombie, headshot);
     }
     return chain;
   }

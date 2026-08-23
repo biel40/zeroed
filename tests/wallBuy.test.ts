@@ -14,10 +14,6 @@ const CONFIG: WallBuyConfig = {
 };
 
 function addPoints(economy: PlayerEconomy, amount: number): void {
-  while (amount >= 100) {
-    economy.awardKill(true);
-    amount -= 100;
-  }
   while (amount >= 10) {
     economy.awardHit();
     amount -= 10;

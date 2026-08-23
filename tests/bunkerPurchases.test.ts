@@ -4,10 +4,6 @@ import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { ArenaAmmoRefill, ArenaWeaponPickup } from '../src/zombies/maps/ZombieArena';
 
 function addPoints(economy: PlayerEconomy, amount: number): void {
-  while (amount >= 100) {
-    economy.awardKill(true);
-    amount -= 100;
-  }
   while (amount >= 10) {
     economy.awardHit();
     amount -= 10;

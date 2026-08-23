@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HEADSHOT_DAMAGE_MULTIPLIER } from '../src/game/CombatConfig';
 import {
   computeDamage,
   MAX_ALIVE,
@@ -74,12 +75,13 @@ describe('roundConfig', () => {
 
 describe('computeDamage', () => {
   it('applies base damage to the torso', () => {
-    expect(computeDamage(34, 'torso', 2)).toBe(34);
+    expect(computeDamage(34, 'torso')).toBe(34);
   });
 
-  it('multiplies damage on headshots', () => {
-    expect(computeDamage(34, 'head', 2)).toBe(68);
-    expect(computeDamage(150, 'head', 3)).toBe(450);
+  it('applies the shared 3x multiplier to every headshot', () => {
+    expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
+    expect(computeDamage(34, 'head')).toBe(102);
+    expect(computeDamage(150, 'head')).toBe(450);
   });
 });
 

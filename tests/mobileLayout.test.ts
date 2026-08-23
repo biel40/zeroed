@@ -52,18 +52,39 @@ describe('mobile stylesheet cascade', () => {
     expect(css).toMatch(/#touch-controls button \{[^}]*touch-action: none/);
   });
 
-  it('keeps only the compact mobile action set with one combined fire button', () => {
+  it('keeps only the required mobile action set with one combined fire button', () => {
     expect(html).not.toContain('id="btn-jump"');
     expect(html).not.toContain('id="btn-ads"');
-    for (const action of ['fire', 'reload', 'interact', 'swap-weapon', 'mode', 'pause']) {
+    expect(html).not.toContain('id="btn-mode"');
+    for (const action of ['fire', 'reload', 'interact', 'swap-weapon', 'pause']) {
       expect(html).toContain(`data-action="${action}"`);
     }
     const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('</div>\n\n      <div id="hud-weapon"'));
-    expect(touchControls.match(/data-action=/g)).toHaveLength(6);
+    expect(touchControls.match(/data-action=/g)).toHaveLength(5);
   });
 
-  it('keeps the primary fire button square instead of inheriting the generic button height', () => {
+  it('keeps comfortable secondary targets and a dominant square fire button', () => {
+    expect(css).toContain('--touch-secondary-size: clamp(52px, 6vw, 58px)');
+    expect(css).toContain('--touch-fire-size: clamp(92px, 7vw, 116px)');
+    expect(css).toMatch(/#touch-controls button \{[^}]*min-width: 48px;[^}]*height: 48px/);
     expect(css).toContain('#touch-controls #btn-fire {');
-    expect(css).toContain('html.touch-controls-enabled #touch-controls #btn-fire {');
+    expect(css).not.toContain('width: 70px; height: 70px');
+  });
+
+  it('positions the action cluster inside the right and bottom safe areas', () => {
+    expect(css).toContain('env(safe-area-inset-right, 0px)');
+    expect(css).toContain('env(safe-area-inset-bottom, 0px)');
+    expect(css).toContain('grid-template-columns: repeat(2, var(--touch-secondary-size))');
+    expect(css).toContain('var(--touch-fire-size) + var(--touch-fire-gap)');
+  });
+
+  it('provides immediate pressed feedback without an input-delaying transition', () => {
+    const activeRule = css.slice(
+      css.indexOf('#touch-controls button:active {'),
+      css.indexOf('}', css.indexOf('#touch-controls button:active {')),
+    );
+    expect(activeRule).toContain('transform: scale(0.94)');
+    expect(activeRule).toContain('filter: brightness(1.15)');
+    expect(activeRule).not.toContain('transition');
   });
 });

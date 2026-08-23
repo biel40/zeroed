@@ -213,8 +213,6 @@ export interface WeaponDefinition {
   readonly scoped: boolean;
   /** Base torso damage per hit (zombies mode). */
   readonly damage: number;
-  /** Headshot damage multiplier (zombies mode). */
-  readonly headshotMultiplier: number;
   /** Energy projectile behaviour; absence means classic ballistics. */
   readonly energy?: EnergyWeaponConfig;
   readonly recoil: RecoilConfig;

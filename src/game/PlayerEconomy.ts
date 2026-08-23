@@ -1,3 +1,5 @@
+import { HEADSHOT_POINTS } from './CombatConfig';
+
 /**
  * CoD Zombies-style Points: a single wallet that every reward and purchase
  * routes through, so the balance is mutated in exactly one place. Pure
@@ -9,8 +11,6 @@
 export const POINTS_HIT = 10;
 /** A kill with a body shot (or any non-headshot finisher). */
 export const POINTS_KILL = 50;
-/** A lethal headshot. REPLACES the kill reward — never stacked with it. */
-export const POINTS_HEADSHOT_KILL = 100;
 /** Points granted for each rebuilt barrier board. */
 export const POINTS_REPAIR = 10;
 
@@ -22,17 +22,17 @@ export class PlayerEconomy {
     return this.balance;
   }
 
-  /** Non-lethal hit reward. Call only when the zombie SURVIVED the hit. */
-  awardHit(): void {
-    this.balance += POINTS_HIT;
+  /** Non-lethal direct-hit reward. Call only when the zombie survived. */
+  awardHit(headshot = false): void {
+    this.balance += headshot ? HEADSHOT_POINTS : POINTS_HIT;
   }
 
   /**
-   * Kill reward. `headshot` selects the higher payout; the two kill rewards
-   * are mutually exclusive by construction (one branch, one addition).
+   * Kill reward. A headshot pays the same 150 points whether or not it was
+   * lethal; the two branches remain mutually exclusive.
    */
   awardKill(headshot: boolean): void {
-    this.balance += headshot ? POINTS_HEADSHOT_KILL : POINTS_KILL;
+    this.balance += headshot ? HEADSHOT_POINTS : POINTS_KILL;
   }
 
   /**

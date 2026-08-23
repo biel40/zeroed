@@ -25,6 +25,7 @@ ZombiesMode <- impactos <- HitTarget / entorno / Zombie
 - `PlayerController` aplica look, recoil de camara, movimiento, salto y colision opcional del mapa.
 - `WeaponInventory` selecciona slots; `Weapon` gobierna gameplay; `WeaponView` anima recargas por fases y `AudioSystem` sincroniza el foley hasta el cierre confirmado.
 - `BallisticsSystem` consume el array vivo de colliders y envia impactos al modo activo.
+- Los impactos directos usan una configuracion global: cabeza = 3x dano y 150 Points por impacto; splash y saltos secundarios de cadena conservan su dano base.
 - `Stats`, `AudioSystem`, `Effects`, `HUD` y `AssetManager` son servicios compartidos por `ModeContext`.
 
 ## Zombies

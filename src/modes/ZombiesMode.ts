@@ -64,7 +64,7 @@ export class ZombiesMode implements GameMode {
   /**
    * Every Zombies weapon runs a finite reserve (generous tier). The mode
    * table ZOMBIES_RESERVE_AMMO wins over the shared definition (so the
-   * M1911 gets 112 in zombies while keeping 8/32 by definition); weapons
+   * M1911 gets 64 in zombies while keeping 8/64 by definition); weapons
    * not listed — the Tesla — keep their definition reserve. The range
    * never calls this — it stays bottomless.
    */
@@ -257,11 +257,10 @@ export class ZombiesMode implements GameMode {
       zombie,
       part,
       weapon.definition.damage,
-      weapon.definition.headshotMultiplier,
     );
-    // Non-lethal hits pay +10; a lethal hit pays its kill reward instead
-    // (via onZombieKilled), so one bullet never double-dips.
-    if (!lethal) this.economy.awardHit();
+    // A surviving headshot pays 150 here; lethal hits pay through the kill
+    // callback instead, so a direct hit is rewarded exactly once.
+    if (!lethal) this.economy.awardHit(part === 'head');
   }
 
   /** The Ray Gun bypasses hitscan ballistics and fires a visible bolt. */
@@ -852,7 +851,9 @@ export class ZombiesMode implements GameMode {
       this.ctx.audio.playTeslaShot();
       this.ctx.stats.registerHit(distance);
       this.ctx.hud.showHitmarker();
-      const chain = this.zombies.applyChainLightning(zombie, CHAIN_ZAP_DAMAGE);
+      const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
+      const chain = this.zombies.applyChainLightning(zombie, CHAIN_ZAP_DAMAGE, part);
+      if (part === 'head' && zombie.isAlive) this.economy.awardHit(true);
       this.ctx.audio.playTeslaChain(chain.length);
       // Arc from the muzzle through each electrocuted zombie in order.
       const muzzle = this.ctx.player.camera.getWorldPosition(this.tmpDirection);
@@ -878,8 +879,8 @@ export class ZombiesMode implements GameMode {
       const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
       this.ctx.stats.registerHit(distance);
       this.ctx.hud.showHitmarker();
-      const lethal = this.zombies.damageZombie(zombie, part, raygun.damage, raygun.headshotMultiplier);
-      if (!lethal) this.economy.awardHit();
+      const lethal = this.zombies.damageZombie(zombie, part, raygun.damage);
+      if (!lethal) this.economy.awardHit(part === 'head');
     }
     // Splash includes the directly-hit zombie: the Ray Gun fantasy is that
     // a bullseye on a packed horde is devastating.

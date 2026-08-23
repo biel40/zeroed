@@ -16,7 +16,7 @@ function bunkerDoor(): PointDoor {
 }
 
 function addPoints(economy: PlayerEconomy, amount: number): void {
-  for (let points = 0; points < amount; points += 100) economy.awardKill(true);
+  for (let points = 0; points < amount; points += 10) economy.awardHit();
 }
 
 describe('Burned Mansion secret bunker interaction', () => {

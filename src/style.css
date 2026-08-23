@@ -159,6 +159,12 @@ body {
 }
 
 #touch-controls {
+  --touch-edge-right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
+  --touch-edge-bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
+  --touch-secondary-size: clamp(52px, 6vw, 58px);
+  --touch-secondary-gap: clamp(10px, 1.5vmin, 14px);
+  --touch-fire-size: clamp(92px, 7vw, 116px);
+  --touch-fire-gap: clamp(18px, 2vw, 28px);
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -211,24 +217,24 @@ body {
 }
 
 .touch-primary {
-  right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
-  bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
+  right: var(--touch-edge-right);
+  bottom: var(--touch-edge-bottom);
   align-items: flex-end;
 }
 
-/* Secondary actions ride above the fire button, in the same right-hand
-   column, so the aiming area stays one uninterrupted surface. */
+/* Two compact secondary rows sit left of FIRE, leaving the primary action
+   isolated at the right thumb's resting position. */
 .touch-secondary {
-  right: calc(clamp(14px, 2.2vw, 26px) + env(safe-area-inset-right, 0px));
-  bottom: calc(clamp(122px, 25vh, 154px) + env(safe-area-inset-bottom, 0px));
+  right: calc(var(--touch-edge-right) + var(--touch-fire-size) + var(--touch-fire-gap));
+  bottom: var(--touch-edge-bottom);
   display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: clamp(6px, 1.2vmin, 10px);
+  grid-template-columns: repeat(2, var(--touch-secondary-size));
+  gap: var(--touch-secondary-gap);
 }
 
 #touch-controls button {
-  min-width: 46px;
-  height: 46px;
+  min-width: 48px;
+  height: 48px;
   padding: 0 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 13px;
@@ -247,15 +253,23 @@ body {
 
 #touch-controls button:active {
   background: rgba(60, 78, 96, 0.7);
+  filter: brightness(1.15);
+  transform: scale(0.94);
 }
 
 .touch-secondary button {
   opacity: 0.72;
 }
 
+.touch-secondary button:not(#btn-pause) {
+  width: var(--touch-secondary-size);
+  height: var(--touch-secondary-size);
+  padding: 0;
+}
+
 #touch-controls #btn-fire {
-  width: clamp(88px, 13vmin, 104px);
-  height: clamp(88px, 13vmin, 104px);
+  width: var(--touch-fire-size);
+  height: var(--touch-fire-size);
   border-radius: 50%;
   font-size: 14px;
   background: rgba(178, 34, 34, 0.5);
@@ -887,13 +901,6 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled .hud-row { font-size: 10px; }
   html.touch-controls-enabled #hud-ammo { font-size: 15px; margin: 0; }
   html.touch-controls-enabled #z-round { font-size: 11px; margin-bottom: 2px; }
-  html.touch-controls-enabled .touch-secondary {
-    right: calc(126px + env(safe-area-inset-right, 0px));
-    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    grid-template-columns: repeat(2, auto);
-  }
-  html.touch-controls-enabled #touch-controls button { min-width: 42px; height: 42px; font-size: 10px; }
-  html.touch-controls-enabled #touch-controls #btn-fire { width: 70px; height: 70px; font-size: 12px; }
   html.touch-controls-enabled #joystick { width: 96px; height: 96px; }
   html.touch-controls-enabled #joystick-knob { width: 42px; height: 42px; }
   html.touch-controls-enabled #banner-title { font-size: 24px; }

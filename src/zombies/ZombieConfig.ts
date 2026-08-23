@@ -10,6 +10,8 @@
  *     never become absurd bullet-sponge fests.
  */
 
+import { HEADSHOT_DAMAGE_MULTIPLIER } from '../game/CombatConfig';
+
 /** Hard cap of simultaneously alive zombies. The pool is sized to this. */
 export const MAX_ALIVE = 24;
 
@@ -66,12 +68,12 @@ export const ROUND_START_DELAY = 2.5;
 /**
  * Finite reserve ammunition per weapon in Zombies mode (generous tier).
  * The mode table wins over the WeaponDefinition (see reserveAmmoFor), so
- * the M1911 starts a run with 120 rounds total: 8 in the mag + 112 here.
- * The Tesla (3/18) is not listed and keeps its definition value. The
- * These overrides keep every Zombies weapon on a finite reserve.
+ * the M1911 starts a run with 72 rounds total: 8 in the mag + 64 here.
+ * The Tesla (5/25) is not listed and keeps its definition value. These
+ * overrides keep every Zombies weapon on a finite reserve.
  */
 export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
-  m1911: 112,
+  m1911: 64,
   m4a1: 300,
   ak47: 300,
   m60: 500,
@@ -206,9 +208,8 @@ export type ZombieHitPart = 'head' | 'torso';
 export function computeDamage(
   baseDamage: number,
   part: ZombieHitPart,
-  headshotMultiplier: number,
 ): number {
-  return part === 'head' ? baseDamage * headshotMultiplier : baseDamage;
+  return part === 'head' ? baseDamage * HEADSHOT_DAMAGE_MULTIPLIER : baseDamage;
 }
 
 /**

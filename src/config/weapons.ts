@@ -8,10 +8,10 @@ import type { WeaponDefinition, WeaponId } from '../weapons/WeaponTypes';
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   /**
    * M1911 — the Zombies starting pistol. Deliberately a sidearm: modest
-   * torso damage but a strong headshot multiplier, light recoil, fast ADS
+   * torso damage, light recoil, fast ADS
    * and a quick reload. Precise players stretch it through early rounds;
    * raw damage per magazine keeps it from competing with the box weapons.
-   * Detailed procedural view model (no CC0 GLB exists), finite 8 / 32 ammunition.
+   * Detailed procedural view model (no CC0 GLB exists), finite 8 / 64 ammunition.
    */
   m1911: {
     id: 'm1911',
@@ -20,14 +20,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'semi',
     rpm: 360,
     magazineSize: 8,
-    reserveAmmo: 32,
+    reserveAmmo: 64,
     reloadTime: 1.6,
     tacticalReloadTime: 1.25,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
     damage: 30,
-    headshotMultiplier: 2.5,
     recoil: {
       verticalKick: 0.011,
       horizontalKick: 0.003,
@@ -96,7 +95,6 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 34,
-    headshotMultiplier: 2,
     recoil: {
       verticalKick: 0.0105,
       horizontalKick: 0.0035,
@@ -168,7 +166,6 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 40,
-    headshotMultiplier: 2,
     recoil: {
       verticalKick: 0.016,
       horizontalKick: 0.0065,
@@ -238,7 +235,6 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 32,
-    headshotMultiplier: 2,
     recoil: {
       verticalKick: 0.019,
       horizontalKick: 0.009,
@@ -309,7 +305,6 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0.7,
     scoped: true,
     damage: 1000,
-    headshotMultiplier: 3,
     recoil: {
       verticalKick: 0.045,
       horizontalKick: 0.004,
@@ -384,7 +379,6 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 600,
-    headshotMultiplier: 1.5,
     energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 1200, color: 0x63f2a4 },
     recoil: {
       verticalKick: 0.012,
@@ -455,8 +449,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     fireModes: ['semi'],
     defaultFireMode: 'semi',
     rpm: 90,
-    magazineSize: 3,
-    reserveAmmo: 18,
+    magazineSize: 5,
+    reserveAmmo: 25,
     reloadTime: 3.2,
     tacticalReloadTime: 2.6,
     boltAction: false,
@@ -465,7 +459,6 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     // The direct hit and every chained zap deal CHAIN_ZAP_DAMAGE via the
     // mode; this base damage is what a NON-chained zombie would take.
     damage: 750,
-    headshotMultiplier: 1,
     // A visible arc bolt, fast but readable; the chain runs off the impact.
     energy: { projectileSpeed: 90, splashRadius: 0, splashDamage: 0, color: 0x7fd4ff },
     recoil: {

@@ -26,13 +26,8 @@ describe('Mystery Box purchase with Points', () => {
       deniedFlashes: 0,
       granted: [],
     };
-    // Preload the wallet to an exact amount: headshots for the hundreds,
-    // then plain hits (+10) for the remainder.
+    // Preload the wallet to an exact amount in normal-hit increments.
     let target = startingPoints;
-    while (target >= 100) {
-      mock.economy.awardKill(true);
-      target -= 100;
-    }
     while (target >= 10) {
       mock.economy.awardHit();
       target -= 10;

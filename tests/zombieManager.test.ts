@@ -283,7 +283,7 @@ describe('ZombieManager attack dodge window', () => {
     const damage = trackDamage(manager);
 
     expect(stepUntilAttack(manager, zombie, player)).toBe(true);
-    manager.damageZombie(zombie, 'torso', 1000, 1);
+    manager.damageZombie(zombie, 'torso', 1000);
     stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player);
 
     expect(zombie.isAlive).toBe(false);
@@ -297,10 +297,10 @@ describe('ZombieManager damage', () => {
     manager.spawnZombie(roundConfig(1), 0, 4);
     const zombie = [...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives][0];
 
-    manager.damageZombie(zombie, 'torso', 34, 2);
+    manager.damageZombie(zombie, 'torso', 34);
     expect(zombie.hp).toBe(ZOMBIE_BASE_HP - 34);
-    manager.damageZombie(zombie, 'head', 34, 2);
-    expect(zombie.hp).toBe(ZOMBIE_BASE_HP - 34 - 68);
+    manager.damageZombie(zombie, 'head', 20);
+    expect(zombie.hp).toBe(ZOMBIE_BASE_HP - 34 - 60);
   });
 
   it('kills unregister hitboxes and report the headshot flag', () => {
@@ -311,7 +311,7 @@ describe('ZombieManager damage', () => {
     const kills: boolean[] = [];
     manager.onZombieKilled = (_z, headshot) => kills.push(headshot);
 
-    manager.damageZombie(zombie, 'head', 150, 3); // 450 >> 100 hp
+    manager.damageZombie(zombie, 'head', 150); // 450 >> 100 hp
     expect(kills).toEqual([true]);
     expect(colliders).toHaveLength(0);
     expect(manager.aliveCount).toBe(0);
@@ -327,8 +327,24 @@ describe('ZombieManager damage', () => {
     const zombie = [...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives][0];
     const kills: boolean[] = [];
     manager.onZombieKilled = (_z, headshot) => kills.push(headshot);
-    manager.damageZombie(zombie, 'torso', 200, 2);
+    manager.damageZombie(zombie, 'torso', 200);
     expect(kills).toEqual([false]);
+  });
+
+  it('multiplies only the direct head hit in a Tesla chain', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const [impact, chained] = [
+      ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
+    ];
+    impact.position.set(0, 0, -20);
+    chained.position.set(1, 0, -20);
+
+    manager.applyChainLightning(impact, 20, 'head');
+
+    expect(impact.hp).toBe(ZOMBIE_BASE_HP - 60);
+    expect(chained.hp).toBe(ZOMBIE_BASE_HP - 20);
   });
 });
 

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   PlayerEconomy,
-  POINTS_HEADSHOT_KILL,
   POINTS_HIT,
   POINTS_KILL,
 } from '../src/game/PlayerEconomy';
+import { HEADSHOT_POINTS } from '../src/game/CombatConfig';
 
 /**
  * Centralized Points economy (CoD Zombies style). All rewards route through
  * PlayerEconomy so there is exactly one place that mutates the balance.
  * Rewards:
- *  - non-lethal hit:      +10
+ *  - non-lethal body hit: +10
  *  - normal kill:         +50
- *  - lethal headshot:     +100  (replaces the kill reward, never stacked)
+ *  - every headshot:      +150  (replaces other rewards for that hit)
  */
 describe('PlayerEconomy points', () => {
   it('starts at zero', () => {
@@ -22,7 +22,7 @@ describe('PlayerEconomy points', () => {
   it('pins the reward values', () => {
     expect(POINTS_HIT).toBe(10);
     expect(POINTS_KILL).toBe(50);
-    expect(POINTS_HEADSHOT_KILL).toBe(100);
+    expect(HEADSHOT_POINTS).toBe(150);
   });
 
   it('awards +10 for a non-lethal hit', () => {
@@ -37,11 +37,16 @@ describe('PlayerEconomy points', () => {
     expect(eco.points).toBe(50);
   });
 
-  it('awards +100 for a lethal headshot INSTEAD of the normal kill reward', () => {
+  it('awards +150 for a non-lethal headshot instead of the body-hit reward', () => {
+    const eco = new PlayerEconomy();
+    eco.awardHit(true);
+    expect(eco.points).toBe(150);
+  });
+
+  it('awards +150 for a lethal headshot instead of the normal kill reward', () => {
     const eco = new PlayerEconomy();
     eco.awardKill(true);
-    // 100 total, not 100 + 50: a headshot kill never double-dips.
-    expect(eco.points).toBe(100);
+    expect(eco.points).toBe(150);
   });
 
   it('a lethal hit does not also pay the +10 hit reward', () => {
@@ -51,7 +56,7 @@ describe('PlayerEconomy points', () => {
     const eco = new PlayerEconomy();
     eco.awardHit(); // zombie survives the body shot
     eco.awardKill(true); // finishing headshot
-    expect(eco.points).toBe(10 + 100);
+    expect(eco.points).toBe(10 + 150);
   });
 
   it('accumulates across many events', () => {
@@ -60,7 +65,7 @@ describe('PlayerEconomy points', () => {
     eco.awardHit();
     eco.awardKill(false);
     eco.awardKill(true);
-    expect(eco.points).toBe(10 + 10 + 50 + 100);
+    expect(eco.points).toBe(10 + 10 + 50 + 150);
   });
 });
 
