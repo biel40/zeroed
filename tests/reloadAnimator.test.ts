@@ -8,6 +8,7 @@ import type { ReloadPhase } from '../src/weapons/WeaponTypes';
 
 const DT = 1 / 240; // fine step: phases must fire exactly once each
 const IDLE_INPUT = { trigger: false, ads: false };
+const WEAPON_IDS = Object.keys(WEAPON_DEFINITIONS) as Array<keyof typeof WEAPON_DEFINITIONS>;
 
 function makeRig(weaponId: keyof typeof WEAPON_DEFINITIONS = 'm4a1') {
   const weapon = new Weapon(WEAPON_DEFINITIONS[weaponId]);
@@ -35,6 +36,27 @@ function step(weapon: Weapon, animator: ReloadAnimator, seconds: number): void {
 }
 
 describe('ReloadAnimator phases', () => {
+  it.each(WEAPON_IDS)('moves and restores the real reload component for %s', (weaponId) => {
+    const { weapon, animator, parts } = makeRig(weaponId);
+    weapon.ammoInMagazine = Math.min(1, weapon.definition.magazineSize - 1);
+    const magazine = parts.magazine!;
+    const homePosition = magazine.position.clone();
+    const homeQuaternion = magazine.quaternion.clone();
+    const config = weapon.definition.view.reloadAnim!;
+    expect(weapon.reload()).toBe(true);
+
+    const midDetach = (config.magOut + config.magDrop) / 2;
+    step(weapon, animator, weapon.definition.tacticalReloadTime * midDetach);
+    expect(
+      magazine.position.distanceTo(homePosition) + magazine.quaternion.angleTo(homeQuaternion),
+    ).toBeGreaterThan(0.005);
+
+    step(weapon, animator, weapon.definition.tacticalReloadTime * (1.1 - midDetach));
+    expect(magazine.visible).toBe(true);
+    expect(magazine.position.distanceTo(homePosition)).toBeLessThan(1e-6);
+    expect(magazine.quaternion.angleTo(homeQuaternion)).toBeLessThan(1e-6);
+  });
+
   it('skips the action phase during a tactical reload', () => {
     const { weapon, animator, phases } = makeRig();
     expect(weapon.reload()).toBe(true);

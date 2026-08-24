@@ -33,7 +33,7 @@ export const MANSION_GROUND_BOUNDS = {
 export const MANSION_BUNKER_BOUNDS = {
   minX: -6.5,
   maxX: 6.5,
-  minZ: -7.5,
+  minZ: -8,
   maxZ: 1.5,
 } as const;
 

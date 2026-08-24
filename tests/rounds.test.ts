@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { HEADSHOT_DAMAGE_MULTIPLIER } from '../src/game/CombatConfig';
 import {
   computeDamage,
+  getBruteSpawnChance,
   MAX_ALIVE,
+  MAX_ACTIVE_BRUTES,
   ROUND_BREAK_SECONDS,
   roundConfig,
+  selectZombieType,
+  SHINY_ZOMBIE_CHANCE,
   splashDamageAt,
   ZOMBIE_BASE_HP,
 } from '../src/zombies/ZombieConfig';
@@ -82,6 +86,44 @@ describe('computeDamage', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
     expect(computeDamage(34, 'head')).toBe(102);
     expect(computeDamage(150, 'head')).toBe(450);
+  });
+});
+
+describe('zombie type selection', () => {
+  it('uses the configured Brute chance bands', () => {
+    expect(getBruteSpawnChance(1)).toBe(0);
+    expect(getBruteSpawnChance(4)).toBe(0);
+    expect(getBruteSpawnChance(5)).toBe(0.08);
+    expect(getBruteSpawnChance(10)).toBe(0.15);
+    expect(getBruteSpawnChance(15)).toBe(0.22);
+    expect(getBruteSpawnChance(20)).toBe(0.3);
+  });
+
+  it('never selects a Brute before round 5', () => {
+    for (let round = 1; round <= 4; round++) {
+      expect(selectZombieType(round, {}, () => 0)).toBe('shiny');
+    }
+  });
+
+  it('rolls Brute first and never combines it with Shiny', () => {
+    let calls = 0;
+    const result = selectZombieType(20, {}, () => {
+      calls++;
+      return 0;
+    });
+    expect(result).toBe('brute');
+    expect(calls).toBe(1);
+  });
+
+  it('falls through to an independent fixed Shiny roll', () => {
+    const values = [0.9, SHINY_ZOMBIE_CHANCE - 0.0001];
+    expect(selectZombieType(50, {}, () => values.shift()!)).toBe('shiny');
+    expect(SHINY_ZOMBIE_CHANCE).toBe(0.005);
+  });
+
+  it('enforces the strict active Brute cap before rolling rarity', () => {
+    expect(MAX_ACTIVE_BRUTES).toBe(2);
+    expect(selectZombieType(50, { brute: MAX_ACTIVE_BRUTES }, () => 0.5)).toBe('normal');
   });
 });
 

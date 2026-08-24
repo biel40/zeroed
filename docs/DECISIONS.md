@@ -1,5 +1,17 @@
 # Decisiones arquitectonicas
 
+## [2026-08-24] Separar tipos zombie de modelos y reservas visuales
+
+- Contexto: escalar el walker no daba al Brute identidad suficiente y un pool con un único modelo impedía introducir siluetas realmente distintas sin crear objetos durante la ronda.
+- Decision: `ZombieTypeId` referencia un `ZombieModelId`; el catálogo de modelos define altura, clips y tintes, mientras `ZombiePool` precarga capacidades por modelo y aplica un único máximo de 24 activos. El Brute usa un GLB original reproducible y dos instancias reservadas.
+- Motivo: añadir estadísticas o tratamientos sobre un modelo existente no requiere assets, y añadir una criatura nueva solo amplía registros y reservas sin duplicar IA, combate, navegación ni orquestación.
+
+## [2026-08-23] Variantes zombie como perfiles sobre el walker (sustituida)
+
+- Contexto: Shiny y Brute necesitan estadísticas, silueta y probabilidades propias sin duplicar IA, assets ni ampliar el pool global de 24.
+- Decision histórica: seleccionar la variante al adquirir un slot y aplicar un perfil central al walker. Sustituida el 2026-08-24 por modelos independientes y reservas visuales por asset.
+- Motivo: conservar una única fuente de verdad para navegación, combate y reciclaje, evitar contadores desincronizados y mantener estable el coste por frame.
+
 ## [2026-08-20] Mantener PWA y actualizaciones fuera del gameplay
 
 - Contexto: Zeroed debe instalarse y reutilizar assets offline sin precachear todo el peso de mapas/audio ni perder una run cuando aparece una version nueva.

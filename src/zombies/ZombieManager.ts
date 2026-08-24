@@ -11,7 +11,9 @@ import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
 import {
   computeDamage,
+  getBruteSpawnChance,
   MAX_ALIVE,
+  selectZombieType,
   splashDamageAt,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_ATTACK_RANGE,
@@ -23,6 +25,10 @@ import {
   ZOMBIE_SEPARATION_RADIUS,
   ZOMBIE_SPEED_JITTER,
   ZOMBIE_WALK_JITTER,
+  ZOMBIE_MODEL_POOL_CAPACITIES,
+  ZOMBIE_TYPE_CONFIGS,
+  type ZombieModelId,
+  type ZombieTypeId,
 } from './ZombieConfig';
 import { Zombie } from './Zombie';
 import { ZombiePool } from './ZombiePool';
@@ -30,9 +36,8 @@ import { MIN_PLAYER_DISTANCE, ZombieSpawner } from './ZombieSpawner';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from './ZombieSpawner';
 import {
   ZombieVisual,
-  ZOMBIE_VARIANTS,
+  ZOMBIE_MODELS,
   type ZombieModelSource,
-  type ZombieVariantId,
 } from './ZombieVisual';
 import { selectChainTargets } from './ZombieConfig';
 import { ZombieNavigationService } from './navigation/ZombieNavigationService';
@@ -49,7 +54,10 @@ const STAIR_APPROACH_LENGTH = 0.9;
 const FLOOR_SETTLE_SPEED = 8;
 
 /** Horizontal body radius used for wall collision (torso capsule is 0.38). */
-const ZOMBIE_BODY_RADIUS = 0.42;
+const ZOMBIE_BODY_RADIUS = ZOMBIE_TYPE_CONFIGS.normal.bodyRadius;
+const NAVIGATION_BODY_RADII = [
+  ...new Set(Object.values(ZOMBIE_TYPE_CONFIGS).map((config) => config.bodyRadius)),
+];
 /** How far ahead (as a fraction of the body radius) the front probe looks. */
 const FRONT_PROBE = 1.3;
 /**
@@ -79,15 +87,16 @@ const PORTAL_OBJECTIVE_RADIUS = 0.7;
 /** Closed barriers seal their window aperture for navigation (boards are gameplay-only). */
 const BARRIER_VOLUME_LENGTH = 1.5;
 const BARRIER_VOLUME_THICKNESS = 0.34;
-const MOVEMENT_SUBSTEP = ZOMBIE_BODY_RADIUS * 0.45;
 /** Surfaces solid enough to stop a walking body (targets are steel/paper). */
 const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'metal']);
 /** A collider blocks movement only if it is tall enough to matter. */
 const MIN_OBSTACLE_HEIGHT = 0.5;
 /** Ground/berm-scale boxes are walkable scenery, never obstacles. */
 const MAX_OBSTACLE_FOOTPRINT = 20;
-/** GLB payloads per variant, keyed by variant id. Missing keys fall back. */
-export type ZombieModelSources = Partial<Record<ZombieVariantId, ZombieModelSource | null>>;
+/** GLB payloads per visual model. Missing keys use that model's distinct fallback. */
+export type ZombieModelSources = Partial<Record<ZombieModelId, ZombieModelSource | null>>;
+const ZOMBIE_POOL_MODELS = (Object.keys(ZOMBIE_MODEL_POOL_CAPACITIES) as ZombieModelId[])
+  .flatMap((modelId) => Array<ZombieModelId>(ZOMBIE_MODEL_POOL_CAPACITIES[modelId]).fill(modelId));
 
 interface EntryRoute {
   readonly barrierId: string;
@@ -171,8 +180,11 @@ export class ZombieManager {
   private readonly entryRoutes = new Map<Zombie, EntryRoute>();
   private readonly stuckState = new Map<Zombie, StuckState>();
   private readonly navPaths = new Map<Zombie, NavPath>();
-  /** Central per-floor navigation grids; doors open/close via rebuild(). */
-  private readonly navigation = new ZombieNavigationService(NAV_CELL_SIZE, ZOMBIE_BODY_RADIUS);
+  /** One grid set per configured body radius, rebuilt from the same topology. */
+  private readonly navigations = new Map(
+    NAVIGATION_BODY_RADII.map((radius) => [radius, new ZombieNavigationService(NAV_CELL_SIZE, radius)]),
+  );
+  private readonly navigation = this.navigations.get(ZOMBIE_BODY_RADIUS) as ZombieNavigationService;
   /** Zombies waiting for an A* budget slot, FIFO; recomputed with fresh data. */
   private readonly pathQueue: Zombie[] = [];
   private readonly pathQueued = new Set<Zombie>();
@@ -205,23 +217,22 @@ export class ZombieManager {
     spawnPoints: ReadonlyArray<ZombieSpawnDefinition> | null = null,
     private barriers: ReadonlyArray<WindowBarrier> = [],
     private readonly floorTransitions: ReadonlyArray<FloorTransitionZone> = [],
+    private readonly typeRng: () => number = rng,
   ) {
     this.rng = rng;
     this.spawner = new ZombieSpawner(rng, spawnPoints ?? undefined);
-    this.pool = new ZombiePool(MAX_ALIVE, () => {
-      // Every zombie is the small walker: the variant mix was dropped (no
-      // large zombies), so the pool is 24 pre-cloned walker bodies with
-      // zero runtime asset work when a round starts.
-      const variant = ZOMBIE_VARIANTS.walker;
-      const tint = variant.tints[Math.floor(rng() * variant.tints.length)];
+    this.pool = new ZombiePool(ZOMBIE_POOL_MODELS.length, (index) => {
+      const modelId = ZOMBIE_POOL_MODELS[index];
+      const model = ZOMBIE_MODELS[modelId];
+      const tint = model.tints[(this.nextZombieId - 1) % model.tints.length];
       const zombie = new Zombie(
-        new ZombieVisual('walker', sources.walker ?? null, tint, castShadows),
+        new ZombieVisual(modelId, sources[modelId] ?? null, tint, castShadows),
       );
       this.zombieIds.set(zombie, this.nextZombieId++);
       zombie.onDeathFinished = () => this.finishDeath(zombie);
       this.group.add(zombie.group);
       return zombie;
-    });
+    }, MAX_ALIVE);
   }
 
   /** The mutable collider array shared with ballistics (range + zombies). */
@@ -282,14 +293,12 @@ export class ZombieManager {
         maxZ: barrier.position.z + (outwardIsX ? halfLength : halfThick),
       });
     }
-    this.navigation.rebuild(
-      this.navigationBounds.map((entry) => ({
-        floor: entry.floor,
-        bounds: entry,
-        baseY: entry.baseY,
-      })),
-      volumes,
-    );
+    const floors = this.navigationBounds.map((entry) => ({
+      floor: entry.floor,
+      bounds: entry,
+      baseY: entry.baseY,
+    }));
+    for (const navigation of this.navigations.values()) navigation.rebuild(floors, volumes);
     this.navPaths.clear();
     this.pathQueue.length = 0;
     this.pathQueued.clear();
@@ -334,6 +343,51 @@ export class ZombieManager {
     return this.pool.activeCount;
   }
 
+  private navigationFor(zombie: Zombie): ZombieNavigationService {
+    return this.navigations.get(zombie.bodyRadius) ?? this.navigation;
+  }
+
+  /** Includes dying corpses until their pool slot is recycled. */
+  get activeBruteCount(): number {
+    return this.countActiveType('brute');
+  }
+
+  getTypeDiagnostics(round: number): Readonly<{
+    round: number;
+    bruteSpawnChance: number;
+    activeBrutes: number;
+    active: ReadonlyArray<Readonly<{
+      typeId: Zombie['typeId'];
+      health: number;
+      speed: number;
+    }>>;
+  }> {
+    return {
+      round,
+      bruteSpawnChance: getBruteSpawnChance(round),
+      activeBrutes: this.activeBruteCount,
+      active: [...this.pool.actives].map((zombie) => ({
+        typeId: zombie.typeId,
+        health: zombie.hp,
+        speed: zombie.speed,
+      })),
+    };
+  }
+
+  private countActiveType(typeId: ZombieTypeId): number {
+    let count = 0;
+    for (const zombie of this.pool.actives) {
+      if (zombie.typeId === typeId) count++;
+    }
+    return count;
+  }
+
+  private activeTypeCounts(): Partial<Record<ZombieTypeId, number>> {
+    const counts: Partial<Record<ZombieTypeId, number>> = {};
+    for (const zombie of this.pool.actives) counts[zombie.typeId] = (counts[zombie.typeId] ?? 0) + 1;
+    return counts;
+  }
+
   get stuckRecoveryCount(): number {
     return this.recoveryCount;
   }
@@ -354,10 +408,19 @@ export class ZombieManager {
   }
 
   /** Spawns one zombie for the round; false when the pool is exhausted. */
-  spawnZombie(config: RoundConfig, playerX: number, playerZ: number): boolean {
-    const zombie = this.pool.acquire();
+  spawnZombie(config: RoundConfig, playerX: number, playerZ: number, round = 1): boolean {
+    let typeId = selectZombieType(round, this.activeTypeCounts(), this.typeRng);
+    let profile = ZOMBIE_TYPE_CONFIGS[typeId];
+    let zombie = this.pool.acquire(profile.modelId);
+    // A future type may share a smaller model reserve with another type.
+    // Preserve round cadence by degrading to the default walker if it is full.
+    if (!zombie && typeId !== 'normal') {
+      typeId = 'normal';
+      profile = ZOMBIE_TYPE_CONFIGS.normal;
+      zombie = this.pool.acquire(profile.modelId);
+    }
     if (!zombie) return false;
-    const spawn = this.pickValidSpawn(playerX, playerZ);
+    const spawn = this.pickValidSpawn(playerX, playerZ, profile.bodyRadius);
     if (!spawn) {
       this.pool.release(zombie);
       this.debugNavigation(zombie, 'spawn-rejected', null, 0, 0, 'no-valid-spawn');
@@ -375,8 +438,12 @@ export class ZombieManager {
     zombie.spawn(
       spawn.x,
       spawn.z,
-      Math.round(ZOMBIE_BASE_HP * config.healthMultiplier),
-      ZOMBIE_BASE_SPEED * config.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
+      Math.round(ZOMBIE_BASE_HP * config.healthMultiplier * profile.healthMultiplier),
+      ZOMBIE_BASE_SPEED * config.speedMultiplier * profile.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
+      0,
+      0,
+      typeId,
+      ZOMBIE_ATTACK_DAMAGE * profile.damageMultiplier,
     );
     this.assignSpawnRoute(zombie, spawn);
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
@@ -410,13 +477,13 @@ export class ZombieManager {
     }
   }
 
-  private pickValidSpawn(playerX: number, playerZ: number): ZombieSpawnPoint | null {
+  private pickValidSpawn(playerX: number, playerZ: number, bodyRadius: number): ZombieSpawnPoint | null {
     const preferred = this.spawner.pickSpawn(playerX, playerZ);
-    if (!this.hitsObstacle(preferred.x, preferred.z, 0)) return preferred;
+    if (!this.hitsObstacle(preferred.x, preferred.z, 0, bodyRadius)) return preferred;
     let farthest: ZombieSpawnPoint | null = null;
     let farthestDistance = -1;
     for (const spawn of this.spawner.points) {
-      if (this.hitsObstacle(spawn.x, spawn.z, 0)) continue;
+      if (this.hitsObstacle(spawn.x, spawn.z, 0, bodyRadius)) continue;
       const distance = Math.hypot(spawn.x - playerX, spawn.z - playerZ);
       if (distance >= MIN_PLAYER_DISTANCE) return spawn;
       if (distance > farthestDistance) {
@@ -690,7 +757,7 @@ export class ZombieManager {
       if (path.length > 0) {
         this.navPaths.set(zombie, {
           floor: zombie.floor,
-          version: this.navigation.version,
+          version: this.navigationFor(zombie).version,
           targetX: objective.x,
           targetZ: objective.z,
           points: path,
@@ -807,7 +874,7 @@ export class ZombieManager {
         // the zombie finishes its swing; each attack lands at most once.
         zombie.onAttackLanded = () => {
           if (this.attackStillConnects(zombie)) {
-            this.onPlayerAttack?.(ZOMBIE_ATTACK_DAMAGE);
+            this.onPlayerAttack?.(zombie.attackDamage);
           }
         };
       }
@@ -836,7 +903,7 @@ export class ZombieManager {
     let path = this.navPaths.get(zombie);
     if (
       path &&
-      (path.version !== this.navigation.version ||
+      (path.version !== this.navigationFor(zombie).version ||
         path.floor !== zombie.floor ||
         Math.hypot(path.targetX - targetX, path.targetZ - targetZ) > PATH_TARGET_TOLERANCE)
     ) {
@@ -846,7 +913,7 @@ export class ZombieManager {
     }
     if (
       path &&
-      this.navigation.hasLineOfSight(
+      this.navigationFor(zombie).hasLineOfSight(
         zombie.floor,
         zombie.position.x,
         zombie.position.z,
@@ -960,9 +1027,9 @@ export class ZombieManager {
 
     if (!stairRamp && rounding === null) {
       // Walking straight: only a wall right ahead triggers rounding.
-      const probeX = pos.x + toTarget.x * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
-      const probeZ = pos.z + toTarget.z * ZOMBIE_BODY_RADIUS * FRONT_PROBE;
-      const obstacle = this.findObstacle(probeX, probeZ, zombie.position.y);
+      const probeX = pos.x + toTarget.x * zombie.bodyRadius * FRONT_PROBE;
+      const probeZ = pos.z + toTarget.z * zombie.bodyRadius * FRONT_PROBE;
+      const obstacle = this.findObstacle(probeX, probeZ, zombie.position.y, zombie.bodyRadius);
       if (obstacle) {
         const tanX = -toTarget.z;
         const tanZ = toTarget.x;
@@ -1017,11 +1084,12 @@ export class ZombieManager {
    * barrier targets live outside the grids by design and keep direct steering.
    */
   private shouldPathfind(zombie: Zombie, targetX: number, targetZ: number): boolean {
-    if (!this.navigation.contains(zombie.floor, zombie.position.x, zombie.position.z)) {
+    const navigation = this.navigationFor(zombie);
+    if (!navigation.contains(zombie.floor, zombie.position.x, zombie.position.z)) {
       return false;
     }
-    if (!this.navigation.contains(zombie.floor, targetX, targetZ)) return false;
-    return !this.navigation.hasLineOfSight(
+    if (!navigation.contains(zombie.floor, targetX, targetZ)) return false;
+    return !navigation.hasLineOfSight(
       zombie.floor,
       zombie.position.x,
       zombie.position.z,
@@ -1047,7 +1115,7 @@ export class ZombieManager {
     }
     this.pathBudget--;
     this.navigationComputations++;
-    const points = this.navigation.findPath(
+    const points = this.navigationFor(zombie).findPath(
       zombie.floor,
       zombie.position.x,
       zombie.position.z,
@@ -1061,7 +1129,7 @@ export class ZombieManager {
     }
     const path: NavPath = {
       floor: zombie.floor,
-      version: this.navigation.version,
+      version: this.navigationFor(zombie).version,
       targetX,
       targetZ,
       points,
@@ -1102,7 +1170,7 @@ export class ZombieManager {
     distance: number,
   ): boolean {
     const pos = zombie.position;
-    return this.lineOfSightClearFrom(pos.x, pos.z, targetX, targetZ, pos.y, distance);
+    return this.lineOfSightClearFrom(pos.x, pos.z, targetX, targetZ, pos.y, distance, zombie.bodyRadius);
   }
 
   private lineOfSightClearFrom(
@@ -1112,14 +1180,15 @@ export class ZombieManager {
     targetZ: number,
     y: number,
     knownDistance?: number,
+    bodyRadius = ZOMBIE_BODY_RADIUS,
   ): boolean {
     const distance = knownDistance ?? Math.hypot(targetX - startX, targetZ - startZ);
     if (distance <= 1e-6) return true;
-    const steps = Math.max(1, Math.ceil(distance / ZOMBIE_BODY_RADIUS));
+    const steps = Math.max(1, Math.ceil(distance / bodyRadius));
     const stepX = (targetX - startX) / steps;
     const stepZ = (targetZ - startZ) / steps;
     for (let i = 1; i <= steps; i++) {
-      if (this.hitsObstacle(startX + stepX * i, startZ + stepZ * i, y)) return false;
+      if (this.hitsObstacle(startX + stepX * i, startZ + stepZ * i, y, bodyRadius)) return false;
     }
     return true;
   }
@@ -1133,15 +1202,15 @@ export class ZombieManager {
   private moveWithCollision(zombie: Zombie, dx: number, dz: number): boolean {
     const pos = zombie.position;
     let moved = false;
-    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / MOVEMENT_SUBSTEP));
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (zombie.bodyRadius * 0.45)));
     const stepX = dx / steps;
     const stepZ = dz / steps;
     for (let step = 0; step < steps; step++) {
-      if (stepX !== 0 && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y)) {
+      if (stepX !== 0 && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y, zombie.bodyRadius)) {
         pos.x += stepX;
         moved = true;
       }
-      if (stepZ !== 0 && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y)) {
+      if (stepZ !== 0 && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y, zombie.bodyRadius)) {
         pos.z += stepZ;
         moved = true;
       }
@@ -1347,9 +1416,10 @@ export class ZombieManager {
    * [] when the objective has no walkable route (e.g. every door closed).
    */
   private buildRecoveryPath(zombie: Zombie, objective: NavigationObjective): RecoveryWaypoint[] {
-    if (!this.navigation.contains(zombie.floor, zombie.position.x, zombie.position.z)) return [];
+    const navigation = this.navigationFor(zombie);
+    if (!navigation.contains(zombie.floor, zombie.position.x, zombie.position.z)) return [];
     this.navigationComputations++;
-    const path = this.navigation.findPath(
+    const path = navigation.findPath(
       zombie.floor,
       zombie.position.x,
       zombie.position.z,
@@ -1369,9 +1439,17 @@ export class ZombieManager {
         const angle = (index / 16) * Math.PI * 2;
         const x = zombie.position.x + Math.cos(angle) * radius;
         const z = zombie.position.z + Math.sin(angle) * radius;
-        if (this.hitsObstacle(x, z, zombie.position.y)) continue;
+        if (this.hitsObstacle(x, z, zombie.position.y, zombie.bodyRadius)) continue;
         if (this.isOccupiedByZombie(x, z, zombie.floor, zombie)) continue;
-        if (!this.lineOfSightClearFrom(zombie.position.x, zombie.position.z, x, z, zombie.position.y)) continue;
+        if (!this.lineOfSightClearFrom(
+          zombie.position.x,
+          zombie.position.z,
+          x,
+          z,
+          zombie.position.y,
+          undefined,
+          zombie.bodyRadius,
+        )) continue;
         const distance = Math.hypot(objective.x - x, objective.z - z);
         if (distance < bestDistance) {
           bestDistance = distance;
@@ -1401,7 +1479,7 @@ export class ZombieManager {
     const facingLength = Math.hypot(playerFacingX, playerFacingZ);
     for (const spawn of this.spawner.points) {
       if (!this.isWithinNavigationBounds(spawn.x, spawn.z, 0)) continue;
-      if (this.hitsObstacle(spawn.x, spawn.z, 0)) continue;
+      if (this.hitsObstacle(spawn.x, spawn.z, 0, zombie.bodyRadius)) continue;
       if (this.isOccupiedByZombie(spawn.x, spawn.z, 0, zombie)) continue;
       const dx = spawn.x - playerX;
       const dz = spawn.z - playerZ;
@@ -1433,9 +1511,17 @@ export class ZombieManager {
         const x = playerX + Math.cos(angle) * radius;
         const z = playerZ + Math.sin(angle) * radius;
         if (!this.isWithinNavigationBounds(x, z, playerFloor)) continue;
-        if (this.hitsObstacle(x, z, feetY)) continue;
+        if (this.hitsObstacle(x, z, feetY, zombie.bodyRadius)) continue;
         if (this.isOccupiedByZombie(x, z, playerFloor, zombie)) continue;
-        if (!this.lineOfSightClearFrom(x, z, playerX, playerZ, feetY)) continue;
+        if (!this.lineOfSightClearFrom(
+          x,
+          z,
+          playerX,
+          playerZ,
+          feetY,
+          undefined,
+          zombie.bodyRadius,
+        )) continue;
         const inView = facingLength > 0 &&
           (Math.cos(angle) * playerFacingX + Math.sin(angle) * playerFacingZ) / facingLength > 0.35;
         if (inView) continue;
@@ -1466,7 +1552,6 @@ export class ZombieManager {
   }
 
   private isOccupiedByZombie(x: number, z: number, floor: number, ignored: Zombie): boolean {
-    const minimumDistance = ZOMBIE_BODY_RADIUS * 2;
     const candidateRamp = this.findRampAt(x, z);
     for (const other of this.pool.actives) {
       if (other === ignored || !other.isAlive) continue;
@@ -1474,7 +1559,9 @@ export class ZombieManager {
         other.floor !== floor &&
         (!candidateRamp || this.findRampAt(other.position.x, other.position.z) !== candidateRamp)
       ) continue;
-      if (Math.hypot(other.position.x - x, other.position.z - z) < minimumDistance) return true;
+      if (Math.hypot(other.position.x - x, other.position.z - z) < ignored.bodyRadius + other.bodyRadius) {
+        return true;
+      }
     }
     return false;
   }
@@ -1486,10 +1573,10 @@ export class ZombieManager {
     targetX: number,
     targetZ: number,
   ): number {
-    const probeDistance = ZOMBIE_BODY_RADIUS * 2.5;
+    const probeDistance = zombie.bodyRadius * 2.5;
     const probeX = zombie.position.x + directionX * probeDistance;
     const probeZ = zombie.position.z + directionZ * probeDistance;
-    if (this.hitsObstacle(probeX, probeZ, zombie.position.y)) return Infinity;
+    if (this.hitsObstacle(probeX, probeZ, zombie.position.y, zombie.bodyRadius)) return Infinity;
     return Math.hypot(targetX - probeX, targetZ - probeZ);
   }
 
@@ -1506,6 +1593,8 @@ export class ZombieManager {
       zombieId: this.zombieIds.get(zombie) ?? -1,
       event,
       state: zombie.state,
+      typeId: zombie.typeId,
+      health: zombie.hp,
       position: { x: zombie.position.x, y: zombie.position.y, z: zombie.position.z },
       objective: objective ? { kind: objective.kind, x: objective.x, z: objective.z } : null,
       speed: zombie.speed,
@@ -1560,18 +1649,18 @@ export class ZombieManager {
   }
 
   /** Circle-vs-AABB test in XZ, with the body radius folded into the box. */
-  private hitsObstacle(x: number, z: number, y: number): boolean {
-    return this.findObstacle(x, z, y) !== null;
+  private hitsObstacle(x: number, z: number, y: number, bodyRadius = ZOMBIE_BODY_RADIUS): boolean {
+    return this.findObstacle(x, z, y, bodyRadius) !== null;
   }
 
-  private findObstacle(x: number, z: number, y: number): THREE.Box3 | null {
+  private findObstacle(x: number, z: number, y: number, bodyRadius = ZOMBIE_BODY_RADIUS): THREE.Box3 | null {
     for (const box of this.obstacles) {
       if (box.max.y <= y + 0.05 || box.min.y >= y + 1.8) continue;
       const nearestX = Math.max(box.min.x, Math.min(box.max.x, x));
       const nearestZ = Math.max(box.min.z, Math.min(box.max.z, z));
       const dx = x - nearestX;
       const dz = z - nearestZ;
-      if (dx * dx + dz * dz < ZOMBIE_BODY_RADIUS * ZOMBIE_BODY_RADIUS) return box;
+      if (dx * dx + dz * dz < bodyRadius * bodyRadius) return box;
     }
     return null;
   }

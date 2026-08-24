@@ -213,6 +213,41 @@ describe('Burned Mansion topology', () => {
     expect(ceilingSegments.some((segment) => new THREE.Box3().setFromObject(segment).intersectsBox(stairwell))).toBe(false);
   });
 
+  it('provides a deep lower landing without changing the protected stair channel', () => {
+    const arena = makeArena();
+    const bunkerFloor = arena.group.getObjectByName('bunker-floor')!;
+    const northCeiling = arena.group.getObjectByName('bunker-ceiling-stair-north')!;
+    const floorBox = new THREE.Box3().setFromObject(bunkerFloor);
+    const ceilingBox = new THREE.Box3().setFromObject(northCeiling);
+    const northWall = arena.wallColliders.find((wall) => {
+      return wall.max.x - wall.min.x > 13 && wall.max.z < -8;
+    });
+
+    expect(floorBox.min.z).toBeCloseTo(-8.5);
+    expect(ceilingBox.min.z).toBeCloseTo(floorBox.min.z);
+    expect(northWall).toBeDefined();
+    expect(-6.75 - northWall!.max.z).toBeGreaterThanOrEqual(1.5);
+    expect(-6.75 - MANSION_BUNKER_BOUNDS.minZ).toBeGreaterThanOrEqual(1.2);
+  });
+
+  it('lets the player clear the lower stairs and maneuver laterally on the landing', () => {
+    const arena = makeArena();
+    const player = new PlayerController(1);
+    player.setFloorTransitions(arena.floorTransitions);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(5.15, MANSION_BUNKER_Y + EYE_HEIGHT, -7.05, -1, MANSION_BUNKER_BOUNDS);
+
+    for (let frame = 0; frame < 60; frame++) player.update(1 / 60, movementInput('KeyW'), weaponStub);
+    expect(player.rig.position.z).toBeLessThan(-7.7);
+    const landingZ = player.rig.position.z;
+
+    for (let frame = 0; frame < 60; frame++) player.update(1 / 60, movementInput('KeyA'), weaponStub);
+    expect(player.rig.position.x).toBeLessThan(4.2);
+    expect(player.rig.position.z).toBeCloseTo(landingZ, 1);
+    expect(player.floor).toBe(-1);
+    expect(player.rig.position.y).toBeCloseTo(MANSION_BUNKER_Y + EYE_HEIGHT, 5);
+  });
+
   it('keeps one-way floor triggers outside their destinations', () => {
     const arena = makeArena();
     expect(arena.floorTransitions.map((zone) => zone.sourceFloor)).toEqual([0, -1]);
@@ -575,15 +610,24 @@ describe('Burned Mansion topology', () => {
     }
   });
 
-  it('routes ground-floor zombies through the stairs for a player inside the bunker', () => {
+  it('routes a wider Brute through the stairs for a player inside the bunker', () => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
-    const manager = new ZombieManager(() => 0, {}, false, [[1.45, -2.5]], [], arena.floorTransitions);
+    const manager = new ZombieManager(
+      () => 0,
+      {},
+      false,
+      [[1.45, -2.5]],
+      [],
+      arena.floorTransitions,
+      () => 0,
+    );
     manager.registerColliders([...arena.colliders]);
-    manager.spawnZombie(roundConfig(1), 5, -2);
+    manager.spawnZombie(roundConfig(5), 5, -2, 5);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
+    expect(zombie.typeId).toBe('brute');
     zombie.state = 'walk';
     for (let frame = 0; frame < 600 && zombie.floor === 0; frame++) {
       manager.update(1 / 60, 5.5, -2, -1);

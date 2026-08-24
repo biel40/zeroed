@@ -62,6 +62,15 @@ describe('M1911 first-person model', () => {
     expect(built.reloadParts?.handle).toBe(built.slide);
   });
 
+  it.each(Object.keys(WEAPON_DEFINITIONS))('does not attach player hands to %s', (weaponId) => {
+    const view = new WeaponView(WEAPON_DEFINITIONS[weaponId as keyof typeof WEAPON_DEFINITIONS], null);
+    const handObjects: THREE.Object3D[] = [];
+    view.root.traverse((object) => {
+      if (object.name.startsWith('fps-') || object.name.includes('hand-anchor')) handObjects.push(object);
+    });
+    expect(handObjects).toHaveLength(0);
+  });
+
   it('uses shallow side serrations instead of full-width blocks across the sight picture', () => {
     const built = buildProceduralViewModel(definition.view);
     built.group.updateMatrixWorld(true);
@@ -128,6 +137,26 @@ describe('M1911 first-person model', () => {
 
     expect(weapon.state).toBe('ready');
     expect(slide.position.z).toBeCloseTo(homeZ, 6);
+  });
+
+  it('restores the magazine and slide immediately when the view is reset', () => {
+    const weapon = new Weapon(definition, () => 0.5);
+    const view = new WeaponView(definition, null);
+    const magazine = view.root.getObjectByName('m1911-magazine')!;
+    const slide = view.root.getObjectByName('m1911-slide')!;
+    const magazineHome = magazine.position.clone();
+    const slideHome = slide.position.clone();
+    weapon.ammoInMagazine = 2;
+    weapon.reload();
+
+    for (let frame = 0; frame < 50; frame++) {
+      weapon.update(1 / 120, { trigger: false, ads: false });
+      view.update(1 / 120, weapon, 0, 0, 0);
+    }
+    view.reset();
+    expect(magazine.visible).toBe(true);
+    expect(magazine.position.distanceTo(magazineHome)).toBeLessThan(1e-6);
+    expect(slide.position.distanceTo(slideHome)).toBeLessThan(1e-6);
   });
 });
 

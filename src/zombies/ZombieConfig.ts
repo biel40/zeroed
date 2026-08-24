@@ -23,6 +23,101 @@ export const ZOMBIE_BASE_SPEED = 1.9;
  * player: reaching the player must be genuinely dangerous.
  */
 export const ZOMBIE_ATTACK_DAMAGE = 25;
+export const SHINY_ZOMBIE_CHANCE = 0.005;
+export const MAX_ACTIVE_BRUTES = 2;
+
+export type ZombieTypeId = 'normal' | 'shiny' | 'brute';
+export type ZombieModelId = 'walker' | 'brute';
+export type ZombieMaterialTreatment = 'base' | 'shiny';
+
+export interface ZombieTypeConfig {
+  readonly modelId: ZombieModelId;
+  readonly materialTreatment: ZombieMaterialTreatment;
+  readonly healthMultiplier: number;
+  readonly speedMultiplier: number;
+  readonly damageMultiplier: number;
+  readonly bodyScale: readonly [number, number, number];
+  readonly hitboxScale: readonly [number, number, number];
+  readonly bodyRadius: number;
+  readonly walkAnimationMultiplier: number;
+  readonly spawnChance?: (round: number) => number;
+  readonly maxActive?: number;
+}
+
+/** Physical visual reserves per asset; the population still has one global cap. */
+export const ZOMBIE_MODEL_POOL_CAPACITIES: Readonly<Record<ZombieModelId, number>> = {
+  walker: MAX_ALIVE,
+  brute: MAX_ACTIVE_BRUTES,
+};
+
+/** Add a type here, then place non-default selection order in ZOMBIE_SPAWN_ORDER. */
+export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig>> = {
+  normal: {
+    modelId: 'walker',
+    materialTreatment: 'base',
+    healthMultiplier: 1,
+    speedMultiplier: 1,
+    damageMultiplier: 1,
+    bodyScale: [1, 1, 1],
+    hitboxScale: [1, 1, 1],
+    bodyRadius: 0.42,
+    walkAnimationMultiplier: 1,
+  },
+  shiny: {
+    modelId: 'walker',
+    materialTreatment: 'shiny',
+    healthMultiplier: 1,
+    speedMultiplier: 1,
+    damageMultiplier: 1,
+    bodyScale: [1, 1, 1],
+    hitboxScale: [1, 1, 1],
+    bodyRadius: 0.42,
+    walkAnimationMultiplier: 1,
+    spawnChance: () => SHINY_ZOMBIE_CHANCE,
+  },
+  brute: {
+    modelId: 'brute',
+    materialTreatment: 'base',
+    healthMultiplier: 3,
+    speedMultiplier: 0.72,
+    damageMultiplier: 1.15,
+    bodyScale: [1, 1, 1],
+    hitboxScale: [1.35, 1.15, 1.18],
+    // Kept conservative so mansion doors and stairs remain navigable.
+    bodyRadius: 0.46,
+    walkAnimationMultiplier: 1,
+    spawnChance: getBruteSpawnChance,
+    maxActive: MAX_ACTIVE_BRUTES,
+  },
+};
+
+/** Earlier entries roll first; normal is the fallback and never appears here. */
+export const ZOMBIE_SPAWN_ORDER: readonly ZombieTypeId[] = ['brute', 'shiny'];
+
+/** Chance that an eligible spawn is replaced by a Brute, by round band. */
+export function getBruteSpawnChance(round: number): number {
+  const r = Math.max(1, Math.floor(round));
+  if (r < 5) return 0;
+  if (r < 10) return 0.08;
+  if (r < 15) return 0.15;
+  if (r < 20) return 0.22;
+  return 0.3;
+}
+
+/** Rolls registered special types in priority order, then falls back to normal. */
+export function selectZombieType(
+  round: number,
+  activeCounts: Readonly<Partial<Record<ZombieTypeId, number>>>,
+  rng: () => number = Math.random,
+): ZombieTypeId {
+  for (const typeId of ZOMBIE_SPAWN_ORDER) {
+    const config = ZOMBIE_TYPE_CONFIGS[typeId];
+    if (config.maxActive !== undefined && (activeCounts[typeId] ?? 0) >= config.maxActive) continue;
+    const chance = config.spawnChance?.(round) ?? 0;
+    if (chance > 0 && rng() < chance) return typeId;
+  }
+  return 'normal';
+}
 /** Distance at which a zombie starts its attack lunge, meters. */
 export const ZOMBIE_ATTACK_RANGE = 1.9;
 /** Damage per attack against a window board. */

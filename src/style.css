@@ -138,6 +138,12 @@ body {
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
 }
 
+#hitmarker.headshot span {
+  width: 3px;
+  background: #ffd36a;
+  box-shadow: 0 0 5px rgba(255, 211, 106, 0.85);
+}
+
 #hitmarker span:nth-child(1) {
   transform: rotate(45deg) translateY(-13px);
 }
@@ -156,6 +162,10 @@ body {
 
 #hitmarker.active {
   animation: hitpop 0.18s ease-out;
+}
+
+#hitmarker.headshot.active {
+  animation-duration: 0.16s;
 }
 
 #touch-controls {

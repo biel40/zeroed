@@ -9,6 +9,7 @@
     "start": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "generate:zombie-brute": "node scripts/generate-brute-asset.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -53,9 +53,10 @@ La capa PWA vive en `src/pwa.ts` y `vite.config.ts`, fuera de `Game` y de los mo
 | `src/modes/GameMode.ts` | Capacidades y hooks de un modo; `ModeContext` limita lo que recibe | Expone escena y `hitColliders` mutables |
 | `src/modes/ZombiesMode.ts` | Estado de la run y coordinacion de subsistemas Zombies | Depende de `ZombieArena`, managers, economia y HUD |
 | `src/weapons/Weapon.ts` | Maquina de estados de arma y eventos | TypeScript puro; consume `WeaponDefinition` |
-| `src/weapons/WeaponView.ts` | Modelos, ADS, sway, bob, recoil y recarga visual | Three.js y assets |
+| `src/weapons/WeaponView.ts` | Modelos, ADS, sway, bob, recoil y recarga visual sin manos del jugador | Compone `ReloadAnimator`, Three.js y assets |
 | `src/shooting/BallisticsSystem.ts` | Pool de proyectiles y resolucion de impactos | Array compartido de colliders y `HitTarget` |
 | `src/zombies/ZombieManager.ts` | Pool, movimiento, combate y hitboxes zombie | Spawns, barreras, transiciones y colliders del mapa |
+| `src/zombies/ZombieConfig.ts` | Registro de tipos, modelos, estadísticas, selección y capacidades visuales | Lógica pura; no depende de Three.js |
 | `src/zombies/maps/ZombieArena.ts` | Contrato de geometria, spawns e interacciones de mapa | Implementado por `ClassicArena` y `BurnedMansionArena` |
 | `src/game/` | Inventario, salud, economia y estadisticas | Logica pura reutilizada por modos |
 
@@ -67,6 +68,7 @@ La capa PWA vive en `src/pwa.ts` y `vite.config.ts`, fuera de `Game` y de los mo
 - `HitTarget` desacopla la balistica de blancos y zombies.
 - Points solo se modifican mediante `PlayerEconomy`; las reservas de Zombies las decide el modo.
 - Pools fijos limitan proyectiles, zombies y efectos. Los loops reutilizan temporales donde es posible.
+- Los tipos zombie (`normal`, `shiny`, `brute`) son perfiles de gameplay; los modelos (`walker`, `brute`) son contratos de asset separados. `ZombiePool` reserva instancias por modelo bajo un único máximo activo.
 
 ## Puntos de extension
 
@@ -75,4 +77,5 @@ La capa PWA vive en `src/pwa.ts` y `vite.config.ts`, fuera de `Game` y de los mo
 - Mapa Zombies: implementar `ZombieArena`; hoy la seleccion y la progresion de puertas aun requieren ramas explicitas.
 - Objeto disparable: implementar `HitTarget` y registrar su `Object3D` en `hitColliders`.
 - Interaccion Zombies: reutilizar `PointDoor`, `WindowBarrier`, `WallBuy` o `ArenaWeaponPickup`; la prioridad esta centralizada en `ZombiesMode`.
+- Tipo zombie: registrar estadísticas/modelo/regla en `ZOMBIE_TYPE_CONFIGS`, incluirlo en `ZOMBIE_SPAWN_ORDER` si no es el fallback y, solo si usa un asset nuevo, añadir su modelo, manifest y capacidad visual.
 - Nueva arma de energia: requiere ampliar el contrato de impacto; el color actual no es una identidad extensible.

@@ -23,9 +23,9 @@ ZombiesMode <- impactos <- HitTarget / entorno / Zombie
 
 - `Input` unifica teclado/raton y controles tactiles mediante `InputState`.
 - `PlayerController` aplica look, recoil de camara, movimiento, salto y colision opcional del mapa.
-- `WeaponInventory` selecciona slots; `Weapon` gobierna gameplay; `WeaponView` anima recargas por fases y `AudioSystem` sincroniza el foley hasta el cierre confirmado.
+- `WeaponInventory` selecciona slots; `Weapon` gobierna gameplay; `WeaponView` compone las armas sin manos del jugador y sus recargas mecánicas por fases, mientras `AudioSystem` sincroniza el foley hasta el cierre confirmado.
 - `BallisticsSystem` consume el array vivo de colliders y envia impactos al modo activo.
-- Los impactos directos usan una configuracion global: cabeza = 3x dano y 150 Points por impacto; splash y saltos secundarios de cadena conservan su dano base.
+- Los impactos directos usan una configuracion global: cabeza = 3x dano y 150 Points por impacto; los headshots reutilizan el hitmarker y audio compartidos para una confirmacion breve, mientras splash y saltos secundarios de cadena conservan su dano base y no duplican ese feedback.
 - `Stats`, `AudioSystem`, `Effects`, `HUD` y `AssetManager` son servicios compartidos por `ModeContext`.
 
 ## Zombies
@@ -34,7 +34,8 @@ ZombiesMode <- impactos <- HitTarget / entorno / Zombie
 RoundManager
   -> descanso de 6 s entre rondas
   -> eventos spawnDue
-  -> ZombieSpawner -> ZombiePool -> ZombieManager
+  -> ZombieManager selecciona normal / shiny / brute
+  -> ZombieSpawner -> validacion por radio -> ZombiePool
   -> Zombie busca ruta/barrera/portal/jugador
   -> sin progreso: ruta acotada -> ajuste local -> spawn valido oculto
   -> ataque -> PlayerHealth -> game over
@@ -51,6 +52,18 @@ Points
   -> MysteryBox -> tirada y pickup
   -> WindowBarrier -> recompensa limitada por ronda
 ```
+
+- `normal`, `shiny` y `brute` comparten `Zombie`, IA y un máximo global de 24.
+  Normal/Shiny usan el modelo `walker`; Brute usa `zombie_brute.glb`, clips y
+  silueta propios. Sus perfiles y asignación de modelo viven en `ZombieConfig`.
+- `ZombiePool` precarga reservas por modelo (24 walker, 2 Brute) pero bloquea
+  cualquier adquisición al llegar a 24 activos totales. Los cadáveres siguen
+  ocupando tanto su reserva visual como el límite especial.
+- Brute multiplica salud, velocidad y daño y usa un radio físico conservador;
+  esos valores alimentan combate, steering, colisión, recuperación y una rejilla
+  de navegación con el despeje correspondiente a su tamaño.
+- `getTypeDiagnostics(round)` expone ronda, probabilidad Brute, ocupación y
+  tipo/salud/velocidad activas para QA sin mantener contadores paralelos.
 
 ## Mapas Zombies
 

@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_ALIVE,
+  MAX_ACTIVE_BRUTES,
   roundConfig,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_BASE_HP,
+  ZOMBIE_BASE_SPEED,
+  ZOMBIE_TYPE_CONFIGS,
 } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { Zombie } from '../src/zombies/Zombie';
@@ -81,6 +84,80 @@ describe('ZombieManager spawning and pooling', () => {
 
     expect(manager.spawnZombie(roundConfig(1), 20, 0)).toBe(false);
     expect(manager.activeCount).toBe(0);
+  });
+
+  it('applies Brute stats from round 5 while preserving the global pool slot', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0);
+    manager.registerColliders([]);
+    expect(manager.spawnZombie(roundConfig(5), 0, 4, 5)).toBe(true);
+    const zombie = [...manager.actives][0];
+    expect(zombie.typeId).toBe('brute');
+    expect(zombie.visual.modelId).toBe('brute');
+    expect(zombie.maxHp).toBe(Math.round(
+      ZOMBIE_BASE_HP * roundConfig(5).healthMultiplier * ZOMBIE_TYPE_CONFIGS.brute.healthMultiplier,
+    ));
+    expect(zombie.speed).toBeCloseTo(
+      ZOMBIE_BASE_SPEED * roundConfig(5).speedMultiplier * ZOMBIE_TYPE_CONFIGS.brute.speedMultiplier * 0.92,
+    );
+    expect(zombie.attackDamage).toBeCloseTo(ZOMBIE_ATTACK_DAMAGE * 1.15);
+    expect(zombie.bodyRadius).toBe(0.46);
+    expect(manager.activeCount).toBe(1);
+  });
+
+  it('never has more than two active Brutes, including dying pooled corpses', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0);
+    manager.registerColliders([]);
+    for (let index = 0; index < 3; index++) {
+      expect(manager.spawnZombie(roundConfig(20), 0, 4, 20)).toBe(true);
+    }
+    expect(manager.activeBruteCount).toBe(MAX_ACTIVE_BRUTES);
+    const brutes = [...manager.actives].filter((zombie) => zombie.typeId === 'brute');
+    manager.damageZombie(brutes[0], 'torso', 10_000);
+    expect(manager.activeBruteCount).toBe(MAX_ACTIVE_BRUTES);
+
+    expect(manager.spawnZombie(roundConfig(20), 0, 4, 20)).toBe(true);
+    expect(manager.activeBruteCount).toBe(MAX_ACTIVE_BRUTES);
+  });
+
+  it('counts Brutes inside the same 24-zombie global population cap', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0);
+    manager.registerColliders([]);
+    let spawned = 0;
+    for (let index = 0; index < MAX_ALIVE + 5; index++) {
+      if (manager.spawnZombie(roundConfig(20), 0, 4, 20)) spawned++;
+    }
+    expect(spawned).toBe(MAX_ALIVE);
+    expect(manager.activeCount).toBe(MAX_ALIVE);
+    expect(manager.activeBruteCount).toBe(MAX_ACTIVE_BRUTES);
+  });
+
+  it('clears Brute occupancy on recycling and run reset', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0);
+    manager.registerColliders([]);
+    manager.spawnZombie(roundConfig(20), 0, 4, 20);
+    const brute = [...manager.actives][0];
+    manager.damageZombie(brute, 'torso', 10_000);
+    step(manager, 3.6);
+    expect(manager.activeBruteCount).toBe(0);
+
+    manager.spawnZombie(roundConfig(20), 0, 4, 20);
+    expect(manager.activeBruteCount).toBe(1);
+    manager.reset();
+    expect(manager.activeBruteCount).toBe(0);
+  });
+
+  it('reports round, chance and active variant stats for QA', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0);
+    manager.registerColliders([]);
+    manager.spawnZombie(roundConfig(5), 0, 4, 5);
+    const zombie = [...manager.actives][0];
+
+    expect(manager.getTypeDiagnostics(5)).toEqual({
+      round: 5,
+      bruteSpawnChance: 0.08,
+      activeBrutes: 1,
+      active: [{ typeId: 'brute', health: zombie.hp, speed: zombie.speed }],
+    });
   });
 });
 

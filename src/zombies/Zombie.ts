@@ -11,6 +11,9 @@ import {
   ZOMBIE_HIT_DURATION,
   ZOMBIE_HIT_HEADSHOT_FACTOR,
   ZOMBIE_SPAWN_DURATION,
+  ZOMBIE_ATTACK_DAMAGE,
+  ZOMBIE_TYPE_CONFIGS,
+  type ZombieTypeId,
 } from './ZombieConfig';
 import { ZombieVisual } from './ZombieVisual';
 
@@ -65,6 +68,9 @@ export class Zombie implements HitTarget {
   hp = 0;
   maxHp = 0;
   speed = 0;
+  attackDamage = ZOMBIE_ATTACK_DAMAGE;
+  bodyRadius = ZOMBIE_TYPE_CONFIGS.normal.bodyRadius;
+  typeId: ZombieTypeId = 'normal';
   /** Optional barrier this zombie must breach before chasing the player. */
   barrierTarget: WindowBarrier | null = null;
   /** Logical map floor; Y is the corresponding physical floor elevation. */
@@ -73,6 +79,8 @@ export class Zombie implements HitTarget {
   private stateTimer = 0;
   private attackCooldown = 0;
   private attackApplied = false;
+  private readonly torsoBaseScale = new THREE.Vector3();
+  private readonly headBaseScale = new THREE.Vector3();
 
   constructor(visual?: ZombieVisual) {
     this.visual = visual ?? new ZombieVisual('walker', null, 0xa8b89a);
@@ -88,6 +96,8 @@ export class Zombie implements HitTarget {
 
     this.group.add(this.visual.root);
     this.visual.attachHitboxes(this.torsoHitbox, this.headHitbox);
+    this.torsoBaseScale.copy(this.torsoHitbox.scale);
+    this.headBaseScale.copy(this.headHitbox.scale);
 
     this.torsoHitbox.userData.target = this;
     this.torsoHitbox.userData.zombie = this;
@@ -110,7 +120,22 @@ export class Zombie implements HitTarget {
   }
 
   /** Resets the pooled zombie and places it at the spawn point. */
-  spawn(x: number, z: number, hp: number, speed: number, y = 0, floor = 0): void {
+  spawn(
+    x: number,
+    z: number,
+    hp: number,
+    speed: number,
+    y = 0,
+    floor = 0,
+    typeId: ZombieTypeId = 'normal',
+    attackDamage = ZOMBIE_ATTACK_DAMAGE,
+  ): void {
+    this.typeId = typeId;
+    this.attackDamage = attackDamage;
+    const profile = ZOMBIE_TYPE_CONFIGS[typeId];
+    this.bodyRadius = profile.bodyRadius;
+    this.visual.setZombieType(typeId);
+    this.applyHitboxProfile(profile.bodyScale, profile.hitboxScale);
     this.hp = hp;
     this.maxHp = hp;
     this.speed = speed;
@@ -125,6 +150,21 @@ export class Zombie implements HitTarget {
     this.visual.setSpawnRise(0);
     this.visual.setState('spawn');
     this.group.visible = true;
+  }
+
+  private applyHitboxProfile(
+    bodyScale: readonly [number, number, number],
+    hitboxScale: readonly [number, number, number],
+  ): void {
+    const apply = (hitbox: THREE.Object3D, base: THREE.Vector3): void => {
+      hitbox.scale.set(
+        base.x * hitboxScale[0] / bodyScale[0],
+        base.y * hitboxScale[1] / bodyScale[1],
+        base.z * hitboxScale[2] / bodyScale[2],
+      );
+    };
+    apply(this.torsoHitbox, this.torsoBaseScale);
+    apply(this.headHitbox, this.headBaseScale);
   }
 
   /** HitTarget hook: pure visual feedback; damage arrives via applyDamage. */

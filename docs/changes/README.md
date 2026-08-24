@@ -17,6 +17,9 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-24 — Asset Brute y catálogo extensible de zombies](2026-08-24-brute-asset-zombie-types.md)
+- [2026-08-23 — Variantes de zombie Shiny y Brute](2026-08-23-zombie-variants.md)
+- [2026-08-23 — Recargas visuales sin manos del jugador](2026-08-23-weapon-reloads.md)
 - [2026-08-23 — Rediseño visual de la AK-47 (Tipo 3 procedural)](2026-08-23-ak47-type3-redesign.md)
 - [2026-08-21 — Colision estable en la escalera del Bunker](2026-08-21-bunker-stair-collision.md)
 - [2026-08-20 — Bunker ampliado y cuerpos flotantes en la escalera](2026-08-20-bunker-expansion-floating-fix.md)

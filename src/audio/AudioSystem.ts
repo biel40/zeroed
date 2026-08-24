@@ -195,7 +195,8 @@ export class AudioSystem {
 
   /**
    * Per-phase reload foley, fired by the ReloadAnimator thresholds so the
-   * sound always matches what the hands are doing. Each style has its own
+   * sound always matches what the visible mechanism is doing. Each style has
+   * its own
    * cadence so the same action feels different for a pistol, rifle, belt-fed,
    * bolt-action or energy weapon.
    */
@@ -360,6 +361,16 @@ export class AudioSystem {
   public playZombieHit(): void {
     this.tick(0, 300, 0.38);
     this.tick(0.012, 150, 0.26);
+  }
+
+  /** Standalone skull impact: a fleshy body followed by a distinct dry crack. */
+  public playHeadshotHit(): void {
+    // Delaying the crack slightly keeps it perceptually separate from the
+    // weapon report. Low Q values retain a broad, audible noise spectrum;
+    // the old resonant ticks measured loud but contained very little energy.
+    this.tick(0.014, 480, 0.85, 0.8, 0.11);
+    this.tick(0.028, 1450, 1.25, 0.9, 0.09);
+    this.tick(0.046, 3200, 0.65, 1.2, 0.06);
   }
 
   /** Short wood/hammer tick for each rebuilt barrier board. */

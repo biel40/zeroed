@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { WeaponId } from '../weapons/WeaponTypes';
-import type { ZombieModelSource } from '../zombies/ZombieVisual';
-import type { ZombieVariantId } from '../zombies/ZombieVisual';
+import type { ZombieModelId } from '../zombies/ZombieConfig';
+import { ZOMBIE_MODELS, type ZombieModelSource } from '../zombies/ZombieVisual';
 
 export const TEXTURE_MANIFEST: readonly string[] = [
   'concrete_diff.jpg',
@@ -20,14 +20,14 @@ export const TEXTURE_MANIFEST: readonly string[] = [
 ];
 
 /** Zombie GLBs (skinned + animated) served from public/assets/zombies/. */
-export const ZOMBIE_MANIFEST: ReadonlyArray<{ id: ZombieVariantId; url: string }> = [
-  { id: 'walker', url: 'assets/zombies/zombie_walker.glb' },
-];
+export const ZOMBIE_MANIFEST: ReadonlyArray<{ id: ZombieModelId; url: string }> =
+  (Object.keys(ZOMBIE_MODELS) as ZombieModelId[])
+    .map((id) => ({ id, url: ZOMBIE_MODELS[id].url }));
 
 export interface AssetManifest {
   readonly weapons: ReadonlyArray<{ id: WeaponId; url: string }>;
   readonly textures: readonly string[];
-  readonly zombies: ReadonlyArray<{ id: ZombieVariantId; url: string }>;
+  readonly zombies: ReadonlyArray<{ id: ZombieModelId; url: string }>;
 }
 
 /**
@@ -40,7 +40,7 @@ export class AssetManager {
   private readonly gltfLoader = new GLTFLoader();
   private readonly textureLoader = new THREE.TextureLoader();
   private readonly models = new Map<WeaponId, THREE.Group>();
-  private readonly zombies = new Map<ZombieVariantId, ZombieModelSource>();
+  private readonly zombies = new Map<ZombieModelId, ZombieModelSource>();
   private readonly textures = new Map<string, THREE.Texture>();
 
   constructor(private readonly anisotropyLimit = 8) {}
@@ -72,8 +72,15 @@ export class AssetManager {
   }
 
   /** Skinned zombie template + clips; null degrades to procedural bodies. */
-  getZombieModel(id: ZombieVariantId): ZombieModelSource | null {
+  getZombieModel(id: ZombieModelId): ZombieModelSource | null {
     return this.zombies.get(id) ?? null;
+  }
+
+  /** Complete model catalog for ZombieManager; missing loads remain null fallbacks. */
+  getZombieModels(): Record<ZombieModelId, ZombieModelSource | null> {
+    return Object.fromEntries(
+      (Object.keys(ZOMBIE_MODELS) as ZombieModelId[]).map((id) => [id, this.getZombieModel(id)]),
+    ) as Record<ZombieModelId, ZombieModelSource | null>;
   }
 
   getTexture(name: string): THREE.Texture | null {
@@ -130,7 +137,7 @@ export class AssetManager {
     }
   }
 
-  private async loadZombie(id: ZombieVariantId, url: string): Promise<void> {
+  private async loadZombie(id: ZombieModelId, url: string): Promise<void> {
     try {
       const gltf = await this.gltfLoader.loadAsync(this.resolve(url));
       this.zombies.set(id, { scene: gltf.scene, clips: gltf.animations });

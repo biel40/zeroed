@@ -29,18 +29,19 @@ rojiza satinada que contrasta con el metal.
 
 ## Modelos de zombies (`public/assets/zombies/`)
 
-Autor: **Quaternius** — https://quaternius.com. Descargados de **Poly Pizza**
-(https://poly.pizza). Modelos skinned, rigged y con clips de animación GLTF;
-los clips concretos por estado se resuelven por nombre en
+El walker procede de **Quaternius** — https://quaternius.com, vía **Poly Pizza**
+(https://poly.pizza). El Brute es un modelo articulado original del proyecto.
+Los clips concretos por estado se resuelven por nombre en
 `src/zombies/ZombieVisual.ts` (contrato verificado en `tests/zombieAssets.test.ts`).
 
 | Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
 | --- | --- | --- | --- | --- | --- |
 | `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0** (atribución: Quaternius) | ~2.1k | ZombieCrawl (spawn), ZombieWalk, ZombieBite (attack) |
+| `brute` | "Zeroed Brute" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | ~1.6k | BruteRise, BruteWalk, BruteSmash, BruteHit, BruteDeath |
 
-> Solo existe la categoría pequeña (`walker`): la variante grande (`hulk`)
-> se eliminó del juego junto con su GLB. No la reintroduzcas sin actualizar
-> también el contrato de `tests/zombieAssets.test.ts`.
+> `normal` y `shiny` comparten el walker; `brute` usa su propio GLB, jerarquía,
+> materiales y clips. El registro separa tipos de gameplay y modelos para que
+> futuros tipos puedan compartir un asset o reservar otro independiente.
 
 Notas:
 
@@ -49,6 +50,9 @@ Notas:
 - Atribución CC-BY: **Quaternius — "Animated Zombie"**, vía Poly Pizza.
 - Variedad por instancia: tinte de piel/ropa, escala ±5 %, walk jitter ±7 %
   (sin cargar modelos adicionales).
+- `shiny` altera el acabado PBR del walker. El Brute tiene cabeza hundida,
+  torso deformado, abdomen expuesto, brazos asimétricos, piernas cortas y
+  restricciones metálicas; su GLB se regenera con `npm run generate:zombie-brute`.
 - Cargadores, cerrojos y tapas de alimentación de las armas son meshes
   procedurales propios (los GLB de armas de Quaternius son mono-mesh). Sus
   anclas locales pueden declararse por arma; los cargadores soltados se

@@ -1579,6 +1579,20 @@ export class WeaponView {
     if (this.slide) this.slideBlowback = 1;
   }
 
+  /** Clears every transient pose when this view is hidden or the run resets. */
+  reset(): void {
+    this.animator?.reset();
+    this.spring.reset();
+    this.flashTime = 0;
+    this.flash.visible = false;
+    this.swayX = 0;
+    this.swayY = 0;
+    this.slideBlowback = 0;
+    if (this.slide) this.slide.position.z = this.slideHomeZ;
+    this.root.position.copy(this.hipPosition);
+    this.root.rotation.set(0, 0, 0);
+  }
+
   getMuzzleWorldPosition(out: THREE.Vector3): THREE.Vector3 {
     return this.muzzle.getWorldPosition(out);
   }
@@ -1660,7 +1674,6 @@ export class WeaponView {
       default:
         break;
     }
-
     if (this.flashTime > 0) {
       this.flashTime -= dt;
       if (this.flashTime <= 0) this.flash.visible = false;

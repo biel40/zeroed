@@ -131,8 +131,7 @@ export class ZombiesMode implements GameMode {
 
     this.zombies = new ZombieManager(
       Math.random,
-      // Only the small walker category exists; nothing else is requested.
-      { walker: ctx.assets.getZombieModel('walker') },
+      ctx.assets.getZombieModels(),
       // Static shadow maps (mobile) must not have moving casters.
       !ctx.profile.useReducedEffects,
       this.arena.spawnPoints,
@@ -248,11 +247,13 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
-    this.ctx.stats.registerHit(distance);
-    this.ctx.hud.showHitmarker();
-    this.ctx.audio.playZombieHit();
-    this.ctx.effects.puff(point, 0x6e1d16, 0.2);
     const part = (object.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
+    const headshot = part === 'head';
+    this.ctx.stats.registerHit(distance);
+    this.ctx.hud.showHitmarker(headshot);
+    if (headshot) this.ctx.audio.playHeadshotHit();
+    else this.ctx.audio.playZombieHit();
+    this.ctx.effects.puff(point, 0x6e1d16, 0.2);
     const lethal = this.zombies.damageZombie(
       zombie,
       part,
@@ -260,7 +261,7 @@ export class ZombiesMode implements GameMode {
     );
     // A surviving headshot pays 150 here; lethal hits pay through the kill
     // callback instead, so a direct hit is rewarded exactly once.
-    if (!lethal) this.economy.awardHit(part === 'head');
+    if (!lethal) this.economy.awardHit(headshot);
   }
 
   /** The Ray Gun bypasses hitscan ballistics and fires a visible bolt. */
@@ -733,7 +734,7 @@ export class ZombiesMode implements GameMode {
         case 'spawnDue':
           if (
             this.zombies &&
-            !this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z)
+            !this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z, event.round)
           ) {
             // Corpses still occupy pool slots and invalid map spawns are
             // rejected. Neither case may silently shorten the round.
@@ -752,7 +753,9 @@ export class ZombiesMode implements GameMode {
     if (!this.isGameplayInputEnabled()) return;
     this.kills++;
     if (headshot) this.headshots++;
-    this.ctx.audio.playZombieDeath();
+    // A lethal headshot already has a strong dedicated impact. Layering the
+    // generic death growl at the same instant masks its short crack.
+    if (!headshot) this.ctx.audio.playZombieDeath();
     // Kill reward: headshot (+100) replaces the normal kill (+50); the two
     // never stack for one death. Splash/chain kills arrive here too, so all
     // kill points flow through this single call.
@@ -850,10 +853,12 @@ export class ZombiesMode implements GameMode {
     if (isTesla && zombie && zombie.isAlive) {
       this.ctx.audio.playTeslaShot();
       this.ctx.stats.registerHit(distance);
-      this.ctx.hud.showHitmarker();
       const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
+      const headshot = part === 'head';
+      this.ctx.hud.showHitmarker(headshot);
+      if (headshot) this.ctx.audio.playHeadshotHit();
       const chain = this.zombies.applyChainLightning(zombie, CHAIN_ZAP_DAMAGE, part);
-      if (part === 'head' && zombie.isAlive) this.economy.awardHit(true);
+      if (headshot && zombie.isAlive) this.economy.awardHit(true);
       this.ctx.audio.playTeslaChain(chain.length);
       // Arc from the muzzle through each electrocuted zombie in order.
       const muzzle = this.ctx.player.camera.getWorldPosition(this.tmpDirection);
@@ -877,10 +882,12 @@ export class ZombiesMode implements GameMode {
     const raygun = WEAPON_DEFINITIONS.raygun;
     if (zombie && zombie.isAlive) {
       const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
+      const headshot = part === 'head';
       this.ctx.stats.registerHit(distance);
-      this.ctx.hud.showHitmarker();
+      this.ctx.hud.showHitmarker(headshot);
+      if (headshot) this.ctx.audio.playHeadshotHit();
       const lethal = this.zombies.damageZombie(zombie, part, raygun.damage);
-      if (!lethal) this.economy.awardHit(part === 'head');
+      if (!lethal) this.economy.awardHit(headshot);
     }
     // Splash includes the directly-hit zombie: the Ray Gun fantasy is that
     // a bullseye on a packed horde is devastating.

@@ -36,6 +36,22 @@ describe('ZombiePool', () => {
     expect(pool.acquire()).toBeNull();
   });
 
+  it('selects fixed model reserves while enforcing one global active cap', () => {
+    const pool = new ZombiePool(
+      3,
+      (index) => ({
+        visual: { modelId: index < 2 ? 'walker' : 'brute' },
+      }) as unknown as Zombie,
+      2,
+    );
+    const brute = pool.acquire('brute');
+    expect(brute?.visual.modelId).toBe('brute');
+    expect(pool.acquire('walker')?.visual.modelId).toBe('walker');
+    expect(pool.acquire('walker')).toBeNull();
+    pool.release(brute as Zombie);
+    expect(pool.acquire('brute')).toBe(brute);
+  });
+
   it('recycles released zombies', () => {
     const pool = makeStubPool(2);
     const a = pool.acquire();

@@ -233,8 +233,9 @@ export class HUD {
     mustGet('pause-menu-btn').addEventListener('click', handlers.onMainMenu);
   }
 
-  showHitmarker(): void {
+  showHitmarker(headshot = false): void {
     this.hitmarker.classList.remove('active');
+    this.hitmarker.classList.toggle('headshot', headshot);
     // Force reflow so the CSS animation restarts on rapid consecutive hits.
     void this.hitmarker.offsetWidth;
     this.hitmarker.classList.add('active');

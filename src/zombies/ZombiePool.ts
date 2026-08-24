@@ -1,23 +1,33 @@
 import type { Zombie } from './Zombie';
+import type { ZombieModelId } from './ZombieConfig';
 
 /**
- * Fixed-size object pool. Zombies are created once up front and then reused
- * forever — no allocations during rounds no matter how long the session
- * runs. The pool size is the hard alive cap: when empty, acquire() returns
- * null instead of ever creating a 25th zombie.
+ * Model-aware object pool. Every visual reserve is created up front, while
+ * maxActive remains the single population cap across all models.
  */
 export class ZombiePool {
   private readonly free: Zombie[] = [];
   private readonly active = new Set<Zombie>();
 
-  constructor(count: number, factory: () => Zombie) {
-    for (let i = 0; i < count; i++) this.free.push(factory());
+  constructor(
+    count: number,
+    factory: (index: number) => Zombie,
+    private readonly maxActive = count,
+  ) {
+    for (let i = 0; i < count; i++) this.free.push(factory(i));
   }
 
-  /** Returns a zombie to reuse, or null when the cap is already reached. */
-  acquire(): Zombie | null {
-    const zombie = this.free.pop();
-    if (!zombie) return null;
+  /** Returns the requested fixed visual model without exceeding the global cap. */
+  acquire(modelId?: ZombieModelId): Zombie | null {
+    if (this.active.size >= this.maxActive) return null;
+    let index = this.free.length - 1;
+    if (modelId) {
+      while (index >= 0 && this.free[index].visual?.modelId !== modelId) index--;
+    }
+    if (index < 0) return null;
+    const zombie = this.free[index];
+    const last = this.free.pop() as Zombie;
+    if (index < this.free.length) this.free[index] = last;
     this.active.add(zombie);
     return zombie;
   }
@@ -39,6 +49,12 @@ export class ZombiePool {
 
   get freeCount(): number {
     return this.free.length;
+  }
+
+  freeCountFor(modelId: ZombieModelId): number {
+    let count = 0;
+    for (const zombie of this.free) if (zombie.visual?.modelId === modelId) count++;
+    return count;
   }
 
   /** Live view of the active zombies; do not mutate while iterating. */

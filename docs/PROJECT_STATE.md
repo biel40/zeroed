@@ -1,20 +1,20 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-08-23. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+Estado inspeccionado: 2026-08-24. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
 
 ## Sistemas funcionales
 
 - Arranque WebGL, carga de GLB/texturas con fallback y selector directo entre los dos mapas Zombies (`src/main.ts`, `src/assets/AssetManager.ts`).
 - PWA instalable con manifest, iconos, app shell offline, cache runtime de texturas/modelos/audio, actualizacion automatica al entrar desde navegador y actualizacion diferida hasta selector o pausa en standalone (`vite.config.ts`, `src/pwa.ts`, `docs/PWA.md`).
 - Shell FPS compartido con render, input desktop/tactil, recuperacion de Pointer Lock, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
-- Armas declarativas con cadencia, modos de fuego, municion, recarga, ADS, dispersion, recoil y view models GLB/procedurales (`src/config/weapons.ts`, `src/weapons/`).
-- Balistica con gravedad/drag, raycast segmentado y prioridad de hitbox de cabeza (`src/shooting/`).
-- Zombies con salud, Points, inventario de dos slots, rondas infinitas, pool de 24 enemigos, ataques y navegacion con steering local, rutas de recuperacion y failsafe de recolocacion (`src/modes/ZombiesMode.ts`, `src/zombies/`).
+- Armas declarativas con cadencia, modos de fuego, munición, recarga, ADS, dispersión y recoil; sus viewmodels GLB/procedurales no muestran manos del jugador y conservan recargas mecánicas diferenciadas sin controlar la munición (`src/config/weapons.ts`, `src/weapons/`).
+- Balistica con gravedad/drag, raycast segmentado, prioridad de hitbox de cabeza y confirmacion visual/sonora especifica de headshot (`src/shooting/`, `src/modes/ZombiesMode.ts`, `src/ui/HUD.ts`, `src/audio/AudioSystem.ts`).
+- Zombies `normal`, `shiny` y `brute` definidos mediante un registro extensible de tipos/modelos; Brute usa un GLB y clips originales, reservas visuales por modelo y máximo derivado de dos bajo el límite global de 24. Todos comparten combate y navegación con steering local, rutas de recuperación y failsafe (`src/modes/ZombiesMode.ts`, `src/zombies/`).
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
 - Pasos de zombie posicionales 3D con pool de 8 fuentes sobre un unico `AudioListener`, prioridad al mas cercano y asset opcional con fallback sintetizado (`src/zombies/ZombieFootsteps.ts`).
-- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado, escalera continua con costados solidos compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
-- Suite Vitest de logica determinista y contratos estaticos PWA. `npm run typecheck` pasa; la validacion completa conserva fallos preexistentes detectados en audio y seleccion de mapa.
+- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado con rellano inferior despejado, escalera continua con costados solidos compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
+- Suite Vitest de logica determinista y contratos estaticos PWA; `npm run typecheck` y la validacion completa pasan.
 
 ## Sistemas parciales o limitados
 
@@ -23,7 +23,7 @@ Estado inspeccionado: 2026-08-23. La fuente de verdad es el codigo actual; `READ
 - La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding A* por planta se activa cuando no existe linea de vision navegable y el anti-stuck fuerza una consulta posterior como fallback; los spawns siguen definidos en planta 0.
 - La escalera del bunker usa escalones visuales sobre una pendiente continua, costados fisicos que impiden entradas laterales a media altura y un corredor zombie que forma la cola en ambos rellanos, proyecta la separacion sobre la pendiente y cambia la identidad de planta sin teletransporte.
 - Tablas de barrera, Mystery Box, wall buys y pickups son principalmente visuales/logicos; varios no forman parte de la colision fisica o balistica.
-- Solo existe la variante zombie `walker`. M60, M1911, Ray Gun y ZEUS-77 usan modelos procedurales.
+- Existen los modelos zombie `walker` y `brute`; Shiny es un tratamiento material del walker. M60, M1911, Ray Gun y ZEUS-77 usan modelos procedurales.
 - Los proyectiles de energia comparten un alcance fijo de 80 m y su comportamiento solo distingue Tesla de Ray Gun por color.
 - Cambiar de modo o mapa requiere recargar la pagina; `Game` y `GameMode` no tienen ciclo de `dispose()`.
 - `BurnedMansionMaterials` carga texturas al margen de la cache ya precargada por `AssetManager`.

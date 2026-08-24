@@ -1,14 +1,17 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { ZombieState } from './Zombie';
+import {
+  ZOMBIE_TYPE_CONFIGS,
+  type ZombieModelId,
+  type ZombieTypeId,
+} from './ZombieConfig';
 
-/** Loaded GLB payload for one zombie variant (scene template + clips). */
+/** Loaded GLB payload for one model source (scene template + clips). */
 export interface ZombieModelSource {
   readonly scene: THREE.Group;
   readonly clips: THREE.AnimationClip[];
 }
-
-export type ZombieVariantId = 'walker';
 
 /**
  * Playback rate cap for the long ZombieBite mocap take. Bumped from 2.5 to
@@ -17,7 +20,8 @@ export type ZombieVariantId = 'walker';
  */
 const ATTACK_TIME_SCALE_CAP = 3.0;
 
-interface VariantConfig {
+export interface ZombieModelConfig {
+  readonly url: string;
   /** World height the model is normalized to, meters. */
   readonly height: number;
   /** Candidate clip names per state; first match wins. */
@@ -26,16 +30,18 @@ interface VariantConfig {
   readonly walkReferenceSpeed: number;
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
   readonly tints: readonly number[];
+  readonly anchors: {
+    readonly torso: readonly string[];
+    readonly head: readonly string[];
+    readonly headTop: readonly string[];
+  };
 }
 
-/**
- * Only the small walker category exists: the large hulk variant was removed
- * and must not be reintroduced (see the variant contract test). Per-instance
- * variety comes from tints, scale jitter and walk jitter instead.
- */
-export const ZOMBIE_VARIANTS: Record<ZombieVariantId, VariantConfig> = {
+/** Asset/animation contracts are independent from gameplay type profiles. */
+export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
   // Quaternius "Animated Zombie" (CC-BY 3.0): classic shambling corpse.
   walker: {
+    url: 'assets/zombies/zombie_walker.glb',
     height: 1.78,
     clips: {
       spawn: ['ZombieCrawl', 'Crawl'],
@@ -47,6 +53,31 @@ export const ZOMBIE_VARIANTS: Record<ZombieVariantId, VariantConfig> = {
     },
     walkReferenceSpeed: 1.35,
     tints: [0xa8b89a, 0x9aa88e, 0xb0a890, 0x98a498],
+    anchors: {
+      torso: ['Hips', 'Pelvis'],
+      head: ['Head'],
+      headTop: ['HeadTop_End', 'HeadTop'],
+    },
+  },
+  // Original Zeroed low-poly Brute: broad, asymmetric and built from scratch.
+  brute: {
+    url: 'assets/zombies/zombie_brute.glb',
+    height: 2.02,
+    clips: {
+      spawn: ['BruteRise'],
+      walk: ['BruteWalk'],
+      attack: ['BruteSmash'],
+      barrierAttack: ['BruteSmash'],
+      hit: ['BruteHit'],
+      death: ['BruteDeath'],
+    },
+    walkReferenceSpeed: 1.05,
+    tints: [0xffffff, 0xe5ebdc],
+    anchors: {
+      torso: ['Torso'],
+      head: ['Head'],
+      headTop: ['HeadTop_End'],
+    },
   },
 };
 
@@ -57,6 +88,13 @@ const FLASH_COLOR = 0xff2211;
 const UNDEAD_GLOW = 0x1a2a12;
 /** How deep below ground the spawn rise starts, meters. */
 const SPAWN_DEPTH = 1.25;
+
+interface MaterialBase {
+  readonly color: THREE.Color;
+  readonly roughness: number;
+  readonly metalness: number;
+  readonly envMapIntensity: number;
+}
 
 /**
  * Resolves an animation clip by candidate name. Matches either the full
@@ -186,10 +224,89 @@ function buildProceduralHumanoid(
   return { root, rig: { hips, torso, head, armL, armR, legL, legR }, materials: [skin, cloth] };
 }
 
-/** Skeleton lookups for the hitbox anchors; first match wins. */
-const TORSO_BONE_NAMES = ['Hips', 'Pelvis'] as const;
-const HEAD_BONE_NAMES = ['Head'] as const;
-const HEAD_TOP_BONE_NAMES = ['HeadTop_End', 'HeadTop'] as const;
+/** Distinct emergency fallback for the Brute asset; never resembles a scaled walker. */
+function buildProceduralBrute(
+  tint: number,
+  castShadow: boolean,
+): {
+  root: THREE.Group;
+  rig: ProceduralRig;
+  materials: THREE.MeshStandardMaterial[];
+} {
+  const skin = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x727c62).multiply(new THREE.Color(tint)),
+    roughness: 0.96,
+    metalness: 0,
+    transparent: true,
+    emissive: FLASH_COLOR,
+    emissiveIntensity: 0,
+    flatShading: true,
+  });
+  const cloth = new THREE.MeshStandardMaterial({
+    color: 0x202923,
+    roughness: 1,
+    metalness: 0,
+    transparent: true,
+    emissive: FLASH_COLOR,
+    emissiveIntensity: 0,
+    flatShading: true,
+  });
+  const root = new THREE.Group();
+  root.scale.setScalar(0.8);
+  const add = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.MeshStandardMaterial,
+    parent: THREE.Object3D,
+    position: readonly [number, number, number],
+    scale: readonly [number, number, number] = [1, 1, 1],
+  ): void => {
+    const part = new THREE.Mesh(geometry, material);
+    part.position.set(...position);
+    part.scale.set(...scale);
+    part.castShadow = castShadow;
+    parent.add(part);
+  };
+
+  const hips = new THREE.Group();
+  hips.position.y = 1.22;
+  root.add(hips);
+  add(new THREE.DodecahedronGeometry(0.5, 0), cloth, hips, [0, 0, 0], [1.1, 0.52, 0.72]);
+  const torso = new THREE.Group();
+  torso.position.set(0, 0.16, 0.03);
+  torso.rotation.x = 0.16;
+  hips.add(torso);
+  add(new THREE.DodecahedronGeometry(0.62, 0), cloth, torso, [0, 0.48, 0], [1.28, 0.9, 0.7]);
+  add(new THREE.SphereGeometry(0.5, 10, 7), skin, torso, [0, 0.16, 0.17], [1.34, 1.05, 1.02]);
+
+  const head = new THREE.Group();
+  head.position.set(0.05, 0.94, 0.06);
+  torso.add(head);
+  add(new THREE.IcosahedronGeometry(0.2, 1), skin, head, [0, 0, 0], [0.9, 1.05, 0.92]);
+
+  const buildArm = (side: -1 | 1, size: number): THREE.Group => {
+    const shoulder = new THREE.Group();
+    shoulder.position.set(side * 0.66, 0.72, 0);
+    shoulder.rotation.z = side * (side < 0 ? 0.18 : 0.09);
+    torso.add(shoulder);
+    add(new THREE.CapsuleGeometry(size * 0.22, size * 0.85, 4, 8), skin, shoulder, [0, -size * 0.52, 0.05], [1.18, 1, 1]);
+    add(new THREE.DodecahedronGeometry(size * 0.27, 0), skin, shoulder, [0, -size * 1.02, 0.12], [1.15, 0.9, 1.18]);
+    return shoulder;
+  };
+  const armL = buildArm(-1, 1.02);
+  const armR = buildArm(1, 0.88);
+
+  const buildLeg = (side: -1 | 1): THREE.Group => {
+    const leg = new THREE.Group();
+    leg.position.set(side * 0.28, -0.18, 0);
+    hips.add(leg);
+    add(new THREE.CapsuleGeometry(0.18, 0.72, 4, 8), cloth, leg, [0, -0.45, 0]);
+    add(new THREE.BoxGeometry(0.36, 0.2, 0.52), cloth, leg, [0, -0.94, 0.11]);
+    return leg;
+  };
+  const legL = buildLeg(-1);
+  const legR = buildLeg(1);
+  return { root, rig: { hips, torso, head, armL, armR, legL, legR }, materials: [skin, cloth] };
+}
 
 /**
  * Bind-pose world targets for the hitboxes. The torso envelope (centered at
@@ -241,6 +358,7 @@ function placeOnAnchor(
  */
 export class ZombieVisual {
   readonly root = new THREE.Group();
+  readonly modelId: ZombieModelId;
   /**
    * Animated anchor the torso hitbox rides: the Hips bone on a GLB rig, the
    * hips group on the procedural fallback, or `root` as a last resort.
@@ -252,8 +370,9 @@ export class ZombieVisual {
   private readonly mixer: THREE.AnimationMixer | null = null;
   private readonly actions = new Map<ZombieState, THREE.AnimationAction>();
   private readonly materials: THREE.MeshStandardMaterial[] = [];
+  private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
-  private readonly variant: VariantConfig;
+  private readonly modelConfig: ZombieModelConfig;
   /** End of the head bone chain, when the rig has one (skull midpoint math). */
   private headTop: THREE.Object3D | null = null;
   private state: ZombieState = 'spawn';
@@ -267,14 +386,20 @@ export class ZombieVisual {
   /** 0..1 spawn rise and death collapse progress, driven by the owner. */
   private rise = 1;
   private collapse = 0;
+  private zombieType: ZombieTypeId = 'normal';
+  private glowColor = UNDEAD_GLOW;
+  private glowIntensity = 0.35;
+  private walkAnimationMultiplier = 1;
+  private heavyBobPhase = 0;
 
   constructor(
-    variantId: ZombieVariantId,
+    modelId: ZombieModelId,
     source: ZombieModelSource | null,
     tint: number,
     castShadow = true,
   ) {
-    this.variant = ZOMBIE_VARIANTS[variantId];
+    this.modelId = modelId;
+    this.modelConfig = ZOMBIE_MODELS[modelId];
 
     if (source) {
       const model = cloneSkeleton(source.scene) as THREE.Group;
@@ -285,10 +410,10 @@ export class ZombieVisual {
       // armature scale (x100+ on these assets) is applied twice and the
       // normalization below shrinks zombies to a few centimeters tall.
       model.updateMatrixWorld(true);
-      // Normalize to the variant height with feet on the ground.
+      // Normalize to the model contract height with feet on the ground.
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
-      const scale = this.variant.height / Math.max(size.y, 1e-4);
+      const scale = this.modelConfig.height / Math.max(size.y, 1e-4);
       model.scale.setScalar(scale);
       model.position.y = -box.min.y * scale;
 
@@ -310,13 +435,13 @@ export class ZombieVisual {
         object.material = Array.isArray(object.material) ? cloned : cloned[0];
       });
       this.root.add(model);
-      this.torsoAnchor = findByName(model, TORSO_BONE_NAMES) ?? this.root;
-      this.headAnchor = findByName(model, HEAD_BONE_NAMES) ?? this.root;
-      this.headTop = findByName(model, HEAD_TOP_BONE_NAMES);
+      this.torsoAnchor = findByName(model, this.modelConfig.anchors.torso) ?? this.root;
+      this.headAnchor = findByName(model, this.modelConfig.anchors.head) ?? this.root;
+      this.headTop = findByName(model, this.modelConfig.anchors.headTop);
 
       this.mixer = new THREE.AnimationMixer(model);
       for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'hit', 'death'] as const) {
-        const clip = resolveClip(source.clips, this.variant.clips[state]);
+        const clip = resolveClip(source.clips, this.modelConfig.clips[state]);
         if (!clip) continue;
         const action = this.mixer.clipAction(clip);
         if (state === 'death') {
@@ -326,12 +451,54 @@ export class ZombieVisual {
         this.actions.set(state, action);
       }
     } else {
-      const built = buildProceduralHumanoid(tint, castShadow);
+      const built = modelId === 'brute'
+        ? buildProceduralBrute(tint, castShadow)
+        : buildProceduralHumanoid(tint, castShadow);
       this.rig = built.rig;
       this.materials.push(...built.materials);
       this.root.add(built.root);
       this.torsoAnchor = built.rig.hips;
       this.headAnchor = built.rig.head;
+    }
+
+    this.materialBases.push(...this.materials.map((material) => ({
+      color: material.color.clone(),
+      roughness: material.roughness,
+      metalness: material.metalness,
+      envMapIntensity: material.envMapIntensity,
+    })));
+  }
+
+  /** Resets and applies a type treatment compatible with this fixed model. */
+  setZombieType(typeId: ZombieTypeId): void {
+    const config = ZOMBIE_TYPE_CONFIGS[typeId];
+    if (config.modelId !== this.modelId) {
+      throw new Error(`Zombie type "${typeId}" requires model "${config.modelId}", got "${this.modelId}"`);
+    }
+    this.flash = 0;
+    this.zombieType = typeId;
+    this.root.scale.set(...config.bodyScale);
+    this.walkAnimationMultiplier = config.walkAnimationMultiplier;
+    this.glowColor = UNDEAD_GLOW;
+    this.glowIntensity = 0.35;
+
+    for (let index = 0; index < this.materials.length; index++) {
+      const material = this.materials[index];
+      const base = this.materialBases[index];
+      material.color.copy(base.color);
+      material.roughness = base.roughness;
+      material.metalness = base.metalness;
+      material.envMapIntensity = base.envMapIntensity;
+      if (config.materialTreatment === 'shiny') {
+        material.color.lerp(new THREE.Color(0xb8c7a5), 0.24);
+        material.roughness = Math.min(material.roughness, 0.46);
+        material.metalness = Math.max(material.metalness, 0.04);
+        material.envMapIntensity = Math.max(material.envMapIntensity, 1.25);
+        this.glowColor = 0x526848;
+        this.glowIntensity = 0.62;
+      }
+      material.emissive.setHex(this.glowColor);
+      material.emissiveIntensity = this.glowIntensity;
     }
   }
 
@@ -387,7 +554,7 @@ export class ZombieVisual {
     if (state !== 'death') this.collapse = 0;
     const next = this.actions.get(state) ?? null;
     if (!next) {
-      // Variants without a hit clip flinch by dipping the current cycle;
+      // Models without a hit clip flinch by dipping the current cycle;
       // without a death clip the body collapses (owner drives setDeathProgress).
       // The dip only triggers on a FRESH hit: re-pinning it on every bullet
       // of a burst would hold the walk cycle in slow motion while the zombie
@@ -451,13 +618,17 @@ export class ZombieVisual {
   setOpacity(opacity: number): void {
     for (const material of this.materials) {
       material.opacity = opacity;
-      if (this.flash <= 0) material.emissiveIntensity = 0.35 * opacity;
+      if (this.flash <= 0) material.emissiveIntensity = this.glowIntensity * opacity;
     }
   }
 
   update(dt: number, speed: number): void {
     // Spawn rise and death collapse apply to the visual root in both paths.
-    this.root.position.y = -(1 - this.rise) * SPAWN_DEPTH;
+    this.heavyBobPhase += dt * Math.max(0.4, speed) * 2.1;
+    const heavyBob = this.zombieType === 'brute' && this.state === 'walk'
+      ? Math.sin(this.heavyBobPhase * 2) * 0.018
+      : 0;
+    this.root.position.y = -(1 - this.rise) * SPAWN_DEPTH + heavyBob;
     if (this.collapse > 0) {
       const ease = 1 - (1 - this.collapse) * (1 - this.collapse);
       this.root.rotation.x = -ease * (Math.PI / 2 - 0.12);
@@ -471,9 +642,9 @@ export class ZombieVisual {
       const walk = this.actions.get('walk');
       if (walk && this.currentAction === walk) {
         // Keep the feet tracking the actual ground speed (round scaling).
-        const variant = this.variant;
         walk.timeScale =
-          this.walkJitter * Math.max(0.4, speed / variant.walkReferenceSpeed);
+          this.walkJitter * this.walkAnimationMultiplier
+          * Math.max(0.4, speed / this.modelConfig.walkReferenceSpeed);
         if (this.hitDip > 0) walk.timeScale *= 1 - this.hitDip * 0.75;
       }
       if (this.hitDip > 0) this.hitDip = Math.max(0, this.hitDip - dt * 3.5);
@@ -489,8 +660,8 @@ export class ZombieVisual {
           material.emissive.setHex(FLASH_COLOR);
           material.emissiveIntensity = this.flash * 1.5;
         } else {
-          material.emissive.setHex(UNDEAD_GLOW);
-          material.emissiveIntensity = 0.35 * (this.materials[0]?.opacity ?? 1);
+          material.emissive.setHex(this.glowColor);
+          material.emissiveIntensity = this.glowIntensity * (this.materials[0]?.opacity ?? 1);
         }
       }
     }
@@ -501,7 +672,7 @@ export class ZombieVisual {
     const rig = this.rig;
     if (!rig) return;
     if (this.state === 'death') return; // collapse handles the pose
-    this.bobPhase += dt * 4.8 * Math.max(0.4, speed / this.variant.walkReferenceSpeed);
+    this.bobPhase += dt * 4.8 * Math.max(0.4, speed / this.modelConfig.walkReferenceSpeed);
     const p = this.bobPhase;
 
     if (this.state === 'attack' || this.state === 'barrierAttack') {

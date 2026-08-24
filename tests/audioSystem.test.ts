@@ -463,6 +463,21 @@ describe('AudioSystem reload sound profiles', () => {
   });
 });
 
+describe('AudioSystem zombie impact sounds', () => {
+  it('gives headshots a loud delayed crack distinct from a body impact', () => {
+    const audio = new AudioSystem() as any;
+    const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+
+    audio.playHeadshotHit();
+
+    expect(tickSpy).toHaveBeenCalledTimes(3);
+    expect(tickSpy.mock.calls[0][0]).toBeGreaterThan(0);
+    expect(Math.max(...tickSpy.mock.calls.map((call) => call[2] as number))).toBeGreaterThanOrEqual(1.2);
+    expect(Math.max(...tickSpy.mock.calls.map((call) => call[3] as number))).toBeLessThanOrEqual(1.2);
+    expect(tickSpy.mock.calls[2][1]).toBeGreaterThan(tickSpy.mock.calls[0][1] as number);
+  });
+});
+
 describe('AudioSystem mystery box open sound', () => {
   afterEach(() => {
     vi.restoreAllMocks();

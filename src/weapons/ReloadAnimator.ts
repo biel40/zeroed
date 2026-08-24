@@ -112,6 +112,13 @@ export class ReloadAnimator {
     this.applyHandleMotion(handle, progress);
   }
 
+  /** Immediate cleanup for hidden/restarted view models. */
+  reset(): void {
+    this.restore();
+    this.fired.clear();
+    this.wasReloading = false;
+  }
+
   private cross(p: number, threshold: number, phase: ReloadPhase): void {
     if (p < threshold || this.fired.has(phase)) return;
     this.fired.add(phase);
@@ -295,9 +302,8 @@ export class ReloadAnimator {
         this.chargeGlow = pulse(p, c.charge, c.chargeEnd);
         break;
       case 'pistol':
-        // One-handed flip: the muzzle dips and the gun cants inboard while
-        // the support hand swaps the magazine, then snaps level for the
-        // slide release.
+        // The muzzle dips and the gun cants inboard during the magazine swap,
+        // then snaps level for the slide release.
         this.bodyTilt = -base * 0.3;
         this.bodyRoll = pulse(p, c.magOut, c.magSeat) * 0.45 + base * 0.08;
         break;

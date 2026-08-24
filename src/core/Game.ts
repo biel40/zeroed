@@ -441,7 +441,10 @@ export class Game {
     const previousId = this.inventory.currentWeapon;
     const nextId = this.inventory.switchTo(index);
     if (!nextId) return;
-    this.entry(previousId).view.root.visible = false;
+    const previous = this.entry(previousId);
+    previous.weapon.equip();
+    previous.view.reset();
+    previous.view.root.visible = false;
     this.currentView.root.visible = true;
     this.currentWeapon.equip();
   }
@@ -466,7 +469,13 @@ export class Game {
     const previousId = this.inventory.currentWeapon;
     const { equipped, dropped } = this.inventory.grant(id);
     entry.weapon.resetAmmo();
-    if (previousId !== equipped) this.entry(previousId).view.root.visible = false;
+    if (previousId !== equipped) {
+      const previous = this.entry(previousId);
+      previous.weapon.equip();
+      previous.view.reset();
+      previous.view.root.visible = false;
+    }
+    entry.view.reset();
     entry.view.root.visible = true;
     entry.weapon.equip();
     console.info(
@@ -480,8 +489,10 @@ export class Game {
     this.inventory.reset(this.mode.startingInventory ?? this.mode.weaponIds);
     for (const entry of this.arsenal.values()) {
       entry.weapon.resetAmmo();
+      entry.view.reset();
       entry.view.root.visible = false;
     }
+    this.magazineDrops.clear();
     this.currentView.root.visible = true;
     this.currentWeapon.equip();
   }

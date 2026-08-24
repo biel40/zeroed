@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { Zombie } from '../src/zombies/Zombie';
+import { ZombieVisual } from '../src/zombies/ZombieVisual';
 import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
@@ -252,5 +253,24 @@ describe('Zombie hitboxes', () => {
     const b = new Zombie();
     expect(a.torsoHitbox.geometry).toBe(b.torsoHitbox.geometry);
     expect(a.headHitbox.geometry).toBe(b.headHitbox.geometry);
+  });
+
+  it('scales Brute torso and head hitboxes with its larger silhouette', () => {
+    const normal = makeZombie();
+    const brute = new Zombie(new ZombieVisual('brute', null, 0xffffff, false));
+    brute.spawn(0, -20, 300, 1.3, 0, 0, 'brute');
+    step(normal, ZOMBIE_SPAWN_DURATION + 0.1);
+    step(brute, ZOMBIE_SPAWN_DURATION + 0.1);
+    normal.group.updateMatrixWorld(true);
+    brute.group.updateMatrixWorld(true);
+
+    const normalTorso = new THREE.Box3().setFromObject(normal.torsoHitbox).getSize(new THREE.Vector3());
+    const bruteTorso = new THREE.Box3().setFromObject(brute.torsoHitbox).getSize(new THREE.Vector3());
+    const normalHead = new THREE.Box3().setFromObject(normal.headHitbox).getSize(new THREE.Vector3());
+    const bruteHead = new THREE.Box3().setFromObject(brute.headHitbox).getSize(new THREE.Vector3());
+    expect(bruteTorso.x).toBeGreaterThan(normalTorso.x * 1.3);
+    expect(bruteTorso.y).toBeGreaterThan(normalTorso.y * 1.1);
+    expect(bruteHead.x).toBeGreaterThan(normalHead.x * 1.3);
+    expect(brute.headHitbox.geometry).toBe(normal.headHitbox.geometry);
   });
 });
