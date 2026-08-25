@@ -12,6 +12,12 @@
 - Decision histórica: seleccionar la variante al adquirir un slot y aplicar un perfil central al walker. Sustituida el 2026-08-24 por modelos independientes y reservas visuales por asset.
 - Motivo: conservar una única fuente de verdad para navegación, combate y reciclaje, evitar contadores desincronizados y mantener estable el coste por frame.
 
+## [2026-08-25] Encadenar auto-recarga desde la maquina de arma
+
+- Contexto: reequipar un arma con cargador vacio dejaba el arma en cero aunque tuviera reserva.
+- Decision: `Weapon.equip()` registra la necesidad y, al terminar `equipping`, solicita el mismo `reload()` usado por input manual y por la ultima bala.
+- Motivo: conservar Empty Reload, eventos, audio, animacion, transferencia autoritativa y cancelacion sin timers ni logica de municion duplicados.
+
 ## [2026-08-20] Mantener PWA y actualizaciones fuera del gameplay
 
 - Contexto: Zeroed debe instalarse y reutilizar assets offline sin precachear todo el peso de mapas/audio ni perder una run cuando aparece una version nueva.

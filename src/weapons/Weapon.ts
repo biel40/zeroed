@@ -31,6 +31,7 @@ export class Weapon {
   private stateTimer = 0;
   private stateDuration = 0;
   private activeReloadType: ReloadType | null = null;
+  private reloadAfterEquip = false;
   private bloom = 0;
   private prevTrigger = false;
 
@@ -117,6 +118,8 @@ export class Weapon {
 
   equip(): void {
     this.activeReloadType = null;
+    this.reloadAfterEquip =
+      this.ammoInMagazine === 0 && (this.reserveAmmo === null || this.reserveAmmo > 0);
     this.prevTrigger = false;
     this.adsAlpha = 0;
     this.bloom = 0;
@@ -142,6 +145,7 @@ export class Weapon {
     this.stateTimer = 0;
     this.stateDuration = 0;
     this.activeReloadType = null;
+    this.reloadAfterEquip = false;
     this.cooldown = 0;
     this.bloom = 0;
     this.adsAlpha = 0;
@@ -231,5 +235,9 @@ export class Weapon {
     this.stateDuration = 0;
     this.activeReloadType = null;
     if (completedState === 'cycling' && this.ammoInMagazine === 0) this.reload();
+    if (completedState === 'equipping' && this.reloadAfterEquip) {
+      this.reloadAfterEquip = false;
+      this.reload();
+    }
   }
 }

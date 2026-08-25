@@ -266,4 +266,74 @@ describe('Equip', () => {
     step(m4, m4.definition.equipTime);
     expect(m4.state).toBe('ready');
   });
+
+  it.each(['m1911', 'ak47'] as const)(
+    'starts the normal empty reload after equipping an empty %s',
+    (id) => {
+      const weapon = makeWeapon(id);
+      weapon.ammoInMagazine = 0;
+      weapon.reserveAmmo = 32;
+
+      weapon.equip();
+      expect(weapon.state).toBe('equipping');
+      expect(weapon.ammoInMagazine).toBe(0);
+
+      const equipped = step(weapon, weapon.definition.equipTime + DT);
+      expect(count(equipped.events, 'reloadStart')).toBe(1);
+      expect(weapon.state).toBe('reloading');
+      expect(weapon.reloadType).toBe('empty');
+      expect(weapon.ammoInMagazine).toBe(0);
+
+      step(weapon, weapon.definition.reloadTime + DT);
+      expect(weapon.ammoInMagazine).toBe(weapon.definition.magazineSize);
+      expect(weapon.reserveAmmo).toBe(32 - weapon.definition.magazineSize);
+      expect(weapon.state).toBe('ready');
+    },
+  );
+
+  it('does not auto-reload an empty weapon without reserve ammo', () => {
+    const m4 = new Weapon(WEAPON_DEFINITIONS.m4a1, () => 0.5, 0);
+    m4.ammoInMagazine = 0;
+    m4.equip();
+
+    const equipped = step(m4, m4.definition.equipTime + DT);
+    expect(count(equipped.events, 'reloadStart')).toBe(0);
+    expect(m4.state).toBe('ready');
+    expect(m4.ammoInMagazine).toBe(0);
+  });
+
+  it('does not auto-reload a partially loaded weapon', () => {
+    const m4 = makeWeapon('m4a1');
+    m4.ammoInMagazine = 4;
+    m4.reserveAmmo = 20;
+    m4.equip();
+
+    const equipped = step(m4, m4.definition.equipTime + DT);
+    expect(count(equipped.events, 'reloadStart')).toBe(0);
+    expect(m4.state).toBe('ready');
+    expect(m4.ammoInMagazine).toBe(4);
+    expect(m4.reserveAmmo).toBe(20);
+  });
+
+  it('cancels and safely restarts an equip-triggered reload without moving ammo early', () => {
+    const m4 = makeWeapon('m4a1');
+    m4.ammoInMagazine = 0;
+    m4.reserveAmmo = 32;
+    m4.equip();
+    step(m4, m4.definition.equipTime + DT);
+    step(m4, m4.definition.reloadTime / 2);
+
+    m4.equip();
+    m4.equip();
+    expect(m4.state).toBe('equipping');
+    expect(m4.ammoInMagazine).toBe(0);
+    expect(m4.reserveAmmo).toBe(32);
+
+    const equippedAgain = step(m4, m4.definition.equipTime + DT);
+    expect(count(equippedAgain.events, 'reloadStart')).toBe(1);
+    expect(m4.state).toBe('reloading');
+    step(m4, m4.definition.reloadTime + DT);
+    expect(m4.ammoInMagazine).toBe(30);
+    expect(m4.reserveAmmo).toBe(2);
+  });
 });
