@@ -4,7 +4,6 @@ import {
   CHAIN_RADIUS,
   CHAIN_ZAP_DAMAGE,
   selectChainTargets,
-  TESLA_UNLOCK_KILLS,
   type ChainCandidate,
 } from '../src/zombies/ZombieConfig';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
@@ -85,10 +84,6 @@ describe('selectChainTargets', () => {
 });
 
 describe('Tesla weapon tuning contract', () => {
-  it('unlocks at exactly 115 kills', () => {
-    expect(TESLA_UNLOCK_KILLS).toBe(115);
-  });
-
   it('is an energy weapon (visible bolt path) with limited ammunition', () => {
     const def = WEAPON_DEFINITIONS.tesla;
     expect(def.energy).toBeDefined();

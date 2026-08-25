@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { PlayerHealth } from '../src/game/PlayerHealth';
+import {
+  PLAYER_HIT_INVULN,
+  PLAYER_MAX_HP,
+  PLAYER_REGEN_DELAY,
+  PLAYER_REGEN_RATE,
+  ZOMBIE_ATTACK_DAMAGE,
+} from '../src/zombies/ZombieConfig';
 
 describe('PlayerHealth', () => {
+  it('survives two normal zombie hits and dies on the third', () => {
+    const health = new PlayerHealth(PLAYER_MAX_HP, PLAYER_HIT_INVULN);
+
+    health.damage(ZOMBIE_ATTACK_DAMAGE);
+    health.update(PLAYER_HIT_INVULN);
+    health.damage(ZOMBIE_ATTACK_DAMAGE);
+    expect(health.hp).toBe(ZOMBIE_ATTACK_DAMAGE);
+    expect(health.isDead).toBe(false);
+
+    health.update(PLAYER_HIT_INVULN);
+    health.damage(ZOMBIE_ATTACK_DAMAGE);
+    expect(health.hp).toBe(0);
+    expect(health.isDead).toBe(true);
+  });
+
   it('starts at full HP', () => {
     const health = new PlayerHealth(100, 0.5);
     expect(health.hp).toBe(100);
@@ -75,6 +97,28 @@ describe('PlayerHealth', () => {
   });
 
   describe('regeneration', () => {
+    it('uses the 30% shorter Zombies delay and preserves timer resets and regen rate', () => {
+      expect(PLAYER_REGEN_DELAY).toBe(2.8);
+      expect(PLAYER_REGEN_RATE).toBe(20);
+      const health = new PlayerHealth(
+        PLAYER_MAX_HP,
+        PLAYER_HIT_INVULN,
+        PLAYER_REGEN_DELAY,
+        PLAYER_REGEN_RATE,
+      );
+
+      health.damage(ZOMBIE_ATTACK_DAMAGE);
+      health.update(1);
+      health.damage(ZOMBIE_ATTACK_DAMAGE); // landed hit restarts the delay at 25 HP
+      health.update(2.79);
+      expect(health.hp).toBe(25);
+
+      health.update(0.02);
+      expect(health.hp).toBeCloseTo(25.4, 5);
+      health.update(1);
+      expect(health.hp).toBeCloseTo(45.4, 5);
+    });
+
     it('regenerates only after the delay without damage', () => {
       const health = new PlayerHealth(100, 0.5, 1, 10);
       health.damage(30); // 70 hp, invulnerable for 0.5 s

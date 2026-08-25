@@ -95,12 +95,12 @@ estados de la box (solo activa desde `closed`) evita dobles cobros.
 
 | Arma | Desbloqueo | Mecánica |
 | --- | --- | --- |
-| **ZEUS-77 Tesla** | `TESLA_UNLOCK_KILLS = 100` | Descarga que **encadena** entre zombies. |
+| **Ray Gun** | Mystery Box o `RAYGUN_UNLOCK_KILLS = 115` | Proyectil con impacto directo y splash. |
+| **ZEUS-77 Tesla** | Mystery Box legendaria, peso 3 | Descarga que **encadena** entre zombies. |
 
-El patrón de desbloqueo es idéntico para ambas: un flag `*Unlocked` en
-`ZombiesMode`, comprobado en `onZombieKilled`, que concede el arma vía
-`ctx.grantWeapon` + banner + sting, exactamente una vez por run. `restart()`
-re-arma los flags. Las energy weapons disparan un bolt visible
+Ray Gun es el único hito automático y su flag en `ZombiesMode` evita repetirlo
+durante una run. ZEUS-77 no tiene hito: es la recompensa más rara de la caja y
+su categoría legendaria se presenta con glow dorado. Las energy weapons disparan un bolt visible
 (`EnergyProjectiles`) en vez de balística hitscan; `onEnergyImpact` distingue
 Tesla de Ray Gun **por el color del bolt** (`config.color`).
 

@@ -6,13 +6,23 @@ import { buildWeaponDisplayModel } from '../weapons/WeaponView';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxEntry, MysteryBoxMachine, MysteryBoxPhase } from './MysteryBox';
 
-/** Interior glow: an arcane violet at rest, the bolt-green of the Ray Gun as a jackpot tell. */
+/** Interior glow: violet at rest, weapon-specific colors for rare results. */
 const GLOW_COLOR = 0x8f6bff;
 const RAYGUN_COLOR = WEAPON_DEFINITIONS.raygun.energy?.color ?? 0x63f2a4;
+export const LEGENDARY_MYSTERY_BOX_COLOR = 0xffc928;
 const LID_OPEN_ANGLE = -1.85;
 const ANCHOR_HEIGHT = 1.12;
 const PARTICLE_COUNT = 42;
 const PARTICLE_TOP = 1.7;
+
+export function getMysteryBoxResultColor(
+  weaponId: WeaponId,
+  rarity: MysteryBoxEntry['rarity'] | undefined,
+): number {
+  if (rarity === 'legendary') return LEGENDARY_MYSTERY_BOX_COLOR;
+  if (weaponId === 'raygun' && rarity === 'rare') return RAYGUN_COLOR;
+  return GLOW_COLOR;
+}
 
 /**
  * The Mystery Box prop: an original design — a weathered plank crate with a
@@ -32,6 +42,7 @@ export class MysteryBoxView {
   private readonly seamMaterials: THREE.MeshStandardMaterial[] = [];
   private readonly anchor = new THREE.Group();
   private readonly displays = new Map<WeaponId, THREE.Object3D>();
+  private readonly rarityByWeapon = new Map<WeaponId, MysteryBoxEntry['rarity']>();
   private readonly particles: THREE.Points;
   private readonly particleMaterial: THREE.PointsMaterial;
   private lidOpen = 0;
@@ -131,6 +142,7 @@ export class MysteryBoxView {
     this.anchor.visible = false;
     this.group.add(this.anchor);
     for (const entry of pool) {
+      this.rarityByWeapon.set(entry.weaponId, entry.rarity);
       const display = buildWeaponDisplayModel(
         WEAPON_DEFINITIONS[entry.weaponId],
         assets.getWeaponModel(entry.weaponId),
@@ -171,9 +183,15 @@ export class MysteryBoxView {
     this.lidOpen = damp(this.lidOpen, lidTarget, 7, dt);
     this.lid.rotation.x = this.lidOpen * LID_OPEN_ANGLE;
 
-    // Jackpot tell: the Ray Gun turns the whole glow bolt-green.
-    const jackpot = machine.displayWeapon === 'raygun' && (phase === 'rolling' || phase === 'awaitingPickup');
-    const color = jackpot ? RAYGUN_COLOR : GLOW_COLOR;
+    // Rare results override the roulette violet; legendary rewards burn gold.
+    const highlighted = phase === 'rolling' || phase === 'awaitingPickup';
+    const rarity = highlighted && machine.displayWeapon
+      ? this.rarityByWeapon.get(machine.displayWeapon)
+      : undefined;
+    const jackpot = rarity === 'rare' || rarity === 'legendary';
+    const color = machine.displayWeapon
+      ? getMysteryBoxResultColor(machine.displayWeapon, rarity)
+      : GLOW_COLOR;
     this.glowLight.color.setHex(color);
     this.interiorMaterial.emissive.setHex(color);
     this.particleMaterial.color.setHex(color);

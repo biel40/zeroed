@@ -16,7 +16,7 @@ ZombiesMode <- impactos <- HitTarget / entorno / Zombie
        -> RoundManager -> ZombieManager -> ZombiePool
        -> ZombieArena -> spawns/colliders/transiciones
        -> interacciones -> barreras/puertas/wall buys/pickups/Mystery Box
-       -> bajas -> hitos Ray Gun/ZEUS-77
+       -> bajas -> hito Ray Gun (115)
 ```
 
 ## Shell compartido
@@ -44,7 +44,7 @@ Impacto en Zombie
   -> dano torso/cabeza
   -> PlayerEconomy: hit o baja
   -> contador de bajas
-  -> hitos: Ray Gun (75), ZEUS-77 (115)
+  -> hito: Ray Gun (115)
 
 Points
   -> PointDoor -> zonas, colliders y spawns activos
@@ -74,6 +74,7 @@ Points
 - Las transiciones con rampa reutilizan sus extremos como portales del A* y steering; en la aproximacion y pendiente, `ZombieManager` centra la horda y mantiene separacion longitudinal para que el corredor conecte plantas sin wall-following, recalculos ni teletransporte.
 - `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
 - `ZombieFootsteps` da pasos posicionales 3D: un unico `AudioListener` en la camara (sobre el AudioContext compartido de `AudioSystem`) y un pool de 8 `PositionalAudio` reasignados cada 0.25 s a los zombies vivos mas cercanos; la cadencia sale de la velocidad medida y solo suenan en `walk` con desplazamiento real.
+- La Mystery Box pondera sus resultados por rareza: ZEUS-77 es legendaria, aparece con glow dorado y peso 3 frente al peso 10 de Ray Gun; Ray Gun sigue garantizada al alcanzar 115 bajas.
 
 ## Armas especiales
 

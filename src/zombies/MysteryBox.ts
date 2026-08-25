@@ -2,22 +2,26 @@ import { lerp } from '../utils/math';
 import type { WeaponId } from '../weapons/WeaponTypes';
 
 /** One weapon on the Mystery Box wheel; weights are relative, not percent. */
+export type MysteryBoxRarity = 'standard' | 'rare' | 'legendary';
+
 export interface MysteryBoxEntry {
   readonly weaponId: WeaponId;
   readonly weight: number;
+  readonly rarity: MysteryBoxRarity;
 }
 
 /**
  * The wheel. The M1911 is deliberately NOT here: it is the starting pistol,
- * not a reward. The Ray Gun is the rare pull — lower its weight (e.g. to
- * 5–7 % of the total) here, never by touching the selection logic.
+ * not a reward. Wonder Weapons are rare pulls; tune their relative weights
+ * here, never by touching the selection logic.
  */
 export const MYSTERY_BOX_POOL: readonly MysteryBoxEntry[] = [
-  { weaponId: 'm4a1', weight: 25 },
-  { weaponId: 'ak47', weight: 25 },
-  { weaponId: 'm60', weight: 20 },
-  { weaponId: 'l96', weight: 20 },
-  { weaponId: 'raygun', weight: 10 },
+  { weaponId: 'm4a1', weight: 25, rarity: 'standard' },
+  { weaponId: 'ak47', weight: 25, rarity: 'standard' },
+  { weaponId: 'm60', weight: 20, rarity: 'standard' },
+  { weaponId: 'l96', weight: 20, rarity: 'standard' },
+  { weaponId: 'raygun', weight: 10, rarity: 'rare' },
+  { weaponId: 'tesla', weight: 3, rarity: 'legendary' },
 ];
 
 /** Timings (seconds) and behaviour knobs of the box sequence. */

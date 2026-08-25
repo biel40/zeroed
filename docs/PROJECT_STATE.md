@@ -11,7 +11,7 @@ Estado inspeccionado: 2026-08-24. La fuente de verdad es el codigo actual; `READ
 - Balistica con gravedad/drag, raycast segmentado, prioridad de hitbox de cabeza y confirmacion visual/sonora especifica de headshot (`src/shooting/`, `src/modes/ZombiesMode.ts`, `src/ui/HUD.ts`, `src/audio/AudioSystem.ts`).
 - Zombies `normal`, `shiny` y `brute` definidos mediante un registro extensible de tipos/modelos; Brute usa un GLB y clips originales, reservas visuales por modelo y máximo derivado de dos bajo el límite global de 24. Todos comparten combate y navegación con steering local, rutas de recuperación y failsafe (`src/modes/ZombiesMode.ts`, `src/zombies/`).
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
-- Ray Gun con proyectil y splash; ZEUS-77 con cadena electrica; desbloqueos por bajas y pickups de ambas armas en el bunker.
+- Ray Gun con proyectil y splash, garantizada a 115 bajas; ZEUS-77 con cadena electrica y resultado legendario raro de Mystery Box. Ambas mantienen pickups en el bunker.
 - Pasos de zombie posicionales 3D con pool de 8 fuentes sobre un unico `AudioListener`, prioridad al mas cercano y asset opcional con fallback sintetizado (`src/zombies/ZombieFootsteps.ts`).
 - Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, bunker ampliado con rellano inferior despejado, escalera continua con costados solidos compartida por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
 - Suite Vitest de logica determinista y contratos estaticos PWA; `npm run typecheck` y la validacion completa pasan.

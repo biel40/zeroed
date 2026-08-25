@@ -6,10 +6,12 @@ import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_RECOVERY,
+  ZOMBIE_BARRIER_ATTACK_RECOVERY,
   ZOMBIE_CORPSE_LINGER,
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
   ZOMBIE_SPAWN_DURATION,
+  ZOMBIE_SPECIAL_ATTACK_RECOVERY,
 } from '../src/zombies/ZombieConfig';
 
 const DT = 1 / 60;
@@ -132,6 +134,36 @@ describe('Zombie attacks', () => {
     expect(zombie.tryAttack()).toBe(false); // still recovering
     step(zombie, ZOMBIE_ATTACK_RECOVERY);
     expect(zombie.tryAttack()).toBe(true);
+  });
+
+  it('reduces the normal attack cycle by 25% without changing dodge timing', () => {
+    expect(ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY).toBeCloseTo(1.45 * 0.75, 6);
+    expect(ZOMBIE_ATTACK_HIT_MOMENT).toBe(0.475);
+  });
+
+  it('preserves the attack recovery of special zombies', () => {
+    for (const typeId of ['shiny', 'brute'] as const) {
+      const zombie = new Zombie(
+        new ZombieVisual(typeId === 'brute' ? 'brute' : 'walker', null, 0xa8b89a),
+      );
+      zombie.spawn(0, -20, 100, 1.9, 0, 0, typeId);
+      step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+      expect(zombie.tryAttack()).toBe(true);
+      step(zombie, ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY);
+      expect(zombie.tryAttack()).toBe(false);
+      step(zombie, ZOMBIE_SPECIAL_ATTACK_RECOVERY - ZOMBIE_ATTACK_RECOVERY + 0.05);
+      expect(zombie.tryAttack()).toBe(true);
+    }
+  });
+
+  it('uses the slightly longer recovery only between barrier attacks', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    expect(zombie.tryBarrierAttack()).toBe(true);
+    step(zombie, ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY);
+    expect(zombie.tryBarrierAttack()).toBe(false);
+    step(zombie, ZOMBIE_BARRIER_ATTACK_RECOVERY - ZOMBIE_ATTACK_RECOVERY + 0.05);
+    expect(zombie.tryBarrierAttack()).toBe(true);
   });
 
   it('cannot attack while dead', () => {

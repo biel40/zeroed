@@ -476,7 +476,6 @@ export class BurnedMansionArena implements ZombieArena {
   private buildProps(): void {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
     this.addProp('burned-sofa', -5.5, 0.35, 8.8, 1.8, 0.7, 0.65, this.materials.charredWood);
-    this.addProp('box-room-cabinet', -5.8, 0.8, -1.2, 1.2, 1.6, 0.5, this.materials.charredWood);
     this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
   }
 

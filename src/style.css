@@ -336,23 +336,58 @@ body {
 #hud-zombies {
   right: 24px;
   bottom: 24px;
-  min-width: 190px;
+  width: clamp(210px, 18vw, 270px);
+  min-width: 0;
+  padding: 15px 18px 14px;
+  overflow: hidden;
+  border: 1px solid rgba(118, 105, 90, 0.28);
+  border-left: 3px solid rgba(117, 20, 15, 0.78);
+  border-radius: 0;
+  clip-path: polygon(2% 0, 97% 2%, 100% 12%, 98% 92%, 91% 100%, 4% 97%, 0 84%, 1% 9%);
+  background:
+    linear-gradient(112deg, transparent 22%, rgba(255, 255, 255, 0.025) 22.5%, transparent 23%),
+    linear-gradient(24deg, transparent 68%, rgba(123, 17, 12, 0.12) 69%, transparent 72%),
+    radial-gradient(circle at 82% 18%, rgba(99, 19, 14, 0.2), transparent 34%),
+    rgba(8, 9, 9, 0.82);
+  box-shadow:
+    inset 0 0 28px rgba(0, 0, 0, 0.8),
+    inset 3px 0 12px rgba(98, 12, 8, 0.16),
+    0 8px 26px rgba(0, 0, 0, 0.48);
+  text-shadow: 0 1px 2px #000;
+}
+
+#hud-zombies::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.32;
+  background:
+    repeating-linear-gradient(167deg, transparent 0 16px, rgba(210, 199, 176, 0.08) 17px, transparent 18px 31px),
+    repeating-linear-gradient(93deg, transparent 0 46px, rgba(0, 0, 0, 0.3) 47px 49px);
+  mix-blend-mode: screen;
 }
 
 #z-round {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: #ff8a5c;
-  margin-bottom: 6px;
+  position: relative;
+  font-size: 18px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.18em;
+  color: #d8c5a3;
+  margin-bottom: 5px;
+  text-shadow: 2px 2px 0 #35100d, 0 0 8px rgba(145, 28, 20, 0.45);
 }
 
 #z-points {
+  position: relative;
   font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #ffd25c;
-  margin-bottom: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #c8a75d;
+  margin-bottom: 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(139, 35, 27, 0.42);
 }
 
 /* Purchase refused: a quick red flash on the points counter. */
@@ -367,24 +402,57 @@ body {
   75% { color: #ff5c5c; transform: translateX(-2px); }
 }
 
+#z-health {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+#z-health .hud-label {
+  display: block;
+  margin-bottom: 4px;
+  color: #aaa396;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
 #z-hp-bar {
-  height: 5px;
-  margin: 4px 0 8px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
+  height: 7px;
+  background: rgba(1, 3, 2, 0.82);
+  border: 1px solid rgba(178, 167, 143, 0.25);
+  transform: skewX(-7deg);
   overflow: hidden;
+  box-shadow: inset 0 1px 3px #000, 0 0 5px rgba(0, 0, 0, 0.8);
 }
 
 #z-hp-fill {
   display: block;
   height: 100%;
   width: 100%;
-  background: #7fd06a;
+  background: linear-gradient(90deg, #486f3a, #7aa85c 72%, #a4c979);
+  box-shadow: 0 0 7px rgba(111, 164, 77, 0.48);
   transition: width 0.15s ease;
 }
 
 #z-hp-fill.low {
-  background: #ff5b4d;
+  background: linear-gradient(90deg, #68120e, #b52a20 70%, #e04a37);
+  box-shadow: 0 0 8px rgba(191, 35, 25, 0.75);
+}
+
+#hud-zombies .hud-row {
+  position: relative;
+  padding-top: 4px;
+  color: #d2cec4;
+  font-weight: 700;
+}
+
+#hud-zombies .hud-row + .hud-row {
+  margin-top: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+#hud-zombies .hud-label {
+  color: #85817a;
 }
 
 #round-banner {
@@ -452,10 +520,23 @@ body {
   inset: 0;
   pointer-events: none;
   opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(80, 0, 0, 0.08) 10%, rgba(180, 12, 6, 0.55) 100%);
+  transition: opacity 0.18s ease-out;
+}
+
+#damage-overlay.lethal {
+  opacity: 0.58;
+}
+
+#damage-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
   background: radial-gradient(ellipse at center, transparent 42%, rgba(200, 20, 10, 0.5) 100%);
 }
 
-#damage-overlay.active {
+#damage-overlay.active::after {
   animation: damageflash 0.45s ease-out forwards;
 }
 
@@ -895,9 +976,12 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled .hud-label { font-size: 8px; }
   html.touch-controls-enabled #hud-weapon-name { font-size: 10px; letter-spacing: 0.08em; }
   html.touch-controls-enabled #hud-ammo { font-size: 17px; margin: 0; }
-  html.touch-controls-enabled #hud-zombies { max-width: 120px; }
+  html.touch-controls-enabled #hud-zombies { max-width: 120px; padding: 7px 9px 6px; }
   html.touch-controls-enabled #z-round { font-size: 11px; letter-spacing: 0.08em; margin-bottom: 2px; }
-  html.touch-controls-enabled #z-hp-bar { height: 3px; margin: 2px 0 3px; }
+  html.touch-controls-enabled #z-points { font-size: 10px; margin-bottom: 4px; padding-bottom: 3px; }
+  html.touch-controls-enabled #z-health { margin-bottom: 4px; }
+  html.touch-controls-enabled #z-health .hud-label { font-size: 7px; margin-bottom: 2px; }
+  html.touch-controls-enabled #z-hp-bar { height: 3px; }
   html.touch-controls-enabled #banner-title { font-size: 26px; letter-spacing: 0.2em; }
   html.touch-controls-enabled #banner-sub { font-size: 11px; letter-spacing: 0.25em; }
   html.touch-controls-enabled #interact-prompt { top: 56%; font-size: 13px; letter-spacing: 0.16em; }
@@ -907,6 +991,7 @@ html.touch-controls-enabled .start-panel {
 
 @media (orientation: landscape) and (max-height: 480px) {
   html.touch-controls-enabled .hud-panel { padding: 4px 7px; }
+  html.touch-controls-enabled #hud-zombies { width: 150px; padding: 6px 9px; }
   html.touch-controls-enabled .hud-row-secondary { display: none; }
   html.touch-controls-enabled .hud-row { font-size: 10px; }
   html.touch-controls-enabled #hud-ammo { font-size: 15px; margin: 0; }

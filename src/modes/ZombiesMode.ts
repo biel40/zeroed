@@ -20,7 +20,7 @@ import {
   PLAYER_REGEN_DELAY,
   PLAYER_REGEN_RATE,
   RAYGUN_UNLOCK_KILLS,
-  TESLA_UNLOCK_KILLS,
+  ZOMBIE_ATTACK_DAMAGE,
   ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
@@ -92,7 +92,6 @@ export class ZombiesMode implements GameMode {
   private kills = 0;
   private headshots = 0;
   private rayGunUnlocked = false;
-  private teslaUnlocked = false;
   private godModeEnabled = false;
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private gameOver = false;
@@ -323,7 +322,6 @@ export class ZombiesMode implements GameMode {
       if (this.ctx.grantWeapon(pickup.weaponId)) {
         pickup.claim();
         if (pickup.weaponId === 'raygun') this.rayGunUnlocked = true;
-        if (pickup.weaponId === 'tesla') this.teslaUnlocked = true;
         this.ctx.audio.playMysteryBoxPickup();
         this.pushHudState();
       } else {
@@ -454,7 +452,11 @@ export class ZombiesMode implements GameMode {
           this.ctx.audio.playMysteryBoxTick();
           break;
         case 'result':
-          this.ctx.audio.playMysteryBoxReveal(event.weaponId === 'raygun');
+          this.ctx.audio.playMysteryBoxReveal(
+            MYSTERY_BOX_POOL.some(
+              (entry) => entry.weaponId === event.weaponId && entry.rarity !== 'standard',
+            ),
+          );
           break;
         case 'pickedUp':
           this.ctx.audio.playMysteryBoxPickup();
@@ -760,25 +762,11 @@ export class ZombiesMode implements GameMode {
     // never stack for one death. Splash/chain kills arrive here too, so all
     // kill points flow through this single call.
     this.economy.awardKill(headshot);
-    if (!this.teslaUnlocked && this.kills >= TESLA_UNLOCK_KILLS) this.unlockTesla();
     if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) this.unlockRayGun();
   }
 
   /**
-   * 115-kill milestone: the ZEUS-77 is granted outright (the inventory's
-   * slot-cap rules apply), announced with the round banner and an electric
-   * sting. The flag makes the handout fire exactly once per run; restart()
-   * re-arms it. Same proven pattern as the Ray Gun milestone below.
-   */
-  private unlockTesla(): void {
-    this.teslaUnlocked = true;
-    this.ctx.grantWeapon('tesla');
-    this.ctx.hud.showRoundBanner('ZEUS-77 UNLOCKED', `${TESLA_UNLOCK_KILLS} KILLS`);
-    this.ctx.audio.playTeslaUnlock();
-  }
-
-  /**
-   * 75-kill milestone: the Ray Gun is granted outright (the inventory's
+   * 115-kill milestone: the Ray Gun is granted outright (the inventory's
    * slot-cap rules apply), announced with the round banner and the box's
    * Ray Gun reveal sting. The flag makes the handout fire exactly once per
    * run; restart() re-arms it.
@@ -796,7 +784,6 @@ export class ZombiesMode implements GameMode {
 
   private activateGodMode(): void {
     this.godModeEnabled = true;
-    this.teslaUnlocked = true;
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
     this.ctx.grantWeapon('tesla');
@@ -918,7 +905,6 @@ export class ZombiesMode implements GameMode {
     this.kills = 0;
     this.headshots = 0;
     this.rayGunUnlocked = false;
-    this.teslaUnlocked = false;
     this.godModeEnabled = false;
     this.godModeCommand.reset();
     this.economy.reset();
@@ -974,6 +960,7 @@ export class ZombiesMode implements GameMode {
       round: this.rounds.round,
       hp: this.health.hp,
       maxHp: this.health.maxHp,
+      lethalHitDamage: ZOMBIE_ATTACK_DAMAGE,
       kills: this.kills,
       headshots: this.headshots,
       points: this.economy.points,

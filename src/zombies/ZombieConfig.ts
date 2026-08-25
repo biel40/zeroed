@@ -18,11 +18,12 @@ export const MAX_ALIVE = 24;
 export const ZOMBIE_BASE_HP = 100;
 /** Walk speed in m/s at round 1. */
 export const ZOMBIE_BASE_SPEED = 1.9;
-/**
- * Damage per landed attack. 25 HP means four clean hits kill a full-health
- * player: reaching the player must be genuinely dangerous.
- */
+/** Damage per landed attack. Three clean hits kill a full-health player. */
 export const ZOMBIE_ATTACK_DAMAGE = 25;
+/** Normal-zombie recovery; 0.75 s attack + 0.3375 s recovery is 25% below 1.45 s. */
+export const ZOMBIE_ATTACK_RECOVERY = 0.3375;
+/** Preserve the established attack cadence of special zombies. */
+export const ZOMBIE_SPECIAL_ATTACK_RECOVERY = 0.7;
 export const SHINY_ZOMBIE_CHANCE = 0.005;
 export const MAX_ACTIVE_BRUTES = 2;
 
@@ -36,6 +37,7 @@ export interface ZombieTypeConfig {
   readonly healthMultiplier: number;
   readonly speedMultiplier: number;
   readonly damageMultiplier: number;
+  readonly attackRecovery: number;
   readonly bodyScale: readonly [number, number, number];
   readonly hitboxScale: readonly [number, number, number];
   readonly bodyRadius: number;
@@ -58,6 +60,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     healthMultiplier: 1,
     speedMultiplier: 1,
     damageMultiplier: 1,
+    attackRecovery: ZOMBIE_ATTACK_RECOVERY,
     bodyScale: [1, 1, 1],
     hitboxScale: [1, 1, 1],
     bodyRadius: 0.42,
@@ -69,6 +72,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     healthMultiplier: 1,
     speedMultiplier: 1,
     damageMultiplier: 1,
+    attackRecovery: ZOMBIE_SPECIAL_ATTACK_RECOVERY,
     bodyScale: [1, 1, 1],
     hitboxScale: [1, 1, 1],
     bodyRadius: 0.42,
@@ -81,6 +85,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     healthMultiplier: 3,
     speedMultiplier: 0.72,
     damageMultiplier: 1.15,
+    attackRecovery: ZOMBIE_SPECIAL_ATTACK_RECOVERY,
     bodyScale: [1, 1, 1],
     hitboxScale: [1.35, 1.15, 1.18],
     // Kept conservative so mansion doors and stairs remain navigable.
@@ -124,8 +129,8 @@ export const ZOMBIE_ATTACK_RANGE = 1.9;
 export const ZOMBIE_BARRIER_ATTACK_DAMAGE = 50;
 /** Distance at which a zombie starts attacking a barrier board. */
 export const ZOMBIE_BARRIER_ATTACK_RANGE = 1.2;
-/** Seconds between the end of one attack and the next wind-up. */
-export const ZOMBIE_ATTACK_RECOVERY = 0.7;
+/** Slightly longer recovery between board hits: ~2 s per five-board window. */
+export const ZOMBIE_BARRIER_ATTACK_RECOVERY = 0.92;
 /** Zombies closer than this push each other apart (soft separation). */
 export const ZOMBIE_SEPARATION_RADIUS = 1.15;
 
@@ -177,17 +182,10 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
 };
 
 /**
- * Kills that auto-unlock the Ray Gun. 75 makes it the first wonder-weapon
- * milestone: an early-to-mid-run raw-damage spike.
+ * Kills that auto-unlock the Ray Gun. Element 115 is the sole weapon milestone;
+ * ZEUS-77 is instead a legendary Mystery Box pull.
  */
-export const RAYGUN_UNLOCK_KILLS = 75;
-
-/**
- * Kills that auto-unlock the ZEUS-77 "Tempest Coil". 115 — the Element 115
- * nod — keeps the Tesla as the late-run horde-control capstone, after the
- * Ray Gun.
- */
-export const TESLA_UNLOCK_KILLS = 115;
+export const RAYGUN_UNLOCK_KILLS = 115;
 
 /**
  * Maximum zombies one Tesla shot can electrocute, impact included. 20 out of
@@ -256,7 +254,7 @@ export function selectChainTargets(
   return chain;
 }
 
-export const PLAYER_MAX_HP = 100;
+export const PLAYER_MAX_HP = ZOMBIE_ATTACK_DAMAGE * 3;
 /**
  * Brief invulnerability window after taking a hit, seconds. Long enough to
  * prevent a surrounding horde from deleting the player in a single frame,
@@ -265,10 +263,10 @@ export const PLAYER_MAX_HP = 100;
 export const PLAYER_HIT_INVULN = 0.45;
 /**
  * Seconds without taking damage before regeneration kicks in. Longer than
- * the full zombie attack cycle (~1.6 s), so regen never starts mid-brawl.
+ * the full normal-zombie attack cycle (~1.09 s), so regen never starts mid-brawl.
  */
-export const PLAYER_REGEN_DELAY = 4;
-/** HP regenerated per second once the delay elapses: 0 → 100 in 5 s. */
+export const PLAYER_REGEN_DELAY = 2.8;
+/** HP regenerated per second once the delay elapses: 0 -> max HP in 3.75 s. */
 export const PLAYER_REGEN_RATE = 20;
 
 export interface RoundConfig {

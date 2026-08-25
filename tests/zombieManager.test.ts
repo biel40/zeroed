@@ -234,7 +234,7 @@ describe('ZombieManager movement', () => {
     manager.onPlayerAttack = (amount) => {
       damage += amount;
     };
-    // Spawn rise (1.1 s) + wind-up (0.57 s) → exactly one hit in 2 seconds.
+    // Spawn rise (1.1 s) + wind-up (0.475 s) -> exactly one hit in 2 seconds.
     step(manager, 2);
     expect(damage).toBe(ZOMBIE_ATTACK_DAMAGE);
   });

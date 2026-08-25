@@ -17,6 +17,9 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-25 — Sala Mystery Box despejada y rondas romanas](2026-08-25-mansion-cabinet-roman-rounds.md)
+- [2026-08-25 — Rediseño del HUD de salud Zombies](2026-08-25-zombies-hud-health-redesign.md)
+- [2026-08-25 — Progresion Ray Gun y ZEUS-77 legendaria](2026-08-25-wonder-weapon-progression.md)
 - [2026-08-24 — Asset Brute y catálogo extensible de zombies](2026-08-24-brute-asset-zombie-types.md)
 - [2026-08-23 — Variantes de zombie Shiny y Brute](2026-08-23-zombie-variants.md)
 - [2026-08-23 — Recargas visuales sin manos del jugador](2026-08-23-weapon-reloads.md)

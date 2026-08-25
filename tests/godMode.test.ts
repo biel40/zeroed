@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
+import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
 
 describe('Zombies GOD_MODE developer command', () => {
   it('activates once after MOTDRULES and grants an infinite-ammo Zeus', () => {
@@ -46,7 +47,7 @@ describe('Zombies GOD_MODE developer command', () => {
       economy: { spend: (cost: number) => boolean; points: number };
     }).economy;
     expect(health.damage(1000)).toBe(false);
-    expect(health.hp).toBe(100);
+    expect(health.hp).toBe(PLAYER_MAX_HP);
     expect(economy.spend(5000)).toBe(true);
     expect(economy.points).toBe(0);
   });

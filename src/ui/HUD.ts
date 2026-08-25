@@ -6,6 +6,7 @@ export interface ZombieHudState {
   readonly round: number;
   readonly hp: number;
   readonly maxHp: number;
+  readonly lethalHitDamage: number;
   readonly kills: number;
   readonly headshots: number;
   readonly points: number;
@@ -15,6 +16,36 @@ export interface GameOverStats {
   readonly round: number;
   readonly kills: number;
   readonly headshots: number;
+}
+
+const ROMAN_NUMERALS: readonly (readonly [number, string])[] = [
+  [1000, 'M'],
+  [900, 'CM'],
+  [500, 'D'],
+  [400, 'CD'],
+  [100, 'C'],
+  [90, 'XC'],
+  [50, 'L'],
+  [40, 'XL'],
+  [10, 'X'],
+  [9, 'IX'],
+  [5, 'V'],
+  [4, 'IV'],
+  [1, 'I'],
+];
+
+/** Roman rounds stay compact through 3999; extreme endless rounds fall back safely. */
+export function formatRomanRound(round: number): string {
+  if (!Number.isInteger(round) || round < 1 || round > 3999) return `${round}`;
+  let remaining = round;
+  let result = '';
+  for (const [value, numeral] of ROMAN_NUMERALS) {
+    while (remaining >= value) {
+      result += numeral;
+      remaining -= value;
+    }
+  }
+  return result;
 }
 
 function mustGet(id: string): HTMLElement {
@@ -42,7 +73,6 @@ export class HUD {
   private readonly zombiesPanel = mustGet('hud-zombies');
   private readonly zRound = mustGet('z-round');
   private readonly zPoints = mustGet('z-points');
-  private readonly zHp = mustGet('z-hp');
   private readonly zHpFill = mustGet('z-hp-fill');
   private readonly zKills = mustGet('z-kills');
   private readonly zHeadshots = mustGet('z-headshots');
@@ -135,15 +165,18 @@ export class HUD {
 
   /** Zombies panel; the whole block only re-renders when something changed. */
   updateZombies(state: ZombieHudState): void {
-    const key = `${state.round}|${state.hp}|${state.kills}|${state.headshots}|${state.points}`;
+    const key = `${state.round}|${state.hp}|${state.maxHp}|${state.lethalHitDamage}|${state.kills}|${state.headshots}|${state.points}`;
     if (key === this.lastZombies) return;
     this.lastZombies = key;
-    this.zRound.textContent = state.round > 0 ? `ROUND ${state.round}` : 'GET READY';
+    this.zRound.textContent = state.round > 0 ? `ROUND ${formatRomanRound(state.round)}` : 'GET READY';
     this.zPoints.textContent = `${state.points} PTS`;
-    this.zHp.textContent = `${Math.ceil(state.hp)}`;
     const ratio = clamp(state.hp / state.maxHp, 0, 1);
     this.zHpFill.style.width = `${ratio * 100}%`;
     this.zHpFill.classList.toggle('low', ratio <= 0.3);
+    this.damageOverlay.classList.toggle(
+      'lethal',
+      state.hp > 0 && state.hp <= state.lethalHitDamage,
+    );
     this.zKills.textContent = `${state.kills}`;
     this.zHeadshots.textContent = `${state.headshots}`;
   }

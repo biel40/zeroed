@@ -12,6 +12,11 @@ function ruleIndex(selector: string): number {
 }
 
 describe('mobile stylesheet cascade', () => {
+  it('uses the health bar without rendering a numeric HP value', () => {
+    expect(html).toContain('id="z-hp-bar"');
+    expect(html).not.toContain('id="z-hp"');
+  });
+
   /**
    * The mobile overrides target the same ids as the desktop rules, so they
    * carry identical specificity and only source order decides the winner.

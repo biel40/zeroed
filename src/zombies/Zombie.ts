@@ -5,6 +5,7 @@ import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_RECOVERY,
+  ZOMBIE_BARRIER_ATTACK_RECOVERY,
   ZOMBIE_CORPSE_LINGER,
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
@@ -79,6 +80,7 @@ export class Zombie implements HitTarget {
   private stateTimer = 0;
   private attackCooldown = 0;
   private attackApplied = false;
+  private attackRecovery = ZOMBIE_ATTACK_RECOVERY;
   private readonly torsoBaseScale = new THREE.Vector3();
   private readonly headBaseScale = new THREE.Vector3();
 
@@ -133,6 +135,7 @@ export class Zombie implements HitTarget {
     this.typeId = typeId;
     this.attackDamage = attackDamage;
     const profile = ZOMBIE_TYPE_CONFIGS[typeId];
+    this.attackRecovery = profile.attackRecovery;
     this.bodyRadius = profile.bodyRadius;
     this.visual.setZombieType(typeId);
     this.applyHitboxProfile(profile.bodyScale, profile.hitboxScale);
@@ -203,7 +206,7 @@ export class Zombie implements HitTarget {
     this.state = 'attack';
     this.stateTimer = ZOMBIE_ATTACK_DURATION;
     this.attackApplied = false;
-    this.attackCooldown = ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY;
+    this.attackCooldown = ZOMBIE_ATTACK_DURATION + this.attackRecovery;
     this.visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
     this.visual.setState('attack');
     return true;
@@ -215,7 +218,7 @@ export class Zombie implements HitTarget {
     this.state = 'barrierAttack';
     this.stateTimer = ZOMBIE_ATTACK_DURATION;
     this.attackApplied = false;
-    this.attackCooldown = ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY;
+    this.attackCooldown = ZOMBIE_ATTACK_DURATION + ZOMBIE_BARRIER_ATTACK_RECOVERY;
     this.visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
     this.visual.setState('barrierAttack');
     return true;

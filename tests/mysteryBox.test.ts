@@ -9,6 +9,10 @@ import {
   type MysteryBoxEventType,
 } from '../src/zombies/MysteryBox';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
+import {
+  getMysteryBoxResultColor,
+  LEGENDARY_MYSTERY_BOX_COLOR,
+} from '../src/zombies/MysteryBoxView';
 
 const DT = 1 / 60;
 
@@ -36,9 +40,9 @@ function roll(machine: MysteryBoxMachine): WeaponId {
 }
 
 describe('Mystery Box pool', () => {
-  it('contains exactly M4A1, AK-47, M60, L96 and the Ray Gun', () => {
+  it('contains the standard weapons, Ray Gun and ZEUS-77', () => {
     expect(MYSTERY_BOX_POOL.map((entry) => entry.weaponId).sort()).toEqual(
-      ['ak47', 'l96', 'm4a1', 'm60', 'raygun'].sort(),
+      ['ak47', 'l96', 'm4a1', 'm60', 'raygun', 'tesla'].sort(),
     );
   });
 
@@ -46,11 +50,22 @@ describe('Mystery Box pool', () => {
     expect(MYSTERY_BOX_POOL.some((entry) => entry.weaponId === 'm1911')).toBe(false);
   });
 
-  it('makes the Ray Gun clearly the rarest pull', () => {
+  it('makes ZEUS-77 a legendary pull rarer than the Ray Gun', () => {
+    const tesla = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'tesla');
     const raygun = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'raygun');
-    const others = MYSTERY_BOX_POOL.filter((entry) => entry.weaponId !== 'raygun');
+    expect(tesla).toMatchObject({ weight: 3, rarity: 'legendary' });
+    expect(raygun).toMatchObject({ weight: 10, rarity: 'rare' });
+    expect(tesla!.weight).toBeLessThan(raygun!.weight);
+    const others = MYSTERY_BOX_POOL.filter((entry) => entry.rarity === 'standard');
     expect(raygun).toBeDefined();
     for (const entry of others) expect(raygun!.weight).toBeLessThan(entry.weight);
+  });
+
+  it('maps the legendary ZEUS-77 reveal to gold', () => {
+    const tesla = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'tesla')!;
+    expect(getMysteryBoxResultColor(tesla.weaponId, tesla.rarity)).toBe(
+      LEGENDARY_MYSTERY_BOX_COLOR,
+    );
   });
 });
 
@@ -58,13 +73,14 @@ describe('pickWeighted (deterministic, injected rng)', () => {
   const pool = MYSTERY_BOX_POOL;
 
   it('maps the roll onto cumulative weights', () => {
-    // Total weight 100: [0..25) m4a1, [25..50) ak47, [50..70) m60, [70..90) l96, [90..100) raygun.
+    // Total 103: 25/25/20/20/10/3, with ZEUS-77 occupying the final 3-weight slice.
     expect(pickWeighted(pool, () => 0)).toBe('m4a1');
-    expect(pickWeighted(pool, () => 0.2499)).toBe('m4a1');
+    expect(pickWeighted(pool, () => 0.24)).toBe('m4a1');
     expect(pickWeighted(pool, () => 0.25)).toBe('ak47');
     expect(pickWeighted(pool, () => 0.55)).toBe('m60');
     expect(pickWeighted(pool, () => 0.75)).toBe('l96');
-    expect(pickWeighted(pool, () => 0.9999)).toBe('raygun');
+    expect(pickWeighted(pool, () => 0.95)).toBe('raygun');
+    expect(pickWeighted(pool, () => 0.9999)).toBe('tesla');
   });
 
   it('dampens the previous result without making it impossible', () => {
@@ -82,7 +98,7 @@ describe('pickWeighted (deterministic, injected rng)', () => {
   });
 
   it('falls back to the last entry when the roll lands on the exact total', () => {
-    expect(pickWeighted(pool, () => 1)).toBe('raygun');
+    expect(pickWeighted(pool, () => 1)).toBe('tesla');
   });
 });
 

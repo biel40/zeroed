@@ -441,7 +441,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    * A slow, visible arc bolt: the zombie it strikes is electrocuted and the
    * charge chains to up to CHAIN_MAX_TARGETS nearby zombies (see
    * ZombieConfig.selectChainTargets). Very high damage, scarce ammunition.
-   * Only unlocked at the TESLA_UNLOCK_KILLS milestone; never in the box.
+   * A legendary, very rare Mystery Box pull with scarce ammunition.
    */
   tesla: {
     id: 'tesla',
@@ -524,11 +524,11 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96', 
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
- * pistol plus the whole Mystery Box pool and the milestone unlocks — so
+ * pistol plus the whole Mystery Box pool and the Ray Gun milestone — so
  * rolls and unlocks never touch the network. This is NOT the slot list:
  * the zombies inventory starts with the M1911 alone (see
- * ZombiesMode.startingInventory); the Ray Gun comes from the Mystery Box
- * and the ZEUS-77 from the 100-kill milestone.
+ * ZombiesMode.startingInventory); both Wonder Weapons can come from the
+ * Mystery Box, while the Ray Gun is also guaranteed at 115 kills.
  */
 export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm1911',
