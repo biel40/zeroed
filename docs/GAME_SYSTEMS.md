@@ -53,7 +53,7 @@ Points
   -> WindowBarrier -> recompensa limitada por ronda
 ```
 
-- `normal`, `shiny` y `brute` comparten `Zombie`, IA y un máximo global de 24.
+- `normal`, `shiny` y `brute` comparten `Zombie`, IA y un máximo global de 24. El melee valida en el inicio y en el instante del impacto la distancia horizontal XZ, una diferencia vertical compatible y la linea de ataque despejada.
   Normal/Shiny usan el modelo `walker`; Brute usa `zombie_brute.glb`, clips y
   silueta propios. Sus perfiles y asignación de modelo viven en `ZombieConfig`.
 - `ZombiePool` precarga reservas por modelo (24 walker, 2 Brute) pero bloquea
@@ -71,7 +71,7 @@ Points
 - `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; la compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece escalera continua, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos.
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
 - `ZombieManager` delega el pathfinding en `ZombieNavigationService`: un grid A* por planta derivado de los colliders del mapa (puertas cerradas y barreras atrincheradas sellan sus vanos; al abrirse, el rebuild invalida las rutas). La persecucion decide el objetivo, el servicio decide la ruta, `moveWithCollision` ejecuta sin atravesar geometria y el anti-stuck es la red de seguridad. Detalles en `docs/changes/2026-08-20-zombie-navigation-service.md`.
-- Las transiciones con rampa reutilizan sus extremos como portales del A* y steering; en la aproximacion y pendiente, `ZombieManager` centra la horda y mantiene separacion longitudinal para que el corredor conecte plantas sin wall-following, recalculos ni teletransporte.
+- Las transiciones con rampa reutilizan sus extremos como portales del A* y steering; en la aproximacion, pendiente y salida al rellano, `ZombieManager` centra la horda y mantiene separacion longitudinal para que el corredor conecte plantas sin giros prematuros, wall-following, recalculos ni teletransporte.
 - `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
 - `ZombieFootsteps` da pasos posicionales 3D: un unico `AudioListener` en la camara (sobre el AudioContext compartido de `AudioSystem`) y un pool de 8 `PositionalAudio` reasignados cada 0.25 s a los zombies vivos mas cercanos; la cadencia sale de la velocidad medida y solo suenan en `walk` con desplazamiento real.
 - La Mystery Box pondera sus resultados por rareza: ZEUS-77 es legendaria, aparece con glow dorado y peso 3 frente al peso 10 de Ray Gun; Ray Gun sigue garantizada al alcanzar 115 bajas.

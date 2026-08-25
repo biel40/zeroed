@@ -17,6 +17,7 @@ import {
   splashDamageAt,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_ATTACK_RANGE,
+  ZOMBIE_ATTACK_VERTICAL_TOLERANCE,
   ZOMBIE_BARRIER_ATTACK_DAMAGE,
   ZOMBIE_BARRIER_ATTACK_RANGE,
   ZOMBIE_BASE_HP,
@@ -68,6 +69,7 @@ const FRONT_PROBE = 1.3;
 const ROUND_SPEED_FACTOR = 0.85;
 const TURN_SPEED = 5.5;
 const WAYPOINT_EPSILON = 0.16;
+const STAIR_EXIT_EPSILON = 0.05;
 const STUCK_CHECK_INTERVAL = 1.5;
 const STUCK_MIN_PROGRESS = 0.2;
 const STUCK_NUDGE_AFTER = 4.5;
@@ -136,6 +138,11 @@ interface RecoveryWaypoint {
   readonly z: number;
 }
 
+interface StairTraversal {
+  readonly exitX: number;
+  readonly exitZ: number;
+}
+
 interface NavPath {
   readonly floor: number;
   /** Topology revision the path was computed against (doors open/close). */
@@ -178,6 +185,7 @@ export class ZombieManager {
    */
   private readonly roundState = new Map<Zombie, { x: number; z: number }>();
   private readonly entryRoutes = new Map<Zombie, EntryRoute>();
+  private readonly stairTraversals = new Map<Zombie, StairTraversal>();
   private readonly stuckState = new Map<Zombie, StuckState>();
   private readonly navPaths = new Map<Zombie, NavPath>();
   /** One grid set per configured body radius, rebuilt from the same topology. */
@@ -207,6 +215,7 @@ export class ZombieManager {
    * when the animation began.
    */
   private lastPlayerX = 0;
+  private lastPlayerY = EYE_HEIGHT;
   private lastPlayerZ = 0;
   private lastPlayerFloor = 0;
 
@@ -427,6 +436,7 @@ export class ZombieManager {
       return false;
     }
     this.roundState.delete(zombie);
+    this.stairTraversals.delete(zombie);
     this.stuckState.delete(zombie);
     this.navPaths.delete(zombie);
     this.pathCooldowns.delete(zombie);
@@ -585,6 +595,7 @@ export class ZombieManager {
     playerFacingZ = 0,
   ): void {
     this.lastPlayerX = playerX;
+    this.lastPlayerY = playerY;
     this.lastPlayerZ = playerZ;
     this.lastPlayerFloor = playerFloor;
     this.frameIndex++;
@@ -620,7 +631,7 @@ export class ZombieManager {
           this.recoveryCount++;
           this.debugNavigation(zombie, 'out-of-bounds-relocated', null, 0, 0, 'valid-placement');
         }
-        this.steer(zombie, dt, playerX, playerZ, playerFloor);
+        this.steer(zombie, dt, playerX, playerZ, playerFloor, playerY);
         this.applyFloorTransition(zombie, dt);
         this.updateStuckRecovery(
           zombie,
@@ -648,6 +659,7 @@ export class ZombieManager {
     this.pool.releaseAll();
     this.roundState.clear();
     this.entryRoutes.clear();
+    this.stairTraversals.clear();
     this.stuckState.clear();
     this.navPaths.clear();
     this.pathQueue.length = 0;
@@ -805,8 +817,16 @@ export class ZombieManager {
     }
   }
 
-  private steer(zombie: Zombie, dt: number, playerX: number, playerZ: number, playerFloor: number): void {
+  private steer(
+    zombie: Zombie,
+    dt: number,
+    playerX: number,
+    playerZ: number,
+    playerFloor: number,
+    playerY: number,
+  ): void {
     if (this.followEntryRoute(zombie, dt)) return;
+    if (this.followStairTraversal(zombie, dt)) return;
     const target = zombie.barrierTarget;
     if (target && target.isOpen) zombie.barrierTarget = null;
 
@@ -861,12 +881,8 @@ export class ZombieManager {
       0,
       playerZ - zombie.position.z,
     );
-    const distance = toPlayer.length();
 
-    if (
-      distance <= ZOMBIE_ATTACK_RANGE &&
-      this.attackLineClear(zombie.position.x, zombie.position.z, playerX, playerZ, zombie.position.y)
-    ) {
+    if (this.canAttackPlayer(zombie, playerX, playerZ, playerFloor, playerY)) {
       if (zombie.tryAttack()) {
         // The wind-up only SCHEDULES the bite: whether it connects is decided
         // at the hit moment, against the player's current position. A player
@@ -1224,6 +1240,16 @@ export class ZombieManager {
     playerZ: number,
     playerFloor: number,
   ): NavigationObjective | null {
+    const stairTraversal = this.stairTraversals.get(zombie);
+    if (stairTraversal) {
+      return {
+        key: `stair-exit:${zombie.floor}`,
+        kind: 'portal',
+        x: stairTraversal.exitX,
+        z: stairTraversal.exitZ,
+        radius: STAIR_EXIT_EPSILON,
+      };
+    }
     const route = this.entryRoutes.get(zombie);
     if (route) {
       const approach = route.stage === 'approach';
@@ -1295,21 +1321,39 @@ export class ZombieManager {
   /**
    * Hit-window validation, run when the bite visually lands — never at
    * wind-up start. The attack connects only if the player is still on the
-   * same floor, still inside ZOMBIE_ATTACK_RANGE and still reachable in a
-   * straight line (the same predicates that allowed the wind-up to begin).
+   * same floor, still inside horizontal and vertical melee range and still
+   * reachable in a straight line (the same predicates that allowed wind-up).
    * The zombie side is already guaranteed alive by the state machine: the
    * callback only fires from the attack state, and death leaves it.
    */
   private attackStillConnects(zombie: Zombie): boolean {
-    if (zombie.floor !== this.lastPlayerFloor) return false;
-    const dx = this.lastPlayerX - zombie.position.x;
-    const dz = this.lastPlayerZ - zombie.position.z;
+    return this.canAttackPlayer(
+      zombie,
+      this.lastPlayerX,
+      this.lastPlayerZ,
+      this.lastPlayerFloor,
+      this.lastPlayerY,
+    );
+  }
+
+  private canAttackPlayer(
+    zombie: Zombie,
+    playerX: number,
+    playerZ: number,
+    playerFloor: number,
+    playerY: number,
+  ): boolean {
+    if (zombie.floor !== playerFloor) return false;
+    const dx = playerX - zombie.position.x;
+    const dz = playerZ - zombie.position.z;
     if (dx * dx + dz * dz > ZOMBIE_ATTACK_RANGE * ZOMBIE_ATTACK_RANGE) return false;
+    const playerFeetY = playerY - EYE_HEIGHT;
+    if (Math.abs(playerFeetY - zombie.position.y) > ZOMBIE_ATTACK_VERTICAL_TOLERANCE) return false;
     return this.attackLineClear(
       zombie.position.x,
       zombie.position.z,
-      this.lastPlayerX,
-      this.lastPlayerZ,
+      playerX,
+      playerZ,
       zombie.position.y,
     );
   }
@@ -1410,6 +1454,41 @@ export class ZombieManager {
     return null;
   }
 
+  private followStairTraversal(zombie: Zombie, dt: number): boolean {
+    const traversal = this.stairTraversals.get(zombie);
+    if (!traversal) return false;
+    const dx = traversal.exitX - zombie.position.x;
+    const dz = traversal.exitZ - zombie.position.z;
+    if (Math.hypot(dx, dz) <= STAIR_EXIT_EPSILON) {
+      this.stairTraversals.delete(zombie);
+      this.stuckState.delete(zombie);
+      return false;
+    }
+    zombie.faceTowards(traversal.exitX, traversal.exitZ, TURN_SPEED * dt);
+    if (zombie.state === 'walk') {
+      const direction = this.tmpToPlayer.set(dx, 0, dz).normalize();
+      this.seek(zombie, dt, direction, traversal.exitX, traversal.exitZ, true);
+    }
+    return true;
+  }
+
+  private beginStairExit(zombie: Zombie, transition: FloorTransitionZone): void {
+    const ramp = transition.ramp;
+    if (!ramp) return;
+    const destinationY = transition.targetY - EYE_HEIGHT;
+    const exitsAtBottom = Math.abs(destinationY - ramp.bottom.y) < 0.05;
+    const destination = exitsAtBottom ? ramp.bottom : ramp.top;
+    const axisX = ramp.bottom.x - ramp.top.x;
+    const axisZ = ramp.bottom.z - ramp.top.z;
+    const length = Math.hypot(axisX, axisZ);
+    if (length <= 1e-6) return;
+    const exitDirection = exitsAtBottom ? 1 : -1;
+    this.stairTraversals.set(zombie, {
+      exitX: destination.x + (axisX / length) * STAIR_APPROACH_LENGTH * exitDirection,
+      exitZ: destination.z + (axisZ / length) * STAIR_APPROACH_LENGTH * exitDirection,
+    });
+  }
+
   /**
    * Recovery routing reuses the central navigation service — a forced,
    * budget-exempt query issued only after a progress check fails. Returns
@@ -1500,6 +1579,7 @@ export class ZombieManager {
       zombie.floor = 0;
       zombie.barrierTarget = null;
       this.assignSpawnRoute(zombie, bestSpawn);
+      this.stairTraversals.delete(zombie);
       this.roundState.delete(zombie);
       return true;
     }
@@ -1529,6 +1609,7 @@ export class ZombieManager {
         zombie.floor = playerFloor;
         zombie.barrierTarget = null;
         this.entryRoutes.delete(zombie);
+        this.stairTraversals.delete(zombie);
         this.roundState.delete(zombie);
         return true;
       }
@@ -1689,6 +1770,7 @@ export class ZombieManager {
       if (transition.targetZ !== undefined) zombie.position.z = transition.targetZ;
       this.roundState.delete(zombie);
       this.navPaths.delete(zombie);
+      this.beginStairExit(zombie, transition);
       return;
     }
   }
@@ -1713,6 +1795,7 @@ export class ZombieManager {
 
   private finishDeath(zombie: Zombie): void {
     this.entryRoutes.delete(zombie);
+    this.stairTraversals.delete(zombie);
     this.roundState.delete(zombie);
     this.stuckState.delete(zombie);
     this.navPaths.delete(zombie);

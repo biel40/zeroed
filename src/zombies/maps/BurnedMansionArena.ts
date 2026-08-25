@@ -379,15 +379,15 @@ export class BurnedMansionArena implements ZombieArena {
 
     // The bunker mirrors the whole mansion footprint, and its ceiling repeats
     // the exact stair aperture of the ground slab so the stairwell stays open.
-    this.addSlab('bunker-floor', 0, MANSION_BUNKER_Y - 0.08, -3.25, 14, 0.16, 10.5, this.materials.floorConcrete);
-    this.addSlab('bunker-ceiling', -1.425, -0.22, -3.25, 11.15, 0.16, 10.5, this.materials.ceilingBurned);
-    this.addSlab('bunker-ceiling-east', 6.575, -0.22, -3.25, 0.85, 0.16, 10.5, this.materials.ceilingBurned);
-    this.addSlab('bunker-ceiling-stair-north', 5.15, -0.22, -7.7, 2, 0.16, 1.6, this.materials.ceilingBurned);
+    this.addSlab('bunker-floor', 0, MANSION_BUNKER_Y - 0.08, -3.75, 14, 0.16, 11.5, this.materials.floorConcrete);
+    this.addSlab('bunker-ceiling', -1.425, -0.22, -3.75, 11.15, 0.16, 11.5, this.materials.ceilingBurned);
+    this.addSlab('bunker-ceiling-east', 6.575, -0.22, -3.75, 0.85, 0.16, 11.5, this.materials.ceilingBurned);
+    this.addSlab('bunker-ceiling-stair-north', 5.15, -0.22, -8.2, 2, 0.16, 2.6, this.materials.ceilingBurned);
     this.addSlab('bunker-ceiling-stair-south', 5.15, -0.22, -0.5, 2, 0.16, 5, this.materials.ceilingBurned);
     const bunkerWallY = MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2;
-    this.addWall(-7, bunkerWallY, -3.25, WALL_THICKNESS, LOWER_WALL_HEIGHT, 10.5, this.materials.concreteDirty);
-    this.addWall(7, bunkerWallY, -3.25, WALL_THICKNESS, LOWER_WALL_HEIGHT, 10.5, this.materials.concreteDirty);
-    this.addWall(0, bunkerWallY, -8.5, 14, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
+    this.addWall(-7, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
+    this.addWall(7, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
+    this.addWall(0, bunkerWallY, -9.5, 14, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
     this.addWall(0, bunkerWallY, 2, 14, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
   }
 

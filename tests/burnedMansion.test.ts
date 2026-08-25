@@ -6,7 +6,7 @@ import { EYE_HEIGHT, PlayerController, stairGroundY } from '../src/player/Player
 import type { Weapon } from '../src/weapons/Weapon';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { Zombie } from '../src/zombies/Zombie';
-import { roundConfig } from '../src/zombies/ZombieConfig';
+import { roundConfig, ZOMBIE_ATTACK_VERTICAL_TOLERANCE } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from '../src/zombies/ZombieSpawner';
 import {
@@ -223,11 +223,11 @@ describe('Burned Mansion topology', () => {
       return wall.max.x - wall.min.x > 13 && wall.max.z < -8;
     });
 
-    expect(floorBox.min.z).toBeCloseTo(-8.5);
+    expect(floorBox.min.z).toBeCloseTo(-9.5);
     expect(ceilingBox.min.z).toBeCloseTo(floorBox.min.z);
     expect(northWall).toBeDefined();
     expect(-6.75 - northWall!.max.z).toBeGreaterThanOrEqual(1.5);
-    expect(-6.75 - MANSION_BUNKER_BOUNDS.minZ).toBeGreaterThanOrEqual(1.2);
+    expect(-6.75 - MANSION_BUNKER_BOUNDS.minZ).toBeGreaterThanOrEqual(2);
   });
 
   it('lets the player clear the lower stairs and maneuver laterally on the landing', () => {
@@ -647,6 +647,54 @@ describe('Burned Mansion topology', () => {
     }
     expect(zombie.floor).toBe(-1);
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+  });
+
+  it('makes a zombie clear the lower stair channel before turning toward the player', () => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(() => 0, {}, false, [[5.15, -2.45]], [], arena.floorTransitions);
+    manager.registerColliders([...arena.colliders]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.spawnZombie(roundConfig(1), 0.8, -4.2);
+    const zombie = [...manager.actives][0];
+    zombie.state = 'walk';
+    zombie.floor = 0;
+    zombie.position.set(5.15, 0, -2.45);
+
+    let minimumZ = zombie.position.z;
+    for (let frame = 0; frame < 900 && zombie.position.z > -7.5; frame++) {
+      manager.update(1 / 60, 0.8, -4.2, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
+      if (zombie.floor === -1) minimumZ = Math.min(minimumZ, zombie.position.z);
+    }
+
+    expect(zombie.floor).toBe(-1);
+    expect(minimumZ).toBeLessThanOrEqual(-7.5);
+    expect(zombie.position.z).toBeLessThanOrEqual(-7.5);
+    expect(manager.stuckRecoveryCount).toBe(0);
+  });
+
+  it('does not let a zombie bite across vertically separated bunker stair sections', () => {
+    const arena = makeArena();
+    const ramp = arena.floorTransitions[0].ramp!;
+    const manager = new ZombieManager(() => 0, {}, false, [[5.15, -5.8]], [], arena.floorTransitions);
+    manager.registerColliders([...arena.colliders]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.spawnZombie(roundConfig(1), 5.15, -4.2);
+    const zombie = [...manager.actives][0];
+    const playerFeetY = stairGroundY(ramp, 5.15, -4.2);
+    zombie.state = 'walk';
+    zombie.floor = 0;
+    zombie.position.set(5.15, stairGroundY(ramp, 5.15, -5.8), -5.8);
+    let damage = 0;
+    manager.onPlayerAttack = (amount) => {
+      damage += amount;
+    };
+
+    expect(Math.abs(playerFeetY - zombie.position.y)).toBeGreaterThan(ZOMBIE_ATTACK_VERTICAL_TOLERANCE);
+    manager.update(1 / 60, 5.15, -4.2, 0, playerFeetY + EYE_HEIGHT);
+
+    expect(zombie.state).toBe('walk');
+    expect(damage).toBe(0);
   });
 
   it.each([

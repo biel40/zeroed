@@ -125,6 +125,8 @@ export function selectZombieType(
 }
 /** Distance at which a zombie starts its attack lunge, meters. */
 export const ZOMBIE_ATTACK_RANGE = 1.9;
+/** Maximum feet-height difference for a melee attack, meters. */
+export const ZOMBIE_ATTACK_VERTICAL_TOLERANCE = 1;
 /** Damage per attack against a window board. */
 export const ZOMBIE_BARRIER_ATTACK_DAMAGE = 50;
 /** Distance at which a zombie starts attacking a barrier board. */

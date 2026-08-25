@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { EYE_HEIGHT } from '../src/player/PlayerController';
 import {
   MAX_ALIVE,
   MAX_ACTIVE_BRUTES,
@@ -7,6 +8,7 @@ import {
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
+  ZOMBIE_ATTACK_VERTICAL_TOLERANCE,
   ZOMBIE_BASE_HP,
   ZOMBIE_BASE_SPEED,
   ZOMBIE_TYPE_CONFIGS,
@@ -244,6 +246,7 @@ describe('ZombieManager attack dodge window', () => {
   interface TestPlayer {
     x: number;
     z: number;
+    y?: number;
   }
 
   function actives(manager: ZombieManager): Zombie[] {
@@ -260,7 +263,7 @@ describe('ZombieManager attack dodge window', () => {
     const frames = Math.round(seconds / DT);
     for (let i = 0; i < frames; i++) {
       move?.(player, DT);
-      manager.update(DT, player.x, player.z);
+      manager.update(DT, player.x, player.z, 0, player.y ?? EYE_HEIGHT);
     }
   }
 
@@ -268,7 +271,7 @@ describe('ZombieManager attack dodge window', () => {
   function stepUntilAttack(manager: ZombieManager, zombie: Zombie, player: TestPlayer): boolean {
     const frames = Math.round(3 / DT);
     for (let i = 0; i < frames; i++) {
-      manager.update(DT, player.x, player.z);
+      manager.update(DT, player.x, player.z, 0, player.y ?? EYE_HEIGHT);
       if (zombie.state === 'attack') return true;
     }
     return false;
@@ -300,6 +303,72 @@ describe('ZombieManager attack dodge window', () => {
     expect(damage()).toBe(0);
     // A missed bite never cancels the swing: the zombie finishes and resumes.
     expect(zombie.state).toBe('walk');
+  });
+
+  it.each([
+    { axis: 'X', player: { x: 200, z: 0 } },
+    { axis: 'Z', player: { x: 0, z: 200 } },
+  ])('does not attack a player far away on $axis', ({ player }) => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), player.x, player.z);
+    const zombie = actives(manager)[0];
+    zombie.state = 'walk';
+    zombie.position.set(0, 0, 0);
+    const damage = trackDamage(manager);
+
+    stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player);
+
+    expect(damage()).toBe(0);
+    expect(zombie.state).toBe('walk');
+  });
+
+  it('does not attack a player above its vertical melee tolerance', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.state = 'walk';
+    zombie.position.set(0, 0, 2.8);
+    const player: TestPlayer = {
+      x: 0,
+      z: 4,
+      y: EYE_HEIGHT + ZOMBIE_ATTACK_VERTICAL_TOLERANCE + 0.1,
+    };
+    const damage = trackDamage(manager);
+
+    stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player);
+
+    expect(damage()).toBe(0);
+    expect(zombie.state).toBe('walk');
+  });
+
+  it('rechecks vertical separation when the bite lands', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.8);
+    const player: TestPlayer = { x: 0, z: 4, y: EYE_HEIGHT };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    player.y = EYE_HEIGHT + ZOMBIE_ATTACK_VERTICAL_TOLERANCE + 0.1;
+    stepWith(manager, ZOMBIE_ATTACK_DURATION + 0.1, player);
+
+    expect(damage()).toBe(0);
+    expect(zombie.state).toBe('walk');
+  });
+
+  it('applies exactly one hit when horizontal and vertical range remain valid', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.8);
+    const player: TestPlayer = { x: 0, z: 4, y: EYE_HEIGHT + 0.5 };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    stepWith(manager, ZOMBIE_ATTACK_DURATION, player);
+
+    expect(damage()).toBe(ZOMBIE_ATTACK_DAMAGE);
   });
 
   it('still hits a player who reacts too late', () => {
