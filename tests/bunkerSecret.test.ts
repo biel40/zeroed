@@ -7,7 +7,7 @@ import type { ArenaCompletionInteraction, ArenaWeaponPickup } from '../src/zombi
 function bunkerDoor(): PointDoor {
   return new PointDoor(
     'nuclear-bunker',
-    3.2,
+    4.2,
     -2.5,
     1,
     0,

@@ -13,12 +13,15 @@ import {
   MANSION_BARRIERS,
   MANSION_AMMO_REFILLS,
   MANSION_BUNKER_BOUNDS,
+  MANSION_BUNKER_DIVIDER_X,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
   MANSION_DOOR_COSTS,
+  MANSION_EAST_WALL_X,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
+  MANSION_STAIR_CENTER_X,
   MANSION_SECRET_AREAS,
   MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
@@ -155,7 +158,7 @@ describe('Burned Mansion topology', () => {
     const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
     const boxRoom = [MANSION_BOX_PLACEMENT.position.x, MANSION_BOX_PLACEMENT.position.z] as const;
     const eastHall = [1.6, -5] as const;
-    const bunkerVestibule = [5.2, -3.3] as const;
+    const bunkerVestibule = [MANSION_STAIR_CENTER_X, -3.3] as const;
 
     expect(canWalk(spawn, boxRoom, arena.wallColliders)).toBe(false);
     unlock(arena, 'to-dining');
@@ -201,12 +204,12 @@ describe('Burned Mansion topology', () => {
     expect(bunkerFloorBox.min.y).toBeLessThan(MANSION_BUNKER_Y);
     expect(bunkerCeilingBox.max.y).toBeLessThan(0);
     const bunkerSize = bunkerFloorBox.getSize(new THREE.Vector3());
-    expect(bunkerSize.x).toBeGreaterThanOrEqual(10);
+    expect(bunkerSize.x).toBeGreaterThanOrEqual(16);
     expect(bunkerSize.z).toBeGreaterThanOrEqual(8.9);
 
     const stairwell = new THREE.Box3(
-      new THREE.Vector3(4.2, -0.31, -6.85),
-      new THREE.Vector3(6.1, -0.13, -3.05),
+      new THREE.Vector3(5.45, -0.31, -6.85),
+      new THREE.Vector3(7.85, -0.13, -3.05),
     );
     const ceilingSegments = arena.group.children.filter((child) => child.name.startsWith('bunker-ceiling'));
     expect(ceilingSegments).toHaveLength(4);
@@ -235,7 +238,7 @@ describe('Burned Mansion topology', () => {
     const player = new PlayerController(1);
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
-    player.teleport(5.15, MANSION_BUNKER_Y + EYE_HEIGHT, -7.05, -1, MANSION_BUNKER_BOUNDS);
+    player.teleport(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT, -7.05, -1, MANSION_BUNKER_BOUNDS);
 
     for (let frame = 0; frame < 60; frame++) player.update(1 / 60, movementInput('KeyW'), weaponStub);
     expect(player.rig.position.z).toBeLessThan(-7.7);
@@ -271,7 +274,7 @@ describe('Burned Mansion topology', () => {
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
 
-    player.teleport(5.15, EYE_HEIGHT, -2.7, 0, arena.playerBounds);
+    player.teleport(MANSION_STAIR_CENTER_X, EYE_HEIGHT, -2.7, 0, arena.playerBounds);
     let previousZ = player.rig.position.z;
     let previousY = player.rig.position.y;
     for (let frame = 0; frame < 150 && player.floor === 0; frame++) {
@@ -299,10 +302,10 @@ describe('Burned Mansion topology', () => {
   });
 
   it.each([
-    { floor: 0, startX: 3.7, key: 'KeyD' as const, groundY: EYE_HEIGHT },
-    { floor: 0, startX: 6.6, key: 'KeyA' as const, groundY: EYE_HEIGHT },
-    { floor: -1, startX: 3.7, key: 'KeyD' as const, groundY: MANSION_BUNKER_Y + EYE_HEIGHT },
-    { floor: -1, startX: 6.6, key: 'KeyA' as const, groundY: MANSION_BUNKER_Y + EYE_HEIGHT },
+    { floor: 0, startX: 4.9, key: 'KeyD' as const, groundY: EYE_HEIGHT },
+    { floor: 0, startX: 8.4, key: 'KeyA' as const, groundY: EYE_HEIGHT },
+    { floor: -1, startX: 4.9, key: 'KeyD' as const, groundY: MANSION_BUNKER_Y + EYE_HEIGHT },
+    { floor: -1, startX: 8.4, key: 'KeyA' as const, groundY: MANSION_BUNKER_Y + EYE_HEIGHT },
   ])('keeps lateral stair contact solid and level from floor $floor at x=$startX', ({ floor, startX, key, groundY }) => {
     const arena = makeArena();
     const player = new PlayerController(1);
@@ -323,7 +326,7 @@ describe('Burned Mansion topology', () => {
     }
 
     expect(player.floor).toBe(floor);
-    expect(Math.abs(player.rig.position.x - 5.15)).toBeGreaterThan(1.25);
+    expect(Math.abs(player.rig.position.x - MANSION_STAIR_CENTER_X)).toBeGreaterThan(1.5);
   });
 
   it('places each standard wall buy in its intended progression zone', () => {
@@ -335,10 +338,29 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'ak47')!.position.x).toBeLessThan(0);
     const m4a1 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm4a1')!;
     expect(m4a1.position.x).toBeGreaterThan(0);
-    expect(m4a1.position.x).toBeLessThan(3.2);
+    expect(m4a1.position.x).toBeLessThan(MANSION_BUNKER_DIVIDER_X);
     expect(m4a1.position.x - 0.35).toBeGreaterThan(2.2);
+    expect(MANSION_BUNKER_DIVIDER_X).toBe(4.2);
+    expect(MANSION_EAST_WALL_X - MANSION_BUNKER_DIVIDER_X).toBeCloseTo(4.95);
     expect(arena.wallBuys).toHaveLength(4);
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(4);
+  });
+
+  it('expands the M4A1 room and bunker wing as one coherent east footprint', () => {
+    const arena = makeArena();
+    const roofBox = new THREE.Box3().setFromObject(arena.group.getObjectByName('mansion-roof')!);
+    const bunkerFloorBox = new THREE.Box3().setFromObject(arena.group.getObjectByName('bunker-floor')!);
+    const bunkerDoor = arena.doors.find((door) => door.id === 'nuclear-bunker')!;
+    const eastBarrier = MANSION_BARRIERS.find((barrier) => barrier.id === 'bunker-east')!;
+
+    expect(MANSION_BUNKER_DIVIDER_X).toBe(4.2);
+    expect(MANSION_EAST_WALL_X).toBe(9.15);
+    expect(bunkerDoor.position.x).toBe(MANSION_BUNKER_DIVIDER_X);
+    expect(eastBarrier.x).toBe(MANSION_EAST_WALL_X);
+    expect(roofBox.max.x).toBeCloseTo(MANSION_EAST_WALL_X + 0.15);
+    expect(bunkerFloorBox.max.x).toBeCloseTo(MANSION_EAST_WALL_X - 0.15);
+    expect(MANSION_GROUND_BOUNDS.maxX).toBeCloseTo(8.6);
+    expect(MANSION_BUNKER_BOUNDS.maxX).toBeCloseTo(8.5);
   });
 
   it('keeps the paid room sequence and bunker price centralized', () => {
@@ -391,9 +413,9 @@ describe('Burned Mansion topology', () => {
 
     unlock(arena, 'nuclear-bunker');
     const bunkerObstacles = arena.wallColliders;
-    expect(canWalk([5.15, -6.9], [-5.8, -4.4], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    expect(canWalk([MANSION_STAIR_CENTER_X, -6.9], [-5.8, -4.4], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
     for (const weaponCase of MANSION_SPECIAL_WEAPON_CASES) {
-      expect(canWalk([5.15, -6.9], [weaponCase.position.x + 1.2, weaponCase.position.z], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+      expect(canWalk([MANSION_STAIR_CENTER_X, -6.9], [weaponCase.position.x + 1.2, weaponCase.position.z], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
     }
   });
 
@@ -442,7 +464,7 @@ describe('Burned Mansion topology', () => {
     expect(steps).toHaveLength(17);
     for (const step of steps) {
       const size = new THREE.Box3().setFromObject(step).getSize(new THREE.Vector3());
-      expect(size.x).toBeGreaterThanOrEqual(1.6);
+      expect(size.x).toBeGreaterThanOrEqual(2.1);
     }
     const ramp = arena.group.getObjectByName('bunker-stair-navigation-ramp');
     expect(ramp?.userData.mapRole).toBe('walkable-stair-ramp');
@@ -450,16 +472,17 @@ describe('Burned Mansion topology', () => {
     expect(arena.group.children.filter((child) => child.name === 'bunker-stair-handrail')).toHaveLength(2);
   });
 
-  it('encloses both stair sides continuously between the lower and upper entrances', () => {
+  it('fills both side walkways and leaves only the longitudinal stair route', () => {
     const arena = makeArena();
-    const sideWalls = arena.wallColliders.filter((collider) => {
+    const sideFills = arena.wallColliders.filter((collider) => {
       const width = collider.max.x - collider.min.x;
       const centerX = (collider.min.x + collider.max.x) / 2;
-      return width <= 0.2 && (Math.abs(centerX - 4.15) < 0.01 || Math.abs(centerX - 6.15) < 0.01);
+      return width > 1.1 && width < 1.2
+        && (Math.abs(centerX - 4.9125) < 0.01 || Math.abs(centerX - 8.4125) < 0.01);
     });
 
-    expect(sideWalls).toHaveLength(2);
-    for (const wall of sideWalls) {
+    expect(sideFills).toHaveLength(2);
+    for (const wall of sideFills) {
       expect(wall.min.z).toBeLessThanOrEqual(-6.75);
       expect(wall.max.z).toBeGreaterThanOrEqual(-2.85);
       expect(wall.min.y).toBeLessThanOrEqual(MANSION_BUNKER_Y);
@@ -468,11 +491,16 @@ describe('Burned Mansion topology', () => {
 
     const stairSideMeshes = arena.group.children.filter((child) => {
       return child.userData.mapRole === 'wall' && child.userData.surface === 'wood'
-        && (Math.abs(child.position.x - 4.15) < 0.01 || Math.abs(child.position.x - 6.15) < 0.01)
+        && (Math.abs(child.position.x - 4.9125) < 0.01 || Math.abs(child.position.x - 8.4125) < 0.01)
         && Math.abs(child.position.z + 4.8) < 0.01;
     }) as THREE.Mesh[];
     expect(stairSideMeshes).toHaveLength(2);
     expect(stairSideMeshes.every((mesh) => (mesh.material as THREE.Material).name === 'charred_wood')).toBe(true);
+
+    unlock(arena, 'nuclear-bunker');
+    expect(canWalk([MANSION_STAIR_CENTER_X, -2.5], [MANSION_STAIR_CENTER_X, -3.2], arena.wallColliders)).toBe(true);
+    expect(canWalk([MANSION_STAIR_CENTER_X, -2.5], [4.9, -4.8], arena.wallColliders)).toBe(false);
+    expect(canWalk([MANSION_STAIR_CENTER_X, -2.5], [8.4, -4.8], arena.wallColliders)).toBe(false);
   });
 
   it('blocks the lower floor from crossing through the back of the stairs', () => {
@@ -480,7 +508,7 @@ describe('Burned Mansion topology', () => {
     const player = new PlayerController(1);
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
-    player.teleport(5.15, MANSION_BUNKER_Y + EYE_HEIGHT, -2.2, -1, MANSION_BUNKER_BOUNDS);
+    player.teleport(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT, -2.2, -1, MANSION_BUNKER_BOUNDS);
 
     for (let frame = 0; frame < 120; frame++) {
       player.update(1 / 60, movementInput('KeyW'), weaponStub);
@@ -522,7 +550,7 @@ describe('Burned Mansion topology', () => {
 
   it('keeps clear walking routes from the stair landing to both Wonder Weapon stations', () => {
     const arena = makeArena();
-    const landing = [3.75, -6.4] as const;
+    const landing = [MANSION_STAIR_CENTER_X, -7.2] as const;
     const rayGunApproach = [-1.2, -3] as const;
     const zeusApproach = [-0.8, -6.1] as const;
 
@@ -574,7 +602,7 @@ describe('Burned Mansion topology', () => {
     for (const point of Object.values(MANSION_SPAWNS).flat()) {
       expect(point.exterior).toBe(true);
       expect(
-        point.x < -7.45 || point.x > 7.45 || point.z < -8.45 || point.z > 10.45,
+        point.x < -7.45 || point.x > MANSION_EAST_WALL_X + 0.3 || point.z < -8.45 || point.z > 10.45,
       ).toBe(true);
       const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === point.barrierId);
       expect(barrier).toBeDefined();
@@ -636,14 +664,15 @@ describe('Burned Mansion topology', () => {
       () => 0,
     );
     manager.registerColliders([...arena.colliders]);
-    manager.spawnZombie(roundConfig(5), 5, -2, 5);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.spawnZombie(roundConfig(5), 0.8, -4.2, 5);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
     expect(zombie.typeId).toBe('brute');
     zombie.state = 'walk';
-    for (let frame = 0; frame < 600 && zombie.floor === 0; frame++) {
-      manager.update(1 / 60, 5.5, -2, -1);
+    for (let frame = 0; frame < 900 && zombie.floor === 0; frame++) {
+      manager.update(1 / 60, 0.8, -4.2, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
     }
     expect(zombie.floor).toBe(-1);
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
@@ -652,14 +681,14 @@ describe('Burned Mansion topology', () => {
   it('makes a zombie clear the lower stair channel before turning toward the player', () => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
-    const manager = new ZombieManager(() => 0, {}, false, [[5.15, -2.45]], [], arena.floorTransitions);
+    const manager = new ZombieManager(() => 0, {}, false, [[MANSION_STAIR_CENTER_X, -2.45]], [], arena.floorTransitions);
     manager.registerColliders([...arena.colliders]);
     manager.setNavigationBounds(arena.navigationBounds);
     manager.spawnZombie(roundConfig(1), 0.8, -4.2);
     const zombie = [...manager.actives][0];
     zombie.state = 'walk';
     zombie.floor = 0;
-    zombie.position.set(5.15, 0, -2.45);
+    zombie.position.set(MANSION_STAIR_CENTER_X, 0, -2.45);
 
     let minimumZ = zombie.position.z;
     for (let frame = 0; frame < 900 && zombie.position.z > -7.5; frame++) {
@@ -676,22 +705,22 @@ describe('Burned Mansion topology', () => {
   it('does not let a zombie bite across vertically separated bunker stair sections', () => {
     const arena = makeArena();
     const ramp = arena.floorTransitions[0].ramp!;
-    const manager = new ZombieManager(() => 0, {}, false, [[5.15, -5.8]], [], arena.floorTransitions);
+    const manager = new ZombieManager(() => 0, {}, false, [[MANSION_STAIR_CENTER_X, -5.8]], [], arena.floorTransitions);
     manager.registerColliders([...arena.colliders]);
     manager.setNavigationBounds(arena.navigationBounds);
-    manager.spawnZombie(roundConfig(1), 5.15, -4.2);
+    manager.spawnZombie(roundConfig(1), MANSION_STAIR_CENTER_X, -4.2);
     const zombie = [...manager.actives][0];
-    const playerFeetY = stairGroundY(ramp, 5.15, -4.2);
+    const playerFeetY = stairGroundY(ramp, MANSION_STAIR_CENTER_X, -4.2);
     zombie.state = 'walk';
     zombie.floor = 0;
-    zombie.position.set(5.15, stairGroundY(ramp, 5.15, -5.8), -5.8);
+    zombie.position.set(MANSION_STAIR_CENTER_X, stairGroundY(ramp, MANSION_STAIR_CENTER_X, -5.8), -5.8);
     let damage = 0;
     manager.onPlayerAttack = (amount) => {
       damage += amount;
     };
 
     expect(Math.abs(playerFeetY - zombie.position.y)).toBeGreaterThan(ZOMBIE_ATTACK_VERTICAL_TOLERANCE);
-    manager.update(1 / 60, 5.15, -4.2, 0, playerFeetY + EYE_HEIGHT);
+    manager.update(1 / 60, MANSION_STAIR_CENTER_X, -4.2, 0, playerFeetY + EYE_HEIGHT);
 
     expect(zombie.state).toBe('walk');
     expect(damage).toBe(0);
@@ -703,7 +732,7 @@ describe('Burned Mansion topology', () => {
   ])('keeps a moving horde on the stair ramp while travelling $direction', ({ zombieFloor, playerFloor, startZ, expectedFloor }) => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
-    const manager = new ZombieManager(() => 0, {}, false, [[5.15, startZ]], [], arena.floorTransitions);
+    const manager = new ZombieManager(() => 0, {}, false, [[MANSION_STAIR_CENTER_X, startZ]], [], arena.floorTransitions);
     manager.registerColliders([...arena.colliders]);
     manager.setNavigationBounds(arena.navigationBounds);
     for (let index = 0; index < 6; index++) manager.spawnZombie(roundConfig(1), 0, 0);
@@ -715,7 +744,7 @@ describe('Burned Mansion topology', () => {
       zombie.floor = zombieFloor;
       const row = Math.floor(index / 3);
       const queuedZ = zombieFloor === 0 ? startZ + row * 0.45 : startZ - row * 0.35;
-      zombie.position.set(4.65 + (index % 3) * 0.5, zombieFloor === -1 ? MANSION_BUNKER_Y : 0, queuedZ);
+      zombie.position.set(MANSION_STAIR_CENTER_X - 0.75 + (index % 3) * 0.5, zombieFloor === -1 ? MANSION_BUNKER_Y : 0, queuedZ);
     }
 
     const ramp = arena.floorTransitions[0].ramp!;
@@ -748,7 +777,7 @@ describe('Burned Mansion topology', () => {
     expect(manager.stuckRecoveryCount).toBe(0);
   });
 
-  it.each([4.65, 5.65])('routes a zombie entering the valid upper stair opening at x=%s', (stairX) => {
+  it.each([MANSION_STAIR_CENTER_X - 0.7, MANSION_STAIR_CENTER_X + 0.7])('routes a zombie entering the valid upper stair opening at x=%s', (stairX) => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
     const manager = new ZombieManager(
@@ -760,21 +789,21 @@ describe('Burned Mansion topology', () => {
       arena.floorTransitions,
     );
     manager.registerColliders([...arena.colliders]);
-    manager.spawnZombie(roundConfig(1), 5.5, -2);
+    manager.spawnZombie(roundConfig(1), MANSION_STAIR_CENTER_X, -2);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
     zombie.state = 'walk';
 
     for (let frame = 0; frame < 600 && zombie.floor === 0; frame++) {
-      manager.update(1 / 60, 5.5, -2, -1);
+      manager.update(1 / 60, MANSION_STAIR_CENTER_X, -2, -1);
     }
 
     expect(zombie.floor).toBe(-1);
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
   });
 
-  it.each([3.7, 6.6])('routes a zombie around the solid stair side from x=%s', (startX) => {
+  it.each([4.9, 8.4])('routes a zombie around the solid stair side from x=%s', (startX) => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
     const manager = new ZombieManager(() => 0, {}, false, [[1.45, -2.5]], [], arena.floorTransitions);
@@ -986,8 +1015,9 @@ describe('Burned Mansion topology', () => {
 
     unlock(arena, 'nuclear-bunker');
     manager.registerColliders([...arena.colliders]);
-    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, 5.5, -2.5, 0);
-    expect(zombie.position.x).toBeGreaterThan(3.2);
+    manager.setNavigationBounds(arena.navigationBounds);
+    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, MANSION_STAIR_CENTER_X, -1.9, 0);
+    expect(zombie.position.x).toBeGreaterThan(MANSION_BUNKER_DIVIDER_X);
     expect(zombie.position.z).toBeLessThan(0);
   });
 

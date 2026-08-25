@@ -17,6 +17,9 @@ Plantilla:
 
 ## Índice
 
+- [2026-08-25 — Ampliacion de las salas M4A1 y bunker](2026-08-25-east-wing-room-expansion.md)
+- [2026-08-25 — Acceso unidireccional a la escalera del bunker](2026-08-25-bunker-stair-single-route.md)
+- [2026-08-25 — Salida estable y rellano ampliado del bunker](2026-08-25-bunker-stair-exit.md)
 - [2026-08-25 — Sala Mystery Box despejada y rondas romanas](2026-08-25-mansion-cabinet-roman-rounds.md)
 - [2026-08-25 — Rediseño del HUD de salud Zombies](2026-08-25-zombies-hud-health-redesign.md)
 - [2026-08-25 — Progresion Ray Gun y ZEUS-77 legendaria](2026-08-25-wonder-weapon-progression.md)

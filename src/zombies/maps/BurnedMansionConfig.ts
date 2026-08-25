@@ -21,10 +21,15 @@ export const MANSION_DOOR_COSTS = {
 /** Safe player spawn in the expanded south starting room. */
 export const MANSION_PLAYER_SPAWN = { x: -3.5, y: 1.72, z: 7.2, floor: 0 } as const;
 
+/** Shared east-wing topology coordinates. */
+export const MANSION_EAST_WALL_X = 9.15;
+export const MANSION_BUNKER_DIVIDER_X = 4.2;
+export const MANSION_STAIR_CENTER_X = 6.65;
+
 /** Ground-floor movement bounds. */
 export const MANSION_GROUND_BOUNDS = {
   minX: -6.6,
-  maxX: 6.6,
+  maxX: MANSION_EAST_WALL_X - 0.55,
   minZ: -7.6,
   maxZ: 9.6,
 } as const;
@@ -32,7 +37,7 @@ export const MANSION_GROUND_BOUNDS = {
 /** Large underground bunker bounds, inset by the player body radius. */
 export const MANSION_BUNKER_BOUNDS = {
   minX: -6.5,
-  maxX: 6.5,
+  maxX: MANSION_EAST_WALL_X - 0.65,
   minZ: -9,
   maxZ: 1.5,
 } as const;
@@ -75,7 +80,7 @@ export const MANSION_AMMO_REFILLS = [
     id: 'start-ammo-refill',
     cost: 800,
     interactionLabel: 'REFILL AMMO — 800',
-    position: { x: 6.25, y: 0.45, z: 9.45 },
+    position: { x: MANSION_EAST_WALL_X - 0.9, y: 0.45, z: 9.45 },
     floor: 0,
     useRange: 1.9,
     lookDotMin: 0.4,
@@ -108,7 +113,7 @@ export const MANSION_BARRIERS: ReadonlyArray<{
   { id: 'box-west', x: -7.15, z: -3.2, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
   { id: 'box-north', x: -3.5, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-dining' },
   { id: 'east-hall-north', x: 1.6, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-east-hall' },
-  { id: 'bunker-east', x: 7.15, z: -2.5, outwardX: 1, outwardZ: 0, zone: 'nuclear-bunker' },
+  { id: 'bunker-east', x: MANSION_EAST_WALL_X, z: -2.5, outwardX: 1, outwardZ: 0, zone: 'nuclear-bunker' },
 ];
 
 /** Point doors: position, outward normal (opens toward), cost key. */
@@ -128,7 +133,7 @@ export const MANSION_DOORS: ReadonlyArray<{
   { id: 'to-east-hall', x: 0, z: -2.5, outwardX: 1, outwardZ: 0, cost: MANSION_DOOR_COSTS.eastHall, y: 0, floor: 0 },
   {
     id: 'nuclear-bunker',
-    x: 3.2,
+    x: MANSION_BUNKER_DIVIDER_X,
     z: -2.5,
     outwardX: 1,
     outwardZ: 0,
@@ -165,7 +170,7 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     weaponId: 'm4a1',
     price: 1500,
     ammoPrice: 750,
-    position: { x: 3.03, y: 1.45, z: -5.4 },
+    position: { x: MANSION_BUNKER_DIVIDER_X - 0.17, y: 1.45, z: -5.4 },
     yaw: -Math.PI / 2,
     floor: 0,
   },
@@ -174,7 +179,7 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     weaponId: 'm60',
     price: 2500,
     ammoPrice: 1250,
-    position: { x: 6.42, y: MANSION_BUNKER_Y + 1.45, z: -5.7 },
+    position: { x: MANSION_EAST_WALL_X - 0.73, y: MANSION_BUNKER_Y + 1.45, z: -5.7 },
     yaw: -Math.PI / 2,
     floor: -1,
   },
@@ -195,7 +200,16 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
     { x: 1.6, z: -16, barrierId: 'east-hall-north', approachX: 1.6, approachZ: -9.05, breachX: 1.6, breachZ: -7.55, exterior: true },
   ],
   'nuclear-bunker': [
-    { x: 14, z: -2.5, barrierId: 'bunker-east', approachX: 8.05, approachZ: -2.5, breachX: 6.55, breachZ: -2.5, exterior: true },
+    {
+      x: 16,
+      z: -2.5,
+      barrierId: 'bunker-east',
+      approachX: MANSION_EAST_WALL_X + 0.9,
+      approachZ: -2.5,
+      breachX: MANSION_EAST_WALL_X - 0.6,
+      breachZ: -2.5,
+      exterior: true,
+    },
   ],
 };
 
