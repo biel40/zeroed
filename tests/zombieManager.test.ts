@@ -15,6 +15,7 @@ import {
 } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { Zombie } from '../src/zombies/Zombie';
+import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
 
 const DT = 1 / 60;
 /** Mirrors the player's ground speed (WALK_SPEED in PlayerController). */
@@ -31,6 +32,32 @@ function step(manager: ZombieManager, seconds: number, px = 0, pz = 4): void {
   const frames = Math.round(seconds / DT);
   for (let i = 0; i < frames; i++) manager.update(DT, px, pz);
 }
+
+describe('ZombieManager barrier feedback', () => {
+  it('emits at most one wood impact per frame and only when a board breaks', () => {
+    const barrier = new WindowBarrier('window', 0, 0, 0, 1, {
+      boardCount: 2,
+      boardHp: 50,
+      repairInterval: 0.1,
+      repairRewardCap: 2,
+    });
+    const manager = new ZombieManager(() => 0, {}, false, null, [barrier]);
+    const hitBarrier = (manager as unknown as { hitBarrier: (target: WindowBarrier) => void })
+      .hitBarrier.bind(manager);
+    let impacts = 0;
+    manager.onBarrierImpact = () => impacts++;
+
+    manager.update(DT, 0, 0);
+    hitBarrier(barrier);
+    hitBarrier(barrier);
+    expect(impacts).toBe(1);
+
+    barrier.repair(0.1);
+    manager.update(DT, 0, 0);
+    hitBarrier(barrier);
+    expect(impacts).toBe(2);
+  });
+});
 
 describe('ZombieManager spawning and pooling', () => {
   it('spawns a zombie, registers its hitboxes and scales stats by round', () => {

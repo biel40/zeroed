@@ -106,6 +106,8 @@ export interface ZombieArena {
   readonly navigationBounds: ReadonlyArray<ZombieNavigationBounds>;
   /** Stair/zone transitions that swap player floor/bounds. */
   readonly floorTransitions?: ReadonlyArray<FloorTransitionZone>;
+  /** Optional visual event fired when a rebuilt board finishes seating. */
+  onBarrierBoardRebuilt?: (() => void) | null;
   /** Called once after the arena is added to the scene. */
   init(): void;
   /** Per-frame update for ambience and animations. */

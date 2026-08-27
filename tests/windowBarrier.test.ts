@@ -47,11 +47,13 @@ describe('WindowBarrier pure logic', () => {
 
   it('reports damaged after one board is destroyed', () => {
     const barrier = new WindowBarrier('w1', 0, 0, 0, 1, DEFAULT_CONFIG);
+    const initialRevision = barrier.boards[0].revision;
     barrier.damage(100);
     expect(barrier.state).toBe('damaged');
     expect(barrier.isDamaged).toBe(true);
     expect(barrier.intactCount).toBe(2);
     expect(barrier.destroyedCount).toBe(1);
+    expect(barrier.boards[0].revision).toBe(initialRevision + 1);
   });
 
   it('opens when all boards are destroyed', () => {
@@ -82,6 +84,7 @@ describe('WindowBarrier pure logic', () => {
     expect(result.rewardableBoards).toBe(1);
     expect(barrier.intactCount).toBe(2);
     expect(barrier.state).toBe('repairing');
+    expect(barrier.boards[0].revision).toBe(2);
   });
 
   it('repairs multiple boards when enough time has passed', () => {

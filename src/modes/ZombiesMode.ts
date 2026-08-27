@@ -105,7 +105,7 @@ export class ZombiesMode implements GameMode {
   /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
   private readonly tmpDirection = new THREE.Vector3();
 
-  constructor(private readonly mapId: 'classic' | 'burned-mansion' = 'classic') {}
+  constructor(private readonly mapId: 'classic' | 'burned-mansion' = 'classic') { }
 
   init(ctx: ModeContext): void {
     this.ctx = ctx;
@@ -142,6 +142,8 @@ export class ZombiesMode implements GameMode {
     this.zombies.setNavigationDebug(new URLSearchParams(window.location.search).has('zombieNavDebug'));
     this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
+    this.zombies.onBarrierImpact = () => ctx.audio.playImpact('wood');
+    this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     ctx.scene.add(this.zombies.group);
     if (this.arena instanceof BurnedMansionArena) {
       this.arena.onTopologyChanged = () => this.syncMansionArena(this.mansionStaticColliders);
@@ -682,14 +684,12 @@ export class ZombiesMode implements GameMode {
     if (this.activeRepairBarrier && this.activeRepairBarrier !== barrier) {
       this.activeRepairBarrier.stopRepair();
     }
+
     this.activeRepairBarrier = barrier;
 
     const result = barrier.repair(dt);
     for (let i = 0; i < result.rewardableBoards; i++) {
       this.economy.awardRepair();
-    }
-    if (result.boardsRepaired > 0) {
-      this.ctx.audio.playRepairBoard();
     }
   }
 
@@ -748,6 +748,7 @@ export class ZombiesMode implements GameMode {
           break;
       }
     }
+    
     this.rounds.clearEvents();
   }
 

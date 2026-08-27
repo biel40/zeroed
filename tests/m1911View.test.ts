@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Weapon } from '../src/weapons/Weapon';
-import { buildProceduralViewModel, WeaponView } from '../src/weapons/WeaponView';
+import { buildProceduralViewModel, buildWeaponDisplayModel, WeaponView } from '../src/weapons/WeaponView';
 import { WallBuy } from '../src/zombies/wallbuys/WallBuy';
 import { WallBuyView } from '../src/zombies/wallbuys/WallBuyView';
 
@@ -37,13 +37,16 @@ function namedMeshes(root: THREE.Object3D, name: string): THREE.Mesh[] {
 }
 
 describe('M1911 first-person model', () => {
-  it('uses a dedicated pistol frame and a camera pose that does not magnify it like a rifle', () => {
+  it('uses a dedicated pistol frame anchored to the lower-right first-person view', () => {
     expect(definition.view.frame).toBe('pistol');
+    expect(definition.view.hip[0]).toBeGreaterThanOrEqual(0.2);
+    expect(definition.view.hip[1]).toBeLessThanOrEqual(-0.23);
+    expect(definition.view.hip[2]).toBeGreaterThanOrEqual(-0.48);
     expect(definition.view.hip[2]).toBeLessThanOrEqual(-0.45);
     expect(definition.view.ads[2]).toBeLessThanOrEqual(-0.34);
   });
 
-  it('keeps the signature slide, grip panels, trigger guard and animated magazine', () => {
+  it('keeps the signature slide, profiled grip, oval trigger guard and animated magazine', () => {
     const built = buildProceduralViewModel(definition.view);
     expect(built.group.name).toBe('m1911-root');
     const frame = built.group.getObjectByName('m1911-frame');
@@ -51,10 +54,12 @@ describe('M1911 first-person model', () => {
     expect(frame?.parent).toBe(built.group);
     expect(slide?.parent).toBe(built.group);
     expect(namedMeshes(built.group, 'm1911-walnut-grip-panel')).toHaveLength(2);
-    expect(namedMeshes(built.group, 'm1911-trigger-guard')).toHaveLength(3);
+    expect(namedMeshes(built.group, 'm1911-trigger-guard')).toHaveLength(1);
     expect(frame?.getObjectByName('m1911-barrel')).toBeTruthy();
+    expect(frame?.getObjectByName('m1911-recoil-spring-plug')).toBeTruthy();
     expect(frame?.getObjectByName('m1911-trigger')).toBeTruthy();
     expect(frame?.getObjectByName('m1911-hammer')).toBeTruthy();
+    expect(frame?.getObjectByName('m1911-mainspring-housing')).toBeTruthy();
     expect(namedMeshes(slide!, 'm1911-rear-sight')).toHaveLength(3);
     expect(namedMeshes(slide!, 'm1911-front-sight')).toHaveLength(2);
     expect(built.reloadParts?.magazine).toBeTruthy();
@@ -76,7 +81,7 @@ describe('M1911 first-person model', () => {
     built.group.updateMatrixWorld(true);
     const slideBodyBox = new THREE.Box3().setFromObject(built.group.getObjectByName('m1911-slide-body')!);
     const serrations = namedMeshes(built.group, 'm1911-slide-serration');
-    expect(serrations).toHaveLength(10);
+    expect(serrations).toHaveLength(14);
     for (const serration of serrations) {
       const box = new THREE.Box3().setFromObject(serration);
       const size = box.getSize(new THREE.Vector3());
@@ -107,9 +112,50 @@ describe('M1911 first-person model', () => {
     for (const panel of namedMeshes(built.group, 'm1911-walnut-grip-panel')) {
       const panelBox = new THREE.Box3().setFromObject(panel);
       expect(panelBox.intersectsBox(gripCoreBox)).toBe(true);
-      expect(panelBox.min.x).toBeGreaterThanOrEqual(gripCoreBox.min.x - 0.0015);
-      expect(panelBox.max.x).toBeLessThanOrEqual(gripCoreBox.max.x + 0.0015);
+      expect(panelBox.min.x).toBeGreaterThanOrEqual(gripCoreBox.min.x - 0.0025);
+      expect(panelBox.max.x).toBeLessThanOrEqual(gripCoreBox.max.x + 0.0025);
     }
+  });
+
+  it('uses full-size Government proportions and rakes the grip base rearward', () => {
+    const built = buildProceduralViewModel(definition.view);
+    const size = new THREE.Box3().setFromObject(built.group).getSize(new THREE.Vector3());
+    const magazine = built.group.getObjectByName('m1911-magazine')!;
+    const screws = namedMeshes(built.group, 'm1911-grip-screw');
+
+    expect(size.z).toBeGreaterThan(0.21);
+    expect(size.y / size.z).toBeGreaterThan(0.6);
+    expect(size.y / size.z).toBeLessThan(0.68);
+    expect(size.x / size.z).toBeLessThan(0.18);
+    expect(magazine.rotation.x).toBeLessThan(0);
+    expect(screws).toHaveLength(4);
+    const leftScrews = screws.filter((screw) => screw.position.x < 0).sort((a, b) => b.position.y - a.position.y);
+    expect(leftScrews[1].position.z).toBeGreaterThan(leftScrews[0].position.z);
+  });
+
+  it('anchors muzzle and casing effects to the modeled openings', () => {
+    const built = buildProceduralViewModel(definition.view);
+    built.group.updateMatrixWorld(true);
+    const crownBox = new THREE.Box3().setFromObject(built.group.getObjectByName('m1911-muzzle-crown')!);
+    const portBox = new THREE.Box3().setFromObject(built.group.getObjectByName('m1911-ejection-port')!);
+
+    expect(built.muzzlePosition.z).toBeLessThanOrEqual(crownBox.min.z + 0.001);
+    expect(built.muzzlePosition.y).toBeGreaterThan(crownBox.min.y);
+    expect(built.muzzlePosition.y).toBeLessThan(crownBox.max.y);
+    expect(built.ejectionPosition.x).toBeGreaterThan(portBox.min.x);
+    expect(built.ejectionPosition.y).toBeGreaterThan(portBox.min.y);
+    expect(built.ejectionPosition.y).toBeLessThan(portBox.max.y);
+    expect(built.ejectionPosition.z).toBeGreaterThan(portBox.min.z);
+    expect(built.ejectionPosition.z).toBeLessThan(portBox.max.z);
+  });
+
+  it('reuses the same M1911 identity in world display models', () => {
+    const display = buildWeaponDisplayModel(definition, null, 0.72);
+    expect(display.getObjectByName('m1911-slide')).toBeTruthy();
+    expect(display.getObjectByName('m1911-grip-core')).toBeTruthy();
+    expect(display.getObjectByName('m1911-recoil-spring-plug')).toBeTruthy();
+    const size = new THREE.Box3().setFromObject(display).getSize(new THREE.Vector3());
+    expect(size.z).toBeGreaterThan(size.y);
   });
 
   it('returns the complete slide to battery after an empty reload', () => {
@@ -161,7 +207,7 @@ describe('M1911 first-person model', () => {
 });
 
 describe('M1911 wall-buy silhouette', () => {
-  it('renders a compact pistol profile instead of the generic long-gun template', () => {
+  it('renders a dedicated Government profile with a real trigger opening', () => {
     const parent = new THREE.Group();
     const buy = new WallBuy({
       id: 'test-m1911',
@@ -175,12 +221,21 @@ describe('M1911 wall-buy silhouette', () => {
     const view = new WallBuyView(buy, definition, parent);
     const size = new THREE.Box3().setFromObject(view.group).getSize(new THREE.Vector3());
 
-    expect(view.group.userData.silhouette).toBe('pistol');
-    expect(view.group.getObjectByName('pistol-slide')).toBeTruthy();
-    expect(view.group.getObjectByName('pistol-grip')).toBeTruthy();
-    expect(namedMeshes(view.group, 'pistol-trigger-guard')).toHaveLength(3);
+    const slide = view.group.getObjectByName('m1911-wall-slide')!;
+    const frame = view.group.getObjectByName('m1911-wall-frame') as THREE.Mesh<THREE.ExtrudeGeometry>;
+    expect(view.group.userData.silhouette).toBe('m1911');
+    expect(slide).toBeTruthy();
+    expect(frame).toBeTruthy();
+    expect(view.group.getObjectByName('m1911-wall-spur-hammer')).toBeTruthy();
+    expect(view.group.getObjectByName('m1911-wall-front-sight')).toBeTruthy();
+    expect((frame.geometry.parameters.shapes as THREE.Shape).holes).toHaveLength(1);
     expect(size.x).toBeLessThan(1);
-    expect(size.y).toBeGreaterThan(0.45);
+    expect(size.y / size.x).toBeGreaterThan(0.6);
+    expect(size.y / size.x).toBeLessThan(0.68);
+    const slideBox = new THREE.Box3().setFromObject(slide);
+    const frameBox = new THREE.Box3().setFromObject(frame);
+    expect(slideBox.max.x).toBeGreaterThan(frameBox.max.x);
+    expect(slideBox.max.y).toBeGreaterThan(frameBox.max.y);
     expect(parent.children).toContain(view.group);
   });
 });

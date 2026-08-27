@@ -4,6 +4,8 @@ export interface BarrierBoard {
   /** 0 = destroyed, >0 = intact/damaged. */
   hp: number;
   readonly maxHp: number;
+  /** Increments whenever this board crosses between destroyed and rebuilt. */
+  revision: number;
 }
 
 export interface WindowBarrierConfig {
@@ -57,6 +59,7 @@ export class WindowBarrier {
     this.mutableBoards = Array.from({ length: config.boardCount }, () => ({
       hp: config.boardHp,
       maxHp: config.boardHp,
+      revision: 0,
     }));
     this.boards = this.mutableBoards;
   }
@@ -92,6 +95,7 @@ export class WindowBarrier {
       if (board.hp <= 0) continue;
       board.hp = Math.max(0, board.hp - amount);
       if (board.hp <= 0) {
+        board.revision++;
         this.updateState();
         return 1;
       }
@@ -140,7 +144,10 @@ export class WindowBarrier {
   }
 
   reset(): void {
-    for (const board of this.mutableBoards) board.hp = board.maxHp;
+    for (const board of this.mutableBoards) {
+      if (board.hp <= 0) board.revision++;
+      board.hp = board.maxHp;
+    }
     this._state = 'intact';
     this.repairTimer = 0;
     this.repairedThisRound = 0;
@@ -150,6 +157,7 @@ export class WindowBarrier {
     for (const board of this.mutableBoards) {
       if (board.hp <= 0) {
         board.hp = board.maxHp;
+        board.revision++;
         this.updateState();
         return true;
       }

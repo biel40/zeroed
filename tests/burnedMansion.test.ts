@@ -6,10 +6,14 @@ import { EYE_HEIGHT, PlayerController, stairGroundY } from '../src/player/Player
 import type { Weapon } from '../src/weapons/Weapon';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { Zombie } from '../src/zombies/Zombie';
-import { roundConfig, ZOMBIE_ATTACK_VERTICAL_TOLERANCE } from '../src/zombies/ZombieConfig';
+import {
+  roundConfig,
+  ZOMBIE_ATTACK_VERTICAL_TOLERANCE,
+} from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from '../src/zombies/ZombieSpawner';
 import {
+  BARRIER_CONFIG,
   MANSION_BARRIERS,
   MANSION_AMMO_REFILLS,
   MANSION_BUNKER_BOUNDS,
@@ -1076,6 +1080,8 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.x).toBeLessThan(-7.45);
     expect(zombie.barrierTarget?.id).toBe('start-west-a');
     const assignedBarrier = zombie.barrierTarget!;
+    let barrierImpacts = 0;
+    manager.onBarrierImpact = () => barrierImpacts++;
     manager.update(1 / 60, -4, 5.4, 0);
     expect(zombie.group.rotation.y).toBeGreaterThan(0);
     expect(zombie.group.rotation.y).toBeLessThan(0.2);
@@ -1094,6 +1100,7 @@ describe('Burned Mansion topology', () => {
     }
     expect(crossed).toBe(true);
     expect(maxStep).toBeLessThan(0.1);
+    expect(barrierImpacts).toBe(BARRIER_CONFIG.boardCount);
   });
 
   it('uses scaled PBR surfaces, instanced frames and room-specific unshadowed point lights', () => {

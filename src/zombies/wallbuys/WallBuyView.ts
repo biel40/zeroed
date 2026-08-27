@@ -19,9 +19,9 @@ export class WallBuyView {
     if (definition.id === 'ak47') {
       this.buildAk47Silhouette();
       this.group.userData.silhouette = 'ak47';
-    } else if (view.frame === 'pistol') {
-      this.buildPistolSilhouette();
-      this.group.userData.silhouette = 'pistol';
+    } else if (definition.id === 'm1911') {
+      this.buildM1911Silhouette();
+      this.group.userData.silhouette = 'm1911';
     } else {
       const totalLength = view.stockLength + view.receiverLength + view.barrelLength;
       const scale = 1.35 / totalLength;
@@ -99,17 +99,50 @@ export class WallBuyView {
     this.addPart(0.06, 0.035, -0.03, 0.075).name = 'ak47-tangent-sight';
   }
 
-  private buildPistolSilhouette(): void {
-    this.addPart(0.72, 0.11, 0, 0.04).name = 'pistol-slide';
-    this.addPart(0.46, 0.08, -0.05, -0.055).name = 'pistol-frame';
-    this.addPart(0.035, 0.08, 0.375, 0.035).name = 'pistol-muzzle';
-    this.addPart(0.18, 0.36, -0.2, -0.25, -0.2).name = 'pistol-grip';
-    this.addPart(0.18, 0.035, 0.06, -0.12).name = 'pistol-trigger-guard';
-    this.addPart(0.035, 0.13, 0.145, -0.175).name = 'pistol-trigger-guard';
-    this.addPart(0.035, 0.1, -0.035, -0.16).name = 'pistol-trigger-guard';
-    this.addPart(0.065, 0.06, -0.36, 0.09, -0.3).name = 'pistol-hammer';
-    this.addPart(0.035, 0.035, 0.27, 0.11).name = 'pistol-front-sight';
-    this.addPart(0.07, 0.035, -0.27, 0.11).name = 'pistol-rear-sight';
+  /** Classic M1911A1 side profile. +X points toward the muzzle. */
+  private buildM1911Silhouette(): void {
+    const addShape = (shape: THREE.Shape, name: string): THREE.Mesh => {
+      const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false });
+      geometry.translate(0, 0, -0.0125);
+      const mesh = new THREE.Mesh(geometry, MATERIAL);
+      mesh.name = name;
+      this.group.add(mesh);
+      return mesh;
+    };
+
+    // Long, low Government slide with an almost square muzzle face.
+    const slide = new THREE.Shape();
+    slide.moveTo(-0.35, 0.012);
+    slide.lineTo(-0.35, 0.092);
+    slide.lineTo(0.365, 0.092);
+    slide.lineTo(0.39, 0.078);
+    slide.lineTo(0.39, 0.012);
+    slide.closePath();
+    addShape(slide, 'm1911-wall-slide');
+
+    // Frame, round guard and rear-raked single-stack grip form one continuous
+    // outline. The hole is deliberate: negative space makes the icon readable.
+    const frame = new THREE.Shape();
+    frame.moveTo(-0.34, 0.018);
+    frame.lineTo(0.34, 0.018);
+    frame.lineTo(0.34, -0.052);
+    frame.lineTo(0.11, -0.075);
+    frame.lineTo(0.105, -0.18);
+    frame.lineTo(-0.075, -0.2);
+    frame.lineTo(-0.1, -0.075);
+    frame.lineTo(-0.2, -0.4);
+    frame.lineTo(-0.36, -0.4);
+    frame.lineTo(-0.26, -0.06);
+    frame.lineTo(-0.39, -0.018);
+    frame.closePath();
+    const triggerOpening = new THREE.Path();
+    triggerOpening.absellipse(0.005, -0.13, 0.078, 0.052, 0, Math.PI * 2, true);
+    frame.holes.push(triggerOpening);
+    addShape(frame, 'm1911-wall-frame');
+
+    this.addPart(0.055, 0.045, -0.38, 0.055, -0.38).name = 'm1911-wall-spur-hammer';
+    this.addPart(0.026, 0.025, 0.28, 0.104).name = 'm1911-wall-front-sight';
+    this.addPart(0.05, 0.027, -0.27, 0.105).name = 'm1911-wall-rear-sight';
   }
 
   private addPart(width: number, height: number, x: number, y: number, rotation = 0): THREE.Mesh {

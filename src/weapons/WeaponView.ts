@@ -329,35 +329,33 @@ function buildTesla(config: ViewModelConfig): BuiltProcedural {
 }
 
 /**
- * M1911 view model built from primitives, detailed to hold up next to the
- * GLB rifles: a rounded slide with front + rear cocking serrations, an
- * ejection port, a barrel bushing and Novak-style sights (a REAL notch you
- * align at the sightY line) riding the live blowback slide; the frame
- * carries the trigger-guard loop, beavertail grip safety, spur hammer,
- * slide stop, thumb safety, magazine release and wood grip panels with
- * screw heads. The slide stays a live part (WeaponView kicks it back per
- * shot, the ReloadAnimator racks it during the charge window — it is the
- * reload "handle") and the magazine, baseplate included, is the droppable
- * reload part. Low-poly primitives are built once at preload: cheap everywhere.
+ * Full-size military M1911A1 built around its defining side profile: long,
+ * slab-sided Government slide, short unrailed dust cover, oval trigger guard
+ * and a thin grip raked rearward. Small GI sights, spur hammer, barrel bushing
+ * and recoil-spring plug keep it distinct from modern railed 1911 variants.
+ * The slide and magazine remain live reload parts.
  */
 function buildPistol(config: ViewModelConfig): BuiltProcedural {
   const group = new THREE.Group();
   group.name = 'm1911-root';
-  // Parkerized frame, blued slide (a touch lighter), walnut grip panels.
+  // Dark parkerized frame, blued slide and reddish-brown walnut stocks.
   const frameMat = new THREE.MeshStandardMaterial({
     color: config.bodyColor,
-    roughness: 0.5,
-    metalness: 0.68,
+    roughness: 0.46,
+    metalness: 0.72,
+    envMapIntensity: 1.15,
   });
   const slideMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(config.bodyColor).offsetHSL(0, 0, 0.025),
-    roughness: 0.4,
-    metalness: 0.78,
+    color: new THREE.Color(config.bodyColor).offsetHSL(0, 0, 0.045),
+    roughness: 0.34,
+    metalness: 0.82,
+    envMapIntensity: 1.3,
   });
   const gripMat = new THREE.MeshStandardMaterial({
     color: config.accentColor,
-    roughness: 0.62,
-    metalness: 0.04,
+    roughness: 0.56,
+    metalness: 0.02,
+    envMapIntensity: 1.05,
   });
   // Small controls: trigger, hammer, sights, bushing, screws.
   const dark = new THREE.MeshStandardMaterial({
@@ -409,84 +407,149 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     return mesh;
   };
 
-  const length = config.receiverLength;
-  const slideY = 0.026;
-  const slideTop = slideY + 0.018;
+  /** Author a side profile in (length, height), then extrude it across X. */
+  const extrudeShape = (
+    shape: THREE.Shape,
+    thickness: number,
+    material: THREE.Material,
+  ): THREE.Mesh => {
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+    geometry.rotateY(Math.PI / 2);
+    geometry.translate(-thickness / 2, 0, 0);
+    const mesh = new THREE.Mesh(geometry, material);
+    frame.add(mesh);
+    return mesh;
+  };
 
-  // --- Frame (static): rails, trigger-guard loop, controls, grip ---
-  const receiver = add(roundedBox(0.032, 0.032, length * 0.92, 2, 0.004), frameMat, 0, 0, 0.006);
-  receiver.name = 'm1911-receiver';
-  const dustCover = add(
-    roundedBox(0.03, 0.018, length * 0.48, 2, 0.004),
+  const extrudeProfile = (
+    points: ReadonlyArray<readonly [number, number]>,
+    thickness: number,
+    material: THREE.Material,
+  ): THREE.Mesh => {
+    const shape = new THREE.Shape();
+    shape.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) shape.lineTo(points[i][0], points[i][1]);
+    shape.closePath();
+    return extrudeShape(shape, thickness, material);
+  };
+
+  const length = config.receiverLength;
+  const slideLength = length * 1.05;
+  const slideY = 0.024;
+
+  // --- Frame (static): one continuous forged profile instead of stacked boxes. ---
+  const receiver = extrudeProfile(
+    [
+      [-0.096, 0.017],
+      [0.096, 0.017],
+      [0.096, -0.01],
+      [0.08, -0.018],
+      [0.02, -0.021],
+      [0.004, -0.015],
+      [-0.084, -0.015],
+      [-0.096, -0.003],
+    ],
+    0.031,
     frameMat,
-    0,
-    -0.018,
-    -length * 0.22,
   );
+  receiver.name = 'm1911-receiver';
+  const dustCover = add(roundedBox(0.029, 0.014, 0.082, 2, 0.004), frameMat, 0, -0.015, -0.054);
   dustCover.name = 'm1911-dust-cover';
-  // Overlapping pieces make one continuous forged trigger-guard loop.
-  const triggerGuardBottom = add(roundedBox(0.026, 0.007, 0.064, 2, 0.003), frameMat, 0, -0.034, -0.012);
-  triggerGuardBottom.name = 'm1911-trigger-guard';
-  const triggerGuardFront = add(roundedBox(0.026, 0.028, 0.008, 2, 0.003), frameMat, 0, -0.022, -0.044, -0.12);
-  triggerGuardFront.name = 'm1911-trigger-guard';
-  const triggerGuardRear = add(roundedBox(0.026, 0.024, 0.008, 2, 0.003), frameMat, 0, -0.024, 0.021, 0.2);
-  triggerGuardRear.name = 'm1911-trigger-guard';
-  // Curved trigger shoe inside the guard.
-  const trigger = add(roundedBox(0.005, 0.018, 0.007, 2, 0.002), dark, 0, -0.022, -0.009, 0.18);
+
+  // A real negative space gives the guard its oval side silhouette.
+  const guardShape = new THREE.Shape();
+  guardShape.absellipse(0.014, -0.037, 0.035, 0.027, 0, Math.PI * 2, false);
+  const guardOpening = new THREE.Path();
+  guardOpening.absellipse(0.014, -0.038, 0.027, 0.019, 0, Math.PI * 2, true);
+  guardShape.holes.push(guardOpening);
+  const triggerGuard = extrudeShape(guardShape, 0.027, frameMat);
+  triggerGuard.name = 'm1911-trigger-guard';
+  const trigger = add(roundedBox(0.005, 0.021, 0.006, 2, 0.002), dark, 0, -0.036, 0.002, -0.18);
   trigger.name = 'm1911-trigger';
-  // Beavertail grip safety sweeping over the web of the hand.
+
+  // Short GI grip-safety tang and solid spur hammer, not modern competition parts.
   const beavertail = add(
-    roundedBox(0.026, 0.02, 0.032, 2, 0.006),
+    roundedBox(0.026, 0.012, 0.026, 2, 0.004),
     frameMat,
     0,
-    0.008,
-    length / 2 - 0.008,
-    -0.3,
+    0.003,
+    0.096,
+    0.12,
   );
   beavertail.name = 'm1911-beavertail';
-  // Cocked hammer pieces overlap the rear frame instead of hovering above it.
-  const hammerStem = add(roundedBox(0.01, 0.024, 0.009, 2, 0.002), dark, 0, 0.021, length / 2 - 0.002, -0.3);
+  const hammerStem = add(roundedBox(0.009, 0.022, 0.008, 2, 0.002), dark, 0, 0.019, 0.096, -0.28);
   hammerStem.name = 'm1911-hammer';
-  const hammerSpur = add(roundedBox(0.01, 0.006, 0.018, 2, 0.002), dark, 0, 0.032, length / 2 + 0.004, -0.42);
+  const hammerSpur = add(roundedBox(0.009, 0.006, 0.018, 2, 0.002), dark, 0, 0.029, 0.103, -0.4);
   hammerSpur.name = 'm1911-hammer';
   // Slide stop (pin + arm) and thumb safety ride the LEFT flank.
   const slideStopPin = add(new THREE.CylinderGeometry(0.004, 0.004, 0.003, 8), dark, -0.0155, -0.004, 0.012, 0, Math.PI / 2);
   slideStopPin.name = 'm1911-frame-control';
   const slideStopArm = add(roundedBox(0.0024, 0.006, 0.02, 2, 0.0012), dark, -0.0158, -0.0085, 0.021);
   slideStopArm.name = 'm1911-frame-control';
-  const thumbSafety = add(roundedBox(0.003, 0.007, 0.016, 2, 0.0015), dark, -0.0154, 0.008, length / 2 - 0.024);
+  const thumbSafety = add(roundedBox(0.003, 0.006, 0.014, 2, 0.0015), dark, -0.0154, 0.006, 0.072);
   thumbSafety.name = 'm1911-frame-control';
   // Magazine release button, left flank above the grip.
-  const magazineRelease = add(new THREE.CylinderGeometry(0.0045, 0.0045, 0.003, 10), dark, -0.0155, -0.032, 0.032, 0, Math.PI / 2);
+  const magazineRelease = add(new THREE.CylinderGeometry(0.004, 0.004, 0.003, 10), dark, -0.0155, -0.022, 0.043, 0, Math.PI / 2);
   magazineRelease.name = 'm1911-frame-control';
 
-  // Grip: steel core, walnut panels and a steel mainspring housing, on the
-  // classic 1911 rake. Screws sit on the panel faces along that same rake
-  // (offsets are the panel-center ± the rotated grip axis).
-  const gripCore = add(roundedBox(0.03, 0.102, 0.038, 2, 0.005), frameMat, 0, -0.064, 0.049, 0.26);
+  // Grip sides are authored directly at the classic rearward rake. The old
+  // rotated cuboid leaned the base toward the muzzle, reversing the 1911 line.
+  const gripCore = extrudeProfile(
+    [
+      [-0.088, -0.006],
+      [-0.024, -0.009],
+      [-0.05, -0.092],
+      [-0.114, -0.092],
+    ],
+    0.029,
+    frameMat,
+  );
   gripCore.name = 'm1911-grip-core';
   for (const side of [-1, 1]) {
-    const panel = add(
-      roundedBox(0.0032, 0.086, 0.031, 2, 0.0015),
+    const panel = extrudeProfile(
+      [
+        [-0.082, -0.017],
+        [-0.03, -0.019],
+        [-0.052, -0.083],
+        [-0.108, -0.083],
+      ],
+      0.0032,
       gripMat,
-      side * 0.0148,
-      -0.064,
-      0.049,
-      0.26,
     );
+    panel.position.x = side * 0.0152;
     panel.name = 'm1911-walnut-grip-panel';
-    add(new THREE.CylinderGeometry(0.0025, 0.0025, 0.0015, 8), dark, side * 0.0162, -0.039, 0.0558, 0, Math.PI / 2);
-    add(new THREE.CylinderGeometry(0.0025, 0.0025, 0.0015, 8), dark, side * 0.0162, -0.089, 0.0422, 0, Math.PI / 2);
+    const upperScrew = add(
+      new THREE.CylinderGeometry(0.0024, 0.0024, 0.0015, 10),
+      dark,
+      side * 0.017,
+      -0.032,
+      0.052,
+      0,
+      Math.PI / 2,
+    );
+    upperScrew.name = 'm1911-grip-screw';
+    const lowerScrew = add(
+      new THREE.CylinderGeometry(0.0024, 0.0024, 0.0015, 10),
+      dark,
+      side * 0.017,
+      -0.071,
+      0.079,
+      0,
+      Math.PI / 2,
+    );
+    lowerScrew.name = 'm1911-grip-screw';
   }
-  add(roundedBox(0.022, 0.084, 0.005, 2, 0.002), dark, 0, -0.069, 0.068, 0.26);
+  const mainspringHousing = add(roundedBox(0.021, 0.07, 0.005, 2, 0.002), dark, 0, -0.053, 0.101, -0.29);
+  mainspringHousing.name = 'm1911-mainspring-housing';
 
-  // The muzzle crown meets the bushing at the slide face; no detached tube.
+  // The two circles at the front are characteristic: barrel/bushing above,
+  // recoil spring plug below. Both meet the slide face instead of floating.
   const barrel = add(
-    new THREE.CylinderGeometry(config.barrelRadius, config.barrelRadius, 0.016, 12),
+    new THREE.CylinderGeometry(config.barrelRadius, config.barrelRadius, 0.014, 16),
     dark,
     0,
     slideY + 0.001,
-    -length / 2 - 0.004,
+    -slideLength / 2 - 0.006,
     Math.PI / 2,
   );
   barrel.name = 'm1911-barrel';
@@ -495,16 +558,25 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     new THREE.MeshBasicMaterial({ color: 0x050607 }),
     0,
     slideY + 0.001,
-    -length / 2 - 0.0122,
+    -slideLength / 2 - 0.0132,
   );
   muzzleCrown.name = 'm1911-muzzle-crown';
+  const recoilPlug = add(
+    new THREE.CylinderGeometry(0.0065, 0.0065, 0.009, 14),
+    dark,
+    0,
+    0.006,
+    -slideLength / 2 - 0.008,
+    Math.PI / 2,
+  );
+  recoilPlug.name = 'm1911-recoil-spring-plug';
 
   // --- SLIDE GROUP — everything in here moves with the blowback / racking ---
   const slide = new THREE.Group();
   slide.name = 'm1911-slide';
   slide.position.set(0, slideY, 0);
   const slideBody = new THREE.Mesh(
-    roundedBox(0.038, 0.036, length * 1.03, 3, 0.006),
+    roundedBox(0.035, 0.034, slideLength, 2, 0.0035),
     slideMat,
   );
   slideBody.name = 'm1911-slide-body';
@@ -524,81 +596,80 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   };
 
   const slideTopRib = slideAdd(
-    roundedBox(0.022, 0.002, length * 0.84, 2, 0.001),
+    roundedBox(0.018, 0.0015, slideLength * 0.78, 2, 0.0007),
     slideMat,
     0,
-    0.0175,
-    -0.002,
+    0.0168,
+    -0.004,
   );
   slideTopRib.name = 'm1911-slide-top-rib';
 
   // Shallow side grooves preserve the 1911 slide silhouette from the rear;
   // full-width ribs read as a ladder when seen down the sights.
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 7; i++) {
       const serration = slideAdd(
-        new THREE.BoxGeometry(0.0008, 0.012, 0.0025),
+        new THREE.BoxGeometry(0.0007, 0.014, 0.0022),
         dark,
-        side * 0.0186,
-        -0.002,
-        length / 2 - 0.016 - i * 0.006,
+        side * 0.0172,
+        -0.001,
+        slideLength / 2 - 0.015 - i * 0.0045,
       );
       serration.name = 'm1911-slide-serration';
     }
   }
-  // Ejection port: a dark inset plate on the top-right of the slide.
-  const ejectionPort = slideAdd(roundedBox(0.016, 0.0015, 0.032, 2, 0.0007), dark, 0.0065, 0.0176, -0.03);
+  // Compact GI ejection port: high on the right side, not lowered or flared.
+  const ejectionPort = slideAdd(roundedBox(0.0012, 0.012, 0.031, 2, 0.0005), dark, 0.0171, 0.004, -0.026);
   ejectionPort.name = 'm1911-ejection-port';
   const chamber = slideAdd(
-    roundedBox(0.011, 0.001, 0.024, 2, 0.0005),
+    roundedBox(0.012, 0.0012, 0.026, 2, 0.0005),
     new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.34, metalness: 0.82 }),
-    0.0065,
-    0.0182,
-    -0.03,
+    0.006,
+    0.0172,
+    -0.026,
   );
   chamber.name = 'm1911-chamber';
   // Barrel bushing ringing the muzzle at the slide face.
-  const bushing = new THREE.Mesh(new THREE.TorusGeometry(0.0096, 0.002, 6, 16), dark);
-  bushing.position.set(0, 0.001, -length / 2 - 0.003);
+  const bushing = new THREE.Mesh(new THREE.TorusGeometry(0.0094, 0.0018, 8, 20), dark);
+  bushing.position.set(0, 0.001, -slideLength / 2 - 0.003);
   bushing.name = 'm1911-barrel-bushing';
   slide.add(bushing);
 
-  // Compact dovetailed sights overlap the slide top. Rear ears leave a real
-  // notch; the front ramp stays restrained, and both end exactly at sightY.
+  // Restrained GI sights: two small rear ears leave the aiming notch.
   const sightTop = config.sightHeight;
-  const rearSightZ = length / 2 - 0.016;
+  const rearSightZ = slideLength / 2 - 0.019;
   const rearBase = slideAdd(
-    roundedBox(0.026, 0.003, 0.014, 2, 0.0012),
+    roundedBox(0.019, 0.003, 0.011, 2, 0.001),
     sightMat,
     0,
-    sightTop - slideY - 0.008,
+    sightTop - slideY - 0.0065,
     rearSightZ,
   );
   rearBase.name = 'm1911-rear-sight';
   for (const side of [-1, 1]) {
     const rearEar = slideAdd(
-      roundedBox(0.0055, 0.007, 0.009, 2, 0.0012),
+      roundedBox(0.0042, 0.006, 0.007, 2, 0.001),
       sightMat,
-      side * 0.007,
-      sightTop - slideY - 0.0035,
+      side * 0.0052,
+      sightTop - slideY - 0.003,
       rearSightZ,
     );
     rearEar.name = 'm1911-rear-sight';
   }
   const frontBase = slideAdd(
-    roundedBox(0.01, 0.003, 0.015, 2, 0.0012),
+    roundedBox(0.007, 0.0025, 0.012, 2, 0.0009),
     sightMat,
     0,
-    sightTop - slideY - 0.0075,
-    -length / 2 + 0.018,
+    sightTop - slideY - 0.00625,
+    -slideLength / 2 + 0.019,
   );
   frontBase.name = 'm1911-front-sight';
   const frontBlade = slideAdd(
-    roundedBox(0.0035, 0.007, 0.006, 2, 0.001),
+    roundedBox(0.0028, 0.006, 0.005, 2, 0.0008),
     sightMat,
     0,
-    sightTop - slideY - 0.0035,
-    -length / 2 + 0.016,
+    sightTop - slideY - 0.003,
+    -slideLength / 2 + 0.017,
   );
   frontBlade.name = 'm1911-front-sight';
   group.add(slide);
@@ -614,14 +685,14 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
       metalness: 0.7,
     }),
   );
-  magazine.position.set(0, -0.064, 0.049);
-  magazine.rotation.x = 0.26;
+  magazine.position.set(0, -0.052, 0.069);
+  magazine.rotation.x = -0.3;
   magazine.name = 'm1911-magazine';
   const baseplate = new THREE.Mesh(
     roundedBox(magW + 0.006, 0.008, magD + 0.006, 2, 0.003),
     dark,
   );
-  baseplate.position.y = -magH / 2 - 0.002;
+  baseplate.position.y = -magH / 2 + 0.001;
   magazine.add(baseplate);
   group.add(magazine);
 
@@ -629,8 +700,16 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   const sightY = sightTop * config.scale;
   return {
     group,
-    muzzlePosition: new THREE.Vector3(0, (slideY + 0.001) * config.scale, (-length / 2 - 0.013) * config.scale),
-    ejectionPosition: new THREE.Vector3(0.018 * config.scale, slideTop * config.scale, -0.03 * config.scale),
+    muzzlePosition: new THREE.Vector3(
+      0,
+      (slideY + 0.001) * config.scale,
+      (-slideLength / 2 - 0.014) * config.scale,
+    ),
+    ejectionPosition: new THREE.Vector3(
+      0.019 * config.scale,
+      (slideY + 0.004) * config.scale,
+      -0.026 * config.scale,
+    ),
     sightY,
     slide,
     reloadParts: { magazine, handle: slide },

@@ -155,6 +155,7 @@ export class BurnedMansionArena implements ZombieArena {
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
   readonly completionInteraction: ArenaCompletionInteraction = MANSION_BUNKER_ENDING;
   onTopologyChanged: (() => void) | null = null;
+  onBarrierBoardRebuilt: (() => void) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -206,7 +207,11 @@ export class BurnedMansionArena implements ZombieArena {
         ),
     );
     for (const barrier of this.allBarriers) {
-      const view = new WindowBarrierView(barrier, this.group);
+      const view = new WindowBarrierView(
+        barrier,
+        this.group,
+        () => this.onBarrierBoardRebuilt?.(),
+      );
       if (this.profile.useReducedEffects) {
         view.group.traverse((object) => { object.castShadow = false; });
       }
@@ -253,7 +258,9 @@ export class BurnedMansionArena implements ZombieArena {
   public update(dt: number): void {
     for (const pickup of this.weaponPickups) pickup.update?.(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
-    for (const view of this.barrierViews) view.update();
+    for (const view of this.barrierViews) {
+      if (view.group.visible) view.update(dt);
+    }
     for (let index = 0; index < this.doorViews.length; index++) {
       if (!this.doorViews[index].update(dt)) continue;
       const doorId = this.doors[index].id;
@@ -270,6 +277,7 @@ export class BurnedMansionArena implements ZombieArena {
 
   public reset(): void {
     for (const barrier of this.allBarriers) barrier.reset();
+    for (const view of this.barrierViews) view.reset();
     for (const door of this.doors) door.reset();
     for (const view of this.doorViews) view.reset();
     for (const pickup of this.weaponPickups) pickup.reset();

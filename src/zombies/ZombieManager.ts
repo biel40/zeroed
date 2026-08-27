@@ -164,6 +164,7 @@ export class ZombieManager {
 
   onZombieKilled: ((zombie: Zombie, headshot: boolean) => void) | null = null;
   onPlayerAttack: ((damage: number) => void) | null = null;
+  onBarrierImpact: (() => void) | null = null;
 
   private readonly pool: ZombiePool;
   private spawner: ZombieSpawner;
@@ -201,6 +202,7 @@ export class ZombieManager {
   /** Open/closed bitmask of the barriers at the last navigation rebuild. */
   private lastBarrierSignature = -1;
   private frameIndex = 0;
+  private lastBarrierImpactAudioFrame = -1;
   private pathBudget = 0;
   private navigationComputations = 0;
   private readonly zombieIds = new Map<Zombie, number>();
@@ -848,7 +850,7 @@ export class ZombieManager {
       if (barrierDistance <= ZOMBIE_BARRIER_ATTACK_RANGE) {
         if (zombie.tryBarrierAttack()) {
           zombie.onAttackLanded = () => {
-            target.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE);
+            this.hitBarrier(target);
             if (target.isOpen) zombie.barrierTarget = null;
           };
         }
@@ -1705,7 +1707,7 @@ export class ZombieManager {
       if (barrier && !barrier.isOpen) {
         zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
         if (zombie.state === 'walk' && zombie.tryBarrierAttack()) {
-          zombie.onAttackLanded = () => barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE);
+          zombie.onAttackLanded = () => this.hitBarrier(barrier);
         }
         return true;
       }
@@ -1727,6 +1729,14 @@ export class ZombieManager {
       this.seek(zombie, dt, direction, route.breachX, route.breachZ);
     }
     return true;
+  }
+
+  private hitBarrier(barrier: WindowBarrier): void {
+    if (barrier.isOpen) return;
+    if (barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE) === 0) return;
+    if (this.lastBarrierImpactAudioFrame === this.frameIndex) return;
+    this.lastBarrierImpactAudioFrame = this.frameIndex;
+    this.onBarrierImpact?.();
   }
 
   /** Circle-vs-AABB test in XZ, with the body radius folded into the box. */
