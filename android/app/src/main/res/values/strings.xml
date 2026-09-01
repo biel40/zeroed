@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Zeroed</string>
+    <string name="title_activity_main">Zeroed</string>
+    <string name="package_name">es.zeroed.game</string>
+    <string name="custom_url_scheme">es.zeroed.game</string>
+</resources>

@@ -216,7 +216,7 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
 /** Mystery Box in the room immediately behind the first paid door. */
 export const MANSION_BOX_PLACEMENT = {
   position: { x: -5.2, y: 0, z: -5.6 },
-  yaw: Math.PI / 2,
+  yaw: -Math.PI / 2,
   useRange: 2.2,
   lookDotMin: 0.5,
   floor: 0,

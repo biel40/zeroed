@@ -160,10 +160,7 @@ export class ZombiesMode implements GameMode {
     }
 
     // The Mystery Box: main weapon progression, exclusive to this mode.
-    // The audio duration provider keeps the reveal synced to the real MP3.
-    this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, Math.random, () =>
-      ctx.audio.getMysteryBoxOpenDuration(),
-    );
+    this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
     this.boxView = new MysteryBoxView(
       ctx.assets,
       this.arena.mysteryBoxPlacement.position,
@@ -755,15 +752,24 @@ export class ZombiesMode implements GameMode {
   private onZombieKilled(headshot: boolean): void {
     if (!this.isGameplayInputEnabled()) return;
     this.kills++;
-    if (headshot) this.headshots++;
+
+    if (headshot) {
+      this.headshots++;
+    }
+
     // A lethal headshot already has a strong dedicated impact. Layering the
     // generic death growl at the same instant masks its short crack.
-    if (!headshot) this.ctx.audio.playZombieDeath();
+    if (!headshot) {
+      this.ctx.audio.playZombieDeath();
+    }
+    
     // Kill reward: headshot (+100) replaces the normal kill (+50); the two
     // never stack for one death. Splash/chain kills arrive here too, so all
     // kill points flow through this single call.
     this.economy.awardKill(headshot);
-    if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) this.unlockRayGun();
+    if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) {
+      this.unlockRayGun();
+    }
   }
 
   /**

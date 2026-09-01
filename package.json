@@ -11,12 +11,17 @@
     "preview": "vite preview",
     "generate:zombie-brute": "node scripts/generate-brute-asset.mjs",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:run": "npm run android:sync && cd android && gradlew.bat installDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "three": "^0.178.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
     "@types/node": "^26.2.0",
     "@types/three": "^0.178.0",
     "typescript": "~5.8.3",

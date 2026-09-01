@@ -191,6 +191,10 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_BOX_PLACEMENT.floor).toBe(0);
   });
 
+  it('faces the Mystery Box toward the room instead of the west windows', () => {
+    expect(MANSION_BOX_PLACEMENT.yaw).toBe(-Math.PI / 2);
+  });
+
   it('builds a large enclosed underground bunker with an open stairwell', () => {
     const arena = makeArena();
     const roof = arena.group.getObjectByName('mansion-roof');

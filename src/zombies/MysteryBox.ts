@@ -1,6 +1,8 @@
 import { lerp } from '../utils/math';
 import type { WeaponId } from '../weapons/WeaponTypes';
 
+const TIMER_EPSILON = 1e-9;
+
 /** One weapon on the Mystery Box wheel; weights are relative, not percent. */
 export type MysteryBoxRarity = 'standard' | 'rare' | 'legendary';
 
@@ -27,25 +29,13 @@ export const MYSTERY_BOX_POOL: readonly MysteryBoxEntry[] = [
 /** Timings (seconds) and behaviour knobs of the box sequence. */
 export const MYSTERY_BOX_TUNING = {
   /** Lid swing before the roll starts. */
-  openTime: 0.12,
-  /**
-   * Fallback roll window, used only while the opening theme is not decoded
-   * yet (or missing entirely). Once the real MP3 duration is known the roll
-   * is timed by `revealLeadTime` instead — see computeRollDuration.
-   */
-  rollTimeMin: 5.88,
-  rollTimeMax: 5.88,
-  /** The weapon reveal lands this many seconds before the opening theme ends. */
-  revealLeadTime: 1,
-  /**
-   * Lower bound for the roll, even if the decoded clip is oddly short: the
-   * roulette needs a minimum run to read as a roulette at all.
-   */
-  rollTimeFloor: 2,
+  openTime: 0.7,
+  /** Exact time from activation until the final weapon is revealed. */
+  revealTime: 5,
   /** How long the result floats before the box takes it back. */
   pickupTime: 10,
   /** Lid swing back down. */
-  closeTime: 0.6,
+  closeTime: 0.85,
   /** Weapon-swap cadence at roll start/end (the decelerating roulette). */
   tickStartInterval: 0.09,
   tickEndInterval: 0.32,
@@ -140,12 +130,6 @@ export class MysteryBoxMachine {
     private readonly pool: readonly MysteryBoxEntry[],
     private readonly tuning: typeof MYSTERY_BOX_TUNING,
     private readonly rng: () => number = Math.random,
-    /**
-     * Duration of the decoded opening theme in seconds, or null while the
-     * asset is still loading. Read fresh at every roll start, so a clip
-     * that finishes decoding mid-session syncs from the next activation.
-     */
-    private readonly openAudioDuration: () => number | null = () => null,
   ) {
     if (pool.length === 0) throw new Error('MysteryBoxMachine needs a non-empty pool');
     this.displayId = pool[0].weaponId;
@@ -194,10 +178,11 @@ export class MysteryBoxMachine {
     switch (this.phase) {
       case 'opening':
         this.timer -= dt;
-        if (this.timer <= 0) {
+        if (this.timer <= TIMER_EPSILON) {
           this.phase = 'rolling';
-          this.rollDuration = this.computeRollDuration();
-          this.timer = this.rollDuration;
+          this.rollDuration = this.tuning.revealTime - this.tuning.openTime;
+          // Preserve frame overshoot so activation-to-reveal remains exactly configured.
+          this.timer += this.rollDuration;
           this.tickTimer = 0;
         }
         break;
@@ -211,7 +196,7 @@ export class MysteryBoxMachine {
           this.pendingEvents.push({ type: 'rollTick' });
         }
         this.timer -= dt;
-        if (this.timer <= 0) {
+        if (this.timer <= TIMER_EPSILON) {
           this.resultId = pickWeighted(this.pool, this.rng, this.lastResult, this.tuning.repeatFactor);
           this.displayId = this.resultId;
           this.phase = 'awaitingPickup';
@@ -256,23 +241,6 @@ export class MysteryBoxMachine {
 
   clearEvents(): void {
     this.pendingEvents.length = 0;
-  }
-
-  /**
-   * Roll length for this activation. With the opening theme decoded, the
-   * reveal (openTime + roll) lands exactly `revealLeadTime` before the
-   * audio ends; without it, the fixed fallback window keeps the show
-   * running. The floor protects the roulette from degenerate clips.
-   */
-  private computeRollDuration(): number {
-    const audioDuration = this.openAudioDuration();
-    if (audioDuration !== null && Number.isFinite(audioDuration) && audioDuration > 0) {
-      return Math.max(
-        this.tuning.rollTimeFloor,
-        audioDuration - this.tuning.revealLeadTime - this.tuning.openTime,
-      );
-    }
-    return lerp(this.tuning.rollTimeMin, this.tuning.rollTimeMax, this.rng());
   }
 
   /** Next weapon shown on the wheel; never the same one twice in a row. */

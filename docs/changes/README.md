@@ -17,6 +17,7 @@ Plantilla:
 
 ## Índice
 
+- [2026-09-01 — Rediseño visual y animado de Mystery Box](2026-09-01-mystery-box-redesign.md)
 - [2026-08-27 — Rediseño Government de la M1911](2026-08-27-m1911-government-redesign.md)
 - [2026-08-25 — Ampliacion de las salas M4A1 y bunker](2026-08-25-east-wing-room-expansion.md)
 - [2026-08-25 — Acceso unidireccional a la escalera del bunker](2026-08-25-bunker-stair-single-route.md)

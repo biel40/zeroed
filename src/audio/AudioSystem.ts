@@ -493,16 +493,6 @@ export class AudioSystem {
     }
   }
 
-  /**
-   * Duration of the decoded Mystery Box opening theme in seconds, or null
-   * while the MP3 is still fetching/decoding (or failed to load). Lets the
-   * box machine time the weapon reveal against the REAL audio instead of
-   * a hardcoded guess.
-   */
-  public getMysteryBoxOpenDuration(): number | null {
-    return this.mysteryBoxOpenBuffer ? this.mysteryBoxOpenBuffer.duration : null;
-  }
-
   /** Mystery Box opening: a hollow rising creak with a wooden knock. */
   public playMysteryBoxOpen(): void {
     const audio: AudioContextParts | null = this.context();

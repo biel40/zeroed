@@ -75,7 +75,7 @@ Points
 - `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
 - `ZombieFootsteps` da pasos posicionales 3D: un unico `AudioListener` en la camara (sobre el AudioContext compartido de `AudioSystem`) y un pool de 8 `PositionalAudio` reasignados cada 0.25 s a los zombies vivos mas cercanos; la cadencia sale de la velocidad medida y solo suenan en `walk` con desplazamiento real.
 - `WindowBarrierView` mantiene una animacion independiente por tabla: el HP sigue siendo autoritativo de inmediato, mientras impacto, caida y encaje se ejecutan en el update de la arena y siempre terminan restaurando la transformacion original.
-- La Mystery Box pondera sus resultados por rareza: ZEUS-77 es legendaria, aparece con glow dorado y peso 3 frente al peso 10 de Ray Gun; Ray Gun sigue garantizada al alcanzar 115 bajas.
+- La Mystery Box pondera sus resultados por rareza: ZEUS-77 es legendaria, aparece con glow dorado y peso 3 frente al peso 10 de Ray Gun; Ray Gun sigue garantizada al alcanzar 115 bajas. Su vista procedural refleja las fases de la maquina con apertura y cierre amortiguados, ruleta flotante y una retirada animada del arma, sin poseer reglas de gameplay. El resultado se revela exactamente 5 segundos despues de la activacion.
 
 ## Armas especiales
 
