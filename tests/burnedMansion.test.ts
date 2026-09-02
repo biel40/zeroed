@@ -673,7 +673,7 @@ describe('Burned Mansion topology', () => {
     );
     manager.registerColliders([...arena.colliders]);
     manager.setNavigationBounds(arena.navigationBounds);
-    manager.spawnZombie(roundConfig(5), 0.8, -4.2, 5);
+    manager.spawnZombie(roundConfig(5), 0.8, -4.2, 6);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];

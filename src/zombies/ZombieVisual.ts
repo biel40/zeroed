@@ -52,7 +52,7 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       death: ['ZombieDeath', 'Death'],
     },
     walkReferenceSpeed: 1.35,
-    tints: [0xa8b89a, 0x9aa88e, 0xb0a890, 0x98a498],
+    tints: [0xb2b9a8, 0x96a18f, 0xb5aa98, 0x8f9b96, 0xa5aa91, 0xaaa29b],
     anchors: {
       torso: ['Hips', 'Pelvis'],
       head: ['Head'],
@@ -88,6 +88,41 @@ const FLASH_COLOR = 0xff2211;
 const UNDEAD_GLOW = 0x1a2a12;
 /** How deep below ground the spawn rise starts, meters. */
 const SPAWN_DEPTH = 1.25;
+
+/**
+ * Reshapes the authored walker through its existing skeleton. Geometry and
+ * clips remain shared; only cheap per-clone bone transforms differ.
+ */
+function applyWalkerAnatomy(model: THREE.Object3D, tint: number): void {
+  const variant = ZOMBIE_MODELS.walker.tints.indexOf(tint);
+  const asymmetry = ((variant < 0 ? tint : variant) % 3 - 1) * 0.035;
+  const scaleBone = (name: string, x: number, y: number, z: number): void => {
+    const bone = model.getObjectByName(name);
+    if (bone) bone.scale.multiply(new THREE.Vector3(x, y, z));
+  };
+
+  // A narrower, taller skull and fuller upper torso remove the toy-like head/body ratio.
+  scaleBone('Head', 0.88 + asymmetry, 1.06, 0.92);
+  scaleBone('Spine2', 1.08, 1.02, 0.96);
+  scaleBone('Hips', 0.96, 1, 0.98);
+  scaleBone('LeftShoulder', 1.04 + asymmetry, 1, 1.02);
+  scaleBone('RightShoulder', 1.04 - asymmetry, 1, 1.02);
+  scaleBone('LeftArm', 0.94, 1.02 + asymmetry, 0.94);
+  scaleBone('RightArm', 0.94, 1.02 - asymmetry, 0.94);
+  scaleBone('LeftForeArm', 0.88, 1.04, 0.9);
+  scaleBone('RightForeArm', 0.9, 1.01, 0.88);
+  scaleBone('LeftHand', 1.04, 1.02, 0.92);
+  scaleBone('RightHand', 0.98, 1.06, 0.94);
+  scaleBone('LeftUpLeg', 0.94, 1.02, 0.96);
+  scaleBone('RightUpLeg', 0.96, 0.99, 0.94);
+
+  // The model node is outside the animated tracks, so the permanent lean does
+  // not fight the mixer. Re-grounding keeps navigation and spawn Y unchanged.
+  model.rotation.x = 0.075 + asymmetry * 0.35;
+  model.updateMatrixWorld(true);
+  const leanedBounds = new THREE.Box3().setFromObject(model);
+  model.position.y -= leanedBounds.min.y;
+}
 
 interface MaterialBase {
   readonly color: THREE.Color;
@@ -346,8 +381,12 @@ function placeOnAnchor(
 ): void {
   anchor.add(hitbox);
   hitbox.position.copy(anchor.worldToLocal(anchorTmpD.copy(worldTarget)));
-  const scale = anchor.getWorldScale(anchorTmpB).x;
-  hitbox.scale.setScalar(1 / Math.max(scale, 1e-6));
+  const scale = anchor.getWorldScale(anchorTmpB);
+  hitbox.scale.set(
+    1 / Math.max(scale.x, 1e-6),
+    1 / Math.max(scale.y, 1e-6),
+    1 / Math.max(scale.z, 1e-6),
+  );
 }
 
 /**
@@ -416,6 +455,7 @@ export class ZombieVisual {
       const scale = this.modelConfig.height / Math.max(size.y, 1e-4);
       model.scale.setScalar(scale);
       model.position.y = -box.min.y * scale;
+      if (modelId === 'walker') applyWalkerAnatomy(model, tint);
 
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
@@ -426,8 +466,13 @@ export class ZombieVisual {
         const cloned = mats.map((m) => {
           const c = m.clone() as THREE.MeshStandardMaterial;
           c.color.multiply(new THREE.Color(tint));
+          // Corpse skin and fabric are dielectric. The source's 0.4
+          // metalness made the whole textured body read like tinted plastic.
+          if (modelId === 'walker') c.metalness = Math.min(c.metalness, 0.04);
+          c.roughness = Math.min(0.94, Math.max(0.72, c.roughness));
+          c.envMapIntensity = modelId === 'walker' ? 0.72 : Math.max(0.8, c.envMapIntensity);
           c.emissive = new THREE.Color(UNDEAD_GLOW);
-          c.emissiveIntensity = 0.35;
+          c.emissiveIntensity = modelId === 'walker' ? 0.12 : 0.2;
           c.transparent = true;
           this.materials.push(c);
           return c;
@@ -480,7 +525,7 @@ export class ZombieVisual {
     this.root.scale.set(...config.bodyScale);
     this.walkAnimationMultiplier = config.walkAnimationMultiplier;
     this.glowColor = UNDEAD_GLOW;
-    this.glowIntensity = 0.35;
+    this.glowIntensity = this.modelId === 'walker' ? 0.12 : 0.2;
 
     for (let index = 0; index < this.materials.length; index++) {
       const material = this.materials[index];

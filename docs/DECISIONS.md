@@ -1,5 +1,11 @@
 # Decisiones arquitectonicas
 
+## [2026-09-02] Separar soporte de mapa de visibilidad publica
+
+- Contexto: Zombies es la experiencia principal y Shooting Range debe desaparecer del menu sin eliminar Classic ni impedir un desbloqueo futuro.
+- Decision: centralizar los mapas soportados y su propiedad `visible` en `src/config/zombieMaps.ts`; el menu muestra Burned Mansion como `PLAY ZOMBIES`, mientras `classic` permanece valido para el modo y para `?map=classic`.
+- Motivo: la disponibilidad publica cambia sin acoplar progresion futura al HTML ni alterar la construccion, carga o funcionalidad interna de los mapas.
+
 ## [2026-08-24] Separar tipos zombie de modelos y reservas visuales
 
 - Contexto: escalar el walker no daba al Brute identidad suficiente y un pool con un único modelo impedía introducir siluetas realmente distintas sin crear objetos durante la ronda.

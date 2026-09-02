@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ZombieMapId } from '../config/zombieMaps';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
 import { PlayerHealth } from '../game/PlayerHealth';
@@ -105,7 +106,7 @@ export class ZombiesMode implements GameMode {
   /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
   private readonly tmpDirection = new THREE.Vector3();
 
-  constructor(private readonly mapId: 'classic' | 'burned-mansion' = 'classic') { }
+  constructor(private readonly mapId: ZombieMapId = 'classic') { }
 
   init(ctx: ModeContext): void {
     this.ctx = ctx;

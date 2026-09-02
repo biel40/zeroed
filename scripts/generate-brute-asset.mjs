@@ -78,22 +78,25 @@ mesh('BrutePelvis', new THREE.DodecahedronGeometry(0.5, 0), materials.cloth, hip
 const torso = new THREE.Group();
 torso.name = 'Torso';
 torso.position.set(0, 0.16, 0.03);
-torso.rotation.x = 0.16;
+torso.rotation.x = 0.24;
 hips.add(torso);
-mesh('BruteChest', new THREE.DodecahedronGeometry(0.62, 0), materials.cloth, torso, [0, 0.48, 0], [1.28, 0.9, 0.7]);
-mesh('BruteBelly', new THREE.SphereGeometry(0.5, 12, 8), materials.skin, torso, [0, 0.16, 0.17], [1.34, 1.05, 1.02]);
+mesh('BruteChest', new THREE.DodecahedronGeometry(0.62, 0), materials.cloth, torso, [0, 0.49, -0.01], [1.48, 0.94, 0.78]);
+mesh('BruteBackMass', new THREE.DodecahedronGeometry(0.43, 0), materials.bruised, torso, [-0.06, 0.62, -0.28], [1.42, 1.04, 0.8], [-0.18, 0, 0.12]);
+mesh('BruteBelly', new THREE.SphereGeometry(0.5, 12, 8), materials.skin, torso, [0.02, 0.15, 0.2], [1.42, 1.12, 1.1]);
 mesh('BruteBellyWound', new THREE.CircleGeometry(0.18, 7), materials.wound, torso, [0.19, 0.2, 0.655], [1.1, 0.72, 1], [0, 0, -0.18]);
 mesh('BruteSpinePlate', new THREE.BoxGeometry(0.32, 0.62, 0.08), materials.metal, torso, [0, 0.47, -0.43], [1, 1, 1], [-0.12, 0, 0]);
+mesh('BruteNeck', new THREE.CylinderGeometry(0.19, 0.25, 0.28, 8), materials.bruised, torso, [0.04, 0.86, 0.02], [1.15, 1, 1.05], [0.18, 0, 0]);
 
 const head = new THREE.Group();
 head.name = 'Head';
-head.position.set(0.05, 0.94, 0.06);
+head.position.set(0.08, 0.98, 0.13);
 head.rotation.z = -0.08;
 torso.add(head);
-mesh('BruteHead', new THREE.IcosahedronGeometry(0.2, 1), materials.bruised, head, [0, 0, 0], [0.9, 1.05, 0.92]);
+mesh('BruteHead', new THREE.IcosahedronGeometry(0.2, 1), materials.bruised, head, [0, 0, 0], [0.82, 1.02, 0.86]);
 mesh('BruteJaw', new THREE.BoxGeometry(0.24, 0.1, 0.2), materials.skin, head, [0, -0.17, 0.06], [1, 1, 1], [0.22, 0, 0]);
 mesh('BruteEyeL', new THREE.SphereGeometry(0.025, 6, 4), materials.wound, head, [-0.07, 0.03, 0.17]);
 mesh('BruteEyeR', new THREE.SphereGeometry(0.025, 6, 4), materials.wound, head, [0.07, 0.03, 0.17]);
+mesh('BruteTempleScar', new THREE.BoxGeometry(0.025, 0.15, 0.012), materials.wound, head, [-0.13, 0.02, 0.15], [1, 1, 1], [0.08, 0, -0.28]);
 const headTop = new THREE.Object3D();
 headTop.name = 'HeadTop_End';
 headTop.position.y = 0.2;
@@ -102,7 +105,7 @@ head.add(headTop);
 function buildArm(side, size, drop, forward) {
   const shoulder = new THREE.Group();
   shoulder.name = side < 0 ? 'ShoulderL' : 'ShoulderR';
-  shoulder.position.set(side * 0.66, 0.72, 0);
+  shoulder.position.set(side * 0.74, 0.72, -0.01);
   shoulder.rotation.z = side * drop;
   torso.add(shoulder);
   mesh(
@@ -111,7 +114,7 @@ function buildArm(side, size, drop, forward) {
     materials.skin,
     shoulder,
     [0, -size * 0.31, forward],
-    [1.15, 1, 1],
+    [1.25, 1, 1.08],
   );
   mesh(
     side < 0 ? 'BruteShoulderL' : 'BruteShoulderR',
@@ -119,7 +122,7 @@ function buildArm(side, size, drop, forward) {
     materials.bruised,
     shoulder,
     [0, -0.02, 0],
-    [1.25, 1, 1],
+    [1.38, 1.08, 1.12],
   );
   const elbow = new THREE.Group();
   elbow.name = side < 0 ? 'ElbowL' : 'ElbowR';
@@ -132,7 +135,7 @@ function buildArm(side, size, drop, forward) {
     materials.bruised,
     elbow,
     [0, -size * 0.3, 0.03],
-    [1.15, 1, 1.1],
+    [1.28, 1, 1.18],
   );
   mesh(
     side < 0 ? 'BruteCuffL' : 'BruteCuffR',
@@ -147,13 +150,13 @@ function buildArm(side, size, drop, forward) {
     materials.skin,
     elbow,
     [0, -size * 0.72, 0.1],
-    [1.1, 0.88, 1.18],
+    [1.28, 0.98, 1.32],
   );
   return shoulder;
 }
 
-const shoulderL = buildArm(-1, 1.02, 0.18, 0.04);
-const shoulderR = buildArm(1, 0.88, 0.09, 0.11);
+const shoulderL = buildArm(-1, 1.08, 0.2, 0.02);
+const shoulderR = buildArm(1, 0.96, 0.08, 0.13);
 
 function buildLeg(side) {
   const leg = new THREE.Group();
@@ -200,32 +203,36 @@ function quaternionTrack(node, times, eulers) {
   return new THREE.QuaternionKeyframeTrack(`${node.name}.quaternion`, times, values);
 }
 
-const walkTimes = [0, 0.3, 0.6, 0.9, 1.2];
-const walk = new THREE.AnimationClip('BruteWalk', 1.2, [
+const walkTimes = [0, 0.35, 0.7, 1.05, 1.4];
+const walk = new THREE.AnimationClip('BruteWalk', 1.4, [
   new THREE.VectorKeyframeTrack('Hips.position', walkTimes, [
-    0, 0.72, 0, 0, 0.77, 0, 0, 0.72, 0, 0, 0.77, 0, 0, 0.72, 0,
+    -0.025, 0.72, 0, 0, 0.8, 0.015, 0.025, 0.72, 0, 0, 0.8, 0.015, -0.025, 0.72, 0,
   ]),
-  quaternionTrack(torso, walkTimes, [[0.16, 0, -0.05], [0.18, 0.08, 0], [0.16, 0, 0.05], [0.18, -0.08, 0], [0.16, 0, -0.05]]),
+  quaternionTrack(torso, walkTimes, [[0.24, 0, -0.07], [0.28, 0.1, 0], [0.24, 0, 0.07], [0.28, -0.1, 0], [0.24, 0, -0.07]]),
+  quaternionTrack(head, walkTimes, [[0.02, 0.05, -0.11], [-0.03, 0, -0.07], [0.02, -0.05, -0.04], [-0.03, 0, -0.08], [0.02, 0.05, -0.11]]),
   quaternionTrack(legL, walkTimes, [[0.42, 0, 0], [0, 0, 0], [-0.42, 0, 0], [0, 0, 0], [0.42, 0, 0]]),
   quaternionTrack(legR, walkTimes, [[-0.42, 0, 0], [0, 0, 0], [0.42, 0, 0], [0, 0, 0], [-0.42, 0, 0]]),
-  quaternionTrack(shoulderL, walkTimes, [[-0.2, 0, -0.18], [0, 0, -0.18], [0.22, 0, -0.18], [0, 0, -0.18], [-0.2, 0, -0.18]]),
-  quaternionTrack(shoulderR, walkTimes, [[0.18, 0, 0.09], [0, 0, 0.09], [-0.18, 0, 0.09], [0, 0, 0.09], [0.18, 0, 0.09]]),
+  quaternionTrack(shoulderL, walkTimes, [[-0.16, 0, -0.2], [-0.04, 0, -0.2], [0.18, 0, -0.2], [0.04, 0, -0.2], [-0.16, 0, -0.2]]),
+  quaternionTrack(shoulderR, walkTimes, [[0.14, 0, 0.08], [0.03, 0, 0.08], [-0.16, 0, 0.08], [-0.03, 0, 0.08], [0.14, 0, 0.08]]),
 ]);
 
-const attackTimes = [0, 0.28, 0.5, 0.75];
+const attackTimes = [0, 0.22, 0.475, 0.62, 0.75];
 const attack = new THREE.AnimationClip('BruteSmash', 0.75, [
-  quaternionTrack(torso, attackTimes, [[0.16, 0, 0], [-0.25, 0, 0], [0.62, 0, 0], [0.16, 0, 0]]),
-  quaternionTrack(shoulderL, attackTimes, [[0, 0, -0.18], [-1.55, 0, -0.35], [0.75, 0, -0.1], [0, 0, -0.18]]),
-  quaternionTrack(shoulderR, attackTimes, [[0, 0, 0.09], [-1.35, 0, 0.25], [0.65, 0, 0.08], [0, 0, 0.09]]),
+  new THREE.VectorKeyframeTrack('Hips.position', attackTimes, [
+    0, 0.72, 0, 0, 0.7, -0.06, 0, 0.75, 0.1, 0.025, 0.7, 0.16, 0, 0.72, 0,
+  ]),
+  quaternionTrack(torso, attackTimes, [[0.24, 0, 0], [-0.2, 0, -0.08], [0.68, 0, 0.05], [0.76, 0.04, 0.1], [0.24, 0, 0]]),
+  quaternionTrack(shoulderL, attackTimes, [[0, 0, -0.2], [-1.62, 0, -0.38], [0.82, 0, -0.08], [0.98, 0.08, 0.04], [0, 0, -0.2]]),
+  quaternionTrack(shoulderR, attackTimes, [[0, 0, 0.08], [-1.42, 0, 0.28], [0.74, 0, 0.06], [0.9, -0.08, -0.03], [0, 0, 0.08]]),
 ]);
 
 const spawn = new THREE.AnimationClip('BruteRise', 1.1, [
-  quaternionTrack(torso, [0, 0.55, 1.1], [[0.8, 0, -0.12], [0.42, 0, 0.08], [0.16, 0, 0]]),
+  quaternionTrack(torso, [0, 0.55, 1.1], [[0.8, 0, -0.12], [0.46, 0, 0.08], [0.24, 0, 0]]),
   quaternionTrack(head, [0, 0.55, 1.1], [[0.5, 0, -0.1], [-0.15, 0, 0.08], [0, 0, -0.08]]),
 ]);
 
 const hit = new THREE.AnimationClip('BruteHit', 0.28, [
-  quaternionTrack(torso, [0, 0.1, 0.28], [[0.16, 0, 0], [-0.1, 0, 0.22], [0.16, 0, 0]]),
+  quaternionTrack(torso, [0, 0.1, 0.28], [[0.24, 0, 0], [-0.1, 0, 0.22], [0.24, 0, 0]]),
 ]);
 
 const death = new THREE.AnimationClip('BruteDeath', 1, [

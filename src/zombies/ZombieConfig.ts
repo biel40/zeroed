@@ -282,6 +282,12 @@ export interface RoundConfig {
   readonly speedMultiplier: number;
 }
 
+/** Multiplies the existing speed curve only while the player learns the map. */
+export function earlyRoundSpeedMultiplier(round: number): number {
+  const r = Math.max(1, Math.floor(round));
+  return [0.75, 0.8, 0.85, 0.9, 0.95][r - 1] ?? 1;
+}
+
 /** Deterministic round scaling; round is 1-based and clamped to >= 1. */
 export function roundConfig(round: number): RoundConfig {
   const r = Math.max(1, Math.floor(round));

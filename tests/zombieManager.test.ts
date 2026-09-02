@@ -4,6 +4,7 @@ import { EYE_HEIGHT } from '../src/player/PlayerController';
 import {
   MAX_ALIVE,
   MAX_ACTIVE_BRUTES,
+  earlyRoundSpeedMultiplier,
   roundConfig,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_ATTACK_DURATION,
@@ -66,6 +67,10 @@ describe('ZombieManager spawning and pooling', () => {
     expect(manager.activeCount).toBe(1);
     expect(manager.aliveCount).toBe(1);
     expect(colliders).toHaveLength(2); // torso + head
+    const zombie = [...manager.actives][0];
+    expect(zombie.speed).toBeCloseTo(
+      ZOMBIE_BASE_SPEED * roundConfig(1).speedMultiplier * earlyRoundSpeedMultiplier(1) * 0.92,
+    );
   });
 
   it('never exceeds the alive cap even if asked to spawn more', () => {
@@ -126,7 +131,11 @@ describe('ZombieManager spawning and pooling', () => {
       ZOMBIE_BASE_HP * roundConfig(5).healthMultiplier * ZOMBIE_TYPE_CONFIGS.brute.healthMultiplier,
     ));
     expect(zombie.speed).toBeCloseTo(
-      ZOMBIE_BASE_SPEED * roundConfig(5).speedMultiplier * ZOMBIE_TYPE_CONFIGS.brute.speedMultiplier * 0.92,
+      ZOMBIE_BASE_SPEED
+        * roundConfig(5).speedMultiplier
+        * earlyRoundSpeedMultiplier(5)
+        * ZOMBIE_TYPE_CONFIGS.brute.speedMultiplier
+        * 0.92,
     );
     expect(zombie.attackDamage).toBeCloseTo(ZOMBIE_ATTACK_DAMAGE * 1.15);
     expect(zombie.bodyRadius).toBe(0.46);

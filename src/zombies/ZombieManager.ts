@@ -11,6 +11,7 @@ import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
 import {
   computeDamage,
+  earlyRoundSpeedMultiplier,
   getBruteSpawnChance,
   MAX_ALIVE,
   selectZombieType,
@@ -451,7 +452,11 @@ export class ZombieManager {
       spawn.x,
       spawn.z,
       Math.round(ZOMBIE_BASE_HP * config.healthMultiplier * profile.healthMultiplier),
-      ZOMBIE_BASE_SPEED * config.speedMultiplier * profile.speedMultiplier * jitter(ZOMBIE_SPEED_JITTER),
+      ZOMBIE_BASE_SPEED
+        * config.speedMultiplier
+        * earlyRoundSpeedMultiplier(round)
+        * profile.speedMultiplier
+        * jitter(ZOMBIE_SPEED_JITTER),
       0,
       0,
       typeId,

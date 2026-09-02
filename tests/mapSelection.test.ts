@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import { HUD } from '../src/ui/HUD';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -23,10 +24,15 @@ class FakeElement {
   readonly style = { setProperty: () => undefined };
   onclick: (() => void) | null = null;
   textContent = '';
+  focused = false;
 
   constructor(private readonly children: FakeElement[] = []) {}
 
   addEventListener(): void {}
+
+  focus(): void {
+    this.focused = true;
+  }
 
   querySelector(selector: string): FakeElement | null {
     return selector === 'span' ? this.children[0] ?? null : null;
@@ -38,12 +44,16 @@ class FakeElement {
 }
 
 describe('Zombies map selection flow', () => {
-  it('exposes one semantic button for each supported map id', () => {
+  it('keeps every supported map wired while exposing only Zombies publicly', () => {
     expect(html).toMatch(/<button type="button" data-map="classic">/);
     expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
     expect(html.match(/data-map=/g)).toHaveLength(2);
     expect(html).not.toContain('data-mode=');
     expect(html).toContain('SHOOTING RANGE');
+    expect(html).toContain('PLAY ZOMBIES');
+    expect(ZOMBIE_MAPS.classic.visible).toBe(false);
+    expect(ZOMBIE_MAPS['burned-mansion'].visible).toBe(true);
+    expect(isZombieMapId('classic')).toBe(true);
   });
 
   it('keeps the map picker above the fixed game canvas', () => {
@@ -81,6 +91,9 @@ describe('Zombies map selection flow', () => {
       const ui = new HUD();
       ui.showMapSelect((mapId) => selected.push(mapId));
       expect(startScreen.classList.contains('hidden')).toBe(true);
+      expect(outdoor.classList.contains('hidden')).toBe(true);
+      expect(mansion.classList.contains('hidden')).toBe(false);
+      expect(mansion.focused).toBe(true);
       outdoor.onclick?.();
 
       ui.showMapSelect((mapId) => selected.push(mapId));

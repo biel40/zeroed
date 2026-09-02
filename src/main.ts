@@ -1,5 +1,6 @@
 import './style.css';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
+import { isZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
@@ -44,7 +45,7 @@ try {
   hud.setReady();
 
   const requestedMap = new URLSearchParams(window.location.search).get('map');
-  if (requestedMap === 'classic' || requestedMap === 'burned-mansion') {
+  if (isZombieMapId(requestedMap)) {
     startGame(new ZombiesMode(requestedMap));
   } else {
     // Zombies is the only game mode; the player chooses its arena directly.

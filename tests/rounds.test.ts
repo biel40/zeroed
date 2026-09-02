@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HEADSHOT_DAMAGE_MULTIPLIER } from '../src/game/CombatConfig';
 import {
   computeDamage,
+  earlyRoundSpeedMultiplier,
   getBruteSpawnChance,
   MAX_ALIVE,
   MAX_ACTIVE_BRUTES,
@@ -69,6 +70,12 @@ describe('roundConfig', () => {
     expect(roundConfig(5).speedMultiplier).toBeCloseTo(1.2);
     expect(roundConfig(10).speedMultiplier).toBeCloseTo(1.45);
     expect(roundConfig(100).speedMultiplier).toBe(1.8);
+  });
+
+  it('applies only the requested early-round speed ramp', () => {
+    expect([1, 2, 3, 4, 5, 6, 20].map(earlyRoundSpeedMultiplier)).toEqual([
+      0.75, 0.8, 0.85, 0.9, 0.95, 1, 1,
+    ]);
   });
 
   it('clamps invalid round numbers to round 1', () => {

@@ -99,7 +99,7 @@ describe('ZombieVisual procedural fallback', () => {
 
     visual.setZombieType('normal');
     expect(material.color.getHex()).toBe(normalColor.getHex());
-    expect(material.emissiveIntensity).toBeCloseTo(0.35);
+    expect(material.emissiveIntensity).toBeCloseTo(0.12);
   });
 
   it('uses a distinct Brute body instead of scaling or augmenting the walker', () => {

@@ -66,8 +66,11 @@ describe('zombie GLB assets', () => {
     const nodes = new Set((json.nodes ?? []).map((node) => node.name));
     expect(nodes).toContain('BruteBelly');
     expect(nodes).toContain('BruteSpinePlate');
+    expect(nodes).toContain('BruteBackMass');
+    expect(nodes).toContain('BruteNeck');
     expect(nodes).toContain('BruteFistL');
     expect(nodes).toContain('BruteFistR');
+    expect(nodes).toContain('BruteTempleScar');
   });
 
   it('loads the Brute binary through the production GLTF loader', async () => {

@@ -1,3 +1,4 @@
+import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { clamp } from '../utils/math';
 import type { Weapon } from '../weapons/Weapon';
 
@@ -144,19 +145,27 @@ export class HUD {
   }
 
   /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
-  showMapSelect(onSelect: (mapId: 'classic' | 'burned-mansion') => void): void {
+  showMapSelect(onSelect: (mapId: ZombieMapId) => void): void {
     this.startScreen.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
+    let firstVisibleButton: HTMLButtonElement | null = null;
     for (const button of buttons) {
+      const map = getZombieMapDefinition(button.dataset.map);
+      button.classList.toggle('hidden', !map?.visible);
+      if (!map) {
+        button.onclick = null;
+        continue;
+      }
+      if (map.visible && !firstVisibleButton) firstVisibleButton = button;
       // Assignment replaces a previous handler if this menu is shown again.
       button.onclick = () => {
         for (const mapButton of buttons) mapButton.onclick = null;
         this.mapSelect.classList.add('hidden');
-        const mapId = button.dataset.map;
-        onSelect(mapId === 'burned-mansion' ? 'burned-mansion' : 'classic');
+        onSelect(map.id);
       };
     }
+    firstVisibleButton?.focus();
   }
 
   setZombiesPanelVisible(visible: boolean): void {

@@ -62,6 +62,9 @@ Points
 - Brute multiplica salud, velocidad y daño y usa un radio físico conservador;
   esos valores alimentan combate, steering, colisión, recuperación y una rejilla
   de navegación con el despeje correspondiente a su tamaño.
+- La velocidad calculada por la curva existente recibe un multiplicador de
+  introducción de 0.75/0.80/0.85/0.90/0.95 en rondas 1-5; desde ronda 6 el
+  multiplicador vuelve a 1 sin alterar salud, cantidad ni spawn.
 - `getTypeDiagnostics(round)` expone ronda, probabilidad Brute, ocupación y
   tipo/salud/velocidad activas para QA sin mantener contadores paralelos.
 
