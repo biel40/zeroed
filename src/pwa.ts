@@ -37,6 +37,7 @@ export function setupPWA(): void {
   let updateSW: () => Promise<void> = async () => {};
   let swRegistration: ServiceWorkerRegistration | null = null;
   let approvedWorker: ServiceWorker | null = null;
+  let watchedWorker: ServiceWorker | null = null;
   const serviceWorker = 'serviceWorker' in navigator ? navigator.serviceWorker : null;
   let controllerSeen = serviceWorker?.controller != null;
 
@@ -61,6 +62,19 @@ export function setupPWA(): void {
     } finally {
       applyingUpdate = false;
     }
+  };
+
+  // Workbox only tracks workers whose `updatefound` it observes; the browser's own
+  // navigation update check can leave a worker already installing before register().
+  const applyWhenInstalled = (registration: ServiceWorkerRegistration): void => {
+    const worker = registration.installing;
+    if (!worker || worker === watchedWorker) return;
+    watchedWorker = worker;
+    worker.addEventListener('statechange', () => {
+      if (worker.state !== 'installed' || registration.waiting !== worker) return;
+      setUpdateAvailable(true);
+      void applyBrowserUpdate();
+    });
   };
 
   const handleWorkerControl = (): void => {
@@ -90,12 +104,17 @@ export function setupPWA(): void {
     onRegisteredSW: (_swScriptUrl, registration) => {
       swRegistration = registration ?? null;
       if (standalone || !registration) return;
+      applyWhenInstalled(registration);
       void registration
         .update()
         .then(() => {
-          if (!registration.waiting) return;
-          setUpdateAvailable(true);
-          return applyBrowserUpdate();
+          if (registration.waiting) {
+            setUpdateAvailable(true);
+            void applyBrowserUpdate();
+            return;
+          }
+          // update() resolves as soon as the new worker starts installing, not when it waits.
+          applyWhenInstalled(registration);
         })
         .catch((error: unknown) =>
           console.error('[Zeroed PWA] Immediate update check failed; using the current version.', error),

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { ZombieVisual, type ZombieModelSource } from '../src/zombies/ZombieVisual';
+import { ZombieVisual, ZOMBIE_MODELS, type ZombieModelSource } from '../src/zombies/ZombieVisual';
 import type { ZombieState } from '../src/zombies/Zombie';
 
 /**
@@ -63,7 +63,7 @@ function internals(visual: ZombieVisual): VisualInternals {
   return visual as unknown as VisualInternals;
 }
 
-const WALK_SPEED = 1.35; // == walkReferenceSpeed → walk timeScale factor 1
+const WALK_SPEED = ZOMBIE_MODELS.walker.walkReferenceSpeed;
 const DT = 1 / 60;
 
 /** Steps the visual the way the game loop does: one update per frame. */
@@ -73,6 +73,36 @@ function step(visual: ZombieVisual, seconds: number, speed = WALK_SPEED): void {
 }
 
 describe('ZombieVisual hit reaction', () => {
+  it('varies walker phase without changing the stride cadence at the same ground speed', () => {
+    const phases: number[] = [];
+    for (const jitter of [0.9, 1.1]) {
+      const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
+      visual.setWalkJitter(jitter);
+      visual.setState('walk');
+      const walk = internals(visual).actions.get('walk')!;
+      const start = walk.time;
+      phases.push(start);
+      step(visual, 0.1);
+      expect(walk.timeScale).toBeCloseTo(1, 6);
+      expect(walk.time - start).toBeCloseTo(0.1, 6);
+      step(visual, 0.1, WALK_SPEED * 0.5);
+      expect(walk.timeScale).toBeCloseTo(0.5, 6);
+    }
+    expect(Math.abs(phases[1] - phases[0])).toBeGreaterThan(0.2);
+  });
+
+  it('freezes locomotion at zero displacement and resumes without resetting phase', () => {
+    const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
+    const walk = internals(visual).actions.get('walk')!;
+    visual.setState('walk');
+    step(visual, 0.2);
+    const phase = walk.time;
+    step(visual, 0.5, 0);
+    expect(walk.time).toBeCloseTo(phase, 6);
+    step(visual, 0.1);
+    expect(walk.time).toBeGreaterThan(phase);
+  });
+
   it('returns to walk after a clipless hit WITHOUT restarting the walk cycle', () => {
     const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
     const walk = internals(visual).actions.get('walk')!;

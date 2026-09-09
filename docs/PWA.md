@@ -61,6 +61,11 @@ Service Worker.
 En navegador normal, cada entrada ejecuta `registration.update()`. Si aparece
 un worker nuevo, el callback `onNeedRefresh` usa el `skipWaiting` de
 `registerSW`; al activarse, `clientsClaim` permite que tome control de la pagina.
+Workbox solo sigue a los workers cuyo `updatefound` observa, y el navegador
+lanza su propia comprobacion durante la navegacion: si ese worker ya esta
+`installing` cuando la pagina registra, o `update()` resuelve mientras aun se
+instala, `src/pwa.ts` lo vigila con `statechange` y aplica el `skipWaiting` al
+llegar a `installed`. Sin esto la build nueva quedaba esperando en silencio.
 Un unico listener `controllerchange`, compartido con `onNeedReload`, realiza la
 recarga y un guard por carga evita procesar dos veces el mismo cambio de control.
 Esto tambien cubre una activacion iniciada desde otra pestana. Si la comprobacion

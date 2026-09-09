@@ -80,7 +80,9 @@ describe('ZombieManager stuck recovery', () => {
       damage += amount;
     };
 
-    for (let frame = 0; frame < Math.round(18 / DT); frame++) {
+    // Round 1 now moves at 0.75x speed, so the recovered zombie needs longer
+    // to cross from the fallback spawn and complete its first attack wind-up.
+    for (let frame = 0; frame < Math.round(21 / DT); frame++) {
       manager.update(DT, 0, -14);
     }
 
@@ -151,13 +153,16 @@ describe('ZombieManager stuck recovery', () => {
       makeWall(0, -8, 0.4, 4), // north-south wall, z ∈ [-10, -6]
     ];
     const manager = new ZombieManager(() => 0);
+    manager.setNavigationBounds([
+      { floor: 0, minX: -6, maxX: 6, minZ: -16, maxZ: -4 },
+    ]);
     manager.registerColliders(colliders);
     manager.spawnZombie(roundConfig(1), -4, -14);
     const zombie = onlyZombie(manager);
     zombie.position.set(1, 0, -9); // in the pocket between both walls
 
     const before = zombie.position.clone();
-    const frames = Math.round(10 / DT);
+    const frames = Math.round(20 / DT);
     let totalTravel = 0;
     for (let i = 0; i < frames; i++) {
       const prevX = zombie.position.x;

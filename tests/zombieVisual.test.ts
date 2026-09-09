@@ -76,6 +76,36 @@ describe('ZombieVisual GLB normalization', () => {
   );
 });
 
+describe('ZombieVisual textured variants', () => {
+  it('preserves the original texture and resets tint without mutating the shared asset', () => {
+    const scene = new THREE.Group();
+    const texture = new THREE.Texture();
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0.4, map: texture });
+    material.name = 'Material';
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.7, 0.2), material);
+    mesh.name = 'Zombie_Cylinder';
+    scene.add(mesh);
+    const visuals = ZOMBIE_MODELS.walker.tints.slice(0, 3).map((tint) =>
+      new ZombieVisual('walker', { scene, clips: [] }, tint, false));
+    const surface = (root: THREE.Object3D): THREE.MeshStandardMaterial =>
+      (root.getObjectByName('Zombie_Cylinder') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const colors = visuals.map((visual) => surface(visual.root).color);
+    expect(ZOMBIE_MODELS.walker.tints).toHaveLength(1);
+    expect(ZOMBIE_MODELS.brute.tints).toHaveLength(1);
+    expect(new Set(colors.map((color) => color.getHex())).size).toBe(1);
+    for (const visual of visuals) {
+      expect(surface(visual.root).map).toBe(texture);
+      expect(surface(visual.root).metalness).toBeLessThanOrEqual(0.04);
+      const normalColor = surface(visual.root).color.getHex();
+      visual.setZombieType('shiny');
+      visual.setZombieType('normal');
+      expect(surface(visual.root).color.getHex()).toBe(normalColor);
+    }
+    expect(material.color.getHex()).toBe(0xffffff);
+    expect(material.metalness).toBe(0.4);
+  });
+});
+
 describe('ZombieVisual procedural fallback', () => {
   it('builds a human-sized body standing on the ground', () => {
     const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
@@ -86,15 +116,17 @@ describe('ZombieVisual procedural fallback', () => {
     expect(box.min.y).toBeGreaterThanOrEqual(-0.02);
   });
 
-  it('applies and resets the subtle Shiny material treatment', () => {
+  it('applies a clearly golden Shiny treatment and restores the normal finish', () => {
     const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
     const mesh = visual.root.getObjectByProperty('isMesh', true) as THREE.Mesh;
     const material = mesh.material as THREE.MeshStandardMaterial;
     const normalColor = material.color.clone();
 
     visual.setZombieType('shiny');
-    expect(material.roughness).toBeLessThanOrEqual(0.46);
-    expect(material.emissiveIntensity).toBeCloseTo(0.62);
+    expect(material.roughness).toBeLessThanOrEqual(0.28);
+    expect(material.emissiveIntensity).toBeGreaterThanOrEqual(0.8);
+    expect(material.emissive.r).toBeGreaterThan(material.emissive.g);
+    expect(material.emissive.g).toBeGreaterThan(material.emissive.b * 3);
     expect(material.color.equals(normalColor)).toBe(false);
 
     visual.setZombieType('normal');
@@ -119,6 +151,52 @@ describe('ZombieVisual procedural fallback', () => {
   it('rejects assigning a gameplay type to an incompatible model', () => {
     const walker = new ZombieVisual('walker', null, 0xa8b89a, false);
     expect(() => walker.setZombieType('brute')).toThrow(/requires model "brute"/);
+  });
+});
+
+describe('ZombieVisual Shiny stars', () => {
+  it('shows a bounded star field only for Shiny, without adding lights', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+    const stars = visual.root.getObjectByName('shiny-stars') as THREE.Points;
+    expect(stars).toBeInstanceOf(THREE.Points);
+    expect(stars.visible).toBe(false);
+    visual.setZombieType('shiny');
+    expect(stars.visible).toBe(true);
+    expect(stars.geometry.getAttribute('position').count).toBe(10);
+    const material = stars.material as THREE.PointsMaterial;
+    expect(material.map).toBeInstanceOf(THREE.DataTexture);
+    expect(material.depthTest).toBe(true);
+    expect(material.depthWrite).toBe(false);
+    expect(material.blending).toBe(THREE.AdditiveBlending);
+    expect(visual.root.getObjectByProperty('isLight', true)).toBeUndefined();
+  });
+
+  it('animates stars in place, freezes at zero delta and clears them on death and pool reuse', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+    visual.setZombieType('shiny');
+    const stars = visual.root.getObjectByName('shiny-stars') as THREE.Points;
+    const positions = stars.geometry.getAttribute('position');
+    const storage = positions.array;
+    visual.update(0.1, 0);
+    const first = Array.from(storage);
+    visual.update(0.1, 0);
+    expect(positions.array).toBe(storage);
+    expect(Array.from(storage)).not.toEqual(first);
+    const frozen = Array.from(storage);
+    visual.update(0, 0);
+    expect(Array.from(storage)).toEqual(frozen);
+    visual.setOpacity(0.25);
+    expect((stars.material as THREE.PointsMaterial).opacity).toBeCloseTo(0.25);
+    visual.setState('death');
+    visual.update(0.1, 0);
+    expect(stars.visible).toBe(false);
+    visual.setZombieType('normal');
+    visual.setState('walk');
+    visual.update(0.1, 1);
+    expect(stars.visible).toBe(false);
+    visual.setZombieType('shiny');
+    expect(stars.visible).toBe(true);
+    expect((stars.material as THREE.PointsMaterial).opacity).toBe(1);
   });
 });
 

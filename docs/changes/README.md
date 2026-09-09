@@ -17,6 +17,10 @@ Plantilla:
 
 ## Índice
 
+- [2026-09-09 - Walker original y Shiny con estrellas](2026-09-09-walker-original-shiny-stars.md)
+- [2026-09-03 — Actualizacion web fiable del Service Worker](2026-09-03-pwa-browser-update.md)
+- [2026-09-03 — Rediseño geométrico de Walker y Brutus](2026-09-03-zombie-model-redesign.md)
+- [2026-09-02 — Anatomía zombie, Brute pesado y velocidad inicial](2026-09-02-zombie-visual-speed.md)
 - [2026-09-01 — Rediseño visual y animado de Mystery Box](2026-09-01-mystery-box-redesign.md)
 - [2026-08-27 — Rediseño Government de la M1911](2026-08-27-m1911-government-redesign.md)
 - [2026-08-25 — Ampliacion de las salas M4A1 y bunker](2026-08-25-east-wing-room-expansion.md)

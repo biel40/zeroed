@@ -1,8 +1,9 @@
 # Assets — procedencia y licencias
 
-Todos los assets externos son **CC0 (Public Domain)** o equivalente, descargados
-de fuentes verificadas y servidos localmente desde `public/assets/`. El juego
-no realiza ninguna petición externa en runtime.
+Los assets externos se sirven localmente desde `public/assets/`, con su licencia
+indicada en cada seccion. Predomina **CC0 (Public Domain)**; el walker original
+usa **CC-BY 3.0** y conserva la atribucion a Quaternius. El juego no realiza
+ninguna peticion externa en runtime.
 
 ## Modelos de armas (`public/assets/weapons/`)
 
@@ -13,11 +14,15 @@ https://creativecommons.org/publicdomain/zero/1.0/
 
 | Arma | Modelo | Página | Triángulos | Tamaño |
 | --- | --- | --- | --- | --- |
-| M4A1 | "Assault Rifle" (AssaultRifle2_1) | https://poly.pizza/m/Bgvuu4CUMV | ~1.9k | 131 KB |
+| M4A1 | Builder procedural dedicado `buildM4A1` en `src/weapons/M4A1ViewModel.ts` | Original del proyecto | 1984 | Sin descarga |
 | L96 | "Sniper Rifle" (SniperRifle_3) | https://poly.pizza/m/TKaBjAEofL | ~1.7k | 93 KB |
 | AK-47 | — (builder procedural dedicado `buildAk47`, frame `'ak47'`, en `WeaponView.ts`; el GLB de Quaternius leía como híbrido AKS-74U y se retiró) | — | primitivas low-poly | — |
 | M60 | — (builder procedural dedicado `buildM60` en `WeaponView.ts`; no se encontró LMG CC0 adecuada) | — | ~40 meshes | — |
 | M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
+
+El GLB anterior de la M4A1, "Assault Rifle" (AssaultRifle2_1) de Quaternius
+(https://poly.pizza/m/Bgvuu4CUMV, CC0, 131 KB), se conserva en el repositorio
+pero ya no se carga. El modelo procedural separa cuerpo y cargador para la recarga.
 
 Los materiales PBR (metalness/roughness por nombre de material) se ajustan en
 tiempo de carga en `src/weapons/WeaponView.ts`. La AK-47 es íntegramente
@@ -29,15 +34,15 @@ rojiza satinada que contrasta con el metal.
 
 ## Modelos de zombies (`public/assets/zombies/`)
 
-El walker procede de **Quaternius** — https://quaternius.com, vía **Poly Pizza**
-(https://poly.pizza). El Brute es un modelo articulado original del proyecto.
+El walker vuelve al asset original de **Quaternius**, via **Poly Pizza**,
+ya incluido en el proyecto. El Brute es un modelo original generado localmente.
 Los clips concretos por estado se resuelven por nombre en
 `src/zombies/ZombieVisual.ts` (contrato verificado en `tests/zombieAssets.test.ts`).
 
 | Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
 | --- | --- | --- | --- | --- | --- |
-| `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0** (atribución: Quaternius) | ~2.1k | ZombieCrawl (spawn), ZombieWalk, ZombieBite (attack) |
-| `brute` | "Zeroed Brute" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | ~1.6k | BruteRise, BruteWalk, BruteSmash, BruteHit, BruteDeath |
+| `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0**, atribucion: Quaternius | 2116 | ZombieCrawl, ZombieWalk, ZombieBite |
+| `brute` | "Zeroed Brute" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | ~2.9k | BruteRise, BruteWalk, BruteSmash, BruteHit, BruteDeath |
 
 > `normal` y `shiny` comparten el walker; `brute` usa su propio GLB, jerarquía,
 > materiales y clips. El registro separa tipos de gameplay y modelos para que
@@ -47,12 +52,14 @@ Notas:
 
 - El `walker` no trae clip de muerte/impacto: cae proceduralmente
   (`ZombieVisual.setDeathProgress`) y el impacto usa flash + crossfade a walk.
-- Atribución CC-BY: **Quaternius — "Animated Zombie"**, vía Poly Pizza.
-- Variedad por instancia: tinte de piel/ropa, escala ±5 %, walk jitter ±7 %
-  (sin cargar modelos adicionales).
-- `shiny` altera el acabado PBR del walker. El Brute tiene cabeza hundida,
+- Cada modelo tiene un unico tinte base. Normal conserva la textura original;
+  Shiny es dorado, emisivo y tiene diez estrellas animadas. No se sortean colores.
+- El walker conserva su rig, textura y clips originales: un material y 694500
+  bytes. Las estrellas usan una textura procedural compartida de 32x32 y una
+  llamada de dibujo adicional por Shiny, sin luces ni assets externos nuevos.
+- El Brute tiene cabeza hundida,
   torso deformado, abdomen expuesto, brazos asimétricos, piernas cortas y
-  restricciones metálicas; su GLB se regenera con `npm run generate:zombie-brute`.
+  restricciones metálicas; solo su GLB se regenera con `npm run generate:zombie-brute`.
 - Cargadores, cerrojos y tapas de alimentación de las armas son meshes
   procedurales propios (los GLB de armas de Quaternius son mono-mesh). Sus
   anclas locales pueden declararse por arma; los cargadores soltados se

@@ -1,5 +1,17 @@
 # Decisiones arquitectonicas
 
+## [2026-09-09] Recuperar Walker original y reservar el brillo para Shiny
+
+- Contexto: el usuario descarta el rediseño humanoide y elige el modelo original de su captura; pide normales del mismo color y Shiny claramente reconocible.
+- Decision: restaurar el GLB de Quaternius existente y su atribucion, retirar el generador Walker descartado y conservar Brute. Un tinte base por modelo; Shiny dorado con diez estrellas en un unico `Points` y textura compartida.
+- Motivo: respetar la referencia visual, evitar que una regeneracion vuelva al diseño rechazado y distinguir Shiny sin luces por enemigo ni cambios de IA, spawn o balance.
+
+## [2026-09-03] Reemplazar deformaciones por assets zombie reproducibles (Walker sustituido)
+
+- Contexto: escalar huesos del walker externo y ensanchar unas pocas primitivas de Brutus no cambiaba suficientemente anatomia, rostro ni silueta.
+- Decision: Walker y Brutus usan GLB originales generados por scripts, conservando los contratos existentes de clips, anchors y pooling. Walker fusiona sus piezas en un skinned mesh de diez grupos materiales; Brutus prioriza detalle porque solo admite dos instancias.
+- Motivo: lograr un rediseño geométrico inequívoco sin tocar gameplay y mantener acotadas las llamadas de dibujo en hordas de hasta 24 walkers.
+
 ## [2026-09-02] Separar soporte de mapa de visibilidad publica
 
 - Contexto: Zombies es la experiencia principal y Shooting Range debe desaparecer del menu sin eliminar Classic ni impedir un desbloqueo futuro.

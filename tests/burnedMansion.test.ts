@@ -679,7 +679,7 @@ describe('Burned Mansion topology', () => {
     ][0];
     expect(zombie.typeId).toBe('brute');
     zombie.state = 'walk';
-    for (let frame = 0; frame < 900 && zombie.floor === 0; frame++) {
+    for (let frame = 0; frame < 1200 && zombie.floor === 0; frame++) {
       manager.update(1 / 60, 0.8, -4.2, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
     }
     expect(zombie.floor).toBe(-1);
@@ -1011,6 +1011,8 @@ describe('Burned Mansion topology', () => {
     ][0];
     zombie.state = 'walk';
 
+    // Round 1 applies earlyRoundSpeedMultiplier (0.75x): the room-crossing
+    // stage gets a proportionally larger frame budget to still reach the milestone.
     unlock(arena, 'to-dining');
     manager.registerColliders([...arena.colliders]);
     for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, -3.5, -2.5, 0);
@@ -1018,13 +1020,13 @@ describe('Burned Mansion topology', () => {
 
     unlock(arena, 'to-east-hall');
     manager.registerColliders([...arena.colliders]);
-    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, 2.5, -5, 0);
+    for (let frame = 0; frame < 2400; frame++) manager.update(1 / 60, 2.5, -5, 0);
     expect(zombie.position.x).toBeGreaterThan(0);
 
     unlock(arena, 'nuclear-bunker');
     manager.registerColliders([...arena.colliders]);
     manager.setNavigationBounds(arena.navigationBounds);
-    for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, MANSION_STAIR_CENTER_X, -1.9, 0);
+    for (let frame = 0; frame < 1500; frame++) manager.update(1 / 60, MANSION_STAIR_CENTER_X, -1.9, 0);
     expect(zombie.position.x).toBeGreaterThan(MANSION_BUNKER_DIVIDER_X);
     expect(zombie.position.z).toBeLessThan(0);
   });

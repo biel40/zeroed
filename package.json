@@ -10,6 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "generate:zombie-brute": "node scripts/generate-brute-asset.mjs",
+    "generate:zombies": "npm run generate:zombie-brute",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "android:sync": "npm run build && npx cap sync android",

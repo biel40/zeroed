@@ -618,6 +618,8 @@ export class ZombieManager {
     }
     this.drainPathQueue();
     for (const zombie of this.pool.actives) {
+      const previousX = zombie.position.x;
+      const previousZ = zombie.position.z;
       if (zombie.isAlive) {
         if (
           this.isOutsideNavigationBounds(zombie) &&
@@ -651,7 +653,12 @@ export class ZombieManager {
           playerFacingZ,
         );
       }
-      zombie.update(dt);
+      // Animate distance actually covered, including collision stops. Clamp
+      // recovery relocations so a teleport cannot fast-forward the walk clip.
+      const visualSpeed = dt > 0
+        ? Math.min(zombie.speed, Math.hypot(zombie.position.x - previousX, zombie.position.z - previousZ) / dt)
+        : 0;
+      zombie.update(dt, visualSpeed);
     }
   }
 
@@ -954,10 +961,22 @@ export class ZombieManager {
     if (path) {
       while (path.index < path.points.length) {
         const waypoint = path.points[path.index];
-        if (
-          Math.hypot(waypoint.x - zombie.position.x, waypoint.z - zombie.position.z) >
-          RECOVERY_WAYPOINT_EPSILON
-        ) {
+        const waypointDistance = Math.hypot(
+          waypoint.x - zombie.position.x,
+          waypoint.z - zombie.position.z,
+        );
+        const nextWaypoint = path.points[path.index + 1];
+        const canAdvance = waypointDistance <= RECOVERY_WAYPOINT_EPSILON && (
+          !nextWaypoint ||
+          this.navigationFor(zombie).hasLineOfSight(
+            zombie.floor,
+            zombie.position.x,
+            zombie.position.z,
+            nextWaypoint.x,
+            nextWaypoint.z,
+          )
+        );
+        if (!canAdvance) {
           targetX = waypoint.x;
           targetZ = waypoint.z;
           toTarget.set(targetX - zombie.position.x, 0, targetZ - zombie.position.z).normalize();

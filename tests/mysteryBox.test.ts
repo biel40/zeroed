@@ -12,6 +12,7 @@ import type { WeaponId } from '../src/weapons/WeaponTypes';
 import {
   getMysteryBoxResultColor,
   LEGENDARY_MYSTERY_BOX_COLOR,
+  MYSTERY_BOX_VISUAL_SIZE,
 } from '../src/zombies/MysteryBoxView';
 
 const DT = 1 / 60;
@@ -235,6 +236,14 @@ describe('MysteryBoxMachine fixed reveal', () => {
 });
 
 describe('Mystery Box placement', () => {
+  it('uses a low, horizontally elongated chest silhouette', () => {
+    expect(MYSTERY_BOX_VISUAL_SIZE.width).toBeGreaterThanOrEqual(1.8);
+    expect(MYSTERY_BOX_VISUAL_SIZE.bodyHeight).toBeLessThanOrEqual(0.62);
+    expect(MYSTERY_BOX_VISUAL_SIZE.width / MYSTERY_BOX_VISUAL_SIZE.bodyHeight).toBeGreaterThan(2.8);
+    expect(MYSTERY_BOX_VISUAL_SIZE.depth).toBeGreaterThanOrEqual(0.82);
+    expect(MYSTERY_BOX_VISUAL_SIZE.depth).toBeLessThanOrEqual(0.92);
+  });
+
   it('stays inside the walkable area, comfortably reachable by the player', () => {
     const { position, useRange } = MYSTERY_BOX_PLACEMENT;
     // Distance from the crate to the closest reachable point must be well

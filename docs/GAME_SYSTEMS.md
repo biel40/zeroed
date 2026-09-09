@@ -24,6 +24,7 @@ ZombiesMode <- impactos <- HitTarget / entorno / Zombie
 - `Input` unifica teclado/raton y controles tactiles mediante `InputState`.
 - `PlayerController` aplica look, recoil de camara, movimiento, salto y colision opcional del mapa.
 - `WeaponInventory` selecciona slots; `Weapon` gobierna gameplay; `WeaponView` compone las armas sin manos del jugador y sus recargas mecánicas por fases, mientras `AudioSystem` sincroniza el foley hasta el cierre confirmado.
+- La M1911 usa una corredera de caras planas, acero de reflejo moderado y una pose de cadera más centrada; conserva el alineado ADS y los anclajes mecánicos de recarga y efectos.
 - `BallisticsSystem` consume el array vivo de colliders y envia impactos al modo activo.
 - Los impactos directos usan una configuracion global: cabeza = 3x dano y 150 Points por impacto; los headshots reutilizan el hitmarker y audio compartidos para una confirmacion breve, mientras splash y saltos secundarios de cadena conservan su dano base y no duplican ese feedback.
 - `Stats`, `AudioSystem`, `Effects`, `HUD` y `AssetManager` son servicios compartidos por `ModeContext`.
@@ -54,8 +55,21 @@ Points
 ```
 
 - `normal`, `shiny` y `brute` comparten `Zombie`, IA y un máximo global de 24. El melee valida en el inicio y en el instante del impacto la distancia horizontal XZ, una diferencia vertical compatible y la linea de ataque despejada.
-  Normal/Shiny usan el modelo `walker`; Brute usa `zombie_brute.glb`, clips y
-  silueta propios. Sus perfiles y asignación de modelo viven en `ZombieConfig`.
+  Normal/Shiny usan `zombie_walker.glb`; Brutus usa `zombie_brute.glb`. Ambos
+  tienen geometria y clips independientes; sus perfiles viven en `ZombieConfig`.
+- Walker recupera el modelo low-poly original de Quaternius (CC-BY 3.0), con
+  textura, rig y clips originales, 2116 triangulos y un material. Los normales
+  comparten el mismo tinte; la variacion de fase no cambia la cadencia de paso.
+  `ZombieManager` sigue pasando la velocidad horizontal medida a la vista para
+  detener el ciclo ante colisiones, sin cambiar la velocidad de gameplay.
+- Shiny usa un acabado dorado emisivo y diez estrellas de cuatro puntas que
+  siguen el torso animado. `ShinyStars` reutiliza buffers y una textura compartida,
+  sin luces ni allocations por frame. Se apaga al morir y se reinicia al reciclar
+  el slot; la pausa de simulacion congela tambien los destellos. Cuesta una llamada
+  adicional por Shiny, sin dibujar estrellas en normales o Brute.
+  `zombie-viewer.html?compare=1` compara Shiny con normales; `?shiny=1&night=1`
+  permite inspeccionar el brillo con poca luz. El visor tiene camara orbital y
+  encuadre movil. Este visor no sustituye una medicion de FPS en movil fisico.
 - `ZombiePool` precarga reservas por modelo (24 walker, 2 Brute) pero bloquea
   cualquier adquisición al llegar a 24 activos totales. Los cadáveres siguen
   ocupando tanto su reserva visual como el límite especial.

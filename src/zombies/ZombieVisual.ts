@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { ZombieState } from './Zombie';
+import { ShinyStars } from './ShinyStars';
 import {
   ZOMBIE_TYPE_CONFIGS,
   type ZombieModelId,
@@ -39,7 +40,7 @@ export interface ZombieModelConfig {
 
 /** Asset/animation contracts are independent from gameplay type profiles. */
 export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
-  // Quaternius "Animated Zombie" (CC-BY 3.0): classic shambling corpse.
+  // Quaternius "Animated Zombie" (CC-BY 3.0), restored visual reference.
   walker: {
     url: 'assets/zombies/zombie_walker.glb',
     height: 1.78,
@@ -52,7 +53,7 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       death: ['ZombieDeath', 'Death'],
     },
     walkReferenceSpeed: 1.35,
-    tints: [0xb2b9a8, 0x96a18f, 0xb5aa98, 0x8f9b96, 0xa5aa91, 0xaaa29b],
+    tints: [0xb2b9a8],
     anchors: {
       torso: ['Hips', 'Pelvis'],
       head: ['Head'],
@@ -72,7 +73,7 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       death: ['BruteDeath'],
     },
     walkReferenceSpeed: 1.05,
-    tints: [0xffffff, 0xe5ebdc],
+    tints: [0xffffff],
     anchors: {
       torso: ['Torso'],
       head: ['Head'],
@@ -88,41 +89,6 @@ const FLASH_COLOR = 0xff2211;
 const UNDEAD_GLOW = 0x1a2a12;
 /** How deep below ground the spawn rise starts, meters. */
 const SPAWN_DEPTH = 1.25;
-
-/**
- * Reshapes the authored walker through its existing skeleton. Geometry and
- * clips remain shared; only cheap per-clone bone transforms differ.
- */
-function applyWalkerAnatomy(model: THREE.Object3D, tint: number): void {
-  const variant = ZOMBIE_MODELS.walker.tints.indexOf(tint);
-  const asymmetry = ((variant < 0 ? tint : variant) % 3 - 1) * 0.035;
-  const scaleBone = (name: string, x: number, y: number, z: number): void => {
-    const bone = model.getObjectByName(name);
-    if (bone) bone.scale.multiply(new THREE.Vector3(x, y, z));
-  };
-
-  // A narrower, taller skull and fuller upper torso remove the toy-like head/body ratio.
-  scaleBone('Head', 0.88 + asymmetry, 1.06, 0.92);
-  scaleBone('Spine2', 1.08, 1.02, 0.96);
-  scaleBone('Hips', 0.96, 1, 0.98);
-  scaleBone('LeftShoulder', 1.04 + asymmetry, 1, 1.02);
-  scaleBone('RightShoulder', 1.04 - asymmetry, 1, 1.02);
-  scaleBone('LeftArm', 0.94, 1.02 + asymmetry, 0.94);
-  scaleBone('RightArm', 0.94, 1.02 - asymmetry, 0.94);
-  scaleBone('LeftForeArm', 0.88, 1.04, 0.9);
-  scaleBone('RightForeArm', 0.9, 1.01, 0.88);
-  scaleBone('LeftHand', 1.04, 1.02, 0.92);
-  scaleBone('RightHand', 0.98, 1.06, 0.94);
-  scaleBone('LeftUpLeg', 0.94, 1.02, 0.96);
-  scaleBone('RightUpLeg', 0.96, 0.99, 0.94);
-
-  // The model node is outside the animated tracks, so the permanent lean does
-  // not fight the mixer. Re-grounding keeps navigation and spawn Y unchanged.
-  model.rotation.x = 0.075 + asymmetry * 0.35;
-  model.updateMatrixWorld(true);
-  const leanedBounds = new THREE.Box3().setFromObject(model);
-  model.position.y -= leanedBounds.min.y;
-}
 
 interface MaterialBase {
   readonly color: THREE.Color;
@@ -411,6 +377,8 @@ export class ZombieVisual {
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
+  private readonly shinyStars: ShinyStars | null;
+  private readonly tmpShinyAnchor = new THREE.Vector3();
   private readonly modelConfig: ZombieModelConfig;
   /** End of the head bone chain, when the rig has one (skull midpoint math). */
   private headTop: THREE.Object3D | null = null;
@@ -455,7 +423,8 @@ export class ZombieVisual {
       const scale = this.modelConfig.height / Math.max(size.y, 1e-4);
       model.scale.setScalar(scale);
       model.position.y = -box.min.y * scale;
-      if (modelId === 'walker') applyWalkerAnatomy(model, tint);
+      // Preserve authored segment lengths and ground contact. Variation comes
+      // from materials/phase, not cascading non-uniform bone scales.
 
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
@@ -468,7 +437,9 @@ export class ZombieVisual {
           c.color.multiply(new THREE.Color(tint));
           // Corpse skin and fabric are dielectric. The source's 0.4
           // metalness made the whole textured body read like tinted plastic.
-          if (modelId === 'walker') c.metalness = Math.min(c.metalness, 0.04);
+          if (modelId === 'walker') {
+            c.metalness = Math.min(c.metalness, 0.04);
+          }
           c.roughness = Math.min(0.94, Math.max(0.72, c.roughness));
           c.envMapIntensity = modelId === 'walker' ? 0.72 : Math.max(0.8, c.envMapIntensity);
           c.emissive = new THREE.Color(UNDEAD_GLOW);
@@ -512,10 +483,12 @@ export class ZombieVisual {
       metalness: material.metalness,
       envMapIntensity: material.envMapIntensity,
     })));
+    this.shinyStars = modelId === 'walker' ? new ShinyStars() : null;
+    if (this.shinyStars) this.root.add(this.shinyStars.points);
   }
 
   /** Resets and applies a type treatment compatible with this fixed model. */
-  setZombieType(typeId: ZombieTypeId): void {
+  public setZombieType(typeId: ZombieTypeId): void {
     const config = ZOMBIE_TYPE_CONFIGS[typeId];
     if (config.modelId !== this.modelId) {
       throw new Error(`Zombie type "${typeId}" requires model "${config.modelId}", got "${this.modelId}"`);
@@ -526,6 +499,7 @@ export class ZombieVisual {
     this.walkAnimationMultiplier = config.walkAnimationMultiplier;
     this.glowColor = UNDEAD_GLOW;
     this.glowIntensity = this.modelId === 'walker' ? 0.12 : 0.2;
+    this.shinyStars?.setEnabled(typeId === 'shiny');
 
     for (let index = 0; index < this.materials.length; index++) {
       const material = this.materials[index];
@@ -535,12 +509,12 @@ export class ZombieVisual {
       material.metalness = base.metalness;
       material.envMapIntensity = base.envMapIntensity;
       if (config.materialTreatment === 'shiny') {
-        material.color.lerp(new THREE.Color(0xb8c7a5), 0.24);
-        material.roughness = Math.min(material.roughness, 0.46);
-        material.metalness = Math.max(material.metalness, 0.04);
-        material.envMapIntensity = Math.max(material.envMapIntensity, 1.25);
-        this.glowColor = 0x526848;
-        this.glowIntensity = 0.62;
+        material.color.setHex(0xffe39b);
+        material.roughness = Math.min(material.roughness, 0.28);
+        material.metalness = Math.max(material.metalness, 0.22);
+        material.envMapIntensity = Math.max(material.envMapIntensity, 1.6);
+        this.glowColor = 0xffb52e;
+        this.glowIntensity = 0.85;
       }
       material.emissive.setHex(this.glowColor);
       material.emissiveIntensity = this.glowIntensity;
@@ -574,9 +548,13 @@ export class ZombieVisual {
     return head.add(anchorTmpC.set(0, HEAD_HITBOX_UP, 0));
   }
 
-  /** Walk-cycle randomization so the horde never marches in sync. */
-  setWalkJitter(jitter: number): void {
-    this.walkJitter = jitter;
+  /** Walker variation offsets phase without changing the authored stride. */
+  public setWalkJitter(jitter: number): void {
+    this.walkJitter = this.modelId === 'walker' ? 1 : jitter;
+    const walk = this.actions.get('walk');
+    if (this.modelId === 'walker' && walk) {
+      walk.time = THREE.MathUtils.euclideanModulo((jitter - 1) * 2.5, 1) * walk.getClip().duration;
+    }
   }
 
   /** The attack clip is stretched/squeezed to the gameplay attack duration. */
@@ -593,9 +571,10 @@ export class ZombieVisual {
    * the pose is a no-op (sustained automatic fire re-enters 'hit' every
    * bullet — restarting the clip each time would strobe its first frames).
    */
-  setState(state: ZombieState): void {
+  public setState(state: ZombieState): void {
     const previous = this.state;
     this.state = state;
+    if (state === 'death' && this.shinyStars) this.shinyStars.points.visible = false;
     if (state !== 'death') this.collapse = 0;
     const next = this.actions.get(state) ?? null;
     if (!next) {
@@ -660,14 +639,15 @@ export class ZombieVisual {
   }
 
   /** Death fade driven by the owning Zombie during its last moments. */
-  setOpacity(opacity: number): void {
+  public setOpacity(opacity: number): void {
+    if (this.shinyStars) this.shinyStars.points.material.opacity = opacity;
     for (const material of this.materials) {
       material.opacity = opacity;
       if (this.flash <= 0) material.emissiveIntensity = this.glowIntensity * opacity;
     }
   }
 
-  update(dt: number, speed: number): void {
+  public update(dt: number, speed: number): void {
     // Spawn rise and death collapse apply to the visual root in both paths.
     this.heavyBobPhase += dt * Math.max(0.4, speed) * 2.1;
     const heavyBob = this.zombieType === 'brute' && this.state === 'walk'
@@ -689,13 +669,20 @@ export class ZombieVisual {
         // Keep the feet tracking the actual ground speed (round scaling).
         walk.timeScale =
           this.walkJitter * this.walkAnimationMultiplier
-          * Math.max(0.4, speed / this.modelConfig.walkReferenceSpeed);
+          * Math.max(0, speed / this.modelConfig.walkReferenceSpeed);
         if (this.hitDip > 0) walk.timeScale *= 1 - this.hitDip * 0.75;
       }
       if (this.hitDip > 0) this.hitDip = Math.max(0, this.hitDip - dt * 3.5);
       this.mixer.update(dt);
     } else if (this.rig) {
       this.updateProcedural(dt, speed);
+    }
+
+    if (this.shinyStars?.points.visible) {
+      this.torsoAnchor.getWorldPosition(this.tmpShinyAnchor);
+      this.root.worldToLocal(this.tmpShinyAnchor);
+      this.shinyStars.points.position.set(this.tmpShinyAnchor.x, this.tmpShinyAnchor.y - 0.85, this.tmpShinyAnchor.z);
+      this.shinyStars.update(dt);
     }
 
     if (this.flash > 0) {
@@ -717,7 +704,9 @@ export class ZombieVisual {
     const rig = this.rig;
     if (!rig) return;
     if (this.state === 'death') return; // collapse handles the pose
-    this.bobPhase += dt * 4.8 * Math.max(0.4, speed / this.modelConfig.walkReferenceSpeed);
+    // The emergency rig retains its own stride; GLB calibration is asset-specific.
+    const referenceSpeed = this.modelId === 'walker' ? 1.35 : this.modelConfig.walkReferenceSpeed;
+    this.bobPhase += dt * 4.8 * Math.max(0, speed / referenceSpeed);
     const p = this.bobPhase;
 
     if (this.state === 'attack' || this.state === 'barrierAttack') {

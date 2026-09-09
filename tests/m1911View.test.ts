@@ -37,10 +37,11 @@ function namedMeshes(root: THREE.Object3D, name: string): THREE.Mesh[] {
 }
 
 describe('M1911 first-person model', () => {
-  it('uses a dedicated pistol frame anchored to the lower-right first-person view', () => {
+  it('keeps the pistol below the sightline and closer to the screen center', () => {
     expect(definition.view.frame).toBe('pistol');
-    expect(definition.view.hip[0]).toBeGreaterThanOrEqual(0.2);
-    expect(definition.view.hip[1]).toBeLessThanOrEqual(-0.23);
+    expect(definition.view.hip[0]).toBeGreaterThan(0.1);
+    expect(definition.view.hip[0]).toBeLessThan(0.18);
+    expect(definition.view.hip[1]).toBeLessThanOrEqual(-0.19);
     expect(definition.view.hip[2]).toBeGreaterThanOrEqual(-0.48);
     expect(definition.view.hip[2]).toBeLessThanOrEqual(-0.45);
     expect(definition.view.ads[2]).toBeLessThanOrEqual(-0.34);

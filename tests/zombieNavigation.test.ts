@@ -88,6 +88,13 @@ describe('ZombieNavigationService', () => {
     }
   });
 
+  it('detects a corner collision between body-radius sampling points', () => {
+    const service = makeService();
+    service.rebuild(FLOORS, [wall(-0.2, 0.2, -6, -2)]);
+
+    expect(service.hasLineOfSight(0, 0.13, -1.57, -4, -10)).toBe(false);
+  });
+
   it('returns null while the only door is closed, and a path once it opens', () => {
     const service = makeService();
     service.rebuild(FLOORS, [...dividingWall(true), doorLeaf()]);

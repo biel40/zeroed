@@ -43,7 +43,10 @@ describe('PWA contract', () => {
     expect(config).toContain('clientsClaim: true');
     expect(pwa).toContain('void registration');
     expect(pwa).toContain('.update()');
-    expect(pwa).toContain('if (!registration.waiting) return');
+    expect(pwa).toContain('applyWhenInstalled(registration)');
+    expect(pwa).toContain('if (!worker || worker === watchedWorker) return');
+    expect(pwa).toContain("worker.addEventListener('statechange'");
+    expect(pwa).toContain("worker.state !== 'installed' || registration.waiting !== worker");
     expect(pwa).toContain('void applyBrowserUpdate()');
     expect(pwa).toContain('if (reloadStarted) return');
     expect(pwa).toContain("serviceWorker?.addEventListener('controllerchange', handleWorkerControl)");

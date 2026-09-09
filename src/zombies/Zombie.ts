@@ -242,7 +242,7 @@ export class Zombie implements HitTarget {
     this.group.rotation.y += Math.max(-maxTurn, Math.min(maxTurn, delta));
   }
 
-  update(dt: number): void {
+  update(dt: number, visualSpeed = this.speed): void {
     if (!this.group.visible) return;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
@@ -296,7 +296,7 @@ export class Zombie implements HitTarget {
         break;
     }
 
-    this.visual.update(dt, this.speed);
+    this.visual.update(dt, visualSpeed);
   }
 
   private setWalk(): void {

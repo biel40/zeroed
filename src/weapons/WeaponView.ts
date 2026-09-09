@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { clamp, damp } from '../utils/math';
 import type { MagazineDropPool } from './MagazineDrop';
+import { buildM4A1 } from './M4A1ViewModel';
 import { ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import type { Weapon } from './Weapon';
@@ -341,21 +342,21 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   // Dark parkerized frame, blued slide and reddish-brown walnut stocks.
   const frameMat = new THREE.MeshStandardMaterial({
     color: config.bodyColor,
-    roughness: 0.46,
-    metalness: 0.72,
-    envMapIntensity: 1.15,
+    roughness: 0.64,
+    metalness: 0.65,
+    envMapIntensity: 0.85,
   });
   const slideMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(config.bodyColor).offsetHSL(0, 0, 0.045),
-    roughness: 0.34,
-    metalness: 0.82,
-    envMapIntensity: 1.3,
+    roughness: 0.52,
+    metalness: 0.75,
+    envMapIntensity: 0.95,
   });
   const gripMat = new THREE.MeshStandardMaterial({
     color: config.accentColor,
-    roughness: 0.56,
+    roughness: 0.82,
     metalness: 0.02,
-    envMapIntensity: 1.05,
+    envMapIntensity: 0.65,
   });
   // Small controls: trigger, hammer, sights, bushing, screws.
   const dark = new THREE.MeshStandardMaterial({
@@ -561,6 +562,7 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     -slideLength / 2 - 0.0132,
   );
   muzzleCrown.name = 'm1911-muzzle-crown';
+  muzzleCrown.rotation.y = Math.PI;
   const recoilPlug = add(
     new THREE.CylinderGeometry(0.0065, 0.0065, 0.009, 14),
     dark,
@@ -575,10 +577,21 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   const slide = new THREE.Group();
   slide.name = 'm1911-slide';
   slide.position.set(0, slideY, 0);
-  const slideBody = new THREE.Mesh(
-    roundedBox(0.035, 0.034, slideLength, 2, 0.0035),
-    slideMat,
-  );
+  // Flat machined flanks and a faceted crown: broad planar highlights instead
+  // of the inflated, rippling reflection of a rounded box along the whole slide.
+  const slideSection = new THREE.Shape();
+  slideSection.moveTo(-0.0175, -0.017);
+  slideSection.lineTo(0.0175, -0.017);
+  slideSection.lineTo(0.0175, 0.009);
+  slideSection.lineTo(0.012, 0.015);
+  slideSection.lineTo(0.007, 0.017);
+  slideSection.lineTo(-0.007, 0.017);
+  slideSection.lineTo(-0.012, 0.015);
+  slideSection.lineTo(-0.0175, 0.009);
+  slideSection.closePath();
+  const slideGeometry = new THREE.ExtrudeGeometry(slideSection, { depth: slideLength, bevelEnabled: false, steps: 1 });
+  slideGeometry.translate(0, 0, -slideLength / 2);
+  const slideBody = new THREE.Mesh(slideGeometry, slideMat);
   slideBody.name = 'm1911-slide-body';
   slide.add(slideBody);
 
@@ -1089,6 +1102,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'pistol') return buildPistol(view);
   if (view.frame === 'lmg') return buildM60(view);
   if (view.frame === 'ak47') return buildAk47(view);
+  if (view.frame === 'm4a1') return buildM4A1(view);
   return buildProcedural(view);
 }
 

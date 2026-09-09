@@ -10,14 +10,20 @@ const GLOW_COLOR = 0x8f6bff;
 const RAYGUN_COLOR = WEAPON_DEFINITIONS.raygun.energy?.color ?? 0x63f2a4;
 export const LEGENDARY_MYSTERY_BOX_COLOR = 0xffc928;
 
-const BOX_WIDTH = 1.55;
+const BOX_WIDTH = 1.9;
 const BOX_DEPTH = 0.88;
-const BODY_HEIGHT = 0.68;
+const BODY_HEIGHT = 0.6;
 const LID_OPEN_ANGLE = 1.72;
-const ANCHOR_HEIGHT = 1.38;
-const PARTICLE_COUNT = 58;
-const PARTICLE_TOP = 2.15;
+const ANCHOR_HEIGHT = 1.3;
+const PARTICLE_COUNT = 48;
+const PARTICLE_TOP = 2.05;
 const WEAPON_EXIT_TIME = 0.72;
+
+export const MYSTERY_BOX_VISUAL_SIZE = Object.freeze({
+  width: BOX_WIDTH,
+  depth: BOX_DEPTH,
+  bodyHeight: BODY_HEIGHT,
+});
 
 export function getMysteryBoxResultColor(
   weaponId: WeaponId,
@@ -98,24 +104,26 @@ export class MysteryBoxView {
       return mesh;
     };
 
-    // A recessed wooden body framed by heavy rails reads as a crafted chest,
-    // rather than one textured cuboid.
+    // A low, elongated wooden body framed by heavy rails reads as a military
+    // field chest rather than one textured cuboid.
     addBox(
       this.group,
-      [BOX_WIDTH - 0.12, BODY_HEIGHT - 0.08, BOX_DEPTH - 0.1],
+      [BOX_WIDTH - 0.14, BODY_HEIGHT - 0.08, BOX_DEPTH - 0.1],
       [0, BODY_HEIGHT / 2 + 0.08, 0],
       darkWoodMaterial,
     );
-    addBox(
-      this.group,
-      [BOX_WIDTH - 0.2, BODY_HEIGHT - 0.19, 0.045],
-      [0, BODY_HEIGHT / 2 + 0.08, -BOX_DEPTH / 2 - 0.012],
-      woodMaterial,
-    );
-    for (const x of [-BOX_WIDTH / 2 - 0.012, BOX_WIDTH / 2 + 0.012]) {
+    for (const y of [0.23, 0.37, 0.51]) {
       addBox(
         this.group,
-        [0.045, BODY_HEIGHT - 0.19, BOX_DEPTH - 0.2],
+        [BOX_WIDTH - 0.22, 0.125, 0.055],
+        [0, y, -BOX_DEPTH / 2 - 0.025],
+        woodMaterial,
+      );
+    }
+    for (const x of [-BOX_WIDTH / 2 - 0.014, BOX_WIDTH / 2 + 0.014]) {
+      addBox(
+        this.group,
+        [0.055, BODY_HEIGHT - 0.19, BOX_DEPTH - 0.2],
         [x, BODY_HEIGHT / 2 + 0.08, 0],
         woodMaterial,
       );
@@ -128,7 +136,7 @@ export class MysteryBoxView {
       for (const sz of [-1, 1]) {
         addBox(
           this.group,
-          [0.1, BODY_HEIGHT + 0.08, 0.1],
+          [0.12, BODY_HEIGHT + 0.08, 0.12],
           [sx * BOX_WIDTH / 2, BODY_HEIGHT / 2 + 0.08, sz * BOX_DEPTH / 2],
           metalMaterial,
         );
@@ -136,23 +144,24 @@ export class MysteryBoxView {
       addBox(
         this.group,
         [0.11, BODY_HEIGHT - 0.11, 0.05],
-        [sx * (BOX_WIDTH / 2 - 0.03), BODY_HEIGHT / 2 + 0.08, -BOX_DEPTH / 2 - 0.04],
+        [sx * (BOX_WIDTH / 2 - 0.04), BODY_HEIGHT / 2 + 0.08, -BOX_DEPTH / 2 - 0.055],
         metalMaterial,
       );
-      addBox(this.group, [0.18, 0.08, BOX_DEPTH - 0.16], [sx * 0.55, 0.025, 0], metalMaterial);
+      addBox(this.group, [0.2, 0.08, BOX_DEPTH - 0.16], [sx * 0.72, 0.025, 0], metalMaterial);
     }
-    addBox(this.group, [BOX_WIDTH - 0.06, 0.08, 0.06], [0, 0.18, -BOX_DEPTH / 2 - 0.04], metalMaterial);
-    addBox(this.group, [BOX_WIDTH - 0.06, 0.08, 0.06], [0, BODY_HEIGHT - 0.02, -BOX_DEPTH / 2 - 0.04], metalMaterial);
+    addBox(this.group, [BOX_WIDTH - 0.06, 0.09, 0.07], [0, 0.17, -BOX_DEPTH / 2 - 0.05], metalMaterial);
+    addBox(this.group, [BOX_WIDTH - 0.06, 0.09, 0.07], [0, BODY_HEIGHT, -BOX_DEPTH / 2 - 0.05], metalMaterial);
 
-    // Three front planks, separated by narrow shadow lines.
-    for (const x of [-0.43, 0, 0.43]) {
-      addBox(this.group, [0.026, BODY_HEIGHT - 0.23, 0.018], [x, BODY_HEIGHT / 2 + 0.08, -BOX_DEPTH / 2 - 0.047], darkWoodMaterial);
+    // Vertical straps divide the front while the raised boards retain visible depth.
+    for (const x of [-0.62, 0.62]) {
+      addBox(this.group, [0.045, BODY_HEIGHT - 0.19, 0.025], [x, BODY_HEIGHT / 2 + 0.08, -BOX_DEPTH / 2 - 0.065], metalMaterial);
     }
 
-    // Brass lock plate and a procedural glowing question-mark emblem.
+    // Brass lock plate and a front-facing question mark built as geometry.
+    // Its points are authored in reading order, so no UV or back-face mirroring applies.
     addBox(
       this.group,
-      [0.25, 0.29, 0.035],
+      [0.27, 0.3, 0.04],
       [0, BODY_HEIGHT / 2 + 0.08, -BOX_DEPTH / 2 - 0.07],
       brassMaterial,
     );
@@ -164,40 +173,53 @@ export class MysteryBoxView {
       metalness: 0.25,
     });
     this.glowMaterials.push(emblemMaterial);
-    const questionArc = new THREE.Mesh(
-      new THREE.TorusGeometry(0.068, 0.014, 8, 20, Math.PI * 1.45),
+    const questionCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.065, 0.055, 0),
+      new THREE.Vector3(-0.07, 0.11, 0),
+      new THREE.Vector3(-0.035, 0.15, 0),
+      new THREE.Vector3(0.025, 0.16, 0),
+      new THREE.Vector3(0.07, 0.13, 0),
+      new THREE.Vector3(0.075, 0.085, 0),
+      new THREE.Vector3(0.045, 0.045, 0),
+      new THREE.Vector3(0.01, 0.02, 0),
+      new THREE.Vector3(0, -0.025, 0),
+    ]);
+    const questionMark = new THREE.Mesh(
+      new THREE.TubeGeometry(questionCurve, 24, 0.014, 7, false),
       emblemMaterial,
     );
-    questionArc.position.set(-0.012, BODY_HEIGHT / 2 + 0.125, -BOX_DEPTH / 2 - 0.092);
-    questionArc.rotation.z = -0.18;
-    this.group.add(questionArc);
-    addBox(
-      this.group,
-      [0.025, 0.065, 0.018],
-      [0.035, BODY_HEIGHT / 2 + 0.055, -BOX_DEPTH / 2 - 0.093],
-      emblemMaterial,
-    ).rotation.z = -0.2;
+    questionMark.position.set(0, BODY_HEIGHT / 2 + 0.105, -BOX_DEPTH / 2 - 0.1);
+    this.group.add(questionMark);
     const questionDot = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), emblemMaterial);
-    questionDot.position.set(0.045, BODY_HEIGHT / 2 - 0.005, -BOX_DEPTH / 2 - 0.105);
+    questionDot.position.set(0, BODY_HEIGHT / 2 + 0.01, -BOX_DEPTH / 2 - 0.105);
     this.group.add(questionDot);
 
     // Rivets catch highlights along the frame and break up the straight rails.
     const rivetGeometry = new THREE.SphereGeometry(0.018, 8, 6);
-    for (const x of [-0.68, -0.5, 0.5, 0.68]) {
-      for (const y of [0.2, BODY_HEIGHT - 0.04]) {
+    for (const x of [-0.86, -0.66, 0.66, 0.86]) {
+      for (const y of [0.21, BODY_HEIGHT - 0.01]) {
         const rivet = new THREE.Mesh(rivetGeometry, brassMaterial);
-        rivet.position.set(x, y, -BOX_DEPTH / 2 - 0.082);
+        rivet.position.set(x, y, -BOX_DEPTH / 2 - 0.09);
         this.group.add(rivet);
       }
     }
 
+    // Compact front latches and rear hinge barrels add readable hardware.
+    for (const x of [-0.38, 0.38]) {
+      addBox(this.group, [0.11, 0.14, 0.06], [x, BODY_HEIGHT + 0.015, -BOX_DEPTH / 2 - 0.075], metalMaterial);
+      const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 10), metalMaterial);
+      hinge.rotation.z = Math.PI / 2;
+      hinge.position.set(x, BODY_HEIGHT + 0.11, BOX_DEPTH / 2 + 0.035);
+      this.group.add(hinge);
+    }
+
     // The lid pivots at its rear edge. Its front edge rises on positive X rotation.
     this.lid.position.set(0, BODY_HEIGHT + 0.13, BOX_DEPTH / 2);
-    addBox(this.lid, [BOX_WIDTH + 0.08, 0.16, BOX_DEPTH + 0.06], [0, 0.08, -BOX_DEPTH / 2], darkWoodMaterial);
-    for (const x of [-0.58, -0.29, 0, 0.29, 0.58]) {
-      addBox(this.lid, [0.255, 0.025, BOX_DEPTH - 0.04], [x, 0.174, -BOX_DEPTH / 2], woodMaterial);
+    addBox(this.lid, [BOX_WIDTH + 0.08, 0.15, BOX_DEPTH + 0.06], [0, 0.075, -BOX_DEPTH / 2], darkWoodMaterial);
+    for (const x of [-0.75, -0.45, -0.15, 0.15, 0.45, 0.75]) {
+      addBox(this.lid, [0.265, 0.035, BOX_DEPTH - 0.04], [x, 0.168, -BOX_DEPTH / 2], woodMaterial);
     }
-    for (const x of [-0.55, 0.55]) {
+    for (const x of [-0.72, 0.72]) {
       addBox(this.lid, [0.09, 0.08, BOX_DEPTH + 0.1], [x, 0.19, -BOX_DEPTH / 2], metalMaterial);
     }
     addBox(this.lid, [BOX_WIDTH + 0.13, 0.09, 0.09], [0, 0.1, -BOX_DEPTH - 0.01], metalMaterial);
@@ -207,11 +229,19 @@ export class MysteryBoxView {
     this.interiorMaterial = new THREE.MeshStandardMaterial({
       color: 0x090611,
       emissive: GLOW_COLOR,
-      emissiveIntensity: 0.45,
+      emissiveIntensity: 0.62,
       roughness: 0.72,
       metalness: 0.1,
     });
     addBox(this.group, [BOX_WIDTH - 0.2, 0.045, BOX_DEPTH - 0.16], [0, BODY_HEIGHT + 0.135, 0], this.interiorMaterial);
+    for (const x of [-0.6, -0.3, 0, 0.3, 0.6]) {
+      addBox(
+        this.lid,
+        [0.035, 0.012, BOX_DEPTH - 0.12],
+        [x, 0.19, -BOX_DEPTH / 2],
+        this.interiorMaterial,
+      );
+    }
 
     this.auraMaterial = new THREE.MeshBasicMaterial({
       color: GLOW_COLOR,
@@ -228,8 +258,8 @@ export class MysteryBoxView {
     aura.position.y = BODY_HEIGHT + 0.8;
     this.group.add(aura);
 
-    this.glowLight = new THREE.PointLight(GLOW_COLOR, 0.35, 8, 1.7);
-    this.glowLight.position.set(0, 0.96, -0.04);
+    this.glowLight = new THREE.PointLight(GLOW_COLOR, 0.42, 7, 1.8);
+    this.glowLight.position.set(0, 0.82, -0.04);
     this.group.add(this.glowLight);
 
     this.anchor.position.y = ANCHOR_HEIGHT;
@@ -248,9 +278,9 @@ export class MysteryBoxView {
 
     const positions = new Float32Array(PARTICLE_COUNT * 3);
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * (BOX_WIDTH + 0.15);
-      positions[i * 3 + 1] = 0.18 + Math.random() * PARTICLE_TOP;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * BOX_DEPTH;
+      positions[i * 3] = (Math.random() - 0.5) * (BOX_WIDTH - 0.28);
+      positions[i * 3 + 1] = BODY_HEIGHT + 0.08 + Math.random() * (PARTICLE_TOP - BODY_HEIGHT);
+      positions[i * 3 + 2] = (Math.random() - 0.5) * (BOX_DEPTH - 0.18);
     }
     const particleGeometry = new THREE.BufferGeometry();
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -345,7 +375,7 @@ export class MysteryBoxView {
     const speed = phase === 'closed' ? 0.08 : 0.5;
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       let y = positions.getY(i) + dt * speed * (0.58 + (i % 5) * 0.12);
-      if (y > PARTICLE_TOP) y = 0.16;
+      if (y > PARTICLE_TOP) y = BODY_HEIGHT + 0.08;
       positions.setY(i, y);
     }
     positions.needsUpdate = true;

@@ -50,6 +50,79 @@ const SMOOTH_WINDOW = 48;
 /** Ring-search radius (cells) when snapping unwalkable endpoints. */
 const SNAP_RADIUS = 8;
 
+function pointToRectDistanceSquared(x: number, z: number, rect: NavigationRect): number {
+  const dx = Math.max(rect.minX - x, 0, x - rect.maxX);
+  const dz = Math.max(rect.minZ - z, 0, z - rect.maxZ);
+  return dx * dx + dz * dz;
+}
+
+function pointToSegmentDistanceSquared(
+  x: number,
+  z: number,
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+): number {
+  const segmentX = toX - fromX;
+  const segmentZ = toZ - fromZ;
+  const lengthSquared = segmentX * segmentX + segmentZ * segmentZ;
+  if (lengthSquared <= 1e-12) return (x - fromX) ** 2 + (z - fromZ) ** 2;
+  const t = Math.max(0, Math.min(1, ((x - fromX) * segmentX + (z - fromZ) * segmentZ) / lengthSquared));
+  const dx = x - (fromX + segmentX * t);
+  const dz = z - (fromZ + segmentZ * t);
+  return dx * dx + dz * dz;
+}
+
+function segmentIntersectsRect(
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  rect: NavigationRect,
+): boolean {
+  let near = 0;
+  let far = 1;
+  const clipAxis = (start: number, delta: number, min: number, max: number): boolean => {
+    if (Math.abs(delta) <= 1e-12) return start >= min && start <= max;
+    let entry = (min - start) / delta;
+    let exit = (max - start) / delta;
+    if (entry > exit) [entry, exit] = [exit, entry];
+    near = Math.max(near, entry);
+    far = Math.min(far, exit);
+    return near <= far;
+  };
+  return clipAxis(fromX, toX - fromX, rect.minX, rect.maxX) &&
+    clipAxis(fromZ, toZ - fromZ, rect.minZ, rect.maxZ);
+}
+
+function segmentClearsRect(
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  rect: NavigationRect,
+  radiusSquared: number,
+): boolean {
+  if (segmentIntersectsRect(fromX, fromZ, toX, toZ, rect)) return false;
+  let distanceSquared = Math.min(
+    pointToRectDistanceSquared(fromX, fromZ, rect),
+    pointToRectDistanceSquared(toX, toZ, rect),
+  );
+  for (const [x, z] of [
+    [rect.minX, rect.minZ],
+    [rect.minX, rect.maxZ],
+    [rect.maxX, rect.minZ],
+    [rect.maxX, rect.maxZ],
+  ]) {
+    distanceSquared = Math.min(
+      distanceSquared,
+      pointToSegmentDistanceSquared(x, z, fromX, fromZ, toX, toZ),
+    );
+  }
+  return distanceSquared >= radiusSquared;
+}
+
 export class NavigationGrid {
   private readonly cols: number;
   private readonly rows: number;
@@ -113,14 +186,11 @@ export class NavigationGrid {
     return true;
   }
 
-  /** Sampled exact clearance along the segment, at body-radius steps. */
+  /** Continuous body-radius clearance along the complete segment. */
   public hasLineOfSight(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
-    const distance = Math.hypot(toX - fromX, toZ - fromZ);
-    if (distance <= 1e-6) return this.isClearPoint(toX, toZ);
-    const steps = Math.max(1, Math.ceil(distance / this.bodyRadius));
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      if (!this.isClearPoint(fromX + (toX - fromX) * t, fromZ + (toZ - fromZ) * t)) return false;
+    const radiusSquared = this.bodyRadius * this.bodyRadius;
+    for (const rect of this.obstacles) {
+      if (!segmentClearsRect(fromX, fromZ, toX, toZ, rect, radiusSquared)) return false;
     }
     return true;
   }

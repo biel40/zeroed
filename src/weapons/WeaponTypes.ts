@@ -185,7 +185,7 @@ export interface ViewModelConfig {
    * 'ak47' uses the dedicated Type-3 AK builder (wood furniture, gas tube,
    * banana magazine). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */

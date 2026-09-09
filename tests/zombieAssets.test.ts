@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { AnimationClip } from 'three';
+import { Box3, SkinnedMesh, Texture, Vector3, type AnimationClip } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { describe, expect, it } from 'vitest';
 import { ZOMBIE_MANIFEST } from '../src/assets/AssetManager';
 import { ZOMBIE_TYPE_CONFIGS, type ZombieModelId } from '../src/zombies/ZombieConfig';
-import { resolveClip, ZOMBIE_MODELS } from '../src/zombies/ZombieVisual';
+import { resolveClip, ZombieVisual, ZOMBIE_MODELS } from '../src/zombies/ZombieVisual';
 import type { ZombieState } from '../src/zombies/Zombie';
 
 const GLB_DIR = fileURLToPath(new URL('../public/assets/zombies', import.meta.url));
@@ -18,6 +18,9 @@ const GLB_FILES: Record<ZombieModelId, string> = {
 function gltfJson(path: string): {
   animations?: Array<{ name?: string }>;
   nodes?: Array<{ name?: string }>;
+  materials?: Array<{ name?: string }>;
+  meshes?: Array<{ primitives?: unknown[] }>;
+  skins?: unknown[];
 } {
   const buffer = readFileSync(path);
   expect(buffer.subarray(0, 4).toString('ascii')).toBe('glTF');
@@ -71,6 +74,37 @@ describe('zombie GLB assets', () => {
     expect(nodes).toContain('BruteFistL');
     expect(nodes).toContain('BruteFistR');
     expect(nodes).toContain('BruteTempleScar');
+    expect(nodes).toContain('BruteTrapL');
+    expect(nodes).toContain('BruteKnuckleR3');
+  });
+
+  it('ships the original textured low-poly walker selected as the visual reference', () => {
+    const json = gltfJson(`${GLB_DIR}/${GLB_FILES.walker}`);
+    const nodes = new Set((json.nodes ?? []).map((node) => node.name));
+    const materials = new Set((json.materials ?? []).map((material) => material.name));
+    expect(nodes).toContain('Zombie_Cylinder');
+    expect(nodes).toContain('Head');
+    expect(nodes).toContain('LeftForeArm');
+    expect(materials).toEqual(new Set(['Material']));
+    expect(json.skins).toHaveLength(1);
+    expect(json.meshes).toHaveLength(1);
+    expect(json.meshes?.[0].primitives).toHaveLength(1);
+  });
+
+  it('loads the walker as one articulated body through the production GLTF loader', async () => {
+    const buffer = readFileSync(`${GLB_DIR}/${GLB_FILES.walker}`);
+    const data = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    const loader = new GLTFLoader().register(() => ({ name: 'headless-texture', loadTexture: async () => new Texture() }));
+    const gltf = await loader.parseAsync(data, '');
+    const skinnedParts: SkinnedMesh[] = [];
+    gltf.scene.traverse((object) => {
+      if (object instanceof SkinnedMesh) skinnedParts.push(object);
+    });
+    expect(gltf.scene.getObjectByName('Zombie_Cylinder')).toBeDefined();
+    expect(skinnedParts).toHaveLength(1);
+    expect(skinnedParts[0].skeleton.bones.map((bone) => bone.name)).toContain('Head');
+    expect((skinnedParts[0].geometry.index?.count ?? 0) / 3).toBe(2116);
+    expect(buffer.byteLength).toBeLessThan(700_000);
   });
 
   it('loads the Brute binary through the production GLTF loader', async () => {
@@ -83,6 +117,33 @@ describe('zombie GLB assets', () => {
     expect(gltf.animations.map((clip) => clip.name)).toEqual([
       'BruteRise', 'BruteWalk', 'BruteSmash', 'BruteHit', 'BruteDeath',
     ]);
+  });
+
+  it('normalizes and animates the restored walker without losing its rig or stopping pose', async () => {
+    const buffer = readFileSync(`${GLB_DIR}/${GLB_FILES.walker}`);
+    const data = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    const loader = new GLTFLoader().register(() => ({ name: 'headless-texture', loadTexture: async () => new Texture() }));
+    const gltf = await loader.parseAsync(data, '');
+    const visual = new ZombieVisual('walker', { scene: gltf.scene, clips: gltf.animations }, ZOMBIE_MODELS.walker.tints[0], false);
+    visual.root.updateMatrixWorld(true);
+    expect(new Box3().setFromObject(visual.root).getSize(new Vector3()).y).toBeCloseTo(1.78, 2);
+    expect(ZOMBIE_MODELS.walker.walkReferenceSpeed).toBe(1.35);
+    const foot = visual.root.getObjectByName('LeftFoot')!;
+    const initialPose = foot.quaternion.clone();
+    visual.setState('walk');
+    visual.update(0.5, ZOMBIE_MODELS.walker.walkReferenceSpeed);
+    expect(foot.quaternion.equals(initialPose)).toBe(false);
+    const pausedPose = foot.quaternion.clone();
+    visual.update(0.5, 0);
+    expect(foot.quaternion.equals(pausedPose)).toBe(true);
+    expect(resolveClip(gltf.animations, ZOMBIE_MODELS.walker.clips.attack)?.duration).toBeGreaterThan(5);
+    visual.setZombieType('shiny');
+    visual.update(0.3, ZOMBIE_MODELS.walker.walkReferenceSpeed);
+    visual.root.updateMatrixWorld(true);
+    const stars = visual.root.getObjectByName('shiny-stars')!.getWorldPosition(new Vector3());
+    const torso = visual.torsoAnchor.getWorldPosition(new Vector3());
+    expect(stars.x).toBeCloseTo(torso.x, 5);
+    expect(stars.z).toBeCloseTo(torso.z, 5);
   });
 });
 
