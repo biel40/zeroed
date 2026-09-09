@@ -17,165 +17,182 @@ function isStandalone(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone === true;
 }
 
-/** Browser-only PWA lifecycle. Gameplay state remains owned by Game. */
-export function setupPWA(): void {
-  const profile = getDeviceProfile();
-  const standalone = isStandalone();
-  const installButton = button('pwa-install');
-  const menuUpdateButton = button('pwa-update-menu');
-  const pauseUpdateButton = button('pwa-update-pause');
-  const mapSelect = document.getElementById('map-select');
-  const pauseMenu = document.getElementById('pause-menu');
-  if (!mapSelect || !pauseMenu) throw new Error('Missing safe PWA update menus');
-  installButton.classList.toggle('hidden', !profile.isMobile || standalone);
-  const updateButtons = [menuUpdateButton, pauseUpdateButton];
-  let installPrompt: InstallPromptEvent | null = null;
-  let updateAvailable = false;
-  let applyingUpdate = false;
-  let reloadPending = false;
-  let reloadStarted = false;
-  let updateSW: () => Promise<void> = async () => {};
-  let swRegistration: ServiceWorkerRegistration | null = null;
-  let approvedWorker: ServiceWorker | null = null;
-  let watchedWorker: ServiceWorker | null = null;
-  const serviceWorker = 'serviceWorker' in navigator ? navigator.serviceWorker : null;
-  let controllerSeen = serviceWorker?.controller != null;
+export class PwaLifecycle {
+  private readonly profile: ReturnType<typeof getDeviceProfile>;
+  private readonly standalone: boolean;
+  private readonly installButton: HTMLButtonElement;
+  private readonly updateButtons: HTMLButtonElement[];
+  private readonly mapSelect: HTMLElement;
+  private readonly pauseMenu: HTMLElement;
+  private installPrompt: InstallPromptEvent | null = null;
+  private updateAvailable: boolean = false;
+  private applyingUpdate: boolean = false;
+  private reloadPending: boolean = false;
+  private reloadStarted: boolean = false;
+  private updateSW: () => Promise<void> = async () => { };
+  private swRegistration: ServiceWorkerRegistration | null = null;
+  private approvedWorker: ServiceWorker | null = null;
+  private watchedWorker: ServiceWorker | null = null;
+  private readonly serviceWorker: ServiceWorkerContainer | null;
+  private controllerSeen: boolean;
 
-  const setUpdateAvailable = (available: boolean): void => {
-    updateAvailable = available;
-    for (const updateButton of updateButtons) updateButton.classList.toggle('hidden', !available);
-  };
+  public constructor() {
+    this.profile = getDeviceProfile();
+    this.standalone = isStandalone();
+    this.installButton = button('pwa-install');
+    this.updateButtons = [button('pwa-update-menu'), button('pwa-update-pause')];
+    const mapSelect = document.getElementById('map-select');
+    const pauseMenu = document.getElementById('pause-menu');
+    if (!mapSelect || !pauseMenu) throw new Error('Missing safe PWA update menus');
+    this.mapSelect = mapSelect;
+    this.pauseMenu = pauseMenu;
+    this.serviceWorker = 'serviceWorker' in navigator ? navigator.serviceWorker : null;
+    this.controllerSeen = this.serviceWorker?.controller != null;
+    this.installButton.classList.toggle('hidden', !this.profile.isMobile || this.standalone);
+  }
 
-  const reloadOnce = (): void => {
-    if (reloadStarted) return;
-    reloadStarted = true;
+  private _setUpdateAvailable(available: boolean): void {
+    this.updateAvailable = available;
+    for (const updateButton of this.updateButtons) {
+      updateButton.classList.toggle('hidden', !available);
+    }
+  }
+
+  private _reloadOnce(): void {
+    if (this.reloadStarted) return;
+    this.reloadStarted = true;
     window.location.reload();
-  };
+  }
 
-  const applyBrowserUpdate = async (): Promise<void> => {
-    if (standalone || applyingUpdate) return;
-    applyingUpdate = true;
+  private async _applyBrowserUpdate(): Promise<void> {
+    if (this.standalone || this.applyingUpdate) return;
+    this.applyingUpdate = true;
     try {
-      await updateSW();
+      await this.updateSW();
     } catch (error: unknown) {
       console.error('[Zeroed PWA] Could not apply the browser update.', error);
     } finally {
-      applyingUpdate = false;
+      this.applyingUpdate = false;
     }
-  };
+  }
 
-  // Workbox only tracks workers whose `updatefound` it observes; the browser's own
-  // navigation update check can leave a worker already installing before register().
-  const applyWhenInstalled = (registration: ServiceWorkerRegistration): void => {
+  private _applyWhenInstalled(registration: ServiceWorkerRegistration): void {
     const worker = registration.installing;
-    if (!worker || worker === watchedWorker) return;
-    watchedWorker = worker;
+    if (!worker || worker === this.watchedWorker) return;
+    this.watchedWorker = worker;
     worker.addEventListener('statechange', () => {
       if (worker.state !== 'installed' || registration.waiting !== worker) return;
-      setUpdateAvailable(true);
-      void applyBrowserUpdate();
+      this._setUpdateAvailable(true);
+      void this._applyBrowserUpdate();
     });
-  };
+  }
 
-  const handleWorkerControl = (): void => {
-    const controller = serviceWorker?.controller;
+  private _handleWorkerControl(): void {
+    const controller = this.serviceWorker?.controller;
     if (!controller) return;
-    if (!controllerSeen) {
-      controllerSeen = true;
+    if (!this.controllerSeen) {
+      this.controllerSeen = true;
       return;
     }
-    if (!standalone || controller === approvedWorker) {
-      reloadOnce();
+    if (!this.standalone || controller === this.approvedWorker) {
+      this._reloadOnce();
       return;
     }
-    reloadPending = true;
-    setUpdateAvailable(true);
-  };
+    this.reloadPending = true;
+    this._setUpdateAvailable(true);
+  }
 
-  serviceWorker?.addEventListener('controllerchange', handleWorkerControl);
+  private async _applyUpdate(): Promise<void> {
+    if (!this.updateAvailable || this.applyingUpdate) return;
 
-  updateSW = registerSW({
-    immediate: true,
-    onNeedRefresh: () => {
-      setUpdateAvailable(true);
-      void applyBrowserUpdate();
-    },
-    onNeedReload: handleWorkerControl,
-    onRegisteredSW: (_swScriptUrl, registration) => {
-      swRegistration = registration ?? null;
-      if (standalone || !registration) return;
-      applyWhenInstalled(registration);
-      void registration
-        .update()
-        .then(() => {
-          if (registration.waiting) {
-            setUpdateAvailable(true);
-            void applyBrowserUpdate();
-            return;
-          }
-          // update() resolves as soon as the new worker starts installing, not when it waits.
-          applyWhenInstalled(registration);
-        })
-        .catch((error: unknown) =>
-          console.error('[Zeroed PWA] Immediate update check failed; using the current version.', error),
-        );
-    },
-    onOfflineReady: () => console.info('[Zeroed PWA] Offline app shell is ready.'),
-    onRegisterError: (error) => console.error('[Zeroed PWA] Service worker registration failed.', error),
-  });
-
-  const applyUpdate = async (): Promise<void> => {
-    if (!updateAvailable || applyingUpdate) return;
-
-    const safeMenuVisible = !mapSelect.classList.contains('hidden') || !pauseMenu.classList.contains('hidden');
+    const safeMenuVisible = !this.mapSelect.classList.contains('hidden') || !this.pauseMenu.classList.contains('hidden');
     if (!safeMenuVisible) return;
     if (
-      !pauseMenu.classList.contains('hidden') &&
+      !this.pauseMenu.classList.contains('hidden') &&
       !window.confirm('Actualizar reiniciara la partida actual. Continuar?')
     ) {
       return;
     }
 
-    if (reloadPending) {
-      reloadOnce();
+    if (this.reloadPending) {
+      this._reloadOnce();
       return;
     }
 
-    approvedWorker = swRegistration?.waiting ?? null;
-    applyingUpdate = true;
-    for (const updateButton of updateButtons) updateButton.disabled = true;
+    this.approvedWorker = this.swRegistration?.waiting ?? null;
+    this.applyingUpdate = true;
+    for (const updateButton of this.updateButtons) updateButton.disabled = true;
     try {
-      await updateSW();
+      await this.updateSW();
     } catch (error: unknown) {
       console.error('[Zeroed PWA] Could not apply the waiting update.', error);
     } finally {
-      applyingUpdate = false;
-      for (const updateButton of updateButtons) updateButton.disabled = false;
+      this.applyingUpdate = false;
+      for (const updateButton of this.updateButtons) updateButton.disabled = false;
     }
-  };
-
-  for (const updateButton of updateButtons) {
-    updateButton.addEventListener('click', () => void applyUpdate());
   }
 
-  window.addEventListener('beforeinstallprompt', (event) => {
-    if (!profile.isMobile) return;
-    event.preventDefault();
-    installPrompt = event as InstallPromptEvent;
-    installButton.classList.toggle('hidden', isStandalone() || !profile.isMobile);
-  });
+  public setup(): void {
+    this.serviceWorker?.addEventListener('controllerchange', () => this._handleWorkerControl());
 
-  installButton.addEventListener('click', async () => {
-    if (!profile.isMobile || !installPrompt || isStandalone()) return;
-    const prompt = installPrompt;
-    installPrompt = null;
-    installButton.classList.add('hidden');
-    await prompt.prompt();
-    await prompt.userChoice;
-  });
+    this.updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh: () => {
+        this._setUpdateAvailable(true);
+        void this._applyBrowserUpdate();
+      },
+      onNeedReload: () => this._handleWorkerControl(),
+      onRegisteredSW: (_swScriptUrl, registration) => {
+        this.swRegistration = registration ?? null;
+        if (this.standalone || !registration) return;
+        this._applyWhenInstalled(registration);
+        void registration
+          .update()
+          .then(() => {
+            if (registration.waiting) {
+              this._setUpdateAvailable(true);
+              void this._applyBrowserUpdate();
+              return;
+            }
+            // update() resolves as soon as the new worker starts installing, not when it waits.
+            this._applyWhenInstalled(registration);
+          })
+          .catch((error: unknown) =>
+            console.error('[Zeroed PWA] Immediate update check failed; using the current version.', error),
+          );
+      },
+      onOfflineReady: () => console.info('[Zeroed PWA] Offline app shell is ready.'),
+      onRegisterError: (error) => console.error('[Zeroed PWA] Service worker registration failed.', error),
+    });
 
-  window.addEventListener('appinstalled', () => {
-    installPrompt = null;
-    installButton.classList.add('hidden');
-  });
+    for (const updateButton of this.updateButtons) {
+      updateButton.addEventListener('click', () => void this._applyUpdate());
+    }
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      if (!this.profile.isMobile) return;
+      event.preventDefault();
+      this.installPrompt = event as InstallPromptEvent;
+      this.installButton.classList.toggle('hidden', isStandalone() || !this.profile.isMobile);
+    });
+
+    this.installButton.addEventListener('click', async () => {
+      if (!this.profile.isMobile || !this.installPrompt || isStandalone()) return;
+      const prompt = this.installPrompt;
+      this.installPrompt = null;
+      this.installButton.classList.add('hidden');
+      await prompt.prompt();
+      await prompt.userChoice;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      this.installPrompt = null;
+      this.installButton.classList.add('hidden');
+    });
+  }
+}
+
+/** Browser-only PWA lifecycle. Gameplay state remains owned by Game. */
+export function setupPWA(): void {
+  new PwaLifecycle().setup();
 }

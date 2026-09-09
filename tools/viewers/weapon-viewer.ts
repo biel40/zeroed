@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { AssetManager } from './assets/AssetManager';
-import { WEAPON_DEFINITIONS } from './config/weapons';
-import { Weapon } from './weapons/Weapon';
-import { WeaponView } from './weapons/WeaponView';
-import type { WeaponId } from './weapons/WeaponTypes';
+import { AssetManager } from '../../src/assets/AssetManager';
+import { WEAPON_DEFINITIONS } from '../../src/config/weapons';
+import { Weapon } from '../../src/weapons/Weapon';
+import { WeaponView } from '../../src/weapons/WeaponView';
+import type { WeaponId } from '../../src/weapons/WeaponTypes';
 
 /**
  * Dev-only visual verification harness (never shipped to the game bundle):
@@ -12,9 +12,9 @@ import type { WeaponId } from './weapons/WeaponTypes';
  * Vite dev server. Mirrors the game renderer (ACES tone mapping,
  * RoomEnvironment IBL) so screenshots compare with in-game footage.
  *
- *   /viewer.html?weapon=ak47&view=pov       hip POV (left) + ADS POV (right)
- *   /viewer.html?weapon=m60&view=external   3/4 silhouette, hip | ADS slots
- *   /viewer.html?weapon=ak47&view=closeup   tight frame on receiver + barrel
+ *   /tools/viewers/weapon-viewer.html?weapon=ak47&view=pov       hip POV (left) + ADS POV (right)
+ *   /tools/viewers/weapon-viewer.html?weapon=m60&view=external  3/4 silhouette, hip | ADS slots
+ *   /tools/viewers/weapon-viewer.html?weapon=ak47&view=closeup  tight frame on receiver + barrel
  */
 
 const params = new URLSearchParams(location.search);
@@ -63,7 +63,7 @@ function makeWeapon(ads: boolean): Weapon {
   const weapon = new Weapon(definition, () => 0.5);
   if (ads) {
     // Drive the ADS blend to completion (speed ~8-12/s → well under 1.5 s).
-    for (let i = 0; i < 90; i++) weapon.update(1 / 60, { trigger: false, ads: true });
+    for (let index = 0; index < 90; index++) weapon.update(1 / 60, { trigger: false, ads: true });
   }
   return weapon;
 }
@@ -129,17 +129,17 @@ if (mode === 'pov') {
 }
 
 function frame(): void {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
   for (const { view, weapon } of slots) view.update(1 / 60, weapon, 0, 0, 0);
   if (mode === 'pov' && slots.length === 2) {
     renderer.setScissorTest(true);
-    for (const [i, slot] of slots.entries()) {
-      const x = i * (w / 2);
-      slot.camera.aspect = w / 2 / h;
+    for (const [index, slot] of slots.entries()) {
+      const x = index * (width / 2);
+      slot.camera.aspect = width / 2 / height;
       slot.camera.updateProjectionMatrix();
-      renderer.setViewport(x, 0, w / 2, h);
-      renderer.setScissor(x, 0, w / 2, h);
+      renderer.setViewport(x, 0, width / 2, height);
+      renderer.setScissor(x, 0, width / 2, height);
       renderer.render(slot.scene, slot.camera);
     }
     renderer.setScissorTest(false);

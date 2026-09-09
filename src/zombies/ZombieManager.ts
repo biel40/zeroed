@@ -839,10 +839,13 @@ export class ZombieManager {
     playerFloor: number,
     playerY: number,
   ): void {
+    if (zombie.barrierTarget?.isOpen) {
+      zombie.barrierTarget = null;
+      zombie.cancelBarrierAttack();
+    }
     if (this.followEntryRoute(zombie, dt)) return;
     if (this.followStairTraversal(zombie, dt)) return;
     const target = zombie.barrierTarget;
-    if (target && target.isOpen) zombie.barrierTarget = null;
 
     if (target) {
       zombie.faceTowards(target.position.x, target.position.z, TURN_SPEED * dt);
@@ -863,7 +866,10 @@ export class ZombieManager {
         if (zombie.tryBarrierAttack()) {
           zombie.onAttackLanded = () => {
             this.hitBarrier(target);
-            if (target.isOpen) zombie.barrierTarget = null;
+            if (target.isOpen) {
+              zombie.barrierTarget = null;
+              zombie.cancelBarrierAttack();
+            }
           };
         }
         return;
@@ -949,6 +955,15 @@ export class ZombieManager {
         zombie.position.z,
         targetX,
         targetZ,
+      ) &&
+      this.lineOfSightClearFrom(
+        zombie.position.x,
+        zombie.position.z,
+        targetX,
+        targetZ,
+        zombie.position.y,
+        undefined,
+        zombie.bodyRadius,
       )
     ) {
       // A clear straight line to the final target beats any routed detour.
@@ -1131,13 +1146,23 @@ export class ZombieManager {
       return false;
     }
     if (!navigation.contains(zombie.floor, targetX, targetZ)) return false;
-    return !navigation.hasLineOfSight(
+    const gridLineClear = navigation.hasLineOfSight(
       zombie.floor,
       zombie.position.x,
       zombie.position.z,
       targetX,
       targetZ,
     );
+    const physicalLineClear = this.lineOfSightClearFrom(
+      zombie.position.x,
+      zombie.position.z,
+      targetX,
+      targetZ,
+      zombie.position.y,
+      undefined,
+      zombie.bodyRadius,
+    );
+    return !gridLineClear || !physicalLineClear;
   }
 
   /**
@@ -1444,6 +1469,21 @@ export class ZombieManager {
     const target = this.containsXZ(ramp.box, zombie.position.x, zombie.position.z)
       ? destination
       : (destination === ramp.bottom ? ramp.top : ramp.bottom);
+    if (
+      target === ramp.top &&
+      ramp.topApproach &&
+      !this.lineOfSightClearFrom(
+        zombie.position.x,
+        zombie.position.z,
+        ramp.top.x,
+        ramp.top.z,
+        zombie.position.y,
+        undefined,
+        zombie.bodyRadius,
+      )
+    ) {
+      return out.set(ramp.topApproach.x, ramp.topApproach.y, ramp.topApproach.z);
+    }
     return out.set(target.x, target.y, target.z);
   }
 
@@ -1731,7 +1771,10 @@ export class ZombieManager {
       if (barrier && !barrier.isOpen) {
         zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
         if (zombie.state === 'walk' && zombie.tryBarrierAttack()) {
-          zombie.onAttackLanded = () => this.hitBarrier(barrier);
+          zombie.onAttackLanded = () => {
+            this.hitBarrier(barrier);
+            if (barrier.isOpen) zombie.cancelBarrierAttack();
+          };
         }
         return true;
       }

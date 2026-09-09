@@ -32,7 +32,9 @@ import {
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
+  MANSION_STAIR_BOTTOM_Z,
   MANSION_STAIR_CENTER_X,
+  MANSION_STAIR_TOP_Z,
   MANSION_SECRET_AREAS,
   MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
@@ -49,6 +51,8 @@ const WINDOW_TOP = 1.9;
 const GROUND_CEILING_Y = 3.2;
 // Underside of the bunker ceiling slab (center -0.22, thickness 0.16).
 const BUNKER_CEILING_Y = -0.3;
+const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
+const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
 
 type WallAxis = 'x' | 'z';
 
@@ -378,8 +382,16 @@ export class BurnedMansionArena implements ZombieArena {
   private buildShell(): void {
     this.addSlab('ground-floor', -0.8, -0.08, 1, 12.4, 0.16, 18, this.materials.floorConcrete);
     this.addSlab('ground-floor-east', 8.45, -0.08, 1, 1.1, 0.16, 18, this.materials.floorConcrete);
-    this.addSlab('ground-floor-stair-north', MANSION_STAIR_CENTER_X, -0.08, -7.45, 2.5, 0.16, 1.1, this.materials.floorConcrete);
-    this.addSlab('ground-floor-stair-south', MANSION_STAIR_CENTER_X, -0.08, 3.5, 2.5, 0.16, 13, this.materials.floorConcrete);
+    this.addSlab(
+      'ground-floor-stair-north', MANSION_STAIR_CENTER_X, -0.08,
+      (-8 + STAIR_APERTURE_MIN_Z) / 2, 2.5, 0.16,
+      STAIR_APERTURE_MIN_Z + 8, this.materials.floorConcrete,
+    );
+    this.addSlab(
+      'ground-floor-stair-south', MANSION_STAIR_CENTER_X, -0.08,
+      (STAIR_APERTURE_MAX_Z + 10) / 2, 2.5, 0.16,
+      10 - STAIR_APERTURE_MAX_Z, this.materials.floorConcrete,
+    );
 
     this.addWindowedWall('z', -7.15, -8, 10, [-3.2, 3.2, 5.4]);
     this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10, [-2.5]);
@@ -393,8 +405,16 @@ export class BurnedMansionArena implements ZombieArena {
     this.addSlab('bunker-floor', 1, MANSION_BUNKER_Y - 0.08, -3.75, 16, 0.16, 11.5, this.materials.floorConcrete);
     this.addSlab('bunker-ceiling', -0.8, -0.22, -3.75, 12.4, 0.16, 11.5, this.materials.ceilingBurned);
     this.addSlab('bunker-ceiling-east', 8.45, -0.22, -3.75, 1.1, 0.16, 11.5, this.materials.ceilingBurned);
-    this.addSlab('bunker-ceiling-stair-north', MANSION_STAIR_CENTER_X, -0.22, -8.2, 2.5, 0.16, 2.6, this.materials.ceilingBurned);
-    this.addSlab('bunker-ceiling-stair-south', MANSION_STAIR_CENTER_X, -0.22, -0.5, 2.5, 0.16, 5, this.materials.ceilingBurned);
+    this.addSlab(
+      'bunker-ceiling-stair-north', MANSION_STAIR_CENTER_X, -0.22,
+      (-9.5 + STAIR_APERTURE_MIN_Z) / 2, 2.5, 0.16,
+      STAIR_APERTURE_MIN_Z + 9.5, this.materials.ceilingBurned,
+    );
+    this.addSlab(
+      'bunker-ceiling-stair-south', MANSION_STAIR_CENTER_X, -0.22,
+      (STAIR_APERTURE_MAX_Z + 2) / 2, 2.5, 0.16,
+      2 - STAIR_APERTURE_MAX_Z, this.materials.ceilingBurned,
+    );
     const bunkerWallY = MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2;
     this.addWall(-7, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
     this.addWall(MANSION_EAST_WALL_X - 0.15, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
@@ -414,8 +434,8 @@ export class BurnedMansionArena implements ZombieArena {
 
   private buildStairs(): void {
     const steps = 17;
-    const topZ = -2.85;
-    const bottomZ = -6.75;
+    const topZ = MANSION_STAIR_TOP_Z;
+    const bottomZ = MANSION_STAIR_BOTTOM_Z;
     const run = topZ - bottomZ;
     const depth = run / steps;
     const rise = Math.abs(MANSION_BUNKER_Y) / steps;
@@ -780,7 +800,6 @@ export class BurnedMansionArena implements ZombieArena {
     this.addPointLight(-3.8, 2.55, 6.5, 0xffad68, 2.4, 6.5, GROUND_CEILING_Y);
     this.addPointLight(-4.5, 2.35, -4.8, 0x839db7, 1.7, 6.5, GROUND_CEILING_Y);
     this.addPointLight(2.1, 2.35, -4.8, 0xb35b32, 1.1, 5.2, GROUND_CEILING_Y);
-    this.addPointLight(5.1, 1.85, -5.5, 0x6e120d, 0.35, 4.5, GROUND_CEILING_Y);
     // Hung under a real ceiling segment: the stair aperture has no slab to
     // anchor the cord to, so a bulb placed there floated unattached.
     this.bunkerEmergencyLight = this.addPointLight(
@@ -831,17 +850,18 @@ export class BurnedMansionArena implements ZombieArena {
     // follows the slope, outside it every body sits on its own floor plane.
     const ramp: StairRamp = {
       box: new THREE.Box3(
-        new THREE.Vector3(5.4, MANSION_BUNKER_Y - 0.2, -6.9),
-        new THREE.Vector3(7.9, 2.1, -2.82),
+        new THREE.Vector3(5.4, MANSION_BUNKER_Y - 0.2, MANSION_STAIR_BOTTOM_Z - 0.15),
+        new THREE.Vector3(7.9, 2.1, MANSION_STAIR_TOP_Z + 0.03),
       ),
-      top: { x: MANSION_STAIR_CENTER_X, y: 0, z: -2.85 },
-      bottom: { x: MANSION_STAIR_CENTER_X, y: MANSION_BUNKER_Y, z: -6.75 },
+      top: { x: MANSION_STAIR_CENTER_X, y: 0, z: MANSION_STAIR_TOP_Z },
+      bottom: { x: MANSION_STAIR_CENTER_X, y: MANSION_BUNKER_Y, z: MANSION_STAIR_BOTTOM_Z },
+      topApproach: { x: 4.8, y: 0, z: -2.5 },
     };
     return [
       {
         box: new THREE.Box3(
-          new THREE.Vector3(5.45, MANSION_BUNKER_Y - 0.2, -7.1),
-          new THREE.Vector3(7.85, 1, -6.6),
+          new THREE.Vector3(5.45, MANSION_BUNKER_Y - 0.2, MANSION_STAIR_BOTTOM_Z - 0.35),
+          new THREE.Vector3(7.85, 1, MANSION_STAIR_BOTTOM_Z + 0.15),
         ),
         sourceFloor: 0,
         targetFloor: -1,
@@ -851,8 +871,8 @@ export class BurnedMansionArena implements ZombieArena {
       },
       {
         box: new THREE.Box3(
-          new THREE.Vector3(5.45, -0.5, -3.05),
-          new THREE.Vector3(7.85, 2.2, -2.7),
+          new THREE.Vector3(5.45, -0.5, MANSION_STAIR_TOP_Z - 0.2),
+          new THREE.Vector3(7.85, 2.2, MANSION_STAIR_TOP_Z + 0.15),
         ),
         sourceFloor: -1,
         targetFloor: 0,

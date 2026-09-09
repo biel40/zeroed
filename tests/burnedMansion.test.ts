@@ -25,7 +25,9 @@ import {
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_SPAWNS,
+  MANSION_STAIR_BOTTOM_Z,
   MANSION_STAIR_CENTER_X,
+  MANSION_STAIR_TOP_Z,
   MANSION_SECRET_AREAS,
   MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
@@ -216,8 +218,8 @@ describe('Burned Mansion topology', () => {
     expect(bunkerSize.z).toBeGreaterThanOrEqual(8.9);
 
     const stairwell = new THREE.Box3(
-      new THREE.Vector3(5.45, -0.31, -6.85),
-      new THREE.Vector3(7.85, -0.13, -3.05),
+      new THREE.Vector3(5.45, -0.31, MANSION_STAIR_BOTTOM_Z - 0.1),
+      new THREE.Vector3(7.85, -0.13, MANSION_STAIR_TOP_Z - 0.2),
     );
     const ceilingSegments = arena.group.children.filter((child) => child.name.startsWith('bunker-ceiling'));
     expect(ceilingSegments).toHaveLength(4);
@@ -237,8 +239,8 @@ describe('Burned Mansion topology', () => {
     expect(floorBox.min.z).toBeCloseTo(-9.5);
     expect(ceilingBox.min.z).toBeCloseTo(floorBox.min.z);
     expect(northWall).toBeDefined();
-    expect(-6.75 - northWall!.max.z).toBeGreaterThanOrEqual(1.5);
-    expect(-6.75 - MANSION_BUNKER_BOUNDS.minZ).toBeGreaterThanOrEqual(2);
+    expect(MANSION_STAIR_BOTTOM_Z - northWall!.max.z).toBeGreaterThanOrEqual(1.5);
+    expect(MANSION_STAIR_BOTTOM_Z - MANSION_BUNKER_BOUNDS.minZ).toBeGreaterThanOrEqual(1.5);
   });
 
   it('lets the player clear the lower stairs and maneuver laterally on the landing', () => {
@@ -246,7 +248,7 @@ describe('Burned Mansion topology', () => {
     const player = new PlayerController(1);
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
-    player.teleport(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT, -7.05, -1, MANSION_BUNKER_BOUNDS);
+    player.teleport(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT, MANSION_STAIR_BOTTOM_Z - 0.3, -1, MANSION_BUNKER_BOUNDS);
 
     for (let frame = 0; frame < 60; frame++) player.update(1 / 60, movementInput('KeyW'), weaponStub);
     expect(player.rig.position.z).toBeLessThan(-7.7);
@@ -282,7 +284,7 @@ describe('Burned Mansion topology', () => {
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
 
-    player.teleport(MANSION_STAIR_CENTER_X, EYE_HEIGHT, -2.7, 0, arena.playerBounds);
+    player.teleport(MANSION_STAIR_CENTER_X, EYE_HEIGHT, MANSION_STAIR_TOP_Z + 0.3, 0, arena.playerBounds);
     let previousZ = player.rig.position.z;
     let previousY = player.rig.position.y;
     for (let frame = 0; frame < 150 && player.floor === 0; frame++) {
@@ -352,6 +354,28 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_EAST_WALL_X - MANSION_BUNKER_DIVIDER_X).toBeCloseTo(4.95);
     expect(arena.wallBuys).toHaveLength(4);
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(4);
+  });
+
+  it('keeps a clear turning lane between the bunker door and the stairs', () => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const westStairFill = arena.wallColliders.find((collider) => {
+      const centerX = (collider.min.x + collider.max.x) / 2;
+      return Math.abs(centerX - 4.9125) < 0.01;
+    });
+
+    expect(westStairFill).toBeDefined();
+    expect(-3.3 - westStairFill!.max.z).toBeGreaterThanOrEqual(0.5);
+    expect(canWalk([4.55, -2.5], [5.65, -3.45], arena.wallColliders)).toBe(true);
+  });
+
+  it('does not wash the M4A1 wall with an unexplained red point light', () => {
+    const arena = makeArena();
+    const misplacedRedLights = arena.group.children.filter((child) => {
+      return child instanceof THREE.PointLight
+        && child.position.distanceTo(new THREE.Vector3(5.1, 1.85, -5.5)) < 0.1;
+    });
+    expect(misplacedRedLights).toHaveLength(0);
   });
 
   it('expands the M4A1 room and bunker wing as one coherent east footprint', () => {
@@ -491,8 +515,8 @@ describe('Burned Mansion topology', () => {
 
     expect(sideFills).toHaveLength(2);
     for (const wall of sideFills) {
-      expect(wall.min.z).toBeLessThanOrEqual(-6.75);
-      expect(wall.max.z).toBeGreaterThanOrEqual(-2.85);
+      expect(wall.min.z).toBeLessThanOrEqual(MANSION_STAIR_BOTTOM_Z);
+      expect(wall.max.z).toBeGreaterThanOrEqual(MANSION_STAIR_TOP_Z);
       expect(wall.min.y).toBeLessThanOrEqual(MANSION_BUNKER_Y);
       expect(wall.max.y).toBeGreaterThanOrEqual(1);
     }
@@ -500,15 +524,15 @@ describe('Burned Mansion topology', () => {
     const stairSideMeshes = arena.group.children.filter((child) => {
       return child.userData.mapRole === 'wall' && child.userData.surface === 'wood'
         && (Math.abs(child.position.x - 4.9125) < 0.01 || Math.abs(child.position.x - 8.4125) < 0.01)
-        && Math.abs(child.position.z + 4.8) < 0.01;
+        && Math.abs(child.position.z - (MANSION_STAIR_TOP_Z + MANSION_STAIR_BOTTOM_Z) / 2) < 0.01;
     }) as THREE.Mesh[];
     expect(stairSideMeshes).toHaveLength(2);
     expect(stairSideMeshes.every((mesh) => (mesh.material as THREE.Material).name === 'charred_wood')).toBe(true);
 
     unlock(arena, 'nuclear-bunker');
-    expect(canWalk([MANSION_STAIR_CENTER_X, -2.5], [MANSION_STAIR_CENTER_X, -3.2], arena.wallColliders)).toBe(true);
-    expect(canWalk([MANSION_STAIR_CENTER_X, -2.5], [4.9, -4.8], arena.wallColliders)).toBe(false);
-    expect(canWalk([MANSION_STAIR_CENTER_X, -2.5], [8.4, -4.8], arena.wallColliders)).toBe(false);
+    expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.1], arena.wallColliders)).toBe(true);
+    expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [4.9, -5], arena.wallColliders)).toBe(false);
+    expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [8.4, -5], arena.wallColliders)).toBe(false);
   });
 
   it('blocks the lower floor from crossing through the back of the stairs', () => {
@@ -516,14 +540,14 @@ describe('Burned Mansion topology', () => {
     const player = new PlayerController(1);
     player.setFloorTransitions(arena.floorTransitions);
     player.setWallColliders(arena.wallColliders);
-    player.teleport(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT, -2.2, -1, MANSION_BUNKER_BOUNDS);
+    player.teleport(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT, MANSION_STAIR_TOP_Z + 0.6, -1, MANSION_BUNKER_BOUNDS);
 
     for (let frame = 0; frame < 120; frame++) {
       player.update(1 / 60, movementInput('KeyW'), weaponStub);
     }
 
     expect(player.floor).toBe(-1);
-    expect(player.rig.position.z).toBeGreaterThan(-2.5);
+    expect(player.rig.position.z).toBeGreaterThan(MANSION_STAIR_TOP_Z + 0.3);
     expect(player.rig.position.y).toBeCloseTo(MANSION_BUNKER_Y + EYE_HEIGHT, 5);
   });
 
@@ -689,24 +713,24 @@ describe('Burned Mansion topology', () => {
   it('makes a zombie clear the lower stair channel before turning toward the player', () => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
-    const manager = new ZombieManager(() => 0, {}, false, [[MANSION_STAIR_CENTER_X, -2.45]], [], arena.floorTransitions);
+    const manager = new ZombieManager(() => 0, {}, false, [[MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.35]], [], arena.floorTransitions);
     manager.registerColliders([...arena.colliders]);
     manager.setNavigationBounds(arena.navigationBounds);
     manager.spawnZombie(roundConfig(1), 0.8, -4.2);
     const zombie = [...manager.actives][0];
     zombie.state = 'walk';
     zombie.floor = 0;
-    zombie.position.set(MANSION_STAIR_CENTER_X, 0, -2.45);
+    zombie.position.set(MANSION_STAIR_CENTER_X, 0, MANSION_STAIR_TOP_Z + 0.35);
 
     let minimumZ = zombie.position.z;
-    for (let frame = 0; frame < 900 && zombie.position.z > -7.5; frame++) {
+    for (let frame = 0; frame < 900 && zombie.position.z > MANSION_STAIR_BOTTOM_Z - 0.2; frame++) {
       manager.update(1 / 60, 0.8, -4.2, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
       if (zombie.floor === -1) minimumZ = Math.min(minimumZ, zombie.position.z);
     }
 
     expect(zombie.floor).toBe(-1);
-    expect(minimumZ).toBeLessThanOrEqual(-7.5);
-    expect(zombie.position.z).toBeLessThanOrEqual(-7.5);
+    expect(minimumZ).toBeLessThanOrEqual(MANSION_STAIR_BOTTOM_Z - 0.2);
+    expect(zombie.position.z).toBeLessThanOrEqual(MANSION_STAIR_BOTTOM_Z - 0.2);
     expect(manager.stuckRecoveryCount).toBe(0);
   });
 
@@ -735,8 +759,8 @@ describe('Burned Mansion topology', () => {
   });
 
   it.each([
-    { direction: 'down', zombieFloor: 0, playerFloor: -1, startZ: -2.45, expectedFloor: -1 },
-    { direction: 'up', zombieFloor: -1, playerFloor: 0, startZ: -7.0, expectedFloor: 0 },
+    { direction: 'down', zombieFloor: 0, playerFloor: -1, startZ: MANSION_STAIR_TOP_Z + 0.35, expectedFloor: -1 },
+    { direction: 'up', zombieFloor: -1, playerFloor: 0, startZ: MANSION_STAIR_BOTTOM_Z - 0.3, expectedFloor: 0 },
   ])('keeps a moving horde on the stair ramp while travelling $direction', ({ zombieFloor, playerFloor, startZ, expectedFloor }) => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
@@ -792,19 +816,19 @@ describe('Burned Mansion topology', () => {
       () => 0,
       {},
       false,
-      [[stairX, -2.8]],
+      [[stairX, MANSION_STAIR_TOP_Z + 0.05]],
       [],
       arena.floorTransitions,
     );
     manager.registerColliders([...arena.colliders]);
-    manager.spawnZombie(roundConfig(1), MANSION_STAIR_CENTER_X, -2);
+    manager.spawnZombie(roundConfig(1), MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.8);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
     zombie.state = 'walk';
 
     for (let frame = 0; frame < 600 && zombie.floor === 0; frame++) {
-      manager.update(1 / 60, MANSION_STAIR_CENTER_X, -2, -1);
+      manager.update(1 / 60, MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.8, -1);
     }
 
     expect(zombie.floor).toBe(-1);
@@ -1140,7 +1164,7 @@ describe('Burned Mansion topology', () => {
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
-    expect(pointLights).toHaveLength(8);
+    expect(pointLights).toHaveLength(7);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
   });
 

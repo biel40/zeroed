@@ -47,11 +47,22 @@ estar verdes.** No hay CI que te salve.
    pero, si `paused`, solo renderiza el frame congelado: no avanza player,
    weapon, ballistics, mode, effects ni timers. No bases pausa en ocultar UI
    o bloquear inputs.
-8. **Visibilidad explícita en TypeScript.** Todos los métodos y propiedades de
-   clases deben declarar `public`, `private`, `protected` o `static` cuando
-   aplique, y el tipo de retorno siempre debe estar tipado. `static` solo se
-   usa para lógica que no depende de `this`; no conviertas funciones de
-   instancia en `public static` por costumbre.
+8. **Visibilidad explícita en TypeScript.** Todas las clases, propiedades,
+   métodos, constructores, getters y setters deben declarar `public`, `private`,
+   `protected` o `static` cuando corresponda. Prefiere `private` para estado
+   interno, `protected` para herencia y `public` solo para la API intencional
+   del objeto. Asegura que cada miembro de la clase tenga una intención clara y
+   evita exponer estado mutable sin necesidad. `static` solo se usa para lógica
+   que no depende de `this`; no conviertas funciones de instancia en
+   `public static` por costumbre. El tipo de retorno siempre debe estar tipado
+   y el código debe ser legible por su visibilidad, no por la documentación.
+
+9. **Clases con intención clara.** Cuando una clase representa un estado
+   interno, un servicio o un contenedor de datos, su acceso debe ser lo más
+   restrictivo posible: propiedades privadas, métodos internos privados y API
+   pública mínima. Esto mejora legibilidad, facilita refactors y hace explícito
+   qué parte del sistema se usa desde fuera. Si una clase se usa solo dentro de
+   un módulo, no la hagas pública por defecto.
 
 ## Mapa de la arquitectura
 

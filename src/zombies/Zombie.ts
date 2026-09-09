@@ -78,6 +78,7 @@ export class Zombie implements HitTarget {
   floor = 0;
 
   private stateTimer = 0;
+  private hitReactionTimer = 0;
   private attackCooldown = 0;
   private attackApplied = false;
   private attackRecovery = ZOMBIE_ATTACK_RECOVERY;
@@ -144,6 +145,7 @@ export class Zombie implements HitTarget {
     this.speed = speed;
     this.state = 'spawn';
     this.stateTimer = ZOMBIE_SPAWN_DURATION;
+    this.hitReactionTimer = 0;
     this.attackCooldown = 0;
     this.attackApplied = false;
     this.floor = floor;
@@ -177,8 +179,8 @@ export class Zombie implements HitTarget {
 
   /**
    * Applies pre-computed damage. Returns true when the hit is lethal.
-   * Non-lethal hits briefly interrupt the current action; headshots stagger
-   * noticeably longer.
+  * Non-lethal hits trigger visual feedback without interrupting pursuit.
+  * Headshots keep that feedback visible slightly longer.
    */
   applyDamage(amount: number, headshot = false): boolean {
     if (!this.isAlive) return false;
@@ -190,9 +192,8 @@ export class Zombie implements HitTarget {
       this.visual.setState('death');
       return true;
     }
-    if (this.state !== 'attack') {
-      this.state = 'hit';
-      this.stateTimer = headshot
+    if (this.state === 'walk') {
+      this.hitReactionTimer = headshot
         ? ZOMBIE_HIT_DURATION * ZOMBIE_HIT_HEADSHOT_FACTOR
         : ZOMBIE_HIT_DURATION;
       this.visual.setState('hit');
@@ -203,6 +204,7 @@ export class Zombie implements HitTarget {
   /** Starts the attack lunge if the cooldown allows it. */
   tryAttack(): boolean {
     if (!this.isAlive || this.attackCooldown > 0 || this.state === 'attack') return false;
+    this.hitReactionTimer = 0;
     this.state = 'attack';
     this.stateTimer = ZOMBIE_ATTACK_DURATION;
     this.attackApplied = false;
@@ -215,6 +217,7 @@ export class Zombie implements HitTarget {
   /** Starts the barrier-attack animation. Reuses the same timing. */
   tryBarrierAttack(): boolean {
     if (!this.isAlive || this.attackCooldown > 0 || this.state === 'barrierAttack') return false;
+    this.hitReactionTimer = 0;
     this.state = 'barrierAttack';
     this.stateTimer = ZOMBIE_ATTACK_DURATION;
     this.attackApplied = false;
@@ -233,6 +236,14 @@ export class Zombie implements HitTarget {
     this.setWalk();
   }
 
+  /** Stops a committed barrier swing when the target has already opened. */
+  public cancelBarrierAttack(): void {
+    if (this.state !== 'barrierAttack') return;
+    this.stateTimer = 0;
+    this.attackApplied = false;
+    this.setWalk();
+  }
+
   faceTowards(x: number, z: number, maxTurn = Infinity): void {
     const target = Math.atan2(x - this.group.position.x, z - this.group.position.z);
     const delta = Math.atan2(
@@ -245,6 +256,10 @@ export class Zombie implements HitTarget {
   update(dt: number, visualSpeed = this.speed): void {
     if (!this.group.visible) return;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    if (this.hitReactionTimer > 0) {
+      this.hitReactionTimer -= dt;
+      if (this.hitReactionTimer <= 0 && this.state === 'walk') this.visual.setState('walk');
+    }
 
     switch (this.state) {
       case 'spawn': {
@@ -301,6 +316,7 @@ export class Zombie implements HitTarget {
 
   private setWalk(): void {
     this.state = 'walk';
+    this.hitReactionTimer = 0;
     // A hit can interrupt the spawn rise: never leave the body half-buried.
     this.visual.setSpawnRise(1);
     this.visual.setState('walk');

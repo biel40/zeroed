@@ -39,9 +39,9 @@ import type { GameMode, ModeContext } from './GameMode';
 import { standardTargetHitEffects } from './hitEffects';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
-const HIT_TRAUMA = 0.42;
-const TRAUMA_DECAY = 1.6;
-const SHAKE_MAX_ANGLE = 0.035;
+const HIT_TRAUMA = 0.55;
+const TRAUMA_DECAY = 2.1;
+const SHAKE_MAX_ANGLE = 0.04;
 /** Distant moans drift in every few seconds, never on a fixed rhythm. */
 const MOAN_MIN_DELAY = 6;
 const MOAN_SPREAD = 9;

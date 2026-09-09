@@ -73,6 +73,25 @@ function step(visual: ZombieVisual, seconds: number, speed = WALK_SPEED): void {
 }
 
 describe('ZombieVisual hit reaction', () => {
+  it('adds two subtle red emissive eyes to the animated head without dynamic lights', () => {
+    const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
+    const eyes = visual.root.getObjectByName('zombie-eyes');
+    expect(eyes?.parent).toBe(visual.headAnchor);
+    expect(eyes?.children).toHaveLength(2);
+    expect(eyes?.children.every((eye) => eye instanceof THREE.Mesh)).toBe(true);
+    expect(eyes?.children.every((eye) => {
+      const material = (eye as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      return material.emissive.r > material.emissive.g * 3
+        && material.emissive.r > material.emissive.b * 3
+        && material.emissiveIntensity <= 0.75;
+    })).toBe(true);
+    expect(eyes?.children.every((eye) => {
+      const size = new THREE.Box3().setFromObject(eye).getSize(new THREE.Vector3());
+      return Math.max(size.x, size.y, size.z) <= 0.06;
+    })).toBe(true);
+    expect(visual.root.getObjectsByProperty('isLight', true)).toHaveLength(0);
+  });
+
   it('varies walker phase without changing the stride cadence at the same ground speed', () => {
     const phases: number[] = [];
     for (const jitter of [0.9, 1.1]) {

@@ -40,6 +40,7 @@ export interface StairRamp {
   readonly box: THREE.Box3;
   readonly top: { readonly x: number; readonly y: number; readonly z: number };
   readonly bottom: { readonly x: number; readonly y: number; readonly z: number };
+  readonly topApproach?: { readonly x: number; readonly y: number; readonly z: number };
 }
 
 /** Ground height on a linear stair ramp, clamped to its two landings. */

@@ -43,6 +43,7 @@ RoundManager
 
 Impacto en Zombie
   -> dano torso/cabeza
+  -> reaccion visual sin interrumpir la persecucion
   -> PlayerEconomy: hit o baja
   -> contador de bajas
   -> hito: Ray Gun (115)
@@ -57,17 +58,24 @@ Points
 - `normal`, `shiny` y `brute` comparten `Zombie`, IA y un máximo global de 24. El melee valida en el inicio y en el instante del impacto la distancia horizontal XZ, una diferencia vertical compatible y la linea de ataque despejada.
   Normal/Shiny usan `zombie_walker.glb`; Brutus usa `zombie_brute.glb`. Ambos
   tienen geometria y clips independientes; sus perfiles viven en `ZombieConfig`.
+- Un golpe aceptado por `PlayerHealth` reproduce audio, una vibracion angular
+  breve y una vineta roja periférica. La invulnerabilidad posterior evita que
+  impactos solapados reinicien el feedback, y la vida critica usa otra capa
+  tenue que no oculta el centro de la mira.
 - Walker recupera el modelo low-poly original de Quaternius (CC-BY 3.0), con
   textura, rig y clips originales, 2116 triangulos y un material. Los normales
   comparten el mismo tinte; la variacion de fase no cambia la cadencia de paso.
   `ZombieManager` sigue pasando la velocidad horizontal medida a la vista para
   detener el ciclo ante colisiones, sin cambiar la velocidad de gameplay.
+- Todos los tipos tienen ojos rojos emisivos pequenos que siguen el hueso de la
+  cabeza, sin luces dinamicas. Los impactos no letales mantienen el estado
+  `walk`: el flinch es solo visual y no detiene la persecucion.
 - Shiny usa un acabado dorado emisivo y diez estrellas de cuatro puntas que
   siguen el torso animado. `ShinyStars` reutiliza buffers y una textura compartida,
   sin luces ni allocations por frame. Se apaga al morir y se reinicia al reciclar
   el slot; la pausa de simulacion congela tambien los destellos. Cuesta una llamada
   adicional por Shiny, sin dibujar estrellas en normales o Brute.
-  `zombie-viewer.html?compare=1` compara Shiny con normales; `?shiny=1&night=1`
+  `tools/viewers/zombie-viewer.html?compare=1` compara Shiny con normales; `?shiny=1&night=1`
   permite inspeccionar el brillo con poca luz. El visor tiene camara orbital y
   encuadre movil. Este visor no sustituye una medicion de FPS en movil fisico.
 - `ZombiePool` precarga reservas por modelo (24 walker, 2 Brute) pero bloquea
@@ -85,7 +93,7 @@ Points
 ## Mapas Zombies
 
 - `ClassicArena`: adapta `ShootingRange`, aplica noche, usa spawns abiertos y Mystery Box; no tiene puertas, barreras ni wall buys.
-- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; el ala este da mas anchura tanto a la sala M4A1 como al acceso y planta inferior del bunker. La compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece una escalera continua de canal unico sin pasillos laterales, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos.
+- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; el ala este da mas anchura tanto a la sala M4A1 como al acceso y planta inferior del bunker. La compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece una escalera continua de canal unico separada del vano por un carril de giro, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos. La M4A1 usa una silueta mural propia y esa pared no tiene iluminacion roja decorativa.
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
 - `ZombieManager` delega el pathfinding en `ZombieNavigationService`: un grid A* por planta derivado de los colliders del mapa (puertas cerradas y barreras atrincheradas sellan sus vanos; al abrirse, el rebuild invalida las rutas). La persecucion decide el objetivo, el servicio decide la ruta, `moveWithCollision` ejecuta sin atravesar geometria y el anti-stuck es la red de seguridad. Detalles en `docs/changes/2026-08-20-zombie-navigation-service.md`.
 - Las transiciones con rampa reutilizan sus extremos como portales del A* y steering; en la aproximacion, pendiente y salida al rellano, `ZombieManager` centra la horda y mantiene separacion longitudinal para que el corredor conecte plantas sin giros prematuros, wall-following, recalculos ni teletransporte.

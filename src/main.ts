@@ -9,62 +9,81 @@ import { setupPWA } from './pwa';
 import { ZombiesMode } from './modes/ZombiesMode';
 import { HUD } from './ui/HUD';
 
-setupPWA();
+class ZeroedBoot {
+  private readonly container: HTMLElement;
+  private readonly profile: ReturnType<typeof getDeviceProfile>;
+  private readonly hud: HUD;
+  private readonly assets: AssetManager;
 
-const container: HTMLElement | null = document.getElementById('app');
-if (!container) throw new Error('Missing #app container');
+  public constructor() {
+    const container = document.getElementById('app');
+    if (!container) throw new Error('Missing #app container');
 
-const profile = getDeviceProfile();
-document.documentElement.classList.toggle('touch-controls-enabled', profile.useTouchControls);
-console.info('[Zeroed boot] Device profile', profile.log);
-
-const canvas: HTMLCanvasElement = document.createElement('canvas');
-const hasWebGL: boolean = !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
-if (!hasWebGL) {
-  const hud: HUD = new HUD();
-  hud.setError('WebGL no está disponible en este navegador.');
-  throw new Error('[Zeroed boot] WebGL is unavailable in this browser.');
-}
-
-const hud: HUD = new HUD();
-const assets: AssetManager = new AssetManager(profile.anisotropyLimit);
-
-const manifest: AssetManifest = {
-  weapons: WEAPON_ORDER.flatMap((id) => {
-    const url: string | undefined = WEAPON_DEFINITIONS[id].view.modelUrl;
-    return url ? [{ id, url }] : [];
-  }),
-  textures: TEXTURE_MANIFEST,
-  zombies: ZOMBIE_MANIFEST,
-};
-
-try {
-  // Individual asset failures degrade to procedural/flat fallbacks inside the
-  // AssetManager, so loading always completes.
-  await assets.loadAll(manifest, (loaded, total) => hud.setLoadProgress(loaded / total));
-  hud.setReady();
-
-  const requestedMap = new URLSearchParams(window.location.search).get('map');
-  if (isZombieMapId(requestedMap)) {
-    startGame(new ZombiesMode(requestedMap));
-  } else {
-    // Zombies is the only game mode; the player chooses its arena directly.
-    hud.showMapSelect((mapId) => startGame(new ZombiesMode(mapId)));
+    this.container = container;
+    this.profile = getDeviceProfile();
+    this.hud = new HUD();
+    this.assets = new AssetManager(this.profile.anisotropyLimit);
   }
 
-  function startGame(mode: GameMode): void {
-    const game: Game = new Game(container!, hud, assets, profile, mode);
+  private static hasWebGL(): boolean {
+    const canvas: HTMLCanvasElement = document.createElement('canvas');
+    return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+  }
+
+  private startGame(mode: GameMode): void {
+    const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode);
     console.info('[Zeroed boot] Game initialized successfully.', {
       mode: mode.id,
-      mobile: profile.isMobile,
-      touch: profile.useTouchControls,
-      pixelRatioLimit: profile.pixelRatioLimit,
+      mobile: this.profile.isMobile,
+      touch: this.profile.useTouchControls,
+      pixelRatioLimit: this.profile.pixelRatioLimit,
     });
-    hud.showStartScreen(false);
+    this.hud.showStartScreen(false);
     void game;
   }
-} catch (error: unknown) {
-  console.error('[Zeroed boot] Initialization failed.', error);
-  hud.setError('La inicialización falló. Revisa la consola del navegador para más detalles.');
-  throw error;
+
+  private async initialize(): Promise<void> {
+    document.documentElement.classList.toggle('touch-controls-enabled', this.profile.useTouchControls);
+    console.info('[Zeroed boot] Device profile', this.profile.log);
+
+    if (!ZeroedBoot.hasWebGL()) {
+      this.hud.setError('WebGL no está disponible en este navegador.');
+      throw new Error('[Zeroed boot] WebGL is unavailable in this browser.');
+    }
+
+    const manifest: AssetManifest = {
+      weapons: WEAPON_ORDER.flatMap((id) => {
+        const url: string | undefined = WEAPON_DEFINITIONS[id].view.modelUrl;
+        return url ? [{ id, url }] : [];
+      }),
+      textures: TEXTURE_MANIFEST,
+      zombies: ZOMBIE_MANIFEST,
+    };
+
+    try {
+      // Individual asset failures degrade to procedural/flat fallbacks inside the
+      // AssetManager, so loading always completes.
+      await this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total));
+      this.hud.setReady();
+
+      const requestedMap = new URLSearchParams(window.location.search).get('map');
+      if (isZombieMapId(requestedMap)) {
+        this.startGame(new ZombiesMode(requestedMap));
+      } else {
+        // Zombies is the only game mode; the player chooses its arena directly.
+        this.hud.showMapSelect((mapId) => this.startGame(new ZombiesMode(mapId)));
+      }
+    } catch (error: unknown) {
+      console.error('[Zeroed boot] Initialization failed.', error);
+      this.hud.setError('La inicialización falló. Revisa la consola del navegador para más detalles.');
+      throw error;
+    }
+  }
+
+  public async run(): Promise<void> {
+    await this.initialize();
+  }
 }
+
+setupPWA();
+void new ZeroedBoot().run();

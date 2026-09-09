@@ -25,6 +25,8 @@ export const MANSION_PLAYER_SPAWN = { x: -3.5, y: 1.72, z: 7.2, floor: 0 } as co
 export const MANSION_EAST_WALL_X = 9.15;
 export const MANSION_BUNKER_DIVIDER_X = 4.2;
 export const MANSION_STAIR_CENTER_X = 6.65;
+export const MANSION_STAIR_TOP_Z = -3.8;
+export const MANSION_STAIR_BOTTOM_Z = -7.3;
 
 /** Ground-floor movement bounds. */
 export const MANSION_GROUND_BOUNDS = {

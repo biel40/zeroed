@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { ZombieVisual, ZOMBIE_MODELS } from './zombies/ZombieVisual';
+import { ZombieVisual, ZOMBIE_MODELS } from '../../src/zombies/ZombieVisual';
 
 // Development-only visual review, independent of the game entry/bundle.
-// /zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?close=1 | ?night=1
+// /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?close=1 | ?night=1
 const params = new URLSearchParams(location.search);
 const close = params.has('close');
 const night = params.has('night');

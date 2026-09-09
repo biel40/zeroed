@@ -519,30 +519,39 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(ellipse at center, rgba(80, 0, 0, 0.08) 10%, rgba(180, 12, 6, 0.55) 100%);
-  transition: opacity 0.18s ease-out;
 }
 
-#damage-overlay.lethal {
-  opacity: 0.58;
-}
-
+#damage-overlay::before,
 #damage-overlay::after {
   content: '';
   position: absolute;
   inset: 0;
   opacity: 0;
-  background: radial-gradient(ellipse at center, transparent 42%, rgba(200, 20, 10, 0.5) 100%);
+}
+
+#damage-overlay::before {
+  background: radial-gradient(ellipse at center, transparent 38%, rgba(115, 0, 0, 0.42) 100%);
+  transition: opacity 0.18s ease-out;
+}
+
+#damage-overlay.lethal::before {
+  opacity: 0.62;
+}
+
+#damage-overlay::after {
+  background: radial-gradient(ellipse at center, transparent 36%, rgba(220, 18, 8, 0.62) 100%);
 }
 
 #damage-overlay.active::after {
-  animation: damageflash 0.45s ease-out forwards;
+  animation: damageflash 0.42s ease-out forwards;
 }
 
 @keyframes damageflash {
   0% {
-    opacity: 1;
+    opacity: 0.9;
+  }
+  30% {
+    opacity: 0.68;
   }
   100% {
     opacity: 0;

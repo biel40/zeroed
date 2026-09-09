@@ -49,30 +49,26 @@ describe('Zombie lifecycle', () => {
     expect(zombie.visual.root.position.y).toBeCloseTo(0, 3);
   });
 
-  it('non-lethal damage interrupts to the hit state', () => {
+  it('keeps walking through non-lethal damage', () => {
     const zombie = makeZombie(100);
     step(zombie, ZOMBIE_SPAWN_DURATION + 0.1); // reach walk
     expect(zombie.applyDamage(30)).toBe(false);
     expect(zombie.hp).toBe(70);
-    expect(zombie.state).toBe('hit');
+    expect(zombie.state).toBe('walk');
     expect(zombie.isAlive).toBe(true);
-    step(zombie, 0.4);
+    step(zombie, 0.5);
     expect(zombie.state).toBe('walk');
   });
 
-  it('non-lethal headshots stagger longer than torso hits', () => {
+  it('keeps walking through non-lethal headshots', () => {
     const torso = makeZombie(100);
     step(torso, ZOMBIE_SPAWN_DURATION + 0.1);
     torso.applyDamage(10, false);
-    step(torso, 0.35);
     expect(torso.state).toBe('walk');
 
     const head = makeZombie(100);
     step(head, ZOMBIE_SPAWN_DURATION + 0.1);
     head.applyDamage(10, true);
-    step(head, 0.35);
-    expect(head.state).toBe('hit'); // still reeling
-    step(head, 0.2);
     expect(head.state).toBe('walk');
   });
 

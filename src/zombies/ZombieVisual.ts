@@ -87,8 +87,32 @@ const CROSSFADE_SECONDS = 0.16;
 const FLASH_COLOR = 0xff2211;
 /** Sickly undead glow kept very low so the bodies read in the dark. */
 const UNDEAD_GLOW = 0x1a2a12;
+const EYE_COLOR = 0x240000;
+const EYE_EMISSIVE = 0xb51212;
+const EYE_EMISSIVE_INTENSITY = 0.55;
 /** How deep below ground the spawn rise starts, meters. */
 const SPAWN_DEPTH = 1.25;
+
+const eyeGeometry = new THREE.SphereGeometry(0.022, 8, 6);
+
+function buildEyes(): { group: THREE.Group; material: THREE.MeshStandardMaterial } {
+  const group = new THREE.Group();
+  group.name = 'zombie-eyes';
+  const material = new THREE.MeshStandardMaterial({
+    color: EYE_COLOR,
+    emissive: EYE_EMISSIVE,
+    emissiveIntensity: EYE_EMISSIVE_INTENSITY,
+    roughness: 0.5,
+    metalness: 0,
+    transparent: true,
+  });
+  for (const x of [-0.055, 0.055]) {
+    const eye = new THREE.Mesh(eyeGeometry, material);
+    eye.position.set(x, 0.015, 0.105);
+    group.add(eye);
+  }
+  return { group, material };
+}
 
 interface MaterialBase {
   readonly color: THREE.Color;
@@ -378,6 +402,7 @@ export class ZombieVisual {
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
   private readonly shinyStars: ShinyStars | null;
+  private readonly eyeMaterial: THREE.MeshStandardMaterial;
   private readonly tmpShinyAnchor = new THREE.Vector3();
   private readonly modelConfig: ZombieModelConfig;
   /** End of the head bone chain, when the rig has one (skull midpoint math). */
@@ -476,6 +501,11 @@ export class ZombieVisual {
       this.torsoAnchor = built.rig.hips;
       this.headAnchor = built.rig.head;
     }
+
+    const eyes = buildEyes();
+    this.eyeMaterial = eyes.material;
+    this.root.updateMatrixWorld(true);
+    placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
 
     this.materialBases.push(...this.materials.map((material) => ({
       color: material.color.clone(),
@@ -641,6 +671,7 @@ export class ZombieVisual {
   /** Death fade driven by the owning Zombie during its last moments. */
   public setOpacity(opacity: number): void {
     if (this.shinyStars) this.shinyStars.points.material.opacity = opacity;
+    this.eyeMaterial.opacity = opacity;
     for (const material of this.materials) {
       material.opacity = opacity;
       if (this.flash <= 0) material.emissiveIntensity = this.glowIntensity * opacity;

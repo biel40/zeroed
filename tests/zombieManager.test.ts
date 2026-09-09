@@ -10,6 +10,7 @@ import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_VERTICAL_TOLERANCE,
+  ZOMBIE_BARRIER_ATTACK_DAMAGE,
   ZOMBIE_BASE_HP,
   ZOMBIE_BASE_SPEED,
   ZOMBIE_TYPE_CONFIGS,
@@ -57,6 +58,32 @@ describe('ZombieManager barrier feedback', () => {
     manager.update(DT, 0, 0);
     hitBarrier(barrier);
     expect(impacts).toBe(2);
+  });
+
+  it('resumes pursuit immediately after the last board breaks', () => {
+    const barrier = new WindowBarrier('window', 0, 0, 0, 1, {
+      boardCount: 1,
+      boardHp: ZOMBIE_BARRIER_ATTACK_DAMAGE,
+      repairInterval: 0.1,
+      repairRewardCap: 1,
+    });
+    const manager = new ZombieManager(() => 0, {}, false, [[0, 0]], [barrier]);
+    expect(manager.spawnZombie(roundConfig(1), 0, 4)).toBe(true);
+    const zombie = [...manager.actives][0];
+    zombie.state = 'walk';
+    zombie.position.set(0, 0, 0);
+    zombie.barrierTarget = barrier;
+
+    manager.update(DT, 0, 4);
+    expect(zombie.state).toBe('barrierAttack');
+    step(manager, ZOMBIE_ATTACK_HIT_MOMENT, 0, 4);
+    expect(barrier.isOpen).toBe(true);
+
+    manager.update(DT, 0, 4);
+
+    expect(zombie.barrierTarget).toBeNull();
+    expect(zombie.state).toBe('walk');
+    expect(zombie.tryAttack()).toBe(false);
   });
 });
 

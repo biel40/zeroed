@@ -4,6 +4,8 @@ import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { buildProceduralViewModel, resolveGlbMagazinePose } from '../src/weapons/WeaponView';
 import { ReloadAnimator } from '../src/weapons/ReloadAnimator';
 import type { Weapon } from '../src/weapons/Weapon';
+import { WallBuy } from '../src/zombies/wallbuys/WallBuy';
+import { WallBuyView } from '../src/zombies/wallbuys/WallBuyView';
 
 const view = WEAPON_DEFINITIONS.m4a1.view;
 const measuredM4Bounds = new THREE.Box3(
@@ -104,5 +106,61 @@ describe('M4A1 reload model', () => {
     expect(pose.position.y).toBeCloseTo(0.1742 * 0.35 - 0.13 * 0.35, 5);
     expect(pose.position.z).toBeCloseTo(-0.5865 * 0.45, 5);
     expect(pose.rotation.x).toBe(0);
+  });
+});
+
+describe('M4A1 wall-buy silhouette', () => {
+  it('uses the recognizable classic carbine profile instead of the generic long gun', () => {
+    const definition = WEAPON_DEFINITIONS.m4a1;
+    const wallBuy = new WallBuy({
+      id: 'test-m4a1',
+      weaponId: 'm4a1',
+      price: 1500,
+      ammoPrice: 750,
+      position: { x: 0, y: 0, z: 0 },
+      yaw: 0,
+      floor: 0,
+    });
+    const view = new WallBuyView(wallBuy, definition, new THREE.Group());
+
+    expect(view.group.userData.silhouette).toBe('m4a1');
+    for (const part of [
+      'stock',
+      'buffer-tube',
+      'upper-receiver',
+      'lower-receiver',
+      'carry-handle',
+      'pistol-grip',
+      'stanag-magazine',
+      'handguard',
+      'front-sight',
+      'barrel',
+    ]) {
+      expect(view.group.getObjectByName(`m4a1-wall-${part}`), part).toBeDefined();
+    }
+    const bounds = new THREE.Box3().setFromObject(view.group).getSize(new THREE.Vector3());
+    expect(bounds.x).toBeGreaterThan(1.25);
+    expect(bounds.y).toBeGreaterThan(0.35);
+    expect(bounds.y).toBeLessThan(0.65);
+
+    const shapeHoles = (name: string): number => {
+      const mesh = view.group.getObjectByName(name) as THREE.Mesh<THREE.ExtrudeGeometry>;
+      const shapes = mesh.geometry.parameters.shapes;
+      const shape = Array.isArray(shapes) ? shapes[0] : shapes;
+      return shape.holes.length;
+    };
+    expect(shapeHoles('m4a1-wall-stock')).toBe(1);
+    expect(shapeHoles('m4a1-wall-carry-handle')).toBe(1);
+    expect(shapeHoles('m4a1-wall-front-sight')).toBe(1);
+    expect(view.group.children.filter((part) => part.name === 'm4a1-wall-handguard-rib')).toHaveLength(6);
+
+    const upper = new THREE.Box3().setFromObject(
+      view.group.getObjectByName('m4a1-wall-upper-receiver')!,
+    ).getSize(new THREE.Vector3());
+    const barrel = new THREE.Box3().setFromObject(
+      view.group.getObjectByName('m4a1-wall-barrel')!,
+    ).getSize(new THREE.Vector3());
+    expect(upper.y).toBeLessThanOrEqual(0.09);
+    expect(barrel.x).toBeGreaterThanOrEqual(0.38);
   });
 });

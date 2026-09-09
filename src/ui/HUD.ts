@@ -60,63 +60,63 @@ function mustGet(id: string): HTMLElement {
  * to avoid layout work every frame.
  */
 export class HUD {
-  private readonly root = mustGet('hud');
-  private readonly weaponName = mustGet('hud-weapon-name');
-  private readonly ammo = mustGet('hud-ammo');
-  private readonly mode = mustGet('hud-mode');
-  private readonly crosshair = mustGet('crosshair');
-  private readonly scope = mustGet('scope-overlay');
-  private readonly hitmarker = mustGet('hitmarker');
-  private readonly startScreen = mustGet('start-screen');
-  private readonly startHint = mustGet('start-hint');
-  private readonly loadingBar = mustGet('loading-bar');
+  private readonly root: HTMLElement = mustGet('hud');
+  private readonly weaponName: HTMLElement = mustGet('hud-weapon-name');
+  private readonly ammo: HTMLElement = mustGet('hud-ammo');
+  private readonly mode: HTMLElement = mustGet('hud-mode');
+  private readonly crosshair: HTMLElement = mustGet('crosshair');
+  private readonly scope: HTMLElement = mustGet('scope-overlay');
+  private readonly hitmarker: HTMLElement = mustGet('hitmarker');
+  private readonly startScreen: HTMLElement = mustGet('start-screen');
+  private readonly startHint: HTMLElement = mustGet('start-hint');
+  private readonly loadingBar: HTMLElement = mustGet('loading-bar');
   private readonly loadingBarFill: HTMLElement;
-  private readonly zombiesPanel = mustGet('hud-zombies');
-  private readonly zRound = mustGet('z-round');
-  private readonly zPoints = mustGet('z-points');
-  private readonly zHpFill = mustGet('z-hp-fill');
-  private readonly zKills = mustGet('z-kills');
-  private readonly zHeadshots = mustGet('z-headshots');
-  private readonly roundBanner = mustGet('round-banner');
-  private readonly bannerTitle = mustGet('banner-title');
-  private readonly bannerSub = mustGet('banner-sub');
-  private readonly damageOverlay = mustGet('damage-overlay');
-  private readonly gameOverPanel = mustGet('game-over');
-  private readonly goRound = mustGet('go-round');
-  private readonly goKills = mustGet('go-kills');
-  private readonly goHeadshots = mustGet('go-headshots');
-  private readonly mapSelect = mustGet('map-select');
-  private readonly interactPrompt = mustGet('interact-prompt');
-  private readonly endingScreen = mustGet('ending-screen');
-  private readonly endingRound = mustGet('ending-round');
+  private readonly zombiesPanel: HTMLElement = mustGet('hud-zombies');
+  private readonly zRound: HTMLElement = mustGet('z-round');
+  private readonly zPoints: HTMLElement = mustGet('z-points');
+  private readonly zHpFill: HTMLElement = mustGet('z-hp-fill');
+  private readonly zKills: HTMLElement = mustGet('z-kills');
+  private readonly zHeadshots: HTMLElement = mustGet('z-headshots');
+  private readonly roundBanner: HTMLElement = mustGet('round-banner');
+  private readonly bannerTitle: HTMLElement = mustGet('banner-title');
+  private readonly bannerSub: HTMLElement = mustGet('banner-sub');
+  private readonly damageOverlay: HTMLElement = mustGet('damage-overlay');
+  private readonly gameOverPanel: HTMLElement = mustGet('game-over');
+  private readonly goRound: HTMLElement = mustGet('go-round');
+  private readonly goKills: HTMLElement = mustGet('go-kills');
+  private readonly goHeadshots: HTMLElement = mustGet('go-headshots');
+  private readonly mapSelect: HTMLElement = mustGet('map-select');
+  private readonly interactPrompt: HTMLElement = mustGet('interact-prompt');
+  private readonly endingScreen: HTMLElement = mustGet('ending-screen');
+  private readonly endingRound: HTMLElement = mustGet('ending-round');
 
-  private lastWeapon = '';
-  private lastAmmo = '';
-  private lastMode = '';
-  private lastZombies = '';
+  private lastWeapon: string = '';
+  private lastAmmo: string = '';
+  private lastMode: string = '';
+  private lastZombies: string = '';
   private lastPrompt: string | null = null;
-  private ready = false;
+  private ready: boolean = false;
 
-  constructor() {
+  public constructor() {
     const fill = this.loadingBar.querySelector('span');
     if (!fill) throw new Error('Missing #loading-bar span');
-    this.loadingBarFill = fill;
+    this.loadingBarFill = fill as HTMLElement;
   }
 
   /** Real asset loading progress, 0..1. */
-  setLoadProgress(ratio: number): void {
+  public setLoadProgress(ratio: number): void {
     const percent = Math.round(ratio * 100);
     this.loadingBarFill.style.width = `${percent}%`;
     this.startHint.textContent = `LOADING ASSETS — ${percent} %`;
   }
 
-  setReady(): void {
+  public setReady(): void {
     this.ready = true;
     this.loadingBar.classList.add('hidden');
     this.startHint.textContent = 'CLICK TO START';
   }
 
-  setError(message: string): void {
+  public setError(message: string): void {
     this.ready = false;
     this.loadingBar.classList.remove('hidden');
     this.loadingBarFill.style.width = '0%';
@@ -124,28 +124,28 @@ export class HUD {
     this.startScreen.classList.remove('hidden');
   }
 
-  setHudVisible(visible: boolean): void {
+  public setHudVisible(visible: boolean): void {
     this.root.classList.toggle('hidden', !visible);
   }
 
-  showStartScreen(paused: boolean): void {
+  public showStartScreen(paused: boolean): void {
     if (!this.ready) return;
     this.startHint.textContent = paused ? 'PAUSED — CLICK TO RESUME' : 'CLICK TO START';
     this.startScreen.classList.remove('hidden');
   }
 
-  hideStartScreen(): void {
+  public hideStartScreen(): void {
     this.startScreen.classList.add('hidden');
   }
 
-  setStartHandler(handler: () => void): void {
+  public setStartHandler(handler: () => void): void {
     this.startScreen.addEventListener('click', () => {
       if (this.ready) handler();
     });
   }
 
   /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
-  showMapSelect(onSelect: (mapId: ZombieMapId) => void): void {
+  public showMapSelect(onSelect: (mapId: ZombieMapId) => void): void {
     this.startScreen.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
@@ -168,12 +168,12 @@ export class HUD {
     firstVisibleButton?.focus();
   }
 
-  setZombiesPanelVisible(visible: boolean): void {
+  public setZombiesPanelVisible(visible: boolean): void {
     this.zombiesPanel.classList.toggle('hidden', !visible);
   }
 
   /** Zombies panel; the whole block only re-renders when something changed. */
-  updateZombies(state: ZombieHudState): void {
+  public updateZombies(state: ZombieHudState): void {
     const key = `${state.round}|${state.hp}|${state.maxHp}|${state.lethalHitDamage}|${state.kills}|${state.headshots}|${state.points}`;
     if (key === this.lastZombies) return;
     this.lastZombies = key;
@@ -191,7 +191,7 @@ export class HUD {
   }
 
   /** Brief red flash on the points counter: a purchase was refused. */
-  flashNotEnoughPoints(): void {
+  public flashNotEnoughPoints(): void {
     this.zPoints.classList.remove('denied');
     // Force reflow so the CSS animation restarts on rapid repeated attempts.
     void this.zPoints.offsetWidth;
@@ -199,7 +199,7 @@ export class HUD {
   }
 
   /** Big centered announcement; CSS animation auto-fades it. */
-  showRoundBanner(title: string, sub = ''): void {
+  public showRoundBanner(title: string, sub = ''): void {
     this.bannerTitle.textContent = title;
     this.bannerSub.textContent = sub;
     this.roundBanner.classList.remove('active');
@@ -209,55 +209,55 @@ export class HUD {
   }
 
   /** Brief red vignette when the player takes a hit. */
-  flashDamage(): void {
+  public flashDamage(): void {
     this.damageOverlay.classList.remove('active');
     void this.damageOverlay.offsetWidth;
     this.damageOverlay.classList.add('active');
   }
 
-  showGameOver(stats: GameOverStats): void {
+  public showGameOver(stats: GameOverStats): void {
     this.goRound.textContent = `${stats.round}`;
     this.goKills.textContent = `${stats.kills}`;
     this.goHeadshots.textContent = `${stats.headshots}`;
     this.gameOverPanel.classList.remove('hidden');
   }
 
-  hideGameOver(): void {
+  public hideGameOver(): void {
     this.gameOverPanel.classList.add('hidden');
   }
 
-  setZombiesRestartHandler(handler: () => void): void {
+  public setZombiesRestartHandler(handler: () => void): void {
     mustGet('go-restart').addEventListener('click', handler);
   }
 
-  showEnding(round: number): void {
+  public showEnding(round: number): void {
     this.setInteractionPrompt(null);
     this.endingRound.textContent = `${round}`;
     this.endingScreen.classList.remove('hidden', 'credits');
     this.endingScreen.classList.add('ending');
   }
 
-  showCredits(): void {
+  public showCredits(): void {
     this.root.classList.add('hidden');
     this.endingScreen.classList.remove('ending');
     this.endingScreen.classList.add('credits');
   }
 
-  hideEnding(): void {
+  public hideEnding(): void {
     this.endingScreen.classList.add('hidden');
     this.endingScreen.classList.remove('ending', 'credits');
   }
 
-  setCreditsMainMenuHandler(handler: () => void): void {
+  public setCreditsMainMenuHandler(handler: () => void): void {
     (mustGet('credits-main-menu') as HTMLButtonElement).onclick = handler;
   }
 
   /** Pause menu: shown while the game loop is halted (Game owns the state). */
-  showPauseMenu(): void {
+  public showPauseMenu(): void {
     mustGet('pause-menu').classList.remove('hidden');
   }
 
-  hidePauseMenu(): void {
+  public hidePauseMenu(): void {
     mustGet('pause-menu').classList.add('hidden');
   }
 
@@ -265,7 +265,7 @@ export class HUD {
    * Wires the three pause-menu actions. Handlers live in Game (it owns the
    * loop, the pointer lock and the restart/menu flow).
    */
-  setPauseHandlers(handlers: {
+  public setPauseHandlers(handlers: {
     onResume: () => void;
     onRestart: () => void;
     onMainMenu: () => void;
@@ -275,7 +275,7 @@ export class HUD {
     mustGet('pause-menu-btn').addEventListener('click', handlers.onMainMenu);
   }
 
-  showHitmarker(headshot = false): void {
+  public showHitmarker(headshot = false): void {
     this.hitmarker.classList.remove('active');
     this.hitmarker.classList.toggle('headshot', headshot);
     // Force reflow so the CSS animation restarts on rapid consecutive hits.
@@ -284,14 +284,14 @@ export class HUD {
   }
 
   /** Center-screen interaction prompt ("MYSTERY BOX\nPress E"); null hides it. */
-  setInteractionPrompt(text: string | null): void {
+  public setInteractionPrompt(text: string | null): void {
     if (text === this.lastPrompt) return;
     this.lastPrompt = text;
     this.interactPrompt.classList.toggle('hidden', text === null);
     if (text !== null) this.interactPrompt.textContent = text;
   }
 
-  update(weapon: Weapon, spreadPixels: number): void {
+  public update(weapon: Weapon, spreadPixels: number): void {
     const definition = weapon.definition;
 
     if (definition.name !== this.lastWeapon) {
