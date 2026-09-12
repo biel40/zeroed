@@ -39,12 +39,18 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
 };
 
 export class MusicManager {
+  public enabled = false;
   private readonly players = new Map<MusicTrackName, HTMLAudioElement>();
   private readonly pauseOffsets = new Map<MusicTrackName, number>();
   private currentTrack: MusicTrackName | null = null;
 
+  public setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.stop();
+  }
+
   private getPlayer(name: MusicTrackName): HTMLAudioElement | null {
-    if (typeof Audio === 'undefined') return null;
+    if (!this.enabled || typeof Audio === 'undefined') return null;
 
     let player = this.players.get(name);
     if (!player) {
@@ -60,6 +66,7 @@ export class MusicManager {
   }
 
   preload(): void {
+    if (!this.enabled) return;
     for (const name of Object.keys(MUSIC_TRACKS) as MusicTrackName[]) {
       const player = this.getPlayer(name);
       if (!player) continue;
@@ -68,6 +75,7 @@ export class MusicManager {
   }
 
   resume(): void {
+    if (!this.enabled) return;
     // Only tracks explicitly paused (pause()) resume here; a freshly
     // preloaded-but-never-played track must wait for its own trigger
     // (playRoundStartOnce / startBackgroundLoop), not restart on every gesture.
@@ -81,6 +89,7 @@ export class MusicManager {
   }
 
   pause(): void {
+    if (!this.enabled) return;
     for (const [name, player] of this.players) {
       if (player.paused) continue;
       this.pauseOffsets.set(name, player.currentTime);
@@ -99,6 +108,7 @@ export class MusicManager {
   }
 
   stopBackgroundLoop(): void {
+    if (!this.enabled) return;
     const player = this.players.get('zombies_background_loop');
     if (!player) return;
     this.currentTrack = null;
@@ -110,6 +120,7 @@ export class MusicManager {
   }
 
   playRoundStartOnce(): void {
+    if (!this.enabled) return;
     const name: MusicTrackName = 'zombies_round_start';
     const player = this.getPlayer(name);
     if (!player) return;
@@ -125,6 +136,7 @@ export class MusicManager {
   }
 
   startBackgroundLoop(): void {
+    if (!this.enabled) return;
     const name: MusicTrackName = 'zombies_background_loop';
     const player = this.getPlayer(name);
     if (!player) return;
@@ -139,6 +151,7 @@ export class MusicManager {
 
   /** Gameplay bed: starts once at match start and keeps looping through rounds. */
   startGameplayLoop(): void {
+    if (!this.enabled) return;
     const name: MusicTrackName = 'zombies_gameplay_loop';
     const player = this.getPlayer(name);
     if (!player) return;

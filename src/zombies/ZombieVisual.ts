@@ -67,10 +67,10 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       headTop: ['HeadTop_End', 'HeadTop'],
     },
   },
-  // Original Zeroed low-poly Brute: broad, asymmetric and built from scratch.
+  // Original Zeroed Brutus: a towering, gaunt humanoid related to the walker.
   brute: {
     url: 'assets/zombies/zombie_brute.glb',
-    height: 2.02,
+    height: 2.3,
     clips: {
       spawn: ['BruteRise'],
       walk: ['BruteWalk'],
@@ -304,7 +304,7 @@ function buildProceduralHumanoid(
   return { root, rig: { hips, torso, head, armL, armR, legL, legR }, materials: [skin, cloth] };
 }
 
-/** Distinct emergency fallback for the Brute asset; never resembles a scaled walker. */
+/** Tall humanoid emergency fallback for Brutus when its authored asset is unavailable. */
 function buildProceduralBrute(
   tint: number,
   castShadow: boolean,
@@ -332,55 +332,61 @@ function buildProceduralBrute(
     flatShading: true,
   });
   const root = new THREE.Group();
-  root.scale.setScalar(0.8);
+  root.scale.setScalar(0.92);
   const add = (
     geometry: THREE.BufferGeometry,
     material: THREE.MeshStandardMaterial,
     parent: THREE.Object3D,
     position: readonly [number, number, number],
     scale: readonly [number, number, number] = [1, 1, 1],
+    rotation: readonly [number, number, number] = [0, 0, 0],
   ): void => {
     const part = new THREE.Mesh(geometry, material);
     part.position.set(...position);
     part.scale.set(...scale);
+    part.rotation.set(...rotation);
     part.castShadow = castShadow;
     parent.add(part);
   };
 
   const hips = new THREE.Group();
-  hips.position.y = 1.22;
+  hips.position.y = 1.2;
   root.add(hips);
-  add(new THREE.DodecahedronGeometry(0.5, 0), cloth, hips, [0, 0, 0], [1.1, 0.52, 0.72]);
+  add(new THREE.BoxGeometry(0.48, 0.24, 0.28), cloth, hips, [0, 0, 0]);
   const torso = new THREE.Group();
-  torso.position.set(0, 0.16, 0.03);
-  torso.rotation.x = 0.16;
+  torso.position.set(0, 0.12, 0.03);
+  torso.rotation.x = 0.24;
   hips.add(torso);
-  add(new THREE.DodecahedronGeometry(0.62, 0), cloth, torso, [0, 0.48, 0], [1.28, 0.9, 0.7]);
-  add(new THREE.SphereGeometry(0.5, 10, 7), skin, torso, [0, 0.16, 0.17], [1.34, 1.05, 1.02]);
+  add(new THREE.DodecahedronGeometry(0.48, 0), cloth, torso, [0, 0.5, 0], [1.18, 1.15, 0.62]);
+  add(new THREE.BoxGeometry(0.24, 0.4, 0.04), skin, torso, [0.08, 0.48, 0.3], [0.7, 1, 1]);
 
   const head = new THREE.Group();
-  head.position.set(0.05, 0.94, 0.06);
+  head.position.set(0.04, 1.08, 0.08);
+  head.rotation.z = -0.1;
   torso.add(head);
-  add(new THREE.IcosahedronGeometry(0.2, 1), skin, head, [0, 0, 0], [0.9, 1.05, 0.92]);
+  add(new THREE.IcosahedronGeometry(0.22, 1), skin, head, [0, 0, 0], [0.86, 1.12, 0.92]);
+  add(new THREE.BoxGeometry(0.18, 0.08, 0.18), skin, head, [0.02, -0.2, 0.06], [1, 1, 1], [0.3, 0, 0.08]);
 
   const buildArm = (side: -1 | 1, size: number): THREE.Group => {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.66, 0.72, 0);
-    shoulder.rotation.z = side * (side < 0 ? 0.18 : 0.09);
+    shoulder.position.set(side * 0.51, 0.82, 0);
+    shoulder.rotation.z = side * (side < 0 ? 0.08 : 0.14);
     torso.add(shoulder);
-    add(new THREE.CapsuleGeometry(size * 0.22, size * 0.85, 4, 8), skin, shoulder, [0, -size * 0.52, 0.05], [1.18, 1, 1]);
-    add(new THREE.DodecahedronGeometry(size * 0.27, 0), skin, shoulder, [0, -size * 1.02, 0.12], [1.15, 0.9, 1.18]);
+    add(new THREE.CapsuleGeometry(size * 0.13, size * 0.62, 4, 8), cloth, shoulder, [0, -size * 0.42, 0.03]);
+    add(new THREE.CapsuleGeometry(size * 0.11, size * 0.58, 4, 8), skin, shoulder, [0, -size * 1.02, 0.1]);
+    add(new THREE.BoxGeometry(size * 0.2, size * 0.16, size * 0.24), skin, shoulder, [0, -size * 1.4, 0.16]);
     return shoulder;
   };
   const armL = buildArm(-1, 1.02);
-  const armR = buildArm(1, 0.88);
+  const armR = buildArm(1, 0.96);
 
   const buildLeg = (side: -1 | 1): THREE.Group => {
     const leg = new THREE.Group();
-    leg.position.set(side * 0.28, -0.18, 0);
+    leg.position.set(side * 0.17, -0.08, 0);
     hips.add(leg);
-    add(new THREE.CapsuleGeometry(0.18, 0.72, 4, 8), cloth, leg, [0, -0.45, 0]);
-    add(new THREE.BoxGeometry(0.36, 0.2, 0.52), cloth, leg, [0, -0.94, 0.11]);
+    add(new THREE.CapsuleGeometry(0.15, 0.62, 4, 8), cloth, leg, [0, -0.39, 0]);
+    add(new THREE.CapsuleGeometry(0.12, 0.54, 4, 8), skin, leg, [0, -0.94, 0.02]);
+    add(new THREE.BoxGeometry(0.28, 0.16, 0.44), cloth, leg, [0, -1.29, 0.12]);
     return leg;
   };
   const legL = buildLeg(-1);
@@ -838,10 +844,10 @@ export class ZombieVisual {
     if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
       const progress = this.barrierProgress();
       const side = this.barrierStrikeSide;
-      this.root.position.y += sampleBarrierMotion(progress, -0.055, 0.015, -0.025);
-      this.root.position.z = sampleBarrierMotion(progress, -0.025, 0.105, 0.07);
-      this.root.rotation.x += sampleBarrierMotion(progress, 0.025, 0.14, 0.075);
-      this.root.rotation.z += side * sampleBarrierMotion(progress, -0.075, 0.052, 0.025);
+      this.root.position.y += sampleBarrierMotion(progress, -0.065, 0.02, -0.08);
+      this.root.position.z = sampleBarrierMotion(progress, -0.035, 0.12, -0.095);
+      this.root.rotation.x += sampleBarrierMotion(progress, 0.035, 0.16, -0.035);
+      this.root.rotation.z += side * sampleBarrierMotion(progress, -0.09, 0.065, -0.045);
     } else if (
       this.state === 'walk' && speed <= STATIONARY_SPEED && this.collapse <= 0 && !this.idleAction
     ) {
@@ -929,14 +935,14 @@ export class ZombieVisual {
     if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
       const progress = this.barrierProgress();
       const side = this.barrierStrikeSide;
-      rig.armL.rotation.x = -1.05 + sampleBarrierMotion(progress, 0.38 * side, -0.95, -0.62);
-      rig.armR.rotation.x = -1.05 + sampleBarrierMotion(progress, -0.38 * side, -0.95, -0.62);
-      rig.armL.rotation.z = 0.12 + side * sampleBarrierMotion(progress, -0.2, 0.09, 0.03);
-      rig.armR.rotation.z = -0.12 + side * sampleBarrierMotion(progress, -0.2, 0.09, 0.03);
-      rig.torso.rotation.x = 0.28 + sampleBarrierMotion(progress, 0.08, 0.3, 0.18);
-      rig.torso.rotation.z = side * sampleBarrierMotion(progress, -0.18, 0.14, 0.07);
-      rig.head.rotation.x = -0.15 + sampleBarrierMotion(progress, -0.08, 0.12, 0.04);
-      rig.head.rotation.z = -side * sampleBarrierMotion(progress, -0.08, 0.06, 0.02);
+      rig.armL.rotation.x = -1.05 + sampleBarrierMotion(progress, 0.42 * side, -1.08, -0.38);
+      rig.armR.rotation.x = -1.05 + sampleBarrierMotion(progress, -0.42 * side, -1.08, -0.38);
+      rig.armL.rotation.z = 0.12 + side * sampleBarrierMotion(progress, -0.24, 0.12, -0.08);
+      rig.armR.rotation.z = -0.12 + side * sampleBarrierMotion(progress, -0.24, 0.12, -0.08);
+      rig.torso.rotation.x = 0.28 + sampleBarrierMotion(progress, 0.1, 0.34, -0.04);
+      rig.torso.rotation.z = side * sampleBarrierMotion(progress, -0.2, 0.16, -0.1);
+      rig.head.rotation.x = -0.15 + sampleBarrierMotion(progress, -0.1, 0.14, -0.06);
+      rig.head.rotation.z = -side * sampleBarrierMotion(progress, -0.1, 0.075, -0.045);
       return;
     }
     if (this.state === 'attack') {

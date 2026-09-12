@@ -20,6 +20,7 @@ export const ZOMBIE_BASE_HP = 100;
 export const ZOMBIE_BASE_SPEED = 1.9;
 /** Damage per landed attack. Three clean hits kill a full-health player. */
 export const ZOMBIE_ATTACK_DAMAGE = 25;
+export const PLAYER_MAX_HP = ZOMBIE_ATTACK_DAMAGE * 3;
 /** Normal-zombie recovery; 0.75 s attack + 0.3375 s recovery is 25% below 1.45 s. */
 export const ZOMBIE_ATTACK_RECOVERY = 0.3375;
 /** Preserve the established attack cadence of special zombies. */
@@ -84,10 +85,11 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     materialTreatment: 'base',
     healthMultiplier: 3,
     speedMultiplier: 0.72,
-    damageMultiplier: 1.15,
+    // Brutus is a telegraphed execution threat: one connected maul is lethal.
+    damageMultiplier: PLAYER_MAX_HP / ZOMBIE_ATTACK_DAMAGE,
     attackRecovery: ZOMBIE_SPECIAL_ATTACK_RECOVERY,
     bodyScale: [1, 1, 1],
-    hitboxScale: [1.35, 1.15, 1.18],
+    hitboxScale: [1.22, 1.28, 1.15],
     // Kept conservative so mansion doors and stairs remain navigable.
     bodyRadius: 0.46,
     walkAnimationMultiplier: 1,
@@ -128,10 +130,10 @@ export const ZOMBIE_ATTACK_RANGE = 1.9;
 /** Maximum feet-height difference for a melee attack, meters. */
 export const ZOMBIE_ATTACK_VERTICAL_TOLERANCE = 1;
 /** Damage per attack against a window board. */
-export const ZOMBIE_BARRIER_ATTACK_DAMAGE = 50;
+export const ZOMBIE_BARRIER_ATTACK_DAMAGE = 100;
 /** Distance at which a zombie starts attacking a barrier board. */
 export const ZOMBIE_BARRIER_ATTACK_RANGE = 1.2;
-/** Slightly longer recovery between board hits: ~2 s per five-board window. */
+/** Deliberate recovery between boards so tearing open a full window remains readable. */
 export const ZOMBIE_BARRIER_ATTACK_RECOVERY = 0.92;
 /** Follow-through after the final board gives the breach weight without delaying navigation noticeably. */
 export const ZOMBIE_BARRIER_BREAK_FINISH_DURATION = 0.34;
@@ -258,7 +260,6 @@ export function selectChainTargets(
   return chain;
 }
 
-export const PLAYER_MAX_HP = ZOMBIE_ATTACK_DAMAGE * 3;
 /**
  * Brief invulnerability window after taking a hit, seconds. Long enough to
  * prevent a surrounding horde from deleting the player in a single frame,

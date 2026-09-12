@@ -36,9 +36,20 @@ export const MANSION_GROUND_BOUNDS = {
   maxZ: 9.6,
 } as const;
 
+export const MANSION_SECRET_ROOM = {
+  centerX: -9.4,
+  centerZ: -4.4,
+  width: 4.8,
+  depth: 4.6,
+  entranceX: -7,
+  entranceZ: -4.4,
+  entranceWidth: 2,
+  boundsMinX: -11.3,
+} as const;
+
 /** Large underground bunker bounds, inset by the player body radius. */
 export const MANSION_BUNKER_BOUNDS = {
-  minX: -6.5,
+  minX: MANSION_SECRET_ROOM.boundsMinX,
   maxX: MANSION_EAST_WALL_X - 0.65,
   minZ: -9,
   maxZ: 1.5,
@@ -46,10 +57,34 @@ export const MANSION_BUNKER_BOUNDS = {
 
 export const MANSION_BUNKER_Y = -3.4;
 
+export const SOUL_LAMP_REQUIRED_SOULS = 8;
+export const SOUL_LAMP_CAPTURE_RADIUS = 5;
+
+export const MANSION_SOUL_LAMPS = [
+  {
+    id: 'start-room',
+    position: { x: -1.35, y: 1.25, z: 9.78 },
+    floor: 0,
+    yaw: 0,
+  },
+  {
+    id: 'mystery-box-room',
+    position: { x: -1.5, y: 1.25, z: -7.78 },
+    floor: 0,
+    yaw: Math.PI,
+  },
+  {
+    id: 'upper-stairs',
+    position: { x: 8.82, y: 1.25, z: -3.05 },
+    floor: 0,
+    yaw: Math.PI / 2,
+  },
+] as const;
+
 export const MANSION_BUNKER_ENDING = {
   id: 'radiation-ending',
   cost: 30000,
-  position: { x: -6.835, y: MANSION_BUNKER_Y + 1.55, z: -4.4 },
+  position: { x: -11.635, y: MANSION_BUNKER_Y + 1.55, z: MANSION_SECRET_ROOM.centerZ },
   floor: -1,
   useRange: 2.1,
   lookDotMin: 0.5,
@@ -112,8 +147,10 @@ export const MANSION_BARRIERS: ReadonlyArray<{
   { id: 'start-west-a', x: -7.15, z: 5.4, outwardX: -1, outwardZ: 0, zone: 'start' },
   { id: 'start-west-b', x: -7.15, z: 3.2, outwardX: -1, outwardZ: 0, zone: 'start' },
   { id: 'start-south', x: -3.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
+  { id: 'start-south-west', x: -5.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
   { id: 'box-west', x: -7.15, z: -3.2, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
   { id: 'box-north', x: -3.5, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-dining' },
+  { id: 'box-north-west', x: -5.5, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-dining' },
   { id: 'east-hall-north', x: 1.6, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-east-hall' },
   { id: 'bunker-east', x: MANSION_EAST_WALL_X, z: -2.5, outwardX: 1, outwardZ: 0, zone: 'nuclear-bunker' },
 ];
@@ -193,10 +230,12 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
     { x: -14, z: 5.4, barrierId: 'start-west-a', approachX: -8.05, approachZ: 5.4, breachX: -6.55, breachZ: 5.4, exterior: true },
     { x: -14, z: 3.2, barrierId: 'start-west-b', approachX: -8.05, approachZ: 3.2, breachX: -6.55, breachZ: 3.2, exterior: true },
     { x: -3.5, z: 18, barrierId: 'start-south', approachX: -3.5, approachZ: 11.05, breachX: -3.5, breachZ: 9.55, exterior: true },
+    { x: -5.5, z: 18, barrierId: 'start-south-west', approachX: -5.5, approachZ: 11.05, breachX: -5.5, breachZ: 9.55, exterior: true },
   ],
   'to-dining': [
     { x: -14, z: -3.2, barrierId: 'box-west', approachX: -8.05, approachZ: -3.2, breachX: -6.55, breachZ: -3.2, exterior: true },
     { x: -3.5, z: -16, barrierId: 'box-north', approachX: -3.5, approachZ: -9.05, breachX: -3.5, breachZ: -7.55, exterior: true },
+    { x: -5.5, z: -16, barrierId: 'box-north-west', approachX: -5.5, approachZ: -9.05, breachX: -5.5, breachZ: -7.55, exterior: true },
   ],
   'to-east-hall': [
     { x: 1.6, z: -16, barrierId: 'east-hall-north', approachX: 1.6, approachZ: -9.05, breachX: 1.6, breachZ: -7.55, exterior: true },

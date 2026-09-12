@@ -379,6 +379,12 @@ export class AudioSystem {
     this.tick(0.04, 180, 0.18);
   }
 
+  /** Quiet layered crack as a zombie tears one board away from a window. */
+  public playBarrierBreak(): void {
+    this.tick(0, 680, 0.12, 1.4, 0.07);
+    this.tick(0.025, 230, 0.08, 1.1, 0.1);
+  }
+
   /** Metallic slide + low thud for unlocking a point door. */
   public playDoorUnlock(): void {
     this.tick(0, 260, 0.32);
@@ -389,6 +395,48 @@ export class AudioSystem {
   public playZombieDeath(): void {
     this.sweep(0, 'sawtooth', 190, 52, 0.3, 0.34);
     this.tick(0.03, 170, 0.3);
+  }
+
+  /** Quiet stereo cue emitted from a soul lamp when one soul reaches it. */
+  public playSoulAbsorb(pan: number, attenuation: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, pan, attenuation);
+    const t = audio.ctx.currentTime;
+    this.sweepTo(audio.ctx, output, t, 'sine', 430, 820, 0.12, 0.13);
+    this.toneTo(audio.ctx, output, t + 0.045, 'triangle', 1120, 0.055, 0.09);
+  }
+
+  /** Bright two-stage chime for a fully charged soul lamp. */
+  public playSoulLampComplete(pan: number, attenuation: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, pan, attenuation);
+    const t = audio.ctx.currentTime;
+    this.toneTo(audio.ctx, output, t, 'triangle', 392, 0.24, 0.24);
+    this.toneTo(audio.ctx, output, t + 0.1, 'triangle', 587, 0.2, 0.3);
+    this.toneTo(audio.ctx, output, t + 0.2, 'sine', 880, 0.13, 0.4);
+  }
+
+  /** Heavy map-wide cue for the hidden bunker wall beginning to move. */
+  public playSecretRoomUnlock(pan: number, attenuation: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, pan, Math.max(0.5, attenuation));
+    const t = audio.ctx.currentTime;
+    this.sweepTo(audio.ctx, output, t, 'sawtooth', 105, 42, 0.38, 0.7);
+    this.sweepTo(audio.ctx, output, t + 0.15, 'triangle', 240, 720, 0.2, 0.55);
+    this.toneTo(audio.ctx, output, t + 0.48, 'sine', 960, 0.14, 0.38);
+  }
+
+  /** Brutus attack tell: a layered sub-bass roar distinct from common zombie vocals. */
+  public playBruteRoar(): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const t: number = audio.ctx.currentTime;
+    this.sweep(0, 'sawtooth', 92, 38, 0.48, 0.62, t);
+    this.sweep(0.035, 'triangle', 138, 54, 0.3, 0.48, t);
+    this.tick(0.09, 78, 0.34, 0.7, 0.22);
   }
 
   /** Heavy thump when the player takes a hit. */
@@ -675,9 +723,68 @@ export class AudioSystem {
     this.tick(offset + 0.006, frequency * 1.85, volume * 0.42, 22, duration * 0.6);
   }
 
+  private spatialBus(audio: AudioContextParts, pan: number, attenuation: number): AudioNode {
+    const gain = audio.ctx.createGain();
+    gain.gain.value = clamp(attenuation, 0, 1);
+    gain.connect(audio.master);
+    if (typeof audio.ctx.createStereoPanner !== 'function') return gain;
+    const panner = audio.ctx.createStereoPanner();
+    panner.pan.value = clamp(pan, -1, 1);
+    panner.connect(gain);
+    return panner;
+  }
+
+  private toneTo(
+    ctx: AudioContext,
+    output: AudioNode,
+    at: number,
+    type: OscillatorType,
+    frequency: number,
+    volume: number,
+    duration: number,
+  ): void {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, at);
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    oscillator.connect(gain);
+    gain.connect(output);
+    oscillator.start(at);
+    oscillator.stop(at + duration + 0.02);
+  }
+
+  private sweepTo(
+    ctx: AudioContext,
+    output: AudioNode,
+    at: number,
+    type: OscillatorType,
+    fromFrequency: number,
+    toFrequency: number,
+    volume: number,
+    duration: number,
+  ): void {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(fromFrequency, at);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, toFrequency), at + duration);
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    oscillator.connect(gain);
+    gain.connect(output);
+    oscillator.start(at);
+    oscillator.stop(at + duration + 0.02);
+  }
+
   private context(): AudioContextParts | null {
     if (!this.ctx || !this.master || !this.noiseBuffer) return null;
     if (this.ctx.state !== 'running') return null;
     return { ctx: this.ctx, master: this.master, noise: this.noiseBuffer };
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

@@ -64,18 +64,18 @@ describe('zombie GLB assets', () => {
     });
   }
 
-  it('ships a purpose-built Brute hierarchy instead of walker geometry', () => {
+  it('ships a purpose-built tall humanoid Brutus hierarchy', () => {
     const json = gltfJson(`${GLB_DIR}/${GLB_FILES.brute}`);
     const nodes = new Set((json.nodes ?? []).map((node) => node.name));
-    expect(nodes).toContain('BruteBelly');
-    expect(nodes).toContain('BruteSpinePlate');
-    expect(nodes).toContain('BruteBackMass');
-    expect(nodes).toContain('BruteNeck');
-    expect(nodes).toContain('BruteFistL');
-    expect(nodes).toContain('BruteFistR');
-    expect(nodes).toContain('BruteTempleScar');
-    expect(nodes).toContain('BruteTrapL');
-    expect(nodes).toContain('BruteKnuckleR3');
+    expect(nodes).toContain('BrutusRibcage');
+    expect(nodes).toContain('BrutusOpenChest');
+    expect(nodes).toContain('BrutusExposedRib4');
+    expect(nodes).toContain('BrutusTornLapL');
+    expect(nodes).toContain('BrutusMissingCheekR');
+    expect(nodes).toContain('BrutusJaw');
+    expect(nodes).toContain('BrutusHandL');
+    expect(nodes).toContain('BrutusBootR');
+    expect(nodes).not.toContain('BruteBelly');
   });
 
   it('ships the original textured low-poly walker selected as the visual reference', () => {
@@ -113,7 +113,7 @@ describe('zombie GLB assets', () => {
     const gltf = await new Promise<{ scene: { getObjectByName(name: string): unknown }; animations: AnimationClip[] }>(
       (resolve, reject) => new GLTFLoader().parse(data, '', resolve, reject),
     );
-    expect(gltf.scene.getObjectByName('BruteBelly')).toBeTruthy();
+    expect(gltf.scene.getObjectByName('BrutusRibcage')).toBeTruthy();
     expect(gltf.animations.map((clip) => clip.name)).toEqual([
       'BruteRise', 'BruteWalk', 'BruteSmash', 'BruteHit', 'BruteDeath',
     ]);

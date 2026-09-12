@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PlayerEconomy } from '../src/game/PlayerEconomy';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { PointDoor } from '../src/zombies/doors/PointDoor';
 import type { ArenaCompletionInteraction, ArenaWeaponPickup } from '../src/zombies/maps/ZombieArena';
+import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
+import { MANSION_SOUL_LAMPS } from '../src/zombies/maps/BurnedMansionConfig';
 
 function bunkerDoor(): PointDoor {
   return new PointDoor(
@@ -150,5 +152,27 @@ describe('Burned Mansion secret bunker interaction', () => {
     expect(economy.points).toBe(100);
     expect(endings).toBe(1);
     expect(mode.isGameplayInputEnabled()).toBe(false);
+  });
+
+  it('forwards a kill position to the matching soul lamp without changing rewards', () => {
+    const mode = new ZombiesMode('burned-mansion');
+    const captureSoul = vi.fn();
+    const arena = Object.assign(Object.create(BurnedMansionArena.prototype), { captureSoul });
+    const economy = new PlayerEconomy();
+    const lamp = MANSION_SOUL_LAMPS[0];
+    (mode as unknown as { arena: BurnedMansionArena }).arena = arena;
+    (mode as unknown as { economy: PlayerEconomy }).economy = economy;
+    (mode as unknown as { ctx: unknown }).ctx = { audio: { playZombieDeath: () => undefined } };
+
+    (mode as unknown as {
+      onZombieKilled(
+        headshot: boolean,
+        position: { x: number; y: number; z: number },
+        floor: number,
+      ): void;
+    }).onZombieKilled(false, lamp.position, lamp.floor);
+
+    expect(economy.points).toBe(50);
+    expect(captureSoul).toHaveBeenCalledWith(lamp.position, lamp.floor);
   });
 });

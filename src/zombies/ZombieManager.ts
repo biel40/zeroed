@@ -165,6 +165,7 @@ export class ZombieManager {
 
   onZombieKilled: ((zombie: Zombie, headshot: boolean) => void) | null = null;
   onPlayerAttack: ((damage: number) => void) | null = null;
+  onBruteAttack: (() => void) | null = null;
   onBarrierImpact: (() => void) | null = null;
 
   private readonly pool: ZombiePool;
@@ -904,6 +905,7 @@ export class ZombieManager {
 
     if (this.canAttackPlayer(zombie, playerX, playerZ, playerFloor, playerY)) {
       if (zombie.tryAttack()) {
+        if (zombie.typeId === 'brute') this.onBruteAttack?.();
         // The wind-up only SCHEDULES the bite: whether it connects is decided
         // at the hit moment, against the player's current position. A player
         // who retreats out of range during the wind-up dodges the hit while

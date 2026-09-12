@@ -19,7 +19,7 @@ const createView = (onBoardRebuilt: (() => void) | null = null) => {
 };
 
 describe('WindowBarrierView', () => {
-  it('shows impact, detachment and fall before hiding a destroyed board', () => {
+  it('pulls a destroyed board toward the zombie before releasing it into a fall', () => {
     const { barrier, view, boards } = createView();
     const board = boards[0];
     const originalPosition = board.position.clone();
@@ -29,13 +29,14 @@ describe('WindowBarrierView', () => {
     barrier.damage(100);
     view.update(0.05);
     expect(board.visible).toBe(true);
-    expect(board.position.z).toBeLessThan(originalPosition.z);
+    expect(board.position.z).toBeGreaterThan(originalPosition.z);
+    expect(board.position.y).toBeGreaterThan(originalPosition.y);
 
     view.update(0.2);
-    expect(board.position.y).toBeLessThan(originalPosition.y);
+    expect(board.position.z).toBeGreaterThan(originalPosition.z + 0.1);
     expect(board.rotation.x).not.toBe(originalRotation.x);
 
-    view.update(0.6);
+    view.update(0.7);
     expect(board.visible).toBe(false);
     expect(board.position.equals(originalPosition)).toBe(true);
     expect(board.rotation.equals(originalRotation)).toBe(true);
@@ -75,12 +76,12 @@ describe('WindowBarrierView', () => {
 
     barrier.damage(100);
     view.update(0.12);
-    const firstBoardY = boards[0].position.y;
+    const firstBoardDepth = boards[0].position.z;
 
     barrier.damage(100);
     view.update(0.05);
-    expect(boards[0].position.y).toBeLessThan(firstBoardY);
-    expect(boards[1].position.z).toBeLessThan(0);
+    expect(boards[0].position.z).toBeGreaterThan(firstBoardDepth);
+    expect(boards[1].position.z).toBeGreaterThan(0);
 
     barrier.repair(0.1);
     view.update(0);
@@ -88,7 +89,7 @@ describe('WindowBarrierView', () => {
 
     barrier.damage(100);
     view.update(0.01);
-    view.update(0.8);
+    view.update(1);
 
     expect(boards[0].visible).toBe(false);
     expect(boards[1].visible).toBe(false);

@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-09-03. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+Estado inspeccionado: 2026-09-12. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
 
 ## Sistemas funcionales
 
@@ -10,11 +10,11 @@ Estado inspeccionado: 2026-09-03. La fuente de verdad es el codigo actual; `READ
 - Armas declarativas con cadencia, modos de fuego, munición, recarga, ADS, dispersión y recoil; sus viewmodels GLB/procedurales no muestran manos del jugador y conservan recargas mecánicas diferenciadas sin controlar la munición (`src/config/weapons.ts`, `src/weapons/`).
 - Balistica con gravedad/drag, raycast segmentado, prioridad de hitbox de cabeza y confirmacion visual/sonora especifica de headshot (`src/shooting/`, `src/modes/ZombiesMode.ts`, `src/ui/HUD.ts`, `src/audio/AudioSystem.ts`).
 - Zombies `normal`, `shiny` y `brute` definidos mediante un registro extensible de tipos/modelos, reservas visuales por modelo y maximo de dos Brutus bajo el limite global de 24. Todos comparten combate y navegacion con steering local, rutas de recuperacion y failsafe (`src/modes/ZombiesMode.ts`, `src/zombies/`).
-- Walker conserva el modelo low-poly original de Quaternius y un unico tinte para normales. Shiny destaca con acabado dorado y estrellas animadas; Brutus conserva su modelo propio de mini-boss. Las rondas 1-5 atenuan unicamente la velocidad final y la curva original vuelve intacta desde ronda 6.
+- Walker conserva el modelo low-poly original de Quaternius y un unico tinte para normales. Shiny destaca con acabado dorado y estrellas animadas; Brutus usa un humanoide original de 2.30 m, rugido de ataque propio e impacto letal. Las rondas 1-5 atenuan unicamente la velocidad final y la curva original vuelve intacta desde ronda 6.
 - Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
 - Ray Gun con proyectil y splash, garantizada a 115 bajas; ZEUS-77 con cadena electrica y resultado legendario raro de Mystery Box. Ambas mantienen pickups en el bunker.
 - Pasos de zombie posicionales 3D con pool de 8 fuentes sobre un unico `AudioListener`, prioridad al mas cercano y asset opcional con fallback sintetizado (`src/zombies/ZombieFootsteps.ts`).
-- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, ala este ampliada para la M4A1 y el acceso al bunker, bunker inferior ensanchado, escalera continua encerrada en un unico canal longitudinal compartido por jugador/zombies y final de 30000 puntos con creditos (`src/zombies/maps/`, `src/zombies/ZombiesRunFlow.ts`).
+- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, ala este ampliada para la M4A1 y el acceso al bunker, bunker inferior ensanchado, escalera continua encerrada en un unico canal longitudinal compartido por jugador/zombies y una sala secreta que contiene el final de 30000 puntos. Tres lamparas de almas por bajas cercanas desbloquean su pared animada y toda la progresion se reinicia con la partida (`src/zombies/maps/`, `src/zombies/secret-room/`, `src/zombies/ZombiesRunFlow.ts`).
 - Suite Vitest de logica determinista y contratos estaticos PWA; `npm run typecheck` pasa. La suite global conserva expectativas desactualizadas de headshots y casos no deterministas de navegación pendientes de resolver.
 
 ## Sistemas parciales o limitados

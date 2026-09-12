@@ -68,7 +68,9 @@ Points
   `ZombieManager` sigue pasando la velocidad horizontal medida a la vista para
   detener el ciclo ante colisiones, sin cambiar la velocidad de gameplay.
 - Walker usa ojos ambar emisivos pequenos que siguen el hueso de la cabeza; el
-  Brute conserva sus ojos propios, ambos sin luces dinamicas. Los impactos no
+  Brute conserva sus ojos propios, ambos sin luces dinamicas. Brutus adopta una
+  anatomia humanoide demacrada de 2.30 m, ropa y deterioro cercanos al walker,
+  pero con extremidades largas, pecho abierto y rostro asimetrico. Los impactos no
   letales mantienen el estado
   `walk`: el flinch es solo visual y no detiene la persecucion.
 - Golpear una ventana usa una animacion aditiva propia sobre `Idle`/`Walk`, con
@@ -86,9 +88,10 @@ Points
 - `ZombiePool` precarga reservas por modelo (24 walker, 2 Brute) pero bloquea
   cualquier adquisición al llegar a 24 activos totales. Los cadáveres siguen
   ocupando tanto su reserva visual como el límite especial.
-- Brute multiplica salud, velocidad y daño y usa un radio físico conservador;
-  esos valores alimentan combate, steering, colisión, recuperación y una rejilla
-  de navegación con el despeje correspondiente a su tamaño.
+- Brute multiplica salud y reduce velocidad, conserva un radio fisico compatible
+  con puertas y mata con cualquier impacto confirmado. Al iniciar el ataque emite
+  un rugido grave exclusivo antes del momento de impacto; distancia, linea de vision
+  y ventana de esquiva siguen gobernadas por el melee compartido.
 - La velocidad calculada por la curva existente recibe un multiplicador de
   introducción de 0.75/0.80/0.85/0.90/0.95 en rondas 1-5; desde ronda 6 el
   multiplicador vuelve a 1 sin alterar salud, cantidad ni spawn.
@@ -98,13 +101,14 @@ Points
 ## Mapas Zombies
 
 - `ClassicArena`: adapta `ShootingRange`, aplica noche, usa spawns abiertos y Mystery Box; no tiene puertas, barreras ni wall buys.
-- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; el ala este da mas anchura tanto a la sala M4A1 como al acceso y planta inferior del bunker. La compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece una escalera continua de canal unico separada del vano por un carril de giro, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos. La M4A1 usa una silueta mural propia y esa pared no tiene iluminacion roja decorativa.
+- `BurnedMansionArena`: progresa desde M1911 hacia AK-47 y M4A1 antes de la puerta de 9999; el ala este da mas anchura tanto a la sala M4A1 como al acceso y planta inferior del bunker. La compuerta pasa de cerrada a abierta antes de retirar su collider, y el bunker ofrece una escalera continua de canal unico separada del vano por un carril de giro, Ray Gun, ZEUS-77, M60 y un final independiente de 30000 puntos dentro de una sala secreta. Tres lamparas de almas cargadas por bajas cercanas revelan su pared oeste mediante una apertura animada; estado, almas en vuelo y reset pertenecen al mapa. La M4A1 usa una silueta mural propia y esa pared no tiene iluminacion roja decorativa.
 - `ZombiesMode` posee salud, rondas, economia, armas y progresion; cada `ZombieArena` posee geometria y datos posicionales.
 - `ZombieManager` delega el pathfinding en `ZombieNavigationService`: un grid A* por planta derivado de los colliders del mapa (puertas cerradas y barreras atrincheradas sellan sus vanos; al abrirse, el rebuild invalida las rutas). La persecucion decide el objetivo, el servicio decide la ruta, `moveWithCollision` ejecuta sin atravesar geometria y el anti-stuck es la red de seguridad. Detalles en `docs/changes/2026-08-20-zombie-navigation-service.md`.
 - Las transiciones con rampa reutilizan sus extremos como portales del A* y steering; en la aproximacion, pendiente y salida al rellano, `ZombieManager` centra la horda y mantiene separacion longitudinal para que el corredor conecte plantas sin giros prematuros, wall-following, recalculos ni teletransporte.
 - `ZombiesRunFlow` impide solapamientos entre `PLAYING`, `ENDING`, `CREDITS`, `FINISHED` y muerte; durante el final se bloquean input, dano, compras, rondas, spawns, proyectiles y audio antes del fundido.
 - `ZombieFootsteps` da pasos posicionales 3D: un unico `AudioListener` en la camara (sobre el AudioContext compartido de `AudioSystem`) y un pool de 8 `PositionalAudio` reasignados cada 0.25 s a los zombies vivos mas cercanos; la cadencia sale de la velocidad medida y solo suenan en `walk` con desplazamiento real.
-- `WindowBarrierView` mantiene una animacion independiente por tabla: el HP sigue siendo autoritativo de inmediato, mientras impacto, caida y encaje se ejecutan en el update de la arena y siempre terminan restaurando la transformacion original.
+- `SecretRoomSystem` usa un estado puro central, reserva almas mientras viajan para impedir sobrecarga y renderiza sus nucleos, estelas y chispas con tres `Points` de buffers fijos. Las tres luces de lampara carecen de sombras y reducen intensidad/tamano con el perfil de efectos; el audio procedural aplica paneo y atenuacion desde la camara sin crear otro `AudioContext`.
+- `WindowBarrierView` mantiene una animacion independiente por tabla: cada golpe zombie arranca una madera hacia el exterior y la suelta en una caida con giro, mientras el HP sigue siendo autoritativo de inmediato. Burned Mansion declara nueve ventanas, cada una emparejada con su hueco de muro y spawn exterior; la reparacion conserva su encaje independiente.
 - La Mystery Box pondera sus resultados por rareza: ZEUS-77 es legendaria, aparece con glow dorado y peso 3 frente al peso 10 de Ray Gun; Ray Gun sigue garantizada al alcanzar 115 bajas. Su vista procedural refleja las fases de la maquina con apertura y cierre amortiguados, ruleta flotante y una retirada animada del arma, sin poseer reglas de gameplay. El resultado se revela exactamente 5 segundos despues de la activacion.
 
 ## Armas especiales

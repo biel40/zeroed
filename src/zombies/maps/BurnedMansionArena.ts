@@ -8,6 +8,7 @@ import { PointDoorView } from '../doors/PointDoorView';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from '../ZombieSpawner';
 import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
+import { SecretRoomSystem } from '../secret-room/SecretRoomSystem';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
@@ -36,6 +37,7 @@ import {
   MANSION_STAIR_CENTER_X,
   MANSION_STAIR_TOP_Z,
   MANSION_SECRET_AREAS,
+  MANSION_SECRET_ROOM,
   MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
 } from './BurnedMansionConfig';
@@ -160,6 +162,9 @@ export class BurnedMansionArena implements ZombieArena {
   readonly completionInteraction: ArenaCompletionInteraction = MANSION_BUNKER_ENDING;
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
+  onSoulAbsorbed: ((position: THREE.Vector3) => void) | null = null;
+  onSoulLampCompleted: ((position: THREE.Vector3) => void) | null = null;
+  onSecretRoomUnlocked: ((position: THREE.Vector3) => void) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -179,6 +184,9 @@ export class BurnedMansionArena implements ZombieArena {
   private readonly activeSpawnZones = new Set<string>(['start']);
   private readonly openDoorIds = new Set<string>();
   private readonly materials: MansionSurfaceMaterials;
+  private readonly secretRoom: SecretRoomSystem;
+  private secretWall!: THREE.Mesh;
+  private secretWallCollider!: THREE.Mesh;
   private wallMaterialIndex = 0;
   private bunkerEmergencyLight: THREE.PointLight | null = null;
   private ambienceTime = 0;
@@ -198,6 +206,14 @@ export class BurnedMansionArena implements ZombieArena {
     this.buildDamageDetails();
     this.buildWindowFrames();
     this.buildLighting();
+    this.secretRoom = new SecretRoomSystem(this.group, this.secretWall, profile);
+    this.secretRoom.onSoulAbsorbed = (position) => this.onSoulAbsorbed?.(position);
+    this.secretRoom.onLampCompleted = (position) => this.onSoulLampCompleted?.(position);
+    this.secretRoom.onUnlocked = (position) => this.onSecretRoomUnlocked?.(position);
+    this.secretRoom.onDoorOpened = () => {
+      this.refreshColliders();
+      this.onTopologyChanged?.();
+    };
 
     this.allBarriers = MANSION_BARRIERS.map(
       (barrier) =>
@@ -260,6 +276,7 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   public update(dt: number): void {
+    this.secretRoom.update(dt);
     for (const pickup of this.weaponPickups) pickup.update?.(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
     for (const view of this.barrierViews) {
@@ -286,6 +303,7 @@ export class BurnedMansionArena implements ZombieArena {
     for (const view of this.doorViews) view.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
     for (const refill of this.ammoRefills) refill.reset();
+    this.secretRoom.reset();
     this.activeSpawnZones.clear();
     this.activeSpawnZones.add('start');
     this.openDoorIds.clear();
@@ -307,6 +325,17 @@ export class BurnedMansionArena implements ZombieArena {
 
   public refreshSpawnPoints(): void {
     this.spawnPoints = this.computeSpawnPoints();
+  }
+
+  public captureSoul(
+    position: { readonly x: number; readonly y: number; readonly z: number },
+    floor: number,
+  ): boolean {
+    return this.secretRoom.captureSoul(position, floor);
+  }
+
+  public get secretRoomState(): SecretRoomSystem['state'] {
+    return this.secretRoom.state;
   }
 
   public refreshColliders(): void {
@@ -365,6 +394,7 @@ export class BurnedMansionArena implements ZombieArena {
 
   private collectBallisticColliders(): ReadonlyArray<THREE.Object3D> {
     const colliders: THREE.Object3D[] = [...this.structureMeshes];
+    if (!this.secretRoom.isDoorOpen) colliders.push(this.secretWallCollider);
     for (let i = 0; i < this.doors.length; i++) {
       if (!this.openDoorIds.has(this.doors[i].id)) colliders.push(this.doorMeshes[i]);
     }
@@ -373,6 +403,7 @@ export class BurnedMansionArena implements ZombieArena {
 
   private collectPlayerWallColliders(): ReadonlyArray<THREE.Box3> {
     const boxes = this.playerWallMeshes.map((mesh) => new THREE.Box3().setFromObject(mesh));
+    if (!this.secretRoom.isDoorOpen) boxes.push(new THREE.Box3().setFromObject(this.secretWallCollider));
     for (let i = 0; i < this.doors.length; i++) {
       if (!this.openDoorIds.has(this.doors[i].id)) boxes.push(new THREE.Box3().setFromObject(this.doorMeshes[i]));
     }
@@ -395,8 +426,8 @@ export class BurnedMansionArena implements ZombieArena {
 
     this.addWindowedWall('z', -7.15, -8, 10, [-3.2, 3.2, 5.4]);
     this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10, [-2.5]);
-    this.addWindowedWall('x', -8.15, -7, 7, [-3.5, 1.6]);
-    this.addWindowedWall('x', 10.15, -7, 7, [-3.5]);
+    this.addWindowedWall('x', -8.15, -7, 7, [-5.5, -3.5, 1.6]);
+    this.addWindowedWall('x', 10.15, -7, 7, [-5.5, -3.5]);
 
     this.addSlab('mansion-roof', 1, 3.28, 1, 16.6, 0.16, 18.6, this.materials.ceilingBurned);
 
@@ -416,10 +447,122 @@ export class BurnedMansionArena implements ZombieArena {
       2 - STAIR_APERTURE_MAX_Z, this.materials.ceilingBurned,
     );
     const bunkerWallY = MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2;
-    this.addWall(-7, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
+    const entranceStart = MANSION_SECRET_ROOM.entranceZ - MANSION_SECRET_ROOM.entranceWidth / 2;
+    const entranceEnd = MANSION_SECRET_ROOM.entranceZ + MANSION_SECRET_ROOM.entranceWidth / 2;
+    this.addWall(
+      MANSION_SECRET_ROOM.entranceX,
+      bunkerWallY,
+      (-9.5 + entranceStart) / 2,
+      WALL_THICKNESS,
+      LOWER_WALL_HEIGHT,
+      entranceStart + 9.5,
+      this.materials.concreteDirty,
+    );
+    this.addWall(
+      MANSION_SECRET_ROOM.entranceX,
+      bunkerWallY,
+      (entranceEnd + 2) / 2,
+      WALL_THICKNESS,
+      LOWER_WALL_HEIGHT,
+      2 - entranceEnd,
+      this.materials.concreteDirty,
+    );
+    this.addWall(
+      MANSION_SECRET_ROOM.entranceX,
+      MANSION_BUNKER_Y + 2.7,
+      MANSION_SECRET_ROOM.entranceZ,
+      WALL_THICKNESS,
+      1,
+      MANSION_SECRET_ROOM.entranceWidth,
+      this.materials.concreteDirty,
+    );
+    this.secretWall = this.buildSecretWall();
     this.addWall(MANSION_EAST_WALL_X - 0.15, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
     this.addWall(1, bunkerWallY, -9.5, 16, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
     this.addWall(1, bunkerWallY, 2, 16, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
+
+    this.addSlab(
+      'secret-room-floor',
+      MANSION_SECRET_ROOM.centerX,
+      MANSION_BUNKER_Y - 0.08,
+      MANSION_SECRET_ROOM.centerZ,
+      MANSION_SECRET_ROOM.width,
+      0.16,
+      MANSION_SECRET_ROOM.depth,
+      this.materials.floorConcrete,
+    );
+    this.addSlab(
+      'secret-room-ceiling',
+      MANSION_SECRET_ROOM.centerX,
+      -0.22,
+      MANSION_SECRET_ROOM.centerZ,
+      MANSION_SECRET_ROOM.width,
+      0.16,
+      MANSION_SECRET_ROOM.depth,
+      this.materials.ceilingBurned,
+    );
+    this.addWall(
+      MANSION_SECRET_ROOM.centerX - MANSION_SECRET_ROOM.width / 2,
+      bunkerWallY,
+      MANSION_SECRET_ROOM.centerZ,
+      WALL_THICKNESS,
+      LOWER_WALL_HEIGHT,
+      MANSION_SECRET_ROOM.depth,
+      this.materials.concreteDirty,
+    );
+    for (const z of [
+      MANSION_SECRET_ROOM.centerZ - MANSION_SECRET_ROOM.depth / 2,
+      MANSION_SECRET_ROOM.centerZ + MANSION_SECRET_ROOM.depth / 2,
+    ]) {
+      this.addWall(
+        MANSION_SECRET_ROOM.centerX,
+        bunkerWallY,
+        z,
+        MANSION_SECRET_ROOM.width,
+        LOWER_WALL_HEIGHT,
+        WALL_THICKNESS,
+        this.materials.concreteDirty,
+      );
+    }
+  }
+
+  private buildSecretWall(): THREE.Mesh {
+    const geometry = new THREE.BoxGeometry(
+      WALL_THICKNESS,
+      LOWER_WALL_HEIGHT,
+      MANSION_SECRET_ROOM.entranceWidth,
+    );
+    this.projectSurfaceUVs(
+      geometry,
+      WALL_THICKNESS,
+      LOWER_WALL_HEIGHT,
+      MANSION_SECRET_ROOM.entranceWidth,
+      this.materials.concreteDirty,
+      23,
+    );
+    const wall = new THREE.Mesh(geometry, this.materials.concreteDirty);
+    wall.position.set(
+      MANSION_SECRET_ROOM.entranceX,
+      MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2,
+      MANSION_SECRET_ROOM.entranceZ,
+    );
+    wall.name = 'secret-room-wall';
+    wall.castShadow = !this.profile.useReducedEffects;
+    wall.receiveShadow = true;
+    wall.userData.surface = 'concrete';
+    wall.userData.mapRole = 'wall';
+    this.group.add(wall);
+
+    this.secretWallCollider = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    this.secretWallCollider.position.copy(wall.position);
+    this.secretWallCollider.name = 'secret-room-wall-collider';
+    this.secretWallCollider.userData.surface = 'concrete';
+    this.secretWallCollider.userData.mapRole = 'secret-wall-collider';
+    this.group.add(this.secretWallCollider);
+    return wall;
   }
 
   private buildInterior(): void {
@@ -716,6 +859,21 @@ export class BurnedMansionArena implements ZombieArena {
       radiationSign.add(blade);
     }
     this.group.add(radiationSign);
+
+    const secretRoomLight = new THREE.PointLight(
+      0x8a4325,
+      this.profile.useReducedEffects ? 0.14 : 0.28,
+      4,
+      2,
+    );
+    secretRoomLight.position.set(
+      MANSION_SECRET_ROOM.centerX,
+      MANSION_BUNKER_Y + 2.45,
+      MANSION_SECRET_ROOM.centerZ,
+    );
+    secretRoomLight.name = 'secret-room-ambient-light';
+    secretRoomLight.castShadow = false;
+    this.group.add(secretRoomLight);
 
   }
 

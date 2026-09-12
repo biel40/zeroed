@@ -5,9 +5,9 @@ const BOARD_WIDTH = 1.5;
 const BOARD_HEIGHT = 0.12;
 const BOARD_THICK = 0.045;
 const GAP = 0.07;
-const IMPACT_DURATION = 0.1;
-const BREAK_MIN_DURATION = 0.64;
-const BREAK_MAX_DURATION = 0.76;
+const PULL_DURATION = 0.18;
+const BREAK_MIN_DURATION = 0.82;
+const BREAK_MAX_DURATION = 0.96;
 const REBUILD_DURATION = 0.32;
 
 type BoardVisualState = 'intact' | 'breaking' | 'destroyed' | 'rebuilding';
@@ -23,6 +23,7 @@ interface BoardAnimation {
   duration: number;
   lateralOffset: number;
   depthOffset: number;
+  liftDistance: number;
   dropDistance: number;
   impactRotationX: number;
   impactRotationY: number;
@@ -93,6 +94,7 @@ export class WindowBarrierView {
         duration: 0,
         lateralOffset: 0,
         depthOffset: 0,
+        liftDistance: 0,
         dropDistance: 0,
         impactRotationX: 0,
         impactRotationY: 0,
@@ -156,15 +158,16 @@ export class WindowBarrierView {
     board.state = 'breaking';
     board.elapsed = 0;
     board.duration = BREAK_MIN_DURATION + this.rng() * (BREAK_MAX_DURATION - BREAK_MIN_DURATION);
-    board.lateralOffset = (this.rng() * 2 - 1) * 0.09;
-    board.depthOffset = -(0.09 + this.rng() * 0.06);
-    board.dropDistance = 0.78 + this.rng() * 0.24;
-    board.impactRotationX = (this.rng() * 2 - 1) * 0.08;
-    board.impactRotationY = (this.rng() * 2 - 1) * 0.06;
-    board.impactRotationZ = (this.rng() * 2 - 1) * 0.07;
-    board.spinX = (this.rng() < 0.5 ? -1 : 1) * (0.65 + this.rng() * 0.3);
-    board.spinY = (this.rng() * 2 - 1) * 0.32;
-    board.spinZ = (this.rng() < 0.5 ? -1 : 1) * (0.35 + this.rng() * 0.3);
+    board.lateralOffset = (this.rng() * 2 - 1) * 0.18;
+    board.depthOffset = 0.3 + this.rng() * 0.16;
+    board.liftDistance = 0.08 + this.rng() * 0.08;
+    board.dropDistance = 0.96 + this.rng() * 0.32;
+    board.impactRotationX = (this.rng() * 2 - 1) * 0.16;
+    board.impactRotationY = (this.rng() * 2 - 1) * 0.12;
+    board.impactRotationZ = (this.rng() * 2 - 1) * 0.14;
+    board.spinX = (this.rng() < 0.5 ? -1 : 1) * (0.9 + this.rng() * 0.45);
+    board.spinY = (this.rng() * 2 - 1) * 0.5;
+    board.spinZ = (this.rng() < 0.5 ? -1 : 1) * (0.55 + this.rng() * 0.4);
     this.restoreOriginalTransform(board);
     board.mesh.visible = true;
   }
@@ -179,13 +182,13 @@ export class WindowBarrierView {
       return;
     }
 
-    if (board.elapsed <= IMPACT_DURATION) {
-      const progress = board.elapsed / IMPACT_DURATION;
-      const eased = 1 - (1 - progress) * (1 - progress);
+    if (board.elapsed <= PULL_DURATION) {
+      const progress = board.elapsed / PULL_DURATION;
+      const eased = 1 - Math.pow(1 - progress, 3);
       board.mesh.position.set(
-        board.originalPosition.x + board.lateralOffset * 0.15 * eased,
-        board.originalPosition.y + Math.sin(progress * Math.PI) * 0.006,
-        board.originalPosition.z - 0.035 * eased,
+        board.originalPosition.x + board.lateralOffset * 0.45 * eased,
+        board.originalPosition.y + board.liftDistance * eased,
+        board.originalPosition.z + board.depthOffset * 0.72 * eased,
       );
       board.mesh.rotation.set(
         board.originalRotation.x + board.impactRotationX * eased,
@@ -196,12 +199,12 @@ export class WindowBarrierView {
       return;
     }
 
-    const progress = (board.elapsed - IMPACT_DURATION) / (board.duration - IMPACT_DURATION);
+    const progress = (board.elapsed - PULL_DURATION) / (board.duration - PULL_DURATION);
     const drift = 1 - (1 - progress) * (1 - progress);
     board.mesh.position.set(
-      board.originalPosition.x + board.lateralOffset * (0.15 + drift * 0.85),
-      board.originalPosition.y - board.dropDistance * progress * progress,
-      board.originalPosition.z - 0.035 + board.depthOffset * drift,
+      board.originalPosition.x + board.lateralOffset * (0.45 + drift * 0.55),
+      board.originalPosition.y + board.liftDistance * (1 - progress) - board.dropDistance * progress * progress,
+      board.originalPosition.z + board.depthOffset * (0.72 + drift * 0.28),
     );
     board.mesh.rotation.set(
       board.originalRotation.x + board.impactRotationX + board.spinX * progress,

@@ -42,7 +42,7 @@ Los clips concretos por estado se resuelven por nombre en
 | Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
 | --- | --- | --- | --- | --- | --- |
 | `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0**, atribucion: Quaternius | 2116 | ZombieCrawl, ZombieWalk, ZombieBite |
-| `brute` | "Zeroed Brute" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | ~2.9k | BruteRise, BruteWalk, BruteSmash, BruteHit, BruteDeath |
+| `brute` | "Zeroed Brutus" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | 1830 | BruteRise, BruteWalk, BruteSmash, BruteHit, BruteDeath |
 
 > `normal` y `shiny` comparten el walker; `brute` usa su propio GLB, jerarquía,
 > materiales y clips. El registro separa tipos de gameplay y modelos para que
@@ -57,9 +57,10 @@ Notas:
 - El walker conserva su rig, textura y clips originales: un material y 694500
   bytes. Las estrellas usan una textura procedural compartida de 32x32 y una
   llamada de dibujo adicional por Shiny, sin luces ni assets externos nuevos.
-- El Brute tiene cabeza hundida,
-  torso deformado, abdomen expuesto, brazos asimétricos, piernas cortas y
-  restricciones metálicas; solo su GLB se regenera con `npm run generate:zombie-brute`.
+- Brutus es un humanoide demacrado de 2.30 m: conserva proporciones humanas,
+  pero alarga extremidades y muestra chaqueta rota, pecho abierto, costillas,
+  mandíbula fracturada y un único ojo infectado. Solo su GLB se regenera con
+  `npm run generate:zombie-brute`.
 - Cargadores, cerrojos y tapas de alimentación de las armas son meshes
   procedurales propios (los GLB de armas de Quaternius son mono-mesh). Sus
   anclas locales pueden declararse por arma; los cargadores soltados se

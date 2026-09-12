@@ -201,6 +201,19 @@ describe('ZombieVisual Shiny stars', () => {
 });
 
 describe('ZombieVisual barrier attack', () => {
+  it('braces and pulls its weight back after grabbing a board', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+
+    visual.setAttackDuration(0.75);
+    visual.setState('barrierAttack');
+    visual.update(0.475, 0);
+    const grabDepth = visual.root.position.z;
+    visual.update(0.12, 0);
+
+    expect(visual.root.position.z).toBeLessThan(grabDepth - 0.1);
+    expect(visual.root.rotation.x).toBeLessThan(0.05);
+  });
+
   it('keeps an organic breaking motion while standing at the barrier', () => {
     const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
 

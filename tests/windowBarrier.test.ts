@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WindowBarrier, type WindowBarrierConfig } from '../src/zombies/barriers/WindowBarrier';
 import { BARRIER_CONFIG } from '../src/zombies/maps/BurnedMansionConfig';
-import {
-  ZOMBIE_ATTACK_DURATION,
-  ZOMBIE_ATTACK_HIT_MOMENT,
-  ZOMBIE_BARRIER_ATTACK_DAMAGE,
-  ZOMBIE_BARRIER_ATTACK_RECOVERY,
-  ZOMBIE_SPECIAL_ATTACK_RECOVERY,
-} from '../src/zombies/ZombieConfig';
+import { ZOMBIE_BARRIER_ATTACK_DAMAGE } from '../src/zombies/ZombieConfig';
 
 const DEFAULT_CONFIG: WindowBarrierConfig = {
   boardCount: 3,
@@ -22,19 +16,15 @@ const fastConfig = (cap: number): WindowBarrierConfig => ({
 });
 
 describe('WindowBarrier pure logic', () => {
-  it('adds approximately two seconds to a full five-board breach through attack cadence', () => {
-    const hitsPerBoard = Math.ceil(BARRIER_CONFIG.boardHp / ZOMBIE_BARRIER_ATTACK_DAMAGE);
-    const totalHits = BARRIER_CONFIG.boardCount * hitsPerBoard;
-    const previousDuration =
-      ZOMBIE_ATTACK_HIT_MOMENT +
-      (totalHits - 1) * (ZOMBIE_ATTACK_DURATION + ZOMBIE_SPECIAL_ATTACK_RECOVERY);
-    const adjustedDuration =
-      ZOMBIE_ATTACK_HIT_MOMENT +
-      (totalHits - 1) * (ZOMBIE_ATTACK_DURATION + ZOMBIE_BARRIER_ATTACK_RECOVERY);
+  it('removes exactly one board with every zombie strike', () => {
+    const barrier = new WindowBarrier('w1', 0, 0, 0, 1, BARRIER_CONFIG);
 
-    expect(previousDuration).toBeCloseTo(13.525, 3);
-    expect(adjustedDuration).toBeCloseTo(15.505, 3);
-    expect(adjustedDuration - previousDuration).toBeCloseTo(1.98, 2);
+    for (let hit = 1; hit <= BARRIER_CONFIG.boardCount; hit++) {
+      expect(barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE)).toBe(1);
+      expect(barrier.destroyedCount).toBe(hit);
+    }
+
+    expect(barrier.isOpen).toBe(true);
   });
 
   it('starts intact', () => {

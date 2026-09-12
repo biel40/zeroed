@@ -29,7 +29,10 @@ import {
   MANSION_STAIR_CENTER_X,
   MANSION_STAIR_TOP_Z,
   MANSION_SECRET_AREAS,
+  MANSION_SECRET_ROOM,
+  MANSION_SOUL_LAMPS,
   MANSION_SPECIAL_WEAPON_CASES,
+  SOUL_LAMP_REQUIRED_SOULS,
   MANSION_WALL_BUYS,
 } from '../src/zombies/maps/BurnedMansionConfig';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
@@ -580,6 +583,108 @@ describe('Burned Mansion topology', () => {
     expect(zeusCase?.children.some((child) => child.userData.mapRole === 'case-glass')).toBe(true);
   });
 
+  it('hides a fully enclosed secret room behind a matching solid bunker wall', () => {
+    const arena = makeArena();
+    const wall = arena.group.getObjectByName('secret-room-wall') as THREE.Mesh;
+    const collider = arena.group.getObjectByName('secret-room-wall-collider') as THREE.Mesh;
+    const lamps = arena.group.children.filter((child) => child.userData.mapRole === 'soul-lamp');
+
+    expect(wall).toBeInstanceOf(THREE.Mesh);
+    expect(wall.userData.mapRole).toBe('wall');
+    expect(arena.colliders).toContain(collider);
+    expect(arena.group.children.some((child) => (
+      child !== wall &&
+      child.userData.mapRole === 'wall' &&
+      Math.abs(child.position.x - MANSION_SECRET_ROOM.entranceX) < 0.01 &&
+      (child as THREE.Mesh).material === wall.material
+    ))).toBe(true);
+    expect(lamps).toHaveLength(3);
+    expect(lamps.map((lamp) => lamp.userData.lampId)).toEqual(MANSION_SOUL_LAMPS.map((lamp) => lamp.id));
+    expect(arena.group.getObjectByName('secret-room-floor')).toBeDefined();
+    expect(arena.group.getObjectByName('secret-room-ceiling')).toBeDefined();
+    expect(canWalk(
+      [-5.8, MANSION_SECRET_ROOM.entranceZ],
+      [MANSION_SECRET_ROOM.centerX, MANSION_SECRET_ROOM.centerZ],
+      arena.wallColliders,
+      MANSION_BUNKER_BOUNDS,
+      MANSION_BUNKER_Y,
+    )).toBe(false);
+  });
+
+  it('shows empty, partially charged and complete lamp states', () => {
+    const arena = makeArena();
+    const definition = MANSION_SOUL_LAMPS[0];
+    const lamp = arena.group.children.find((child) => child.userData.lampId === definition.id)!;
+    const light = lamp.children.find((child) => child instanceof THREE.PointLight) as THREE.PointLight;
+    const emptyIntensity = light.intensity;
+
+    arena.captureSoul(definition.position, definition.floor);
+    arena.update(0.6);
+    expect(lamp.userData.souls).toBe(1);
+    expect(lamp.userData.completed).toBe(false);
+    expect(light.intensity).toBeGreaterThan(emptyIntensity);
+
+    for (let soul = 1; soul < SOUL_LAMP_REQUIRED_SOULS; soul++) {
+      arena.captureSoul(definition.position, definition.floor);
+      arena.update(0.6);
+    }
+    expect(lamp.userData.souls).toBe(SOUL_LAMP_REQUIRED_SOULS);
+    expect(lamp.userData.completed).toBe(true);
+    expect(light.intensity).toBeGreaterThan(emptyIntensity * 10);
+
+    arena.reset();
+    expect(lamp.userData.souls).toBe(0);
+    expect(lamp.userData.completed).toBe(false);
+    expect(light.intensity).toBeCloseTo(emptyIntensity);
+  });
+
+  it('charges each lamp on soul arrival and removes the secret collider only after reveal', () => {
+    const arena = makeArena();
+    let topologyChanges = 0;
+    arena.onTopologyChanged = () => { topologyChanges++; };
+
+    for (const lamp of MANSION_SOUL_LAMPS) {
+      for (let soul = 0; soul < SOUL_LAMP_REQUIRED_SOULS; soul++) {
+        expect(arena.captureSoul(lamp.position, lamp.floor)).toBe(true);
+        arena.update(1);
+      }
+    }
+
+    const wall = arena.group.getObjectByName('secret-room-wall') as THREE.Mesh;
+    const collider = arena.group.getObjectByName('secret-room-wall-collider') as THREE.Mesh;
+    expect(arena.secretRoomState.completedLamps).toBe(3);
+    expect(arena.secretRoomState.unlocked).toBe(true);
+    expect(wall.position.y).toBeLessThan(MANSION_BUNKER_Y + 1.6);
+    expect(arena.colliders).toContain(collider);
+    expect(topologyChanges).toBe(0);
+
+    arena.group.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster(
+      new THREE.Vector3(-5.8, MANSION_BUNKER_Y + 2.5, MANSION_SECRET_ROOM.entranceZ),
+      new THREE.Vector3(-1, 0, 0),
+      0,
+      3,
+    );
+    expect(ray.intersectObjects([...arena.colliders], false).some((hit) => hit.object === collider)).toBe(true);
+
+    arena.update(1);
+    expect(arena.colliders).not.toContain(collider);
+    expect(topologyChanges).toBe(1);
+    expect(canWalk(
+      [-5.8, MANSION_SECRET_ROOM.entranceZ],
+      [MANSION_SECRET_ROOM.centerX, MANSION_SECRET_ROOM.centerZ],
+      arena.wallColliders,
+      MANSION_BUNKER_BOUNDS,
+      MANSION_BUNKER_Y,
+    )).toBe(true);
+
+    arena.reset();
+    expect(arena.secretRoomState.completedLamps).toBe(0);
+    expect(arena.secretRoomState.unlocked).toBe(false);
+    expect(arena.colliders).toContain(collider);
+    expect(wall.position.y).toBeCloseTo(MANSION_BUNKER_Y + 1.6);
+  });
+
   it('keeps clear walking routes from the stair landing to both Wonder Weapon stations', () => {
     const arena = makeArena();
     const landing = [MANSION_STAIR_CENTER_X, -7.2] as const;
@@ -617,17 +722,17 @@ describe('Burned Mansion topology', () => {
 
   it('activates only windows and spawns belonging to unlocked zones', () => {
     const arena = makeArena();
-    expect(arena.barriers).toHaveLength(3);
-    expect(arena.spawnPoints).toHaveLength(3);
+    expect(arena.barriers).toHaveLength(4);
+    expect(arena.spawnPoints).toHaveLength(4);
     unlock(arena, 'to-dining');
-    expect(arena.barriers).toHaveLength(5);
-    expect(arena.spawnPoints).toHaveLength(5);
-    unlock(arena, 'to-east-hall');
-    expect(arena.barriers).toHaveLength(6);
-    expect(arena.spawnPoints).toHaveLength(6);
-    unlock(arena, 'nuclear-bunker');
     expect(arena.barriers).toHaveLength(7);
     expect(arena.spawnPoints).toHaveLength(7);
+    unlock(arena, 'to-east-hall');
+    expect(arena.barriers).toHaveLength(8);
+    expect(arena.spawnPoints).toHaveLength(8);
+    unlock(arena, 'nuclear-bunker');
+    expect(arena.barriers).toHaveLength(9);
+    expect(arena.spawnPoints).toHaveLength(9);
   });
 
   it('defines every zombie spawn outside with a route through its assigned barricade', () => {
@@ -1164,7 +1269,7 @@ describe('Burned Mansion topology', () => {
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
-    expect(pointLights).toHaveLength(7);
+    expect(pointLights).toHaveLength(9);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
   });
 
@@ -1180,8 +1285,8 @@ describe('Burned Mansion topology', () => {
     arena.reset();
 
     expect(arena.doors.every((door) => door.isLocked)).toBe(true);
-    expect(arena.barriers).toHaveLength(3);
-    expect(arena.spawnPoints).toHaveLength(3);
+    expect(arena.barriers).toHaveLength(4);
+    expect(arena.spawnPoints).toHaveLength(4);
     expect(barrier.state).toBe('intact');
     expect(barrier.boards.every((board) => board.hp === board.maxHp)).toBe(true);
     expect(

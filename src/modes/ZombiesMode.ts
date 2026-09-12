@@ -105,6 +105,7 @@ export class ZombiesMode implements GameMode {
   private activeRepairBarrier: WindowBarrier | null = null;
   /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
   private readonly tmpDirection = new THREE.Vector3();
+  private readonly tmpAudioPosition = new THREE.Vector3();
 
   constructor(private readonly mapId: ZombieMapId = 'classic') { }
 
@@ -141,13 +142,31 @@ export class ZombiesMode implements GameMode {
     this.zombies.setNavigationBounds(this.arena.navigationBounds);
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.setNavigationDebug(new URLSearchParams(window.location.search).has('zombieNavDebug'));
-    this.zombies.onZombieKilled = (_zombie, headshot) => this.onZombieKilled(headshot);
+    this.zombies.onZombieKilled = (zombie, headshot) => this.onZombieKilled(
+      headshot,
+      { x: zombie.position.x, y: zombie.position.y, z: zombie.position.z },
+      zombie.floor,
+    );
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
-    this.zombies.onBarrierImpact = () => ctx.audio.playImpact('wood');
+    this.zombies.onBruteAttack = () => ctx.audio.playBruteRoar();
+    this.zombies.onBarrierImpact = () => ctx.audio.playBarrierBreak();
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     ctx.scene.add(this.zombies.group);
     if (this.arena instanceof BurnedMansionArena) {
       this.arena.onTopologyChanged = () => this.syncMansionArena(this.mansionStaticColliders);
+      this.arena.onSoulAbsorbed = (position) => {
+        const spatial = this.spatialCueFor(position);
+        ctx.audio.playSoulAbsorb(spatial.pan, spatial.attenuation);
+      };
+      this.arena.onSoulLampCompleted = (position) => {
+        const spatial = this.spatialCueFor(position);
+        ctx.audio.playSoulLampComplete(spatial.pan, spatial.attenuation);
+      };
+      this.arena.onSecretRoomUnlocked = (position) => {
+        const spatial = this.spatialCueFor(position);
+        ctx.audio.playSecretRoomUnlock(spatial.pan, spatial.attenuation);
+        ctx.hud.showRoundBanner('A HIDDEN PASSAGE OPENS', 'BENEATH THE MANSION');
+      };
     }
 
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
@@ -750,7 +769,11 @@ export class ZombiesMode implements GameMode {
     this.rounds.clearEvents();
   }
 
-  private onZombieKilled(headshot: boolean): void {
+  private onZombieKilled(
+    headshot: boolean,
+    deathPosition?: { readonly x: number; readonly y: number; readonly z: number },
+    floor?: number,
+  ): void {
     if (!this.isGameplayInputEnabled()) return;
     this.kills++;
 
@@ -768,9 +791,29 @@ export class ZombiesMode implements GameMode {
     // never stack for one death. Splash/chain kills arrive here too, so all
     // kill points flow through this single call.
     this.economy.awardKill(headshot);
+    if (deathPosition && floor !== undefined && this.arena instanceof BurnedMansionArena) {
+      this.arena.captureSoul(deathPosition, floor);
+    }
     if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) {
       this.unlockRayGun();
     }
+  }
+
+  private spatialCueFor(position: THREE.Vector3): { pan: number; attenuation: number } {
+    this.ctx.player.camera.getWorldPosition(this.tmpAudioPosition);
+    this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    const dx = position.x - this.tmpAudioPosition.x;
+    const dy = position.y - this.tmpAudioPosition.y;
+    const dz = position.z - this.tmpAudioPosition.z;
+    const horizontalDistance = Math.hypot(dx, dz);
+    const distance = Math.hypot(horizontalDistance, dy);
+    const rightX = -this.tmpDirection.z;
+    const rightZ = this.tmpDirection.x;
+    const pan = horizontalDistance > 0.001
+      ? THREE.MathUtils.clamp((dx * rightX + dz * rightZ) / horizontalDistance, -1, 1)
+      : 0;
+    const attenuation = THREE.MathUtils.clamp(1 / (1 + Math.max(0, distance - 2) * 0.12), 0.18, 1);
+    return { pan, attenuation };
   }
 
   /**

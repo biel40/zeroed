@@ -34,7 +34,7 @@ describe('MusicManager', () => {
     expect(playRoundStartOnce).toHaveBeenCalledTimes(1);
   });
 
-  it('preloads both zombie music tracks as soon as the audio system resumes', () => {
+  it('does not preload any music tracks when the audio system resumes', () => {
     const created: string[] = [];
 
     class FakeAudioContext {
@@ -122,17 +122,11 @@ describe('MusicManager', () => {
     const audio = new AudioSystem();
     audio.resume();
 
-    expect(created).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('zombies_round_start.mp3'),
-        expect.stringContaining('zombies_background_loop.mp3'),
-      ]),
-    );
+    expect(created).toEqual([]);
   });
 
-  it('reuses a single intro and loop player and lets the round-start track play out uncut', () => {
+  it('keeps all music disabled even when round and loop triggers are requested', () => {
     const plays: string[] = [];
-    const pauses: string[] = [];
 
     class FakeAudio {
       public currentTime = 0;
@@ -152,7 +146,6 @@ describe('MusicManager', () => {
 
       pause = vi.fn(() => {
         this.paused = true;
-        pauses.push(this.src);
       });
     }
 
@@ -160,23 +153,14 @@ describe('MusicManager', () => {
     const music = new MusicManager();
 
     music.playRoundStartOnce();
-    music.playRoundStartOnce();
-    expect(plays.filter((src) => src.includes('zombies_round_start.mp3'))).toHaveLength(1);
-    // No auto-cut timer: the round-start track is left alone until something
-    // else (pause/stop) touches it.
-    expect(pauses.filter((src) => src.includes('zombies_round_start.mp3'))).toHaveLength(0);
-
     music.startBackgroundLoop();
-    music.startBackgroundLoop();
-    expect(plays.filter((src) => src.includes('zombies_background_loop.mp3'))).toHaveLength(1);
-
-    music.pause();
+    music.startGameplayLoop();
     music.resume();
-    expect(pauses.length).toBeGreaterThan(0);
-    expect(plays.length).toBeGreaterThanOrEqual(2);
+
+    expect(plays).toEqual([]);
   });
 
-  it('does not resume the background loop after stopBackgroundLoop is followed by resume', () => {
+  it('does not resume a disabled background loop after stopBackgroundLoop is followed by resume', () => {
     const plays: string[] = [];
 
     class FakeAudio {
@@ -203,14 +187,11 @@ describe('MusicManager', () => {
     vi.stubGlobal('Audio', FakeAudio);
     const music = new MusicManager();
 
-    // Pause menu music starts, then the player resumes gameplay: stopping the
-    // loop must not leave it eligible for the generic resume() call right
-    // after (that was the bug that kept it playing through the whole match).
     music.startBackgroundLoop();
     music.stopBackgroundLoop();
     music.resume();
 
-    expect(plays.filter((src) => src.includes('zombies_background_loop.mp3'))).toHaveLength(1);
+    expect(plays).toEqual([]);
   });
 });
 
@@ -475,6 +456,19 @@ describe('AudioSystem zombie impact sounds', () => {
     expect(Math.max(...tickSpy.mock.calls.map((call) => call[2] as number))).toBeGreaterThanOrEqual(1.2);
     expect(Math.max(...tickSpy.mock.calls.map((call) => call[3] as number))).toBeLessThanOrEqual(1.2);
     expect(tickSpy.mock.calls[2][1]).toBeGreaterThan(tickSpy.mock.calls[0][1] as number);
+  });
+
+  it('gives Brutus a layered low-frequency attack roar', () => {
+    const audio = new AudioSystem() as any;
+    audio.context = vi.fn(() => ({ ctx: { currentTime: 0 }, master: {}, noise: {} }));
+    const sweepSpy = vi.spyOn(audio, 'sweep').mockImplementation(() => {});
+    const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+
+    audio.playBruteRoar();
+
+    expect(sweepSpy).toHaveBeenCalledTimes(2);
+    expect(sweepSpy.mock.calls[0][2]).toBeLessThan(100);
+    expect(tickSpy).toHaveBeenCalledOnce();
   });
 });
 

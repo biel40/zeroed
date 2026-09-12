@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EYE_HEIGHT } from '../src/player/PlayerController';
 import {
   MAX_ALIVE,
   MAX_ACTIVE_BRUTES,
+  PLAYER_MAX_HP,
   earlyRoundSpeedMultiplier,
   roundConfig,
   ZOMBIE_ATTACK_DAMAGE,
@@ -168,7 +169,7 @@ describe('ZombieManager spawning and pooling', () => {
         * ZOMBIE_TYPE_CONFIGS.brute.speedMultiplier
         * 0.92,
     );
-    expect(zombie.attackDamage).toBeCloseTo(ZOMBIE_ATTACK_DAMAGE * 1.15);
+    expect(zombie.attackDamage).toBe(PLAYER_MAX_HP);
     expect(zombie.bodyRadius).toBe(0.46);
     expect(manager.activeCount).toBe(1);
   });
@@ -306,6 +307,24 @@ describe('ZombieManager movement', () => {
     // Spawn rise (1.1 s) + wind-up (0.475 s) -> exactly one hit in 2 seconds.
     step(manager, 2);
     expect(damage).toBe(ZOMBIE_ATTACK_DAMAGE);
+  });
+
+  it('telegraphs a Brutus attack and deals lethal full-health damage', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0);
+    manager.registerColliders([]);
+    manager.spawnZombie(roundConfig(5), 0, 4, 5);
+    const brute = [...manager.actives][0];
+    brute.position.set(0.4, 0, 4);
+    brute.state = 'walk';
+    const roar = vi.fn();
+    let damage = 0;
+    manager.onBruteAttack = roar;
+    manager.onPlayerAttack = (amount) => { damage += amount; };
+
+    step(manager, ZOMBIE_ATTACK_HIT_MOMENT + DT, 0, 4);
+
+    expect(roar).toHaveBeenCalledOnce();
+    expect(damage).toBe(PLAYER_MAX_HP);
   });
 });
 

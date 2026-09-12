@@ -283,7 +283,7 @@ describe('Zombie hitboxes', () => {
     expect(a.headHitbox.geometry).toBe(b.headHitbox.geometry);
   });
 
-  it('scales Brute torso and head hitboxes with its larger silhouette', () => {
+  it('scales Brutus hitboxes for a taller humanoid silhouette', () => {
     const normal = makeZombie();
     const brute = new Zombie(new ZombieVisual('brute', null, 0xffffff, false));
     brute.spawn(0, -20, 300, 1.3, 0, 0, 'brute');
@@ -296,9 +296,9 @@ describe('Zombie hitboxes', () => {
     const bruteTorso = new THREE.Box3().setFromObject(brute.torsoHitbox).getSize(new THREE.Vector3());
     const normalHead = new THREE.Box3().setFromObject(normal.headHitbox).getSize(new THREE.Vector3());
     const bruteHead = new THREE.Box3().setFromObject(brute.headHitbox).getSize(new THREE.Vector3());
-    expect(bruteTorso.x).toBeGreaterThan(normalTorso.x * 1.3);
-    expect(bruteTorso.y).toBeGreaterThan(normalTorso.y * 1.1);
-    expect(bruteHead.x).toBeGreaterThan(normalHead.x * 1.3);
+    expect(bruteTorso.x).toBeGreaterThan(normalTorso.x * 1.18);
+    expect(bruteTorso.y).toBeGreaterThan(normalTorso.y * 1.22);
+    expect(bruteHead.x).toBeGreaterThan(normalHead.x * 1.18);
     expect(brute.headHitbox.geometry).toBe(normal.headHitbox.geometry);
   });
 });

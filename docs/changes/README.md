@@ -17,6 +17,9 @@ Plantilla:
 
 ## Índice
 
+- [2026-09-12 - Sala secreta y lamparas de almas](2026-09-12-secret-room-soul-lamps.md)
+- [2026-09-12 - Rediseño humanoide y golpe letal de Brutus](2026-09-12-brutus-redesign.md)
+- [2026-09-12 - Ventanas adicionales y arranque de tablas](2026-09-12-window-tear-animation.md)
 - [2026-09-09 - Walker original y Shiny con estrellas](2026-09-09-walker-original-shiny-stars.md)
 - [2026-09-03 — Actualizacion web fiable del Service Worker](2026-09-03-pwa-browser-update.md)
 - [2026-09-03 — Rediseño geométrico de Walker y Brutus](2026-09-03-zombie-model-redesign.md)
