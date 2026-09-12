@@ -133,6 +133,8 @@ export const ZOMBIE_BARRIER_ATTACK_DAMAGE = 50;
 export const ZOMBIE_BARRIER_ATTACK_RANGE = 1.2;
 /** Slightly longer recovery between board hits: ~2 s per five-board window. */
 export const ZOMBIE_BARRIER_ATTACK_RECOVERY = 0.92;
+/** Follow-through after the final board gives the breach weight without delaying navigation noticeably. */
+export const ZOMBIE_BARRIER_BREAK_FINISH_DURATION = 0.34;
 /** Zombies closer than this push each other apart (soft separation). */
 export const ZOMBIE_SEPARATION_RADIUS = 1.15;
 

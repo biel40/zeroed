@@ -201,7 +201,20 @@ describe('ZombieVisual Shiny stars', () => {
 });
 
 describe('ZombieVisual barrier attack', () => {
-  it('plays the attack clip while breaking a window barrier', () => {
+  it('keeps an organic breaking motion while standing at the barrier', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+
+    visual.setAttackDuration(0.75);
+    visual.setState('barrierAttack');
+    visual.update(0.12, 0);
+    const firstPose = visual.root.rotation.clone();
+    visual.update(0.12, 0);
+
+    expect(visual.root.rotation.x).not.toBeCloseTo(firstPose.x, 4);
+    expect(visual.root.rotation.z).not.toBeCloseTo(firstPose.z, 4);
+  });
+
+  it('uses the quiet base clip instead of recycling the player attack', () => {
     const arm = new THREE.Object3D();
     arm.name = 'Arm';
     const scene = new THREE.Group();
@@ -209,13 +222,133 @@ describe('ZombieVisual barrier attack', () => {
     const attack = new THREE.AnimationClip('ZombieBite', 0.9, [
       new THREE.NumberKeyframeTrack('Arm.rotation[x]', [0, 0.9], [0, 1]),
     ]);
-    const visual = new ZombieVisual('walker', { scene, clips: [attack] }, 0xffffff, false);
+    const idle = new THREE.AnimationClip('ZombieIdle', 0.9, [
+      new THREE.NumberKeyframeTrack('Arm.rotation[x]', [0, 0.9], [0, 0]),
+    ]);
+    const visual = new ZombieVisual('walker', { scene, clips: [attack, idle] }, 0xffffff, false);
 
     visual.setAttackDuration(0.9);
     visual.setState('barrierAttack');
     visual.update(0.5, 1.9);
 
-    expect(visual.root.getObjectByName('Arm')?.rotation.x).toBeGreaterThan(0.2);
+    expect(visual.root.getObjectByName('Arm')?.rotation.x).toBeCloseTo(0, 4);
+  });
+
+  it('carries the impact into a smooth final-board follow-through', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+    visual.setAttackDuration(0.75);
+    visual.setBarrierBreakDuration(0.34);
+    visual.setState('barrierAttack');
+    visual.update(0.475, 0);
+    const impact = visual.root.rotation.clone();
+
+    visual.setState('barrierBreak');
+    visual.update(0.08, 0);
+    const followThrough = visual.root.rotation.clone();
+    visual.update(0.26, 0);
+
+    expect(followThrough.x).not.toBeCloseTo(impact.x, 4);
+    expect(visual.root.rotation.x).toBeCloseTo(0, 4);
+    expect(visual.root.rotation.z).toBeCloseTo(0, 4);
+  });
+
+  it('keeps real joint motion (not only root sway) while stalled at zero speed, using the authored idle clip', () => {
+    const head = new THREE.Object3D();
+    head.name = 'Head';
+    const scene = new THREE.Group();
+    scene.add(head);
+    const walk = new THREE.AnimationClip('ZombieWalk', 1, [
+      new THREE.NumberKeyframeTrack('Head.rotation[x]', [0, 1], [0, 0]),
+    ]);
+    const idle = new THREE.AnimationClip('ZombieIdle', 1, [
+      new THREE.NumberKeyframeTrack('Head.rotation[x]', [0, 0.5, 1], [0, 0.3, 0]),
+    ]);
+    const visual = new ZombieVisual('walker', { scene, clips: [walk, idle] }, 0xffffff, false);
+
+    visual.setState('walk');
+    visual.update(0.1, 0);
+    const first = visual.root.getObjectByName('Head')!.rotation.x;
+    visual.update(0.1, 0);
+    const second = visual.root.getObjectByName('Head')!.rotation.x;
+
+    expect(second).not.toBeCloseTo(first, 4);
+  });
+
+  it('preserves idle motion on repeated walk requests and resumes the next barrier strike', () => {
+    const head = new THREE.Object3D();
+    head.name = 'Head';
+    const scene = new THREE.Group();
+    scene.add(head);
+    const walk = new THREE.AnimationClip('ZombieWalk', 1, [
+      new THREE.NumberKeyframeTrack('Head.rotation[x]', [0, 1], [0, 0]),
+    ]);
+    const idle = new THREE.AnimationClip('ZombieIdle', 1, [
+      new THREE.NumberKeyframeTrack('Head.rotation[x]', [0, 0.5, 1], [0, 0.3, 0]),
+    ]);
+    const attack = new THREE.AnimationClip('ZombieBite', 0.75, [
+      new THREE.NumberKeyframeTrack('Head.rotation[x]', [0, 0.75], [1, 1]),
+    ]);
+    const visual = new ZombieVisual('walker', { scene, clips: [walk, idle, attack] }, 0xffffff, false);
+    const renderedHead = visual.root.getObjectByName('Head')!;
+    visual.setState('barrierAttack');
+    visual.update(0.3, 0);
+    visual.setState('walk');
+    visual.update(0.2, 0);
+    visual.setState('walk');
+    visual.update(0.2, 0);
+    const first = renderedHead.rotation.x;
+    visual.setState('walk');
+    visual.update(0.13, 0);
+    expect(renderedHead.rotation.x).not.toBeCloseTo(first, 4);
+    visual.setState('barrierAttack');
+    visual.update(0.2, 0);
+    expect(renderedHead.rotation.x).not.toBeCloseTo(1, 4);
+    expect(renderedHead.rotation.x).not.toBeCloseTo(first, 4);
+  });
+
+  it('builds recessed sockets with an amber undead glow and no floating catchlight', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+    const eyes = visual.root.getObjectByName('zombie-eyes') as THREE.Group;
+    const sockets = eyes.children.filter((child) => child.name === 'zombie-eye-socket') as THREE.Mesh[];
+    const glows = eyes.children.filter((child) => child.name === 'zombie-eye-glow') as THREE.Mesh[];
+    const cores = eyes.children.filter((child) => child.name === 'zombie-eye-core') as THREE.Mesh[];
+
+    expect(sockets).toHaveLength(2);
+    expect(glows).toHaveLength(2);
+    expect(cores).toHaveLength(2);
+    expect(eyes.children).toHaveLength(6);
+    for (const socket of sockets) {
+      const material = socket.material as THREE.MeshStandardMaterial;
+      expect(material.emissive.getHex()).toBe(0x000000);
+      expect(socket.scale.x).toBeGreaterThan(socket.scale.y);
+    }
+    for (const glow of glows) {
+      const material = glow.material as THREE.MeshBasicMaterial;
+      expect(material).toBeInstanceOf(THREE.MeshBasicMaterial);
+      expect(material.color.r).toBeGreaterThan(material.color.b * 2);
+      expect(material.blending).toBe(THREE.AdditiveBlending);
+      expect(glow.position.z).toBeGreaterThan(sockets[0].position.z);
+      expect(glow.position.z).toBeGreaterThanOrEqual(0.09);
+      expect(glow.scale.x).toBeGreaterThan(glow.scale.y * 1.5);
+      expect(glow.scale.x).toBeGreaterThanOrEqual(1);
+    }
+    for (const core of cores) {
+      const material = core.material as THREE.MeshBasicMaterial;
+      expect(material.color.r).toBeGreaterThan(material.color.g);
+      expect(material.color.g).toBeGreaterThan(material.color.b);
+      expect(core.position.z).toBeGreaterThan(glows[0].position.z);
+    }
+  });
+
+  it('keeps a subtle sway instead of freezing while stationary at the barrier between swings', () => {
+    const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
+    visual.setState('walk');
+    visual.update(0.2, 0);
+    const firstPose = visual.root.rotation.clone();
+    visual.update(0.2, 0);
+
+    expect(visual.root.rotation.x).not.toBeCloseTo(firstPose.x, 4);
+    expect(visual.root.rotation.z).not.toBeCloseTo(firstPose.z, 4);
   });
 
   it('anchors the Brute torso hitbox to its animated chest node', () => {
@@ -246,5 +379,27 @@ describe('ZombieVisual barrier attack', () => {
 
     expect(visual.torsoAnchor.name).toBe('Torso');
     expect(torsoHitbox.getWorldPosition(new THREE.Vector3()).distanceTo(before)).toBeGreaterThan(0.05);
+  });
+});
+
+describe('ZombieVisual eyes vs authored assets', () => {
+  it('skips the generic eye overlay for a GLB model that already has authored eyes', () => {
+    const scene = new THREE.Group();
+    const head = new THREE.Group();
+    head.name = 'Head';
+    scene.add(head);
+    const visual = new ZombieVisual('brute', { scene, clips: [] }, 0xffffff, false);
+
+    expect(visual.root.getObjectByName('zombie-eyes')).toBeUndefined();
+  });
+
+  it('keeps the generic eye overlay for a GLB model without authored eyes', () => {
+    const scene = new THREE.Group();
+    const head = new THREE.Group();
+    head.name = 'Head';
+    scene.add(head);
+    const visual = new ZombieVisual('walker', { scene, clips: [] }, 0xffffff, false);
+
+    expect(visual.root.getObjectByName('zombie-eyes')).toBeDefined();
   });
 });

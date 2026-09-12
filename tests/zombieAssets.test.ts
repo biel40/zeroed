@@ -119,7 +119,7 @@ describe('zombie GLB assets', () => {
     ]);
   });
 
-  it('normalizes and animates the restored walker without losing its rig or stopping pose', async () => {
+  it('normalizes and animates the restored walker without losing its rig or freezing when stationary', async () => {
     const buffer = readFileSync(`${GLB_DIR}/${GLB_FILES.walker}`);
     const data = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
     const loader = new GLTFLoader().register(() => ({ name: 'headless-texture', loadTexture: async () => new Texture() }));
@@ -135,7 +135,7 @@ describe('zombie GLB assets', () => {
     expect(foot.quaternion.equals(initialPose)).toBe(false);
     const pausedPose = foot.quaternion.clone();
     visual.update(0.5, 0);
-    expect(foot.quaternion.equals(pausedPose)).toBe(true);
+    expect(foot.quaternion.equals(pausedPose)).toBe(false);
     expect(resolveClip(gltf.animations, ZOMBIE_MODELS.walker.clips.attack)?.duration).toBeGreaterThan(5);
     visual.setZombieType('shiny');
     visual.update(0.3, ZOMBIE_MODELS.walker.walkReferenceSpeed);

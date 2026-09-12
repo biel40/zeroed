@@ -1,15 +1,22 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { ZombieState } from '../../src/zombies/Zombie';
+import { ZOMBIE_ATTACK_DURATION, ZOMBIE_BARRIER_ATTACK_RECOVERY } from '../../src/zombies/ZombieConfig';
 import { ZombieVisual, ZOMBIE_MODELS } from '../../src/zombies/ZombieVisual';
 
 // Development-only visual review, independent of the game entry/bundle.
-// /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?close=1 | ?night=1
+// /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?state=barrierAttack | ?close=1 | ?night=1
 const params = new URLSearchParams(location.search);
 const close = params.has('close');
 const night = params.has('night');
-const state = params.get('state') === 'attack' ? 'attack' : 'walk';
+const requestedState = params.get('state');
+const state: ZombieState =
+  requestedState === 'attack' || requestedState === 'barrierAttack' ? requestedState : 'walk';
 const fixedTime = params.has('time') ? Math.max(0, Number(params.get('time')) || 0) : null;
+let cycleTime = 0;
+let displayedState = state;
+const cycleDuration = ZOMBIE_ATTACK_DURATION + ZOMBIE_BARRIER_ATTACK_RECOVERY;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight);
@@ -37,14 +44,14 @@ controls.enablePan = false;
 controls.minDistance = close ? 0.55 : 2.3;
 controls.maxDistance = 7;
 controls.maxPolarAngle = Math.PI * 0.52;
-const gltf = await new GLTFLoader().loadAsync(ZOMBIE_MODELS.walker.url);
+const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${ZOMBIE_MODELS.walker.url}`);
 const visuals: ZombieVisual[] = [];
 const placements: THREE.Group[] = [];
 for (const [index, yaw] of (close ? [0] : [0, 0.75, Math.PI / 2]).entries()) {
   const visual = new ZombieVisual('walker', { scene: gltf.scene, clips: gltf.animations }, ZOMBIE_MODELS.walker.tints[0], false);
   visual.setZombieType(params.has('shiny') || (params.has('compare') && index === 0) ? 'shiny' : 'normal');
   visual.setWalkJitter(1);
-  visual.setAttackDuration(0.75);
+  visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
   visual.setState(state);
   const placement = new THREE.Group();
   placement.position.x = close ? 0 : (index - 1) * 0.72;
@@ -53,7 +60,26 @@ for (const [index, yaw] of (close ? [0] : [0, 0.75, Math.PI / 2]).entries()) {
   scene.add(placement);
   placements.push(placement);
   visuals.push(visual);
-  if (fixedTime !== null) visual.update(fixedTime, ZOMBIE_MODELS.walker.walkReferenceSpeed);
+  if (fixedTime !== null) advanceVisual(visual, fixedTime);
+}
+function advanceVisual(visual: ZombieVisual, elapsed: number): void {
+  if (state !== 'barrierAttack') {
+    visual.update(elapsed, ZOMBIE_MODELS.walker.walkReferenceSpeed);
+    return;
+  }
+  let remaining = elapsed;
+  let phase = cycleTime;
+  while (remaining > 0) {
+    const attacking = phase < ZOMBIE_ATTACK_DURATION;
+    const boundary = attacking ? ZOMBIE_ATTACK_DURATION : cycleDuration;
+    const step = Math.min(remaining, boundary - phase, 1 / 60);
+    displayedState = attacking ? 'barrierAttack' : 'walk';
+    visual.setState(displayedState);
+    visual.update(step, 0);
+    remaining -= step;
+    phase += step;
+    if (phase >= cycleDuration) phase = 0;
+  }
 }
 function resize(): void {
   const compact = innerWidth < 700;
@@ -72,8 +98,11 @@ let previous = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - previous) / 1000);
   previous = now;
-  if (fixedTime === null) for (const visual of visuals) visual.update(dt, ZOMBIE_MODELS.walker.walkReferenceSpeed);
+  if (fixedTime === null) {
+    for (const visual of visuals) advanceVisual(visual, dt);
+    cycleTime = (cycleTime + dt) % cycleDuration;
+  }
   renderer.render(scene, camera);
-  document.getElementById('status')!.textContent = `${state} · ${fixedTime === null ? 'animado' : `${fixedTime.toFixed(3)} s`} · ${renderer.info.render.calls} draws · ${renderer.info.render.triangles} triángulos`;
+  document.getElementById('status')!.textContent = `${displayedState} · ${fixedTime === null ? 'animado' : `${fixedTime.toFixed(3)} s`} · ${renderer.info.render.calls} draws · ${renderer.info.render.triangles} triángulos`;
 });
 window.addEventListener('resize', resize);

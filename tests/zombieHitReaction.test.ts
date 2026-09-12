@@ -73,17 +73,19 @@ function step(visual: ZombieVisual, seconds: number, speed = WALK_SPEED): void {
 }
 
 describe('ZombieVisual hit reaction', () => {
-  it('adds two subtle red emissive eyes to the animated head without dynamic lights', () => {
+  it('adds recessed amber eyes to the animated head without dynamic lights', () => {
     const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
     const eyes = visual.root.getObjectByName('zombie-eyes');
     expect(eyes?.parent).toBe(visual.headAnchor);
-    expect(eyes?.children).toHaveLength(2);
+    expect(eyes?.children).toHaveLength(6);
     expect(eyes?.children.every((eye) => eye instanceof THREE.Mesh)).toBe(true);
-    expect(eyes?.children.every((eye) => {
-      const material = (eye as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      return material.emissive.r > material.emissive.g * 3
-        && material.emissive.r > material.emissive.b * 3
-        && material.emissiveIntensity <= 0.75;
+    const glows = eyes?.children.filter((eye) => eye.name === 'zombie-eye-glow') as THREE.Mesh[];
+    expect(glows).toHaveLength(2);
+    expect(glows.every((eye) => {
+      const material = eye.material as THREE.MeshBasicMaterial;
+      return material.color.r > material.color.b * 2
+        && material.color.g > material.color.b * 2
+        && material.blending === THREE.AdditiveBlending;
     })).toBe(true);
     expect(eyes?.children.every((eye) => {
       const size = new THREE.Box3().setFromObject(eye).getSize(new THREE.Vector3());

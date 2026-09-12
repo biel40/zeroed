@@ -67,9 +67,14 @@ Points
   comparten el mismo tinte; la variacion de fase no cambia la cadencia de paso.
   `ZombieManager` sigue pasando la velocidad horizontal medida a la vista para
   detener el ciclo ante colisiones, sin cambiar la velocidad de gameplay.
-- Todos los tipos tienen ojos rojos emisivos pequenos que siguen el hueso de la
-  cabeza, sin luces dinamicas. Los impactos no letales mantienen el estado
+- Walker usa ojos ambar emisivos pequenos que siguen el hueso de la cabeza; el
+  Brute conserva sus ojos propios, ambos sin luces dinamicas. Los impactos no
+  letales mantienen el estado
   `walk`: el flinch es solo visual y no detiene la persecucion.
+- Golpear una ventana usa una animacion aditiva propia sobre `Idle`/`Walk`, con
+  lado dominante alterno y sin reciclar el ataque al jugador. El ultimo impacto
+  completa un follow-through breve antes de que el zombie atraviese la abertura;
+  el cooldown de combate no se reinicia.
 - Shiny usa un acabado dorado emisivo y diez estrellas de cuatro puntas que
   siguen el torso animado. `ShinyStars` reutiliza buffers y una textura compartida,
   sin luces ni allocations por frame. Se apaga al morir y se reinicia al reciclar

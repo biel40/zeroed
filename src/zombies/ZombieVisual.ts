@@ -29,8 +29,12 @@ export interface ZombieModelConfig {
   readonly clips: Record<ZombieState, readonly string[]>;
   /** Walk clip ground speed at timeScale 1; syncs feet with movement. */
   readonly walkReferenceSpeed: number;
+  /** Standing-still clip candidates; drives real joint motion while stalled at a barrier (optional: not every asset has one). */
+  readonly idleClip?: readonly string[];
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
   readonly tints: readonly number[];
+  /** True when the GLB already sculpts/textures its own eyes (skip the generic overlay). */
+  readonly hasAuthoredEyes: boolean;
   readonly anchors: {
     readonly torso: readonly string[];
     readonly head: readonly string[];
@@ -48,12 +52,15 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       spawn: ['ZombieCrawl', 'Crawl'],
       walk: ['ZombieWalk', 'Walk'],
       attack: ['ZombieBite', 'Bite', 'Punch'],
-      barrierAttack: ['ZombieBite', 'Bite', 'Punch'],
+      barrierAttack: ['ZombieBarrierAttack'],
+      barrierBreak: ['ZombieBarrierBreak'],
       hit: ['ZombieHit', 'HitReact', 'Hit'],
       death: ['ZombieDeath', 'Death'],
     },
     walkReferenceSpeed: 1.35,
+    idleClip: ['ZombieIdle', 'Idle'],
     tints: [0xb2b9a8],
+    hasAuthoredEyes: false,
     anchors: {
       torso: ['Hips', 'Pelvis'],
       head: ['Head'],
@@ -68,12 +75,14 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       spawn: ['BruteRise'],
       walk: ['BruteWalk'],
       attack: ['BruteSmash'],
-      barrierAttack: ['BruteSmash'],
+      barrierAttack: ['BruteBarrierAttack'],
+      barrierBreak: ['BruteBarrierBreak'],
       hit: ['BruteHit'],
       death: ['BruteDeath'],
     },
     walkReferenceSpeed: 1.05,
     tints: [0xffffff],
+    hasAuthoredEyes: true,
     anchors: {
       torso: ['Torso'],
       head: ['Head'],
@@ -83,35 +92,72 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
 };
 
 const CROSSFADE_SECONDS = 0.16;
+/** Below this ground speed the zombie is treated as stationary (stalled at a barrier). */
+const STATIONARY_SPEED = 0.05;
 /** Hit-flash emissive color shared by every zombie material. */
 const FLASH_COLOR = 0xff2211;
 /** Sickly undead glow kept very low so the bodies read in the dark. */
 const UNDEAD_GLOW = 0x1a2a12;
-const EYE_COLOR = 0x240000;
-const EYE_EMISSIVE = 0xb51212;
-const EYE_EMISSIVE_INTENSITY = 0.55;
+const EYE_SOCKET_COLOR = 0x080604;
+const EYE_GLOW_COLOR = 0xffb31a;
+const EYE_CORE_COLOR = 0xffe27a;
 /** How deep below ground the spawn rise starts, meters. */
 const SPAWN_DEPTH = 1.25;
 
-const eyeGeometry = new THREE.SphereGeometry(0.022, 8, 6);
+const eyeSocketGeometry = new THREE.CircleGeometry(0.018, 12);
+const eyeGlowGeometry = new THREE.CircleGeometry(0.011, 12);
+const eyeCoreGeometry = new THREE.CircleGeometry(0.006, 10);
 
-function buildEyes(): { group: THREE.Group; material: THREE.MeshStandardMaterial } {
+/**
+ * Flat dark sockets with a warm inner glow. Keeping both layers planar makes
+ * the light read from inside the face rather than as spheres glued on top.
+ */
+function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
   const group = new THREE.Group();
   group.name = 'zombie-eyes';
-  const material = new THREE.MeshStandardMaterial({
-    color: EYE_COLOR,
-    emissive: EYE_EMISSIVE,
-    emissiveIntensity: EYE_EMISSIVE_INTENSITY,
-    roughness: 0.5,
+  const socketMaterial = new THREE.MeshStandardMaterial({
+    color: EYE_SOCKET_COLOR,
+    roughness: 1,
     metalness: 0,
     transparent: true,
+    side: THREE.DoubleSide,
   });
-  for (const x of [-0.055, 0.055]) {
-    const eye = new THREE.Mesh(eyeGeometry, material);
-    eye.position.set(x, 0.015, 0.105);
-    group.add(eye);
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: EYE_GLOW_COLOR,
+    transparent: true,
+    opacity: 0.88,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+  });
+  const coreMaterial = new THREE.MeshBasicMaterial({
+    color: EYE_CORE_COLOR,
+    transparent: true,
+    opacity: 0.94,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+  });
+  for (const x of [-0.045, 0.045]) {
+    const socket = new THREE.Mesh(eyeSocketGeometry, socketMaterial);
+    socket.name = 'zombie-eye-socket';
+    socket.position.set(x, 0.014, 0.09);
+    socket.scale.set(1.18, 0.68, 1);
+
+    const glow = new THREE.Mesh(eyeGlowGeometry, glowMaterial);
+    glow.name = 'zombie-eye-glow';
+    glow.position.set(x, 0.014, 0.092);
+    glow.scale.set(1.08, 0.58, 1);
+
+    const core = new THREE.Mesh(eyeCoreGeometry, coreMaterial);
+    core.name = 'zombie-eye-core';
+    core.position.set(x, 0.014, 0.093);
+    core.scale.set(1.05, 0.54, 1);
+    group.add(socket, glow, core);
   }
-  return { group, material };
+  return { group, materials: [socketMaterial, glowMaterial, coreMaterial] };
 }
 
 interface MaterialBase {
@@ -147,6 +193,15 @@ interface ProceduralRig {
   armR: THREE.Group;
   legL: THREE.Group;
   legR: THREE.Group;
+}
+
+interface BarrierRig {
+  readonly torso: THREE.Object3D | null;
+  readonly head: THREE.Object3D | null;
+  readonly shoulderL: THREE.Object3D | null;
+  readonly shoulderR: THREE.Object3D | null;
+  readonly forearmL: THREE.Object3D | null;
+  readonly forearmR: THREE.Object3D | null;
 }
 
 /**
@@ -358,6 +413,26 @@ function findByName(root: THREE.Object3D, names: readonly string[]): THREE.Objec
   return null;
 }
 
+function smoothStep(value: number): number {
+  return value * value * (3 - 2 * value);
+}
+
+function sampleBarrierMotion(
+  progress: number,
+  anticipation: number,
+  impact: number,
+  followThrough: number,
+): number {
+  if (progress < 0.28) return THREE.MathUtils.lerp(0, anticipation, smoothStep(progress / 0.28));
+  if (progress < 0.63) {
+    return THREE.MathUtils.lerp(anticipation, impact, smoothStep((progress - 0.28) / 0.35));
+  }
+  if (progress < 0.8) {
+    return THREE.MathUtils.lerp(impact, followThrough, smoothStep((progress - 0.63) / 0.17));
+  }
+  return THREE.MathUtils.lerp(followThrough, 0, smoothStep((progress - 0.8) / 0.2));
+}
+
 /**
  * Places a hitbox on an animated anchor so that, in bind pose, it sits
  * exactly at `worldTarget` with its geometry measured in world meters.
@@ -401,18 +476,28 @@ export class ZombieVisual {
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
+  private barrierRig: BarrierRig | null = null;
+  private readonly barrierBoneOffsets = new Map<THREE.Object3D, THREE.Quaternion>();
+  private readonly barrierEuler = new THREE.Euler();
+  private readonly barrierQuaternion = new THREE.Quaternion();
   private readonly shinyStars: ShinyStars | null;
-  private readonly eyeMaterial: THREE.MeshStandardMaterial;
+  private readonly eyeMaterials: readonly THREE.Material[];
   private readonly tmpShinyAnchor = new THREE.Vector3();
   private readonly modelConfig: ZombieModelConfig;
   /** End of the head bone chain, when the rig has one (skull midpoint math). */
   private headTop: THREE.Object3D | null = null;
   private state: ZombieState = 'spawn';
   private currentAction: THREE.AnimationAction | null = null;
+  /** Authored standing-still clip (e.g. "ZombieIdle"); null when the asset has none. */
+  private readonly idleAction: THREE.AnimationAction | null = null;
+  /** True while the idle clip (not the frozen walk clip) is driving the pose. */
+  private idleActive = false;
   private walkJitter = 1;
   private attackDuration = 0.9;
   private flash = 0;
   private bobPhase = Math.random() * Math.PI * 2;
+  /** Advances every frame regardless of speed; drives the stationary idle sway. */
+  private idlePhase = Math.random() * Math.PI * 2;
   /** Brief cycle slowdown standing in for a missing hit-react clip. */
   private hitDip = 0;
   /** 0..1 spawn rise and death collapse progress, driven by the owner. */
@@ -423,6 +508,10 @@ export class ZombieVisual {
   private glowIntensity = 0.35;
   private walkAnimationMultiplier = 1;
   private heavyBobPhase = 0;
+  private barrierMotionTime = 0;
+  private barrierBreakDuration = 0.34;
+  private barrierBreakStart = 0.63;
+  private barrierStrikeSide = 1;
 
   constructor(
     modelId: ZombieModelId,
@@ -479,9 +568,20 @@ export class ZombieVisual {
       this.torsoAnchor = findByName(model, this.modelConfig.anchors.torso) ?? this.root;
       this.headAnchor = findByName(model, this.modelConfig.anchors.head) ?? this.root;
       this.headTop = findByName(model, this.modelConfig.anchors.headTop);
+      this.barrierRig = {
+        torso: findByName(model, ['Spine2', 'Spine1', 'Torso']),
+        head: findByName(model, ['Head']),
+        shoulderL: findByName(model, ['LeftShoulder', 'ShoulderL']),
+        shoulderR: findByName(model, ['RightShoulder', 'ShoulderR']),
+        forearmL: findByName(model, ['LeftForeArm', 'ElbowL']),
+        forearmR: findByName(model, ['RightForeArm', 'ElbowR']),
+      };
+      for (const bone of Object.values(this.barrierRig)) {
+        if (bone) this.barrierBoneOffsets.set(bone, new THREE.Quaternion());
+      }
 
       this.mixer = new THREE.AnimationMixer(model);
-      for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'hit', 'death'] as const) {
+      for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'barrierBreak', 'hit', 'death'] as const) {
         const clip = resolveClip(source.clips, this.modelConfig.clips[state]);
         if (!clip) continue;
         const action = this.mixer.clipAction(clip);
@@ -490,6 +590,14 @@ export class ZombieVisual {
           action.clampWhenFinished = true;
         }
         this.actions.set(state, action);
+      }
+      const idleClip = this.modelConfig.idleClip
+        ? resolveClip(source.clips, this.modelConfig.idleClip)
+        : null;
+      if (idleClip) {
+        const idleAction = this.mixer.clipAction(idleClip);
+        idleAction.setLoop(THREE.LoopRepeat, Infinity);
+        this.idleAction = idleAction;
       }
     } else {
       const built = modelId === 'brute'
@@ -502,10 +610,10 @@ export class ZombieVisual {
       this.headAnchor = built.rig.head;
     }
 
-    const eyes = buildEyes();
-    this.eyeMaterial = eyes.material;
+    const eyes = source && this.modelConfig.hasAuthoredEyes ? null : buildEyes();
+    this.eyeMaterials = eyes?.materials ?? [];
     this.root.updateMatrixWorld(true);
-    placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
+    if (eyes) placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
 
     this.materialBases.push(...this.materials.map((material) => ({
       color: material.color.clone(),
@@ -592,6 +700,10 @@ export class ZombieVisual {
     this.attackDuration = seconds;
   }
 
+  setBarrierBreakDuration(seconds: number): void {
+    this.barrierBreakDuration = seconds;
+  }
+
   /**
    * Crossfades into a state; one-shot states restart from the beginning.
    * Two rules keep bullet impacts from breaking the base animation:
@@ -603,9 +715,33 @@ export class ZombieVisual {
    */
   public setState(state: ZombieState): void {
     const previous = this.state;
+    if (state === 'walk' && previous === 'walk' && this.idleActive) return;
     this.state = state;
+    if (previous !== state) this.idleActive = false;
+    if (state === 'barrierAttack' && previous !== 'barrierAttack') {
+      this.barrierMotionTime = 0;
+      this.barrierStrikeSide *= -1;
+    }
+    if (state === 'barrierBreak' && previous === 'barrierAttack') {
+      this.barrierBreakStart = Math.max(0.63, Math.min(0.8, this.barrierMotionTime / this.attackDuration));
+      this.barrierMotionTime = 0;
+    }
     if (state === 'death' && this.shinyStars) this.shinyStars.points.visible = false;
     if (state !== 'death') this.collapse = 0;
+    // Barrier strikes are authored procedurally over a quiet base pose. They
+    // must never fall back to the player bite/smash clip.
+    if (state === 'barrierAttack' || state === 'barrierBreak') {
+      const base = this.idleAction ?? this.actions.get('walk') ?? null;
+      if (base && base !== this.currentAction) {
+        base.reset();
+        base.enabled = true;
+        base.timeScale = this.idleAction ? 0.82 : 0.12;
+        base.play();
+        if (this.currentAction) base.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
+        this.currentAction = base;
+      }
+      return;
+    }
     const next = this.actions.get(state) ?? null;
     if (!next) {
       // Models without a hit clip flinch by dipping the current cycle;
@@ -632,7 +768,7 @@ export class ZombieVisual {
       return;
     }
     next.reset();
-    if (state === 'attack' || state === 'barrierAttack') {
+    if (state === 'attack') {
       const clip = next.getClip();
       const raw = clip.duration / Math.max(this.attackDuration, 1e-3);
       if (raw > ATTACK_TIME_SCALE_CAP) {
@@ -671,7 +807,7 @@ export class ZombieVisual {
   /** Death fade driven by the owning Zombie during its last moments. */
   public setOpacity(opacity: number): void {
     if (this.shinyStars) this.shinyStars.points.material.opacity = opacity;
-    this.eyeMaterial.opacity = opacity;
+    for (const material of this.eyeMaterials) material.opacity = opacity;
     for (const material of this.materials) {
       material.opacity = opacity;
       if (this.flash <= 0) material.emissiveIntensity = this.glowIntensity * opacity;
@@ -679,12 +815,18 @@ export class ZombieVisual {
   }
 
   public update(dt: number, speed: number): void {
+    this.clearBarrierBoneOffsets();
     // Spawn rise and death collapse apply to the visual root in both paths.
     this.heavyBobPhase += dt * Math.max(0.4, speed) * 2.1;
+    this.idlePhase += dt;
+    if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+      this.barrierMotionTime += dt;
+    }
     const heavyBob = this.zombieType === 'brute' && this.state === 'walk'
       ? Math.sin(this.heavyBobPhase * 2) * 0.018
       : 0;
     this.root.position.y = -(1 - this.rise) * SPAWN_DEPTH + heavyBob;
+    this.root.position.z = 0;
     if (this.collapse > 0) {
       const ease = 1 - (1 - this.collapse) * (1 - this.collapse);
       this.root.rotation.x = -ease * (Math.PI / 2 - 0.12);
@@ -693,9 +835,50 @@ export class ZombieVisual {
       this.root.rotation.x = 0;
       this.root.rotation.z = 0;
     }
+    if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+      const progress = this.barrierProgress();
+      const side = this.barrierStrikeSide;
+      this.root.position.y += sampleBarrierMotion(progress, -0.055, 0.015, -0.025);
+      this.root.position.z = sampleBarrierMotion(progress, -0.025, 0.105, 0.07);
+      this.root.rotation.x += sampleBarrierMotion(progress, 0.025, 0.14, 0.075);
+      this.root.rotation.z += side * sampleBarrierMotion(progress, -0.075, 0.052, 0.025);
+    } else if (
+      this.state === 'walk' && speed <= STATIONARY_SPEED && this.collapse <= 0 && !this.idleAction
+    ) {
+      // Fallback for assets without an idle clip (procedural rig, Brute):
+      // sway the root so the zombie keeps reading as alive instead of a
+      // paused statue. The walker GLB has a real idle clip (see below) that
+      // moves actual joints instead, which reads far less "frozen".
+      this.root.rotation.x += Math.sin(this.idlePhase * 1.6) * 0.015;
+      this.root.rotation.z += Math.sin(this.idlePhase * 1.1 + 1.7) * 0.012;
+    }
 
     if (this.mixer) {
       const walk = this.actions.get('walk');
+      const stationary = this.state === 'walk' && speed <= STATIONARY_SPEED && this.collapse <= 0;
+      if (this.idleAction) {
+        if (stationary && !this.idleActive) {
+          // The walk clip freezes mid-cycle at zero ground speed (e.g.
+          // recovering between barrier swings), which can pause on an
+          // arms-raised frame and read as stuck. Crossfading into the
+          // authored idle clip drives real joint motion (breathing, head
+          // and arm sway) instead of just swaying the whole root.
+          this.idleActive = true;
+          this.idleAction.reset();
+          this.idleAction.enabled = true;
+          this.idleAction.timeScale = 1;
+          this.idleAction.play();
+          if (this.currentAction) this.idleAction.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
+          this.currentAction = this.idleAction;
+        } else if (!stationary && this.idleActive && walk) {
+          this.idleActive = false;
+          walk.enabled = true;
+          walk.timeScale = this.walkJitter;
+          walk.play();
+          walk.crossFadeFrom(this.idleAction, CROSSFADE_SECONDS, false);
+          this.currentAction = walk;
+        }
+      }
       if (walk && this.currentAction === walk) {
         // Keep the feet tracking the actual ground speed (round scaling).
         walk.timeScale =
@@ -705,6 +888,9 @@ export class ZombieVisual {
       }
       if (this.hitDip > 0) this.hitDip = Math.max(0, this.hitDip - dt * 3.5);
       this.mixer.update(dt);
+      if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+        this.applyBarrierBonePose(this.barrierProgress());
+      }
     } else if (this.rig) {
       this.updateProcedural(dt, speed);
     }
@@ -740,7 +926,20 @@ export class ZombieVisual {
     this.bobPhase += dt * 4.8 * Math.max(0, speed / referenceSpeed);
     const p = this.bobPhase;
 
-    if (this.state === 'attack' || this.state === 'barrierAttack') {
+    if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+      const progress = this.barrierProgress();
+      const side = this.barrierStrikeSide;
+      rig.armL.rotation.x = -1.05 + sampleBarrierMotion(progress, 0.38 * side, -0.95, -0.62);
+      rig.armR.rotation.x = -1.05 + sampleBarrierMotion(progress, -0.38 * side, -0.95, -0.62);
+      rig.armL.rotation.z = 0.12 + side * sampleBarrierMotion(progress, -0.2, 0.09, 0.03);
+      rig.armR.rotation.z = -0.12 + side * sampleBarrierMotion(progress, -0.2, 0.09, 0.03);
+      rig.torso.rotation.x = 0.28 + sampleBarrierMotion(progress, 0.08, 0.3, 0.18);
+      rig.torso.rotation.z = side * sampleBarrierMotion(progress, -0.18, 0.14, 0.07);
+      rig.head.rotation.x = -0.15 + sampleBarrierMotion(progress, -0.08, 0.12, 0.04);
+      rig.head.rotation.z = -side * sampleBarrierMotion(progress, -0.08, 0.06, 0.02);
+      return;
+    }
+    if (this.state === 'attack') {
       // Both arms swing forward and down over the player.
       rig.armL.rotation.x = -1.9;
       rig.armR.rotation.x = -1.9;
@@ -763,5 +962,64 @@ export class ZombieVisual {
     rig.torso.rotation.x = 0.28 + Math.sin(p * 2) * 0.04;
     rig.torso.rotation.z = Math.sin(p) * 0.06;
     rig.head.rotation.z = Math.sin(p * 0.7) * 0.1;
+  }
+
+  private barrierProgress(): number {
+    if (this.state === 'barrierBreak') {
+      const finish = Math.min(1, this.barrierMotionTime / Math.max(this.barrierBreakDuration, 1e-3));
+      return THREE.MathUtils.lerp(this.barrierBreakStart, 1, finish);
+    }
+    return Math.min(1, this.barrierMotionTime / Math.max(this.attackDuration, 1e-3));
+  }
+
+  private clearBarrierBoneOffsets(): void {
+    for (const [bone, offset] of this.barrierBoneOffsets) {
+      if (offset.w === 1 && offset.x === 0 && offset.y === 0 && offset.z === 0) continue;
+      this.barrierQuaternion.copy(offset).invert();
+      bone.quaternion.multiply(this.barrierQuaternion);
+      offset.identity();
+    }
+  }
+
+  private rotateBarrierBone(bone: THREE.Object3D | null, x: number, y: number, z: number): void {
+    if (!bone) return;
+    const offset = this.barrierBoneOffsets.get(bone);
+    if (!offset) return;
+    offset.setFromEuler(this.barrierEuler.set(x, y, z));
+    bone.quaternion.multiply(offset);
+  }
+
+  private applyBarrierBonePose(progress: number): void {
+    const rig = this.barrierRig;
+    if (!rig) return;
+    const side = this.barrierStrikeSide;
+    this.rotateBarrierBone(
+      rig.torso,
+      sampleBarrierMotion(progress, 0.04, 0.18, 0.1),
+      side * sampleBarrierMotion(progress, -0.22, 0.16, 0.08),
+      side * sampleBarrierMotion(progress, -0.12, 0.09, 0.04),
+    );
+    this.rotateBarrierBone(
+      rig.head,
+      sampleBarrierMotion(progress, -0.08, 0.08, 0.025),
+      -side * sampleBarrierMotion(progress, -0.08, 0.06, 0.02),
+      0,
+    );
+    const dominantWindup = side > 0 ? -0.48 : -0.2;
+    const offhandWindup = side > 0 ? -0.2 : -0.48;
+    this.rotateBarrierBone(
+      rig.shoulderL,
+      sampleBarrierMotion(progress, dominantWindup, -0.92, -0.58),
+      side * sampleBarrierMotion(progress, 0.12, -0.08, -0.03),
+      0,
+    );
+    this.rotateBarrierBone(
+      rig.shoulderR,
+      sampleBarrierMotion(progress, offhandWindup, -0.92, -0.58),
+      side * sampleBarrierMotion(progress, 0.12, -0.08, -0.03),
+      0,
+    );
+    this.rotateBarrierBone(rig.forearmL, sampleBarrierMotion(progress, 0.2, -0.42, -0.18), 0, 0);
+    this.rotateBarrierBone(rig.forearmR, sampleBarrierMotion(progress, 0.2, -0.42, -0.18), 0, 0);
   }
 }

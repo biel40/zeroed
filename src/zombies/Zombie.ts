@@ -6,6 +6,7 @@ import {
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_RECOVERY,
   ZOMBIE_BARRIER_ATTACK_RECOVERY,
+  ZOMBIE_BARRIER_BREAK_FINISH_DURATION,
   ZOMBIE_CORPSE_LINGER,
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
@@ -18,7 +19,14 @@ import {
 } from './ZombieConfig';
 import { ZombieVisual } from './ZombieVisual';
 
-export type ZombieState = 'spawn' | 'walk' | 'attack' | 'hit' | 'death' | 'barrierAttack';
+export type ZombieState =
+  | 'spawn'
+  | 'walk'
+  | 'attack'
+  | 'hit'
+  | 'death'
+  | 'barrierAttack'
+  | 'barrierBreak';
 
 // Shared invisible hitbox geometry across every pooled zombie.
 let torsoGeometry: THREE.CapsuleGeometry | null = null;
@@ -214,7 +222,7 @@ export class Zombie implements HitTarget {
     return true;
   }
 
-  /** Starts the barrier-attack animation. Reuses the same timing. */
+  /** Starts the dedicated barrier strike. Gameplay impact timing stays aligned with melee. */
   tryBarrierAttack(): boolean {
     if (!this.isAlive || this.attackCooldown > 0 || this.state === 'barrierAttack') return false;
     this.hitReactionTimer = 0;
@@ -242,6 +250,16 @@ export class Zombie implements HitTarget {
     this.stateTimer = 0;
     this.attackApplied = false;
     this.setWalk();
+  }
+
+  /** Completes the last committed strike before entering through the opened window. */
+  public finishBarrierAttack(): void {
+    if (this.state !== 'barrierAttack') return;
+    this.state = 'barrierBreak';
+    this.stateTimer = ZOMBIE_BARRIER_BREAK_FINISH_DURATION;
+    this.attackApplied = true;
+    this.visual.setBarrierBreakDuration(ZOMBIE_BARRIER_BREAK_FINISH_DURATION);
+    this.visual.setState('barrierBreak');
   }
 
   faceTowards(x: number, z: number, maxTurn = Infinity): void {
@@ -278,6 +296,11 @@ export class Zombie implements HitTarget {
           this.attackApplied = true;
           this.onAttackLanded?.();
         }
+        if (this.stateTimer <= 0) this.setWalk();
+        break;
+      }
+      case 'barrierBreak': {
+        this.stateTimer -= dt;
         if (this.stateTimer <= 0) this.setWalk();
         break;
       }

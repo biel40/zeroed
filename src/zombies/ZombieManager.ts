@@ -868,7 +868,7 @@ export class ZombieManager {
             this.hitBarrier(target);
             if (target.isOpen) {
               zombie.barrierTarget = null;
-              zombie.cancelBarrierAttack();
+              zombie.finishBarrierAttack();
             }
           };
         }
@@ -1773,7 +1773,7 @@ export class ZombieManager {
         if (zombie.state === 'walk' && zombie.tryBarrierAttack()) {
           zombie.onAttackLanded = () => {
             this.hitBarrier(barrier);
-            if (barrier.isOpen) zombie.cancelBarrierAttack();
+            if (barrier.isOpen) zombie.finishBarrierAttack();
           };
         }
         return true;

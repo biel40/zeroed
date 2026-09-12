@@ -670,16 +670,16 @@ describe('Burned Mansion topology', () => {
     }
   });
 
-  it('keeps the Mystery Box room clear of the removed cabinet and collider', () => {
+  it('keeps non-functional furniture out of the starting and Mystery Box rooms', () => {
     const arena = makeArena();
     const removedCabinetBounds = new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(-5.8, 0.8, -1.2),
       new THREE.Vector3(1.2, 1.6, 0.5),
     );
 
+    expect(arena.group.getObjectByName('burned-sofa')).toBeUndefined();
     expect(arena.group.getObjectByName('box-room-cabinet')).toBeUndefined();
     expect(arena.wallColliders.some((collider) => collider.equals(removedCabinetBounds))).toBe(false);
-    expect(arena.group.getObjectByName('burned-sofa')).toBeDefined();
     expect(arena.group.getObjectByName('east-hall-charred-cabinet')).toBeDefined();
   });
 
