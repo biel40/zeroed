@@ -224,6 +224,13 @@ export class SecretRoomSystem {
     return this.doorOpen;
   }
 
+  activateLamp(lampIndex: number): boolean {
+    if (!this.state.activateLamp(lampIndex)) return false;
+    this.lamps[lampIndex].pulseTime = 0.8;
+    this.syncLampVisual(lampIndex);
+    return true;
+  }
+
   captureSoul(position: { readonly x: number; readonly y: number; readonly z: number }, floor: number): boolean {
     const slotIndex = this.souls.findIndex((slot) => !slot.active);
     if (slotIndex < 0) return false;
@@ -438,11 +445,13 @@ export class SecretRoomSystem {
     const view = this.lamps[index];
     const progress = lamp.currentSouls / this.state.requiredSouls;
     const pulse = view.pulseTime > 0 ? Math.sin((view.pulseTime / 0.8) * Math.PI) : 0;
-    view.glassMaterial.emissiveIntensity = 0.02 + progress * 1.25 + pulse * 1.5;
-    view.glassMaterial.opacity = 0.3 + progress * 0.3;
-    view.coreMaterial.opacity = 0.03 + progress * 0.72 + pulse * 0.2;
+    const activeGlow = lamp.activated ? 0.1 : 0;
+    view.glassMaterial.emissiveIntensity = 0.02 + activeGlow + progress * 1.25 + pulse * 1.5;
+    view.glassMaterial.opacity = 0.3 + activeGlow + progress * 0.3;
+    view.coreMaterial.opacity = 0.03 + activeGlow + progress * 0.72 + pulse * 0.2;
     const maxLight = this.profile.useReducedEffects ? 0.38 : 0.72;
-    view.light.intensity = 0.015 + progress * maxLight + pulse * 1.1;
+    view.light.intensity = 0.015 + activeGlow + progress * maxLight + pulse * 1.1;
+    view.group.userData.activated = lamp.activated;
     view.group.userData.souls = lamp.currentSouls;
     view.group.userData.completed = lamp.completed;
   }

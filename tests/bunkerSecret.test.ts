@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { PlayerEconomy } from '../src/game/PlayerEconomy';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { PointDoor } from '../src/zombies/doors/PointDoor';
-import type { ArenaCompletionInteraction, ArenaWeaponPickup } from '../src/zombies/maps/ZombieArena';
+import type {
+  ArenaCompletionInteraction,
+  ArenaSoulLampInteraction,
+  ArenaWeaponPickup,
+} from '../src/zombies/maps/ZombieArena';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
 import { MANSION_SOUL_LAMPS } from '../src/zombies/maps/BurnedMansionConfig';
 
@@ -30,6 +34,29 @@ describe('Burned Mansion secret bunker interaction', () => {
     useRange: 2,
     lookDotMin: 0,
   };
+
+  it('activates an unlit soul lamp through USE before it can collect souls', () => {
+    const mode = new ZombiesMode('burned-mansion');
+    let activated = false;
+    const lamp = {
+      id: 'start-room',
+      position: { x: 0, y: 1, z: 0 },
+      floor: 0,
+      useRange: 2,
+      lookDotMin: 0.45,
+      get activated() { return activated; },
+      activate: () => { activated = true; return true; },
+    } satisfies ArenaSoulLampInteraction;
+    (mode as unknown as { ctx: unknown }).ctx = { profile: { useTouchControls: false } };
+    (mode as any).findFacingDoor = () => null;
+    (mode as any).findRepairableBarrier = () => null;
+    (mode as any).findFacingSoulLamp = () => activated ? null : lamp;
+
+    expect(mode.getInteractPrompt()).toBe('ACTIVATE SOUL LAMP\nPress E');
+    mode.onInteract();
+    expect(activated).toBe(true);
+    expect(mode.getInteractPrompt()).not.toBe('ACTIVATE SOUL LAMP\nPress E');
+  });
 
   it('shows the exact sealed-door prompt and required-points message', () => {
     const mode = new ZombiesMode('burned-mansion');

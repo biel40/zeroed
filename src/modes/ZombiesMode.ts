@@ -32,7 +32,7 @@ import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
 import { ClassicArena } from '../zombies/maps/ClassicArena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
-import type { ArenaAmmoRefill, ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
+import type { ArenaAmmoRefill, ArenaSoulLampInteraction, ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
 import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
@@ -165,7 +165,7 @@ export class ZombiesMode implements GameMode {
       this.arena.onSecretRoomUnlocked = (position) => {
         const spatial = this.spatialCueFor(position);
         ctx.audio.playSecretRoomUnlock(spatial.pan, spatial.attenuation);
-        ctx.hud.showRoundBanner('A HIDDEN PASSAGE OPENS', 'BENEATH THE MANSION');
+        ctx.hud.showRoundBanner('A HIDDEN CHAMBER OPENS');
       };
     }
 
@@ -300,7 +300,7 @@ export class ZombiesMode implements GameMode {
     return !this.gameOver && this.runFlow.acceptsGameplay;
   }
 
-  /** E pressed: door unlock > barrier repair > wall buy > box use > box pickup. */
+  /** E pressed: door unlock > barrier repair > soul lamp > purchases. */
   onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
 
@@ -321,6 +321,12 @@ export class ZombiesMode implements GameMode {
     // press here keeps activation priority identical to the visible prompt.
     const barrier = this.findRepairableBarrier();
     if (barrier && barrier.isDamaged) return;
+
+    const soulLamp = this.findFacingSoulLamp();
+    if (soulLamp) {
+      soulLamp.activate();
+      return;
+    }
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -403,6 +409,9 @@ export class ZombiesMode implements GameMode {
     if (barrier && barrier.isDamaged) {
       return `REPAIR BARRICADE\n${key}`;
     }
+
+    const soulLamp = this.findFacingSoulLamp();
+    if (soulLamp) return `ACTIVATE SOUL LAMP\n${tapKey}`;
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -531,6 +540,29 @@ export class ZombiesMode implements GameMode {
       if (dot >= wallBuy.lookDotMin && dot > bestDot) {
         bestDot = dot;
         best = wallBuy;
+      }
+    }
+    return best;
+  }
+
+  private findFacingSoulLamp(): ArenaSoulLampInteraction | null {
+    const lamps = this.arena?.soulLampInteractions ?? [];
+    if (lamps.length === 0) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    let best: ArenaSoulLampInteraction | null = null;
+    let bestDot = -1;
+    for (const lamp of lamps) {
+      if (lamp.activated || lamp.floor !== this.ctx.player.floor) continue;
+      const dx = lamp.position.x - playerPos.x;
+      const dz = lamp.position.z - playerPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > lamp.useRange * lamp.useRange) continue;
+      const distance = Math.sqrt(distSq);
+      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+      if (dot >= lamp.lookDotMin && dot > bestDot) {
+        bestDot = dot;
+        best = lamp;
       }
     }
     return best;

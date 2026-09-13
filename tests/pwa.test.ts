@@ -43,26 +43,26 @@ describe('PWA contract', () => {
     expect(config).toContain('clientsClaim: true');
     expect(pwa).toContain('void registration');
     expect(pwa).toContain('.update()');
-    expect(pwa).toContain('applyWhenInstalled(registration)');
-    expect(pwa).toContain('if (!worker || worker === watchedWorker) return');
+    expect(pwa).toContain('this._applyWhenInstalled(registration)');
+    expect(pwa).toContain('if (!worker || worker === this.watchedWorker) return');
     expect(pwa).toContain("worker.addEventListener('statechange'");
     expect(pwa).toContain("worker.state !== 'installed' || registration.waiting !== worker");
-    expect(pwa).toContain('void applyBrowserUpdate()');
-    expect(pwa).toContain('if (reloadStarted) return');
-    expect(pwa).toContain("serviceWorker?.addEventListener('controllerchange', handleWorkerControl)");
-    expect(pwa).toContain('onNeedReload: handleWorkerControl');
-    expect(pwa).toContain('controllerSeen = true');
+    expect(pwa).toContain('void this._applyBrowserUpdate()');
+    expect(pwa).toContain('if (this.reloadStarted) return');
+    expect(pwa).toContain("this.serviceWorker?.addEventListener('controllerchange', () => this._handleWorkerControl())");
+    expect(pwa).toContain('onNeedReload: () => this._handleWorkerControl()');
+    expect(pwa).toContain('this.controllerSeen = true');
   });
 
   it('requires a visible safe menu before applying a waiting update in standalone mode', () => {
-    expect(pwa).toContain('if (standalone || applyingUpdate) return');
-    expect(pwa).toContain('if (!standalone || controller === approvedWorker)');
-    expect(pwa).toContain('approvedWorker = swRegistration?.waiting ?? null');
-    expect(pwa).toContain('reloadPending = true');
-    expect(pwa).toContain("!mapSelect.classList.contains('hidden')");
-    expect(pwa).toContain("!pauseMenu.classList.contains('hidden')");
+    expect(pwa).toContain('if (this.standalone || this.applyingUpdate) return');
+    expect(pwa).toContain('if (!this.standalone || controller === this.approvedWorker)');
+    expect(pwa).toContain('this.approvedWorker = this.swRegistration?.waiting ?? null');
+    expect(pwa).toContain('this.reloadPending = true');
+    expect(pwa).toContain("!this.mapSelect.classList.contains('hidden')");
+    expect(pwa).toContain("!this.pauseMenu.classList.contains('hidden')");
     expect(pwa).toContain("window.confirm('Actualizar reiniciara la partida actual. Continuar?')");
-    expect(pwa).toContain('await updateSW()');
+    expect(pwa).toContain('await this.updateSW()');
   });
 
   it('keeps install and update actions hidden until supported or needed', () => {
@@ -70,7 +70,7 @@ describe('PWA contract', () => {
     expect(html).toMatch(/id="pwa-update-menu" class="pwa-action hidden"/);
     expect(html).toMatch(/id="pwa-update-pause" class="hidden"/);
     expect(pwa).toContain('getDeviceProfile()');
-    expect(pwa).toContain("installButton.classList.toggle('hidden', isStandalone() || !profile.isMobile)");
+    expect(pwa).toContain("this.installButton.classList.toggle('hidden', isStandalone() || !this.profile.isMobile)");
     expect(pwa).toContain("window.addEventListener('beforeinstallprompt'");
     expect(pwa).toContain("window.addEventListener('appinstalled'");
   });

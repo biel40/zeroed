@@ -66,18 +66,24 @@ export const MANSION_SOUL_LAMPS = [
     position: { x: -1.35, y: 1.25, z: 9.78 },
     floor: 0,
     yaw: 0,
+    useRange: 2,
+    lookDotMin: 0.45,
   },
   {
     id: 'mystery-box-room',
     position: { x: -1.5, y: 1.25, z: -7.78 },
     floor: 0,
     yaw: Math.PI,
+    useRange: 2,
+    lookDotMin: 0.45,
   },
   {
     id: 'upper-stairs',
-    position: { x: 8.82, y: 1.25, z: -3.05 },
+    position: { x: 8.82, y: 1.25, z: -3.8 },
     floor: 0,
     yaw: Math.PI / 2,
+    useRange: 2,
+    lookDotMin: 0.45,
   },
 ] as const;
 

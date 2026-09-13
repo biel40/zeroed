@@ -11,6 +11,9 @@ describe('SecretRoomState', () => {
   it('accepts only nearby kills on the same floor and reserves souls in flight', () => {
     const state = new SecretRoomState(definitions, 2, 3);
 
+    expect(state.beginSoul(1, 0, 0)).toBeNull();
+    expect(state.activateLamp(0)).toBe(true);
+    expect(state.activateLamp(0)).toBe(false);
     expect(state.beginSoul(0, 0, -1)).toBeNull();
     expect(state.beginSoul(4, 0, 0)).toBeNull();
     expect(state.beginSoul(1, 0, 0)).toBe(0);
@@ -23,6 +26,7 @@ describe('SecretRoomState', () => {
   it('prevents over-reservation and unlocks exactly when every lamp completes', () => {
     const state = new SecretRoomState(definitions, 1, 3);
 
+    definitions.forEach((_, index) => state.activateLamp(index));
     expect(state.beginSoul(0, 0, 0)).toBe(0);
     expect(state.beginSoul(0, 0, 0)).toBeNull();
     expect(state.absorbSoul(0)).toEqual({ lampCompleted: true, unlocked: false });
@@ -37,6 +41,8 @@ describe('SecretRoomState', () => {
 
   it('resets all run-local progression including souls still travelling', () => {
     const state = new SecretRoomState(definitions, 1, 3);
+    state.activateLamp(0);
+    state.activateLamp(1);
     state.beginSoul(0, 0, 0);
     state.absorbSoul(0);
     state.beginSoul(10, 0, 0);
@@ -45,6 +51,6 @@ describe('SecretRoomState', () => {
 
     expect(state.unlocked).toBe(false);
     expect(state.completedLamps).toBe(0);
-    expect(state.lamps.every((lamp) => lamp.currentSouls === 0 && lamp.pendingSouls === 0)).toBe(true);
+    expect(state.lamps.every((lamp) => !lamp.activated && lamp.currentSouls === 0 && lamp.pendingSouls === 0)).toBe(true);
   });
 });

@@ -50,7 +50,8 @@ describe('Zombies map selection flow', () => {
     expect(html.match(/data-map=/g)).toHaveLength(2);
     expect(html).not.toContain('data-mode=');
     expect(html).toContain('SHOOTING RANGE');
-    expect(html).toContain('PLAY ZOMBIES');
+    expect(html).toContain('ZOMBIES');
+    expect(html).toContain('BURNED MANSION');
     expect(ZOMBIE_MAPS.classic.visible).toBe(false);
     expect(ZOMBIE_MAPS['burned-mansion'].visible).toBe(true);
     expect(isZombieMapId('classic')).toBe(true);

@@ -2,7 +2,7 @@
 
 ## [2026-09-12] Mantener el ritual de almas dentro de Burned Mansion
 
-- Contexto: tres lamparas repartidas por el mapa deben reaccionar a bajas, mostrar almas en vuelo y abrir una sala fisica del bunker sin introducir prompts ni persistencia entre partidas.
+- Contexto: tres lamparas repartidas por el mapa deben activarse con USE antes de reaccionar a bajas, mostrar almas en vuelo y abrir una sala fisica del bunker sin persistencia entre partidas.
 - Decision: `ZombiesMode` reenvia una instantanea de posicion/planta desde el callback autoritativo de muerte; `SecretRoomState` gobierna progreso y reservas en vuelo, mientras `SecretRoomSystem`, propiedad de `BurnedMansionArena`, posee vistas, pool, pared animada y reset. El collider permanece hasta acabar la apertura y reutiliza la resincronizacion topologica existente.
 - Motivo: mantener la run general desacoplada de un easter egg especifico del mapa, impedir dobles cargas con muertes simultaneas y conservar coherencia entre visual, colision de jugador, balistica y navegacion zombie.
 

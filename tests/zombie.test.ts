@@ -12,6 +12,7 @@ import {
   ZOMBIE_DEATH_FALL,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_SPECIAL_ATTACK_RECOVERY,
+  ZOMBIE_TYPE_CONFIGS,
 } from '../src/zombies/ZombieConfig';
 
 const DT = 1 / 60;
@@ -283,22 +284,19 @@ describe('Zombie hitboxes', () => {
     expect(a.headHitbox.geometry).toBe(b.headHitbox.geometry);
   });
 
-  it('scales Brutus hitboxes for a taller humanoid silhouette', () => {
-    const normal = makeZombie();
+  it('applies the configured Brutus hitbox scale independently of animation pose', () => {
     const brute = new Zombie(new ZombieVisual('brute', null, 0xffffff, false));
-    brute.spawn(0, -20, 300, 1.3, 0, 0, 'brute');
-    step(normal, ZOMBIE_SPAWN_DURATION + 0.1);
-    step(brute, ZOMBIE_SPAWN_DURATION + 0.1);
-    normal.group.updateMatrixWorld(true);
-    brute.group.updateMatrixWorld(true);
+    const torsoBaseScale = brute.torsoHitbox.scale.clone();
+    const headBaseScale = brute.headHitbox.scale.clone();
+    const { bodyScale, hitboxScale } = ZOMBIE_TYPE_CONFIGS.brute;
 
-    const normalTorso = new THREE.Box3().setFromObject(normal.torsoHitbox).getSize(new THREE.Vector3());
-    const bruteTorso = new THREE.Box3().setFromObject(brute.torsoHitbox).getSize(new THREE.Vector3());
-    const normalHead = new THREE.Box3().setFromObject(normal.headHitbox).getSize(new THREE.Vector3());
-    const bruteHead = new THREE.Box3().setFromObject(brute.headHitbox).getSize(new THREE.Vector3());
-    expect(bruteTorso.x).toBeGreaterThan(normalTorso.x * 1.18);
-    expect(bruteTorso.y).toBeGreaterThan(normalTorso.y * 1.22);
-    expect(bruteHead.x).toBeGreaterThan(normalHead.x * 1.18);
-    expect(brute.headHitbox.geometry).toBe(normal.headHitbox.geometry);
+    brute.spawn(0, -20, 300, 1.3, 0, 0, 'brute');
+
+    expect(brute.torsoHitbox.scale.x).toBeCloseTo(torsoBaseScale.x * hitboxScale[0] / bodyScale[0]);
+    expect(brute.torsoHitbox.scale.y).toBeCloseTo(torsoBaseScale.y * hitboxScale[1] / bodyScale[1]);
+    expect(brute.torsoHitbox.scale.z).toBeCloseTo(torsoBaseScale.z * hitboxScale[2] / bodyScale[2]);
+    expect(brute.headHitbox.scale.x).toBeCloseTo(headBaseScale.x * hitboxScale[0] / bodyScale[0]);
+    expect(brute.headHitbox.scale.y).toBeCloseTo(headBaseScale.y * hitboxScale[1] / bodyScale[1]);
+    expect(brute.headHitbox.scale.z).toBeCloseTo(headBaseScale.z * hitboxScale[2] / bodyScale[2]);
   });
 });

@@ -611,6 +611,18 @@ describe('Burned Mansion topology', () => {
     )).toBe(false);
   });
 
+  it('keeps the upper stair soul lamp clear of the east window opening', () => {
+    const arena = makeArena();
+    const lamp = arena.group.getObjectByName('soul-lamp:upper-stairs')!;
+    const window = MANSION_BARRIERS.find((barrier) => barrier.id === 'bunker-east')!;
+    const windowOpening = new THREE.Box3(
+      new THREE.Vector3(MANSION_EAST_WALL_X - 0.2, 0.3, window.z - 0.75),
+      new THREE.Vector3(MANSION_EAST_WALL_X + 0.2, 1.9, window.z + 0.75),
+    );
+
+    expect(new THREE.Box3().setFromObject(lamp).intersectsBox(windowOpening)).toBe(false);
+  });
+
   it('shows empty, partially charged and complete lamp states', () => {
     const arena = makeArena();
     const definition = MANSION_SOUL_LAMPS[0];
@@ -618,6 +630,8 @@ describe('Burned Mansion topology', () => {
     const light = lamp.children.find((child) => child instanceof THREE.PointLight) as THREE.PointLight;
     const emptyIntensity = light.intensity;
 
+    expect(arena.captureSoul(definition.position, definition.floor)).toBe(false);
+    expect(arena.soulLampInteractions[0].activate()).toBe(true);
     arena.captureSoul(definition.position, definition.floor);
     arena.update(0.6);
     expect(lamp.userData.souls).toBe(1);
@@ -633,6 +647,7 @@ describe('Burned Mansion topology', () => {
     expect(light.intensity).toBeGreaterThan(emptyIntensity * 10);
 
     arena.reset();
+    expect(lamp.userData.activated).toBe(false);
     expect(lamp.userData.souls).toBe(0);
     expect(lamp.userData.completed).toBe(false);
     expect(light.intensity).toBeCloseTo(emptyIntensity);
@@ -644,6 +659,7 @@ describe('Burned Mansion topology', () => {
     arena.onTopologyChanged = () => { topologyChanges++; };
 
     for (const lamp of MANSION_SOUL_LAMPS) {
+      expect(arena.soulLampInteractions.find((interaction) => interaction.id === lamp.id)!.activate()).toBe(true);
       for (let soul = 0; soul < SOUL_LAMP_REQUIRED_SOULS; soul++) {
         expect(arena.captureSoul(lamp.position, lamp.floor)).toBe(true);
         arena.update(1);
@@ -1162,29 +1178,33 @@ describe('Burned Mansion topology', () => {
 
   it('routes around solid furniture instead of attacking through it', () => {
     const arena = makeArena();
-    const sofa = arena.group.getObjectByName('burned-sofa')!;
-    const playerZ = sofa.position.z - 1.4;
-    const manager = new ZombieManager(() => 0, {}, false, [[sofa.position.x, sofa.position.z + 0.75]]);
+    const furniture = arena.group.getObjectByName('east-hall-charred-cabinet')!;
+    const playerX = furniture.position.x + 0.5;
+    const playerZ = furniture.position.z - 1.4;
+    const manager = new ZombieManager(() => 0, {}, false, [[2, -5]]);
     manager.registerColliders([...arena.colliders]);
-    manager.spawnZombie(roundConfig(1), sofa.position.x, playerZ);
+    manager.spawnZombie(roundConfig(1), -20, -20);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
     zombie.state = 'walk';
+    zombie.position.set(playerX, 0, furniture.position.z + 1.1);
     let damage = 0;
     manager.onPlayerAttack = (amount) => {
       damage += amount;
     };
 
     let maxStep = 0;
+    let maxLateralOffset = 0;
     for (let frame = 0; frame < 480; frame++) {
       const previous = zombie.position.clone();
-      manager.update(1 / 60, sofa.position.x, playerZ, 0);
+      manager.update(1 / 60, playerX, playerZ, 0);
       maxStep = Math.max(maxStep, zombie.position.distanceTo(previous));
+      maxLateralOffset = Math.max(maxLateralOffset, Math.abs(zombie.position.x - playerX));
     }
 
     expect(damage).toBeGreaterThan(0);
-    expect(Math.abs(zombie.position.x - sofa.position.x)).toBeGreaterThan(0.4);
+    expect(maxLateralOffset).toBeGreaterThan(0.4);
     expect(maxStep).toBeLessThan(0.1);
   });
 

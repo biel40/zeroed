@@ -12,7 +12,13 @@ import { SecretRoomSystem } from '../secret-room/SecretRoomSystem';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
-import type { ArenaAmmoRefill, ArenaCompletionInteraction, ArenaWeaponPickup, ZombieArena } from './ZombieArena';
+import type {
+  ArenaAmmoRefill,
+  ArenaCompletionInteraction,
+  ArenaSoulLampInteraction,
+  ArenaWeaponPickup,
+  ZombieArena,
+} from './ZombieArena';
 import {
   createMansionSurfaceMaterials,
   projectBoxUVs,
@@ -38,6 +44,7 @@ import {
   MANSION_STAIR_TOP_Z,
   MANSION_SECRET_AREAS,
   MANSION_SECRET_ROOM,
+  MANSION_SOUL_LAMPS,
   MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
 } from './BurnedMansionConfig';
@@ -173,6 +180,7 @@ export class BurnedMansionArena implements ZombieArena {
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly weaponPickups: ReadonlyArray<ArenaWeaponPickup>;
   readonly ammoRefills: ReadonlyArray<ArenaAmmoRefill>;
+  readonly soulLampInteractions: ReadonlyArray<ArenaSoulLampInteraction>;
   spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = [];
 
   private readonly structureMeshes: THREE.Mesh[] = [];
@@ -207,6 +215,18 @@ export class BurnedMansionArena implements ZombieArena {
     this.buildWindowFrames();
     this.buildLighting();
     this.secretRoom = new SecretRoomSystem(this.group, this.secretWall, profile);
+    this.soulLampInteractions = MANSION_SOUL_LAMPS.map((lamp, index) => {
+      const secretRoom = this.secretRoom;
+      return {
+        id: lamp.id,
+        position: lamp.position,
+        floor: lamp.floor,
+        useRange: lamp.useRange,
+        lookDotMin: lamp.lookDotMin,
+        get activated(): boolean { return secretRoom.state.lamps[index].activated; },
+        activate: () => secretRoom.activateLamp(index),
+      };
+    });
     this.secretRoom.onSoulAbsorbed = (position) => this.onSoulAbsorbed?.(position);
     this.secretRoom.onLampCompleted = (position) => this.onSoulLampCompleted?.(position);
     this.secretRoom.onUnlocked = (position) => this.onSecretRoomUnlocked?.(position);

@@ -6,6 +6,7 @@ export interface SoulLampDefinition {
 
 export interface SoulLampState {
   readonly id: string;
+  activated: boolean;
   currentSouls: number;
   pendingSouls: number;
   completed: boolean;
@@ -28,6 +29,7 @@ export class SecretRoomState {
   ) {
     this.lamps = definitions.map((definition) => ({
       id: definition.id,
+      activated: false,
       currentSouls: 0,
       pendingSouls: 0,
       completed: false,
@@ -36,6 +38,13 @@ export class SecretRoomState {
 
   get completedLamps(): number {
     return this.lamps.reduce((total, lamp) => total + (lamp.completed ? 1 : 0), 0);
+  }
+
+  activateLamp(lampIndex: number): boolean {
+    const lamp = this.lamps[lampIndex];
+    if (!lamp || lamp.activated) return false;
+    lamp.activated = true;
+    return true;
   }
 
   /** Reserves one nearby lamp slot while its soul is still travelling. */
@@ -49,6 +58,7 @@ export class SecretRoomState {
       const definition = this.definitions[index];
       if (
         definition.floor !== floor ||
+        !lamp.activated ||
         lamp.completed ||
         lamp.currentSouls + lamp.pendingSouls >= this.requiredSouls
       ) continue;
@@ -84,6 +94,7 @@ export class SecretRoomState {
   reset(): void {
     this.unlocked = false;
     for (const lamp of this.lamps) {
+      lamp.activated = false;
       lamp.currentSouls = 0;
       lamp.pendingSouls = 0;
       lamp.completed = false;
