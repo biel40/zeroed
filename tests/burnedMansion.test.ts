@@ -611,15 +611,17 @@ describe('Burned Mansion topology', () => {
     )).toBe(false);
   });
 
-  it('keeps the upper stair soul lamp clear of the east window opening', () => {
+  it('mounts the upper stair soul lamp on the solid east wall beyond the window', () => {
     const arena = makeArena();
     const lamp = arena.group.getObjectByName('soul-lamp:upper-stairs')!;
+    const definition = MANSION_SOUL_LAMPS.find((candidate) => candidate.id === 'upper-stairs')!;
     const window = MANSION_BARRIERS.find((barrier) => barrier.id === 'bunker-east')!;
     const windowOpening = new THREE.Box3(
       new THREE.Vector3(MANSION_EAST_WALL_X - 0.2, 0.3, window.z - 0.75),
       new THREE.Vector3(MANSION_EAST_WALL_X + 0.2, 1.9, window.z + 0.75),
     );
 
+    expect(definition.position.z - window.z).toBeGreaterThan(2.5);
     expect(new THREE.Box3().setFromObject(lamp).intersectsBox(windowOpening)).toBe(false);
   });
 

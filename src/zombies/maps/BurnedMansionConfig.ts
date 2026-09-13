@@ -79,7 +79,7 @@ export const MANSION_SOUL_LAMPS = [
   },
   {
     id: 'upper-stairs',
-    position: { x: 8.82, y: 1.25, z: -3.8 },
+    position: { x: 8.82, y: 1.25, z: 0.2 },
     floor: 0,
     yaw: Math.PI / 2,
     useRange: 2,
