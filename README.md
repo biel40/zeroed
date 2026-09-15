@@ -1,17 +1,14 @@
-# Zeroed - Three.js Zombies FPS
+# Zeroed - Browser Zombies FPS
 
-FPS Zombies de navegador construido con Three.js y TypeScript. El juego permite
-elegir directamente entre `Classic Zombies` y `Burned Mansion`, con rondas
-infinitas, economía, Mystery Box, armas de pared y Wonder Weapons.
+Un FPS Zombies de navegador construido con Three.js y TypeScript. Desarrollado con el amor y el cariño de un viejo y clásico jugador de los Call of Duty Zombies clásicos.
 
-## Tecnologías
+## Tecnologías utilizadas
 
-- **TypeScript** (modo estricto)
-- **Three.js** — render WebGL, raycasting, escena
-- **Vite** — dev server y build
-- **Vitest** — tests de la lógica determinista
-- **Web Audio API** — sonido procedural, sin assets de audio
-- Sin frameworks de UI, sin motores de física. Dependencia única: `three`.
+- **TypeScript**
+- **Three.js**
+- **Vite**
+- **Vitest** 
+- **Web Audio API**
 
 ## Instalación y ejecución
 
@@ -35,15 +32,6 @@ npm run dev
 | `Space` | Saltar |
 | `ESC` | Liberar el puntero |
 
-## Comandos disponibles
-
-| Comando | Descripción |
-| --- | --- |
-| `npm run dev` | Servidor de desarrollo |
-| `npm run build` | Typecheck estricto + build de producción en `dist/` |
-| `npm run preview` | Sirve el build de producción |
-| `npm run test` | Tests unitarios (Vitest) |
-| `npm run typecheck` | Solo `tsc --noEmit` |
 
 ## Arquitectura
 
@@ -97,56 +85,6 @@ Decisiones clave:
 3. Opcionalmente ajusta `view` (colores, cargador, óptica) para el placeholder
    procedural.
 
-### Pipeline de assets (GLB + fallback)
-
-M4A1, AK-47 y L96 cargan modelos GLB reales (CC0, Quaternius — ver
-`ASSETS.md` para fuentes y licencias). La M60 usa el modelo procedural
-mejorado (no se encontró LMG CC0 adecuada).
-
-- `AssetManager` carga todo antes de mostrar CLICK TO START, con progreso
-  real en pantalla, caché única y `console.warn` por asset fallido.
-- Si un GLB falta o falla, el arma usa automáticamente el modelo procedural:
-  el juego siempre funciona.
-- `WeaponView` normaliza el GLB a la longitud real (`view.modelLength`),
-  corrige orientación (`view.modelYaw`), deriva la línea de mira desde el
-  bounding box para el ADS y ajusta materiales PBR por nombre (`Wood`,
-  `DarkMetal`, `Glass`…).
-- Para sustituir un modelo: reemplaza el `.glb` en
-  `public/assets/weapons/<id>/model.glb` y ajusta `modelLength`, `modelYaw`
-  y los trims `hip`/`ads` en `config/weapons.ts`.
-
-### View model de primera persona
-
-Cada arma tiene personalidad visual propia (todo en `ViewModelConfig`):
-
-- **Sway**: retardo suavizado frente al ratón, reducido 80 % en ADS.
-- **Bob**: depende de la velocidad real, suprimido al apuntar.
-- **Recoil visual**: muelle independiente por arma (`SpringRecoil`:
-  traslación + pitch + roll con stiffness/damping propios). El recoil de
-  gameplay (cámara) no cambia.
-- **Animaciones de estado**: reload, equip y ciclo de cerrojo procedurales.
-- Muzzle flash con sprite aditivo + luz puntual reutilizada + humo sutil.
-
-## Rendimiento
-
-Objetivo: 60 FPS estables en un PC moderno. Medidas estructurales:
-
-- `devicePixelRatio` limitado a 2.
-- Una única luz direccional con sombras (2048) + hemisférica + environment
-  map por PMREM (`RoomEnvironment`, sin descarga). Sin postprocesado.
-- Pools fijos round-robin: 32 proyectiles/trazadoras, 96 bullet holes,
-  24 casquillos, 16 chispas, 10 puffs de humo. Nada se acumula.
-- Sin allocations en el loop: vectores temporales reutilizados, arrays de
-  raycast persistentes, cola de eventos del arma drenada sin copiar.
-  (Excepción conocida: los `Intersection` internos del `Raycaster` por
-  impacto, de vida corta y volumen mínimo).
-- Assets ligeros: GLBs de 59–131 KB (1.1k–1.9k tris), texturas JPG 1K.
-  Total descargable ≈ 6.5 MB (de los cuales ~6 MB son texturas de entorno).
-- HUD en DOM que solo escribe cuando el valor cambia.
-- `dt` clampado a 50 ms.
-- **Debug de rendimiento**: arranca con `?debug` para ver FPS, draw calls,
-  triángulos, geometrías y texturas (`renderer.info`) en pantalla.
-
 ## Tests
 
 Los tests cubren la lógica determinista: cadencia de fuego, semi/auto,
@@ -158,7 +96,5 @@ estadísticas. No se testea WebGL.
 npm run test
 ```
 
-## Limitaciones conocidas / trabajo futuro
-- Los sonidos son sintetizados; sustituir por samples solo requiere tocar
-  `AudioSystem`.
-- Sin modo multijugador, IA ni puntuación persistente: fuera de alcance.
+## Limitaciones conocidas
+- Sin modo multijugador, IA ni puntuación persistente: fuera de alcance inicial del proyecto.
