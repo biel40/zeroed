@@ -31,8 +31,8 @@ headshot no se duplica en splash ni cadena.
   automaticamente un Bowie que no ocupa ranura. La cuchillada aplica 150 de
   dano en su contacto visual, tiene 2.05 m de alcance y usa el primer collider
   bajo la mira, por lo que paredes y enemigos cercanos bloquean el golpe. Con
-  municion disponible funciona como melee rapido mediante NUM 3 o el boton
-  KNIFE del HUD tactil, sin cambiar el arma equipada.
+  municion disponible funciona como melee rapido mediante 3 (o NUM 3) o el
+  boton KNIFE del HUD tactil, sin cambiar el arma equipada.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
   continua de canal unico, sin teletransporte.

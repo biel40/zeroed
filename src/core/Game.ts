@@ -625,7 +625,11 @@ export class Game {
       if (this.input.wasPressed('KeyR')) weapon.reload();
       if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
-      if (this.input.wasPressed('Numpad3') || this.input.wasPressed('TouchKnife')) {
+      if (
+        this.input.wasPressed('Digit3') ||
+        this.input.wasPressed('Numpad3') ||
+        this.input.wasPressed('TouchKnife')
+      ) {
         this.mode.onMeleeAttack?.();
       }
       allowGameplayInput =
