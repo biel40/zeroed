@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import type { DeviceProfile } from '../../core/DeviceProfile';
-import type { ShootingRange } from '../../range/ShootingRange';
+import type { OutdoorArena } from '../../range/OutdoorArena';
 import { MYSTERY_BOX_PLACEMENT } from '../MysteryBox';
 import { NightEnvironment } from '../NightEnvironment';
 import { SPAWN_POINTS } from '../ZombieSpawner';
 import type { ZombieArena } from './ZombieArena';
 
 /**
- * Adapter that wraps the existing outdoor shooting range. It keeps the
- * classic Zombies map behaviour unchanged while fitting the `ZombieArena`
+ * Adapter that wraps the existing outdoor arena. It keeps the classic
+ * Zombies map behaviour unchanged while fitting the `ZombieArena`
  * contract.
  */
 export class ClassicArena implements ZombieArena {
@@ -28,14 +28,14 @@ export class ClassicArena implements ZombieArena {
   private readonly night: NightEnvironment;
 
   constructor(
-    range: ShootingRange,
+    arena: OutdoorArena,
     scene: THREE.Scene,
     setExposure: (exposure: number) => void,
     profile: DeviceProfile,
   ) {
-    this.group.add(range.group);
-    this.colliders = [...range.colliders];
-    this.night = new NightEnvironment(scene, range, setExposure, profile);
+    this.group.add(arena.group);
+    this.colliders = [...arena.colliders];
+    this.night = new NightEnvironment(scene, arena, setExposure, profile);
   }
 
   public init(): void {

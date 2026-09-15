@@ -429,6 +429,17 @@ export class AudioSystem {
     this.toneTo(audio.ctx, output, t + 0.48, 'sine', 960, 0.14, 0.38);
   }
 
+  /** Abrupt layered sting for the secret-room ritual apparition. */
+  public playRitualScare(pan: number, attenuation: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, pan, Math.max(0.65, attenuation));
+    const t = audio.ctx.currentTime;
+    this.sweepTo(audio.ctx, output, t, 'sawtooth', 760, 58, 0.2, 0.78);
+    this.toneTo(audio.ctx, output, t + 0.025, 'square', 46, 0.32, 0.62);
+    this.sweepTo(audio.ctx, output, t + 0.13, 'triangle', 120, 510, 0.18, 0.4);
+  }
+
   /** Brutus attack tell: a layered sub-bass roar distinct from common zombie vocals. */
   public playBruteRoar(): void {
     const audio: AudioContextParts | null = this.context();

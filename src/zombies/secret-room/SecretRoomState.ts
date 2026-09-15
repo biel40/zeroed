@@ -21,6 +21,7 @@ export interface SoulArrivalResult {
 export class SecretRoomState {
   readonly lamps: SoulLampState[];
   unlocked = false;
+  ritualScareTriggered = false;
 
   constructor(
     readonly definitions: ReadonlyArray<SoulLampDefinition>,
@@ -91,8 +92,15 @@ export class SecretRoomState {
     return { lampCompleted, unlocked };
   }
 
+  triggerRitualScare(): boolean {
+    if (!this.unlocked || this.ritualScareTriggered) return false;
+    this.ritualScareTriggered = true;
+    return true;
+  }
+
   reset(): void {
     this.unlocked = false;
+    this.ritualScareTriggered = false;
     for (const lamp of this.lamps) {
       lamp.activated = false;
       lamp.currentSouls = 0;

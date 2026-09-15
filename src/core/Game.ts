@@ -9,7 +9,7 @@ import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
-import { ShootingRange } from '../range/ShootingRange';
+import { OutdoorArena } from '../range/OutdoorArena';
 import { Effects } from '../rendering/Effects';
 import { BallisticsSystem } from '../shooting/BallisticsSystem';
 import type { SurfaceType } from '../shooting/HitTarget';
@@ -61,7 +61,7 @@ export class Game {
   private readonly clock = new THREE.Clock();
   private readonly input: Input;
   private readonly player: PlayerController;
-  private readonly range: ShootingRange;
+  private readonly range: OutdoorArena;
   private readonly ballistics: BallisticsSystem;
   private readonly effects: Effects;
   private readonly audio = new AudioSystem();
@@ -151,7 +151,7 @@ export class Game {
     this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
     this.scene.add(this.player.rig);
 
-    this.range = new ShootingRange(this.assets);
+    this.range = new OutdoorArena(this.assets);
     this.scene.add(this.range.group);
 
     this.effects = new Effects(this.scene);

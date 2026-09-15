@@ -1,30 +1,30 @@
-# Roadmap deducido
+# Roadmap previo a v1.0
 
-Solo incluye trabajo respaldado por defectos, limitaciones o contratos presentes en el repositorio.
+Solo incluye trabajo respaldado por bugs, limitaciones o contratos presentes.
 
 ## Correcciones de comportamiento
 
-- Impedir que la simulacion avance antes del primer START y detener input de gameplay durante game over.
-- Permitir reparar barreras completamente destruidas y cancelar correctamente la reparacion al cambiar arma en tactil.
-- Corregir RESTART del campo de tiro y definir un reset completo y verificable para una run Zombies.
-- Hacer ilimitada la reserva del campo de tiro sin alterar las reservas finitas de Zombies.
-- Corregir distancias de impacto balisticas/energeticas y el fade vertical de zombies fuera de Y=0.
-- Conectar la musica de Zombies al ciclo real deseado sin reproducir pistas inactivas al reanudar.
+- Bloquear simulacion antes de START y input de gameplay durante game over.
+- Reparar barreras totalmente destruidas; cancelar reparacion al cambiar arma
+  en tactil.
+- Hacer verificable RESTART completo para Classic y Zombies.
+- Mantener reserva infinita en range y finita en Zombies.
+- Corregir distancias de impacto y fade vertical de cadaveres.
+- Conectar musica al ciclo real sin pistas inactivas al reanudar.
 
-## Consolidacion de contratos
+## Contratos y arquitectura
 
-- Identificar proyectiles de energia por arma o tipo de impacto, no por color, antes de agregar otra arma especial.
-- Reutilizar las texturas precargadas de `AssetManager` en Burned Mansion.
-- Definir propiedad/registro de colliders dinamicos para evitar mutaciones ambiguas del array compartido.
-- Incorporar `dispose()` en shell/modos antes de permitir cambios de modo o mapa sin recarga de pagina.
-- Alinear los contratos inactivos o ambiguos (`cameraShare`, `acceptsDecals`, `reserveAmmoFor`) con su comportamiento real.
+- Identificar energia por arma/tipo, no por color.
+- Reutilizar texturas precargadas y registrar colliders dinamicos.
+- Implementar `dispose()` para cambiar modo/mapa sin recarga.
+- Alinear `cameraShare`, `acceptsDecals` y `reserveAmmoFor` con su uso real.
 
-## Validacion y documentacion existente
+## Validacion y distribucion
 
-- Agregar pruebas de integracion del arranque, pausa/reinicio, game over, spawn con pool ocupado, reparacion total y distancia de impacto.
-- Mantener `README.md`, `ASSETS.md` y el indice de `docs/changes/` alineados con los dos modos, siete armas y assets de audio actuales.
-- Documentar procedencia/licencia de los MP3 y resolver la afirmacion incompatible de que todos los assets externos son CC0 frente al zombie CC-BY 3.0.
-
-## Distribucion
-
-- Empaquetar el build Vite como aplicacion Android mediante Capacitor, manteniendo la PWA y la web de `zeroed.es` como canales independientes.
+- Añadir integracion de arranque, pausa/reinicio, game over, pool ocupado,
+  reparacion total y distancia de impacto.
+- Alinear README, ASSETS y esta documentacion con siete armas y audio actual.
+- Documentar procedencia/licencia de MP3 y corregir la afirmacion de que todos
+  los externos son CC0 frente al walker CC-BY 3.0.
+- Validar build Vite, PWA/offline y empaquetado Android con Capacitor.
+- Retirar o blindar god mode y revisar casos de navegacion no deterministas.

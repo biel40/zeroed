@@ -32,7 +32,12 @@ import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
 import { ClassicArena } from '../zombies/maps/ClassicArena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
-import type { ArenaAmmoRefill, ArenaSoulLampInteraction, ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
+import type {
+  ArenaAmmoRefill,
+  ArenaRitualInteraction,
+  ArenaSoulLampInteraction,
+  ArenaWeaponPickup,
+} from '../zombies/maps/ZombieArena';
 import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
@@ -166,6 +171,10 @@ export class ZombiesMode implements GameMode {
         const spatial = this.spatialCueFor(position);
         ctx.audio.playSecretRoomUnlock(spatial.pan, spatial.attenuation);
         ctx.hud.showRoundBanner('A HIDDEN CHAMBER OPENS');
+      };
+      this.arena.onRitualScare = (position) => {
+        const spatial = this.spatialCueFor(position);
+        ctx.audio.playRitualScare(spatial.pan, spatial.attenuation);
       };
     }
 
@@ -328,6 +337,12 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
+    const ritual = this.findFacingRitualCircle();
+    if (ritual) {
+      ritual.activate();
+      return;
+    }
+
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
       this.purchaseWallBuy(wallBuy);
@@ -412,6 +427,9 @@ export class ZombiesMode implements GameMode {
 
     const soulLamp = this.findFacingSoulLamp();
     if (soulLamp) return `ACTIVATE SOUL LAMP\n${tapKey}`;
+
+    const ritual = this.findFacingRitualCircle();
+    if (ritual) return `TOUCH THE RITUAL CIRCLE\n${tapKey}`;
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -566,6 +584,20 @@ export class ZombiesMode implements GameMode {
       }
     }
     return best;
+  }
+
+  private findFacingRitualCircle(): ArenaRitualInteraction | null {
+    const ritual = this.arena?.ritualInteraction;
+    if (!ritual?.available || ritual.floor !== this.ctx.player.floor) return null;
+    const playerPos = this.ctx.player.rig.position;
+    const dx = ritual.position.x - playerPos.x;
+    const dz = ritual.position.z - playerPos.z;
+    const distanceSq = dx * dx + dz * dz;
+    if (distanceSq > ritual.useRange * ritual.useRange) return null;
+    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
+    const distance = Math.sqrt(distanceSq);
+    const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
+    return dot >= ritual.lookDotMin ? ritual : null;
   }
 
   private findFacingWeaponPickup(): ArenaWeaponPickup | null {

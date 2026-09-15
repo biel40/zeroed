@@ -70,6 +70,16 @@ export interface ArenaSoulLampInteraction {
   activate(): boolean;
 }
 
+export interface ArenaRitualInteraction {
+  readonly id: string;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  readonly available: boolean;
+  activate(): boolean;
+}
+
 export interface PlayerBounds {
   readonly minX: number;
   readonly maxX: number;
@@ -105,6 +115,7 @@ export interface ZombieArena {
   readonly weaponPickups?: ReadonlyArray<ArenaWeaponPickup>;
   readonly ammoRefills?: ReadonlyArray<ArenaAmmoRefill>;
   readonly soulLampInteractions?: ReadonlyArray<ArenaSoulLampInteraction>;
+  readonly ritualInteraction?: ArenaRitualInteraction;
   readonly completionInteraction?: ArenaCompletionInteraction;
   readonly mysteryBoxPlacement: MysteryBoxPlacement;
   /** Safe initial position owned by the map rather than the game mode. */

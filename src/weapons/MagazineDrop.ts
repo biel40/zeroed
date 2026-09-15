@@ -12,7 +12,7 @@ const BOUNCE = 0.28;
 
 interface DroppedMagazine {
   object: THREE.Object3D;
-  materials: THREE.Material[];
+  materials: Array<{ material: THREE.Material; baseOpacity: number }>;
   velocity: THREE.Vector3;
   angular: THREE.Vector3;
   life: number;
@@ -46,7 +46,7 @@ export class MagazineDropPool {
     if (this.entries.length >= MAX_DROPPED) this.recycle(this.entries[0]);
 
     const object = source.clone();
-    const materials: THREE.Material[] = [];
+    const materials: DroppedMagazine['materials'] = [];
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       child.castShadow = false;
@@ -54,8 +54,7 @@ export class MagazineDropPool {
       const cloned = mats.map((m) => {
         const c = m.clone();
         c.transparent = true;
-        c.opacity = 1;
-        materials.push(c);
+        materials.push({ material: c, baseOpacity: c.opacity });
         return c;
       });
       child.material = Array.isArray(child.material) ? cloned : cloned[0];
@@ -94,7 +93,9 @@ export class MagazineDropPool {
       // Fade during the last stretch.
       if (entry.life < FADE_SECONDS) {
         const opacity = entry.life / FADE_SECONDS;
-        for (const m of entry.materials) m.opacity = opacity;
+        for (const entryMaterial of entry.materials) {
+          entryMaterial.material.opacity = entryMaterial.baseOpacity * opacity;
+        }
       }
 
       if (entry.settled) continue;
@@ -127,7 +128,7 @@ export class MagazineDropPool {
 
   private recycle(entry: DroppedMagazine): void {
     this.group.remove(entry.object);
-    for (const m of entry.materials) m.dispose();
+    for (const entryMaterial of entry.materials) entryMaterial.material.dispose();
     const index = this.entries.indexOf(entry);
     if (index >= 0) this.entries.splice(index, 1);
   }

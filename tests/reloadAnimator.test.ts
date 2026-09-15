@@ -169,4 +169,19 @@ describe('MagazineDropPool', () => {
     for (let i = 0; i < 60 * 6; i++) pool.update(1 / 60); // past the 5 s lifetime
     expect(pool.activeCount).toBe(0);
   });
+
+  it('preserves transparent cell materials while applying the final fade', () => {
+    const scene = new THREE.Scene();
+    const pool = new MagazineDropPool(scene);
+    const material = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.4 });
+    const source = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.05), material);
+    source.updateMatrixWorld(true);
+
+    pool.drop(source);
+    const dropped = scene.children[0].children[0] as THREE.Mesh;
+    expect((dropped.material as THREE.Material).opacity).toBeCloseTo(0.4);
+
+    pool.update(4.5);
+    expect((dropped.material as THREE.Material).opacity).toBeCloseTo(0.2);
+  });
 });

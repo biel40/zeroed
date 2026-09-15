@@ -57,6 +57,18 @@ export const MANSION_BUNKER_BOUNDS = {
 
 export const MANSION_BUNKER_Y = -3.4;
 
+export const MANSION_RITUAL_CIRCLE = {
+  id: 'secret-room-ritual-circle',
+  position: {
+    x: MANSION_SECRET_ROOM.centerX,
+    y: MANSION_BUNKER_Y + 0.02,
+    z: MANSION_SECRET_ROOM.centerZ,
+  },
+  floor: -1,
+  useRange: 1.85,
+  lookDotMin: 0.2,
+} as const;
+
 export const SOUL_LAMP_REQUIRED_SOULS = 8;
 export const SOUL_LAMP_CAPTURE_RADIUS = 5;
 
@@ -111,7 +123,7 @@ export const MANSION_SPECIAL_WEAPON_CASES = [
     id: 'bunker-zeus',
     weaponId: 'tesla' as const,
     cost: 3000,
-    interactionLabel: 'ZEUS-99 — 3000',
+    interactionLabel: 'ZEUS-77 — 3000',
     position: { x: -2.2, y: MANSION_BUNKER_Y + 1.1, z: -6.05 },
     useRange: 2,
     lookDotMin: 0.42,

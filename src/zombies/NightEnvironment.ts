@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { DeviceProfile } from '../core/DeviceProfile';
-import type { ShootingRange } from '../range/ShootingRange';
+import type { OutdoorArena } from '../range/OutdoorArena';
 
 const FOG_COLOR = 0x0b1018;
 const FOG_DENSITY = 0.016;
@@ -53,12 +53,12 @@ function makeStarsTexture(): THREE.CanvasTexture {
 }
 
 /**
- * Zombies-mode atmosphere: converts the sunny range into a moonlit,
- * fog-drenched night scene. The range geometry is never touched — the sun
+ * Zombies-mode atmosphere: converts the sunny arena into a moonlit,
+ * fog-drenched night scene. The arena geometry is never touched — the sun
  * directional is restyled into moonlight (no extra shadow-casting light),
  * and a few practical fixtures (sodium floods, a failing tube, an emergency
  * beacon) add warm/cold pools of light. Dust motes drift through the air.
- * Classic Zombies owns this treatment of the shared outdoor range geometry.
+ * Classic Zombies owns this treatment of the shared outdoor arena geometry.
  */
 export class NightEnvironment {
   private readonly group = new THREE.Group();
@@ -70,7 +70,7 @@ export class NightEnvironment {
 
   constructor(
     scene: THREE.Scene,
-    range: ShootingRange,
+    arena: OutdoorArena,
     setExposure: (exposure: number) => void,
     profile: DeviceProfile,
   ) {
@@ -104,15 +104,15 @@ export class NightEnvironment {
     this.group.add(moon);
 
     // --- Sun → moonlight (reuses the existing shadow-casting light) ---
-    const moonlight = range.sun;
+    const moonlight = arena.sun;
     moonlight.color.setHex(MOON_COLOR);
     moonlight.intensity = profile.useReducedEffects ? 0.42 : 0.55;
     moonlight.position.set(-42, 62, -40);
     moonlight.target.position.set(0, 0, -30);
 
-    range.hemisphere.color.setHex(0x223448);
-    range.hemisphere.groundColor.setHex(0x0a0c0e);
-    range.hemisphere.intensity = 0.32;
+    arena.hemisphere.color.setHex(0x223448);
+    arena.hemisphere.groundColor.setHex(0x0a0c0e);
+    arena.hemisphere.intensity = 0.32;
 
     // --- Practical fixtures ---
     // Warm sodium floods under the roof, washing the firing line in amber.

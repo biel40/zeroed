@@ -5,7 +5,7 @@ import type { DeviceProfile } from '../core/DeviceProfile';
 import type { Stats } from '../game/Stats';
 import type { Input } from '../player/Input';
 import type { PlayerController } from '../player/PlayerController';
-import type { ShootingRange } from '../range/ShootingRange';
+import type { OutdoorArena } from '../range/OutdoorArena';
 import type { Effects } from '../rendering/Effects';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { HUD } from '../ui/HUD';
@@ -26,11 +26,11 @@ export interface ModeContext {
   /** Hardware quality tiers for mode-level effect scaling. */
   readonly profile: DeviceProfile;
   /**
-   * The physical range: modes may restyle its lights (night mode) without
+   * The physical arena: modes may restyle its lights (night mode) without
    * touching geometry. One mode runs per session, so changes never need
    * to be reverted.
    */
-  readonly range: ShootingRange;
+  readonly range: OutdoorArena;
   /**
    * Mutable collider array shared with the BallisticsSystem and the aim
    * raycast. Modes may push/splice dynamic hitboxes (zombies) here.

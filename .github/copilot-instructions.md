@@ -87,7 +87,7 @@ public/assets/            GLBs y texturas PBR (ver ASSETS.md).
 `Game` es agnóstico del modo. Cada modo implementa `GameMode` y recibe un
 `ModeContext`. Lo zombie no sabe nada del campo de tiro y viceversa.
 
-- **Shooting Range**: armas con reserva infinita, un slot por arma.
+- **Classic**: armas con reserva infinita, un slot por arma.
 - **Zombies**: empieza solo con la M1911, inventario de 2 slots
   (`WeaponInventory`), reserva finita por arma (`ZOMBIES_RESERVE_AMMO`),
   economía de **Points** (`PlayerEconomy`), Mystery Box (950 PTS), y dos

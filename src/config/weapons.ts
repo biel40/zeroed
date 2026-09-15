@@ -482,8 +482,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     equipTime: 0.45,
     audio: { volume: 0.6, duration: 0.2, lowpass: 5200, thump: 240, energy: true },
     view: {
-      // Dedicated procedural builder (WeaponView.buildTesla): twin coils,
-      // capacitor fins and a fork emitter. No GLB, like the Ray Gun.
+      // Dedicated procedural builder: exposed helical coil, removable caged
+      // capacitor and fork emitter. No GLB, like the Ray Gun.
       teslaFrame: 'tesla',
       energyColor: 0x7fd4ff,
       hip: [0.24, -0.22, -0.44],

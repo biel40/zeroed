@@ -62,7 +62,7 @@ src/
   shooting/trajectory.ts    Integración balística pura (testeable)
   shooting/BallisticsSystem.ts Proyectiles + raycast por segmentos + trazadoras
   shooting/HitTarget.ts     Interfaz estructural + tipos de superficie
-  range/ShootingRange.ts    Escenario PBR, props, iluminación, señales
+  range/OutdoorArena.ts      Escenario PBR, props, iluminación, señales
   range/Target.ts           Blancos reactivos (acero con muelle, papel con decals)
   rendering/Effects.ts      Pools: bullet holes, casquillos, chispas, humo
   audio/AudioSystem.ts      Sonido procedural Web Audio

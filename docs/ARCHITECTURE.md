@@ -1,81 +1,54 @@
 # Arquitectura
 
-FPS de navegador en TypeScript estricto, Three.js, Vite y Vitest. No usa framework de UI, servidor ni motor de fisicas.
+Zeroed es un FPS web en TypeScript estricto, Three.js, Vite y Vitest. No usa
+framework de UI, servidor ni motor de fisicas.
 
-## Estructura
-
-```text
-index.html / src/main.ts
-  -> PWA lifecycle + DeviceProfile + AssetManager + HUD
-  -> selector directo de mapa Zombies
-  -> core/Game.ts                    shell y composition root
-       -> player/                    input y controlador FPS
-       -> weapons/ + config/         logica, datos y vista de armas
-       -> shooting/                  balistica compartida
-       -> range/                     escenario y HitTargets
-       -> rendering/ + audio/ + ui/ efectos laterales
-        -> modes/GameMode.ts          frontera del modo Zombies
-             -> ZombiesMode
-                  -> zombies/         run, enemigos e interacciones
-                  -> zombies/maps/    ClassicArena / BurnedMansionArena
-```
-
-## Flujo de ejecucion
+## Flujo
 
 ```text
-main.ts
-  -> detecta WebGL y perfil
-  -> precarga manifest
-  -> selecciona mapa Zombies
-  -> new Game(..., mode)
-  -> mode.init(ModeContext)
-  -> renderer.setAnimationLoop(Game.tick)
-
-Game.tick
-  -> entrada e interaccion
-  -> PlayerController.update
-  -> Weapon.update -> pendingEvents
-  -> disparo: BallisticsSystem o GameMode.onWeaponFired
-  -> balistica -> HitTarget -> GameMode.onTargetHit
-  -> range.update -> mode.update
-  -> vistas, efectos, HUD y render
+main.ts -> PWA + DeviceProfile + AssetManager + selector de mapa
+        -> Game (loop, renderer, pausa, servicios compartidos)
+        -> Player/Input + WeaponInventory/Weapon + Ballistics/EnergyProjectiles
+        -> ZombiesMode(GameMode) -> ZombieArena + run Zombies
+        -> vistas, audio, HUD, efectos y render
 ```
 
-La pausa corta el `tick` tras renderizar el frame congelado. El `dt` esta limitado a 50 ms.
+`Game.tick()` procesa input, jugador, arma, impactos, arena, modo, vistas,
+efectos, HUD y render. El `dt` se limita a 50 ms. En pausa consume el reloj,
+pero congela la simulacion y conserva el frame visible.
 
-La capa PWA vive en `src/pwa.ts` y `vite.config.ts`, fuera de `Game` y de los modos. Workbox precachea el shell y cachea assets pesados bajo demanda; el navegador aplica automaticamente una actualizacion al entrar, mientras standalone la difiere hasta selector o pausa. La estrategia completa se documenta en `docs/PWA.md`.
+## Responsabilidades
 
-## Responsabilidades y dependencias
+| Area | Responsabilidad |
+| --- | --- |
+| `src/core/Game.ts` | Composition root, loop, pausa y servicios comunes |
+| `src/modes/GameMode.ts` | Contrato del modo y `ModeContext` |
+| `src/modes/ZombiesMode.ts` | Run, rondas, economia, salud, armas y progresion |
+| `src/zombies/maps/*` | Geometria, colliders, spawns e interacciones del mapa |
+| `src/weapons/` + `src/config/` | Logica pura, definiciones y viewmodels |
+| `src/shooting/` | Trayectoria, pool balistico, raycast y `HitTarget` |
+| `src/zombies/` | IA, pool, combate, barreras, puertas y wonder weapons |
+| `src/game/` | Inventario, salud, economia y estadisticas puras |
+| `src/pwa.ts` | Service Worker, instalacion y actualizaciones |
 
-| Area | Responsabilidad | Dependencias relevantes |
-| --- | --- | --- |
-| `src/core/Game.ts` | Crea y conecta todos los servicios compartidos; posee loop, pausa y arsenal | Depende del contrato `GameMode`, no de clases zombie concretas |
-| `src/modes/GameMode.ts` | Capacidades y hooks de un modo; `ModeContext` limita lo que recibe | Expone escena y `hitColliders` mutables |
-| `src/modes/ZombiesMode.ts` | Estado de la run y coordinacion de subsistemas Zombies | Depende de `ZombieArena`, managers, economia y HUD |
-| `src/weapons/Weapon.ts` | Maquina de estados de arma y eventos | TypeScript puro; consume `WeaponDefinition` |
-| `src/weapons/WeaponView.ts` | Modelos, ADS, sway, bob, recoil y recarga visual sin manos del jugador | Compone `ReloadAnimator`, Three.js y assets |
-| `src/shooting/BallisticsSystem.ts` | Pool de proyectiles y resolucion de impactos | Array compartido de colliders y `HitTarget` |
-| `src/zombies/ZombieManager.ts` | Pool, movimiento, combate y hitboxes zombie | Spawns, barreras, transiciones y colliders del mapa |
-| `src/zombies/ZombieConfig.ts` | Registro de tipos, modelos, estadísticas, selección y capacidades visuales | Lógica pura; no depende de Three.js |
-| `src/zombies/maps/ZombieArena.ts` | Contrato de geometria, spawns e interacciones de mapa | Implementado por `ClassicArena` y `BurnedMansionArena` |
-| `src/game/` | Inventario, salud, economia y estadisticas | Logica pura reutilizada por modos |
+## Contratos
 
-## Fronteras existentes
+- Las armas son datos (`WeaponDefinition`), no subclases. `Weapon` no importa
+  Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`.
+- Logica determinista y vistas Three.js permanecen separadas para poder probar
+  en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
+  municion la decide el modo.
+- `ZombieArena` permite una unica `ZombiesMode` con `ClassicArena` y
+  `BurnedMansionArena`. `HitTarget` desacopla balistica de blancos.
+- Pools y temporales reutilizables limitan allocations por frame. Los tipos
+  zombie (`normal`, `shiny`, `brute`) pueden compartir modelo sin duplicar IA.
+- Las armas de energia usan `EnergyProjectiles`; identificar impactos por color
+  no es extensible y debe sustituirse antes de una tercera arma.
+- No existe `dispose()` completo para cambiar modo o mapa sin recargar.
 
-- La configuracion define armas; no hay subclases por arma (`src/config/weapons.ts`).
-- Logica determinista y vistas Three.js estan separadas en armas, Mystery Box, barreras y puertas.
-- La comunicacion de `Weapon` hacia el shell usa `pendingEvents`.
-- `HitTarget` desacopla la balistica de blancos y zombies.
-- Points solo se modifican mediante `PlayerEconomy`; las reservas de Zombies las decide el modo.
-- Pools fijos limitan proyectiles, zombies y efectos. Los loops reutilizan temporales donde es posible.
-- Los tipos zombie (`normal`, `shiny`, `brute`) son perfiles de gameplay; los modelos (`walker`, `brute`) son contratos de asset separados. `ZombiePool` reserva instancias por modelo bajo un único máximo activo.
+## Extension
 
-## Puntos de extension
-
-- Arma convencional: `WeaponId`, `WeaponDefinition` y lista de preload/orden aplicable.
-- Modo: implementar `GameMode` y registrarlo en selector/HUD.
-- Mapa Zombies: implementar `ZombieArena`; hoy la seleccion y la progresion de puertas aun requieren ramas explicitas.
-- Objeto disparable: implementar `HitTarget` y registrar su `Object3D` en `hitColliders`.
-- Interaccion Zombies: reutilizar `PointDoor`, `WindowBarrier`, `WallBuy` o `ArenaWeaponPickup`; la prioridad esta centralizada en `ZombiesMode`.
-- Tipo zombie: registrar estadísticas/modelo/regla en `ZOMBIE_TYPE_CONFIGS`, incluirlo en `ZOMBIE_SPAWN_ORDER` si no es el fallback y, solo si usa un asset nuevo, añadir su modelo, manifest y capacidad visual.
-- Nueva arma de energia: requiere ampliar el contrato de impacto; el color actual no es una identidad extensible.
+Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo modo:
+`GameMode` y selector. Nuevo mapa: `ZombieArena`. Nuevo blanco: `HitTarget` y
+registro en colliders. Nuevo tipo zombie: registro de estadisticas/modelo,
+orden de spawn y asset si procede.

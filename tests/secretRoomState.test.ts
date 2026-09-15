@@ -53,4 +53,17 @@ describe('SecretRoomState', () => {
     expect(state.completedLamps).toBe(0);
     expect(state.lamps.every((lamp) => !lamp.activated && lamp.currentSouls === 0 && lamp.pendingSouls === 0)).toBe(true);
   });
+
+  it('allows the unlocked ritual scare exactly once per run', () => {
+    const state = new SecretRoomState(definitions, 1, 3);
+
+    expect(state.triggerRitualScare()).toBe(false);
+    state.unlocked = true;
+    expect(state.triggerRitualScare()).toBe(true);
+    expect(state.triggerRitualScare()).toBe(false);
+
+    state.reset();
+    state.unlocked = true;
+    expect(state.triggerRitualScare()).toBe(true);
+  });
 });

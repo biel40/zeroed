@@ -35,12 +35,12 @@ function makeSignTexture(label: string): THREE.CanvasTexture {
 }
 
 /**
- * Builds the outdoor range: platform, bench, roof, side walls, props, target
+ * Builds the outdoor arena: platform, bench, roof, side walls, props, target
  * rows at 25/50/100/200 m with distance signage and a backstop berm.
  * Materials use the downloaded PBR texture sets when available and fall back
  * to flat colors otherwise.
  */
-export class ShootingRange {
+export class OutdoorArena {
   readonly group = new THREE.Group();
   readonly colliders: THREE.Object3D[] = [];
   readonly targets: Target[] = [];

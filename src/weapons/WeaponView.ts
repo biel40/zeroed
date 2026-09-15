@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clamp, damp } from '../utils/math';
 import type { MagazineDropPool } from './MagazineDrop';
 import { buildM4A1 } from './M4A1ViewModel';
@@ -109,7 +110,7 @@ export interface BuiltProcedural {
   muzzlePosition: THREE.Vector3;
   ejectionPosition: THREE.Vector3;
   sightY: number;
-  /** Emissive materials that pulse over time; only the Ray Gun uses this. */
+  /** Emissive materials that pulse over time on procedural energy weapons. */
   energyMaterials?: THREE.MeshStandardMaterial[];
   /** Reload parts the animator drives (magazine, feed cover, handle, cell). */
   reloadParts?: Partial<ReloadParts>;
@@ -207,125 +208,289 @@ function buildRaygun(config: ViewModelConfig): BuiltProcedural {
 }
 
 /**
- * ZEUS-77 "Tempest Coil" view model: an original electric Wonder Weapon
- * built from primitives — a dark gunmetal receiver, two exposed copper
- * accelerator coils wrapping the barrel, a glowing capacitor spine, and a
- * fork emitter up front that the chain arcs read as the arc's origin. The
- * capacitor cell on top is the reloadable part (cell-style choreography).
- * Distinct silhouette from the Ray Gun: coils + fork vs. rings + sphere.
+ * ZEUS-77 "Tempest Coil": a long, handmade electromechanical prototype with
+ * a real exposed winding, caged capacitor and fork discharge crown. Named
+ * assemblies keep the reload cell and future moving parts independently usable.
  */
 function buildTesla(config: ViewModelConfig): BuiltProcedural {
   const group = new THREE.Group();
+  group.name = 'zeus77-root';
   const glowColor = config.energyColor ?? 0x7fd4ff;
+  const boreY = 0.012;
+  const muzzleZ = -0.61;
+  const sy = config.sightHeight;
 
-  const body = new THREE.MeshStandardMaterial({
+  const wornSteel = new THREE.MeshStandardMaterial({
     color: config.bodyColor,
-    roughness: 0.4,
-    metalness: 0.8,
+    roughness: 0.54,
+    metalness: 0.76,
+    envMapIntensity: 1.15,
   });
-  const copper = new THREE.MeshStandardMaterial({
-    color: 0xb0603a,
-    roughness: 0.32,
-    metalness: 0.9,
+  const blackSteel = new THREE.MeshStandardMaterial({ color: 0x111417, roughness: 0.6, metalness: 0.68 });
+  const copper = new THREE.MeshStandardMaterial({ color: config.accentColor, roughness: 0.34, metalness: 0.9 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0x9a6a2d, roughness: 0.42, metalness: 0.84 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x4c2818, roughness: 0.82, metalness: 0.02 });
+  const ceramic = new THREE.MeshStandardMaterial({ color: 0x9a917d, roughness: 0.72, metalness: 0.05 });
+  const redWire = new THREE.MeshStandardMaterial({ color: 0x5a1310, roughness: 0.76, metalness: 0.08 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x284452,
+    roughness: 0.18,
+    metalness: 0.16,
+    transparent: true,
+    opacity: 0.48,
+    depthWrite: false,
   });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x11141a, roughness: 0.5, metalness: 0.5 });
-  const energyMaterials: THREE.MeshStandardMaterial[] = [];
-  const makeGlow = (intensity = 1.6): THREE.MeshStandardMaterial => {
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x0a0e14,
-      roughness: 0.35,
-      metalness: 0.2,
-      emissive: glowColor,
-      emissiveIntensity: intensity,
-    });
-    energyMaterials.push(material);
-    return material;
-  };
+  const energy = new THREE.MeshStandardMaterial({
+    color: 0x102733,
+    roughness: 0.28,
+    metalness: 0.12,
+    emissive: glowColor,
+    emissiveIntensity: 1.65,
+  });
+  const energyMaterials = [energy];
 
+  const box = (width: number, height: number, depth: number): THREE.BoxGeometry =>
+    new THREE.BoxGeometry(width, height, depth);
+  const cylinder = (radius: number, length: number, segments = 12): THREE.CylinderGeometry => {
+    const geometry = new THREE.CylinderGeometry(radius, radius, length, segments);
+    geometry.rotateX(Math.PI / 2);
+    return geometry;
+  };
+  const profile = (points: readonly (readonly [number, number])[], width: number): THREE.ExtrudeGeometry => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-points[0][0], points[0][1]);
+    for (const [depth, height] of points.slice(1)) shape.lineTo(-depth, height);
+    shape.closePath();
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: width,
+      bevelEnabled: true,
+      bevelSegments: 1,
+      bevelSize: 0.002,
+      bevelThickness: 0.002,
+      steps: 1,
+      curveSegments: 1,
+    });
+    geometry.rotateY(Math.PI / 2);
+    geometry.translate(-width / 2, 0, 0);
+    return geometry;
+  };
+  const assembly = (name: string): THREE.Group => {
+    const part = new THREE.Group();
+    part.name = `zeus77-${name}`;
+    group.add(part);
+    return part;
+  };
   const add = (
+    name: string,
     geometry: THREE.BufferGeometry,
     material: THREE.Material,
     x: number,
     y: number,
     z: number,
-    rx = 0,
-    rz = 0,
+    parent: THREE.Object3D = group,
   ): THREE.Mesh => {
     const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `zeus77-${name}`;
     mesh.position.set(x, y, z);
-    mesh.rotation.x = rx;
-    mesh.rotation.z = rz;
-    group.add(mesh);
+    parent.add(mesh);
     return mesh;
   };
+  const cable = (
+    name: string,
+    points: readonly THREE.Vector3[],
+    material: THREE.Material,
+    parent: THREE.Object3D,
+    radius = 0.0035,
+  ): THREE.Mesh => add(
+    name,
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3([...points]), 12, radius, 5, false),
+    material,
+    0,
+    0,
+    0,
+    parent,
+  );
+  const batchAssembly = (part: THREE.Group): void => {
+    const batches = new Map<THREE.Material, THREE.Mesh[]>();
+    for (const child of part.children) {
+      if (!(child instanceof THREE.Mesh)) continue;
+      const batch = batches.get(child.material) ?? [];
+      batch.push(child);
+      batches.set(child.material, batch);
+    }
+    let batchIndex = 0;
+    for (const [material, meshes] of batches) {
+      if (meshes.length < 2) continue;
+      const geometries = meshes.map((mesh) => {
+        mesh.updateMatrix();
+        const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+        geometry.applyMatrix4(mesh.matrix);
+        return geometry;
+      });
+      const merged = mergeGeometries(geometries);
+      if (merged) {
+        const mesh = new THREE.Mesh(merged, material);
+        mesh.name = `${part.name}-batch-${batchIndex++}`;
+        mesh.userData.sourceNames = meshes.map((source) => source.name);
+        part.add(mesh);
+        for (const source of meshes) {
+          source.geometry.dispose();
+          part.remove(source);
+        }
+      }
+      for (const geometry of geometries) geometry.dispose();
+    }
+  };
 
-  const sy = config.sightHeight;
-
-  // Grip and receiver block.
-  add(new THREE.BoxGeometry(0.04, 0.11, 0.05), dark, 0, -0.08, 0.06, 0.3);
-  add(new THREE.BoxGeometry(0.06, 0.072, 0.24), body, 0, 0, -0.01);
-  // Angular shoulder stock.
-  add(new THREE.BoxGeometry(0.05, 0.08, 0.14), dark, 0, -0.02, 0.17, -0.12);
-
-  // Barrel core with twin copper accelerator coils wrapping it.
-  add(new THREE.CylinderGeometry(0.016, 0.016, 0.3, 12), dark, 0, 0.004, -0.22, Math.PI / 2);
-  for (const z of [-0.13, -0.19, -0.25, -0.31]) {
-    add(new THREE.TorusGeometry(0.032, 0.0075, 8, 16), copper, 0, 0.004, z);
-  }
-  // Insulating glow rings between the coils.
-  for (const z of [-0.16, -0.22, -0.28]) {
-    add(new THREE.TorusGeometry(0.03, 0.004, 6, 16), makeGlow(1.3), 0, 0.004, z);
-  }
-
-  // Fork emitter: two prongs splayed apart, arcing tips — the chain origin.
+  const stock = assembly('stock');
+  add('stock-wood', profile([
+    [0.07, 0.027], [0.22, 0.035], [0.285, 0.008], [0.282, -0.08],
+    [0.245, -0.098], [0.17, -0.068], [0.07, -0.032],
+  ], 0.052), wood, 0, 0, 0, stock);
+  add('stock-spine', box(0.06, 0.018, 0.2), blackSteel, 0, 0.025, 0.155, stock);
+  add('buttplate', box(0.058, 0.115, 0.012), brass, 0, -0.03, 0.286, stock);
   for (const side of [-1, 1]) {
+    add('stock-rivet', cylinder(0.003, 0.004, 7), brass, side * 0.027, -0.015, 0.25, stock).rotation.y = Math.PI / 2;
+  }
+
+  const receiver = assembly('receiver');
+  add('receiver-core', profile([
+    [-0.11, 0.033], [0.105, 0.033], [0.125, 0.012], [0.112, -0.044],
+    [-0.085, -0.044], [-0.115, -0.016],
+  ], 0.07), wornSteel, 0, 0, 0, receiver);
+  add('receiver-top-rail', box(0.052, 0.009, 0.235), brass, 0, 0.04, -0.002, receiver);
+  for (const z of [-0.09, -0.045, 0, 0.045, 0.09]) {
+    add('top-rail-notch', box(0.058, 0.006, 0.008), blackSteel, 0, 0.046, z, receiver);
+  }
+  for (const side of [-1, 1]) {
+    add('receiver-side-plate', box(0.004, 0.052, 0.145), brass, side * 0.037, -0.002, 0.01, receiver);
+    for (const z of [-0.045, 0.055]) {
+      add('receiver-bolt', cylinder(0.004, 0.003, 7), blackSteel, side * 0.04, 0.012, z, receiver).rotation.y = Math.PI / 2;
+    }
+  }
+
+  const grip = assembly('grip');
+  add('grip-core', profile([
+    [0.045, -0.03], [0.095, -0.035], [0.135, -0.142], [0.082, -0.15],
+  ], 0.046), wood, 0, 0, 0, grip);
+  for (const side of [-1, 1]) {
+    add('grip-panel', box(0.004, 0.082, 0.04), wood, side * 0.025, -0.09, 0.09, grip).rotation.x = -0.24;
+    add('grip-screw', cylinder(0.003, 0.003, 7), brass, side * 0.028, -0.085, 0.09, grip).rotation.y = Math.PI / 2;
+  }
+  const triggerGuard = add('trigger-guard', new THREE.TorusGeometry(0.026, 0.003, 5, 14), brass, 0, -0.047, -0.055, grip);
+  triggerGuard.rotation.y = Math.PI / 2;
+  triggerGuard.scale.z = 1.35;
+  add('trigger', box(0.006, 0.027, 0.005), blackSteel, 0, -0.048, -0.052, grip).rotation.x = -0.25;
+
+  const transformer = assembly('transformer-bank');
+  add('transformer-case', box(0.062, 0.055, 0.12), blackSteel, 0, -0.065, -0.01, transformer);
+  for (let fin = 0; fin < 7; fin++) {
+    add('cooling-fin', box(0.078, 0.044, 0.005), wornSteel, 0, -0.069, 0.04 - fin * 0.017, transformer);
+  }
+  for (const side of [-1, 1]) {
+    add('terminal', cylinder(0.009, 0.026, 8), ceramic, side * 0.023, -0.028, -0.045, transformer).rotation.x = Math.PI / 2;
+  }
+
+  const capacitor = assembly('capacitor-cell');
+  capacitor.position.set(0.047, 0.035, 0.045);
+  add('capacitor-energy-core', cylinder(0.015, 0.105, 10), energy, 0, 0, 0, capacitor);
+  add('capacitor-glass', cylinder(0.023, 0.11, 12), glass, 0, 0, 0, capacitor);
+  for (const z of [-0.058, 0.058]) {
+    add('capacitor-cap', cylinder(0.027, 0.012, 10), brass, 0, 0, z, capacitor);
+  }
+  for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
     add(
-      new THREE.BoxGeometry(0.008, 0.008, 0.09),
+      'capacitor-cage-bar',
+      box(0.004, 0.004, 0.12),
       copper,
-      side * 0.02,
-      0.004,
-      -0.38,
+      Math.cos(angle) * 0.026,
+      Math.sin(angle) * 0.026,
       0,
-      side * 0.18,
+      capacitor,
     );
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), makeGlow(2.2));
-    tip.position.set(side * 0.033, 0.004, -0.415);
-    group.add(tip);
+  }
+  add('capacitor-latch', box(0.014, 0.012, 0.022), blackSteel, 0.026, -0.02, 0.048, capacitor);
+
+  const barrel = assembly('coil-chamber');
+  add('chamber-core', cylinder(0.018, 0.35, 12), energy, 0, boreY, -0.31, barrel);
+  add('chamber-glass', cylinder(0.026, 0.35, 14), glass, 0, boreY, -0.31, barrel);
+  add('rear-barrel-socket', cylinder(0.038, 0.055, 12), wornSteel, 0, boreY, -0.13, barrel);
+  for (const z of [-0.155, -0.245, -0.335, -0.425, -0.475]) {
+    add('coil-support-ring', new THREE.TorusGeometry(0.034, 0.004, 6, 16), z === -0.475 ? brass : ceramic, 0, boreY, z, barrel);
+  }
+  const helixPoints: THREE.Vector3[] = [];
+  const helixSegments = 56;
+  for (let index = 0; index <= helixSegments; index++) {
+    const t = index / helixSegments;
+    const angle = t * Math.PI * 11;
+    helixPoints.push(new THREE.Vector3(
+      Math.cos(angle) * 0.031,
+      boreY + Math.sin(angle) * 0.031,
+      -0.165 - t * 0.3,
+    ));
+  }
+  add(
+    'exposed-copper-coil',
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(helixPoints), helixSegments, 0.0045, 5, false),
+    copper,
+    0,
+    0,
+    0,
+    barrel,
+  );
+  for (const side of [-1, 1]) {
+    add('chamber-rail', box(0.006, 0.007, 0.36), brass, side * 0.041, boreY - 0.027, -0.31, barrel);
+    cable(
+      'insulated-feed-wire',
+      [
+        new THREE.Vector3(side * 0.035, -0.045, -0.025),
+        new THREE.Vector3(side * 0.052, -0.035, -0.12),
+        new THREE.Vector3(side * 0.052, -0.018, -0.34),
+        new THREE.Vector3(side * 0.038, boreY - 0.02, -0.49),
+      ],
+      side < 0 ? redWire : blackSteel,
+      barrel,
+    );
   }
 
-  // Capacitor spine along the top: three glowing cells between copper ribs.
-  const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.09, 12), makeGlow(1.8));
-  cell.rotation.x = Math.PI / 2;
-  cell.position.set(0, 0.062, -0.02);
-  group.add(cell);
-  for (const z of [-0.055, 0.015]) {
-    add(new THREE.TorusGeometry(0.024, 0.005, 6, 14), copper, 0, 0.062, z);
+  const emitter = assembly('fork-emitter');
+  add('emitter-crown', cylinder(0.042, 0.025, 12), brass, 0, boreY, -0.5, emitter);
+  add('emitter-insulator', cylinder(0.031, 0.02, 10), ceramic, 0, boreY, -0.518, emitter);
+  for (const side of [-1, 1]) {
+    const prong = add('emitter-prong', box(0.011, 0.012, 0.095), copper, side * 0.025, boreY, -0.553, emitter);
+    prong.rotation.y = -side * 0.12;
+    add('emitter-electrode', new THREE.SphereGeometry(0.011, 8, 6), energy, side * 0.032, boreY, -0.594, emitter);
   }
-  // Cage posts holding the capacitor.
-  add(new THREE.BoxGeometry(0.006, 0.03, 0.006), dark, 0, 0.036, -0.05);
-  add(new THREE.BoxGeometry(0.006, 0.03, 0.006), dark, 0, 0.036, 0.012);
+  add('discharge-gap', new THREE.TorusGeometry(0.019, 0.0035, 5, 14), brass, 0, boreY, -0.584, emitter);
 
-  // Red-dot sight (the Tesla aims true: ADS aligns the dot to shot center).
-  add(new THREE.BoxGeometry(0.02, 0.012, 0.05), dark, 0, sy - 0.024, -0.13);
-  add(new THREE.BoxGeometry(0.003, 0.03, 0.004), dark, -0.011, sy - 0.006, -0.13);
-  add(new THREE.BoxGeometry(0.003, 0.03, 0.004), dark, 0.011, sy - 0.006, -0.13);
-  add(new THREE.BoxGeometry(0.026, 0.003, 0.004), dark, 0, sy + 0.008, -0.13);
-  const dot = new THREE.Mesh(
+  const optic = assembly('optic');
+  add('optic-base', box(0.026, 0.012, 0.052), blackSteel, 0, sy - 0.027, -0.105, optic);
+  for (const side of [-1, 1]) {
+    add('optic-post', box(0.004, 0.032, 0.005), blackSteel, side * 0.014, sy - 0.007, -0.105, optic);
+  }
+  add('optic-bridge', box(0.032, 0.004, 0.005), blackSteel, 0, sy + 0.01, -0.105, optic);
+  add(
+    'optic-dot',
     new THREE.SphereGeometry(0.0035, 8, 6),
     new THREE.MeshBasicMaterial({ color: glowColor, toneMapped: false }),
+    0,
+    sy,
+    -0.105,
+    optic,
   );
-  dot.position.set(0, sy, -0.13);
-  group.add(dot);
+
+  for (const part of [stock, receiver, grip, transformer, barrel, emitter, optic]) {
+    batchAssembly(part);
+  }
 
   group.scale.setScalar(config.scale);
-  const sightY = sy * config.scale;
   return {
     group,
-    muzzlePosition: new THREE.Vector3(0, 0.004 * config.scale, -0.42 * config.scale),
-    ejectionPosition: new THREE.Vector3(0.035 * config.scale, 0, 0.02),
-    sightY,
+    muzzlePosition: new THREE.Vector3(0, boreY, muzzleZ).multiplyScalar(config.scale),
+    ejectionPosition: new THREE.Vector3(0.04, 0, 0.015).multiplyScalar(config.scale),
+    sightY: sy * config.scale,
     energyMaterials,
-    reloadParts: { magazine: cell },
+    reloadParts: { magazine: capacitor },
   };
 }
 
@@ -1121,29 +1286,36 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
 function buildAk47(config: ViewModelConfig): BuiltProcedural {
   const group = new THREE.Group();
   group.name = 'ak47-root';
-  // Parkerized near-black steel + classic reddish-brown birch laminate.
+  // Blued near-black steel + satin reddish-brown birch laminate. The higher
+  // roughness keeps both readable under the game's lighting without looking
+  // like polished plastic in first person.
   const steel = new THREE.MeshStandardMaterial({
     color: config.bodyColor,
-    roughness: 0.36,
-    metalness: 0.82,
-    envMapIntensity: 1.3,
+    roughness: 0.48,
+    metalness: 0.76,
+    envMapIntensity: 1.05,
   });
   const steelDark = new THREE.MeshStandardMaterial({
-    color: 0x14161a,
-    roughness: 0.45,
-    metalness: 0.6,
+    color: 0x101216,
+    roughness: 0.56,
+    metalness: 0.68,
   });
   const wood = new THREE.MeshStandardMaterial({
     color: config.accentColor,
-    roughness: 0.55,
+    roughness: 0.66,
     metalness: 0,
-    envMapIntensity: 1.1,
+    envMapIntensity: 0.82,
+  });
+  const woodDark = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(config.accentColor).multiplyScalar(0.62),
+    roughness: 0.72,
+    metalness: 0,
   });
   const magSteel = new THREE.MeshStandardMaterial({
     color: config.reloadAnim?.magColor ?? 0x2b2d30,
-    roughness: 0.42,
-    metalness: 0.55,
-    envMapIntensity: 1.15,
+    roughness: 0.52,
+    metalness: 0.62,
+    envMapIntensity: 1,
   });
 
   const add = (
@@ -1175,6 +1347,7 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
     material: THREE.Material,
     /** Optional width taper along world Z (wrist slimmer than the butt). */
     widthTaper?: { readonly zMin: number; readonly zMax: number; readonly atMin: number; readonly atMax: number },
+    parent: THREE.Object3D = group,
   ): THREE.Mesh => {
     const shape = new THREE.Shape();
     shape.moveTo(points[0][0], points[0][1]);
@@ -1182,7 +1355,12 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
     shape.closePath();
     const geometry = new THREE.ExtrudeGeometry(shape, {
       depth: thickness,
-      bevelEnabled: false,
+      bevelEnabled: true,
+      bevelSegments: 1,
+      bevelSize: 0.0015,
+      bevelThickness: 0.0015,
+      curveSegments: 1,
+      steps: 1,
     });
     geometry.rotateY(Math.PI / 2);
     geometry.translate(-thickness / 2, 0, 0);
@@ -1197,7 +1375,7 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
       geometry.computeVertexNormals();
     }
     const mesh = new THREE.Mesh(geometry, material);
-    group.add(mesh);
+    parent.add(mesh);
     return mesh;
   };
 
@@ -1205,13 +1383,21 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
   const boreY = 0.016;
   const receiverZ = 0.13; // receiver half-length (stamped receiver + trunnions)
 
-  // --- Receiver: layered boxes + rounded dust cover, never one big slab ---
-  const receiver = add(
-    new RoundedBoxGeometry(0.04, 0.056, receiverZ * 2, 2, 0.005),
+  // --- Receiver: a tapered side profile under a separate arched top cover ---
+  // The stepped front and narrower lower edge remove the generic rectangular
+  // rifle-body read while retaining a cheap, closed low-poly volume.
+  const receiver = extrudeProfile(
+    [
+      [-receiverZ, 0.017],
+      [0.098, 0.017],
+      [receiverZ, 0.007],
+      [receiverZ, -0.028],
+      [0.082, -0.041],
+      [-0.096, -0.037],
+      [-receiverZ, -0.024],
+    ],
+    0.04,
     steel,
-    0,
-    -0.006,
-    0,
   );
   receiver.name = 'ak47-receiver';
   const dustCover = add(
@@ -1227,6 +1413,14 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
     'ak47-front-trunnion';
   add(new THREE.BoxGeometry(0.034, 0.04, 0.03), steel, 0, -0.008, 0.135).name =
     'ak47-rear-trunnion';
+  // Ejection opening and sparse rivets break up the right side in the hip
+  // pose without relying on textures or increasing silhouette complexity.
+  add(new RoundedBoxGeometry(0.0025, 0.016, 0.068, 1, 0.002), steelDark, 0.0215, 0.014, -0.034).name =
+    'ak47-ejection-port';
+  for (const z of [-0.105, 0.09]) {
+    add(new THREE.CylinderGeometry(0.0028, 0.0028, 0.003, 6), steelDark, 0.022, -0.011, z, 0, Math.PI / 2)
+      .name = 'ak47-receiver-rivet';
+  }
   // Selector paddle on the right flank — an AK signature.
   add(new THREE.BoxGeometry(0.003, 0.02, 0.095), steelDark, 0.0215, 0.008, 0.03).name =
     'ak47-selector';
@@ -1264,18 +1458,21 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
   ).name = 'ak47-cleaning-rod';
   const muzzleZ = -0.553;
 
-  // --- Front sight: protected post at the muzzle, tip on the sight line ---
-  add(new THREE.BoxGeometry(0.02, 0.034, 0.022), steel, 0, 0.028, -0.505).name =
+  // --- Front sight: narrow collar, protected post and open sight picture ---
+  add(new THREE.CylinderGeometry(0.013, 0.013, 0.022, 8), steel, 0, boreY, -0.505, Math.PI / 2).name =
     'ak47-front-sight-base';
   add(new THREE.BoxGeometry(0.004, 0.028, 0.004), steelDark, 0, sy - 0.014, -0.505).name =
     'ak47-front-sight-post';
   for (const side of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.003, 0.024, 0.018), steelDark, side * 0.0075, 0.052, -0.505).name =
+    const wing = add(new THREE.BoxGeometry(0.003, 0.027, 0.012), steelDark, side * 0.0085, 0.05, -0.505, 0, side * -0.12);
+    wing.name =
       'ak47-front-sight-wing';
   }
 
-  // --- Gas system: block, visible tube ends, rear sight block + tangent ---
-  add(new THREE.BoxGeometry(0.02, 0.05, 0.024), steel, 0, 0.026, -0.375, -0.06).name =
+  // --- Gas system: barrel collar, diagonal bridge, tube and tangent block ---
+  add(new THREE.CylinderGeometry(0.012, 0.012, 0.022, 8), steel, 0, boreY, -0.375, Math.PI / 2).name =
+    'ak47-gas-block-collar';
+  add(new THREE.BoxGeometry(0.018, 0.041, 0.018), steel, 0, 0.03, -0.375, -0.13).name =
     'ak47-gas-block';
   add(
     new THREE.CylinderGeometry(0.0085, 0.0085, 0.225, 8),
@@ -1298,13 +1495,41 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
       .name = 'ak47-tangent-ear';
   }
 
-  // --- Two-piece wooden handguard around the barrel + gas tube ---
-  add(new RoundedBoxGeometry(0.048, 0.042, 0.25, 2, 0.009), wood, 0, 0.004, -0.23).name =
-    'ak47-handguard-lower';
-  add(new RoundedBoxGeometry(0.052, 0.046, 0.09, 2, 0.012), wood, 0, 0.002, -0.26).name =
-    'ak47-handguard-lower-swell';
-  add(new RoundedBoxGeometry(0.038, 0.024, 0.145, 2, 0.008), wood, 0, 0.046, -0.2775).name =
-    'ak47-handguard-upper';
+  // --- Two-piece wooden handguard with the AK's tapered palm swell ---
+  const lowerHandguard = extrudeProfile(
+    [
+      [0.122, 0.018],
+      [0.15, 0.024],
+      [0.29, 0.026],
+      [0.36, 0.015],
+      [0.36, -0.016],
+      [0.315, -0.023],
+      [0.17, -0.027],
+      [0.122, -0.015],
+    ],
+    0.048,
+    wood,
+  );
+  lowerHandguard.name = 'ak47-handguard-lower';
+  const upperHandguard = extrudeProfile(
+    [
+      [0.184, 0.058],
+      [0.21, 0.064],
+      [0.326, 0.061],
+      [0.35, 0.052],
+      [0.34, 0.035],
+      [0.2, 0.035],
+    ],
+    0.038,
+    wood,
+  );
+  upperHandguard.name = 'ak47-handguard-upper';
+  // Two shallow laminate seams give the wood scale and direction while using
+  // simple geometry and one shared material.
+  for (const y of [-0.012, 0.011]) {
+    add(new THREE.BoxGeometry(0.0018, 0.003, 0.165), woodDark, 0.025, y, -0.26).name =
+      'ak47-handguard-laminate';
+  }
   // Steel band clamping the handguard front (the gas block sits just ahead).
   add(new THREE.BoxGeometry(0.042, 0.03, 0.012), steel, 0, 0.006, -0.356).name =
     'ak47-handguard-band';
@@ -1315,18 +1540,21 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
   // reading as a featureless slab in first person.
   const stock = extrudeProfile(
     [
-      [-0.115, -0.006], // wrist top (embedded in the receiver/trunnion)
-      [-0.19, -0.014], // comb
-      [-0.331, -0.026], // buttplate top
-      [-0.338, -0.086], // buttplate bottom
-      [-0.328, -0.09], // toe
-      [-0.115, -0.042], // wrist bottom
+      [-0.112, 0.005], // wrist top (embedded in the rear trunnion)
+      [-0.18, -0.003], // comb
+      [-0.326, -0.018], // buttplate top
+      [-0.338, -0.083], // buttplate bottom
+      [-0.323, -0.094], // toe
+      [-0.185, -0.065], // lower belly
+      [-0.112, -0.04], // wrist bottom
     ],
-    0.034,
+    0.036,
     wood,
     { zMin: 0.115, zMax: 0.338, atMin: 0.78, atMax: 1.04 },
   );
   stock.name = 'ak47-stock';
+  add(new THREE.BoxGeometry(0.002, 0.003, 0.175), woodDark, 0.019, -0.038, 0.245, -0.08).name =
+    'ak47-stock-laminate';
   // Steel buttplate cap following the profile's rear angle.
   add(new THREE.BoxGeometry(0.035, 0.068, 0.006), steelDark, 0, -0.055, 0.3335, -0.106).name =
     'ak47-buttplate';
@@ -1334,17 +1562,19 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
   // --- Wooden pistol grip: swept back like the real bakelite/wood grip ---
   const grip = extrudeProfile(
     [
-      [-0.07, -0.03], // top front
-      [-0.075, -0.065], // front strap
-      [-0.095, -0.108], // bottom front
-      [-0.143, -0.115], // bottom
-      [-0.15, -0.105], // bottom rear
-      [-0.125, -0.03], // top rear
+      [-0.066, -0.029], // top front
+      [-0.074, -0.068], // front strap
+      [-0.097, -0.116], // bottom front
+      [-0.132, -0.119], // heel
+      [-0.143, -0.105], // rear strap
+      [-0.12, -0.031], // top rear
     ],
-    0.026,
+    0.028,
     wood,
   );
   grip.name = 'ak47-grip';
+  add(new THREE.BoxGeometry(0.002, 0.055, 0.004), woodDark, 0.015, -0.078, 0.106, -0.28).name =
+    'ak47-grip-groove';
 
   // --- Charging handle on the RIGHT flank (the animator racks it +Z) ---
   const handle = new THREE.Group();
@@ -1358,32 +1588,53 @@ function buildAk47(config: ViewModelConfig): BuiltProcedural {
   handle.add(handleStem, handleKnob);
   group.add(handle);
 
-  // --- 30-round 7.62 "banana" magazine: tangential arc, strong forward
-  // sweep; the group origin sits at the feed lips so the ReloadAnimator's
-  // 'rock' style pivots it out of the well like the real rock-and-lock. ---
+  // --- 30-round 7.62 magazine: one continuous curved shell rather than a
+  // stack of boxes. The group origin remains at the feed lips so the shared
+  // rock-and-lock animation and detached-magazine pool keep working. ---
   const magazine = new THREE.Group();
   magazine.name = 'ak47-magazine';
   const magH = config.reloadAnim?.magSize[1] ?? 0.16;
-  const segments = 6;
-  const segH = magH / segments;
-  const tiltPerSeg = 0.185; // ~64° total sweep — the 7.62 curve
-  let segY = 0;
-  let segZ = 0;
-  for (let i = 0; i < segments; i++) {
-    const t = i / (segments - 1);
-    const seg = new THREE.Mesh(
-      new RoundedBoxGeometry(0.036 - t * 0.008, segH * 1.12, 0.052 - t * 0.01, 2, 0.004),
-      magSteel,
-    );
-    seg.name = 'ak47-magazine-segment';
-    seg.position.set(0, segY - segH / 2, segZ);
-    // Positive rx sweeps each segment down-FORWARD along the feed curve.
-    seg.rotation.x = (i + 0.5) * tiltPerSeg;
-    magazine.add(seg);
-    const stepAngle = (i + 1) * tiltPerSeg;
-    segY -= Math.cos(stepAngle) * segH;
-    segZ -= Math.sin(stepAngle) * segH;
+  const magScale = magH / 0.16;
+  const magazineBody = extrudeProfile(
+    [
+      [-0.017 * magScale, 0.004 * magScale],
+      [0.035 * magScale, 0.004 * magScale],
+      [0.057 * magScale, -0.047 * magScale],
+      [0.097 * magScale, -0.107 * magScale],
+      [0.158 * magScale, -0.158 * magScale],
+      [0.176 * magScale, -0.166 * magScale],
+      [0.147 * magScale, -0.181 * magScale],
+      [0.102 * magScale, -0.148 * magScale],
+      [0.061 * magScale, -0.098 * magScale],
+      [0.025 * magScale, -0.043 * magScale],
+      [-0.012 * magScale, -0.018 * magScale],
+    ],
+    0.036,
+    magSteel,
+    undefined,
+    magazine,
+  );
+  magazineBody.name = 'ak47-magazine-body';
+  // Shallow transverse ribs retain the stamped-steel character and provide
+  // readable motion during reloads without fragmenting the main silhouette.
+  const ribPoses: ReadonlyArray<readonly [number, number, number]> = [
+    [-0.036, -0.024, 0.18],
+    [-0.076, -0.055, 0.38],
+    [-0.118, -0.096, 0.58],
+    [-0.153, -0.14, 0.78],
+  ];
+  for (const [y, z, tilt] of ribPoses) {
+    const rib = new THREE.Mesh(new RoundedBoxGeometry(0.038, 0.006, 0.046, 1, 0.002), steelDark);
+    rib.name = 'ak47-magazine-segment';
+    rib.position.set(0, y * magScale, z * magScale);
+    rib.rotation.x = tilt;
+    magazine.add(rib);
   }
+  const floorplate = new THREE.Mesh(new THREE.BoxGeometry(0.037, 0.006, 0.036), steelDark);
+  floorplate.name = 'ak47-magazine-floorplate';
+  floorplate.position.set(0, -0.173 * magScale, -0.15 * magScale);
+  floorplate.rotation.x = 0.78;
+  magazine.add(floorplate);
   // Home pose: feed lips inside the mag well, body raked slightly forward.
   magazine.position.set(0, -0.026, -0.048);
   magazine.rotation.x = 0.18;

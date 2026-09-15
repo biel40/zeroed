@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import {
   MANSION_BUNKER_Y,
+  MANSION_RITUAL_CIRCLE,
   MANSION_SECRET_ROOM,
   MANSION_SOUL_LAMPS,
   SOUL_LAMP_CAPTURE_RADIUS,
@@ -14,6 +15,109 @@ const TRAIL_POINTS_PER_SOUL = 2;
 const MAX_SPARKS = 24;
 const DOOR_OPEN_DURATION = 1.8;
 const HIDDEN_POINT = -1000;
+const RITUAL_TEXTURE_SIZE = 256;
+const RITUAL_SCARE_DURATION = 0.82;
+
+function makeRitualTexture(): THREE.DataTexture {
+  const size = RITUAL_TEXTURE_SIZE;
+  const data = new Uint8Array(size * size * 4);
+  let seed = 0x51a7;
+  const random = (): number => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const stamp = (x: number, y: number, radius: number, strength: number): void => {
+    const minX = Math.max(0, Math.floor(x - radius));
+    const maxX = Math.min(size - 1, Math.ceil(x + radius));
+    const minY = Math.max(0, Math.floor(y - radius));
+    const maxY = Math.min(size - 1, Math.ceil(y + radius));
+    for (let py = minY; py <= maxY; py++) {
+      for (let px = minX; px <= maxX; px++) {
+        const distance = Math.hypot(px - x, py - y);
+        if (distance > radius) continue;
+        const offset = (py * size + px) * 4;
+        const worn = random() > 0.16 ? 1 : random() * 0.28;
+        const alpha = Math.round((1 - distance / radius) * strength * worn);
+        data[offset] = 84 + Math.round(random() * 28);
+        data[offset + 1] = 14 + Math.round(random() * 11);
+        data[offset + 2] = 10 + Math.round(random() * 8);
+        data[offset + 3] = Math.max(data[offset + 3], alpha);
+      }
+    }
+  };
+  const line = (fromX: number, fromY: number, toX: number, toY: number, width: number): void => {
+    const length = Math.hypot(toX - fromX, toY - fromY);
+    const steps = Math.ceil(length * 1.35);
+    for (let step = 0; step <= steps; step++) {
+      if (random() < 0.075) continue;
+      const t = step / steps;
+      stamp(
+        fromX + (toX - fromX) * t + (random() - 0.5) * 1.8,
+        fromY + (toY - fromY) * t + (random() - 0.5) * 1.8,
+        width * (0.65 + random() * 0.55),
+        150 + random() * 90,
+      );
+    }
+  };
+
+  const center = size / 2;
+  for (const radius of [102, 91]) {
+    let previousX = center + radius;
+    let previousY = center;
+    for (let segment = 1; segment <= 96; segment++) {
+      const angle = segment / 96 * Math.PI * 2;
+      const x = center + Math.cos(angle) * radius;
+      const y = center + Math.sin(angle) * radius;
+      line(previousX, previousY, x, y, radius === 102 ? 3.2 : 2.2);
+      previousX = x;
+      previousY = y;
+    }
+  }
+  const points = Array.from({ length: 5 }, (_, index) => {
+    const angle = -Math.PI / 2 + index * Math.PI * 2 / 5;
+    return [center + Math.cos(angle) * 84, center + Math.sin(angle) * 84] as const;
+  });
+  for (let index = 0; index < 5; index++) {
+    const from = points[index];
+    const to = points[(index + 2) % 5];
+    line(from[0], from[1], to[0], to[1], 4.2);
+  }
+  for (let index = 0; index < 90; index++) {
+    const angle = random() * Math.PI * 2;
+    const radius = 30 + random() * 82;
+    stamp(center + Math.cos(angle) * radius, center + Math.sin(angle) * radius, 0.8 + random() * 2.5, 30 + random() * 75);
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function makeApparitionTexture(): THREE.DataTexture {
+  const width = 48;
+  const height = 96;
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const nx = (x + 0.5 - width / 2) / (width / 2);
+      const head = Math.hypot(nx / 0.46, (y - 24) / 19) < 1;
+      const shoulders = y >= 40 && y < 76 && Math.abs(nx) < 0.38 + (y - 40) * 0.013;
+      const robe = y >= 70 && Math.abs(nx) < 0.84 - (y - 70) * 0.012;
+      if (!head && !shoulders && !robe) continue;
+      const offset = (y * width + x) * 4;
+      const eye = y >= 21 && y <= 25 && Math.abs(Math.abs(nx) - 0.17) < 0.07;
+      data[offset] = eye ? 255 : 24;
+      data[offset + 1] = eye ? 30 : 0;
+      data[offset + 2] = eye ? 18 : 0;
+      data[offset + 3] = eye ? 245 : Math.round(205 * (0.82 + Math.sin(x * 9 + y * 5) * 0.18));
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
 
 interface SoulSlot {
   active: boolean;
@@ -45,6 +149,13 @@ interface SoulLampView {
   readonly coreMaterial: THREE.MeshBasicMaterial;
   readonly light: THREE.PointLight;
   pulseTime: number;
+}
+
+interface RitualCandleView {
+  readonly flame: THREE.Mesh;
+  readonly flameMaterial: THREE.MeshBasicMaterial;
+  readonly phase: number;
+  readonly baseY: number;
 }
 
 function makeGlowTexture(): THREE.DataTexture {
@@ -81,6 +192,7 @@ export class SecretRoomSystem {
   onLampCompleted: ((position: THREE.Vector3) => void) | null = null;
   onUnlocked: ((position: THREE.Vector3) => void) | null = null;
   onDoorOpened: (() => void) | null = null;
+  onRitualScare: ((position: THREE.Vector3) => void) | null = null;
 
   private readonly lamps: SoulLampView[] = [];
   private readonly souls: SoulSlot[] = [];
@@ -97,9 +209,15 @@ export class SecretRoomSystem {
   private readonly doorStartY: number;
   private readonly revealMaterial: THREE.MeshBasicMaterial;
   private readonly revealLight: THREE.PointLight;
+  private readonly ritualMaterial: THREE.MeshStandardMaterial;
+  private readonly ritualCandles: RitualCandleView[] = [];
+  private readonly ritualLights: THREE.PointLight[] = [];
+  private readonly apparition: THREE.Sprite;
   private doorProgress = 0;
   private doorOpening = false;
   private doorOpen = false;
+  private ritualTime = 0;
+  private ritualScareTime = 0;
 
   constructor(
     private readonly parent: THREE.Object3D,
@@ -217,6 +335,27 @@ export class SecretRoomSystem {
       MANSION_SECRET_ROOM.entranceZ,
     );
     parent.add(this.revealLight);
+    this.ritualMaterial = this.buildRitualCircle();
+    const apparitionMaterial = new THREE.SpriteMaterial({
+      map: makeApparitionTexture(),
+      color: 0x4b0705,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    });
+    this.apparition = new THREE.Sprite(apparitionMaterial);
+    this.apparition.name = 'ritual-apparition';
+    this.apparition.position.set(
+      MANSION_SECRET_ROOM.centerX - 1.25,
+      MANSION_BUNKER_Y + 1.28,
+      MANSION_SECRET_ROOM.centerZ,
+    );
+    this.apparition.scale.set(1.05, 2.1, 1);
+    this.apparition.visible = false;
+    this.apparition.userData.mapRole = 'ritual-jumpscare-apparition';
+    parent.add(this.apparition);
     this.syncAllLampVisuals();
   }
 
@@ -228,6 +367,18 @@ export class SecretRoomSystem {
     if (!this.state.activateLamp(lampIndex)) return false;
     this.lamps[lampIndex].pulseTime = 0.8;
     this.syncLampVisual(lampIndex);
+    return true;
+  }
+
+  triggerRitualScare(): boolean {
+    if (!this.state.triggerRitualScare()) return false;
+    this.ritualScareTime = RITUAL_SCARE_DURATION;
+    this.apparition.visible = true;
+    this.onRitualScare?.(new THREE.Vector3(
+      MANSION_RITUAL_CIRCLE.position.x,
+      MANSION_BUNKER_Y + 0.8,
+      MANSION_RITUAL_CIRCLE.position.z,
+    ));
     return true;
   }
 
@@ -259,6 +410,7 @@ export class SecretRoomSystem {
     this.updateSparks(dt);
     this.updateLampPulses(dt);
     this.updateDoor(dt);
+    this.updateRitual(dt);
   }
 
   reset(): void {
@@ -283,6 +435,11 @@ export class SecretRoomSystem {
     this.secretWall.position.y = this.doorStartY;
     this.revealMaterial.opacity = 0;
     this.revealLight.intensity = 0;
+    this.ritualScareTime = 0;
+    this.ritualTime = 0;
+    this.ritualMaterial.emissiveIntensity = 0.06;
+    this.apparition.visible = false;
+    (this.apparition.material as THREE.SpriteMaterial).opacity = 0;
     this.soulPoints.visible = false;
     this.trailPoints.visible = false;
     this.sparkPoints.visible = false;
@@ -357,6 +514,139 @@ export class SecretRoomSystem {
     });
     this.parent.add(group);
     return { group, glassMaterial, coreMaterial, light, pulseTime: 0 };
+  }
+
+  private buildRitualCircle(): THREE.MeshStandardMaterial {
+    const texture = makeRitualTexture();
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      color: 0x795049,
+      emissive: 0x4a0604,
+      emissiveMap: texture,
+      emissiveIntensity: 0.06,
+      transparent: true,
+      opacity: 0.88,
+      roughness: 0.96,
+      metalness: 0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    });
+    const ritual = new THREE.Mesh(new THREE.PlaneGeometry(3.35, 3.35), material);
+    ritual.name = 'secret-room-ritual-circle';
+    ritual.position.set(
+      MANSION_RITUAL_CIRCLE.position.x,
+      MANSION_RITUAL_CIRCLE.position.y,
+      MANSION_RITUAL_CIRCLE.position.z,
+    );
+    ritual.rotation.x = -Math.PI / 2;
+    ritual.receiveShadow = true;
+    ritual.renderOrder = 2;
+    ritual.userData.mapRole = 'ritual-circle';
+    this.parent.add(ritual);
+
+    const waxMaterial = new THREE.MeshStandardMaterial({ color: 0x651612, roughness: 0.92 });
+    const wickMaterial = new THREE.MeshStandardMaterial({ color: 0x140c09, roughness: 1 });
+    const flameGeometry = new THREE.SphereGeometry(0.035, 6, 5);
+    const bodyGeometry = new THREE.CylinderGeometry(0.07, 0.085, 0.32, 8);
+    const wickGeometry = new THREE.CylinderGeometry(0.009, 0.009, 0.05, 5);
+    for (let index = 0; index < 5; index++) {
+      const angle = -Math.PI / 2 + index * Math.PI * 2 / 5;
+      const x = MANSION_SECRET_ROOM.centerX + Math.cos(angle) * 1.72;
+      const z = MANSION_SECRET_ROOM.centerZ + Math.sin(angle) * 1.72;
+      const candleHeight = 0.27 + (index % 3) * 0.055;
+      const candle = new THREE.Group();
+      candle.name = `ritual-candle-${index}`;
+      candle.position.set(x, MANSION_BUNKER_Y, z);
+      candle.userData.mapRole = 'ritual-candle';
+      const body = new THREE.Mesh(bodyGeometry, waxMaterial);
+      body.scale.y = candleHeight / 0.32;
+      body.position.y = candleHeight / 2;
+      const waxPool = new THREE.Mesh(new THREE.CircleGeometry(0.11 + (index % 2) * 0.025, 9), waxMaterial);
+      waxPool.rotation.x = -Math.PI / 2;
+      waxPool.position.y = 0.008;
+      const wick = new THREE.Mesh(wickGeometry, wickMaterial);
+      wick.position.y = candleHeight + 0.018;
+      const flameMaterial = new THREE.MeshBasicMaterial({ color: 0xff8a2a, toneMapped: false });
+      const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+      flame.scale.set(0.75, 1.65, 0.75);
+      const flameY = candleHeight + 0.095;
+      flame.position.y = flameY;
+      candle.add(waxPool, body, wick, flame);
+      this.parent.add(candle);
+      this.ritualCandles.push({ flame, flameMaterial, phase: index * 1.71, baseY: flameY });
+
+      if ((!this.profile.useReducedEffects && index % 2 === 0) || (this.profile.useReducedEffects && index === 0)) {
+        const light = new THREE.PointLight(0xff6b24, this.profile.useReducedEffects ? 0.32 : 0.52, 2.7, 2);
+        light.position.set(
+          this.profile.useReducedEffects ? MANSION_SECRET_ROOM.centerX : x,
+          MANSION_BUNKER_Y + 0.42,
+          this.profile.useReducedEffects ? MANSION_SECRET_ROOM.centerZ : z,
+        );
+        light.intensity = 0;
+        light.castShadow = false;
+        light.name = `ritual-candle-light-${index}`;
+        this.ritualLights.push(light);
+        this.parent.add(light);
+      }
+    }
+
+    const stoneGeometry = new THREE.DodecahedronGeometry(0.055, 0);
+    const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x211c19, roughness: 1 });
+    const stones = new THREE.InstancedMesh(stoneGeometry, stoneMaterial, 12);
+    const transform = new THREE.Object3D();
+    for (let index = 0; index < 12; index++) {
+      const angle = index * 2.399 + 0.4;
+      const radius = 1.22 + (index % 4) * 0.2;
+      transform.position.set(
+        MANSION_SECRET_ROOM.centerX + Math.cos(angle) * radius,
+        MANSION_BUNKER_Y + 0.035,
+        MANSION_SECRET_ROOM.centerZ + Math.sin(angle) * radius,
+      );
+      transform.rotation.set(index * 0.31, angle, index * 0.17);
+      transform.scale.setScalar(0.7 + (index % 3) * 0.22);
+      transform.updateMatrix();
+      stones.setMatrixAt(index, transform.matrix);
+    }
+    stones.name = 'ritual-debris-stones';
+    stones.userData.mapRole = 'ritual-debris';
+    stones.receiveShadow = !this.profile.useReducedEffects;
+    this.parent.add(stones);
+    return material;
+  }
+
+  private updateRitual(dt: number): void {
+    this.ritualTime += dt;
+    const scareActive = this.ritualScareTime > 0;
+    if (scareActive) this.ritualScareTime = Math.max(0, this.ritualScareTime - dt);
+    const scareProgress = scareActive ? 1 - this.ritualScareTime / RITUAL_SCARE_DURATION : 1;
+    const flash = scareActive ? Math.max(0, 1 - scareProgress * 4.5) : 0;
+    this.ritualMaterial.emissiveIntensity = 0.06 + flash * 2.6;
+    for (let index = 0; index < this.ritualCandles.length; index++) {
+      const candle = this.ritualCandles[index];
+      const flicker = 0.88 + Math.sin(this.ritualTime * 13 + candle.phase) * 0.09
+        + Math.sin(this.ritualTime * 23 + candle.phase * 0.7) * 0.035;
+      candle.flame.scale.y = 1.65 * flicker;
+      candle.flame.position.y = candle.baseY + (flicker - 0.88) * 0.03;
+      candle.flameMaterial.color.setHex(flash > 0.15 ? 0xff2414 : 0xff8a2a);
+    }
+    for (let index = 0; index < this.ritualLights.length; index++) {
+      const light = this.ritualLights[index];
+      const base = this.profile.useReducedEffects ? 0.32 : 0.52;
+      light.intensity = this.doorOpen
+        ? base * (0.88 + Math.sin(this.ritualTime * 11.5 + index * 2.3) * 0.12) + flash * 1.7
+        : 0;
+      light.color.setHex(flash > 0.15 ? 0xff160c : 0xff6b24);
+    }
+    if (!scareActive) {
+      this.apparition.visible = false;
+      (this.apparition.material as THREE.SpriteMaterial).opacity = 0;
+      return;
+    }
+    const apparitionOpacity = Math.sin(scareProgress * Math.PI);
+    this.apparition.visible = apparitionOpacity > 0.01;
+    (this.apparition.material as THREE.SpriteMaterial).opacity = apparitionOpacity * 0.9;
+    this.apparition.scale.set(1.05 + flash * 0.4, 2.1 + flash * 0.65, 1);
   }
 
   private updateSouls(dt: number): void {

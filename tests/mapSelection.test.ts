@@ -49,7 +49,7 @@ describe('Zombies map selection flow', () => {
     expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
     expect(html.match(/data-map=/g)).toHaveLength(2);
     expect(html).not.toContain('data-mode=');
-    expect(html).toContain('SHOOTING RANGE');
+    expect(html).toContain('CLASSIC');
     expect(html).toContain('ZOMBIES');
     expect(html).toContain('BURNED MANSION');
     expect(ZOMBIE_MAPS.classic.visible).toBe(false);
@@ -116,6 +116,6 @@ describe('Zombies map selection flow', () => {
     expect(main).toContain('hud.showMapSelect((mapId) =>');
     expect(main).toContain('startGame(new ZombiesMode(mapId))');
     expect(main).not.toContain('showModeSelect');
-    expect(main).not.toContain('ShootingRangeMode');
+    expect(main).not.toContain('ClassicMode');
   });
 });

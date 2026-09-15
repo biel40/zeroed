@@ -66,7 +66,7 @@ describe('WeaponInventory (zombies two-weapon rule)', () => {
     expect(inventory.currentWeapon).toBe('m1911');
   });
 
-  it('supports the Shooting Range shape: four fixed weapons', () => {
+  it('supports the classic map shape: five fixed weapons', () => {
     const inventory = new WeaponInventory(['m4a1', 'ak47', 'm60', 'l96', 'm1911'], 5);
     expect(inventory.weapons).toHaveLength(5);
     expect(inventory.switchTo(4)).toBe('m1911');

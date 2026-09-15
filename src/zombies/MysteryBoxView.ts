@@ -158,7 +158,7 @@ export class MysteryBoxView {
     }
 
     // Brass lock plate and a front-facing question mark built as geometry.
-    // Its points are authored in reading order, so no UV or back-face mirroring applies.
+    // Local X is mirrored here because the playable front is viewed from local -Z.
     addBox(
       this.group,
       [0.27, 0.3, 0.04],
@@ -174,14 +174,14 @@ export class MysteryBoxView {
     });
     this.glowMaterials.push(emblemMaterial);
     const questionCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.065, 0.055, 0),
-      new THREE.Vector3(-0.07, 0.11, 0),
-      new THREE.Vector3(-0.035, 0.15, 0),
-      new THREE.Vector3(0.025, 0.16, 0),
-      new THREE.Vector3(0.07, 0.13, 0),
-      new THREE.Vector3(0.075, 0.085, 0),
-      new THREE.Vector3(0.045, 0.045, 0),
-      new THREE.Vector3(0.01, 0.02, 0),
+      new THREE.Vector3(0.065, 0.055, 0),
+      new THREE.Vector3(0.07, 0.11, 0),
+      new THREE.Vector3(0.035, 0.15, 0),
+      new THREE.Vector3(-0.025, 0.16, 0),
+      new THREE.Vector3(-0.07, 0.13, 0),
+      new THREE.Vector3(-0.075, 0.085, 0),
+      new THREE.Vector3(-0.045, 0.045, 0),
+      new THREE.Vector3(-0.01, 0.02, 0),
       new THREE.Vector3(0, -0.025, 0),
     ]);
     const questionMark = new THREE.Mesh(

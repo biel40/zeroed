@@ -1,45 +1,39 @@
 # Estado del proyecto
 
-Estado inspeccionado: 2026-09-12. La fuente de verdad es el codigo actual; `README.md` y algunas notas de `docs/changes/` describen estados anteriores.
+**Corte:** 2026-09-15. La fuente de verdad es el codigo actual.
 
-## Sistemas funcionales
+## Funcional
 
-- Arranque WebGL, carga de GLB/texturas con fallback y menu principal centrado en Burned Mansion; Classic/Shooting Range sigue soportado internamente pero se oculta mediante el catalogo de mapas (`src/main.ts`, `src/config/zombieMaps.ts`, `src/assets/AssetManager.ts`).
-- PWA instalable con manifest, iconos, app shell offline, cache runtime de texturas/modelos/audio, actualizacion automatica al entrar desde navegador y actualizacion diferida hasta selector o pausa en standalone (`vite.config.ts`, `src/pwa.ts`, `docs/PWA.md`).
-- Shell FPS compartido con render, input desktop/tactil, recuperacion de Pointer Lock, jugador, armas, balistica, efectos, audio, HUD, pausa real y perfiles de dispositivo (`src/core/Game.ts`).
-- Armas declarativas con cadencia, modos de fuego, munición, recarga, ADS, dispersión y recoil; sus viewmodels GLB/procedurales no muestran manos del jugador y conservan recargas mecánicas diferenciadas sin controlar la munición (`src/config/weapons.ts`, `src/weapons/`).
-- Balistica con gravedad/drag, raycast segmentado, prioridad de hitbox de cabeza y confirmacion visual/sonora especifica de headshot (`src/shooting/`, `src/modes/ZombiesMode.ts`, `src/ui/HUD.ts`, `src/audio/AudioSystem.ts`).
-- Zombies `normal`, `shiny` y `brute` definidos mediante un registro extensible de tipos/modelos, reservas visuales por modelo y maximo de dos Brutus bajo el limite global de 24. Todos comparten combate y navegacion con steering local, rutas de recuperacion y failsafe (`src/modes/ZombiesMode.ts`, `src/zombies/`).
-- Walker conserva el modelo low-poly original de Quaternius y un unico tinte para normales. Shiny destaca con acabado dorado y estrellas animadas; Brutus usa un humanoide original de 2.30 m, rugido de ataque propio e impacto letal. Las rondas 1-5 atenuan unicamente la velocidad final y la curva original vuelve intacta desde ronda 6.
-- Mystery Box, compras de pared, puertas por puntos, barreras reparables y recompensas centralizadas (`src/zombies/`, `src/game/PlayerEconomy.ts`).
-- Ray Gun con proyectil y splash, garantizada a 115 bajas; ZEUS-77 con cadena electrica y resultado legendario raro de Mystery Box. Ambas mantienen pickups en el bunker.
-- Pasos de zombie posicionales 3D con pool de 8 fuentes sobre un unico `AudioListener`, prioridad al mas cercano y asset opcional con fallback sintetizado (`src/zombies/ZombieFootsteps.ts`).
-- Mapas Zombies `classic` y `burned-mansion`; la mansion incluye colision del jugador, progresion pagada de tres salas, ala este ampliada para la M4A1 y el acceso al bunker, bunker inferior ensanchado, escalera continua encerrada en un unico canal longitudinal compartido por jugador/zombies y una sala secreta que contiene el final de 30000 puntos. Tres lamparas deben activarse individualmente con USE antes de recolectar almas de bajas cercanas y desbloquear su pared animada; toda la progresion se reinicia con la partida (`src/zombies/maps/`, `src/zombies/secret-room/`, `src/zombies/ZombiesRunFlow.ts`).
-- Suite Vitest de logica determinista y contratos estaticos PWA; `npm run typecheck` pasa. La suite global conserva expectativas desactualizadas de headshots y casos no deterministas de navegación pendientes de resolver.
+- Entrada WebGL, menu Zombies, mapas `classic` y `burned-mansion`, carga de
+  assets con fallback y shell FPS compartido desktop/tactil.
+- Armas declarativas, balistica segmentada, energia, headshots, recargas,
+  economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.
+- Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
+  melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria.
+- Burned Mansion con dos plantas, bunker, escalera continua, progresion pagada,
+  nueve ventanas y sala secreta de lamparas/almas. Final de 30000 Points.
+- PWA instalable, cache runtime y actualizacion diferenciada entre navegador y
+  standalone. Capacitor prepara distribucion Android.
 
-## Sistemas parciales o limitados
+## Limitaciones y bugs abiertos
 
-- Los tests se ejecutan en Node: no cubren WebGL, DOM real, pointer lock, fullscreen, audio real ni flujos end-to-end de arranque/pausa/reinicio.
-- La instalacion, el modo standalone y el Service Worker real requieren validacion manual en un build de produccion servido por HTTPS; Vitest solo verifica sus contratos estaticos.
-- La IA usa rutas explicitas y steering contra AABB, no un navmesh global. El pathfinding A* por planta se activa cuando no existe linea de vision navegable y el anti-stuck fuerza una consulta posterior como fallback; los spawns siguen definidos en planta 0.
-- La escalera del bunker usa escalones visuales sobre una pendiente continua ensanchada; dos rellenos macizos eliminan los pasillos laterales y fuerzan el recorrido entre el acceso superior y la salida inferior. El corredor zombie forma la cola en ambos rellanos, proyecta la separacion sobre la pendiente y cambia la identidad de planta sin teletransporte.
-- Tablas de barrera, Mystery Box, wall buys y pickups son principalmente visuales/logicos; varios no forman parte de la colision fisica o balistica.
-- Existen los modelos zombie `walker` y `brute`; Shiny es un tratamiento material y efecto de estrellas sobre el walker. M60, M1911, Ray Gun y ZEUS-77 usan modelos procedurales.
-- Los proyectiles de energia comparten un alcance fijo de 80 m y su comportamiento solo distingue Tesla de Ray Gun por color.
-- Cambiar de modo o mapa requiere recargar la pagina; `Game` y `GameMode` no tienen ciclo de `dispose()`.
-- `BurnedMansionMaterials` carga texturas al margen de la cache ya precargada por `AssetManager`.
-- El diagnostico de navegacion es opcional mediante `?zombieNavDebug` y permanece silencioso por defecto.
+- No hay pruebas de WebGL, DOM real, Pointer Lock, fullscreen, audio real ni
+  flujo end-to-end. PWA y offline requieren validacion manual en HTTPS.
+- Antes del primer START la simulacion puede avanzar; game over tactil aun
+  puede recibir movimiento/disparo.
+- Barreras totalmente destruidas no siempre entran en reparacion; el cambio de
+  arma tactil debe cancelar reparacion.
+- RESTART necesita reset verificable de toda la run. Distancias de impacto y
+  fade vertical de cadaveres tienen casos pendientes.
+- La musica al reanudar, la cache de texturas de Burned Mansion y el registro de
+  colliders dinamicos necesitan consolidacion.
+- Energia aun se distingue por color; cambiar modo/mapa requiere recarga por
+  falta de `dispose()`. Existen flags de debug que deben blindarse o retirarse.
+- La suite de tests puede contener expectativas antiguas de headshots o casos
+  de navegacion no deterministas.
 
-## Bugs relevantes detectados
+## Fuente complementaria
 
-- Una barrera totalmente destruida no puede seleccionarse para reparacion porque `isDamaged` excluye el estado abierto (`src/zombies/barriers/WindowBarrier.ts:81`, `src/modes/ZombiesMode.ts:495`).
-- La distancia reportada por balas cuenta dos veces parte del segmento de impacto (`src/shooting/BallisticsSystem.ts:172`, `src/shooting/trajectory.ts:47`).
-- La muerte de un zombie asigna una Y absoluta durante el fade; los cadaveres del bunker suben hacia Y=0 (`src/zombies/Zombie.ts:232`).
-- En tactil, movimiento y disparo siguen activos detras de la pantalla de game over (`src/core/Game.ts:565`, `src/modes/ZombiesMode.ts:174`).
-
-## Funcionalidad pendiente representada en el codigo
-
-- Sustituir la discriminacion por color antes de incorporar una tercera arma de energia (`docs/changes/2026-08-13-tesla-weapon.md`).
-- El pipeline admite reemplazar modelos procedurales y ajustar la alineacion ADS heuristica mediante configuracion (`src/config/weapons.ts`, `src/weapons/WeaponView.ts`).
-- Los fallbacks de modelos, texturas y audio forman parte del comportamiento esperado; no indican por si solos una carga pendiente.
-- No hay marcadores `TODO` o `FIXME` activos en `src/`.
+`V0.9.md` resume el producto; `ROADMAP.md` ordena el trabajo; `ARCHITECTURE.md`
+describe fronteras; `GAME_SYSTEMS.md` describe runtime; `PWA.md` y
+`ANDROID_DOCS.md` describen distribucion.

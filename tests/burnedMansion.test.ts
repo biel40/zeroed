@@ -24,6 +24,7 @@ import {
   MANSION_EAST_WALL_X,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
+  MANSION_RITUAL_CIRCLE,
   MANSION_SPAWNS,
   MANSION_STAIR_BOTTOM_Z,
   MANSION_STAIR_CENTER_X,
@@ -422,7 +423,7 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([2000, 3000]);
     expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.interactionLabel)).toEqual([
       'RAY GUN — 2000',
-      'ZEUS-99 — 3000',
+      'ZEUS-77 — 3000',
     ]);
     expect(pickups.map((pickup) => pickup.weaponId)).toEqual(['raygun', 'tesla']);
     expect(pickups.map((pickup) => pickup.cost)).toEqual([2000, 3000]);
@@ -625,6 +626,26 @@ describe('Burned Mansion topology', () => {
     expect(new THREE.Box3().setFromObject(lamp).intersectsBox(windowOpening)).toBe(false);
   });
 
+  it('centers a dimensional ritual set with a distressed decal, candles and debris', () => {
+    const arena = makeArena();
+    const ritual = arena.group.getObjectByName('secret-room-ritual-circle') as THREE.Mesh;
+    const candles = arena.group.children.filter((child) => child.userData.mapRole === 'ritual-candle');
+    const lights = arena.group.children.filter((child) => child.name.startsWith('ritual-candle-light-'));
+    const debris = arena.group.getObjectByName('ritual-debris-stones');
+
+    expect(ritual).toBeInstanceOf(THREE.Mesh);
+    expect(ritual.position.x).toBe(MANSION_SECRET_ROOM.centerX);
+    expect(ritual.position.z).toBe(MANSION_SECRET_ROOM.centerZ);
+    expect(ritual.position.y).toBeCloseTo(MANSION_BUNKER_Y + 0.02);
+    expect(ritual.material).toBeInstanceOf(THREE.MeshStandardMaterial);
+    expect((ritual.material as THREE.MeshStandardMaterial).map).toBeInstanceOf(THREE.DataTexture);
+    expect(candles).toHaveLength(5);
+    expect(lights).toHaveLength(3);
+    expect(debris).toBeInstanceOf(THREE.InstancedMesh);
+    expect(arena.ritualInteraction.position).toEqual(MANSION_RITUAL_CIRCLE.position);
+    expect(arena.ritualInteraction.available).toBe(false);
+  });
+
   it('shows empty, partially charged and complete lamp states', () => {
     const arena = makeArena();
     const definition = MANSION_SOUL_LAMPS[0];
@@ -688,6 +709,17 @@ describe('Burned Mansion topology', () => {
     arena.update(1);
     expect(arena.colliders).not.toContain(collider);
     expect(topologyChanges).toBe(1);
+    expect(arena.ritualInteraction.available).toBe(true);
+    expect(arena.ritualInteraction.activate()).toBe(true);
+    expect(arena.ritualInteraction.available).toBe(false);
+    expect(arena.ritualInteraction.activate()).toBe(false);
+    expect(arena.group.getObjectByName('ritual-apparition')?.visible).toBe(true);
+    arena.update(0.6);
+    const apparition = arena.group.getObjectByName('ritual-apparition') as THREE.Sprite;
+    expect(apparition.visible).toBe(true);
+    expect((apparition.material as THREE.SpriteMaterial).opacity).toBeGreaterThan(0);
+    arena.update(0.3);
+    expect(apparition.visible).toBe(false);
     expect(canWalk(
       [-5.8, MANSION_SECRET_ROOM.entranceZ],
       [MANSION_SECRET_ROOM.centerX, MANSION_SECRET_ROOM.centerZ],
@@ -699,6 +731,7 @@ describe('Burned Mansion topology', () => {
     arena.reset();
     expect(arena.secretRoomState.completedLamps).toBe(0);
     expect(arena.secretRoomState.unlocked).toBe(false);
+    expect(arena.secretRoomState.ritualScareTriggered).toBe(false);
     expect(arena.colliders).toContain(collider);
     expect(wall.position.y).toBeCloseTo(MANSION_BUNKER_Y + 1.6);
   });
@@ -1291,7 +1324,7 @@ describe('Burned Mansion topology', () => {
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
-    expect(pointLights).toHaveLength(9);
+    expect(pointLights).toHaveLength(12);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
   });
 

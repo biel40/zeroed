@@ -15,6 +15,7 @@ import type { WeaponId } from '../../weapons/WeaponTypes';
 import type {
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
+  ArenaRitualInteraction,
   ArenaSoulLampInteraction,
   ArenaWeaponPickup,
   ZombieArena,
@@ -38,6 +39,7 @@ import {
   MANSION_EAST_WALL_X,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
+  MANSION_RITUAL_CIRCLE,
   MANSION_SPAWNS,
   MANSION_STAIR_BOTTOM_Z,
   MANSION_STAIR_CENTER_X,
@@ -167,11 +169,13 @@ export class BurnedMansionArena implements ZombieArena {
   ] as const;
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
   readonly completionInteraction: ArenaCompletionInteraction = MANSION_BUNKER_ENDING;
+  readonly ritualInteraction: ArenaRitualInteraction;
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
   onSoulAbsorbed: ((position: THREE.Vector3) => void) | null = null;
   onSoulLampCompleted: ((position: THREE.Vector3) => void) | null = null;
   onSecretRoomUnlocked: ((position: THREE.Vector3) => void) | null = null;
+  onRitualScare: ((position: THREE.Vector3) => void) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -215,8 +219,15 @@ export class BurnedMansionArena implements ZombieArena {
     this.buildWindowFrames();
     this.buildLighting();
     this.secretRoom = new SecretRoomSystem(this.group, this.secretWall, profile);
+    const secretRoom = this.secretRoom;
+    this.ritualInteraction = {
+      ...MANSION_RITUAL_CIRCLE,
+      get available(): boolean {
+        return secretRoom.isDoorOpen && !secretRoom.state.ritualScareTriggered;
+      },
+      activate: () => secretRoom.triggerRitualScare(),
+    };
     this.soulLampInteractions = MANSION_SOUL_LAMPS.map((lamp, index) => {
-      const secretRoom = this.secretRoom;
       return {
         id: lamp.id,
         position: lamp.position,
@@ -230,6 +241,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.secretRoom.onSoulAbsorbed = (position) => this.onSoulAbsorbed?.(position);
     this.secretRoom.onLampCompleted = (position) => this.onSoulLampCompleted?.(position);
     this.secretRoom.onUnlocked = (position) => this.onSecretRoomUnlocked?.(position);
+    this.secretRoom.onRitualScare = (position) => this.onRitualScare?.(position);
     this.secretRoom.onDoorOpened = () => {
       this.refreshColliders();
       this.onTopologyChanged?.();

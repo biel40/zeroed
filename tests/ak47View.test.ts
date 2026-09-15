@@ -42,7 +42,9 @@ function meshBounds(root: THREE.Object3D): MeshBounds[] {
 describe('AK-47 procedural view model', () => {
   it('dispatches to the dedicated builder through the shared entry point', () => {
     const built = buildProceduralViewModel(definition.view);
-    expect(built.group.getObjectByName('ak47-receiver')).toBeTruthy();
+    const receiver = built.group.getObjectByName('ak47-receiver') as THREE.Mesh;
+    expect(receiver).toBeTruthy();
+    expect(receiver.geometry.type).toBe('ExtrudeGeometry');
   });
 
   it('lays out the classic full-size silhouette along -Z: butt → muzzle', () => {
@@ -147,10 +149,27 @@ describe('AK-47 procedural view model', () => {
     }
   });
 
+  it('keeps the procedural detail within a mobile-friendly geometry budget', () => {
+    const built = buildProceduralViewModel(definition.view);
+    let meshes = 0;
+    let triangles = 0;
+    built.group.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      meshes++;
+      triangles += object.geometry.index
+        ? object.geometry.index.count / 3
+        : object.geometry.attributes.position.count / 3;
+    });
+
+    expect(meshes).toBeLessThanOrEqual(50);
+    expect(triangles).toBeLessThanOrEqual(6000);
+  });
+
   it('hangs a strongly curved banana magazine from the well', () => {
     const built = buildProceduralViewModel(definition.view);
     const mag = built.group.getObjectByName('ak47-magazine') as THREE.Group;
     expect(mag).toBeTruthy();
+    expect(mag.getObjectByName('ak47-magazine-body')).toBeTruthy();
     const segments = mag.children.filter((c) => c.name === 'ak47-magazine-segment');
     expect(segments.length).toBeGreaterThanOrEqual(4);
 

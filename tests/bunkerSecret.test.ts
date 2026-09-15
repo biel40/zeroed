@@ -4,6 +4,7 @@ import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { PointDoor } from '../src/zombies/doors/PointDoor';
 import type {
   ArenaCompletionInteraction,
+  ArenaRitualInteraction,
   ArenaSoulLampInteraction,
   ArenaWeaponPickup,
 } from '../src/zombies/maps/ZombieArena';
@@ -56,6 +57,30 @@ describe('Burned Mansion secret bunker interaction', () => {
     mode.onInteract();
     expect(activated).toBe(true);
     expect(mode.getInteractPrompt()).not.toBe('ACTIVATE SOUL LAMP\nPress E');
+  });
+
+  it('triggers the ritual-circle scare once and then removes its prompt', () => {
+    const mode = new ZombiesMode('burned-mansion');
+    let triggered = false;
+    const ritual = {
+      id: 'secret-room-ritual-circle',
+      position: { x: 0, y: -3.38, z: 0 },
+      floor: -1,
+      useRange: 2,
+      lookDotMin: 0.2,
+      get available() { return !triggered; },
+      activate: () => { triggered = true; return true; },
+    } satisfies ArenaRitualInteraction;
+    (mode as unknown as { ctx: unknown }).ctx = { profile: { useTouchControls: false } };
+    (mode as any).findFacingDoor = () => null;
+    (mode as any).findRepairableBarrier = () => null;
+    (mode as any).findFacingSoulLamp = () => null;
+    (mode as any).findFacingRitualCircle = () => ritual.available ? ritual : null;
+
+    expect(mode.getInteractPrompt()).toBe('TOUCH THE RITUAL CIRCLE\nPress E');
+    mode.onInteract();
+    expect(triggered).toBe(true);
+    expect(mode.getInteractPrompt()).not.toBe('TOUCH THE RITUAL CIRCLE\nPress E');
   });
 
   it('shows the exact sealed-door prompt and required-points message', () => {

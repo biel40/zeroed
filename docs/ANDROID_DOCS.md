@@ -1,22 +1,26 @@
-Cuando generamos la versión compilada como .apk la ruta en la que se guarda el fichero es la siguiente:
+# Android con Capacitor
 
-- ./android/app/build/outputs/apk/debug/app-debug.apk
-- 
-# 1. Build del bundle web + copia a Android
+El APK debug se genera en `android/app/build/outputs/apk/debug/app-debug.apk`.
+PWA y web siguen siendo canales independientes.
+
+## Build e instalacion
+
+```powershell
 npm run build
 npx cap sync android
-
-# 2. Compilar + instalar directo en el móvil conectado por USB
-cd android
+Set-Location android
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
 .\gradlew.bat installDebug
+```
 
-# 3. Icono nativo y splash screen
-El icono del launcher (legacy, adaptive, round) y la splash screen nativa se
-generan con @capacitor/assets a partir de assets/icon.png (copia del favicon
-oficial exportado por pwa-assets-generator). Tras cambiar el favicon, regenera:
+## Iconos y splash
 
+`@capacitor/assets` usa `assets/icon.png` para generar los iconos launcher y
+el splash. Tras cambiar el favicon:
+
+```powershell
 npm run android:icons
+```
 
-Esto sobrescribe android/app/src/main/res/mipmap-* y res/drawable*/splash.png.
-No hace falta tocar esos ficheros a mano.
+El comando sobrescribe `android/app/src/main/res/mipmap-*` y
+`res/drawable*/splash.png`; no se editan manualmente.
