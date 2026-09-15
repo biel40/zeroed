@@ -48,6 +48,8 @@ export interface ModeContext {
   grantWeapon(id: WeaponId): boolean;
   canGrantWeapon(id: WeaponId): boolean;
   hasWeapon(id: WeaponId): boolean;
+  /** True while any carried weapon can fire now or can still be reloaded. */
+  hasUsableWeapon(): boolean;
   canRefillWeaponAmmo(id: WeaponId): boolean;
   refillWeaponAmmo(id: WeaponId): boolean;
   canRefillEquippedWeaponAmmo(): boolean;
@@ -97,6 +99,9 @@ export interface GameMode {
    * true when the mode handles it itself (Ray Gun energy bolts).
    */
   onWeaponFired?(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean;
+  /** Mode-owned fallback (for example the Zombies Bowie) replaces fire/ADS input. */
+  usesFallbackAttack?(): boolean;
+  getFallbackWeaponName?(): string | null;
   /**
    * Called when the pointer lock is lost. Return true when the mode shows
    * its own UI (game over) and the default pause screen should be skipped.
@@ -108,6 +113,8 @@ export interface GameMode {
   onKeyInput?(key: string): void;
   /** Interact key (E) pressed while gameplay input is active. */
   onInteract?(): void;
+  /** Dedicated quick-melee action; does not consume an inventory slot. */
+  onMeleeAttack?(): void;
   /**
    * The pause menu's RESTART action. The mode resets its own run state
    * (health, rounds, kills, economy, arsenal) and resumes play. Optional:

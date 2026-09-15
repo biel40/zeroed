@@ -291,8 +291,27 @@ export class HUD {
     if (text !== null) this.interactPrompt.textContent = text;
   }
 
-  public update(weapon: Weapon, spreadPixels: number): void {
+  public update(weapon: Weapon, spreadPixels: number, fallbackWeapon: string | null = null): void {
     const definition = weapon.definition;
+    if (fallbackWeapon !== null) {
+      if (fallbackWeapon !== this.lastWeapon) {
+        this.weaponName.textContent = fallbackWeapon;
+        this.lastWeapon = fallbackWeapon;
+      }
+      if (this.lastAmmo !== 'MELEE') {
+        this.ammo.textContent = 'MELEE';
+        this.lastAmmo = 'MELEE';
+      }
+      if (this.lastMode !== 'BLADE') {
+        this.mode.textContent = 'BLADE';
+        this.lastMode = 'BLADE';
+      }
+      this.crosshair.style.setProperty('--gap', '10.0px');
+      this.crosshair.style.opacity = '1';
+      this.scope.style.opacity = '0';
+      this.scope.style.visibility = 'hidden';
+      return;
+    }
 
     if (definition.name !== this.lastWeapon) {
       this.weaponName.textContent = definition.name;

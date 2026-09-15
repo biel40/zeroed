@@ -208,7 +208,9 @@ describe('Zombie hitboxes', () => {
     const zombie = makeZombie();
     step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
     zombie.group.updateMatrixWorld(true);
-    expect(worldCenter(zombie.torsoHitbox).y).toBeCloseTo(0.75, 3);
+    // The hips now lower to seat the support foot during the stride.
+    expect(worldCenter(zombie.torsoHitbox).y).toBeGreaterThan(0.6);
+    expect(worldCenter(zombie.torsoHitbox).y).toBeLessThanOrEqual(0.76);
   });
 
   it('torso capsule reaches the ground so leg shots register', () => {

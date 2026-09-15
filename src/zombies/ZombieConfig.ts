@@ -125,8 +125,10 @@ export function selectZombieType(
   }
   return 'normal';
 }
-/** Distance at which a zombie starts its attack lunge, meters. */
-export const ZOMBIE_ATTACK_RANGE = 1.9;
+/** Maximum committed melee distance; kept close to the visible arm/lunge envelope. */
+export const ZOMBIE_ATTACK_RANGE = 1.65;
+/** Maximum collision-cleared visual step during a committed melee, meters. */
+export const ZOMBIE_ATTACK_LUNGE = 0.38;
 /** Maximum feet-height difference for a melee attack, meters. */
 export const ZOMBIE_ATTACK_VERTICAL_TOLERANCE = 1;
 /** Damage per attack against a window board. */
@@ -146,12 +148,8 @@ export const ZOMBIE_SPAWN_DURATION = 1.1;
 /** Full attack lunge; the damage lands at the hit moment below. */
 export const ZOMBIE_ATTACK_DURATION = 0.75;
 /**
- * Wind-up before the blow connects — the player's dodge window. 0.475 s is
- * still ~63 % of the attack: the ZombieBite clip (played from 30 % at 3.0×,
- * up from 2.5×, over the 5.04 s take) now reaches the same head-extension
- * peak sooner in real time, so the hit still fires exactly when the bite
- * visually reaches the player — just quicker, giving the player less time
- * to back out of range.
+ * Wind-up before the blow connects and the player's dodge window. The shared
+ * procedural attack curves place every variant at contact at exactly 0.475 s.
  */
 export const ZOMBIE_ATTACK_HIT_MOMENT = 0.475;
 /** Brief stagger on non-lethal hits; movement resumes right after. */

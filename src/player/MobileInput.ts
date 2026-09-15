@@ -33,6 +33,9 @@ export function applyMobileAction(state: InputState, action: string, pressed: bo
     case 'interact':
       state.setKey('KeyE', pressed);
       break;
+    case 'knife':
+      state.setKey('TouchKnife', pressed);
+      break;
     default:
       break;
   }

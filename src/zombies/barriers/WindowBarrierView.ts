@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import type { WindowBarrier } from './WindowBarrier';
+import { boardPullProgress, BOARD_PULL_DURATION, BOARD_PULL_DISTANCE, BOARD_PULL_DROP } from '../ZombieAttackMotion';
 
 const BOARD_WIDTH = 1.5;
 const BOARD_HEIGHT = 0.12;
 const BOARD_THICK = 0.045;
 const GAP = 0.07;
-const PULL_DURATION = 0.18;
+const PULL_DURATION = BOARD_PULL_DURATION;
 const BREAK_MIN_DURATION = 0.82;
 const BREAK_MAX_DURATION = 0.96;
 const REBUILD_DURATION = 0.32;
@@ -19,6 +20,8 @@ interface BoardAnimation {
   readonly originalScale: THREE.Vector3;
   state: BoardVisualState;
   revision: number;
+  impactRevision: number;
+  vibrationTime: number;
   elapsed: number;
   duration: number;
   lateralOffset: number;
@@ -90,6 +93,8 @@ export class WindowBarrierView {
         originalScale: mesh.scale.clone(),
         state: intact ? 'intact' : 'destroyed',
         revision: barrier.boards[i].revision,
+        impactRevision: barrier.boards[i].impactRevision,
+        vibrationTime: 1,
         elapsed: 0,
         duration: 0,
         lateralOffset: 0,
@@ -122,6 +127,10 @@ export class WindowBarrierView {
     for (let i = 0; i < this.boards.length; i++) {
       const board = this.boards[i];
       const source = this.barrier.boards[i];
+      if (board.impactRevision !== source.impactRevision) {
+        board.impactRevision = source.impactRevision;
+        board.vibrationTime = 0;
+      }
       if (board.revision !== source.revision) {
         board.revision = source.revision;
         if (source.hp > 0) {
@@ -135,6 +144,12 @@ export class WindowBarrierView {
         this.updateBreaking(board, dt);
       } else if (board.state === 'rebuilding') {
         this.updateRebuilding(board, dt);
+      } else if (board.state === 'intact' && board.vibrationTime < 0.35) {
+        board.vibrationTime = Math.min(0.35, board.vibrationTime + dt);
+        const t = board.vibrationTime;
+        const shake = Math.sin(t * 48) * Math.exp(-t * 13) * (1 - t / 0.35);
+        board.mesh.position.z = board.originalPosition.z + shake * 0.045;
+        board.mesh.rotation.x = board.originalRotation.x + shake * 0.055;
       }
     }
   }
@@ -143,6 +158,8 @@ export class WindowBarrierView {
     for (let i = 0; i < this.boards.length; i++) {
       const board = this.boards[i];
       board.revision = this.barrier.boards[i].revision;
+      board.impactRevision = this.barrier.boards[i].impactRevision;
+      board.vibrationTime = 1;
       board.state = this.barrier.boards[i].hp > 0 ? 'intact' : 'destroyed';
       board.elapsed = 0;
       this.restoreOriginalTransform(board);
@@ -159,8 +176,9 @@ export class WindowBarrierView {
     board.elapsed = 0;
     board.duration = BREAK_MIN_DURATION + this.rng() * (BREAK_MAX_DURATION - BREAK_MIN_DURATION);
     board.lateralOffset = (this.rng() * 2 - 1) * 0.18;
-    board.depthOffset = 0.3 + this.rng() * 0.16;
-    board.liftDistance = 0.08 + this.rng() * 0.08;
+    // Hands grab from the outward side, then rip the released plank back.
+    board.depthOffset = BOARD_PULL_DISTANCE;
+    board.liftDistance = -BOARD_PULL_DROP;
     board.dropDistance = 0.96 + this.rng() * 0.32;
     board.impactRotationX = (this.rng() * 2 - 1) * 0.16;
     board.impactRotationY = (this.rng() * 2 - 1) * 0.12;
@@ -183,17 +201,16 @@ export class WindowBarrierView {
     }
 
     if (board.elapsed <= PULL_DURATION) {
-      const progress = board.elapsed / PULL_DURATION;
-      const eased = 1 - Math.pow(1 - progress, 3);
+      const eased = boardPullProgress(board.elapsed);
       board.mesh.position.set(
-        board.originalPosition.x + board.lateralOffset * 0.45 * eased,
+        board.originalPosition.x,
         board.originalPosition.y + board.liftDistance * eased,
-        board.originalPosition.z + board.depthOffset * 0.72 * eased,
+        board.originalPosition.z + board.depthOffset * eased,
       );
       board.mesh.rotation.set(
-        board.originalRotation.x + board.impactRotationX * eased,
-        board.originalRotation.y + board.impactRotationY * eased,
-        board.originalRotation.z + board.impactRotationZ * eased,
+        board.originalRotation.x,
+        board.originalRotation.y,
+        board.originalRotation.z,
         board.originalRotation.order,
       );
       return;
@@ -202,14 +219,14 @@ export class WindowBarrierView {
     const progress = (board.elapsed - PULL_DURATION) / (board.duration - PULL_DURATION);
     const drift = 1 - (1 - progress) * (1 - progress);
     board.mesh.position.set(
-      board.originalPosition.x + board.lateralOffset * (0.45 + drift * 0.55),
-      board.originalPosition.y + board.liftDistance * (1 - progress) - board.dropDistance * progress * progress,
-      board.originalPosition.z + board.depthOffset * (0.72 + drift * 0.28),
+      board.originalPosition.x + board.lateralOffset * drift,
+      board.originalPosition.y + board.liftDistance - board.dropDistance * progress * progress,
+      board.originalPosition.z + board.depthOffset + drift * 0.08,
     );
     board.mesh.rotation.set(
-      board.originalRotation.x + board.impactRotationX + board.spinX * progress,
-      board.originalRotation.y + board.impactRotationY + board.spinY * progress,
-      board.originalRotation.z + board.impactRotationZ + board.spinZ * progress,
+      board.originalRotation.x + board.spinX * progress,
+      board.originalRotation.y + board.spinY * progress,
+      board.originalRotation.z + board.spinZ * progress,
       board.originalRotation.order,
     );
   }

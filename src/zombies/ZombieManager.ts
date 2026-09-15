@@ -17,6 +17,7 @@ import {
   selectZombieType,
   splashDamageAt,
   ZOMBIE_ATTACK_DAMAGE,
+  ZOMBIE_ATTACK_LUNGE,
   ZOMBIE_ATTACK_RANGE,
   ZOMBIE_ATTACK_VERTICAL_TOLERANCE,
   ZOMBIE_BARRIER_ATTACK_DAMAGE,
@@ -187,6 +188,7 @@ export class ZombieManager {
    * committed to when it hit a wall; null while it walks straight.
    */
   private readonly roundState = new Map<Zombie, { x: number; z: number }>();
+  private readonly movement = new Map<Zombie, { x: number; z: number; frame: number }>();
   private readonly entryRoutes = new Map<Zombie, EntryRoute>();
   private readonly stairTraversals = new Map<Zombie, StairTraversal>();
   private readonly stuckState = new Map<Zombie, StuckState>();
@@ -254,6 +256,7 @@ export class ZombieManager {
     this.rebuildObstacles();
     // Door/map topology changed: discard decisions made against old solids.
     this.roundState.clear();
+    this.movement.clear();
     this.stuckState.clear();
     this.rebuildNavigation();
   }
@@ -530,7 +533,7 @@ export class ZombieManager {
     baseDamage: number,
   ): boolean {
     const damage = computeDamage(baseDamage, part);
-    if (zombie.applyDamage(damage, part === 'head')) {
+    if (zombie.applyDamage(damage, part === 'head', this.lastPlayerX, this.lastPlayerZ)) {
       this.kill(zombie, part === 'head');
       return true;
     }
@@ -572,7 +575,9 @@ export class ZombieManager {
       const isDirectHit = zombie === impact;
       const headshot = isDirectHit && directPart === 'head';
       const appliedDamage = isDirectHit ? computeDamage(damage, directPart) : damage;
-      if (zombie.applyDamage(appliedDamage, headshot)) this.kill(zombie, headshot);
+      const sourceX = isDirectHit ? this.lastPlayerX : impact.position.x;
+      const sourceZ = isDirectHit ? this.lastPlayerZ : impact.position.z;
+      if (zombie.applyDamage(appliedDamage, headshot, sourceX, sourceZ)) this.kill(zombie, headshot);
     }
     return chain;
   }
@@ -589,7 +594,7 @@ export class ZombieManager {
       const damage = splashDamageAt(splashDamage, Math.hypot(dx, dz), radius);
       if (damage <= 0) continue;
       // applyDamage already triggers the red hit flash.
-      if (zombie.applyDamage(damage)) this.kill(zombie, false);
+      if (zombie.applyDamage(damage, false, center.x, center.z)) this.kill(zombie, false);
     }
   }
 
@@ -621,6 +626,7 @@ export class ZombieManager {
     for (const zombie of this.pool.actives) {
       const previousX = zombie.position.x;
       const previousZ = zombie.position.z;
+      const previousYaw = zombie.group.rotation.y;
       if (zombie.isAlive) {
         if (
           this.isOutsideNavigationBounds(zombie) &&
@@ -657,9 +663,14 @@ export class ZombieManager {
       // Animate distance actually covered, including collision stops. Clamp
       // recovery relocations so a teleport cannot fast-forward the walk clip.
       const visualSpeed = dt > 0
-        ? Math.min(zombie.speed, Math.hypot(zombie.position.x - previousX, zombie.position.z - previousZ) / dt)
+        ? Math.min(zombie.speed * MAX_MOVE_SPEED_FACTOR, Math.hypot(zombie.position.x - previousX, zombie.position.z - previousZ) / dt)
         : 0;
-      zombie.update(dt, visualSpeed);
+      if (zombie.state === 'walk' && visualSpeed > 0.05) {
+        zombie.group.rotation.y = previousYaw;
+        zombie.faceTowards(zombie.position.x + zombie.position.x - previousX,
+          zombie.position.z + zombie.position.z - previousZ, TURN_SPEED * dt);
+      }
+      zombie.update(dt, visualSpeed / Math.max(0.01, zombie.group.scale.x));
     }
   }
 
@@ -844,14 +855,24 @@ export class ZombieManager {
       zombie.barrierTarget = null;
       zombie.cancelBarrierAttack();
     }
+    // Finish in the contact frame, even if the player runs around the window.
+    if (zombie.state === 'barrierBreak') return;
     if (this.followEntryRoute(zombie, dt)) return;
     if (this.followStairTraversal(zombie, dt)) return;
     const target = zombie.barrierTarget;
 
     if (target) {
       zombie.faceTowards(target.position.x, target.position.z, TURN_SPEED * dt);
+      this.updateBarrierContact(zombie, target);
     } else {
-      zombie.faceTowards(playerX, playerZ, TURN_SPEED * dt);
+      // A committed swing keeps its initial facing and target. Continuing to
+      // track a strafing player during wind-up made the torso and arms corkscrew;
+      // hit validation still uses the player's live position at contact.
+      if (zombie.state !== 'attack') {
+        zombie.faceTowards(playerX, playerZ, TURN_SPEED * dt);
+        this.updateAttackReach(zombie, playerX, playerZ);
+        this.setStrikeTarget(zombie, playerX, playerY - 0.3, playerZ);
+      }
     }
 
     if (zombie.state !== 'walk') return;
@@ -862,10 +883,10 @@ export class ZombieManager {
         0,
         target.position.z - zombie.position.z,
       );
-      const barrierDistance = toBarrier.length();
-      if (barrierDistance <= ZOMBIE_BARRIER_ATTACK_RANGE) {
+      if (this.barrierPositionValid(zombie, target)) {
         if (zombie.tryBarrierAttack()) {
           zombie.onAttackLanded = () => {
+            if (!this.barrierPositionValid(zombie, target) || !this.facingTarget(zombie, target.position.x, target.position.z)) return;
             this.hitBarrier(target);
             if (target.isOpen) {
               zombie.barrierTarget = null;
@@ -875,8 +896,10 @@ export class ZombieManager {
         }
         return;
       }
-      toBarrier.normalize();
-      this.seek(zombie, dt, toBarrier, target.position.x, target.position.z);
+      const approachX = target.position.x + target.outward.x * 0.9;
+      const approachZ = target.position.z + target.outward.z * 0.9;
+      toBarrier.set(approachX - zombie.position.x, 0, approachZ - zombie.position.z).normalize();
+      this.seek(zombie, dt, toBarrier, approachX, approachZ);
       return;
     }
 
@@ -903,7 +926,8 @@ export class ZombieManager {
       playerZ - zombie.position.z,
     );
 
-    if (this.canAttackPlayer(zombie, playerX, playerZ, playerFloor, playerY)) {
+    if (this.facingTarget(zombie, playerX, playerZ)
+      && this.canAttackPlayer(zombie, playerX, playerZ, playerFloor, playerY)) {
       if (zombie.tryAttack()) {
         if (zombie.typeId === 'brute') this.onBruteAttack?.();
         // The wind-up only SCHEDULES the bite: whether it connects is decided
@@ -911,7 +935,8 @@ export class ZombieManager {
         // who retreats out of range during the wind-up dodges the hit while
         // the zombie finishes its swing; each attack lands at most once.
         zombie.onAttackLanded = () => {
-          if (this.attackStillConnects(zombie)) {
+          if (Math.hypot(this.lastPlayerX - playerX, this.lastPlayerZ - playerZ) <= 0.6
+            && this.attackStillConnects(zombie)) {
             this.onPlayerAttack?.(zombie.attackDamage);
           }
         };
@@ -1122,7 +1147,30 @@ export class ZombieManager {
     }
 
     if (rounding === null) {
-      this.moveWithCollision(zombie, seekX * dt, seekZ * dt);
+      // Brake into direction changes over a short interval. Ramps and wall
+      // tangents retain their constrained steering so inertia cannot pull a
+      // body out of a narrow passage. Collision still owns final displacement.
+      let velocity = this.movement.get(zombie);
+      if (!velocity) {
+        velocity = { x: seekX, z: seekZ, frame: this.frameIndex };
+        this.movement.set(zombie, velocity);
+      }
+      if (velocity.frame !== this.frameIndex - 1 || stairRamp) {
+        velocity.x = seekX;
+        velocity.z = seekZ;
+      } else {
+        const change = Math.hypot(seekX - velocity.x, seekZ - velocity.z);
+        const blend = Math.min(1, zombie.speed * 8 * dt / Math.max(change, 1e-6));
+        velocity.x += (seekX - velocity.x) * blend;
+        velocity.z += (seekZ - velocity.z) * blend;
+      }
+      velocity.frame = this.frameIndex;
+      const beforeX = pos.x, beforeZ = pos.z;
+      this.moveWithCollision(zombie, velocity.x * dt, velocity.z * dt);
+      if (dt > 0) {
+        velocity.x = (pos.x - beforeX) / dt;
+        velocity.z = (pos.z - beforeZ) / dt;
+      }
     } else {
       // Follow the wall tangent and nothing else: mixing the to-target
       // direction back in is what dragged zombies backwards off the wall on
@@ -1380,13 +1428,68 @@ export class ZombieManager {
    * callback only fires from the attack state, and death leaves it.
    */
   private attackStillConnects(zombie: Zombie): boolean {
-    return this.canAttackPlayer(
+    return this.facingTarget(zombie, this.lastPlayerX, this.lastPlayerZ) && this.canAttackPlayer(
       zombie,
       this.lastPlayerX,
       this.lastPlayerZ,
       this.lastPlayerFloor,
       this.lastPlayerY,
     );
+  }
+
+  private facingTarget(zombie: Zombie, x: number, z: number): boolean {
+    const dx = x - zombie.position.x;
+    const dz = z - zombie.position.z;
+    return dx * Math.sin(zombie.group.rotation.y) + dz * Math.cos(zombie.group.rotation.y)
+      >= Math.hypot(dx, dz) * 0.35;
+  }
+
+  private updateAttackReach(zombie: Zombie, playerX: number, playerZ: number): void {
+    const distance = Math.hypot(playerX - zombie.position.x, playerZ - zombie.position.z);
+    if (distance > ZOMBIE_ATTACK_RANGE && zombie.state !== 'attack') return;
+    let reach = Math.min(ZOMBIE_ATTACK_LUNGE, Math.max(0, distance - 1.1));
+    // Sweep along the displayed facing, including during a turning wind-up.
+    const x = zombie.position.x + Math.sin(zombie.group.rotation.y) * reach;
+    const z = zombie.position.z + Math.cos(zombie.group.rotation.y) * reach;
+    if (!this.lineOfSightClearFrom(zombie.position.x, zombie.position.z, x, z,
+      zombie.position.y, undefined, zombie.bodyRadius)) reach = 0;
+    for (const other of this.pool.actives) {
+      if (other === zombie || !other.isAlive || other.floor !== zombie.floor) continue;
+      if (Math.hypot(x - other.position.x, z - other.position.z) < zombie.bodyRadius + other.bodyRadius) {
+        reach = 0;
+        break;
+      }
+    }
+    zombie.visual.setAttackReach(reach / zombie.group.scale.x);
+  }
+
+  private setStrikeTarget(zombie: Zombie, x: number, y: number, z: number): void {
+    const dx = x - zombie.position.x;
+    const dz = z - zombie.position.z;
+    const yaw = zombie.group.rotation.y;
+    const scale = zombie.group.scale.x;
+    zombie.visual.setStrikeTarget((dx * Math.cos(yaw) - dz * Math.sin(yaw)) / scale,
+      (y - zombie.position.y) / scale, (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / scale);
+  }
+
+  private updateBarrierContact(zombie: Zombie, barrier: WindowBarrier): void {
+    // Keep the struck board as the follow-through target until recovery ends.
+    if (zombie.state === 'barrierBreak' || zombie.state === 'barrierAttack') return;
+    let index = 0;
+    while (index < barrier.boards.length && barrier.boards[index].hp <= 0) index++;
+    this.setStrikeTarget(zombie, barrier.position.x,
+      barrier.y + (barrier.boards.length - 1) * 0.095 - index * 0.19, barrier.position.z);
+  }
+
+  private barrierPositionValid(zombie: Zombie, barrier: WindowBarrier): boolean {
+    if (barrier.isOpen || zombie.floor !== barrier.floor) return false;
+    const dx = zombie.position.x - barrier.position.x;
+    const dz = zombie.position.z - barrier.position.z;
+    const depth = dx * barrier.outward.x + dz * barrier.outward.z;
+    const lateral = Math.abs(dx * barrier.outward.z - dz * barrier.outward.x);
+    return depth >= zombie.bodyRadius + 0.17 && Math.hypot(dx, dz) <= ZOMBIE_BARRIER_ATTACK_RANGE
+      && lateral <= Math.max(0.16, BARRIER_VOLUME_LENGTH / 2 - zombie.bodyRadius)
+      && this.attackLineClear(zombie.position.x, zombie.position.z, barrier.position.x, barrier.position.z, zombie.position.y);
   }
 
   private canAttackPlayer(
@@ -1772,8 +1875,10 @@ export class ZombieManager {
 
       if (barrier && !barrier.isOpen) {
         zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
-        if (zombie.state === 'walk' && zombie.tryBarrierAttack()) {
+        this.updateBarrierContact(zombie, barrier);
+        if (zombie.state === 'walk' && this.barrierPositionValid(zombie, barrier) && zombie.tryBarrierAttack()) {
           zombie.onAttackLanded = () => {
+            if (!this.barrierPositionValid(zombie, barrier) || !this.facingTarget(zombie, barrier.position.x, barrier.position.z)) return;
             this.hitBarrier(barrier);
             if (barrier.isOpen) zombie.finishBarrierAttack();
           };
@@ -1802,7 +1907,7 @@ export class ZombieManager {
 
   private hitBarrier(barrier: WindowBarrier): void {
     if (barrier.isOpen) return;
-    if (barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE) === 0) return;
+    barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE);
     if (this.lastBarrierImpactAudioFrame === this.frameIndex) return;
     this.lastBarrierImpactAudioFrame = this.frameIndex;
     this.onBarrierImpact?.();

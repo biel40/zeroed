@@ -41,8 +41,8 @@ Los clips concretos por estado se resuelven por nombre en
 
 | Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
 | --- | --- | --- | --- | --- | --- |
-| `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0**, atribucion: Quaternius | 2116 | ZombieCrawl, ZombieWalk, ZombieBite |
-| `brute` | "Zeroed Brutus" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | 1830 | BruteRise, BruteWalk, BruteSmash, BruteHit, BruteDeath |
+| `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0**, atribucion: Quaternius | 2116 | ZombieCrawl, ZombieIdle, ZombieWalk, ZombieRun |
+| `brute` | "Zeroed Brutus" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | 1830 | BruteRise, BruteWalk, BruteDeath |
 
 > `normal` y `shiny` comparten el walker; `brute` usa su propio GLB, jerarquía,
 > materiales y clips. El registro separa tipos de gameplay y modelos para que
@@ -50,8 +50,10 @@ Los clips concretos por estado se resuelven por nombre en
 
 Notas:
 
-- El `walker` no trae clip de muerte/impacto: cae proceduralmente
-  (`ZombieVisual.setDeathProgress`) y el impacto usa flash + crossfade a walk.
+- Los ataques al jugador y a barreras se resuelven proceduralmente sobre una
+  base quieta para compartir contacto, variantes y limites anatomicos entre
+  rigs. El `walker` no trae clip de muerte/impacto: cae proceduralmente y los
+  impactos usan flash y una reaccion direccional aditiva.
 - Cada modelo tiene un unico tinte base. Normal conserva la textura original;
   Shiny es dorado, emisivo y tiene diez estrellas animadas. No se sortean colores.
 - El walker conserva su rig, textura y clips originales: un material y 694500

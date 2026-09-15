@@ -6,6 +6,8 @@ export interface BarrierBoard {
   readonly maxHp: number;
   /** Increments whenever this board crosses between destroyed and rebuilt. */
   revision: number;
+  /** Every physical strike, including hits that leave the board intact. */
+  impactRevision: number;
 }
 
 export interface WindowBarrierConfig {
@@ -60,6 +62,7 @@ export class WindowBarrier {
       hp: config.boardHp,
       maxHp: config.boardHp,
       revision: 0,
+      impactRevision: 0,
     }));
     this.boards = this.mutableBoards;
   }
@@ -93,6 +96,8 @@ export class WindowBarrier {
     if (this.isOpen) return 0;
     for (const board of this.mutableBoards) {
       if (board.hp <= 0) continue;
+      if (amount <= 0) return 0;
+      board.impactRevision++;
       board.hp = Math.max(0, board.hp - amount);
       if (board.hp <= 0) {
         board.revision++;

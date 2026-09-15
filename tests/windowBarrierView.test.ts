@@ -19,7 +19,7 @@ const createView = (onBoardRebuilt: (() => void) | null = null) => {
 };
 
 describe('WindowBarrierView', () => {
-  it('pulls a destroyed board toward the zombie before releasing it into a fall', () => {
+  it('pulls the released board toward the grabbing zombie before it falls', () => {
     const { barrier, view, boards } = createView();
     const board = boards[0];
     const originalPosition = board.position.clone();
@@ -30,7 +30,7 @@ describe('WindowBarrierView', () => {
     view.update(0.05);
     expect(board.visible).toBe(true);
     expect(board.position.z).toBeGreaterThan(originalPosition.z);
-    expect(board.position.y).toBeGreaterThan(originalPosition.y);
+    expect(board.position.y).toBeLessThan(originalPosition.y); // drops while pulled free
 
     view.update(0.2);
     expect(board.position.z).toBeGreaterThan(originalPosition.z + 0.1);

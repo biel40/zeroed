@@ -22,6 +22,16 @@ function updateWeapon(weapon: Weapon, state: InputState, seconds: number): numbe
 }
 
 describe('mobile 1-Tap ADS Fire', () => {
+  it('maps the dedicated knife button to a one-frame shared action', () => {
+    const state = new InputState();
+    applyMobileAction(state, 'knife', true);
+    expect(state.wasPressed('TouchKnife')).toBe(true);
+    state.endFrame();
+    expect(state.wasPressed('TouchKnife')).toBe(false);
+    applyMobileAction(state, 'knife', false);
+    expect(state.isDown('TouchKnife')).toBe(false);
+  });
+
   it('presses and releases ADS and trigger as one shared input action', () => {
     const state = new InputState();
     applyMobileAction(state, 'fire', true);

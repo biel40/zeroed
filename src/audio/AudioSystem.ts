@@ -363,6 +363,33 @@ export class AudioSystem {
     this.tick(0.012, 150, 0.26);
   }
 
+  /** Fast air cut for the Bowie wind-up. */
+  public playKnifeSwing(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const source = audio.ctx.createBufferSource();
+    source.buffer = audio.noise;
+    const filter = audio.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1500, audio.ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(420, audio.ctx.currentTime + 0.11);
+    filter.Q.value = 0.7;
+    const gain = audio.ctx.createGain();
+    gain.gain.setValueAtTime(0.18, audio.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audio.ctx.currentTime + 0.13);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audio.master);
+    source.start();
+    source.stop(audio.ctx.currentTime + 0.14);
+  }
+
+  /** Wet low impact with a short metallic edge from the heavy blade. */
+  public playKnifeHit(): void {
+    this.tick(0, 240, 0.5, 0.75, 0.1);
+    this.tick(0.012, 1150, 0.22, 1.1, 0.055);
+  }
+
   /** Standalone skull impact: a fleshy body followed by a distinct dry crack. */
   public playHeadshotHit(): void {
     // Delaying the crack slightly keeps it perceptually separate from the

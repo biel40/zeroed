@@ -38,7 +38,7 @@ function step(manager: ZombieManager, seconds: number, px = 0, pz = 4): void {
 }
 
 describe('ZombieManager barrier feedback', () => {
-  it('emits at most one wood impact per frame and only when a board breaks', () => {
+  it('emits at most one wood impact per frame', () => {
     const barrier = new WindowBarrier('window', 0, 0, 0, 1, {
       boardCount: 2,
       boardHp: 50,
@@ -73,7 +73,7 @@ describe('ZombieManager barrier feedback', () => {
     expect(manager.spawnZombie(roundConfig(1), 0, 4)).toBe(true);
     const zombie = [...manager.actives][0];
     zombie.state = 'walk';
-    zombie.position.set(0, 0, 0);
+    zombie.position.set(0, 0, 0.9);
     zombie.barrierTarget = barrier;
 
     manager.update(DT, 0, 4);
@@ -321,7 +321,9 @@ describe('ZombieManager movement', () => {
     manager.onBruteAttack = roar;
     manager.onPlayerAttack = (amount) => { damage += amount; };
 
-    step(manager, ZOMBIE_ATTACK_HIT_MOMENT + DT, 0, 4);
+    // Brutus first turns its whole body toward the target, then commits the
+    // locked attack instead of twisting its arms through a sideways wind-up.
+    step(manager, 0.9, 0, 4);
 
     expect(roar).toHaveBeenCalledOnce();
     expect(damage).toBe(PLAYER_MAX_HP);

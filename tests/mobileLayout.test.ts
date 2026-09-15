@@ -57,15 +57,16 @@ describe('mobile stylesheet cascade', () => {
     expect(css).toMatch(/#touch-controls button \{[^}]*touch-action: none/);
   });
 
-  it('keeps only the required mobile action set with one combined fire button', () => {
+  it('keeps the required mobile actions with dedicated fire and knife buttons', () => {
     expect(html).not.toContain('id="btn-jump"');
     expect(html).not.toContain('id="btn-ads"');
     expect(html).not.toContain('id="btn-mode"');
-    for (const action of ['fire', 'reload', 'interact', 'swap-weapon', 'pause']) {
+    for (const action of ['fire', 'knife', 'reload', 'interact', 'swap-weapon', 'pause']) {
       expect(html).toContain(`data-action="${action}"`);
     }
     const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('</div>\n\n      <div id="hud-weapon"'));
-    expect(touchControls.match(/data-action=/g)).toHaveLength(5);
+    expect(touchControls.match(/data-action=/g)).toHaveLength(6);
+    expect(touchControls).toContain('id="btn-knife"');
   });
 
   it('keeps comfortable secondary targets and a dominant square fire button', () => {

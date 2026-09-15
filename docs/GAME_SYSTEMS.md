@@ -27,11 +27,33 @@ headshot no se duplica en splash ni cadena.
   reutilizadas; Brutus anade rugido y ataque letal.
 - El melee valida distancia XZ, diferencia vertical, linea de ataque, ventana de
   esquiva e instante de impacto. El feedback de dano respeta invulnerabilidad.
+- Si todas las armas transportadas agotan cargador y reserva, el modo equipa
+  automaticamente un Bowie que no ocupa ranura. La cuchillada aplica 150 de
+  dano en su contacto visual, tiene 2.05 m de alcance y usa el primer collider
+  bajo la mira, por lo que paredes y enemigos cercanos bloquean el golpe. Con
+  municion disponible funciona como melee rapido mediante NUM 3 o el boton
+  KNIFE del HUD tactil, sin cambiar el arma equipada.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
   continua de canal unico, sin teletransporte.
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
   fallback sintetizado si falta el asset.
+- Animacion: idle, marcha, persecucion y muerte se generan sobre los esqueletos
+  existentes y se cachean por modelo. El mixer reproduce los ciclos; el apoyo
+  de la marcha se calibra al desplazamiento real y conserva fase al cambiar de
+  velocidad. El cambio walk/run tiene histeresis para evitar alternancias. En
+  walkers se conserva la mayor parte del movimiento superior authored y una
+  capa determinista sutil desfasa torso, cabeza y brazos; no modifica piernas
+  ni apoyo.
+- Melee y ventanas usan tres variantes (un brazo por lado y dos manos), con
+  anticipacion, contacto a 0.475 s y recuperacion. Los brazos apuntan al blanco
+  comprometido, conservan la muneca local y comparten el movimiento de la tabla
+  tras el impacto. La ultima tabla continua el ataque sin reiniciar la mezcla.
+  Salir del area del golpe durante la anticipacion permite esquivarlo.
+- Los cambios de estado mezclan posicion y rotacion desde la pose visible.
+  Los impactos leves son aditivos y breves; la muerte conserva impulso y altura
+  de planta, con variacion lateral y sin ragdoll. El steering frena los cambios
+  de direccion, manteniendo las restricciones de paredes y rampas.
 
 ## Mapas e interacciones
 
@@ -42,6 +64,9 @@ headshot no se duplica en splash ni cadena.
   geometria, colliders, spawns, barreras y puertas.
 - Barreras: HP autoritativo, rotura visual independiente y reparacion limitada
   por ronda. Puertas y wall buys cobran de forma atomica.
+- Los golpes a ventanas validan separacion del marco, alineacion lateral y
+  linea de contacto. Cada tiron hace vibrar la tabla o la arranca hacia fuera;
+  el ultimo completa su recuperacion antes de retomar la ruta de entrada.
 - Mystery Box: 950 Points, revelado a los 5 s; Ray Gun garantizada a 115 bajas;
   ZEUS-77 es legendaria y encadena objetivos. Ambas usan proyectiles de energia.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre

@@ -2,7 +2,15 @@ import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { ZombieState } from './Zombie';
 import { ShinyStars } from './ShinyStars';
+import { ZombieLimb } from './ZombieLimb';
+import { buildZombieMotionClips } from './ZombieMotionClips';
+import { sampleZombieWalkMotion } from './ZombieWalkMotion';
+import { sampleMeleeMotion, sampleWindowMotion, boardPullProgress,
+  BOARD_PULL_DISTANCE, BOARD_PULL_DROP, BOARD_PULL_DURATION } from './ZombieAttackMotion';
 import {
+  ZOMBIE_ATTACK_LUNGE,
+  ZOMBIE_ATTACK_HIT_MOMENT,
+  ZOMBIE_DEATH_FALL,
   ZOMBIE_TYPE_CONFIGS,
   type ZombieModelId,
   type ZombieTypeId,
@@ -14,12 +22,6 @@ export interface ZombieModelSource {
   readonly clips: THREE.AnimationClip[];
 }
 
-/**
- * Playback rate cap for the long ZombieBite mocap take. Bumped from 2.5 to
- * 3.0 alongside the shorter gameplay attack duration (see ZombieConfig) so
- * the bite genuinely plays faster instead of just cutting the tail earlier.
- */
-const ATTACK_TIME_SCALE_CAP = 3.0;
 
 export interface ZombieModelConfig {
   readonly url: string;
@@ -29,6 +31,9 @@ export interface ZombieModelConfig {
   readonly clips: Record<ZombieState, readonly string[]>;
   /** Walk clip ground speed at timeScale 1; syncs feet with movement. */
   readonly walkReferenceSpeed: number;
+  /** Faster locomotion clip and its authored ground speed, when available. */
+  readonly runClip?: readonly string[];
+  readonly runReferenceSpeed?: number;
   /** Standing-still clip candidates; drives real joint motion while stalled at a barrier (optional: not every asset has one). */
   readonly idleClip?: readonly string[];
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
@@ -58,6 +63,8 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       death: ['ZombieDeath', 'Death'],
     },
     walkReferenceSpeed: 1.35,
+    runClip: ['ZombieRun', 'Run'],
+    runReferenceSpeed: 3.1,
     idleClip: ['ZombieIdle', 'Idle'],
     tints: [0xb2b9a8],
     hasAuthoredEyes: false,
@@ -91,7 +98,8 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
   },
 };
 
-const CROSSFADE_SECONDS = 0.16;
+const CROSSFADE_SECONDS = 0.2;
+const motionClipCache = new WeakMap<THREE.Object3D, THREE.AnimationClip[]>();
 /** Below this ground speed the zombie is treated as stationary (stalled at a barrier). */
 const STATIONARY_SPEED = 0.05;
 /** Hit-flash emissive color shared by every zombie material. */
@@ -200,8 +208,6 @@ interface BarrierRig {
   readonly head: THREE.Object3D | null;
   readonly shoulderL: THREE.Object3D | null;
   readonly shoulderR: THREE.Object3D | null;
-  readonly forearmL: THREE.Object3D | null;
-  readonly forearmR: THREE.Object3D | null;
 }
 
 /**
@@ -423,22 +429,6 @@ function smoothStep(value: number): number {
   return value * value * (3 - 2 * value);
 }
 
-function sampleBarrierMotion(
-  progress: number,
-  anticipation: number,
-  impact: number,
-  followThrough: number,
-): number {
-  if (progress < 0.28) return THREE.MathUtils.lerp(0, anticipation, smoothStep(progress / 0.28));
-  if (progress < 0.63) {
-    return THREE.MathUtils.lerp(anticipation, impact, smoothStep((progress - 0.28) / 0.35));
-  }
-  if (progress < 0.8) {
-    return THREE.MathUtils.lerp(impact, followThrough, smoothStep((progress - 0.63) / 0.17));
-  }
-  return THREE.MathUtils.lerp(followThrough, 0, smoothStep((progress - 0.8) / 0.2));
-}
-
 /**
  * Places a hitbox on an animated anchor so that, in bind pose, it sits
  * exactly at `worldTarget` with its geometry measured in world meters.
@@ -483,9 +473,12 @@ export class ZombieVisual {
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
   private barrierRig: BarrierRig | null = null;
-  private readonly barrierBoneOffsets = new Map<THREE.Object3D, THREE.Quaternion>();
+
   private readonly barrierEuler = new THREE.Euler();
   private readonly barrierQuaternion = new THREE.Quaternion();
+  private readonly boneWorldRotation = new THREE.Quaternion();
+  private readonly rootWorldRotation = new THREE.Quaternion();
+  private readonly boneBasis = new THREE.Quaternion();
   private readonly shinyStars: ShinyStars | null;
   private readonly eyeMaterials: readonly THREE.Material[];
   private readonly tmpShinyAnchor = new THREE.Vector3();
@@ -496,6 +489,8 @@ export class ZombieVisual {
   private currentAction: THREE.AnimationAction | null = null;
   /** Authored standing-still clip (e.g. "ZombieIdle"); null when the asset has none. */
   private readonly idleAction: THREE.AnimationAction | null = null;
+  private readonly runAction: THREE.AnimationAction | null = null;
+  private locomotionAction: THREE.AnimationAction | null = null;
   /** True while the idle clip (not the frozen walk clip) is driving the pose. */
   private idleActive = false;
   private walkJitter = 1;
@@ -504,8 +499,6 @@ export class ZombieVisual {
   private bobPhase = Math.random() * Math.PI * 2;
   /** Advances every frame regardless of speed; drives the stationary idle sway. */
   private idlePhase = Math.random() * Math.PI * 2;
-  /** Brief cycle slowdown standing in for a missing hit-react clip. */
-  private hitDip = 0;
   /** 0..1 spawn rise and death collapse progress, driven by the owner. */
   private rise = 1;
   private collapse = 0;
@@ -518,6 +511,46 @@ export class ZombieVisual {
   private barrierBreakDuration = 0.34;
   private barrierBreakStart = 0.63;
   private barrierStrikeSide = 1;
+  private motionSpeed = 0;
+  private lean = 0;
+  private turnLean = 0;
+  private reactionX = 0;
+  private reactionZ = 0;
+  private reactionAge = 1;
+  private deathLean = 0;
+  private deathSide = 0;
+  private deathTime = 0;
+  private readonly poseBones: THREE.Object3D[] = [];
+  private readonly poseFrom: THREE.Quaternion[] = [];
+  private readonly positionFrom: THREE.Vector3[] = [];
+  // The mixer may skip unchanged tracks. Restore its exact output before
+  // sampling again, so visual polish can never feed back into the next frame.
+  private readonly baseRotations: THREE.Quaternion[] = [];
+  private readonly basePositions: THREE.Vector3[] = [];
+  private readonly baseScales: THREE.Vector3[] = [];
+  private transitionTime = CROSSFADE_SECONDS;
+  private readonly feet: THREE.Object3D[] = [];
+  private readonly footRestY: number[] = [];
+  private readonly footPosition = new THREE.Vector3();
+  private hipsRestY = 0;
+  private groundOffset = 0;
+  private attackReach = 0;
+  private walkPhase = 0;
+  private deathStartPitch = 0;
+  private deathStartRoll = 0;
+  private deathStartForward = 0;
+  private deathTravel = 0;
+  private readonly arms: ZombieLimb[] = [];
+  private readonly limbBones = new Set<THREE.Object3D>();
+  private gaitPhase = Math.random();
+  private gaitWeight = 0;
+  private attackVariant = 0;
+  private barrierVariant = 0;
+  private nextAttackVariant = 0;
+  private nextBarrierVariant = 0;
+  private readonly strikeTarget = new THREE.Vector3(0, 1.3, 1);
+  private readonly limbPoint = new THREE.Vector3();
+  private readonly limbRotation = new THREE.Quaternion();
 
   constructor(
     modelId: ZombieModelId,
@@ -579,16 +612,18 @@ export class ZombieVisual {
         head: findByName(model, ['Head']),
         shoulderL: findByName(model, ['LeftShoulder', 'ShoulderL']),
         shoulderR: findByName(model, ['RightShoulder', 'ShoulderR']),
-        forearmL: findByName(model, ['LeftForeArm', 'ElbowL']),
-        forearmR: findByName(model, ['RightForeArm', 'ElbowR']),
       };
-      for (const bone of Object.values(this.barrierRig)) {
-        if (bone) this.barrierBoneOffsets.set(bone, new THREE.Quaternion());
-      }
+
 
       this.mixer = new THREE.AnimationMixer(model);
+      let rebuilt = motionClipCache.get(source.scene);
+      if (!rebuilt) {
+        rebuilt = buildZombieMotionClips(this.root, this.modelConfig.height, source.clips);
+        motionClipCache.set(source.scene, rebuilt);
+      }
       for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'barrierBreak', 'hit', 'death'] as const) {
-        const clip = resolveClip(source.clips, this.modelConfig.clips[state]);
+        const clip = (state === 'walk' ? rebuilt[1] : state === 'death' ? rebuilt[3] : undefined)
+          ?? resolveClip(source.clips, this.modelConfig.clips[state]);
         if (!clip) continue;
         const action = this.mixer.clipAction(clip);
         if (state === 'death') {
@@ -597,13 +632,21 @@ export class ZombieVisual {
         }
         this.actions.set(state, action);
       }
-      const idleClip = this.modelConfig.idleClip
+      const idleClip = rebuilt[0] ?? (this.modelConfig.idleClip
         ? resolveClip(source.clips, this.modelConfig.idleClip)
-        : null;
+        : null);
       if (idleClip) {
         const idleAction = this.mixer.clipAction(idleClip);
         idleAction.setLoop(THREE.LoopRepeat, Infinity);
         this.idleAction = idleAction;
+      }
+      const runClip = rebuilt[2] ?? (this.modelConfig.runClip
+        ? resolveClip(source.clips, this.modelConfig.runClip)
+        : null);
+      if (runClip) {
+        const runAction = this.mixer.clipAction(runClip);
+        runAction.setLoop(THREE.LoopRepeat, Infinity);
+        this.runAction = runAction;
       }
     } else {
       const built = modelId === 'brute'
@@ -614,9 +657,55 @@ export class ZombieVisual {
       this.root.add(built.root);
       this.torsoAnchor = built.rig.hips;
       this.headAnchor = built.rig.head;
+      this.barrierRig = {
+        torso: built.rig.torso, head: built.rig.head,
+        shoulderL: built.rig.armL, shoulderR: built.rig.armR,
+      };
+
+    }
+
+    if (this.rig) {
+      this.hipsRestY = this.rig.hips.position.y;
+      this.poseBones.push(...Object.values(this.rig));
+      this.poseFrom.push(...this.poseBones.map((bone) => bone.quaternion.clone()));
+    }
+    if (source) {
+      // Measure limb rest positions only after normalization has reached the
+      // world matrices. Stale pre-scale matrices create oversized attack arcs.
+      this.root.updateMatrixWorld(true);
+      for (const side of ['Left', 'Right']) {
+        const suffix = side === 'Left' ? 'L' : 'R';
+        const makeLimb = (names: string[][], list: ZombieLimb[]): void => {
+          const bones = names.map((candidates) => findByName(this.root, candidates));
+          if (!bones[0] || !bones[1] || !bones[2]) return;
+          const limb = new ZombieLimb(this.root, bones[0], bones[1], bones[2]);
+          list.push(limb);
+          for (const bone of bones) this.limbBones.add(bone!);
+        };
+        makeLimb([[`${side}Arm`, `Shoulder${suffix}`], [`${side}ForeArm`, `Elbow${suffix}`],
+          [`${side}Hand`, `BrutusHand${suffix}`]], this.arms);
+      }
+      this.root.traverse((bone) => {
+        if (bone instanceof THREE.Bone || this.limbBones.has(bone) ||
+          bone === this.torsoAnchor || bone === this.headAnchor || bone === this.barrierRig?.torso) {
+          this.poseBones.push(bone);
+          this.poseFrom.push(bone.quaternion.clone());
+        }
+      });
+      for (const names of [['LeftFoot', 'FootL'], ['RightFoot', 'FootR']]) {
+        const foot = findByName(this.root, names);
+        if (!foot) continue;
+        this.feet.push(foot);
+        foot.getWorldPosition(this.footPosition);
+        this.footRestY.push(this.root.worldToLocal(this.footPosition).y);
+      }
     }
 
     const eyes = source && this.modelConfig.hasAuthoredEyes ? null : buildEyes();
+    this.positionFrom.push(...this.poseBones.map(bone => bone.position.clone()));
+    this.baseRotations.push(...this.poseBones.map(bone => bone.quaternion.clone()));
+    this.basePositions.push(...this.poseBones.map(bone => bone.position.clone()));
+    this.baseScales.push(...this.poseBones.map(bone => bone.scale.clone()));
     this.eyeMaterials = eyes?.materials ?? [];
     this.root.updateMatrixWorld(true);
     if (eyes) placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
@@ -638,6 +727,24 @@ export class ZombieVisual {
       throw new Error(`Zombie type "${typeId}" requires model "${config.modelId}", got "${this.modelId}"`);
     }
     this.flash = 0;
+    this.restoreBasePose();
+    this.motionSpeed = this.lean = this.turnLean = 0;
+    this.reactionX = this.reactionZ = 0;
+    this.reactionAge = 1;
+    this.deathTime = this.deathLean = this.deathSide = 0;
+    this.groundOffset = this.attackReach = 0;
+    this.gaitWeight = 0;
+    this.locomotionAction = null;
+    this.strikeTarget.set(0, 1.3, 1);
+    this.root.position.set(0, 0, 0);
+    this.root.rotation.set(0, 0, 0);
+    this.mixer?.stopAllAction();
+    this.captureBasePose();
+    this.currentAction = null;
+    this.idleActive = false;
+    const walk = this.actions.get('walk');
+    if (walk) walk.time = this.walkPhase * walk.getClip().duration;
+    if (this.runAction) this.runAction.time = this.walkPhase * this.runAction.getClip().duration;
     this.zombieType = typeId;
     this.root.scale.set(...config.bodyScale);
     this.walkAnimationMultiplier = config.walkAnimationMultiplier;
@@ -692,18 +799,32 @@ export class ZombieVisual {
     return head.add(anchorTmpC.set(0, HEAD_HITBOX_UP, 0));
   }
 
-  /** Walker variation offsets phase without changing the authored stride. */
+  /** Per-instance variation offsets phase without changing the authored stride. */
   public setWalkJitter(jitter: number): void {
-    this.walkJitter = this.modelId === 'walker' ? 1 : jitter;
+    this.walkJitter = 1;
+    this.walkPhase = THREE.MathUtils.euclideanModulo((jitter - 1) * 2.5, 1);
     const walk = this.actions.get('walk');
-    if (this.modelId === 'walker' && walk) {
-      walk.time = THREE.MathUtils.euclideanModulo((jitter - 1) * 2.5, 1) * walk.getClip().duration;
+    if (walk) {
+      walk.time = this.walkPhase * walk.getClip().duration;
     }
+    if (this.runAction) this.runAction.time = this.walkPhase * this.runAction.getClip().duration;
+    this.nextAttackVariant = Math.floor(this.walkPhase * 3) % 3;
+    this.nextBarrierVariant = (this.nextAttackVariant + 1) % 3;
   }
 
   /** The attack clip is stretched/squeezed to the gameplay attack duration. */
   setAttackDuration(seconds: number): void {
     this.attackDuration = seconds;
+  }
+
+  /** Collision-cleared visual step, bounded independently from damage range. */
+  setAttackReach(reach: number): void {
+    this.attackReach = THREE.MathUtils.clamp(reach, 0, ZOMBIE_ATTACK_LUNGE);
+  }
+
+  /** Contact point relative to the navigation body, in unscaled visual meters. */
+  setStrikeTarget(x: number, y: number, z: number): void {
+    this.strikeTarget.set(x, y, z);
   }
 
   setBarrierBreakDuration(seconds: number): void {
@@ -721,42 +842,70 @@ export class ZombieVisual {
    */
   public setState(state: ZombieState): void {
     const previous = this.state;
+    if (previous !== state) {
+      for (let i = 0; i < this.poseBones.length; i++) {
+        this.poseFrom[i].copy(this.poseBones[i].quaternion);
+        this.positionFrom[i].copy(this.poseBones[i].position);
+      }
+      this.transitionTime = state === 'spawn' || (state === 'barrierBreak' && previous === 'barrierAttack')
+        ? CROSSFADE_SECONDS : 0;
+    }
     if (state === 'walk' && previous === 'walk' && this.idleActive) return;
     this.state = state;
     if (previous !== state) this.idleActive = false;
-    if (state === 'barrierAttack' && previous !== 'barrierAttack') {
+    if ((state === 'barrierAttack' || state === 'attack') && previous !== state) {
       this.barrierMotionTime = 0;
-      this.barrierStrikeSide *= -1;
+      if (state === 'attack') {
+        this.attackVariant = this.nextAttackVariant;
+        this.nextAttackVariant = (this.nextAttackVariant + 1) % 3;
+        this.barrierStrikeSide = this.attackVariant === 2 ? 0
+          : Math.sign(this.arms[this.attackVariant]?.rest.x ?? (this.attackVariant === 0 ? -1 : 1));
+      } else {
+        this.barrierVariant = this.nextBarrierVariant;
+        this.nextBarrierVariant = (this.nextBarrierVariant + 1) % 3;
+        this.barrierStrikeSide = this.barrierVariant === 2 ? 0
+          : Math.sign(this.arms[this.barrierVariant]?.rest.x ?? (this.barrierVariant === 0 ? -1 : 1));
+      }
     }
     if (state === 'barrierBreak' && previous === 'barrierAttack') {
-      this.barrierBreakStart = Math.max(0.63, Math.min(0.8, this.barrierMotionTime / this.attackDuration));
+      this.barrierBreakStart = Math.min(1, this.barrierMotionTime / this.attackDuration);
       this.barrierMotionTime = 0;
     }
     if (state === 'death' && this.shinyStars) this.shinyStars.points.visible = false;
+    if (state === 'death' && previous !== 'death') {
+      this.deathTime = 0;
+      this.deathStartPitch = this.root.rotation.x;
+      this.deathStartRoll = this.root.rotation.z;
+      this.deathStartForward = this.root.position.z;
+      this.deathTravel = Math.min(0.14, this.motionSpeed * 0.06);
+      this.deathLean = Math.min(0.16, this.motionSpeed * 0.065) + this.lean;
+      this.deathSide = Math.sin(this.bobPhase + this.idlePhase) * 0.16 + this.turnLean;
+    }
     if (state !== 'death') this.collapse = 0;
-    // Barrier strikes are authored procedurally over a quiet base pose. They
-    // must never fall back to the player bite/smash clip.
-    if (state === 'barrierAttack' || state === 'barrierBreak') {
+    // Known rigs use a contact-timed upper-body strike over a quiet base.
+    // Unknown rigs retain their authored attack; barriers never use a bite.
+    if (state === 'barrierAttack' || state === 'barrierBreak' ||
+      (state === 'attack' && this.arms.length === 2)) {
       const base = this.idleAction ?? this.actions.get('walk') ?? null;
       if (base && base !== this.currentAction) {
         base.reset();
         base.enabled = true;
-        base.timeScale = this.idleAction ? 0.82 : 0.12;
         base.play();
         if (this.currentAction) base.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
         this.currentAction = base;
       }
+      this.locomotionAction = base;
+      // Attack choreography owns the limbs. A moving idle/walk underneath it
+      // changes the shoulder origin and turns the same swipe into a wobble.
+      if (base) { base.time = 0; base.timeScale = 0; }
       return;
     }
     const next = this.actions.get(state) ?? null;
     if (!next) {
-      // Models without a hit clip flinch by dipping the current cycle;
-      // without a death clip the body collapses (owner drives setDeathProgress).
-      // The dip only triggers on a FRESH hit: re-pinning it on every bullet
-      // of a burst would hold the walk cycle in slow motion while the zombie
-      // keeps moving at full speed (visible foot sliding).
-      if (state === 'hit' && previous !== 'hit') this.hitDip = 1;
-      if (state === 'death' && this.currentAction) this.currentAction.fadeOut(0.35);
+      // Clipless reactions layer over the uninterrupted locomotion clock.
+      if (state === 'hit' && previous !== 'hit') this.reactToHit(0, -1, 0.12);
+      // Keep the last living joint pose under the lightweight collapse.
+      if (state === 'death' && this.currentAction) this.currentAction.paused = true;
       return;
     }
     if (next === this.currentAction) {
@@ -771,22 +920,18 @@ export class ZombieVisual {
       if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
       next.play();
       this.currentAction = next;
+      this.locomotionAction = next;
       return;
     }
     next.reset();
     if (state === 'attack') {
-      const clip = next.getClip();
-      const raw = clip.duration / Math.max(this.attackDuration, 1e-3);
-      if (raw > ATTACK_TIME_SCALE_CAP) {
-        // Long mocap take: skip the idle wind-up, cap the playback rate.
-        next.time = clip.duration * 0.3;
-        next.timeScale = ATTACK_TIME_SCALE_CAP;
-      } else {
-        next.timeScale = raw;
-      }
+      next.setLoop(THREE.LoopOnce, 1);
+      next.clampWhenFinished = true;
+      next.timeScale = next.getClip().duration / this.attackDuration;
     }
     if (state === 'spawn') next.timeScale = 1.15;
     if (state === 'hit') next.timeScale = 1.4;
+    if (state === 'death') next.timeScale = next.getClip().duration / ZOMBIE_DEATH_FALL;
     next.enabled = true;
     // next !== currentAction here (the same-action case returned above).
     if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
@@ -797,6 +942,23 @@ export class ZombieVisual {
   /** Red emissive pulse on bullet impact. */
   hitFlash(): void {
     this.flash = 1;
+  }
+
+  /** Additive recoil in body-local space; never changes the locomotion clock. */
+  reactToHit(localX: number, localZ: number, strength: number): void {
+    this.reactionX = THREE.MathUtils.clamp(this.reactionX + localZ * strength, -0.18, 0.18);
+    this.reactionZ = THREE.MathUtils.clamp(this.reactionZ - localX * strength, -0.14, 0.14);
+    this.reactionAge = 0;
+  }
+
+  /** Actual collision-resolved speed and angular velocity, supplied by the owner. */
+  setMotion(dt: number, speed: number, turnRate: number): void {
+    if (dt <= 0 || this.state === 'death') return;
+    const blend = 1 - Math.exp(-dt * 9);
+    const acceleration = THREE.MathUtils.clamp((speed - this.motionSpeed) * 0.09, -0.12, 0.12);
+    this.lean += (acceleration - this.lean) * blend;
+    this.turnLean += (THREE.MathUtils.clamp(-turnRate * 0.025, -0.12, 0.12) - this.turnLean) * blend;
+    this.motionSpeed += (speed - this.motionSpeed) * blend;
   }
 
   /** 0 (fully buried) → 1 (standing on the ground) while spawning. */
@@ -821,42 +983,47 @@ export class ZombieVisual {
   }
 
   public update(dt: number, speed: number): void {
-    this.clearBarrierBoneOffsets();
+    this.restoreBasePose();
+    this.transitionTime += dt;
+    this.reactionAge += dt;
+    if (this.state === 'death') this.deathTime += dt;
     // Spawn rise and death collapse apply to the visual root in both paths.
     this.heavyBobPhase += dt * Math.max(0.4, speed) * 2.1;
     this.idlePhase += dt;
-    if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+    if (this.state === 'barrierAttack' || this.state === 'barrierBreak' || this.state === 'attack') {
       this.barrierMotionTime += dt;
     }
     const heavyBob = this.zombieType === 'brute' && this.state === 'walk'
-      ? Math.sin(this.heavyBobPhase * 2) * 0.018
+      ? (1 - Math.cos(this.heavyBobPhase * 2)) * 0.009
       : 0;
     this.root.position.y = -(1 - this.rise) * SPAWN_DEPTH + heavyBob;
     this.root.position.z = 0;
     if (this.collapse > 0) {
       const ease = 1 - (1 - this.collapse) * (1 - this.collapse);
       this.root.rotation.x = -ease * (Math.PI / 2 - 0.12);
-      this.root.rotation.z = ease * 0.18;
+      this.root.rotation.z = ease * (0.18 + this.deathSide);
     } else {
       this.root.rotation.x = 0;
       this.root.rotation.z = 0;
     }
+    if (this.state === 'death') {
+      const settle = Math.min(1, this.deathTime / ZOMBIE_DEATH_FALL);
+      const remaining = 1 - smoothStep(settle);
+      this.root.position.z = this.deathStartForward + this.deathTravel * (1 - remaining);
+      this.root.rotation.x += this.deathStartPitch * remaining;
+      this.root.rotation.z += this.deathStartRoll * remaining;
+      this.root.rotation.x += this.deathLean * Math.sin(settle * Math.PI);
+      if (this.actions.has('death')) this.root.rotation.z += this.deathSide * Math.sin(settle * Math.PI);
+    }
+    if (this.state === 'attack') {
+      this.root.position.z = sampleMeleeMotion(this.barrierProgress(), 0, this.attackReach * 0.12,
+        this.attackReach, this.attackReach * 0.85, 0);
+    }
     if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
       const progress = this.barrierProgress();
-      const side = this.barrierStrikeSide;
-      this.root.position.y += sampleBarrierMotion(progress, -0.065, 0.02, -0.08);
-      this.root.position.z = sampleBarrierMotion(progress, -0.035, 0.12, -0.095);
-      this.root.rotation.x += sampleBarrierMotion(progress, 0.035, 0.16, -0.035);
-      this.root.rotation.z += side * sampleBarrierMotion(progress, -0.09, 0.065, -0.045);
-    } else if (
-      this.state === 'walk' && speed <= STATIONARY_SPEED && this.collapse <= 0 && !this.idleAction
-    ) {
-      // Fallback for assets without an idle clip (procedural rig, Brute):
-      // sway the root so the zombie keeps reading as alive instead of a
-      // paused statue. The walker GLB has a real idle clip (see below) that
-      // moves actual joints instead, which reads far less "frozen".
-      this.root.rotation.x += Math.sin(this.idlePhase * 1.6) * 0.015;
-      this.root.rotation.z += Math.sin(this.idlePhase * 1.1 + 1.7) * 0.012;
+      // Braced feet and a small weight shift, never a whole-body rocking pivot.
+      this.root.position.y += sampleWindowMotion(progress, 0, -0.015, -0.025, -0.015, 0);
+      this.root.position.z = sampleWindowMotion(progress, 0, 0.025, 0.025, -0.025, 0);
     }
 
     if (this.mixer) {
@@ -876,6 +1043,7 @@ export class ZombieVisual {
           this.idleAction.play();
           if (this.currentAction) this.idleAction.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
           this.currentAction = this.idleAction;
+          this.locomotionAction = this.idleAction;
         } else if (!stationary && this.idleActive && walk) {
           this.idleActive = false;
           walk.enabled = true;
@@ -883,23 +1051,80 @@ export class ZombieVisual {
           walk.play();
           walk.crossFadeFrom(this.idleAction, CROSSFADE_SECONDS, false);
           this.currentAction = walk;
+          this.locomotionAction = walk;
         }
       }
-      if (walk && this.currentAction === walk) {
-        // Keep the feet tracking the actual ground speed (round scaling).
-        walk.timeScale =
-          this.walkJitter * this.walkAnimationMultiplier
-          * Math.max(0, speed / this.modelConfig.walkReferenceSpeed);
-        if (this.hitDip > 0) walk.timeScale *= 1 - this.hitDip * 0.75;
+      if (walk && this.state === 'walk' && !stationary) {
+        const useRun = !!this.runAction && speed >= (this.locomotionAction === this.runAction ? 2.15 : 2.45);
+        const locomotion = useRun ? this.runAction! : walk;
+        if (this.locomotionAction !== locomotion) {
+          const previous = this.locomotionAction;
+          const phase = previous
+            ? THREE.MathUtils.euclideanModulo(previous.time / previous.getClip().duration, 1)
+            : this.walkPhase;
+          locomotion.enabled = true;
+          locomotion.time = phase * locomotion.getClip().duration;
+          locomotion.play();
+          if (previous) locomotion.crossFadeFrom(previous, 0.22, false);
+          this.currentAction = locomotion;
+          this.locomotionAction = locomotion;
+          this.idleActive = false;
+        }
+        const referenceSpeed = useRun
+          ? (this.modelConfig.runReferenceSpeed ?? this.modelConfig.walkReferenceSpeed)
+          : this.modelConfig.walkReferenceSpeed;
+        locomotion.timeScale = this.walkJitter * this.walkAnimationMultiplier
+          * Math.max(0, speed / referenceSpeed);
+      } else if (stationary && !this.idleAction && this.locomotionAction) {
+        // Assets without an idle hold a planted locomotion pose. Subtle life
+        // comes from torso/head breathing below, never from shuffling feet or
+        // rocking the complete body around its ankles.
+        this.locomotionAction.timeScale = 0;
       }
-      if (this.hitDip > 0) this.hitDip = Math.max(0, this.hitDip - dt * 3.5);
       this.mixer.update(dt);
-      if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
-        this.applyBarrierBonePose(this.barrierProgress());
+      if (this.state === 'walk' && this.locomotionAction) {
+        this.gaitPhase = THREE.MathUtils.euclideanModulo(
+          this.locomotionAction.time / this.locomotionAction.getClip().duration,
+          1,
+        );
       }
     } else if (this.rig) {
       this.updateProcedural(dt, speed);
     }
+
+    this.captureBasePose();
+    if (this.state === 'death' && !this.actions.has('death')) {
+      // The mixer has paused its base clip, but the actual last visible pose
+      // also includes solved limbs. Preserve that pose underneath the fall.
+      for (let i = 0; i < this.poseBones.length; i++) this.poseBones[i].quaternion.copy(this.poseFrom[i]);
+    }
+    if (this.state === 'attack' || this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+      this.applyAttackBodyPose(this.barrierProgress());
+    }
+    this.applyInertia(dt);
+    this.gaitWeight += ((this.state === 'walk' ? Math.min(1, speed / 0.3) : 0) - this.gaitWeight)
+      * (1 - Math.exp(-dt * 14));
+    this.applyLimbMotion();
+    const blend = smoothStep(Math.min(1, this.transitionTime / CROSSFADE_SECONDS));
+    if (blend < 1) {
+      for (let i = 0; i < this.poseBones.length; i++) {
+        this.poseBones[i].quaternion.slerp(this.poseFrom[i], 1 - blend);
+        this.poseBones[i].position.lerp(this.positionFrom[i], 1 - blend);
+      }
+    }
+    // Two cached ankle anchors, no raycasts or per-vertex bounds. Preserve
+    // the authored swing foot while seating the lower support foot.
+    let groundTarget = 0;
+    if (this.state === 'walk' && this.feet.length === 2) {
+      let support = Infinity;
+      for (let i = 0; i < this.feet.length; i++) {
+        this.feet[i].getWorldPosition(this.footPosition);
+        support = Math.min(support, this.root.worldToLocal(this.footPosition).y - this.footRestY[i]);
+      }
+      groundTarget = -THREE.MathUtils.clamp(support * this.root.scale.y, -0.08, 0.08);
+    }
+    this.groundOffset += (groundTarget - this.groundOffset) * (1 - Math.exp(-dt * 18));
+    this.root.position.y += this.groundOffset;
 
     if (this.shinyStars?.points.visible) {
       this.torsoAnchor.getWorldPosition(this.tmpShinyAnchor);
@@ -926,30 +1151,23 @@ export class ZombieVisual {
   private updateProcedural(dt: number, speed: number): void {
     const rig = this.rig;
     if (!rig) return;
-    if (this.state === 'death') return; // collapse handles the pose
+    if (this.state === 'death') {
+      for (let i = 0; i < this.poseBones.length; i++) this.poseBones[i].quaternion.copy(this.poseFrom[i]);
+      return;
+    }
     // The emergency rig retains its own stride; GLB calibration is asset-specific.
     const referenceSpeed = this.modelId === 'walker' ? 1.35 : this.modelConfig.walkReferenceSpeed;
     this.bobPhase += dt * 4.8 * Math.max(0, speed / referenceSpeed);
     const p = this.bobPhase;
 
-    if (this.state === 'barrierAttack' || this.state === 'barrierBreak') {
-      const progress = this.barrierProgress();
-      const side = this.barrierStrikeSide;
-      rig.armL.rotation.x = -1.05 + sampleBarrierMotion(progress, 0.42 * side, -1.08, -0.38);
-      rig.armR.rotation.x = -1.05 + sampleBarrierMotion(progress, -0.42 * side, -1.08, -0.38);
-      rig.armL.rotation.z = 0.12 + side * sampleBarrierMotion(progress, -0.24, 0.12, -0.08);
-      rig.armR.rotation.z = -0.12 + side * sampleBarrierMotion(progress, -0.24, 0.12, -0.08);
-      rig.torso.rotation.x = 0.28 + sampleBarrierMotion(progress, 0.1, 0.34, -0.04);
-      rig.torso.rotation.z = side * sampleBarrierMotion(progress, -0.2, 0.16, -0.1);
-      rig.head.rotation.x = -0.15 + sampleBarrierMotion(progress, -0.1, 0.14, -0.06);
-      rig.head.rotation.z = -side * sampleBarrierMotion(progress, -0.1, 0.075, -0.045);
-      return;
-    }
-    if (this.state === 'attack') {
-      // Both arms swing forward and down over the player.
-      rig.armL.rotation.x = -1.9;
-      rig.armR.rotation.x = -1.9;
-      rig.torso.rotation.x = 0.55;
+    if (this.state === 'attack' || this.state === 'barrierAttack' || this.state === 'barrierBreak') {
+      rig.torso.rotation.set(0.28, 0, 0);
+      rig.head.rotation.set(-0.15, 0, 0);
+      rig.armL.rotation.set(-0.7, 0, 0.12);
+      rig.armR.rotation.set(-0.7, 0, -0.12);
+      rig.legL.rotation.set(0.08, 0, 0);
+      rig.legR.rotation.set(-0.08, 0, 0);
+      rig.hips.position.y = this.hipsRestY;
       return;
     }
     if (this.state === 'hit') {
@@ -958,74 +1176,156 @@ export class ZombieVisual {
       return;
     }
     rig.head.rotation.x = -0.15;
-    rig.legL.rotation.x = Math.sin(p) * 0.55;
-    rig.legR.rotation.x = Math.sin(p + Math.PI) * 0.55;
-    // Zombie reach: both arms raised forward, flopping out of sync.
-    rig.armL.rotation.x = -1.15 + Math.sin(p + Math.PI) * 0.16;
-    rig.armR.rotation.x = -1.05 + Math.sin(p) * 0.2;
-    rig.armL.rotation.z = 0.12 + Math.sin(p * 0.5) * 0.06;
-    rig.armR.rotation.z = -0.14 - Math.cos(p * 0.45) * 0.06;
+    const stride = Math.min(1, speed / 0.35);
+    rig.legL.rotation.x = Math.sin(p) * 0.55 * stride;
+    rig.legR.rotation.x = Math.sin(p + Math.PI) * 0.55 * stride;
+    const legLength = this.modelId === 'walker' ? 0.92 : 1.37;
+    rig.hips.position.y = this.hipsRestY - legLength * (1 - Math.cos(rig.legL.rotation.x));
+    // Restrained arm drag shares the leg phase.
+    rig.armL.rotation.x = -0.4 + Math.sin(p + Math.PI) * 0.08;
+    rig.armR.rotation.x = -0.48 + Math.sin(p) * 0.08;
+    rig.armL.rotation.z = 0.12 + Math.sin(p) * 0.015;
+    rig.armR.rotation.z = -0.14 - Math.sin(p) * 0.015;
     rig.torso.rotation.x = 0.28 + Math.sin(p * 2) * 0.04;
     rig.torso.rotation.z = Math.sin(p) * 0.06;
-    rig.head.rotation.z = Math.sin(p * 0.7) * 0.1;
+    rig.head.rotation.z = -Math.sin(p) * 0.02;
   }
 
   private barrierProgress(): number {
     if (this.state === 'barrierBreak') {
-      const finish = Math.min(1, this.barrierMotionTime / Math.max(this.barrierBreakDuration, 1e-3));
-      return THREE.MathUtils.lerp(this.barrierBreakStart, 1, finish);
+      return Math.min(1, this.barrierBreakStart
+        + Math.min(this.barrierMotionTime, this.barrierBreakDuration) / this.attackDuration);
     }
     return Math.min(1, this.barrierMotionTime / Math.max(this.attackDuration, 1e-3));
   }
 
-  private clearBarrierBoneOffsets(): void {
-    for (const [bone, offset] of this.barrierBoneOffsets) {
-      if (offset.w === 1 && offset.x === 0 && offset.y === 0 && offset.z === 0) continue;
-      this.barrierQuaternion.copy(offset).invert();
-      bone.quaternion.multiply(this.barrierQuaternion);
-      offset.identity();
+  private restoreBasePose(): void {
+    for (let i = 0; i < this.poseBones.length; i++) {
+      this.poseBones[i].quaternion.copy(this.baseRotations[i]);
+      this.poseBones[i].position.copy(this.basePositions[i]);
+      this.poseBones[i].scale.copy(this.baseScales[i]);
+    }
+  }
+
+  private captureBasePose(): void {
+    for (let i = 0; i < this.poseBones.length; i++) {
+      this.baseRotations[i].copy(this.poseBones[i].quaternion).normalize();
+      this.basePositions[i].copy(this.poseBones[i].position);
+      this.baseScales[i].copy(this.poseBones[i].scale);
     }
   }
 
   private rotateBarrierBone(bone: THREE.Object3D | null, x: number, y: number, z: number): void {
     if (!bone) return;
-    const offset = this.barrierBoneOffsets.get(bone);
-    if (!offset) return;
-    offset.setFromEuler(this.barrierEuler.set(x, y, z));
-    bone.quaternion.multiply(offset);
+
+    this.barrierQuaternion.setFromEuler(this.barrierEuler.set(x, y, z));
+    // Anatomical offsets use the visual body's axes, not each export's
+    // arbitrary bone-local axes (the walker and Brutus differ here).
+    bone.getWorldQuaternion(this.boneWorldRotation).normalize();
+    this.root.getWorldQuaternion(this.rootWorldRotation).normalize();
+    this.boneBasis.copy(this.boneWorldRotation).invert().multiply(this.rootWorldRotation);
+    this.barrierQuaternion.premultiply(this.boneBasis);
+    this.boneBasis.invert();
+    this.barrierQuaternion.multiply(this.boneBasis);
+    bone.quaternion.multiply(this.barrierQuaternion).normalize();
   }
 
-  private applyBarrierBonePose(progress: number): void {
+  /** Compact spatially aimed strikes. Locomotion remains owned by the authored
+   * clips so procedural correction cannot destabilize the legs or wrists. */
+  private applyLimbMotion(): void {
+    const melee = this.state === 'attack';
+    if (!melee && this.state !== 'barrierAttack' && this.state !== 'barrierBreak') return;
+
+    const progress = this.barrierProgress();
+    const variant = melee ? this.attackVariant : this.barrierVariant;
+    for (let i = 0; i < this.arms.length; i++) {
+      const arm = this.arms[i];
+      const side = Math.sign(arm.rest.x) || 1;
+      const height = this.modelConfig.height;
+      const active = variant === 2 || i === variant;
+      // Let the spare arm keep its relaxed, authored pose. Solving it into
+      // a second artificial guard was forcing the elbow away from the ribs.
+      if (!active) continue;
+      arm.tip.getWorldPosition(this.limbPoint);
+      this.root.worldToLocal(this.limbPoint);
+      const neutralX = this.limbPoint.x;
+      const neutralY = this.limbPoint.y;
+      const neutralZ = this.limbPoint.z;
+      const x = this.strikeTarget.x;
+      const y = this.strikeTarget.y;
+      const z = this.strikeTarget.z;
+      const weight = smoothStep(Math.min(1, progress / 0.22));
+      if (melee) {
+        const spread = variant === 2 ? side * 0.17 : 0;
+        this.limbPoint.set(
+          sampleMeleeMotion(progress, neutralX, side * 0.3, x + spread, x - side * 0.1 + spread, neutralX),
+          sampleMeleeMotion(progress, neutralY, y - 0.12, y, y - 0.1, neutralY),
+          sampleMeleeMotion(progress, neutralZ, 0.24, z, z - 0.08, neutralZ),
+        );
+      } else {
+        const elapsed = progress * this.attackDuration - ZOMBIE_ATTACK_HIT_MOMENT;
+        const pull = boardPullProgress(elapsed);
+        const release = smoothStep(Math.max(0, Math.min(1, (elapsed - BOARD_PULL_DURATION) / 0.095)));
+        // Wind-up stays behind the contact plane. The shoulder drives the
+        // compact pound; only after contact does the hand follow the board.
+        this.limbPoint.set(
+          sampleWindowMotion(progress, neutralX, x + side * 0.22, x + side * 0.16, x + side * 0.16, neutralX),
+          sampleWindowMotion(progress, neutralY, y + (variant === 2 ? 0.24 : 0.12), y, y, neutralY) - BOARD_PULL_DROP * pull * (1 - release),
+          sampleWindowMotion(progress, neutralZ, z - 0.32, z, z, neutralZ) - BOARD_PULL_DISTANCE * pull * (1 - release),
+        );
+      }
+      // Targets are body-relative; compensate once for the root's step.
+      this.limbPoint.sub(this.root.position);
+      this.limbRotation.copy(this.root.quaternion).invert();
+      this.limbPoint.applyQuaternion(this.limbRotation);
+      arm.solve(this.limbPoint.x, this.limbPoint.y, this.limbPoint.z,
+        side * height * 0.24, height * 0.52, -0.05, weight, false, true);
+    }
+  }
+
+  private applyInertia(dt: number): void {
+    const rig = this.barrierRig;
+    if (!rig || this.state === 'spawn') return;
+    const recoil = this.reactionAge < 0.24 ? Math.sin(Math.PI * this.reactionAge / 0.24) : 0;
+    const alive = this.state === 'death' ? Math.max(0, 1 - this.deathTime / ZOMBIE_DEATH_FALL) : 1;
+    const pitch = (this.lean + this.reactionX * recoil) * alive;
+    const roll = (this.turnLean + this.reactionZ * recoil) * alive;
+    const gait = this.gaitPhase * Math.PI * 2;
+    const weightShift = this.state === 'walk' ? Math.sin(gait) * this.gaitWeight * 0.035 : 0;
+    const breath = this.state === 'walk' ? Math.sin(this.idlePhase * 1.8) * 0.014 : 0;
+    const idleSway = this.state === 'walk' ? Math.cos(this.idlePhase * 1.8) * 0.008 : 0;
+    const walkWeight = this.state === 'walk' && this.modelId === 'walker'
+      ? Math.max(0.35, this.gaitWeight)
+      : 0;
+    const walk = sampleZombieWalkMotion(this.gaitPhase, walkWeight);
+    this.rotateBarrierBone(rig.torso, pitch + breath + walk.torsoPitch,
+      -roll * 0.5, roll + idleSway + weightShift + walk.torsoRoll);
+    this.rotateBarrierBone(rig.head, -pitch * 0.55 - breath + walk.headPitch,
+      roll * 0.4, -roll * 0.6 - idleSway - weightShift * 0.6 + walk.headRoll);
+    this.rotateBarrierBone(rig.shoulderL,
+      -pitch * 0.7 + weightShift * 1.8 + walk.leftShoulderPitch, 0, -roll * 0.35);
+    this.rotateBarrierBone(rig.shoulderR,
+      -pitch * 0.55 - weightShift * 1.5 + walk.rightShoulderPitch, 0, -roll * 0.35);
+    const decay = Math.exp(-dt * 6);
+    this.reactionX *= decay;
+    this.reactionZ *= decay;
+  }
+
+  private applyAttackBodyPose(progress: number): void {
     const rig = this.barrierRig;
     if (!rig) return;
     const side = this.barrierStrikeSide;
-    this.rotateBarrierBone(
-      rig.torso,
-      sampleBarrierMotion(progress, 0.04, 0.18, 0.1),
-      side * sampleBarrierMotion(progress, -0.22, 0.16, 0.08),
-      side * sampleBarrierMotion(progress, -0.12, 0.09, 0.04),
-    );
-    this.rotateBarrierBone(
-      rig.head,
-      sampleBarrierMotion(progress, -0.08, 0.08, 0.025),
-      -side * sampleBarrierMotion(progress, -0.08, 0.06, 0.02),
-      0,
-    );
-    const dominantWindup = side > 0 ? -0.48 : -0.2;
-    const offhandWindup = side > 0 ? -0.2 : -0.48;
-    this.rotateBarrierBone(
-      rig.shoulderL,
-      sampleBarrierMotion(progress, dominantWindup, -0.92, -0.58),
-      side * sampleBarrierMotion(progress, 0.12, -0.08, -0.03),
-      0,
-    );
-    this.rotateBarrierBone(
-      rig.shoulderR,
-      sampleBarrierMotion(progress, offhandWindup, -0.92, -0.58),
-      side * sampleBarrierMotion(progress, 0.12, -0.08, -0.03),
-      0,
-    );
-    this.rotateBarrierBone(rig.forearmL, sampleBarrierMotion(progress, 0.2, -0.42, -0.18), 0, 0);
-    this.rotateBarrierBone(rig.forearmR, sampleBarrierMotion(progress, 0.2, -0.42, -0.18), 0, 0);
+    const melee = this.state === 'attack';
+    if (melee && this.currentAction === this.actions.get('attack') && this.currentAction) return;
+    const sample = melee ? sampleMeleeMotion : sampleWindowMotion;
+    const pitch = sample(progress, 0, -0.035, 0.16, 0.06, 0);
+    const twist = side * sample(progress, 0, -0.07, 0.035, 0.07, 0);
+    this.rotateBarrierBone(rig.torso, pitch, twist, 0);
+    this.rotateBarrierBone(rig.head, -pitch * 0.45, -twist * 0.5, 0);
+    if (this.arms.length === 2) return; // IK is the only owner of known-rig arms.
+    // Clipless emergency rigs use the same distinct timing and asymmetry.
+    const reach = sample(progress, 0, 0.15, -0.85, -0.6, 0);
+    this.rotateBarrierBone(rig.shoulderL, side <= 0 ? reach : -0.1, 0, 0);
+    this.rotateBarrierBone(rig.shoulderR, side >= 0 ? reach : -0.1, 0, 0);
   }
 }

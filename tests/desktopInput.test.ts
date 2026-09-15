@@ -112,4 +112,25 @@ describe('DesktopInput pointer lock lifecycle', () => {
     expect(characters).toEqual(['m', 'o']);
     input.dispose();
   });
+
+  it('records numpad 3 as a distinct melee action key', () => {
+    const documentTarget = new FakeEventTarget() as FakeEventTarget & {
+      pointerLockElement: HTMLElement | null;
+      visibilityState: DocumentVisibilityState;
+    };
+    const windowTarget = new FakeEventTarget();
+    const canvas = new FakeEventTarget() as unknown as HTMLElement;
+    documentTarget.pointerLockElement = canvas;
+    documentTarget.visibilityState = 'visible';
+    vi.stubGlobal('document', documentTarget);
+    vi.stubGlobal('window', windowTarget);
+    const state = new InputState();
+    const input = new DesktopInput(canvas, state, () => undefined);
+
+    documentTarget.dispatch('keydown', { code: 'Numpad3', key: '3', repeat: false } as KeyboardEvent);
+
+    expect(state.wasPressed('Numpad3')).toBe(true);
+    expect(state.wasPressed('Digit3')).toBe(false);
+    input.dispose();
+  });
 });

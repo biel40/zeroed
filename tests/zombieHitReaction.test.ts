@@ -11,7 +11,7 @@ import type { ZombieState } from '../src/zombies/Zombie';
  *
  * The synthetic source mirrors the shipped walker GLB contract: spawn, walk
  * and attack clips, and — like the real asset — NO hit clip, so the flinch
- * falls back to the walk-cycle dip. A second source adds a hit clip to cover
+ * falls back to additive recoil. A second source adds a hit clip to cover
  * the clip path.
  */
 
@@ -56,7 +56,6 @@ function makeWalkerSource(): ZombieModelSource {
 interface VisualInternals {
   actions: Map<ZombieState, THREE.AnimationAction>;
   currentAction: THREE.AnimationAction | null;
-  hitDip: number;
 }
 
 function internals(visual: ZombieVisual): VisualInternals {
@@ -133,7 +132,7 @@ describe('ZombieVisual hit reaction', () => {
     const phaseBeforeHit = walk.time;
     expect(phaseBeforeHit).toBeGreaterThan(0.3);
 
-    visual.setState('hit'); // no hit clip → dip on the still-playing walk
+    visual.setState('hit'); // no hit clip → recoil over the still-playing walk
     visual.update(0.1, WALK_SPEED);
     visual.setState('walk');
 
@@ -142,22 +141,22 @@ describe('ZombieVisual hit reaction', () => {
     expect(internals(visual).currentAction).toBe(walk);
   });
 
-  it('does not re-pin the flinch dip on every bullet of a burst', () => {
+  it('never slows the walk clock on repeated clipless hits', () => {
     const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
     const walk = internals(visual).actions.get('walk')!;
 
     visual.setState('walk');
     step(visual, DT);
     visual.setState('hit');
-    step(visual, 0.2); // dip mostly decayed: hitDip ≈ 0.3
+    step(visual, 0.2);
     const settledTimeScale = walk.timeScale;
-    expect(settledTimeScale).toBeGreaterThan(0.7);
+    expect(settledTimeScale).toBe(1);
 
     visual.setState('hit'); // second round of the burst lands mid-state
     step(visual, DT);
 
     // A re-pinned dip would drag timeScale back to ~0.25 (slow-motion stride).
-    expect(walk.timeScale).toBeGreaterThan(0.7);
+    expect(walk.timeScale).toBe(1);
   });
 
   it('never restarts a real hit clip while it is already playing', () => {

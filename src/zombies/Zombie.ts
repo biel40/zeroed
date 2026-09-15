@@ -10,8 +10,6 @@ import {
   ZOMBIE_CORPSE_LINGER,
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
-  ZOMBIE_HIT_DURATION,
-  ZOMBIE_HIT_HEADSHOT_FACTOR,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_TYPE_CONFIGS,
@@ -86,12 +84,13 @@ export class Zombie implements HitTarget {
   floor = 0;
 
   private stateTimer = 0;
-  private hitReactionTimer = 0;
   private attackCooldown = 0;
   private attackApplied = false;
   private attackRecovery = ZOMBIE_ATTACK_RECOVERY;
   private readonly torsoBaseScale = new THREE.Vector3();
   private readonly headBaseScale = new THREE.Vector3();
+  private previousYaw = 0;
+  private deathGroundY = 0;
 
   constructor(visual?: ZombieVisual) {
     this.visual = visual ?? new ZombieVisual('walker', null, 0xa8b89a);
@@ -153,7 +152,8 @@ export class Zombie implements HitTarget {
     this.speed = speed;
     this.state = 'spawn';
     this.stateTimer = ZOMBIE_SPAWN_DURATION;
-    this.hitReactionTimer = 0;
+    this.previousYaw = 0;
+    this.deathGroundY = y;
     this.attackCooldown = 0;
     this.attackApplied = false;
     this.floor = floor;
@@ -187,24 +187,28 @@ export class Zombie implements HitTarget {
 
   /**
    * Applies pre-computed damage. Returns true when the hit is lethal.
-  * Non-lethal hits trigger visual feedback without interrupting pursuit.
-  * Headshots keep that feedback visible slightly longer.
+   * Non-lethal hits trigger directional visual feedback without interrupting
+   * pursuit. Headshots and stronger damage produce a larger brief reaction.
    */
-  applyDamage(amount: number, headshot = false): boolean {
+  applyDamage(amount: number, headshot = false, sourceX?: number, sourceZ?: number): boolean {
     if (!this.isAlive) return false;
     this.hp -= amount;
     this.visual.hitFlash();
+    const dx = sourceX === undefined ? -Math.sin(this.group.rotation.y) : this.position.x - sourceX;
+    const dz = sourceZ === undefined ? -Math.cos(this.group.rotation.y) : this.position.z - sourceZ;
+    const length = Math.hypot(dx, dz) || 1;
+    const yaw = this.group.rotation.y;
+    this.visual.reactToHit(
+      (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / length,
+      (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / length,
+      Math.min(0.3, 0.07 + amount / Math.max(1, this.maxHp) * 0.3 + (headshot ? 0.06 : 0)),
+    );
     if (this.hp <= 0) {
+      this.deathGroundY = this.position.y;
       this.state = 'death';
       this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
       this.visual.setState('death');
       return true;
-    }
-    if (this.state === 'walk') {
-      this.hitReactionTimer = headshot
-        ? ZOMBIE_HIT_DURATION * ZOMBIE_HIT_HEADSHOT_FACTOR
-        : ZOMBIE_HIT_DURATION;
-      this.visual.setState('hit');
     }
     return false;
   }
@@ -212,7 +216,6 @@ export class Zombie implements HitTarget {
   /** Starts the attack lunge if the cooldown allows it. */
   tryAttack(): boolean {
     if (!this.isAlive || this.attackCooldown > 0 || this.state === 'attack') return false;
-    this.hitReactionTimer = 0;
     this.state = 'attack';
     this.stateTimer = ZOMBIE_ATTACK_DURATION;
     this.attackApplied = false;
@@ -225,7 +228,6 @@ export class Zombie implements HitTarget {
   /** Starts the dedicated barrier strike. Gameplay impact timing stays aligned with melee. */
   tryBarrierAttack(): boolean {
     if (!this.isAlive || this.attackCooldown > 0 || this.state === 'barrierAttack') return false;
-    this.hitReactionTimer = 0;
     this.state = 'barrierAttack';
     this.stateTimer = ZOMBIE_ATTACK_DURATION;
     this.attackApplied = false;
@@ -247,9 +249,7 @@ export class Zombie implements HitTarget {
   /** Stops a committed barrier swing when the target has already opened. */
   public cancelBarrierAttack(): void {
     if (this.state !== 'barrierAttack') return;
-    this.stateTimer = 0;
-    this.attackApplied = false;
-    this.setWalk();
+    this.finishBarrierAttack();
   }
 
   /** Completes the last committed strike before entering through the opened window. */
@@ -273,11 +273,11 @@ export class Zombie implements HitTarget {
 
   update(dt: number, visualSpeed = this.speed): void {
     if (!this.group.visible) return;
+    const yawDelta = Math.atan2(Math.sin(this.group.rotation.y - this.previousYaw), Math.cos(this.group.rotation.y - this.previousYaw));
+    this.visual.setMotion(dt, visualSpeed, dt > 0 ? yawDelta / dt : 0);
+    this.previousYaw = this.group.rotation.y;
+    let visualUpdated = false;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
-    if (this.hitReactionTimer > 0) {
-      this.hitReactionTimer -= dt;
-      if (this.hitReactionTimer <= 0 && this.state === 'walk') this.visual.setState('walk');
-    }
 
     switch (this.state) {
       case 'spawn': {
@@ -292,6 +292,10 @@ export class Zombie implements HitTarget {
       case 'barrierAttack': {
         this.stateTimer -= dt;
         const elapsed = ZOMBIE_ATTACK_DURATION - this.stateTimer;
+        // Sample this frame's strike before emitting its impact. A breaking
+        // callback can now continue from the exact displayed contact pose.
+        this.visual.update(dt, visualSpeed);
+        visualUpdated = true;
         if (!this.attackApplied && elapsed >= ZOMBIE_ATTACK_HIT_MOMENT) {
           this.attackApplied = true;
           this.onAttackLanded?.();
@@ -313,13 +317,12 @@ export class Zombie implements HitTarget {
         this.stateTimer -= dt;
         const total = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
         const elapsed = total - Math.max(0, this.stateTimer);
-        if (elapsed <= ZOMBIE_DEATH_FALL) {
-          this.visual.setDeathProgress(elapsed / ZOMBIE_DEATH_FALL);
-        } else if (elapsed > ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER) {
+        this.visual.setDeathProgress(Math.min(1, elapsed / ZOMBIE_DEATH_FALL));
+        if (elapsed > ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER) {
           const fade =
             (elapsed - ZOMBIE_DEATH_FALL - ZOMBIE_CORPSE_LINGER) / ZOMBIE_DEATH_FADE;
           this.visual.setOpacity(1 - fade);
-          this.group.position.y = -fade * 0.35; // sinks gently while fading
+          this.group.position.y = this.deathGroundY - fade * 0.35;
         }
         if (this.stateTimer <= 0) {
           this.group.visible = false;
@@ -334,12 +337,11 @@ export class Zombie implements HitTarget {
         break;
     }
 
-    this.visual.update(dt, visualSpeed);
+    if (!visualUpdated) this.visual.update(dt, visualSpeed);
   }
 
   private setWalk(): void {
     this.state = 'walk';
-    this.hitReactionTimer = 0;
     // A hit can interrupt the spawn rise: never leave the body half-buried.
     this.visual.setSpawnRise(1);
     this.visual.setState('walk');

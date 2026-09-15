@@ -277,6 +277,13 @@ body {
   padding: 0;
 }
 
+#touch-controls #btn-knife {
+  color: #fff1d0;
+  border-color: rgba(240, 194, 105, 0.5);
+  background: rgba(75, 54, 28, 0.62);
+  font-size: 9px;
+}
+
 #touch-controls #btn-fire {
   width: var(--touch-fire-size);
   height: var(--touch-fire-size);

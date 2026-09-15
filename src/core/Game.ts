@@ -232,6 +232,10 @@ export class Game {
       grantWeapon: (id) => this.grantWeapon(id),
       canGrantWeapon: (id) => this.arsenal.has(id),
       hasWeapon: (id) => this.inventory.has(id),
+      hasUsableWeapon: () => this.inventory.weapons.some((id) => {
+        const weapon = this.entry(id).weapon;
+        return weapon.ammoInMagazine > 0 || weapon.reserveAmmo === null || weapon.reserveAmmo > 0;
+      }),
       canRefillWeaponAmmo: (id) => {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && !entry.weapon.isAmmoFull;
@@ -621,6 +625,9 @@ export class Game {
       if (this.input.wasPressed('KeyR')) weapon.reload();
       if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
+      if (this.input.wasPressed('Numpad3') || this.input.wasPressed('TouchKnife')) {
+        this.mode.onMeleeAttack?.();
+      }
       allowGameplayInput =
         (this.input.pointerLocked || this.profile.useTouchControls) &&
         (this.mode.isGameplayInputEnabled?.() ?? true);
@@ -629,9 +636,10 @@ export class Game {
     // Interactions may equip a purchased/picked-up weapon in this same frame.
     weapon = this.currentWeapon;
 
+    const fallbackAttack = this.mode.usesFallbackAttack?.() ?? false;
     this.player.update(dt, this.input, weapon, allowGameplayInput);
-    this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown;
-    this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown;
+    this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown && !fallbackAttack;
+    this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown && !fallbackAttack;
     this.frameInput.repeatSemiAuto = allowGameplayInput && this.input.repeatSemiAuto;
     if (allowGameplayInput) {
       weapon.update(dt, this.frameInput);
@@ -641,6 +649,8 @@ export class Game {
     }
 
     this.mode.update(dt);
+    const fallbackName = this.mode.getFallbackWeaponName?.() ?? null;
+    this.currentView.root.visible = fallbackName === null;
     this.currentView.update(
       dt,
       weapon,
@@ -662,7 +672,7 @@ export class Game {
       10,
       MAX_SPREAD_PIXELS,
     );
-    this.hud.update(weapon, spreadPixels);
+    this.hud.update(weapon, spreadPixels, fallbackName);
     this.hud.setInteractionPrompt(
       allowGameplayInput ? (this.mode.getInteractPrompt?.() ?? null) : null,
     );

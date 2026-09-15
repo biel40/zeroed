@@ -201,7 +201,7 @@ describe('ZombieVisual Shiny stars', () => {
 });
 
 describe('ZombieVisual barrier attack', () => {
-  it('braces and pulls its weight back after grabbing a board', () => {
+  it('braces and shifts its weight back after pounding a board', () => {
     const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
 
     visual.setAttackDuration(0.75);
@@ -210,8 +210,8 @@ describe('ZombieVisual barrier attack', () => {
     const grabDepth = visual.root.position.z;
     visual.update(0.12, 0);
 
-    expect(visual.root.position.z).toBeLessThan(grabDepth - 0.1);
-    expect(visual.root.rotation.x).toBeLessThan(0.05);
+    expect(visual.root.position.z).toBeLessThan(grabDepth - 0.035);
+    expect(visual.root.rotation.x).toBe(0); // body no longer rocks around its ankles
   });
 
   it('keeps an organic breaking motion while standing at the barrier', () => {
@@ -220,11 +220,12 @@ describe('ZombieVisual barrier attack', () => {
     visual.setAttackDuration(0.75);
     visual.setState('barrierAttack');
     visual.update(0.12, 0);
-    const firstPose = visual.root.rotation.clone();
+    const firstPose = visual.headAnchor.quaternion.clone();
     visual.update(0.12, 0);
 
-    expect(visual.root.rotation.x).not.toBeCloseTo(firstPose.x, 4);
-    expect(visual.root.rotation.z).not.toBeCloseTo(firstPose.z, 4);
+    expect(visual.headAnchor.quaternion.angleTo(firstPose)).toBeGreaterThan(0.001);
+    expect(visual.root.rotation.x).toBe(0);
+    expect(visual.root.rotation.z).toBe(0);
   });
 
   it('uses the quiet base clip instead of recycling the player attack', () => {
@@ -253,14 +254,15 @@ describe('ZombieVisual barrier attack', () => {
     visual.setBarrierBreakDuration(0.34);
     visual.setState('barrierAttack');
     visual.update(0.475, 0);
-    const impact = visual.root.rotation.clone();
+    const impact = visual.root.position.clone();
 
     visual.setState('barrierBreak');
     visual.update(0.08, 0);
-    const followThrough = visual.root.rotation.clone();
+    const followThrough = visual.root.position.clone();
     visual.update(0.26, 0);
 
-    expect(followThrough.x).not.toBeCloseTo(impact.x, 4);
+    expect(followThrough.z).toBeLessThan(impact.z);
+    expect(visual.root.position.z).toBeCloseTo(0, 4);
     expect(visual.root.rotation.x).toBeCloseTo(0, 4);
     expect(visual.root.rotation.z).toBeCloseTo(0, 4);
   });
@@ -353,15 +355,16 @@ describe('ZombieVisual barrier attack', () => {
     }
   });
 
-  it('keeps a subtle sway instead of freezing while stationary at the barrier between swings', () => {
+  it('keeps subtle upper-body life without rocking the root while stationary', () => {
     const visual = new ZombieVisual('walker', null, 0xa8b89a, false);
     visual.setState('walk');
     visual.update(0.2, 0);
-    const firstPose = visual.root.rotation.clone();
+    const firstPose = visual.headAnchor.quaternion.clone();
     visual.update(0.2, 0);
 
-    expect(visual.root.rotation.x).not.toBeCloseTo(firstPose.x, 4);
-    expect(visual.root.rotation.z).not.toBeCloseTo(firstPose.z, 4);
+    expect(visual.headAnchor.quaternion.angleTo(firstPose)).toBeGreaterThan(0.001);
+    expect(visual.root.rotation.x).toBe(0);
+    expect(visual.root.rotation.z).toBe(0);
   });
 
   it('anchors the Brute torso hitbox to its animated chest node', () => {
