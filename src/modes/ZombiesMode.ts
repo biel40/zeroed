@@ -225,7 +225,7 @@ export class ZombiesMode implements GameMode {
     // Some of these states return before the normal end-of-swing cleanup.
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
     if (this.runFlow.state === 'ENDING') {
-      this.arena.update(dt);
+      this.arena.update(dt, this.ctx.player?.rig.position);
       if (this.runFlow.update(dt)) this.ctx.hud.showCredits();
       return;
     }
@@ -260,7 +260,7 @@ export class ZombiesMode implements GameMode {
     this.energy.update(dt);
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
-    this.arena.update(dt);
+    this.arena.update(dt, playerPos);
     if (this.box && this.boxView) {
       this.box.update(dt);
       this.boxView.update(dt, this.box);

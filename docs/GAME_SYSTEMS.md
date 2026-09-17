@@ -80,3 +80,8 @@ headshot no se duplica en splash ni cadena.
 Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 10,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos; el
 perfil de dispositivo limita pixel ratio, sombras y efectos.
+
+Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
+malla y mantiene un presupuesto local estable de luces puntuales: seis en el
+perfil completo y cuatro con efectos reducidos. Asi el hueco que deja visibles
+ambas plantas no obliga a evaluar simultaneamente todas las luces decorativas.

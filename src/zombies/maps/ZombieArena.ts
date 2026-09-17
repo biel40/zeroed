@@ -133,7 +133,7 @@ export interface ZombieArena {
   /** Called once after the arena is added to the scene. */
   init(): void;
   /** Per-frame update for ambience and animations. */
-  update(dt: number): void;
+  update(dt: number, observerPosition?: THREE.Vector3): void;
   /** Called when the run restarts. */
   reset(): void;
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import { EYE_HEIGHT, type FloorTransitionZone, type StairRamp } from '../../player/PlayerController';
 import { WindowBarrier } from '../barriers/WindowBarrier';
@@ -64,6 +65,14 @@ const GROUND_CEILING_Y = 3.2;
 const BUNKER_CEILING_Y = -0.3;
 const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
 const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
+const DESKTOP_POINT_LIGHT_BUDGET = 6;
+const REDUCED_EFFECTS_POINT_LIGHT_BUDGET = 4;
+
+interface RankedPointLight {
+  readonly light: THREE.PointLight;
+  readonly position: THREE.Vector3;
+  score: number;
+}
 
 type WallAxis = 'x' | 'z';
 
@@ -201,6 +210,7 @@ export class BurnedMansionArena implements ZombieArena {
   private secretWallCollider!: THREE.Mesh;
   private wallMaterialIndex = 0;
   private bunkerEmergencyLight: THREE.PointLight | null = null;
+  private readonly rankedPointLights: RankedPointLight[] = [];
   private ambienceTime = 0;
 
   constructor(
@@ -299,6 +309,7 @@ export class BurnedMansionArena implements ZombieArena {
 
     this.floorTransitions = this.buildFloorTransitions();
     this.refreshProgressionState();
+    this.initializePointLightBudget();
     if (DEBUG_MAP_COLLIDERS) this.addDebugHelpers();
   }
 
@@ -307,7 +318,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.scene.fog = new THREE.FogExp2(0x17110e, 0.018);
   }
 
-  public update(dt: number): void {
+  public update(dt: number, observerPosition?: THREE.Vector3): void {
     this.secretRoom.update(dt);
     for (const pickup of this.weaponPickups) pickup.update?.(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
@@ -326,6 +337,7 @@ export class BurnedMansionArena implements ZombieArena {
     if (this.bunkerEmergencyLight) {
       this.bunkerEmergencyLight.intensity = 1.05 + Math.sin(this.ambienceTime * 3.1) * 0.18;
     }
+    if (observerPosition) this.updatePointLightBudget(observerPosition);
   }
 
   public reset(): void {
@@ -614,19 +626,28 @@ export class BurnedMansionArena implements ZombieArena {
     const run = topZ - bottomZ;
     const depth = run / steps;
     const rise = Math.abs(MANSION_BUNKER_Y) / steps;
+    const stepGeometries: THREE.BoxGeometry[] = [];
     for (let index = 0; index < steps; index++) {
       const top = MANSION_BUNKER_Y + (index + 1) * rise;
       const height = top - MANSION_BUNKER_Y;
       const geometry = new THREE.BoxGeometry(2.15, Math.max(0.12, height), depth);
       this.projectSurfaceUVs(geometry, 2.15, Math.max(0.12, height), depth, this.materials.metal, index);
-      const step = new THREE.Mesh(geometry, this.materials.metal);
-      step.position.set(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + height / 2, bottomZ + (index + 0.5) * depth);
-      step.castShadow = !this.profile.useReducedEffects;
-      step.receiveShadow = true;
-      step.name = `bunker-stair-step-${index}`;
-      step.userData.mapRole = 'visual-stair';
-      this.group.add(step);
+      geometry.translate(
+        MANSION_STAIR_CENTER_X,
+        MANSION_BUNKER_Y + height / 2,
+        bottomZ + (index + 0.5) * depth,
+      );
+      stepGeometries.push(geometry);
     }
+    const mergedStepsGeometry = mergeGeometries(stepGeometries);
+    if (!mergedStepsGeometry) throw new Error('Unable to merge bunker stair geometry');
+    const mergedSteps = new THREE.Mesh(mergedStepsGeometry, this.materials.metal);
+    mergedSteps.castShadow = !this.profile.useReducedEffects;
+    mergedSteps.receiveShadow = true;
+    mergedSteps.name = 'bunker-stair-steps';
+    mergedSteps.userData.mapRole = 'visual-stair';
+    mergedSteps.userData.stepCount = steps;
+    this.group.add(mergedSteps);
 
     const sideHeight = Math.abs(MANSION_BUNKER_Y) + 1;
     const sideY = MANSION_BUNKER_Y + sideHeight / 2;
@@ -1218,6 +1239,44 @@ export class BurnedMansionArena implements ZombieArena {
 
     this.group.add(light, cord, mount, bulb);
     return light;
+  }
+
+  /**
+   * Three.js evaluates every visible point light in every PBR fragment. The
+   * stair aperture exposes both floors at once, so keeping every decorative
+   * light active there made this small room the map's worst GPU hot spot.
+   * Cache static world positions and retain only the strongest local lights.
+   */
+  private initializePointLightBudget(): void {
+    this.group.updateMatrixWorld(true);
+    this.group.traverse((object) => {
+      if (!(object instanceof THREE.PointLight)) return;
+      this.rankedPointLights.push({
+        light: object,
+        position: object.getWorldPosition(new THREE.Vector3()),
+        score: 0,
+      });
+    });
+    this.updatePointLightBudget(new THREE.Vector3(
+      this.playerSpawn.x,
+      this.playerSpawn.y,
+      this.playerSpawn.z,
+    ));
+  }
+
+  private updatePointLightBudget(observerPosition: THREE.Vector3): void {
+    for (const entry of this.rankedPointLights) {
+      const distanceSq = entry.position.distanceToSquared(observerPosition);
+      const outsideRange = entry.light.distance > 0 && distanceSq > entry.light.distance ** 2;
+      entry.score = outsideRange ? 0 : entry.light.intensity / (1 + distanceSq);
+    }
+    this.rankedPointLights.sort((left, right) => right.score - left.score);
+    const budget = this.profile.useReducedEffects
+      ? REDUCED_EFFECTS_POINT_LIGHT_BUDGET
+      : DESKTOP_POINT_LIGHT_BUDGET;
+    for (let index = 0; index < this.rankedPointLights.length; index++) {
+      this.rankedPointLights[index].light.visible = index < budget;
+    }
   }
 
   private nextWallMaterial(): THREE.MeshStandardMaterial {

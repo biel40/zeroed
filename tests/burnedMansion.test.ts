@@ -494,14 +494,13 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_BARRIERS.find((barrier) => barrier.id === 'start-south')?.z).toBe(10.15);
   });
 
-  it('uses comfortable uniform steps over one continuous navigation ramp', () => {
+  it('batches the comfortable uniform steps over one continuous navigation ramp', () => {
     const arena = makeArena();
-    const steps = arena.group.children.filter((child) => child.name.startsWith('bunker-stair-step-'));
-    expect(steps).toHaveLength(17);
-    for (const step of steps) {
-      const size = new THREE.Box3().setFromObject(step).getSize(new THREE.Vector3());
-      expect(size.x).toBeGreaterThanOrEqual(2.1);
-    }
+    const steps = arena.group.getObjectByName('bunker-stair-steps');
+    expect(steps?.userData.mapRole).toBe('visual-stair');
+    expect(steps?.userData.stepCount).toBe(17);
+    const size = new THREE.Box3().setFromObject(steps!).getSize(new THREE.Vector3());
+    expect(size.x).toBeGreaterThanOrEqual(2.1);
     const ramp = arena.group.getObjectByName('bunker-stair-navigation-ramp');
     expect(ramp?.userData.mapRole).toBe('walkable-stair-ramp');
     expect(ramp?.userData.walkableSurface).toBe(true);
@@ -1326,6 +1325,21 @@ describe('Burned Mansion topology', () => {
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
     expect(pointLights).toHaveLength(12);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
+  });
+
+  it('keeps a fixed local point-light budget around the player', () => {
+    const arena = makeArena();
+    const pointLights: THREE.PointLight[] = [];
+    arena.group.traverse((object) => {
+      if (object instanceof THREE.PointLight) pointLights.push(object);
+    });
+
+    expect(pointLights.length).toBeGreaterThan(6);
+    expect(pointLights.filter((light) => light.visible)).toHaveLength(6);
+
+    arena.update(1 / 60, new THREE.Vector3(MANSION_STAIR_CENTER_X, 0.6, -5.5));
+    expect(pointLights.filter((light) => light.visible)).toHaveLength(6);
+    expect(pointLights.some((light) => light.visible && light.position.z < -4)).toBe(true);
   });
 
   it('restores doors, active zones, colliders and barrier state on restart', () => {
