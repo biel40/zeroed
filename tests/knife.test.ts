@@ -4,9 +4,9 @@ import { PlayerEconomy, POINTS_KNIFE_KILL } from '../src/game/PlayerEconomy';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import {
   KNIFE_ATTACK_DURATION,
-  KNIFE_DAMAGE,
   KNIFE_HIT_MOMENT,
   Knife,
+  knifeDamageForRound,
 } from '../src/weapons/Knife';
 
 describe('Knife', () => {
@@ -116,7 +116,7 @@ describe('Zombies knife impact', () => {
     mode.economy = economy;
     const camera = new THREE.PerspectiveCamera();
     camera.position.set(0, 1.7, 0);
-    const zombie = { isAlive: true, floor: 0 };
+    const zombie = { isAlive: true, floor: 0, maxHp: 150 };
     const hitbox = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial());
     hitbox.position.set(0, 1.7, -1.2);
     hitbox.userData.zombie = zombie;
@@ -139,9 +139,45 @@ describe('Zombies knife impact', () => {
 
     mode.applyKnifeImpact();
 
-    expect(damageZombie).toHaveBeenCalledWith(zombie, 'torso', KNIFE_DAMAGE, 'knife');
+    expect(damageZombie).toHaveBeenCalledWith(zombie, 'torso', 150, 'knife');
     expect(mode.ctx.audio.playKnifeHit).toHaveBeenCalledTimes(1);
     expect(economy.points).toBe(POINTS_KNIFE_KILL);
+  });
+
+  it.each([
+    [1, 500],
+    [2, 250],
+    [5, 100],
+  ])('scales knife damage for round %i', (round, expectedDamage) => {
+    const mode = new ZombiesMode() as any;
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 1.7, 0);
+    const zombie = { isAlive: true, floor: 0, maxHp: 500 };
+    const hitbox = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial());
+    hitbox.position.set(0, 1.7, -1.2);
+    hitbox.userData.zombie = zombie;
+    const group = new THREE.Group();
+    group.add(hitbox);
+    const damageZombie = vi.fn();
+    mode.rounds = { round };
+    mode.ctx = {
+      hasUsableWeapon: () => false,
+      player: { camera, floor: 0 },
+      hitColliders: [hitbox],
+      stats: { registerHit: vi.fn() },
+      hud: { showHitmarker: vi.fn() },
+      audio: { playKnifeHit: vi.fn() },
+      effects: { puff: vi.fn() },
+    };
+    mode.zombies = { group, damageZombie };
+
+    mode.applyKnifeImpact();
+
+    expect(damageZombie).toHaveBeenCalledWith(zombie, 'torso', expectedDamage, 'knife');
+  });
+
+  it('treats pre-round startup as round one', () => {
+    expect(knifeDamageForRound(150, 0)).toBe(150);
   });
 
   it('cannot stab through arena geometry', () => {

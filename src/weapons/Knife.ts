@@ -2,8 +2,11 @@ import * as THREE from 'three';
 
 export const KNIFE_ATTACK_DURATION = 0.72;
 export const KNIFE_HIT_MOMENT = 0.39;
-export const KNIFE_DAMAGE = 150;
 export const KNIFE_RANGE = 2.05;
+
+export function knifeDamageForRound(maxHp: number, round: number): number {
+  return maxHp / Math.max(1, round);
+}
 
 const REST_POSITION = new THREE.Vector3(0.34, -0.31, -0.48);
 const WINDUP_POSITION = new THREE.Vector3(0.47, -0.37, -0.36);

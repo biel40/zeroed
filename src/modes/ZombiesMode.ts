@@ -7,7 +7,7 @@ import { DeveloperCommand } from '../game/DeveloperCommand';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
-import { KNIFE_DAMAGE, KNIFE_RANGE, Knife } from '../weapons/Knife';
+import { KNIFE_RANGE, Knife, knifeDamageForRound } from '../weapons/Knife';
 import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zombies/MysteryBox';
@@ -350,7 +350,8 @@ export class ZombiesMode implements GameMode {
     this.ctx.hud.showHitmarker();
     this.ctx.audio.playKnifeHit();
     this.ctx.effects.puff(impact.point, 0x6e1d16, 0.24);
-    const lethal = this.zombies.damageZombie(zombie, 'torso', KNIFE_DAMAGE, 'knife');
+    const damage = knifeDamageForRound(zombie.maxHp, this.rounds.round);
+    const lethal = this.zombies.damageZombie(zombie, 'torso', damage, 'knife');
     if (!lethal) this.economy.awardHit(false);
   }
 
