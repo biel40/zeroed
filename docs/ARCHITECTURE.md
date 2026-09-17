@@ -35,7 +35,7 @@ pero congela la simulacion y conserva el frame visible.
 
 - Las armas son datos (`WeaponDefinition`), no subclases. `Weapon` no importa
   Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`.
-- El Bowie es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
+- El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
   inventario. Sirve como fallback sin municion y como ataque rapido dedicado;
   `GameMode.usesFallbackAttack()` permite que el shell ceda fire/ADS durante
   la cuchillada sin convertirlo en un arma de proyectiles ficticia.

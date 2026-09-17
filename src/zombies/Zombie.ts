@@ -38,9 +38,9 @@ function getTorsoGeometry(): THREE.CapsuleGeometry {
   return torsoGeometry;
 }
 function getHeadGeometry(): THREE.SphereGeometry {
-  // Slightly wider than the visible skull: headshots stay rewarding without
-  // demanding pixel-perfect aim at a swaying target.
-  headGeometry ??= new THREE.SphereGeometry(0.26, 12, 10);
+  // Closely follows the visible skull: the animated anchor keeps it fair
+  // while the tighter radius makes the high-value headshot deliberate.
+  headGeometry ??= new THREE.SphereGeometry(0.22, 12, 10);
   return headGeometry;
 }
 /** Invisible to the eye, fully visible to the raycaster. */

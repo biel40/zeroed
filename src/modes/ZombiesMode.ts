@@ -7,7 +7,7 @@ import { DeveloperCommand } from '../game/DeveloperCommand';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
-import { BOWIE_DAMAGE, BOWIE_RANGE, BowieKnife } from '../weapons/BowieKnife';
+import { KNIFE_DAMAGE, KNIFE_RANGE, Knife } from '../weapons/Knife';
 import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zombies/MysteryBox';
@@ -26,7 +26,7 @@ import {
   ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
-import { ZombieManager } from '../zombies/ZombieManager';
+import { ZombieManager, type ZombieKillSource } from '../zombies/ZombieManager';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
@@ -112,8 +112,8 @@ export class ZombiesMode implements GameMode {
   /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
   private readonly tmpDirection = new THREE.Vector3();
   private readonly tmpAudioPosition = new THREE.Vector3();
-  private readonly bowie = new BowieKnife();
-  private readonly bowieRaycaster = new THREE.Raycaster();
+  private readonly knife = new Knife();
+  private readonly knifeRaycaster = new THREE.Raycaster();
 
   constructor(private readonly mapId: ZombieMapId = 'classic') { }
 
@@ -150,10 +150,11 @@ export class ZombiesMode implements GameMode {
     this.zombies.setNavigationBounds(this.arena.navigationBounds);
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.setNavigationDebug(new URLSearchParams(window.location.search).has('zombieNavDebug'));
-    this.zombies.onZombieKilled = (zombie, headshot) => this.onZombieKilled(
+    this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(
       headshot,
       { x: zombie.position.x, y: zombie.position.y, z: zombie.position.z },
       zombie.floor,
+      source,
     );
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
     this.zombies.onBruteAttack = () => ctx.audio.playBruteRoar();
@@ -186,9 +187,9 @@ export class ZombiesMode implements GameMode {
       this.onEnergyImpact(point, config, object, distance);
     this.chain = new ChainLightning(ctx.scene);
     this.footsteps = new ZombieFootsteps(ctx.scene, ctx.player.camera);
-    this.bowie.onSwing = () => ctx.audio.playKnifeSwing();
-    this.bowie.onImpact = () => this.applyBowieImpact();
-    ctx.player.camera.add(this.bowie.root);
+    this.knife.onSwing = () => ctx.audio.playKnifeSwing();
+    this.knife.onImpact = () => this.applyKnifeImpact();
+    ctx.player.camera.add(this.knife.root);
 
     if (this.mapId === 'classic') {
       ctx.audio.startWind();
@@ -220,6 +221,9 @@ export class ZombiesMode implements GameMode {
   }
 
   update(dt: number): void {
+    // The view model must never survive a transition that stops gameplay.
+    // Some of these states return before the normal end-of-swing cleanup.
+    if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
     if (this.runFlow.state === 'ENDING') {
       this.arena.update(dt);
       if (this.runFlow.update(dt)) this.ctx.hud.showCredits();
@@ -239,8 +243,8 @@ export class ZombiesMode implements GameMode {
 
     const playerPos = this.ctx.player.rig.position;
     const fallbackOnly = this.isGameplayInputEnabled() && !this.ctx.hasUsableWeapon();
-    const bowieEnabled = fallbackOnly || this.bowie.isAttacking;
-    this.bowie.setEnabled(bowieEnabled);
+    const knifeEnabled = fallbackOnly || this.knife.isAttacking;
+    this.knife.setEnabled(knifeEnabled);
     this.ctx.player.camera.getWorldDirection(this.tmpDirection);
     this.zombies.update(
       dt,
@@ -251,8 +255,8 @@ export class ZombiesMode implements GameMode {
       this.tmpDirection.x,
       this.tmpDirection.z,
     );
-    this.bowie.update(dt, fallbackOnly && this.ctx.input.leftButtonDown, this.ctx.player.speed01);
-    if (!fallbackOnly && !this.bowie.isAttacking) this.bowie.setEnabled(false);
+    this.knife.update(dt, fallbackOnly && this.ctx.input.leftButtonDown, this.ctx.player.speed01);
+    if (!fallbackOnly && !this.knife.isAttacking) this.knife.setEnabled(false);
     this.energy.update(dt);
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
@@ -313,31 +317,31 @@ export class ZombiesMode implements GameMode {
 
   usesFallbackAttack(): boolean {
     return this.isGameplayInputEnabled() && !!this.ctx
-      && (!this.ctx.hasUsableWeapon() || this.bowie.isAttacking);
+      && (!this.ctx.hasUsableWeapon() || this.knife.isAttacking);
   }
 
   getFallbackWeaponName(): string | null {
-    return this.usesFallbackAttack() ? 'BOWIE KNIFE' : null;
+    return this.usesFallbackAttack() ? 'KNIFE' : null;
   }
 
   public onMeleeAttack(): void {
     if (!this.isGameplayInputEnabled()) return;
-    this.bowie.setEnabled(true);
-    this.bowie.trigger();
+    this.knife.setEnabled(true);
+    this.knife.trigger();
   }
 
   /** The center ray gives melee the same occlusion rules as firearms: a wall
    * or a nearer zombie consumes the first contact before anything behind it. */
-  private applyBowieImpact(): void {
+  private applyKnifeImpact(): void {
     if (!this.usesFallbackAttack()) return;
     this.ctx.player.camera.updateWorldMatrix(true, false);
     this.zombies.group.updateMatrixWorld(true);
     this.ctx.player.camera.getWorldPosition(this.tmpAudioPosition);
     this.ctx.player.camera.getWorldDirection(this.tmpDirection);
-    this.bowieRaycaster.set(this.tmpAudioPosition, this.tmpDirection);
-    this.bowieRaycaster.near = 0;
-    this.bowieRaycaster.far = BOWIE_RANGE;
-    const impact = this.bowieRaycaster.intersectObjects(this.ctx.hitColliders, false)[0];
+    this.knifeRaycaster.set(this.tmpAudioPosition, this.tmpDirection);
+    this.knifeRaycaster.near = 0;
+    this.knifeRaycaster.far = KNIFE_RANGE;
+    const impact = this.knifeRaycaster.intersectObjects(this.ctx.hitColliders, false)[0];
     if (!impact) return;
     const zombie = impact.object.userData.zombie as Zombie | undefined;
     if (!zombie?.isAlive || zombie.floor !== this.ctx.player.floor) return;
@@ -346,7 +350,7 @@ export class ZombiesMode implements GameMode {
     this.ctx.hud.showHitmarker();
     this.ctx.audio.playKnifeHit();
     this.ctx.effects.puff(impact.point, 0x6e1d16, 0.24);
-    const lethal = this.zombies.damageZombie(zombie, 'torso', BOWIE_DAMAGE);
+    const lethal = this.zombies.damageZombie(zombie, 'torso', KNIFE_DAMAGE, 'knife');
     if (!lethal) this.economy.awardHit(false);
   }
 
@@ -887,6 +891,7 @@ export class ZombiesMode implements GameMode {
     headshot: boolean,
     deathPosition?: { readonly x: number; readonly y: number; readonly z: number },
     floor?: number,
+    source: ZombieKillSource = 'default',
   ): void {
     if (!this.isGameplayInputEnabled()) return;
     this.kills++;
@@ -901,10 +906,10 @@ export class ZombiesMode implements GameMode {
       this.ctx.audio.playZombieDeath();
     }
     
-    // Kill reward: headshot (+100) replaces the normal kill (+50); the two
-    // never stack for one death. Splash/chain kills arrive here too, so all
-    // kill points flow through this single call.
-    this.economy.awardKill(headshot);
+    // Rewards are mutually exclusive: the risky knife finisher beats a
+    // headshot, and neither stacks with the ordinary kill payout.
+    if (source === 'knife') this.economy.awardKnifeKill();
+    else this.economy.awardKill(headshot);
     if (deathPosition && floor !== undefined && this.arena instanceof BurnedMansionArena) {
       this.arena.captureSoul(deathPosition, floor);
     }
@@ -1085,7 +1090,7 @@ export class ZombiesMode implements GameMode {
       this.arena.reset();
     }
     this.activeRepairBarrier = null;
-    this.bowie.reset();
+    this.knife.reset();
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
     // Fresh run: M1911 with 8 / 32, no box weapons, box back to closed.
@@ -1105,7 +1110,7 @@ export class ZombiesMode implements GameMode {
   private beginEnding(): void {
     this.activeRepairBarrier?.stopRepair();
     this.activeRepairBarrier = null;
-    this.bowie.reset();
+    this.knife.reset();
     this.rounds.clearEvents();
     this.zombies.reset();
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();

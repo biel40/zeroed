@@ -363,7 +363,7 @@ export class AudioSystem {
     this.tick(0.012, 150, 0.26);
   }
 
-  /** Fast air cut for the Bowie wind-up. */
+  /** Fast air cut for the knife wind-up. */
   public playKnifeSwing(): void {
     const audio = this.context();
     if (!audio) return;

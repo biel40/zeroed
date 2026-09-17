@@ -99,7 +99,7 @@ export interface GameMode {
    * true when the mode handles it itself (Ray Gun energy bolts).
    */
   onWeaponFired?(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean;
-  /** Mode-owned fallback (for example the Zombies Bowie) replaces fire/ADS input. */
+  /** Mode-owned fallback (for example the Zombies knife) replaces fire/ADS input. */
   usesFallbackAttack?(): boolean;
   getFallbackWeaponName?(): string | null;
   /**

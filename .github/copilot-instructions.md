@@ -96,11 +96,12 @@ public/assets/            GLBs y texturas PBR (ver ASSETS.md).
 ### Points (solo Zombies)
 
 Recompensas centralizadas en `PlayerEconomy`: hit no letal `+10`, baja normal
-`+50`, headshot letal `+100` (nunca se suman baja + headshot: una sola rama
-en `awardKill`). Todos los kills —bala, splash Ray Gun, cadena Tesla— pasan por
-`onZombieKilled`, así que el kill reward vive en un único sitio. La Mystery Box
-cobra con `economy.spend(950)` atómico antes de activarse; la máquina de
-estados de la box (solo activa desde `closed`) evita dobles cobros.
+`+50`, headshot `+150` (nunca se suman baja + headshot: una sola rama en
+`awardKill`). Una baja con cuchillo paga `+200` vía `awardKnifeKill` y tampoco
+se apila. Todos los kills —bala, splash Ray Gun, cadena Tesla, cuchillo—
+pasan por `onZombieKilled`, así que el kill reward vive en un único sitio. La
+Mystery Box cobra con `economy.spend(950)` atómico antes de activarse; la
+máquina de estados de la box (solo activa desde `closed`) evita dobles cobros.
 
 ## Wonder Weapons (solo Zombies)
 

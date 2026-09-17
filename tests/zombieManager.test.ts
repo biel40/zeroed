@@ -555,6 +555,18 @@ describe('ZombieManager damage', () => {
     expect(manager.activeCount).toBe(0);
   });
 
+  it('preserves the knife source when reporting a lethal melee hit', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = [...manager.actives][0];
+    const sources: string[] = [];
+    manager.onZombieKilled = (_z, _headshot, source) => sources.push(source);
+
+    manager.damageZombie(zombie, 'torso', 10_000, 'knife');
+
+    expect(sources).toEqual(['knife']);
+  });
+
   it('headshot flag is false for torso kills', () => {
     const { manager } = makeManager();
     manager.spawnZombie(roundConfig(1), 0, 4);

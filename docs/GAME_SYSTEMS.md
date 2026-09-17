@@ -27,8 +27,10 @@ headshot no se duplica en splash ni cadena.
   reutilizadas; Brutus anade rugido y ataque letal.
 - El melee valida distancia XZ, diferencia vertical, linea de ataque, ventana de
   esquiva e instante de impacto. El feedback de dano respeta invulnerabilidad.
+- La cabeza usa una hitbox ajustada al craneo. Un headshot concede 150 Points y
+  una baja con cuchillo concede 200 Points por su mayor riesgo y dificultad.
 - Si todas las armas transportadas agotan cargador y reserva, el modo equipa
-  automaticamente un Bowie que no ocupa ranura. La cuchillada aplica 150 de
+  automaticamente un Knife que no ocupa ranura. La cuchillada aplica 150 de
   dano en su contacto visual, tiene 2.05 m de alcance y usa el primer collider
   bajo la mira, por lo que paredes y enemigos cercanos bloquean el golpe. Con
   municion disponible funciona como melee rapido mediante 3 (o NUM 3) o el

@@ -155,6 +155,8 @@ interface NavPath {
   index: number;
 }
 
+export type ZombieKillSource = 'default' | 'knife';
+
 /**
  * Owns the zombie population: pooling, spawning, steering (seek + soft
  * neighbor separation), attacks and damage. The shared collider array is
@@ -164,7 +166,7 @@ interface NavPath {
 export class ZombieManager {
   readonly group = new THREE.Group();
 
-  onZombieKilled: ((zombie: Zombie, headshot: boolean) => void) | null = null;
+  onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource) => void) | null = null;
   onPlayerAttack: ((damage: number) => void) | null = null;
   onBruteAttack: (() => void) | null = null;
   onBarrierImpact: (() => void) | null = null;
@@ -531,10 +533,11 @@ export class ZombieManager {
     zombie: Zombie,
     part: ZombieHitPart,
     baseDamage: number,
+    source: ZombieKillSource = 'default',
   ): boolean {
     const damage = computeDamage(baseDamage, part);
     if (zombie.applyDamage(damage, part === 'head', this.lastPlayerX, this.lastPlayerZ)) {
-      this.kill(zombie, part === 'head');
+      this.kill(zombie, part === 'head', source);
       return true;
     }
     return false;
@@ -1971,10 +1974,10 @@ export class ZombieManager {
     return portal ? portal.targetY - EYE_HEIGHT : 0;
   }
 
-  private kill(zombie: Zombie, headshot: boolean): void {
+  private kill(zombie: Zombie, headshot: boolean, source: ZombieKillSource = 'default'): void {
     // The falling body must stop blocking bullets immediately.
     this.removeColliders(zombie);
-    this.onZombieKilled?.(zombie, headshot);
+    this.onZombieKilled?.(zombie, headshot, source);
   }
 
   private finishDeath(zombie: Zombie): void {

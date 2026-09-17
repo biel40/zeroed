@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PlayerEconomy,
   POINTS_HIT,
+  POINTS_KNIFE_KILL,
   POINTS_KILL,
 } from '../src/game/PlayerEconomy';
 import { HEADSHOT_POINTS } from '../src/game/CombatConfig';
@@ -13,6 +14,7 @@ import { HEADSHOT_POINTS } from '../src/game/CombatConfig';
  *  - non-lethal body hit: +10
  *  - normal kill:         +50
  *  - every headshot:      +150  (replaces other rewards for that hit)
+ *  - knife kill:          +200  (replaces the normal kill reward)
  */
 describe('PlayerEconomy points', () => {
   it('starts at zero', () => {
@@ -23,6 +25,7 @@ describe('PlayerEconomy points', () => {
     expect(POINTS_HIT).toBe(10);
     expect(POINTS_KILL).toBe(50);
     expect(HEADSHOT_POINTS).toBe(150);
+    expect(POINTS_KNIFE_KILL).toBe(200);
   });
 
   it('awards +10 for a non-lethal hit', () => {
@@ -47,6 +50,13 @@ describe('PlayerEconomy points', () => {
     const eco = new PlayerEconomy();
     eco.awardKill(true);
     expect(eco.points).toBe(150);
+  });
+
+  it('awards more for a knife kill than for a headshot', () => {
+    const eco = new PlayerEconomy();
+    eco.awardKnifeKill();
+    expect(eco.points).toBe(POINTS_KNIFE_KILL);
+    expect(eco.points).toBeGreaterThan(HEADSHOT_POINTS);
   });
 
   it('a lethal hit does not also pay the +10 hit reward', () => {

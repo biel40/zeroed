@@ -236,7 +236,7 @@ describe('Zombie hitboxes', () => {
     const torso = (zombie.torsoHitbox.geometry as THREE.CapsuleGeometry).parameters;
     const head = (zombie.headHitbox.geometry as THREE.SphereGeometry).parameters;
     const torsoCylinderTop = worldCenter(zombie.torsoHitbox).y + torso.height / 2;
-    expect(head.radius).toBeGreaterThan(0.2);
+    expect(head.radius).toBeCloseTo(0.22);
     expect(worldCenter(zombie.headHitbox).y).toBeGreaterThan(torsoCylinderTop);
   });
 

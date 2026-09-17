@@ -11,6 +11,8 @@ import { HEADSHOT_POINTS } from './CombatConfig';
 export const POINTS_HIT = 10;
 /** A kill with a body shot (or any non-headshot finisher). */
 export const POINTS_KILL = 50;
+/** A knife kill: the short-range commitment pays more than a headshot. */
+export const POINTS_KNIFE_KILL = 200;
 /** Points granted for each rebuilt barrier board. */
 export const POINTS_REPAIR = 10;
 
@@ -33,6 +35,11 @@ export class PlayerEconomy {
    */
   awardKill(headshot: boolean): void {
     this.balance += headshot ? HEADSHOT_POINTS : POINTS_KILL;
+  }
+
+  /** Dedicated lethal melee reward; never stacked with the normal kill. */
+  public awardKnifeKill(): void {
+    this.balance += POINTS_KNIFE_KILL;
   }
 
   /**
