@@ -38,12 +38,13 @@ como cue independiente sobre la música de fondo.
   esquiva e instante de impacto. El feedback de dano respeta invulnerabilidad.
 - La cabeza usa una hitbox ajustada al craneo. Un headshot concede 150 Points y
   una baja con cuchillo concede 200 Points por su mayor riesgo y dificultad.
-- Si todas las armas transportadas agotan cargador y reserva, el modo equipa
-  automaticamente un Knife que no ocupa ranura. La cuchillada aplica 150 de
-  dano en su contacto visual, tiene 2.05 m de alcance y usa el primer collider
-  bajo la mira, por lo que paredes y enemigos cercanos bloquean el golpe. Con
-  municion disponible funciona como melee rapido mediante 3 (o NUM 3) o el
-  boton KNIFE del HUD tactil, sin cambiar el arma equipada.
+- Un arma sin cargador ni reserva permanece equipada: el disparo queda
+  bloqueado y una nueva pulsacion reproduce el sonido de encasquillamiento. El
+  Knife no ocupa ranura y funciona exclusivamente como melee rapido mediante 3
+  (o NUM 3) o el boton KNIFE del HUD tactil, sin cambiar el arma equipada. La
+  cuchillada aplica 150 de dano en su contacto visual, tiene 2.05 m de alcance
+  y usa el primer collider bajo la mira, por lo que paredes y enemigos cercanos
+  bloquean el golpe.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
   continua de canal unico, sin teletransporte.

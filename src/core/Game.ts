@@ -235,10 +235,6 @@ export class Game {
       grantWeapon: (id) => this.grantWeapon(id),
       canGrantWeapon: (id) => this.arsenal.has(id),
       hasWeapon: (id) => this.inventory.has(id),
-      hasUsableWeapon: () => this.inventory.weapons.some((id) => {
-        const weapon = this.entry(id).weapon;
-        return weapon.ammoInMagazine > 0 || weapon.reserveAmmo === null || weapon.reserveAmmo > 0;
-      }),
       canRefillWeaponAmmo: (id) => {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && !entry.weapon.isAmmoFull;
@@ -314,6 +310,7 @@ export class Game {
     }
     this.audio.resume();
     void this.audio.loadMysteryBoxOpenAsset();
+    void this.audio.loadDryFireAsset();
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
       this.paused = false;

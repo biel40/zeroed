@@ -48,8 +48,6 @@ export interface ModeContext {
   grantWeapon(id: WeaponId): boolean;
   canGrantWeapon(id: WeaponId): boolean;
   hasWeapon(id: WeaponId): boolean;
-  /** True while any carried weapon can fire now or can still be reloaded. */
-  hasUsableWeapon(): boolean;
   canRefillWeaponAmmo(id: WeaponId): boolean;
   refillWeaponAmmo(id: WeaponId): boolean;
   canRefillEquippedWeaponAmmo(): boolean;

@@ -100,7 +100,7 @@ describe('Zombies knife lifecycle', () => {
 describe('Zombies knife impact', () => {
   it('starts a dedicated knife attack while a firearm is still usable', () => {
     const mode = new ZombiesMode() as any;
-    mode.ctx = { hasUsableWeapon: () => true };
+    mode.ctx = {};
     mode.isGameplayInputEnabled = () => true;
 
     mode.onMeleeAttack();
@@ -108,6 +108,16 @@ describe('Zombies knife impact', () => {
     expect(mode.knife.isAttacking).toBe(true);
     expect(mode.usesFallbackAttack()).toBe(true);
     expect(mode.getFallbackWeaponName()).toBe('KNIFE');
+  });
+
+  it('keeps the firearm selected when every carried weapon is empty', () => {
+    const mode = new ZombiesMode() as any;
+    mode.ctx = {};
+    mode.isGameplayInputEnabled = () => true;
+
+    expect(mode.knife.isAttacking).toBe(false);
+    expect(mode.usesFallbackAttack()).toBe(false);
+    expect(mode.getFallbackWeaponName()).toBeNull();
   });
 
   it('tags an unobstructed knife kill and awards its exclusive 200 points', () => {
@@ -127,7 +137,6 @@ describe('Zombies knife impact', () => {
       return true;
     });
     mode.ctx = {
-      hasUsableWeapon: () => false,
       player: { camera, floor: 0 },
       hitColliders: [hitbox],
       stats: { registerHit: vi.fn() },
@@ -136,6 +145,8 @@ describe('Zombies knife impact', () => {
       effects: { puff: vi.fn() },
     };
     mode.zombies = { group, damageZombie };
+    mode.knife.setEnabled(true);
+    mode.knife.trigger();
 
     mode.applyKnifeImpact();
 
@@ -161,7 +172,6 @@ describe('Zombies knife impact', () => {
     const damageZombie = vi.fn();
     mode.rounds = { round };
     mode.ctx = {
-      hasUsableWeapon: () => false,
       player: { camera, floor: 0 },
       hitColliders: [hitbox],
       stats: { registerHit: vi.fn() },
@@ -170,6 +180,8 @@ describe('Zombies knife impact', () => {
       effects: { puff: vi.fn() },
     };
     mode.zombies = { group, damageZombie };
+    mode.knife.setEnabled(true);
+    mode.knife.trigger();
 
     mode.applyKnifeImpact();
 
@@ -194,7 +206,6 @@ describe('Zombies knife impact', () => {
     group.add(wall, hitbox);
     const damageZombie = vi.fn();
     mode.ctx = {
-      hasUsableWeapon: () => false,
       player: { camera, floor: 0 },
       hitColliders: [hitbox, wall],
       stats: { registerHit: vi.fn() },
@@ -203,6 +214,8 @@ describe('Zombies knife impact', () => {
       effects: { puff: vi.fn() },
     };
     mode.zombies = { group, damageZombie };
+    mode.knife.setEnabled(true);
+    mode.knife.trigger();
 
     mode.applyKnifeImpact();
 

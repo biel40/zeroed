@@ -242,9 +242,7 @@ export class ZombiesMode implements GameMode {
     }
 
     const playerPos = this.ctx.player.rig.position;
-    const fallbackOnly = this.isGameplayInputEnabled() && !this.ctx.hasUsableWeapon();
-    const knifeEnabled = fallbackOnly || this.knife.isAttacking;
-    this.knife.setEnabled(knifeEnabled);
+    this.knife.setEnabled(this.knife.isAttacking);
     this.ctx.player.camera.getWorldDirection(this.tmpDirection);
     this.zombies.update(
       dt,
@@ -255,8 +253,8 @@ export class ZombiesMode implements GameMode {
       this.tmpDirection.x,
       this.tmpDirection.z,
     );
-    this.knife.update(dt, fallbackOnly && this.ctx.input.leftButtonDown, this.ctx.player.speed01);
-    if (!fallbackOnly && !this.knife.isAttacking) this.knife.setEnabled(false);
+    this.knife.update(dt, false, this.ctx.player.speed01);
+    if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.energy.update(dt);
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
@@ -317,7 +315,7 @@ export class ZombiesMode implements GameMode {
 
   usesFallbackAttack(): boolean {
     return this.isGameplayInputEnabled() && !!this.ctx
-      && (!this.ctx.hasUsableWeapon() || this.knife.isAttacking);
+      && this.knife.isAttacking;
   }
 
   getFallbackWeaponName(): string | null {

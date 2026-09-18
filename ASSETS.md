@@ -93,6 +93,7 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `menu_theme.mp3` | Música en bucle del menú principal y de pausa |
 | `background_music_theme.mp3` | Música en bucle durante la partida |
 | `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
+| `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |
 
 ### Opcional: pasos de zombie

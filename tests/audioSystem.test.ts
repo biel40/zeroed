@@ -220,6 +220,7 @@ describe('Game pause resume', () => {
       music: { stopMenuLoop: vi.fn(), startGameplayLoop: vi.fn() },
       resumeMusic: vi.fn(),
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
+      loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.profile = { isMobile: true, useTouchControls: true };
     game.input = { requestPointerLock: vi.fn() };
@@ -240,6 +241,7 @@ describe('Game pause resume', () => {
       pauseMusic: vi.fn(),
       music: { stopMenuLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
+      loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { showPauseMenu: vi.fn() };
@@ -310,6 +312,7 @@ describe('Game pause resume', () => {
       stopMusic: vi.fn(),
       music: { stopMenuLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
+      loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { showPauseMenu: vi.fn() };
@@ -502,13 +505,13 @@ describe('AudioSystem zombie impact sounds', () => {
   });
 });
 
-describe('AudioSystem mystery box open sound', () => {
+describe('AudioSystem sampled effects', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it('loads the MP3 asset and plays it when the box opens', async () => {
+  it('loads and plays the mystery-box and dry-fire MP3 assets', async () => {
     const starts: Array<{ source: string; buffer: AudioBuffer | null }> = [];
 
     class FakeAudioContext {
@@ -579,8 +582,11 @@ describe('AudioSystem mystery box open sound', () => {
 
     await audio.loadMysteryBoxOpenAsset();
     audio.playMysteryBoxOpen();
+    await audio.loadDryFireAsset();
+    audio.playDryFire();
 
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('mystery_box_open.mp3'));
-    expect(starts.length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('encasquillada_arma.mp3'));
+    expect(starts).toHaveLength(2);
   });
 });

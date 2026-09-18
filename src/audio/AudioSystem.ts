@@ -122,7 +122,9 @@ export class AudioSystem {
   private lastPingTime: number = -1;
   private wind: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
+  private dryFireBuffer: AudioBuffer | null = null;
   private readonly mysteryBoxOpenUrl: string = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
+  private readonly dryFireUrl: string = `${import.meta.env.BASE_URL}assets/audio/encasquillada_arma.mp3`;
 
   public constructor(music: MusicManager = new MusicManager()) {
     this.music = music;
@@ -582,6 +584,32 @@ export class AudioSystem {
     }
   }
 
+  public async loadDryFireAsset(): Promise<void> {
+    if (this.dryFireBuffer) return;
+
+    const ctx: AudioContext = this.ctx ?? new AudioContext();
+    this.ctx = ctx;
+    if (!this.master) {
+      this.master = ctx.createGain();
+      this.master.gain.value = 0.55;
+      this.master.connect(ctx.destination);
+
+      const length: number = ctx.sampleRate;
+      this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const data: Float32Array = this.noiseBuffer.getChannelData(0);
+      for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    }
+
+    try {
+      const response: Response = await fetch(this.dryFireUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const audioData: ArrayBuffer = await response.arrayBuffer();
+      this.dryFireBuffer = await ctx.decodeAudioData(audioData.slice(0));
+    } catch (error) {
+      console.warn('[AudioSystem] Dry-fire MP3 not available; procedural fallback will be used.', error);
+    }
+  }
+
   /** Mystery Box opening: a hollow rising creak with a wooden knock. */
   public playMysteryBoxOpen(): void {
     const audio: AudioContextParts | null = this.context();
@@ -642,6 +670,18 @@ export class AudioSystem {
   }
 
   public playDryFire(): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    if (this.dryFireBuffer) {
+      const source: AudioBufferSourceNode = audio.ctx.createBufferSource();
+      const gain: GainNode = audio.ctx.createGain();
+      source.buffer = this.dryFireBuffer;
+      gain.gain.value = 0.5;
+      source.connect(gain);
+      gain.connect(audio.master);
+      source.start();
+      return;
+    }
     this.tick(0, 2500, 0.16);
   }
 
