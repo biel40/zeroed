@@ -19,12 +19,21 @@ ADS, recoil y recarga; `WeaponView` muestra el arma sin manos y
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
 
+La música usa una pista en bucle durante la partida y comparte otra entre el
+menú principal y la pausa. Al pausar se conserva la posición de la pista de
+partida; al reanudar continúa desde ese punto. El inicio de ronda se reproduce
+como cue independiente sobre la música de fondo.
+
 ## Zombies
 
 - Rondas con descanso de 6 s; limite global de 24 activos. `normal` y `shiny`
   usan walker; `brute` usa modelo propio, reserva maxima 2, mas salud, menor
   velocidad y muerte con impacto confirmado. Shiny anade diez estrellas
   reutilizadas; Brutus anade rugido y ataque letal.
+- Las rondas 1–5 aplican una rampa de velocidad progresiva (65 %, 72 %, 80 %,
+  88 % y 95 %) antes de alcanzar el ritmo normal en la ronda 6. Cada aparición
+  recibe velocidad, escala y una fase de marcha independientes para evitar que
+  la horda avance como un bloque sincronizado.
 - El melee valida distancia XZ, diferencia vertical, linea de ataque, ventana de
   esquiva e instante de impacto. El feedback de dano respeta invulnerabilidad.
 - La cabeza usa una hitbox ajustada al craneo. Un headshot concede 150 Points y
@@ -40,13 +49,10 @@ headshot no se duplica en splash ni cadena.
   continua de canal unico, sin teletransporte.
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
   fallback sintetizado si falta el asset.
-- Animacion: idle, marcha, persecucion y muerte se generan sobre los esqueletos
-  existentes y se cachean por modelo. El mixer reproduce los ciclos; el apoyo
-  de la marcha se calibra al desplazamiento real y conserva fase al cambiar de
-  velocidad. El cambio walk/run tiene histeresis para evitar alternancias. En
-  walkers se conserva la mayor parte del movimiento superior authored y una
-  capa determinista sutil desfasa torso, cabeza y brazos; no modifica piernas
-  ni apoyo.
+- Animacion: el walker conserva completos los clips originales de idle, marcha
+  y muerte del GLB. El mixer sincroniza la marcha con la velocidad y mezcla los
+  cambios de estado, mientras una capa aditiva limitada aporta inercia de giro,
+  aceleracion e impactos sin reescribir el encorvamiento, braceo o zancada.
 - Melee y ventanas usan tres variantes (un brazo por lado y dos manos), con
   anticipacion, contacto a 0.475 s y recuperacion. Los brazos apuntan al blanco
   comprometido, conservan la muneca local y comparten el movimiento de la tabla

@@ -27,7 +27,6 @@ import {
   ZOMBIE_SCALE_JITTER,
   ZOMBIE_SEPARATION_RADIUS,
   ZOMBIE_SPEED_JITTER,
-  ZOMBIE_WALK_JITTER,
   ZOMBIE_MODEL_POOL_CAPACITIES,
   ZOMBIE_TYPE_CONFIGS,
   type ZombieModelId,
@@ -70,6 +69,8 @@ const FRONT_PROBE = 1.3;
  */
 const ROUND_SPEED_FACTOR = 0.85;
 const TURN_SPEED = 5.5;
+/** Attacks only commit once the body is within 15 degrees of its target. */
+const STRIKE_ALIGNMENT_COS = Math.cos(Math.PI / 12);
 const WAYPOINT_EPSILON = 0.16;
 const STAIR_EXIT_EPSILON = 0.05;
 const STUCK_CHECK_INTERVAL = 1.5;
@@ -449,11 +450,11 @@ export class ZombieManager {
     this.stuckState.delete(zombie);
     this.navPaths.delete(zombie);
     this.pathCooldowns.delete(zombie);
-    // Cheap per-spawn variation: scale, ground speed and walk-cycle phase all
-    // jitter so 24 zombies never read as synchronized clones.
+    // Cheap per-spawn variation: scale, ground speed and a full-cycle phase
+    // offset keep 24 zombies from reading as synchronized clones.
     const jitter = (amount: number): number => 1 + (this.rng() * 2 - 1) * amount;
     zombie.group.scale.setScalar(jitter(ZOMBIE_SCALE_JITTER));
-    zombie.visual.setWalkJitter(jitter(ZOMBIE_WALK_JITTER));
+    zombie.visual.setWalkPhase(this.rng());
     zombie.spawn(
       spawn.x,
       spawn.z,
@@ -887,6 +888,12 @@ export class ZombieManager {
         target.position.z - zombie.position.z,
       );
       if (this.barrierPositionValid(zombie, target)) {
+        if (!this.alignedForStrike(zombie, target.position.x, target.position.z)) return;
+        // Remove the tiny remaining angular error before converting the board
+        // contact point into local animation space. The committed swing then
+        // stays straight instead of landing diagonally across the body.
+        zombie.faceTowards(target.position.x, target.position.z);
+        this.updateBarrierContact(zombie, target);
         if (zombie.tryBarrierAttack()) {
           zombie.onAttackLanded = () => {
             if (!this.barrierPositionValid(zombie, target) || !this.facingTarget(zombie, target.position.x, target.position.z)) return;
@@ -929,8 +936,14 @@ export class ZombieManager {
       playerZ - zombie.position.z,
     );
 
-    if (this.facingTarget(zombie, playerX, playerZ)
+    if (this.alignedForStrike(zombie, playerX, playerZ)
       && this.canAttackPlayer(zombie, playerX, playerZ, playerFloor, playerY)) {
+      // The attack animation uses a committed local-space target. Finish the
+      // last small turn first so the whole strike remains directly ahead even
+      // if the player dodges during the wind-up.
+      zombie.faceTowards(playerX, playerZ);
+      this.updateAttackReach(zombie, playerX, playerZ);
+      this.setStrikeTarget(zombie, playerX, playerY - 0.3, playerZ);
       if (zombie.tryAttack()) {
         if (zombie.typeId === 'brute') this.onBruteAttack?.();
         // The wind-up only SCHEDULES the bite: whether it connects is decided
@@ -1447,6 +1460,13 @@ export class ZombieManager {
       >= Math.hypot(dx, dz) * 0.35;
   }
 
+  private alignedForStrike(zombie: Zombie, x: number, z: number): boolean {
+    const dx = x - zombie.position.x;
+    const dz = z - zombie.position.z;
+    return dx * Math.sin(zombie.group.rotation.y) + dz * Math.cos(zombie.group.rotation.y)
+      >= Math.hypot(dx, dz) * STRIKE_ALIGNMENT_COS;
+  }
+
   private updateAttackReach(zombie: Zombie, playerX: number, playerZ: number): void {
     const distance = Math.hypot(playerX - zombie.position.x, playerZ - zombie.position.z);
     if (distance > ZOMBIE_ATTACK_RANGE && zombie.state !== 'attack') return;
@@ -1879,7 +1899,12 @@ export class ZombieManager {
       if (barrier && !barrier.isOpen) {
         zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
         this.updateBarrierContact(zombie, barrier);
-        if (zombie.state === 'walk' && this.barrierPositionValid(zombie, barrier) && zombie.tryBarrierAttack()) {
+        if (zombie.state === 'walk'
+          && this.barrierPositionValid(zombie, barrier)
+          && this.alignedForStrike(zombie, barrier.position.x, barrier.position.z)) {
+          zombie.faceTowards(barrier.position.x, barrier.position.z);
+          this.updateBarrierContact(zombie, barrier);
+          if (!zombie.tryBarrierAttack()) return true;
           zombie.onAttackLanded = () => {
             if (!this.barrierPositionValid(zombie, barrier) || !this.facingTarget(zombie, barrier.position.x, barrier.position.z)) return;
             this.hitBarrier(barrier);

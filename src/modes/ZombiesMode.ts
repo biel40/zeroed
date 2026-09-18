@@ -352,7 +352,9 @@ export class ZombiesMode implements GameMode {
     this.ctx.effects.puff(impact.point, 0x6e1d16, 0.24);
     const damage = knifeDamageForRound(zombie.maxHp, this.rounds.round);
     const lethal = this.zombies.damageZombie(zombie, 'torso', damage, 'knife');
-    if (!lethal) this.economy.awardHit(false);
+    if (!lethal) {
+      this.economy.awardHit(false);
+    }
   }
 
   /** Skip the pause screen while the game-over panel is up. */
@@ -884,7 +886,7 @@ export class ZombiesMode implements GameMode {
           break;
       }
     }
-    
+
     this.rounds.clearEvents();
   }
 
@@ -906,7 +908,7 @@ export class ZombiesMode implements GameMode {
     if (!headshot) {
       this.ctx.audio.playZombieDeath();
     }
-    
+
     // Rewards are mutually exclusive: the risky knife finisher beats a
     // headshot, and neither stacks with the ordinary kill payout.
     if (source === 'knife') this.economy.awardKnifeKill();

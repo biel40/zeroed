@@ -6,10 +6,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { Zombie } from '../src/zombies/Zombie';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import { ZombieVisual } from '../src/zombies/ZombieVisual';
-import { buildZombieMotionClips } from '../src/zombies/ZombieMotionClips';
 import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
 import { WindowBarrierView } from '../src/zombies/barriers/WindowBarrierView';
-import { sampleZombieWalkMotion } from '../src/zombies/ZombieWalkMotion';
 import {
   MAX_ALIVE, roundConfig, ZOMBIE_ATTACK_DURATION, ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_CORPSE_LINGER, ZOMBIE_DEATH_FALL, ZOMBIE_SPAWN_DURATION,
@@ -22,6 +20,13 @@ async function loadModel(id: 'walker' | 'brute') {
   const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   return { scene: gltf.scene, clips: gltf.animations };
 }
+function headFacingYaw(visual: ZombieVisual): number {
+  visual.root.updateMatrixWorld(true);
+  const rootRotation = visual.root.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const headRotation = visual.headAnchor.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootRotation);
+  const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(headRotation);
+  return Math.atan2(forward.x, forward.z);
+}
 function walkingZombie(): Zombie {
   const zombie = new Zombie();
   zombie.spawn(0, 0, 100, 1);
@@ -30,45 +35,27 @@ function walkingZombie(): Zombie {
 }
 
 describe('zombie animation synchronization', () => {
-  it('layers a hunched asymmetric zombie silhouette over the authored stride', () => {
-    const forwardStep = sampleZombieWalkMotion(0.25, 1);
-    const dragStep = sampleZombieWalkMotion(0.75, 1);
-    const stopped = sampleZombieWalkMotion(0.25, 0);
+  it('uses the original authored walk clip without rebuilding its pose', async () => {
+    const visual = new ZombieVisual('walker', await loadModel('walker'), 0xffffff, false) as any;
+    visual.setState('walk');
+    visual.update(0.1, 1.35);
 
-    expect(forwardStep.torsoPitch).toBeGreaterThan(0.03);
-    expect(forwardStep.torsoPitch).toBeLessThan(0.08);
-    expect(Math.abs(forwardStep.torsoRoll)).toBeGreaterThan(0.01);
-    expect(forwardStep.torsoRoll * dragStep.torsoRoll).toBeLessThan(0);
-    expect(Math.abs(forwardStep.leftShoulderPitch - forwardStep.rightShoulderPitch)).toBeGreaterThan(0.05);
-    expect(Math.abs(forwardStep.leftShoulderPitch - forwardStep.rightShoulderPitch)).toBeLessThan(0.2);
-    expect(stopped).toEqual({
-      torsoPitch: 0,
-      torsoRoll: 0,
-      headPitch: 0,
-      headRoll: 0,
-      leftShoulderPitch: 0,
-      rightShoulderPitch: 0,
-    });
+    expect(visual.locomotionAction.getClip().name).toMatch(/ZombieWalk$/);
+    expect(visual.locomotionAction.getClip().name).not.toMatch(/^Zeroed/);
   });
 
-  it('keeps most of the authored walker upper-body motion in the rebuilt walk', () => {
-    const root = new THREE.Group();
-    const spine = new THREE.Bone();
-    spine.name = 'Spine1';
-    root.add(spine);
-    const authoredTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.8, 0, 0));
-    const source = new THREE.AnimationClip('ZombieWalk', 1, [
-      new THREE.QuaternionKeyframeTrack('Spine1.quaternion', [0, 1], [
-        0, 0, 0, 1,
-        ...authoredTurn.toArray(),
-      ]),
-    ]);
+  it('keeps the technical idle gaze forward while waiting and striking at a barrier', async () => {
+    const visual = new ZombieVisual('walker', await loadModel('walker'), 0xffffff, false);
+    visual.setState('walk');
+    visual.update(0.2, 1.35);
+    visual.update(0.25, 0);
+    visual.update(0.25, 0);
+    expect(Math.abs(headFacingYaw(visual))).toBeLessThan(0.08);
 
-    const rebuilt = buildZombieMotionClips(root, 1.78, [source])[1];
-    const track = rebuilt.tracks.find((candidate) => candidate.name === 'Spine1.quaternion')!;
-    const rebuiltTurn = new THREE.Quaternion().fromArray(track.values, 4);
-
-    expect(rebuiltTurn.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.4);
+    visual.setStrikeTarget(0, 1.3, 0.9);
+    visual.setState('barrierAttack');
+    visual.update(0.25, 0);
+    expect(Math.abs(headFacingYaw(visual))).toBeLessThan(0.08);
   });
 
   it('keeps every rendered vertex within the body envelope through spawned, moving and reused rigs', async () => {
@@ -123,32 +110,16 @@ describe('zombie animation synchronization', () => {
     expect(visual.headAnchor.getWorldPosition(new THREE.Vector3()).y).toBeLessThan(0.55);
   });
 
-  it('keeps the median support-foot speed calibrated and chase stable around the switch speed', async () => {
+  it('keeps the original walk cycle active across the full chase-speed range', async () => {
     const visual = new ZombieVisual('walker', await loadModel('walker'), 0xffffff, false) as any;
     visual.setState('walk');
     visual.update(0.3, 1.35);
-    const feet = ['LeftFoot', 'RightFoot'].map(name => visual.root.getObjectByName(name)!);
-    const points: THREE.Vector3[][] = [[], []];
-    for (let frame = 0; frame < 240; frame++) {
-      visual.update(1 / 120, 1.35);
-      feet.forEach((foot, i) => points[i].push(foot.getWorldPosition(new THREE.Vector3())));
-    }
-    const supportSpeeds: number[] = [];
-    for (const positions of points) {
-      const floor = Math.min(...positions.map(p => p.y));
-      for (let i = 1; i < positions.length; i++) {
-        const speed = (positions[i - 1].z - positions[i].z) * 120;
-        if (positions[i].y < floor + 0.035 && speed > 0.05) supportSpeeds.push(speed);
-      }
-    }
-    supportSpeeds.sort((a, b) => a - b);
-    expect(Math.abs(supportSpeeds[Math.floor(supportSpeeds.length / 2)] - 1.35))
-      .toBeLessThan(1.35 * 0.25);
+    const walk = visual.locomotionAction;
     visual.update(0.1, 2.6);
-    const run = visual.locomotionAction;
-    for (const speed of [2.3, 2.4, 2.2, 2.35]) {
+    for (const speed of [2.3, 2.8, 1.1, 2.35]) {
       visual.update(DT, speed);
-      expect(visual.locomotionAction).toBe(run);
+      expect(visual.locomotionAction).toBe(walk);
+      expect(visual.locomotionAction.getClip().name).toMatch(/ZombieWalk$/);
     }
   });
 
@@ -218,18 +189,6 @@ describe('zombie animation synchronization', () => {
     const rightGrab = right.getWorldPosition(new THREE.Vector3());
     expect(Math.abs(leftGrab.z - rightGrab.z)).toBeLessThan(0.16);
     expect(leftGrab.z).toBeGreaterThan(guard.z + 0.25);
-  });
-
-  it('uses the rebuilt run cycle for a fast walker and preserves locomotion phase', async () => {
-    const visual = new ZombieVisual('walker', await loadModel('walker'), 0xffffff, false) as any;
-    visual.setState('walk');
-    visual.update(0.4, 1.6);
-    const walkPhase = visual.locomotionAction.time / visual.locomotionAction.getClip().duration;
-    visual.update(0.02, 2.8);
-    const runPhase = visual.locomotionAction.time / visual.locomotionAction.getClip().duration;
-
-    expect(visual.locomotionAction.getClip().name).toMatch(/ZombieRun$/);
-    expect(Math.abs(runPhase - walkPhase)).toBeLessThan(0.12);
   });
 
   it.each(['walker', 'brute'] as const)('%s cycles left, right and two-hand barrier strikes', async (id) => {

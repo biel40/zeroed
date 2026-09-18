@@ -1,13 +1,12 @@
 export type MusicTrackName =
   | 'zombies_round_start'
-  | 'zombies_background_loop'
-  | 'zombies_gameplay_loop';
+  | 'menu_theme'
+  | 'background_music_theme';
 
 export const ZOMBIES_MUSIC_PATHS = {
   roundStart: `${import.meta.env.BASE_URL}assets/audio/zombies_round_start.mp3`,
-  backgroundLoop: `${import.meta.env.BASE_URL}assets/audio/zombies_background_loop.mp3`,
-  // Placeholder path: drop the real file at public/assets/audio/zombies_gameplay_loop.mp3.
-  gameplayLoop: `${import.meta.env.BASE_URL}assets/audio/zombies_gameplay_loop.mp3`,
+  menu: `${import.meta.env.BASE_URL}assets/audio/menu_theme.mp3`,
+  gameplay: `${import.meta.env.BASE_URL}assets/audio/background_music_theme.mp3`,
 } as const;
 
 interface MusicTrackDef {
@@ -24,15 +23,15 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
     volume: 0.6,
     loop: false,
   },
-  zombies_background_loop: {
-    name: 'zombies_background_loop',
-    path: ZOMBIES_MUSIC_PATHS.backgroundLoop,
+  menu_theme: {
+    name: 'menu_theme',
+    path: ZOMBIES_MUSIC_PATHS.menu,
     volume: 0.22,
     loop: true,
   },
-  zombies_gameplay_loop: {
-    name: 'zombies_gameplay_loop',
-    path: ZOMBIES_MUSIC_PATHS.gameplayLoop,
+  background_music_theme: {
+    name: 'background_music_theme',
+    path: ZOMBIES_MUSIC_PATHS.gameplay,
     volume: 0.2,
     loop: true,
   },
@@ -42,7 +41,6 @@ export class MusicManager {
   public enabled = false;
   private readonly players = new Map<MusicTrackName, HTMLAudioElement>();
   private readonly pauseOffsets = new Map<MusicTrackName, number>();
-  private currentTrack: MusicTrackName | null = null;
 
   public setEnabled(enabled: boolean): void {
     this.enabled = enabled;
@@ -78,7 +76,7 @@ export class MusicManager {
     if (!this.enabled) return;
     // Only tracks explicitly paused (pause()) resume here; a freshly
     // preloaded-but-never-played track must wait for its own trigger
-    // (playRoundStartOnce / startBackgroundLoop), not restart on every gesture.
+    // (playRoundStartOnce / startMenuLoop), not restart on every gesture.
     for (const [name, offset] of this.pauseOffsets) {
       const player = this.players.get(name);
       if (!player) continue;
@@ -98,23 +96,20 @@ export class MusicManager {
   }
 
   stop(): void {
-    this.currentTrack = null;
     this.pauseOffsets.clear();
     for (const player of this.players.values()) {
       player.pause();
       player.currentTime = 0;
-      player.loop = false;
     }
   }
 
-  stopBackgroundLoop(): void {
+  stopMenuLoop(): void {
     if (!this.enabled) return;
-    const player = this.players.get('zombies_background_loop');
+    const player = this.players.get('menu_theme');
     if (!player) return;
-    this.currentTrack = null;
     // A hard stop, not a pause-for-later: must NOT land in pauseOffsets, or
     // the next resume() call replays it straight over the match's audio.
-    this.pauseOffsets.delete('zombies_background_loop');
+    this.pauseOffsets.delete('menu_theme');
     player.pause();
     player.currentTime = 0;
   }
@@ -125,24 +120,22 @@ export class MusicManager {
     const player = this.getPlayer(name);
     if (!player) return;
 
-    const isAlreadyPlaying = this.currentTrack === name && !player.paused && !player.ended;
+    const isAlreadyPlaying = !player.paused && !player.ended;
     if (isAlreadyPlaying) return;
 
-    this.currentTrack = name;
     player.currentTime = 0;
     player.loop = false;
     player.volume = MUSIC_TRACKS[name].volume;
     void player.play().catch(() => undefined);
   }
 
-  startBackgroundLoop(): void {
+  startMenuLoop(): void {
     if (!this.enabled) return;
-    const name: MusicTrackName = 'zombies_background_loop';
+    const name: MusicTrackName = 'menu_theme';
     const player = this.getPlayer(name);
     if (!player) return;
     if (!player.paused) return;
 
-    this.currentTrack = name;
     player.currentTime = this.pauseOffsets.get(name) ?? 0;
     player.loop = true;
     player.volume = MUSIC_TRACKS[name].volume;
@@ -152,12 +145,11 @@ export class MusicManager {
   /** Gameplay bed: starts once at match start and keeps looping through rounds. */
   startGameplayLoop(): void {
     if (!this.enabled) return;
-    const name: MusicTrackName = 'zombies_gameplay_loop';
+    const name: MusicTrackName = 'background_music_theme';
     const player = this.getPlayer(name);
     if (!player) return;
     if (!player.paused) return;
 
-    this.currentTrack = name;
     player.loop = true;
     player.volume = MUSIC_TRACKS[name].volume;
     void player.play().catch(() => undefined);

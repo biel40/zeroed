@@ -106,7 +106,7 @@ interface AudioContextParts {
  * assets required; the class is the only place that knows about sound.
  */
 export class AudioSystem {
-  public readonly music: MusicManager = new MusicManager();
+  public readonly music: MusicManager;
   /**
    * The shared AudioContext, created on the first user gesture (resume()).
    * Positional consumers (a THREE.AudioListener) MUST share this context via
@@ -124,6 +124,10 @@ export class AudioSystem {
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private readonly mysteryBoxOpenUrl: string = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
 
+  public constructor(music: MusicManager = new MusicManager()) {
+    this.music = music;
+  }
+
   /** Must be called from a user gesture before any sound can play. */
   public resume(): void {
     if (!this.ctx) {
@@ -139,7 +143,6 @@ export class AudioSystem {
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     this.music.preload();
-    this.music.resume();
   }
 
   public pauseMusic(): void {

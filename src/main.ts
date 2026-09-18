@@ -1,5 +1,6 @@
 import './style.css';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
+import { MusicManager } from './audio/MusicManager';
 import { isZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile } from './core/DeviceProfile';
@@ -14,6 +15,7 @@ class ZeroedBoot {
   private readonly profile: ReturnType<typeof getDeviceProfile>;
   private readonly hud: HUD;
   private readonly assets: AssetManager;
+  private readonly music = new MusicManager();
 
   public constructor() {
     const container = document.getElementById('app');
@@ -23,6 +25,19 @@ class ZeroedBoot {
     this.profile = getDeviceProfile();
     this.hud = new HUD();
     this.assets = new AssetManager(this.profile.anisotropyLimit);
+    this.music.setEnabled(true);
+    this.music.startMenuLoop();
+
+    // Browsers reject autoplay before the first interaction. Retrying in the
+    // capture phase lets menu music begin on that gesture and still allows a
+    // START click to switch it to gameplay music later in the same event.
+    const unlockMenuMusic = (): void => {
+      this.music.startMenuLoop();
+      document.removeEventListener('pointerdown', unlockMenuMusic, true);
+      document.removeEventListener('keydown', unlockMenuMusic, true);
+    };
+    document.addEventListener('pointerdown', unlockMenuMusic, { capture: true, once: true });
+    document.addEventListener('keydown', unlockMenuMusic, { capture: true, once: true });
   }
 
   private static hasWebGL(): boolean {
@@ -31,7 +46,7 @@ class ZeroedBoot {
   }
 
   private startGame(mode: GameMode): void {
-    const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode);
+    const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode, this.music);
     console.info('[Zeroed boot] Game initialized successfully.', {
       mode: mode.id,
       mobile: this.profile.isMobile,

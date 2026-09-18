@@ -164,7 +164,6 @@ export const ZOMBIE_DEATH_FADE = 0.8;
 // --- Per-zombie visual/behavior variation (fractions, applied at spawn) ---
 export const ZOMBIE_SPEED_JITTER = 0.08;
 export const ZOMBIE_SCALE_JITTER = 0.05;
-export const ZOMBIE_WALK_JITTER = 0.07;
 
 export const ROUND_BREAK_SECONDS = 6;
 export const ROUND_START_DELAY = 2.5;
@@ -286,7 +285,7 @@ export interface RoundConfig {
 /** Multiplies the existing speed curve only while the player learns the map. */
 export function earlyRoundSpeedMultiplier(round: number): number {
   const r = Math.max(1, Math.floor(round));
-  return [0.75, 0.8, 0.85, 0.9, 0.95][r - 1] ?? 1;
+  return [0.65, 0.72, 0.8, 0.88, 0.95][r - 1] ?? 1;
 }
 
 /** Deterministic round scaling; round is 1-based and clamped to >= 1. */

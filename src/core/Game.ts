@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { AssetManager } from '../assets/AssetManager';
 import { AudioSystem } from '../audio/AudioSystem';
+import { MusicManager } from '../audio/MusicManager';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import { getDeviceProfile, type DeviceProfile } from '../core/DeviceProfile';
 import { Stats } from '../game/Stats';
@@ -64,7 +65,7 @@ export class Game {
   private readonly range: OutdoorArena;
   private readonly ballistics: BallisticsSystem;
   private readonly effects: Effects;
-  private readonly audio = new AudioSystem();
+  private readonly audio: AudioSystem;
   private readonly stats = new Stats();
   /** Every weapon the mode may use, preloaded once; the inventory picks slots. */
   private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
@@ -109,7 +110,9 @@ export class Game {
     private readonly assets: AssetManager,
     private readonly profile: DeviceProfile = getDeviceProfile(),
     private readonly mode: GameMode,
+    music: MusicManager = new MusicManager(),
   ) {
+    this.audio = new AudioSystem(music);
     const rendererOptions = {
       antialias: !this.profile.useReducedEffects,
       powerPreference: 'high-performance' as const,
@@ -314,7 +317,8 @@ export class Game {
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
       this.paused = false;
-      this.audio.music.stopBackgroundLoop();
+      this.audio.music.stopMenuLoop();
+      this.audio.resumeMusic();
       if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
@@ -323,7 +327,6 @@ export class Game {
     }
     if (this.gameplayStarted) {
       this.paused = true;
-      this.audio.pauseMusic();
       this.hud.showPauseMenu();
     }
     this.pointerLockRequested = true;
@@ -342,7 +345,7 @@ export class Game {
       this.pointerLockRequested = false;
       this.gameplayStarted = true;
       this.paused = false;
-      this.audio.music.stopBackgroundLoop();
+      this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
       if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
       this.hud.hidePauseMenu();
@@ -372,7 +375,7 @@ export class Game {
     if (this.paused) return;
     this.paused = true;
     this.audio.pauseMusic();
-    if (this.mode.id === 'zombies') this.audio.music.startBackgroundLoop();
+    if (this.mode.id === 'zombies') this.audio.music.startMenuLoop();
     this.hud.showPauseMenu();
     // Release the pointer so the cursor can click the menu (desktop).
     if (document.pointerLockElement) document.exitPointerLock();
@@ -399,6 +402,7 @@ export class Game {
     this.pointerLockRequested = false;
     this.renderer.setAnimationLoop(null);
     this.audio.stopMusic();
+    this.audio.music.startMenuLoop();
     this.audio.stopWind();
     this.hud.hideEnding();
     this.hud.hideGameOver();

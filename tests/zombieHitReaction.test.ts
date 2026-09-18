@@ -95,9 +95,9 @@ describe('ZombieVisual hit reaction', () => {
 
   it('varies walker phase without changing the stride cadence at the same ground speed', () => {
     const phases: number[] = [];
-    for (const jitter of [0.9, 1.1]) {
+    for (const phase of [0.15, 0.72]) {
       const visual = new ZombieVisual('walker', makeWalkerSource(), 0xffffff, false);
-      visual.setWalkJitter(jitter);
+      visual.setWalkPhase(phase);
       visual.setState('walk');
       const walk = internals(visual).actions.get('walk')!;
       const start = walk.time;
@@ -108,7 +108,7 @@ describe('ZombieVisual hit reaction', () => {
       step(visual, 0.1, WALK_SPEED * 0.5);
       expect(walk.timeScale).toBeCloseTo(0.5, 6);
     }
-    expect(Math.abs(phases[1] - phases[0])).toBeGreaterThan(0.2);
+    expect(Math.abs(phases[1] - phases[0])).toBeGreaterThan(0.5);
   });
 
   it('freezes locomotion at zero displacement and resumes without resetting phase', () => {

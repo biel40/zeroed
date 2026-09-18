@@ -1183,15 +1183,15 @@ describe('Burned Mansion topology', () => {
 
   it('lets zombies pursue through the full ground-floor room sequence', () => {
     const arena = makeArena();
-    const manager = new ZombieManager(() => 0, {}, false, [[-3.5, 4.8]]);
-    manager.spawnZombie(roundConfig(1), -3.5, -2.5);
+    // This is a topology test, so use the post-introduction movement pace and
+    // force a normal walker instead of coupling its timeout to round-1 tuning.
+    const manager = new ZombieManager(() => 0, {}, false, [[-3.5, 4.8]], [], [], () => 1);
+    manager.spawnZombie(roundConfig(6), -3.5, -2.5, 6);
     const zombie = [
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
     zombie.state = 'walk';
 
-    // Round 1 applies earlyRoundSpeedMultiplier (0.75x): the room-crossing
-    // stage gets a proportionally larger frame budget to still reach the milestone.
     unlock(arena, 'to-dining');
     manager.registerColliders([...arena.colliders]);
     for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, -3.5, -2.5, 0);

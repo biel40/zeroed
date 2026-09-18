@@ -37,6 +37,25 @@ function step(manager: ZombieManager, seconds: number, px = 0, pz = 4): void {
   for (let i = 0; i < frames; i++) manager.update(DT, px, pz);
 }
 
+function facingDot(zombie: Zombie, x: number, z: number): number {
+  const dx = x - zombie.position.x;
+  const dz = z - zombie.position.z;
+  return (dx * Math.sin(zombie.group.rotation.y) + dz * Math.cos(zombie.group.rotation.y))
+    / Math.hypot(dx, dz);
+}
+
+function stepUntilState(
+  manager: ZombieManager,
+  zombie: Zombie,
+  state: Zombie['state'],
+  px = 0,
+  pz = 4,
+): void {
+  for (let frame = 0; frame < 60 && zombie.state !== state; frame++) {
+    manager.update(DT, px, pz);
+  }
+}
+
 describe('ZombieManager barrier feedback', () => {
   it('emits at most one wood impact per frame', () => {
     const barrier = new WindowBarrier('window', 0, 0, 0, 1, {
@@ -74,10 +93,14 @@ describe('ZombieManager barrier feedback', () => {
     const zombie = [...manager.actives][0];
     zombie.state = 'walk';
     zombie.position.set(0, 0, 0.9);
+    zombie.group.rotation.y = 0;
     zombie.barrierTarget = barrier;
 
     manager.update(DT, 0, 4);
+    expect(zombie.state).toBe('walk');
+    stepUntilState(manager, zombie, 'barrierAttack');
     expect(zombie.state).toBe('barrierAttack');
+    expect(facingDot(zombie, barrier.position.x, barrier.position.z)).toBeCloseTo(1, 6);
     step(manager, ZOMBIE_ATTACK_HIT_MOMENT, 0, 4);
     expect(barrier.isOpen).toBe(true);
 
@@ -307,6 +330,22 @@ describe('ZombieManager movement', () => {
     // Spawn rise (1.1 s) + wind-up (0.475 s) -> exactly one hit in 2 seconds.
     step(manager, 2);
     expect(damage).toBe(ZOMBIE_ATTACK_DAMAGE);
+  });
+
+  it('finishes facing the player before committing to an attack', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = [...manager.actives][0];
+    zombie.state = 'walk';
+    zombie.position.set(0, 0, 2.8);
+    zombie.group.rotation.y = Math.PI / 2;
+
+    manager.update(DT, 0, 4);
+    expect(zombie.state).toBe('walk');
+    stepUntilState(manager, zombie, 'attack');
+
+    expect(zombie.state).toBe('attack');
+    expect(facingDot(zombie, 0, 4)).toBeCloseTo(1, 6);
   });
 
   it('telegraphs a Brutus attack and deals lethal full-health damage', () => {
@@ -712,7 +751,7 @@ describe('ZombieManager wall collisions', () => {
     const zombie = onlyZombie(manager);
     zombie.position.set(0, 0, -16);
 
-    step(manager, 6);
+    step(manager, 7);
 
     // Walked straight through both: distance to the player shrank a lot.
     expect(zombie.position.z).toBeGreaterThan(-10);

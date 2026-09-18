@@ -53,7 +53,10 @@ const referenceMixers = new Map<ZombieVisual, THREE.AnimationMixer>();
 for (const [index, yaw] of (close ? [0] : [0, 0.75, Math.PI / 2]).entries()) {
   const visual = new ZombieVisual(modelId, { scene: gltf.scene, clips: gltf.animations }, ZOMBIE_MODELS[modelId].tints[0], false);
   visual.setZombieType(modelId === 'brute' ? 'brute' : params.has('shiny') || (params.has('compare') && index === 0) ? 'shiny' : 'normal');
-  visual.setWalkJitter(1 + (Number(params.get('variant')) || 0) / 7.5);
+  visual.setWalkPhase(THREE.MathUtils.euclideanModulo(
+    (Number(params.get('variant')) || index) * 0.37,
+    1,
+  ));
   visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
   visual.setAttackReach(0.3);
   visual.setStrikeTarget(0, 1.3, state === 'barrierAttack' ? 0.9 : 1.35);

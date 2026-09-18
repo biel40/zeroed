@@ -3,8 +3,7 @@ import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.j
 import type { ZombieState } from './Zombie';
 import { ShinyStars } from './ShinyStars';
 import { ZombieLimb } from './ZombieLimb';
-import { buildZombieMotionClips } from './ZombieMotionClips';
-import { sampleZombieWalkMotion } from './ZombieWalkMotion';
+import { buildZombieRestClips } from './ZombieMotionClips';
 import { sampleMeleeMotion, sampleWindowMotion, boardPullProgress,
   BOARD_PULL_DISTANCE, BOARD_PULL_DROP, BOARD_PULL_DURATION } from './ZombieAttackMotion';
 import {
@@ -31,9 +30,6 @@ export interface ZombieModelConfig {
   readonly clips: Record<ZombieState, readonly string[]>;
   /** Walk clip ground speed at timeScale 1; syncs feet with movement. */
   readonly walkReferenceSpeed: number;
-  /** Faster locomotion clip and its authored ground speed, when available. */
-  readonly runClip?: readonly string[];
-  readonly runReferenceSpeed?: number;
   /** Standing-still clip candidates; drives real joint motion while stalled at a barrier (optional: not every asset has one). */
   readonly idleClip?: readonly string[];
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
@@ -63,8 +59,6 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       death: ['ZombieDeath', 'Death'],
     },
     walkReferenceSpeed: 1.35,
-    runClip: ['ZombieRun', 'Run'],
-    runReferenceSpeed: 3.1,
     idleClip: ['ZombieIdle', 'Idle'],
     tints: [0xb2b9a8],
     hasAuthoredEyes: false,
@@ -99,7 +93,7 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
 };
 
 const CROSSFADE_SECONDS = 0.2;
-const motionClipCache = new WeakMap<THREE.Object3D, THREE.AnimationClip[]>();
+const restClipCache = new WeakMap<THREE.Object3D, readonly [THREE.AnimationClip, THREE.AnimationClip] | null>();
 /** Below this ground speed the zombie is treated as stationary (stalled at a barrier). */
 const STATIONARY_SPEED = 0.05;
 /** Hit-flash emissive color shared by every zombie material. */
@@ -489,11 +483,9 @@ export class ZombieVisual {
   private currentAction: THREE.AnimationAction | null = null;
   /** Authored standing-still clip (e.g. "ZombieIdle"); null when the asset has none. */
   private readonly idleAction: THREE.AnimationAction | null = null;
-  private readonly runAction: THREE.AnimationAction | null = null;
   private locomotionAction: THREE.AnimationAction | null = null;
   /** True while the idle clip (not the frozen walk clip) is driving the pose. */
   private idleActive = false;
-  private walkJitter = 1;
   private attackDuration = 0.9;
   private flash = 0;
   private bobPhase = Math.random() * Math.PI * 2;
@@ -542,8 +534,6 @@ export class ZombieVisual {
   private deathTravel = 0;
   private readonly arms: ZombieLimb[] = [];
   private readonly limbBones = new Set<THREE.Object3D>();
-  private gaitPhase = Math.random();
-  private gaitWeight = 0;
   private attackVariant = 0;
   private barrierVariant = 0;
   private nextAttackVariant = 0;
@@ -616,13 +606,13 @@ export class ZombieVisual {
 
 
       this.mixer = new THREE.AnimationMixer(model);
-      let rebuilt = motionClipCache.get(source.scene);
-      if (!rebuilt) {
-        rebuilt = buildZombieMotionClips(this.root, this.modelConfig.height, source.clips);
-        motionClipCache.set(source.scene, rebuilt);
+      let restClips = restClipCache.get(source.scene);
+      if (restClips === undefined) {
+        restClips = buildZombieRestClips(this.root, this.modelConfig.height);
+        restClipCache.set(source.scene, restClips);
       }
       for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'barrierBreak', 'hit', 'death'] as const) {
-        const clip = (state === 'walk' ? rebuilt[1] : state === 'death' ? rebuilt[3] : undefined)
+        const clip = (state === 'death' ? restClips?.[1] : undefined)
           ?? resolveClip(source.clips, this.modelConfig.clips[state]);
         if (!clip) continue;
         const action = this.mixer.clipAction(clip);
@@ -632,21 +622,13 @@ export class ZombieVisual {
         }
         this.actions.set(state, action);
       }
-      const idleClip = rebuilt[0] ?? (this.modelConfig.idleClip
+      const idleClip = restClips?.[0] ?? (this.modelConfig.idleClip
         ? resolveClip(source.clips, this.modelConfig.idleClip)
         : null);
       if (idleClip) {
         const idleAction = this.mixer.clipAction(idleClip);
         idleAction.setLoop(THREE.LoopRepeat, Infinity);
         this.idleAction = idleAction;
-      }
-      const runClip = rebuilt[2] ?? (this.modelConfig.runClip
-        ? resolveClip(source.clips, this.modelConfig.runClip)
-        : null);
-      if (runClip) {
-        const runAction = this.mixer.clipAction(runClip);
-        runAction.setLoop(THREE.LoopRepeat, Infinity);
-        this.runAction = runAction;
       }
     } else {
       const built = modelId === 'brute'
@@ -733,7 +715,6 @@ export class ZombieVisual {
     this.reactionAge = 1;
     this.deathTime = this.deathLean = this.deathSide = 0;
     this.groundOffset = this.attackReach = 0;
-    this.gaitWeight = 0;
     this.locomotionAction = null;
     this.strikeTarget.set(0, 1.3, 1);
     this.root.position.set(0, 0, 0);
@@ -744,7 +725,6 @@ export class ZombieVisual {
     this.idleActive = false;
     const walk = this.actions.get('walk');
     if (walk) walk.time = this.walkPhase * walk.getClip().duration;
-    if (this.runAction) this.runAction.time = this.walkPhase * this.runAction.getClip().duration;
     this.zombieType = typeId;
     this.root.scale.set(...config.bodyScale);
     this.walkAnimationMultiplier = config.walkAnimationMultiplier;
@@ -799,15 +779,13 @@ export class ZombieVisual {
     return head.add(anchorTmpC.set(0, HEAD_HITBOX_UP, 0));
   }
 
-  /** Per-instance variation offsets phase without changing the authored stride. */
-  public setWalkJitter(jitter: number): void {
-    this.walkJitter = 1;
-    this.walkPhase = THREE.MathUtils.euclideanModulo((jitter - 1) * 2.5, 1);
+  /** Full-cycle per-instance phase offset without changing stride cadence. */
+  public setWalkPhase(phase: number): void {
+    this.walkPhase = THREE.MathUtils.euclideanModulo(phase, 1);
     const walk = this.actions.get('walk');
     if (walk) {
       walk.time = this.walkPhase * walk.getClip().duration;
     }
-    if (this.runAction) this.runAction.time = this.walkPhase * this.runAction.getClip().duration;
     this.nextAttackVariant = Math.floor(this.walkPhase * 3) % 3;
     this.nextBarrierVariant = (this.nextAttackVariant + 1) % 3;
   }
@@ -911,12 +889,12 @@ export class ZombieVisual {
     if (next === this.currentAction) {
       // Already driving the pose (walk after a clipless hit, or a repeated
       // one-shot under sustained fire): let the clip run, never reset.
-      if (state === 'walk') next.timeScale = this.walkJitter;
+      if (state === 'walk') next.timeScale = 1;
       return;
     }
     if (state === 'walk') {
       next.enabled = true;
-      next.timeScale = this.walkJitter;
+      next.timeScale = 1;
       if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
       next.play();
       this.currentAction = next;
@@ -1047,7 +1025,7 @@ export class ZombieVisual {
         } else if (!stationary && this.idleActive && walk) {
           this.idleActive = false;
           walk.enabled = true;
-          walk.timeScale = this.walkJitter;
+          walk.timeScale = 1;
           walk.play();
           walk.crossFadeFrom(this.idleAction, CROSSFADE_SECONDS, false);
           this.currentAction = walk;
@@ -1055,26 +1033,21 @@ export class ZombieVisual {
         }
       }
       if (walk && this.state === 'walk' && !stationary) {
-        const useRun = !!this.runAction && speed >= (this.locomotionAction === this.runAction ? 2.15 : 2.45);
-        const locomotion = useRun ? this.runAction! : walk;
-        if (this.locomotionAction !== locomotion) {
+        if (this.locomotionAction !== walk) {
           const previous = this.locomotionAction;
           const phase = previous
             ? THREE.MathUtils.euclideanModulo(previous.time / previous.getClip().duration, 1)
             : this.walkPhase;
-          locomotion.enabled = true;
-          locomotion.time = phase * locomotion.getClip().duration;
-          locomotion.play();
-          if (previous) locomotion.crossFadeFrom(previous, 0.22, false);
-          this.currentAction = locomotion;
-          this.locomotionAction = locomotion;
+          walk.enabled = true;
+          walk.time = phase * walk.getClip().duration;
+          walk.play();
+          if (previous) walk.crossFadeFrom(previous, CROSSFADE_SECONDS, false);
+          this.currentAction = walk;
+          this.locomotionAction = walk;
           this.idleActive = false;
         }
-        const referenceSpeed = useRun
-          ? (this.modelConfig.runReferenceSpeed ?? this.modelConfig.walkReferenceSpeed)
-          : this.modelConfig.walkReferenceSpeed;
-        locomotion.timeScale = this.walkJitter * this.walkAnimationMultiplier
-          * Math.max(0, speed / referenceSpeed);
+        walk.timeScale = this.walkAnimationMultiplier
+          * Math.max(0, speed / this.modelConfig.walkReferenceSpeed);
       } else if (stationary && !this.idleAction && this.locomotionAction) {
         // Assets without an idle hold a planted locomotion pose. Subtle life
         // comes from torso/head breathing below, never from shuffling feet or
@@ -1082,12 +1055,6 @@ export class ZombieVisual {
         this.locomotionAction.timeScale = 0;
       }
       this.mixer.update(dt);
-      if (this.state === 'walk' && this.locomotionAction) {
-        this.gaitPhase = THREE.MathUtils.euclideanModulo(
-          this.locomotionAction.time / this.locomotionAction.getClip().duration,
-          1,
-        );
-      }
     } else if (this.rig) {
       this.updateProcedural(dt, speed);
     }
@@ -1102,8 +1069,6 @@ export class ZombieVisual {
       this.applyAttackBodyPose(this.barrierProgress());
     }
     this.applyInertia(dt);
-    this.gaitWeight += ((this.state === 'walk' ? Math.min(1, speed / 0.3) : 0) - this.gaitWeight)
-      * (1 - Math.exp(-dt * 14));
     this.applyLimbMotion();
     const blend = smoothStep(Math.min(1, this.transitionTime / CROSSFADE_SECONDS));
     if (blend < 1) {
@@ -1290,22 +1255,11 @@ export class ZombieVisual {
     const alive = this.state === 'death' ? Math.max(0, 1 - this.deathTime / ZOMBIE_DEATH_FALL) : 1;
     const pitch = (this.lean + this.reactionX * recoil) * alive;
     const roll = (this.turnLean + this.reactionZ * recoil) * alive;
-    const gait = this.gaitPhase * Math.PI * 2;
-    const weightShift = this.state === 'walk' ? Math.sin(gait) * this.gaitWeight * 0.035 : 0;
-    const breath = this.state === 'walk' ? Math.sin(this.idlePhase * 1.8) * 0.014 : 0;
-    const idleSway = this.state === 'walk' ? Math.cos(this.idlePhase * 1.8) * 0.008 : 0;
-    const walkWeight = this.state === 'walk' && this.modelId === 'walker'
-      ? Math.max(0.35, this.gaitWeight)
-      : 0;
-    const walk = sampleZombieWalkMotion(this.gaitPhase, walkWeight);
-    this.rotateBarrierBone(rig.torso, pitch + breath + walk.torsoPitch,
-      -roll * 0.5, roll + idleSway + weightShift + walk.torsoRoll);
-    this.rotateBarrierBone(rig.head, -pitch * 0.55 - breath + walk.headPitch,
-      roll * 0.4, -roll * 0.6 - idleSway - weightShift * 0.6 + walk.headRoll);
-    this.rotateBarrierBone(rig.shoulderL,
-      -pitch * 0.7 + weightShift * 1.8 + walk.leftShoulderPitch, 0, -roll * 0.35);
-    this.rotateBarrierBone(rig.shoulderR,
-      -pitch * 0.55 - weightShift * 1.5 + walk.rightShoulderPitch, 0, -roll * 0.35);
+    // Keep locomotion authored by the original asset. Only acceleration,
+    // steering and hit recoil are layered here, so the classic hunched gait
+    // and arm swing remain intact instead of being re-authored every frame.
+    this.rotateBarrierBone(rig.torso, pitch, -roll * 0.5, roll);
+    this.rotateBarrierBone(rig.head, -pitch * 0.55, roll * 0.4, -roll * 0.6);
     const decay = Math.exp(-dt * 6);
     this.reactionX *= decay;
     this.reactionZ *= decay;

@@ -74,7 +74,7 @@ describe('roundConfig', () => {
 
   it('applies only the requested early-round speed ramp', () => {
     expect([1, 2, 3, 4, 5, 6, 20].map(earlyRoundSpeedMultiplier)).toEqual([
-      0.75, 0.8, 0.85, 0.9, 0.95, 1, 1,
+      0.65, 0.72, 0.8, 0.88, 0.95, 1, 1,
     ]);
   });
 

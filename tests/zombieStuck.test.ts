@@ -120,9 +120,11 @@ describe('ZombieManager stuck recovery', () => {
     // behind the wall from a zombie at (0, -6): the straight line to the
     // player is perpendicular to the wall face — the worst case.
     const colliders: THREE.Object3D[] = [makeWall(0, -10, 4, 0.4)];
-    const manager = new ZombieManager(() => 0);
+    // Navigation geometry should not depend on the deliberately slow tutorial
+    // pace, so exercise it at the normal post-introduction walker speed.
+    const manager = new ZombieManager(() => 0, {}, true, null, [], [], () => 1);
     manager.registerColliders(colliders);
-    manager.spawnZombie(roundConfig(1), 0, -14);
+    manager.spawnZombie(roundConfig(6), 0, -14, 6);
     const zombie = onlyZombie(manager);
     zombie.position.set(0, 0, -6);
 

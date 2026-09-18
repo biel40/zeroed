@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
-import { MusicManager } from '../src/audio/MusicManager';
+import { MusicManager, ZOMBIES_MUSIC_PATHS } from '../src/audio/MusicManager';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Game } from '../src/core/Game';
 
@@ -8,6 +8,11 @@ describe('MusicManager', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('uses the supplied menu and gameplay music assets', () => {
+    expect(ZOMBIES_MUSIC_PATHS.menu).toContain('assets/audio/menu_theme.mp3');
+    expect(ZOMBIES_MUSIC_PATHS.gameplay).toContain('assets/audio/background_music_theme.mp3');
   });
 
   it('triggers the round-start music track on every roundStarted event', async () => {
@@ -153,14 +158,14 @@ describe('MusicManager', () => {
     const music = new MusicManager();
 
     music.playRoundStartOnce();
-    music.startBackgroundLoop();
+    music.startMenuLoop();
     music.startGameplayLoop();
     music.resume();
 
     expect(plays).toEqual([]);
   });
 
-  it('does not resume a disabled background loop after stopBackgroundLoop is followed by resume', () => {
+  it('does not resume a stopped menu loop over gameplay music', () => {
     const plays: string[] = [];
 
     class FakeAudio {
@@ -186,12 +191,14 @@ describe('MusicManager', () => {
 
     vi.stubGlobal('Audio', FakeAudio);
     const music = new MusicManager();
+    music.setEnabled(true);
 
-    music.startBackgroundLoop();
-    music.stopBackgroundLoop();
+    music.startMenuLoop();
+    music.pause();
+    music.stopMenuLoop();
     music.resume();
 
-    expect(plays).toEqual([]);
+    expect(plays).toEqual([expect.stringContaining('menu_theme.mp3')]);
   });
 });
 
@@ -210,7 +217,8 @@ describe('Game pause resume', () => {
     const game: any = Object.create((Game as any).prototype);
     game.audio = {
       resume: vi.fn(),
-      music: { stopBackgroundLoop: vi.fn() },
+      music: { stopMenuLoop: vi.fn(), startGameplayLoop: vi.fn() },
+      resumeMusic: vi.fn(),
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.profile = { isMobile: true, useTouchControls: true };
@@ -230,7 +238,7 @@ describe('Game pause resume', () => {
     game.audio = {
       resume: vi.fn(),
       pauseMusic: vi.fn(),
-      music: { stopBackgroundLoop: vi.fn() },
+      music: { stopMenuLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };
@@ -249,7 +257,8 @@ describe('Game pause resume', () => {
     game.pointerLockRequested = true;
     game.gameplayStarted = true;
     game.profile = { useTouchControls: false };
-    game.audio = { music: { stopBackgroundLoop: vi.fn() } };
+    game.mode = { id: 'zombies' };
+    game.audio = { music: { stopMenuLoop: vi.fn(), startGameplayLoop: vi.fn() } };
     game.audio.resumeMusic = vi.fn();
     game.hud = {
       hidePauseMenu: vi.fn(),
@@ -266,7 +275,28 @@ describe('Game pause resume', () => {
 
     expect(game.paused).toBe(false);
     expect(game.pointerLockRequested).toBe(false);
+    expect(game.audio.music.stopMenuLoop).toHaveBeenCalledOnce();
+    expect(game.audio.resumeMusic).toHaveBeenCalledOnce();
+    expect(game.audio.music.startGameplayLoop).toHaveBeenCalledOnce();
     expect(game.hud.hidePauseMenu).toHaveBeenCalledOnce();
+  });
+
+  it('pauses gameplay music and starts the menu theme when the game is paused', () => {
+    vi.stubGlobal('document', { pointerLockElement: null, exitPointerLock: vi.fn() });
+    const game: any = Object.create((Game as any).prototype);
+    game.paused = false;
+    game.mode = { id: 'zombies' };
+    game.audio = {
+      pauseMusic: vi.fn(),
+      music: { startMenuLoop: vi.fn() },
+    };
+    game.hud = { showPauseMenu: vi.fn() };
+
+    (Game as any).prototype.pause.call(game);
+
+    expect(game.audio.pauseMusic).toHaveBeenCalledOnce();
+    expect(game.audio.music.startMenuLoop).toHaveBeenCalledOnce();
+    expect(game.hud.showPauseMenu).toHaveBeenCalledOnce();
   });
 
   it('keeps a restart recoverable until desktop lock is confirmed', () => {
@@ -278,7 +308,7 @@ describe('Game pause resume', () => {
       resume: vi.fn(),
       pauseMusic: vi.fn(),
       stopMusic: vi.fn(),
-      music: { stopBackgroundLoop: vi.fn() },
+      music: { stopMenuLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };

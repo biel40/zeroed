@@ -14,6 +14,8 @@
   nueve ventanas y sala secreta de lamparas/almas. Final de 30000 Points.
 - PWA instalable, cache runtime y actualizacion diferenciada entre navegador y
   standalone. Capacitor prepara distribucion Android.
+- Música diferenciada para partida y menú/pausa, con reanudación de la pista de
+  partida desde su posición anterior y cue independiente al iniciar ronda.
 
 ## Limitaciones y bugs abiertos
 
@@ -25,8 +27,8 @@
   arma tactil debe cancelar reparacion.
 - RESTART necesita reset verificable de toda la run. Distancias de impacto y
   fade vertical de cadaveres tienen casos pendientes.
-- La musica al reanudar, la cache de texturas de Burned Mansion y el registro de
-  colliders dinamicos necesitan consolidacion.
+- La cache de texturas de Burned Mansion y el registro de colliders dinamicos
+  necesitan consolidacion.
 - Energia aun se distingue por color; cambiar modo/mapa requiere recarga por
   falta de `dispose()`. Existen flags de debug que deben blindarse o retirarse.
 - La suite de tests puede contener expectativas antiguas de headshots o casos
