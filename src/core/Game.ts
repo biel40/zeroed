@@ -235,6 +235,7 @@ export class Game {
       grantWeapon: (id) => this.grantWeapon(id),
       canGrantWeapon: (id) => this.arsenal.has(id),
       hasWeapon: (id) => this.inventory.has(id),
+      getEquippedWeaponId: () => this.inventory.currentWeapon,
       canRefillWeaponAmmo: (id) => {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && !entry.weapon.isAmmoFull;

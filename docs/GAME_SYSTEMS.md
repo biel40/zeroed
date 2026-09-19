@@ -79,8 +79,10 @@ como cue independiente sobre la música de fondo.
 - Los golpes a ventanas validan separacion del marco, alineacion lateral y
   linea de contacto. Cada tiron hace vibrar la tabla o la arranca hacia fuera;
   el ultimo completa su recuperacion antes de retomar la ruta de entrada.
-- Mystery Box: 950 Points, revelado a los 5 s; Ray Gun garantizada a 115 bajas;
-  ZEUS-77 es legendaria y encadena objetivos. Ambas usan proyectiles de energia.
+- Mystery Box: 950 Points, revelado a los 5 s; nunca entrega el arma equipada
+  al activarla. Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
+  legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
+  proyectiles de energia.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
   una pared una sola vez por run. El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.

@@ -38,7 +38,7 @@ describe('Mystery Box purchase with Points', () => {
     const box = {
       state: 'closed' as string,
       result: null as string | null,
-      tryActivate: () => {
+      tryActivate: (_excludedWeaponId?: string) => {
         if (box.state !== 'closed') return false;
         box.state = 'opening';
         mock.activated++;
@@ -52,6 +52,7 @@ describe('Mystery Box purchase with Points', () => {
     (mode as unknown as Record<string, unknown>).gameOver = false;
     (mode as unknown as Record<string, unknown>).ctx = {
       grantWeapon: (id: string) => mock.granted.push(id),
+      getEquippedWeaponId: () => 'm1911',
       hud: {
         flashNotEnoughPoints: () => {
           mock.deniedFlashes++;

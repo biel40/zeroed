@@ -53,7 +53,7 @@ describe('Mystery Box pool', () => {
   it('makes ZEUS-77 a legendary pull rarer than the Ray Gun', () => {
     const tesla = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'tesla');
     const raygun = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'raygun');
-    expect(tesla).toMatchObject({ weight: 3, rarity: 'legendary' });
+    expect(tesla).toMatchObject({ weight: 1, rarity: 'legendary' });
     expect(raygun).toMatchObject({ weight: 10, rarity: 'rare' });
     expect(tesla!.weight).toBeLessThan(raygun!.weight);
     const others = MYSTERY_BOX_POOL.filter((entry) => entry.rarity === 'standard');
@@ -73,7 +73,7 @@ describe('pickWeighted (deterministic, injected rng)', () => {
   const pool = MYSTERY_BOX_POOL;
 
   it('maps the roll onto cumulative weights', () => {
-    // Total 103: 25/25/20/20/10/3, with ZEUS-77 occupying the final 3-weight slice.
+    // Total 101: 25/25/20/20/10/1, with ZEUS-77 occupying the final 1-weight slice.
     expect(pickWeighted(pool, () => 0)).toBe('m4a1');
     expect(pickWeighted(pool, () => 0.24)).toBe('m4a1');
     expect(pickWeighted(pool, () => 0.25)).toBe('ak47');
@@ -84,17 +84,22 @@ describe('pickWeighted (deterministic, injected rng)', () => {
   });
 
   it('dampens the previous result without making it impossible', () => {
-    // With lastId=ak47 and factor 0.5: weights become 25 / 12.5 / 20 / 20 / 10 → total 87.5.
-    // The AK window shrinks from [0.25..0.50) to [25/87.5≈0.2857 .. 37.5/87.5≈0.4286).
+    // With lastId=ak47 and factor 0.5: weights become 25 / 12.5 / 20 / 20 / 10 / 1 → total 88.5.
+    // The AK window shrinks to [25/88.5≈0.2825 .. 37.5/88.5≈0.4237).
     expect(pickWeighted(pool, () => 0.3, 'ak47', 0.5)).toBe('ak47'); // still possible
     expect(pickWeighted(pool, () => 0.45, 'ak47', 0.5)).toBe('m60'); // old AK territory, now M60
     expect(pickWeighted(pool, () => 0.27, 'ak47', 0.5)).toBe('m4a1'); // below the shrunk window
   });
 
   it('with factor 0 the previous weapon cannot repeat at all', () => {
-    // factor 0 removes ak47 from the wheel (total 75): [0..25) m4a1, [25..45) m60, …
-    // A roll of 0.5 × 75 = 37.5 lands where the AK used to be and skips to m60.
+    // factor 0 removes ak47 from the wheel (total 76): [0..25) m4a1, [25..45) m60, …
+    // A roll of 0.5 × 76 = 38 lands where the AK used to be and skips to m60.
     expect(pickWeighted(pool, () => 0.5, 'ak47', 0)).toBe('m60');
+  });
+
+  it('completely excludes the equipped weapon while preserving the other weights', () => {
+    expect(pickWeighted(pool, () => 0, null, 1, 'm4a1')).toBe('ak47');
+    expect(pickWeighted(pool, () => 0.9999, null, 1, 'tesla')).toBe('raygun');
   });
 
   it('falls back to the last entry when the roll lands on the exact total', () => {
@@ -132,6 +137,17 @@ describe('MysteryBoxMachine state flow', () => {
     expect(events).toContain('result');
     expect(machine.state).toBe('awaitingPickup');
     expect(MYSTERY_BOX_POOL.some((e) => e.weaponId === machine.result)).toBe(true);
+  });
+
+  it('never offers the weapon equipped when the box was activated', () => {
+    for (const equipped of MYSTERY_BOX_POOL.map((entry) => entry.weaponId)) {
+      for (const random of [0, 0.25, 0.5, 0.75, 0.9999]) {
+        const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => random);
+        expect(machine.tryActivate(equipped)).toBe(true);
+        step(machine, MYSTERY_BOX_TUNING.revealTime + 0.1);
+        expect(machine.result).not.toBe(equipped);
+      }
+    }
   });
 
   it('ignores activation spam while busy', () => {

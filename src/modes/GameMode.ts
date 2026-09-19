@@ -48,6 +48,8 @@ export interface ModeContext {
   grantWeapon(id: WeaponId): boolean;
   canGrantWeapon(id: WeaponId): boolean;
   hasWeapon(id: WeaponId): boolean;
+  /** Weapon selected when an interaction begins. */
+  getEquippedWeaponId(): WeaponId;
   canRefillWeaponAmmo(id: WeaponId): boolean;
   refillWeaponAmmo(id: WeaponId): boolean;
   canRefillEquippedWeaponAmmo(): boolean;

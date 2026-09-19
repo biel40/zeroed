@@ -454,7 +454,7 @@ export class ZombiesMode implements GameMode {
         this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${MYSTERY_BOX_TUNING.cost} PTS NEEDED`);
         return;
       }
-      this.box.tryActivate();
+      this.box.tryActivate(this.ctx.getEquippedWeaponId());
       return;
     }
     if (this.box.state === 'awaitingPickup') {
