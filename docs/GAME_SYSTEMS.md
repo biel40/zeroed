@@ -69,6 +69,9 @@ como cue independiente sobre la música de fondo.
 - `ClassicArena`: arena clásica nocturna, spawns abiertos y Mystery Box.
 - `BurnedMansionArena`: dos plantas, colision, nueve ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta.
+- Las luminarias ambientales de ambos mapas emiten rojo y sufren parpadeos
+  electricos irregulares y desfasados; las luces funcionales de armas,
+  recompensas y objetivos conservan su identidad visual.
 - `ZombiesMode` posee run, rondas, salud, economia y progresion; el arena posee
   geometria, colliders, spawns, barreras y puertas.
 - Barreras: HP autoritativo, rotura visual independiente y reparacion limitada

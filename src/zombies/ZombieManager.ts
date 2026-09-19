@@ -47,6 +47,19 @@ import { ZombieNavigationService } from './navigation/ZombieNavigationService';
 const SEPARATION_PUSH = 2.2;
 const MAX_SEPARATION_SPEED_FACTOR = 0.65;
 const MAX_MOVE_SPEED_FACTOR = 1.15;
+/**
+ * Low-pass on the displayed walking direction. Per-frame displacement carries
+ * separation and collision-slide noise; facing it raw made bodies twitch.
+ */
+const HEADING_RESPONSE = 6;
+/** Lateral lane spacing so a column of chasers fans out instead of stacking. */
+const PURSUIT_LANE_SLOTS = 5;
+const PURSUIT_LANE_SPACING = 0.45;
+/** Distance ahead along the chase line where the body rejoins its lane. */
+const PURSUIT_LANE_LOOKAHEAD = 3;
+/** Lanes fade out inside this range so every body still converges to strike. */
+const PURSUIT_LANE_CONVERGE_DISTANCE = 2.5;
+const PURSUIT_LANE_FADE_DISTANCE = 3;
 /** Pulls stair traffic toward the center without snapping or teleporting it. */
 const STAIR_CENTERING_GAIN = 4;
 const MAX_STAIR_CENTERING_SPEED_FACTOR = 0.7;
@@ -192,6 +205,8 @@ export class ZombieManager {
    */
   private readonly roundState = new Map<Zombie, { x: number; z: number }>();
   private readonly movement = new Map<Zombie, { x: number; z: number; frame: number }>();
+  /** Smoothed unit walking direction the body visibly faces. */
+  private readonly headings = new Map<Zombie, { x: number; z: number }>();
   private readonly entryRoutes = new Map<Zombie, EntryRoute>();
   private readonly stairTraversals = new Map<Zombie, StairTraversal>();
   private readonly stuckState = new Map<Zombie, StuckState>();
@@ -446,6 +461,7 @@ export class ZombieManager {
       return false;
     }
     this.roundState.delete(zombie);
+    this.headings.delete(zombie);
     this.stairTraversals.delete(zombie);
     this.stuckState.delete(zombie);
     this.navPaths.delete(zombie);
@@ -671,11 +687,27 @@ export class ZombieManager {
         : 0;
       if (zombie.state === 'walk' && visualSpeed > 0.05) {
         zombie.group.rotation.y = previousYaw;
-        zombie.faceTowards(zombie.position.x + zombie.position.x - previousX,
-          zombie.position.z + zombie.position.z - previousZ, TURN_SPEED * dt);
+        const heading = this.smoothHeading(zombie, zombie.position.x - previousX, zombie.position.z - previousZ, dt);
+        zombie.faceTowards(zombie.position.x + heading.x, zombie.position.z + heading.z, TURN_SPEED * dt);
       }
       zombie.update(dt, visualSpeed / Math.max(0.01, zombie.group.scale.x));
     }
+  }
+
+  private smoothHeading(zombie: Zombie, dx: number, dz: number, dt: number): { x: number; z: number } {
+    const length = Math.hypot(dx, dz);
+    const directionX = dx / length;
+    const directionZ = dz / length;
+    let heading = this.headings.get(zombie);
+    if (!heading) {
+      heading = { x: directionX, z: directionZ };
+      this.headings.set(zombie, heading);
+      return heading;
+    }
+    const blend = Math.min(1, HEADING_RESPONSE * dt);
+    heading.x += (directionX - heading.x) * blend;
+    heading.z += (directionZ - heading.z) * blend;
+    return heading;
   }
 
   /** Game over / restart: every zombie vanishes back into the pool. */
@@ -688,6 +720,7 @@ export class ZombieManager {
     }
     this.pool.releaseAll();
     this.roundState.clear();
+    this.headings.clear();
     this.entryRoutes.clear();
     this.stairTraversals.clear();
     this.stuckState.clear();
@@ -739,7 +772,8 @@ export class ZombieManager {
         pathFailed: false,
       };
       this.stuckState.set(zombie, state);
-      this.navPaths.delete(zombie);
+      // seek() already drops routes whose target drifted; deleting here also
+      // threw away the path computed this very frame for the new objective.
     }
     if (Math.hypot(objective.x - state.objectiveX, objective.z - state.objectiveZ) > 1.5) {
       state.objectiveX = objective.x;
@@ -961,7 +995,45 @@ export class ZombieManager {
     }
 
     toPlayer.normalize();
+    this.applyPursuitLane(zombie, toPlayer, playerX, playerZ);
     this.seek(zombie, dt, toPlayer, playerX, playerZ);
+  }
+
+  /**
+   * Steers the chase onto a per-zombie lane parallel to the player line, so
+   * a column arrives as a spread crowd rather than single file. The lane is
+   * rejoined a short distance ahead of the body — aiming at an offset point
+   * beside a distant player barely bends the path. Only the steering
+   * direction changes: routing and line-of-sight still target the player,
+   * and a lane whose approach is blocked is dropped for this frame.
+   */
+  private applyPursuitLane(zombie: Zombie, toPlayer: THREE.Vector3, playerX: number, playerZ: number): void {
+    const distance = Math.hypot(playerX - zombie.position.x, playerZ - zombie.position.z);
+    const weight = THREE.MathUtils.clamp(
+      (distance - PURSUIT_LANE_CONVERGE_DISTANCE) / PURSUIT_LANE_FADE_DISTANCE,
+      0,
+      1,
+    );
+    if (weight <= 0) return;
+    const slot = (this.zombieIds.get(zombie) ?? 0) % PURSUIT_LANE_SLOTS - (PURSUIT_LANE_SLOTS - 1) / 2;
+    if (slot === 0) return;
+    const perpX = -toPlayer.z;
+    const perpZ = toPlayer.x;
+    const lane = slot * PURSUIT_LANE_SPACING * weight;
+    const side = (zombie.position.x - playerX) * perpX + (zombie.position.z - playerZ) * perpZ;
+    const lookahead = Math.min(PURSUIT_LANE_LOOKAHEAD, distance);
+    const targetX = zombie.position.x + toPlayer.x * lookahead + perpX * (lane - side);
+    const targetZ = zombie.position.z + toPlayer.z * lookahead + perpZ * (lane - side);
+    if (!this.lineOfSightClearFrom(
+      zombie.position.x,
+      zombie.position.z,
+      targetX,
+      targetZ,
+      zombie.position.y,
+      undefined,
+      zombie.bodyRadius,
+    )) return;
+    toPlayer.set(targetX - zombie.position.x, 0, targetZ - zombie.position.z).normalize();
   }
 
   private seek(
@@ -1024,16 +1096,16 @@ export class ZombieManager {
           waypoint.z - zombie.position.z,
         );
         const nextWaypoint = path.points[path.index + 1];
-        const canAdvance = waypointDistance <= RECOVERY_WAYPOINT_EPSILON && (
-          !nextWaypoint ||
-          this.navigationFor(zombie).hasLineOfSight(
-            zombie.floor,
-            zombie.position.x,
-            zombie.position.z,
-            nextWaypoint.x,
-            nextWaypoint.z,
-          )
+        // Skip any waypoint whose successor is already in clear view: walking
+        // to every corner first read as hesitant, robotic detours.
+        const nextVisible = nextWaypoint !== undefined && this.navigationFor(zombie).hasLineOfSight(
+          zombie.floor,
+          zombie.position.x,
+          zombie.position.z,
+          nextWaypoint.x,
+          nextWaypoint.z,
         );
+        const canAdvance = nextVisible || (waypointDistance <= RECOVERY_WAYPOINT_EPSILON && !nextWaypoint);
         if (!canAdvance) {
           targetX = waypoint.x;
           targetZ = waypoint.z;
@@ -1130,7 +1202,10 @@ export class ZombieManager {
       const probeX = pos.x + toTarget.x * zombie.bodyRadius * FRONT_PROBE;
       const probeZ = pos.z + toTarget.z * zombie.bodyRadius * FRONT_PROBE;
       const obstacle = this.findObstacle(probeX, probeZ, zombie.position.y, zombie.bodyRadius);
-      if (obstacle) {
+      // A graze with the straight line still clear is left to collision
+      // sliding; committing to wall-following there and dropping it a frame
+      // later (once the line read clear) was the corner zigzag.
+      if (obstacle && !this.lineOfSightClear(zombie, targetX, targetZ, distance)) {
         const tanX = -toTarget.z;
         const tanZ = toTarget.x;
         const positiveScore = this.roundDirectionScore(
@@ -2009,6 +2084,7 @@ export class ZombieManager {
     this.entryRoutes.delete(zombie);
     this.stairTraversals.delete(zombie);
     this.roundState.delete(zombie);
+    this.headings.delete(zombie);
     this.stuckState.delete(zombie);
     this.navPaths.delete(zombie);
     this.pathCooldowns.delete(zombie);

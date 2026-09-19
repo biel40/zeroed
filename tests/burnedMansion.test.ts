@@ -1011,6 +1011,36 @@ describe('Burned Mansion topology', () => {
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 2);
   });
 
+  it.each(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => [weaponCase.id, weaponCase.position] as const))(
+    'routes a zombie around the %s display case instead of through it',
+    (_id, casePosition) => {
+      const arena = makeArena();
+      unlock(arena, 'nuclear-bunker');
+      const manager = new ZombieManager(() => 0, {}, false, [[1.45, -2.5]], [], arena.floorTransitions);
+      manager.registerColliders([...arena.colliders]);
+      manager.setNavigationBounds(arena.navigationBounds);
+      manager.spawnZombie(roundConfig(1), 0, 0);
+      const zombie = [...manager.actives][0];
+      zombie.state = 'walk';
+      zombie.floor = -1;
+      // Player and zombie face each other with the case exactly in between.
+      zombie.position.set(casePosition.x - 2.2, MANSION_BUNKER_Y, casePosition.z);
+      const playerX = casePosition.x + 2.2;
+      const caseHalfWidth = 0.6;
+      const caseHalfDepth = 0.45;
+      const tolerance = zombie.bodyRadius * 0.5;
+
+      for (let frame = 0; frame < 600; frame++) {
+        manager.update(1 / 60, playerX, casePosition.z, -1, MANSION_BUNKER_Y + EYE_HEIGHT);
+        const inX = Math.abs(zombie.position.x - casePosition.x) < caseHalfWidth + tolerance;
+        const inZ = Math.abs(zombie.position.z - casePosition.z) < caseHalfDepth + tolerance;
+        expect(inX && inZ).toBe(false);
+      }
+
+      expect(Math.hypot(zombie.position.x - playerX, zombie.position.z - casePosition.z)).toBeLessThan(2);
+    },
+  );
+
   it('settles a body pushed off the stair ramp back onto its own floor plane', () => {
     const arena = makeArena();
     unlock(arena, 'nuclear-bunker');
@@ -1043,6 +1073,30 @@ describe('Burned Mansion topology', () => {
       const box = new THREE.Box3().setFromObject(mount).expandByScalar(0.02);
       expect(slabs.some((slab) => slab.intersectsBox(box))).toBe(true);
     }
+  });
+
+  it('uses red, independently flickering bulbs for every area light', () => {
+    const arena = makeArena();
+    const lights = arena.group.children.filter(
+      (child): child is THREE.PointLight => child instanceof THREE.PointLight
+        && child.userData.mapRole === 'area-light',
+    );
+    const bulbs = arena.group.children.filter(
+      (child): child is THREE.Mesh => child.userData.mapRole === 'damaged-bulb',
+    );
+    const initialIntensities = lights.map((light) => light.intensity);
+
+    arena.update(0.43, new THREE.Vector3(0, 1, 0));
+
+    expect(lights).toHaveLength(7);
+    expect(bulbs).toHaveLength(lights.length);
+    expect(lights.every((light) => light.color.getHex() === 0xff180c)).toBe(true);
+    expect(lights.every((light, index) => light.intensity !== initialIntensities[index])).toBe(true);
+    expect(new Set(lights.map((light) => light.intensity.toFixed(3))).size).toBeGreaterThan(3);
+    expect(bulbs.every((bulb) => {
+      const material = bulb.material as THREE.MeshBasicMaterial;
+      return material.color.r > material.color.g * 5 && material.color.r > material.color.b * 3;
+    })).toBe(true);
   });
 
   it('retargets stairs when the player changes floors repeatedly', () => {

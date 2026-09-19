@@ -13,6 +13,7 @@ import { SecretRoomSystem } from '../secret-room/SecretRoomSystem';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
+import { CreepyAreaLights } from '../../rendering/CreepyAreaLights';
 import type {
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
@@ -209,9 +210,8 @@ export class BurnedMansionArena implements ZombieArena {
   private secretWall!: THREE.Mesh;
   private secretWallCollider!: THREE.Mesh;
   private wallMaterialIndex = 0;
-  private bunkerEmergencyLight: THREE.PointLight | null = null;
+  private readonly areaLights = new CreepyAreaLights();
   private readonly rankedPointLights: RankedPointLight[] = [];
-  private ambienceTime = 0;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -333,10 +333,7 @@ export class BurnedMansionArena implements ZombieArena {
       this.refreshProgressionState();
       this.onTopologyChanged?.();
     }
-    this.ambienceTime += dt;
-    if (this.bunkerEmergencyLight) {
-      this.bunkerEmergencyLight.intensity = 1.05 + Math.sin(this.ambienceTime * 3.1) * 0.18;
-    }
+    this.areaLights.update(dt);
     if (observerPosition) this.updatePointLightBudget(observerPosition);
   }
 
@@ -737,8 +734,20 @@ export class BurnedMansionArena implements ZombieArena {
       cap.position.y = 1.98;
       frame.add(base, cap);
       caseGroup.add(frame);
-      this.structureMeshes.push(base);
-      this.playerWallMeshes.push(base);
+
+      // The 12 cm base alone is below the zombie obstacle height filter, so
+      // bodies walked through the glass. One solid volume covers the cabinet.
+      const caseCollider = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.98, 0.9),
+        new THREE.MeshBasicMaterial({ visible: false }),
+      );
+      caseCollider.position.y = 0.99;
+      caseCollider.name = `${reward.id}-case-collider`;
+      caseCollider.userData.surface = 'metal';
+      caseCollider.userData.mapRole = 'case-collider';
+      caseGroup.add(caseCollider);
+      this.structureMeshes.push(caseCollider);
+      this.playerWallMeshes.push(caseCollider);
 
       const glassMaterial = new THREE.MeshPhysicalMaterial({
         color: reward.weaponId === 'tesla' ? 0x72d8e8 : 0x8ddca0,
@@ -1007,16 +1016,15 @@ export class BurnedMansionArena implements ZombieArena {
     this.group.add(
       new THREE.HemisphereLight(0x34465e, 0x110d0a, this.profile.useReducedEffects ? 0.18 : 0.25),
     );
-    this.addPointLight(-3.8, 2.55, 6.5, 0xffad68, 2.4, 6.5, GROUND_CEILING_Y);
-    this.addPointLight(-4.5, 2.35, -4.8, 0x839db7, 1.7, 6.5, GROUND_CEILING_Y);
-    this.addPointLight(2.1, 2.35, -4.8, 0xb35b32, 1.1, 5.2, GROUND_CEILING_Y);
+    this.addPointLight(-3.8, 2.55, 6.5, 2.4, 6.5, GROUND_CEILING_Y);
+    this.addPointLight(-4.5, 2.35, -4.8, 1.7, 6.5, GROUND_CEILING_Y);
+    this.addPointLight(2.1, 2.35, -4.8, 1.1, 5.2, GROUND_CEILING_Y);
     // Hung under a real ceiling segment: the stair aperture has no slab to
     // anchor the cord to, so a bulb placed there floated unattached.
-    this.bunkerEmergencyLight = this.addPointLight(
+    this.addPointLight(
       3.4,
       MANSION_BUNKER_Y + 2.45,
       -5.6,
-      0xff2418,
       1.05,
       5.5,
       BUNKER_CEILING_Y,
@@ -1025,7 +1033,6 @@ export class BurnedMansionArena implements ZombieArena {
       -1.4,
       MANSION_BUNKER_Y + 2.35,
       -4.6,
-      0x5eabc4,
       1.35,
       7,
       BUNKER_CEILING_Y,
@@ -1034,7 +1041,6 @@ export class BurnedMansionArena implements ZombieArena {
       -5.2,
       MANSION_BUNKER_Y + 2.4,
       -1.6,
-      0x7f93a8,
       1.15,
       6.5,
       BUNKER_CEILING_Y,
@@ -1043,7 +1049,6 @@ export class BurnedMansionArena implements ZombieArena {
       -4.8,
       MANSION_BUNKER_Y + 2.4,
       -6.6,
-      0x486a7d,
       0.95,
       6,
       BUNKER_CEILING_Y,
@@ -1213,16 +1218,16 @@ export class BurnedMansionArena implements ZombieArena {
     x: number,
     y: number,
     z: number,
-    color: number,
     intensity: number,
     distance: number,
     ceilingY: number = GROUND_CEILING_Y,
   ): THREE.PointLight {
-    const light = new THREE.PointLight(color, intensity, distance, 1.8);
+    const light = new THREE.PointLight(0xffffff, intensity, distance, 1.8);
     light.position.set(x, y, z);
+    const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const bulb = new THREE.Mesh(
       new THREE.SphereGeometry(0.055, 8, 6),
-      new THREE.MeshBasicMaterial({ color }),
+      bulbMaterial,
     );
     bulb.position.copy(light.position);
     bulb.userData.mapRole = 'damaged-bulb';
@@ -1238,6 +1243,7 @@ export class BurnedMansionArena implements ZombieArena {
     mount.userData.mapRole = 'light-mount';
 
     this.group.add(light, cord, mount, bulb);
+    this.areaLights.add(light, bulbMaterial);
     return light;
   }
 

@@ -1,19 +1,11 @@
 import * as THREE from 'three';
 import type { DeviceProfile } from '../core/DeviceProfile';
 import type { OutdoorArena } from '../range/OutdoorArena';
+import { CreepyAreaLights } from '../rendering/CreepyAreaLights';
 
 const FOG_COLOR = 0x0b1018;
 const FOG_DENSITY = 0.016;
 const MOON_COLOR = 0x93b0dd;
-const SODIUM_COLOR = 0xff9540;
-
-interface FlickeringLight {
-  light: THREE.PointLight;
-  base: number;
-  seed: number;
-  /** 0 = steady, 1 = fully unreliable; negative = slow pulse. */
-  instability: number;
-}
 
 function makeNightSkyTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -56,13 +48,13 @@ function makeStarsTexture(): THREE.CanvasTexture {
  * Zombies-mode atmosphere: converts the sunny arena into a moonlit,
  * fog-drenched night scene. The arena geometry is never touched — the sun
  * directional is restyled into moonlight (no extra shadow-casting light),
- * and a few practical fixtures (sodium floods, a failing tube, an emergency
- * beacon) add warm/cold pools of light. Dust motes drift through the air.
+ * and a few failing red practical fixtures add hostile, uneven pools of
+ * light. Dust motes drift through the air.
  * Classic Zombies owns this treatment of the shared outdoor arena geometry.
  */
 export class NightEnvironment {
   private readonly group = new THREE.Group();
-  private readonly flickering: FlickeringLight[] = [];
+  private readonly areaLights = new CreepyAreaLights();
   private readonly dust: THREE.Points;
   private readonly dustBase: Float32Array;
   private readonly dustCount: number;
@@ -115,13 +107,12 @@ export class NightEnvironment {
     arena.hemisphere.intensity = 0.32;
 
     // --- Practical fixtures ---
-    // Warm sodium floods under the roof, washing the firing line in amber.
-    this.addFixture(-7.4, 2.82, 4.2, SODIUM_COLOR, 15, 19, 0.12);
-    this.addFixture(7.4, 2.82, 4.2, SODIUM_COLOR, 15, 19, 0.12);
-    // A failing cold tube on the back wall: the one unreliable light.
-    this.addFixture(0, 2.25, 8.45, 0xbfd8ff, 5, 11, 0.8);
-    // Red emergency beacon in the dark left corner; slow breathing pulse.
-    this.addFixture(-8.0, 2.0, 8.5, 0xff2a18, 3.2, 8, -1);
+    // Every zone light shares the same failing red electrical treatment, but
+    // uses a different phase so the arena never flashes as one uniform strobe.
+    this.addFixture(-7.4, 2.82, 4.2, 15, 19);
+    this.addFixture(7.4, 2.82, 4.2, 15, 19);
+    this.addFixture(0, 2.25, 8.45, 5, 11);
+    this.addFixture(-8.0, 2.0, 8.5, 3.2, 8);
 
     // --- Dust motes drifting through the light shafts ---
     this.dustCount = profile.useReducedEffects ? 60 : 140;
@@ -153,48 +144,27 @@ export class NightEnvironment {
     scene.add(this.group);
   }
 
-  /** Small emissive bulb + point light; instability < 0 means slow pulse. */
+  /** Small visible bulb paired with one red, failing point light. */
   private addFixture(
     x: number,
     y: number,
     z: number,
-    color: number,
     intensity: number,
     distance: number,
-    instability: number,
   ): void {
-    const light = new THREE.PointLight(color, intensity, distance, 1.8);
+    const light = new THREE.PointLight(0xffffff, intensity, distance, 1.8);
     light.position.set(x, y, z);
-    const bulbMaterial = new THREE.MeshBasicMaterial({ color, fog: false });
+    const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), bulbMaterial);
     bulb.position.set(x, y, z);
+    bulb.userData.mapRole = 'area-light-bulb';
     this.group.add(light, bulb);
-    this.flickering.push({
-      light,
-      base: intensity,
-      seed: Math.random() * 100,
-      instability,
-    });
+    this.areaLights.add(light, bulbMaterial);
   }
 
   update(dt: number): void {
     this.time += dt;
-
-    for (const f of this.flickering) {
-      if (f.instability < 0) {
-        // Emergency beacon: slow breathing pulse.
-        const pulse = 0.6 + 0.4 * Math.sin(this.time * 2.1 + f.seed);
-        f.light.intensity = f.base * pulse;
-        continue;
-      }
-      // Mains hum: mostly steady with small wavering; the unstable tube
-      // occasionally drops out for a beat. Subtle, never a strobe.
-      const waver =
-        Math.sin(this.time * 13 + f.seed) * 0.5 + Math.sin(this.time * 31 + f.seed * 2) * 0.5;
-      let level = 1 - f.instability * 0.16 * (0.5 + 0.5 * waver);
-      if (f.instability > 0.5 && Math.sin(this.time * 1.7 + f.seed) > 0.985) level *= 0.25;
-      f.light.intensity = f.base * level;
-    }
+    this.areaLights.update(dt);
 
     // Dust drift: slow vertical bob and a light horizontal push.
     const positions = this.dust.geometry.getAttribute('position') as THREE.BufferAttribute;
