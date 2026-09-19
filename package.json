@@ -14,7 +14,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "android:sync": "npm run build && npx cap sync android",
+    "preandroid:apk": "node scripts/ensure-android-sdk.mjs",
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "preandroid:run": "node scripts/ensure-android-sdk.mjs",
     "android:run": "npm run android:sync && cd android && gradlew.bat installDebug",
     "android:icons": "capacitor-assets generate --android --iconBackgroundColor '#0b1220' --iconBackgroundColorDark '#0b1220'"
   },
