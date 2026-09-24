@@ -3,6 +3,7 @@ import { DurableObject } from 'cloudflare:workers';
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
 const maxMessageBytes = 32 * 1024;
+const relayProtocolVersion = 2;
 
 function randomRoomCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
@@ -15,7 +16,7 @@ function send(socket, message) {
 
 // The relay only pairs peers; the host validates every gameplay payload.
 // Peers may never forge the relay's own lobby/presence messages.
-const reservedTypes = new Set(['create', 'join', 'created', 'joined', 'peerJoined', 'peerLeft', 'error']);
+const reservedTypes = new Set(['hello', 'create', 'join', 'relayReady', 'created', 'joined', 'peerJoined', 'peerLeft', 'error']);
 
 export default {
   async fetch(request, env) {
@@ -77,7 +78,9 @@ export class CoopRoom extends DurableObject {
     const attachment = socket.deserializeAttachment();
     if (!attachment) return;
 
-    if (message.type === 'create' && isHost && !attachment.joined) {
+    if (message.type === 'hello') {
+      send(socket, { type: 'relayReady', version: relayProtocolVersion });
+    } else if (message.type === 'create' && isHost && !attachment.joined) {
       socket.serializeAttachment({ ...attachment, joined: true });
       send(socket, { type: 'created', code: attachment.code });
     } else if (message.type === 'join' && isGuest && !attachment.joined &&

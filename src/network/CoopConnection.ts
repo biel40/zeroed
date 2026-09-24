@@ -1,4 +1,7 @@
-import type { IncomingMessage, OutgoingMessage } from './Protocol';
+import { RELAY_PROTOCOL_VERSION, type IncomingMessage, type OutgoingMessage } from './Protocol';
+
+const RELAY_HANDSHAKE_TIMEOUT_MS = 4000;
+const CONNECTION_TIMEOUT_MS = 8000;
 
 /**
  * Socket to the room relay. The relay only pairs two peers and forwards
@@ -28,8 +31,59 @@ export class CoopConnection {
         resolve();
         return;
       }
-      this.socket.addEventListener('open', () => resolve(), { once: true });
-      this.socket.addEventListener('error', () => reject(new Error('Could not connect to the room server.')), { once: true });
+      if (this.disposed || this.socket.readyState === WebSocket.CLOSED) {
+        reject(new Error('Room server connection closed.'));
+        return;
+      }
+      const cleanup = (): void => {
+        clearTimeout(timer);
+        this.socket.removeEventListener('open', onOpen);
+        this.socket.removeEventListener('error', onError);
+        this.socket.removeEventListener('close', onClose);
+      };
+      const onOpen = (): void => { cleanup(); resolve(); };
+      const onError = (): void => { cleanup(); reject(new Error('Could not connect to the room server.')); };
+      const onClose = (): void => { cleanup(); reject(new Error('Room server connection closed.')); };
+      const timer = setTimeout(() => {
+        cleanup();
+        this.dispose();
+        reject(new Error('Room server did not respond. Check the server and try again.'));
+      }, CONNECTION_TIMEOUT_MS);
+      this.socket.addEventListener('open', onOpen);
+      this.socket.addEventListener('error', onError);
+      this.socket.addEventListener('close', onClose);
+    });
+  }
+
+  /** Fail in the lobby when a deployed relay still speaks an older protocol. */
+  public checkRelay(): Promise<void> {
+    if (!this.isOpen || this.disposed) return Promise.reject(new Error('Room server connection closed.'));
+    return new Promise((resolve, reject) => {
+      const cleanup = (): void => {
+        clearTimeout(timer);
+        this.socket.removeEventListener('message', onMessage);
+        this.socket.removeEventListener('close', onClose);
+      };
+      const onClose = (): void => {
+        cleanup();
+        reject(new Error('Room server connection closed.'));
+      };
+      const onMessage = (event: MessageEvent): void => {
+        let response: unknown;
+        try { response = JSON.parse(String(event.data)); } catch { return; }
+        if (!response || typeof response !== 'object' || !('type' in response)
+          || response.type !== 'relayReady') return;
+        cleanup();
+        if ('version' in response && response.version === RELAY_PROTOCOL_VERSION) resolve();
+        else reject(new Error('Room server version differs from the game. Redeploy the room server.'));
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Room server did not confirm its version. Redeploy the room server.'));
+      }, RELAY_HANDSHAKE_TIMEOUT_MS);
+      this.socket.addEventListener('message', onMessage);
+      this.socket.addEventListener('close', onClose);
+      this.send({ type: 'hello', version: RELAY_PROTOCOL_VERSION });
     });
   }
 

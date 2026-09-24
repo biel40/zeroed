@@ -33,6 +33,10 @@ ocultas en la interfaz; se puede configurar el servidor con
 
 El juego puede seguir en Vercel. El Worker de Cloudflare recibe los WebSockets
 en `/multiplayer` y asigna cada codigo de sala a un Durable Object SQLite.
+El cliente comprueba la versión del relay antes de crear o unirse a una sala;
+si el Worker está desactualizado, muestra un error en el menú en vez de iniciar
+una partida sin sincronización. Tras cambiar el protocolo, desplegar primero el
+Worker y después la web.
 No se necesita crear los objetos a mano: la configuracion `wrangler.jsonc`
 registra la clase `CoopRoom`, y Cloudflare crea cada instancia al usar un codigo.
 

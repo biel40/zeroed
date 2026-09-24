@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 const port = Number(process.env.PORT ?? 8787);
 const rooms = new Map();
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const relayProtocolVersion = 2;
 
 function roomCode() {
   let code;
@@ -20,7 +21,7 @@ function send(socket, message) {
 
 // The relay only pairs peers; the host validates every gameplay payload.
 // Peers may never forge the relay's own lobby/presence messages.
-const reservedTypes = new Set(['create', 'join', 'created', 'joined', 'peerJoined', 'peerLeft', 'error']);
+const reservedTypes = new Set(['hello', 'create', 'join', 'relayReady', 'created', 'joined', 'peerJoined', 'peerLeft', 'error']);
 
 function leave(socket) {
   const code = socket.roomCode;
@@ -54,7 +55,9 @@ sockets.on('connection', (socket) => {
     try { message = JSON.parse(bytes.toString()); } catch { return; }
     if (!message || typeof message.type !== 'string') return;
     const room = rooms.get(socket.roomCode);
-    if (message.type === 'create' && !socket.roomCode) {
+    if (message.type === 'hello') {
+      send(socket, { type: 'relayReady', version: relayProtocolVersion });
+    } else if (message.type === 'create' && !socket.roomCode) {
       const code = roomCode();
       rooms.set(code, { host: socket, guest: null });
       socket.roomCode = code;

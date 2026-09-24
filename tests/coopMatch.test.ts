@@ -235,6 +235,16 @@ describe('co-op doors and points', () => {
 });
 
 describe('co-op lifecycle', () => {
+  it('reports a missing initial host state instead of leaving the guest silently stuck', () => {
+    const match = makeMatch();
+    match.relay.connected = false;
+    match.guest.onGameplayStarted();
+    match.step(0.1, 101);
+    expect(match.guest.isGameplayInputEnabled()).toBe(false);
+    expect(match.guestSide.hud.showRoundBanner).toHaveBeenCalledWith('MATCH NOT SYNCHRONIZED', 'OPEN THE MENU TO LEAVE');
+    expect(match.guestSide.ctx.unlockPointer).toHaveBeenCalled();
+  });
+
   it('lets the host continue and retarget zombies when the guest disconnects mid-round', () => {
     const match = startedMatch();
     spawnOne(match);

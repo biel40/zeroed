@@ -20,6 +20,7 @@ import { CoopWorld } from './CoopWorld';
 
 const COOP_WEAPONS: readonly WeaponId[] = ['m1911'];
 const PLAYER_STATE_INTERVAL = 1 / 20;
+const INITIAL_MATCH_TIMEOUT = 10;
 
 /**
  * Co-op replica. The guest simulates only its own first-person player and
@@ -46,6 +47,7 @@ export class CoopGuestMode implements GameMode {
   private hostLost = false;
   private gameOverShown = false;
   private sendElapsed = 0;
+  private initialMatchWait = 0;
 
   public constructor(private readonly connection: CoopConnection) {}
 
@@ -71,6 +73,14 @@ export class CoopGuestMode implements GameMode {
     this.replica.update(dt);
     this.hostAvatar.update(dt);
     if (this.playing && !this.hostLost) {
+      if (!this.match) {
+        this.initialMatchWait += dt;
+        if (this.initialMatchWait >= INITIAL_MATCH_TIMEOUT) {
+          this.onHostLost('MATCH NOT SYNCHRONIZED');
+          this.pushHud();
+          return;
+        }
+      }
       this.sendElapsed += dt;
       if (this.sendElapsed >= PLAYER_STATE_INTERVAL) {
         this.sendElapsed = 0;
@@ -103,6 +113,7 @@ export class CoopGuestMode implements GameMode {
 
   public onGameplayStarted(): void {
     this.playing = true;
+    this.initialMatchWait = 0;
     this.send({ type: 'ready' });
   }
 
@@ -112,7 +123,7 @@ export class CoopGuestMode implements GameMode {
   }
 
   public isGameplayInputEnabled(): boolean {
-    return !this.hostLost && this.match !== null && this.match.phase !== 'gameOver' && this.match.stats.guest.alive;
+    return this.playing && !this.hostLost && this.match !== null && this.match.phase !== 'gameOver' && this.match.stats.guest.alive;
   }
 
   public onInteract(): void {
@@ -196,6 +207,7 @@ export class CoopGuestMode implements GameMode {
 
   private applyMatchState(state: MatchState): void {
     this.match = state;
+    this.initialMatchWait = 0;
     this.round = state.round;
     this.hostAvatar.push(state.host);
     this.hostAvatar.setAlive(state.stats.host.alive);
@@ -222,6 +234,7 @@ export class CoopGuestMode implements GameMode {
     this.ctx.resetArsenal();
     this.hostAvatar.clear();
     this.match = null;
+    this.initialMatchWait = 0;
     this.round = 0;
     if (this.gameOverShown) {
       // The game-over panel released the pointer: a click must re-lock it.

@@ -102,46 +102,51 @@ class ZeroedBoot {
   }
 
   private async connectCoop(url: string, role: 'host' | 'guest', code = ''): Promise<void> {
+    let connection: CoopConnection | null = null;
+    let replacedConnection = false;
     try {
       this.hud.hideCoopRoomCode();
       const endpoint = new URL(url);
       if (endpoint.protocol !== 'ws:' && endpoint.protocol !== 'wss:') throw new Error('Use a ws:// or wss:// server address.');
-      if (role === 'guest' && !/^[A-Z2-9]{6}$/.test(code)) throw new Error('Enter a six-character room code.');
+      if (role === 'guest' && !/^[A-HJ-NP-Z2-9]{6}$/.test(code)) throw new Error('Enter a valid six-character room code.');
       this.coopConnection?.dispose();
+      this.coopConnection = null;
+      replacedConnection = true;
       endpoint.searchParams.set('role', role);
       if (role === 'guest') endpoint.searchParams.set('code', code);
-      const connection = new CoopConnection(endpoint.toString());
-      this.coopConnection = connection;
-      connection.onClose = () => {
-        if (this.coopConnection !== connection) return;
+      const activeConnection = new CoopConnection(endpoint.toString());
+      connection = activeConnection;
+      this.coopConnection = activeConnection;
+      activeConnection.onClose = () => {
+        if (this.coopConnection !== activeConnection) return;
         this.hud.hideCoopRoomCode();
         this.hud.setCoopStatus('Connection closed. Check the server and try again.');
       };
-      let startPending = false;
-      connection.onMessage = (message) => {
+      activeConnection.onMessage = (message) => {
         if (message.type === 'error') this.hud.setCoopStatus(String(message.message));
         if (message.type === 'created') {
           this.hud.showCoopRoomCode(String(message.code));
           this.hud.setCoopStatus('Room created. Share the code and wait for your partner.');
         }
         if (message.type === 'peerLeft' && role === 'host') {
-          startPending = false;
           this.hud.setCoopStatus('Your partner left. Waiting for another player.');
           return;
         }
         const ready = (message.type === 'peerJoined' && role === 'host') || (message.type === 'joined' && role === 'guest');
         if (!ready) return;
-        startPending = true;
-        this.hud.setCoopStatus('Partner found. Preparing the match…');
-        // The teammate model is optional; the match starts either way.
-        void this.assets.loadPlayerModel().then(() => {
-          if (startPending) this.startCoopGame(role, connection);
-        });
+        // The optional teammate model loads in the background; a slow asset
+        // request must never hold the match or its first state packet.
+        this.startCoopGame(role, activeConnection);
       };
       this.hud.setCoopStatus('Connecting…');
-      await connection.open();
-      connection.send(role === 'host' ? { type: 'create' } : { type: 'join', code });
+      await activeConnection.open();
+      await activeConnection.checkRelay();
+      if (this.coopConnection !== activeConnection) return;
+      activeConnection.send(role === 'host' ? { type: 'create' } : { type: 'join', code });
     } catch (error) {
+      if (connection && this.coopConnection !== connection) return;
+      connection?.dispose();
+      if (replacedConnection) this.coopConnection = null;
       this.hud.setCoopStatus(error instanceof Error ? error.message : 'Connection failed.');
     }
   }
