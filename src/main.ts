@@ -8,6 +8,9 @@ import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
 import { setupPWA } from './pwa';
 import { ZombiesMode } from './modes/ZombiesMode';
+import { CoopGuestMode } from './modes/coop/CoopGuestMode';
+import { CoopHostMode } from './modes/coop/CoopHostMode';
+import { CoopConnection } from './network/CoopConnection';
 import { HUD } from './ui/HUD';
 
 class ZeroedBoot {
@@ -16,6 +19,9 @@ class ZeroedBoot {
   private readonly hud: HUD;
   private readonly assets: AssetManager;
   private readonly music = new MusicManager();
+  /** Lobby-owned socket; ownership moves to the co-op mode once a match starts. */
+  private coopConnection: CoopConnection | null = null;
+  private game: Game | null = null;
 
   public constructor() {
     const container = document.getElementById('app');
@@ -46,7 +52,11 @@ class ZeroedBoot {
   }
 
   private startGame(mode: GameMode): void {
-    const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode, this.music);
+    this.hud.hideCoopLobby();
+    this.game?.dispose();
+    const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode, this.music,
+      () => this.onGameExited(game));
+    this.game = game;
     console.info('[Zeroed boot] Game initialized successfully.', {
       mode: mode.id,
       mobile: this.profile.isMobile,
@@ -54,7 +64,86 @@ class ZeroedBoot {
       pixelRatioLimit: this.profile.pixelRatioLimit,
     });
     this.hud.showStartScreen(false);
-    void game;
+  }
+
+  private onGameExited(game: Game): void {
+    if (this.game === game) this.game = null;
+    this.showMapMenu();
+  }
+
+  private startCoopGame(role: 'host' | 'guest', connection: CoopConnection): void {
+    if (this.coopConnection !== connection) return;
+    // The mode now owns the socket and disposes it when the match is left.
+    this.coopConnection = null;
+    connection.onMessage = null;
+    connection.onClose = null;
+    this.startGame(role === 'host' ? new CoopHostMode(connection) : new CoopGuestMode(connection));
+  }
+
+  private showMapMenu(): void {
+    this.hud.showMapSelect((mapId) => this.startGame(new ZombiesMode(mapId)));
+  }
+
+  private showCoopLobby(): void {
+    const defaultServerUrl = import.meta.env.VITE_COOP_SERVER_URL?.trim()
+      || (location.protocol === 'https:'
+        ? `wss://${location.host}/multiplayer`
+        : `ws://${location.hostname}:8787`);
+    void this.assets.loadPlayerModel();
+    this.hud.showCoopLobby(defaultServerUrl, {
+      host: (url) => void this.connectCoop(url, 'host'),
+      join: (url, code) => void this.connectCoop(url, 'guest', code),
+      back: () => {
+        this.coopConnection?.dispose();
+        this.coopConnection = null;
+        this.showMapMenu();
+      },
+    });
+  }
+
+  private async connectCoop(url: string, role: 'host' | 'guest', code = ''): Promise<void> {
+    try {
+      this.hud.hideCoopRoomCode();
+      const endpoint = new URL(url);
+      if (endpoint.protocol !== 'ws:' && endpoint.protocol !== 'wss:') throw new Error('Use a ws:// or wss:// server address.');
+      if (role === 'guest' && !/^[A-Z2-9]{6}$/.test(code)) throw new Error('Enter a six-character room code.');
+      this.coopConnection?.dispose();
+      endpoint.searchParams.set('role', role);
+      if (role === 'guest') endpoint.searchParams.set('code', code);
+      const connection = new CoopConnection(endpoint.toString());
+      this.coopConnection = connection;
+      connection.onClose = () => {
+        if (this.coopConnection !== connection) return;
+        this.hud.hideCoopRoomCode();
+        this.hud.setCoopStatus('Connection closed. Check the server and try again.');
+      };
+      let startPending = false;
+      connection.onMessage = (message) => {
+        if (message.type === 'error') this.hud.setCoopStatus(String(message.message));
+        if (message.type === 'created') {
+          this.hud.showCoopRoomCode(String(message.code));
+          this.hud.setCoopStatus('Room created. Share the code and wait for your partner.');
+        }
+        if (message.type === 'peerLeft' && role === 'host') {
+          startPending = false;
+          this.hud.setCoopStatus('Your partner left. Waiting for another player.');
+          return;
+        }
+        const ready = (message.type === 'peerJoined' && role === 'host') || (message.type === 'joined' && role === 'guest');
+        if (!ready) return;
+        startPending = true;
+        this.hud.setCoopStatus('Partner found. Preparing the match…');
+        // The teammate model is optional; the match starts either way.
+        void this.assets.loadPlayerModel().then(() => {
+          if (startPending) this.startCoopGame(role, connection);
+        });
+      };
+      this.hud.setCoopStatus('Connecting…');
+      await connection.open();
+      connection.send(role === 'host' ? { type: 'create' } : { type: 'join', code });
+    } catch (error) {
+      this.hud.setCoopStatus(error instanceof Error ? error.message : 'Connection failed.');
+    }
   }
 
   private async initialize(): Promise<void> {
@@ -80,13 +169,14 @@ class ZeroedBoot {
       // AssetManager, so loading always completes.
       await this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total));
       this.hud.setReady();
+      this.hud.setCoopSelectHandler(() => this.showCoopLobby());
 
       const requestedMap = new URLSearchParams(window.location.search).get('map');
       if (isZombieMapId(requestedMap)) {
         this.startGame(new ZombiesMode(requestedMap));
       } else {
-        // Zombies is the only game mode; the player chooses its arena directly.
-        this.hud.showMapSelect((mapId) => this.startGame(new ZombiesMode(mapId)));
+        // Burned Mansion is the only Zombies arena.
+        this.showMapMenu();
       }
     } catch (error: unknown) {
       console.error('[Zeroed boot] Initialization failed.', error);

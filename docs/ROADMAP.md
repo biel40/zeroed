@@ -2,13 +2,21 @@
 
 Solo incluye trabajo respaldado por bugs, limitaciones o contratos presentes.
 
+## Cooperativo despues del primer corte
+
+- Validar dos navegadores reales con Pointer Lock y latencia; comprobar
+  movimiento, disparos, pausas, muerte, reinicio y desconexion.
+- Completar reglas compartidas de compras, cuchillo, Mystery Box, bunker y
+  secretos de Burned Mansion sin alterar la ruta individual offline.
+- Evaluar reconciliacion de movimiento, proyectiles equivalentes entre ambos
+  jugadores y reconexion antes de ampliar salas o distribuir en Android.
+
 ## Correcciones de comportamiento
 
 - Bloquear simulacion antes de START y input de gameplay durante game over.
 - Reparar barreras totalmente destruidas; cancelar reparacion al cambiar arma
   en tactil.
-- Hacer verificable RESTART completo para Classic y Zombies.
-- Mantener reserva infinita en range y finita en Zombies.
+- Hacer verificable RESTART completo para individual y cooperativo.
 - Corregir distancias de impacto y fade vertical de cadaveres.
 - Conectar musica al ciclo real sin pistas inactivas al reanudar.
 
@@ -16,7 +24,6 @@ Solo incluye trabajo respaldado por bugs, limitaciones o contratos presentes.
 
 - Identificar energia por arma/tipo, no por color.
 - Reutilizar texturas precargadas y registrar colliders dinamicos.
-- Implementar `dispose()` para cambiar modo/mapa sin recarga.
 - Alinear `cameraShare`, `acceptsDecals` y `reserveAmmoFor` con su uso real.
 
 ## Validacion y distribucion

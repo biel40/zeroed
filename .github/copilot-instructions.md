@@ -123,8 +123,9 @@ detiene la simulación en el `tick`. Desktop: ESC libera el pointer lock y
 `onLockChange(false)` abre el menú (no se puede interceptar ESC antes del
 unlock — ábrelo EN el handler). Móvil: botón `| |` → `Input.onPauseRequest`.
 RESUME re-bloquea y continúa; RESTART llama a `mode.onRestartRequested()`;
-MAIN MENU hace `location.reload()`. El game over suprime la pausa vía
-`onPointerUnlock()`.
+MAIN MENU hace `Game.dispose()` y vuelve al menú sin recargar. El game over suprime la pausa vía
+`onPointerUnlock()`. En cooperativo (`GameMode.sharedSimulation`) la pausa es
+solo local: el menú retira el input de ese jugador y la partida sigue.
 
 ## Historial de cambios
 

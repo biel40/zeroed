@@ -5,10 +5,6 @@ export interface ZombieMapDefinition {
 
 /** Supported arenas are independent from which ones the public menu exposes. */
 export const ZOMBIE_MAPS = {
-  classic: {
-    id: 'classic',
-    visible: false,
-  },
   'burned-mansion': {
     id: 'burned-mansion',
     visible: true,

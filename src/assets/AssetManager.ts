@@ -3,20 +3,15 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import type { ZombieModelId } from '../zombies/ZombieConfig';
 import { ZOMBIE_MODELS, type ZombieModelSource } from '../zombies/ZombieVisual';
+import { REMOTE_SOLDIER_MODEL_URL, type RemotePlayerModelSource } from '../rendering/RemotePlayerAvatar';
 
 export const TEXTURE_MANIFEST: readonly string[] = [
-  'concrete_diff.jpg',
-  'concrete_nor.jpg',
-  'concrete_rough.jpg',
   'brown_planks_03_diff.jpg',
   'brown_planks_03_nor.jpg',
   'brown_planks_03_rough.jpg',
   'metal_plate_diff.jpg',
   'metal_plate_nor.jpg',
   'metal_plate_rough.jpg',
-  'brown_mud_dry_diff.jpg',
-  'brown_mud_dry_nor.jpg',
-  'brown_mud_dry_rough.jpg',
 ];
 
 /** Zombie GLBs (skinned + animated) served from public/assets/zombies/. */
@@ -42,6 +37,8 @@ export class AssetManager {
   private readonly models = new Map<WeaponId, THREE.Group>();
   private readonly zombies = new Map<ZombieModelId, ZombieModelSource>();
   private readonly textures = new Map<string, THREE.Texture>();
+  private playerModel: RemotePlayerModelSource | null = null;
+  private playerModelLoad: Promise<void> | null = null;
 
   constructor(private readonly anisotropyLimit = 8) {}
 
@@ -85,6 +82,28 @@ export class AssetManager {
 
   getTexture(name: string): THREE.Texture | null {
     return this.textures.get(name) ?? null;
+  }
+
+  /**
+   * Co-op only: loads the teammate soldier once, on demand, so single player
+   * never requests it. A missing file resolves to the procedural stand-in.
+   */
+  public loadPlayerModel(): Promise<void> {
+    this.playerModelLoad ??= this.gltfLoader.loadAsync(this.resolve(REMOTE_SOLDIER_MODEL_URL))
+      .then((gltf) => {
+        this.playerModel = { scene: gltf.scene, clips: gltf.animations };
+      })
+      .catch((error: unknown) => {
+        console.warn(
+          `[AssetManager] Remote soldier model missing (${REMOTE_SOLDIER_MODEL_URL}). Procedural stand-in will be used.`,
+          error,
+        );
+      });
+    return this.playerModelLoad;
+  }
+
+  public getPlayerModel(): RemotePlayerModelSource | null {
+    return this.playerModel;
   }
 
   /** Textures following the `${slug}_{map}.jpg` convention as a PBR set. */

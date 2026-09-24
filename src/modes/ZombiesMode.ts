@@ -31,7 +31,6 @@ import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
-import { ClassicArena } from '../zombies/maps/ClassicArena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
 import type {
   ArenaAmmoRefill,
@@ -42,7 +41,6 @@ import type {
 import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
-import { standardTargetHitEffects } from './hitEffects';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
@@ -56,8 +54,7 @@ const MOAN_SPREAD = 9;
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
  * brief post-hit invulnerability, game over / restart, and the mode-only
  * Ray Gun firing visible energy bolts with splash damage. The mode owns the
- * night atmosphere (moonlight, fog, practicals, ambience) — the shooting
- * range stays sunny because each mode applies its own environment.
+ * Burned Mansion atmosphere, progression and interactions.
  */
 export class ZombiesMode implements GameMode {
   readonly id = 'zombies' as const;
@@ -72,8 +69,7 @@ export class ZombiesMode implements GameMode {
    * Every Zombies weapon runs a finite reserve (generous tier). The mode
    * table ZOMBIES_RESERVE_AMMO wins over the shared definition (so the
    * M1911 gets 64 in zombies while keeping 8/64 by definition); weapons
-   * not listed — the Tesla — keep their definition reserve. The range
-   * never calls this — it stays bottomless.
+   * not listed — the Tesla — keep their definition reserve.
    */
   reserveAmmoFor(id: WeaponId): number | undefined {
     return ZOMBIES_RESERVE_AMMO[id] ?? WEAPON_DEFINITIONS[id].reserveAmmo;
@@ -115,25 +111,19 @@ export class ZombiesMode implements GameMode {
   private readonly knife = new Knife();
   private readonly knifeRaycaster = new THREE.Raycaster();
 
-  constructor(private readonly mapId: ZombieMapId = 'classic') { }
+  constructor(mapId: ZombieMapId = 'burned-mansion') {
+    if (mapId !== 'burned-mansion') throw new Error(`Unknown Zombies map: ${mapId}`);
+  }
 
   init(ctx: ModeContext): void {
     this.ctx = ctx;
 
-    if (this.mapId === 'burned-mansion') {
-      // Hide the default sunny range; the mansion brings its own geometry.
-      ctx.range.group.visible = false;
-      this.arena = new BurnedMansionArena(ctx.scene, ctx.profile);
-    } else {
-      this.arena = new ClassicArena(ctx.range, ctx.scene, ctx.setExposure, ctx.profile);
-    }
+    this.arena = new BurnedMansionArena(ctx.scene, ctx.profile);
 
     this.arena.init();
     ctx.scene.add(this.arena.group);
 
-    // Replace ballistics colliders with the arena's geometry. For the classic
-    // map this is equivalent to the range colliders; for the mansion it swaps
-    // in the mansion walls.
+    // The arena owns static ballistics geometry; zombies add dynamic hitboxes.
     ctx.hitColliders.length = 0;
     ctx.hitColliders.push(...this.arena.colliders);
     this.mansionStaticColliders = new Set(this.arena.colliders);
@@ -190,10 +180,6 @@ export class ZombiesMode implements GameMode {
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyKnifeImpact();
     ctx.player.camera.add(this.knife.root);
-
-    if (this.mapId === 'classic') {
-      ctx.audio.startWind();
-    }
 
     // The Mystery Box: main weapon progression, exclusive to this mode.
     this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
@@ -269,23 +255,17 @@ export class ZombiesMode implements GameMode {
   }
 
   onTargetHit(
-    target: HitTarget,
+    _target: HitTarget,
     distance: number,
     point: THREE.Vector3,
-    normal: THREE.Vector3,
+    _normal: THREE.Vector3,
     object: THREE.Object3D,
     weapon: Weapon,
   ): void {
     if (!this.isGameplayInputEnabled()) return;
     const zombie = object.userData.zombie as Zombie | undefined;
 
-    // Range props stay decorative and keep their classic feedback.
-    if (!zombie) {
-      this.ctx.stats.registerHit(distance);
-      this.ctx.hud.showHitmarker();
-      standardTargetHitEffects(this.ctx.audio, this.ctx.effects, target, point, normal, object);
-      return;
-    }
+    if (!zombie) return;
 
     const part = (object.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
     const headshot = part === 'head';

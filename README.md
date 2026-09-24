@@ -13,6 +13,11 @@ npm install
 npm run dev
 ```
 
+Para probar el primer cooperativo de dos jugadores en Burned Mansion, inicia también
+`npm run multiplayer:server` y abre dos pestañas. La partida individual no
+necesita ese servidor. Alcance, límites y conexión por Internet:
+[Multijugador](docs/MULTIPLAYER.md).
+
 Abre `http://localhost:5173`. Para comprobar cambios:
 
 ```bash
@@ -47,6 +52,11 @@ Los controles táctiles se adaptan automáticamente en móvil.
 | `npm run dev` | Inicia Vite en desarrollo |
 | `npm run test` | Ejecuta la suite Vitest |
 | `npm run typecheck` | Comprueba TypeScript estricto |
+| `npm run multiplayer:server` | Inicia el servidor gratuito de salas privadas |
+| `npm run multiplayer:test-server` | Prueba el protocolo de salas |
+| `npm run multiplayer:cloudflare:dev` | Prueba el Worker de salas localmente |
+| `npm run multiplayer:cloudflare:deploy` | Despliega el Worker en Cloudflare |
+| `npm run multiplayer:cloudflare:test` | Prueba el Worker local con Wrangler en el puerto 8787 |
 | `npm run build` | Genera la versión de producción |
 | `npm run android:run` | Sincroniza e instala una build Android de depuración |
 

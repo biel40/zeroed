@@ -76,20 +76,52 @@
   <div id="map-select" class="hidden">
     <div class="start-panel">
       <h1 class="zeroed-title">ZEROED</h1>
-      <p class="mode-hint">THE DEAD ARE WAITING</p>
+      <p class="mode-hint">THE DEAD ARE COMING</p>
       <div class="mode-grid" role="group" aria-label="Zombies">
-        <button type="button" data-map="classic">
-          <span class="mode-name">CLASSIC</span>
-          <span class="mode-desc">Outdoor variant</span>
-        </button>
         <button type="button" data-map="burned-mansion">
           <span class="mode-name">ZOMBIES</span>
           <span class="mode-desc">BURNED MANSION</span>
         </button>
       </div>
+      <button type="button" id="coop-select" class="coop-select">MULTIPLAYER MODE</button>
       <div class="pwa-actions" aria-live="polite">
         <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="coop-lobby" class="hidden">
+    <div class="coop-lobby-content">
+      <button type="button" id="coop-back" aria-label="Back to main menu" title="Back">
+        <span aria-hidden="true">←</span> BACK
+      </button>
+      <div class="start-panel">
+        <h1>CO-OP ZOMBIES</h1>
+        <p class="mode-hint">BURNED MANSION · TWO-PLAYER ROOM</p>
+        <div class="coop-actions">
+          <button type="button" id="coop-host">CREATE ROOM</button>
+          <button type="button" id="coop-join">JOIN ROOM</button>
+        </div>
+        <div id="coop-join-fields" class="coop-join-fields hidden">
+          <label for="coop-code">FRIEND'S ROOM CODE</label>
+          <input id="coop-code" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123" />
+          <button type="button" id="coop-join-submit">CONNECT</button>
+        </div>
+        <p id="coop-status" role="status" aria-live="polite"></p>
+        <div id="coop-room-share" class="coop-room-share hidden">
+          <span id="coop-room-code" class="coop-room-code"></span>
+          <button type="button" id="coop-copy-code">COPY CODE</button>
+          <button type="button" id="coop-share-code">SHARE</button>
+        </div>
+        <details id="coop-connection-options" class="hidden">
+          <summary>CONNECTION OPTIONS</summary>
+          <div class="coop-server-field">
+            <label for="coop-server">ROOM SERVER</label>
+            <input id="coop-server" type="url" spellcheck="false" placeholder="wss://your-server.example" />
+            <p>Only change this if you use a different room server.</p>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -142,11 +174,11 @@
         <span><kbd>LMB</kbd></span><span>Fire</span>
         <span><kbd>RMB</kbd></span><span>ADS</span>
         <span><kbd>R</kbd></span><span>Reload</span>
-        <span><kbd>X</kbd></span><span>Fire mode</span>
+        <span data-coop-hidden><kbd>X</kbd></span><span data-coop-hidden>Fire mode</span>
         <span><kbd>E</kbd></span><span>Interact</span>
-        <span><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span>Knife</span>
+        <span data-coop-hidden><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span data-coop-hidden>Knife</span>
         <span><kbd>Space</kbd></span><span>Jump</span>
-        <span><kbd>1</kbd>–<kbd>2</kbd></span><span>Weapon slots</span>
+        <span data-coop-hidden><kbd>1</kbd>–<kbd>2</kbd></span><span data-coop-hidden>Weapon slots</span>
         <span><kbd>ESC</kbd></span><span>Release mouse</span>
       </div>
     </div>

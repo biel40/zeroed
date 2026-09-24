@@ -3,6 +3,7 @@ import type { Weapon } from '../weapons/Weapon';
 import { clamp, damp, lerp } from '../utils/math';
 import type { Input } from './Input';
 import type { PlayerBounds } from '../zombies/maps/ZombieArena';
+import { MANSION_GROUND_BOUNDS } from '../zombies/maps/BurnedMansionConfig';
 
 export const BASE_FOV = 75;
 
@@ -54,20 +55,8 @@ export function stairGroundY(ramp: StairRamp, x: number, z: number): number {
   return lerp(ramp.top.y, ramp.bottom.y, progress);
 }
 
-/**
- * Delimited walkable area, enforced by the movement clamp below. minZ is
- * the frontier: the firing-line bench (top spanning z 0.8–1.6) plus the
- * angled barriers form a physical barrier the player can neither cross nor
- * round — the field beyond (target lanes, zombie grounds) stays off-limits
- * in every mode. 1.7 keeps a hair of clearance so the view never clips the
- * bench top.
- */
-export const PLAYER_BOUNDS: PlayerBounds = {
-  minX: -7,
-  maxX: 7,
-  minZ: 1.7,
-  maxZ: 8,
-};
+/** Default movement area before the active arena finishes initialization. */
+export const PLAYER_BOUNDS: PlayerBounds = MANSION_GROUND_BOUNDS;
 
 /**
  * First-person rig: rig (yaw + position) → pitch node → camera (recoil

@@ -4,7 +4,7 @@
  * "walk in" from the outskirts of the arena instead of popping into view.
  */
 
-/** Fixed entry points around the open side of the range, as [x, z] pairs. */
+/** Legacy fallback for isolated spawn simulations; playable maps supply their own points. */
 export const SPAWN_POINTS: ReadonlyArray<readonly [number, number]> = [
   [-18, -34],
   [18, -34],
@@ -22,7 +22,7 @@ export const MIN_PLAYER_DISTANCE = 10;
 export interface ZombieSpawnPoint {
   readonly x: number;
   readonly z: number;
-  /** Entry assigned by the map; absent on the classic open arena. */
+  /** Optional entry assigned by an arena barrier. */
   readonly barrierId?: string;
   readonly approachX?: number;
   readonly approachZ?: number;

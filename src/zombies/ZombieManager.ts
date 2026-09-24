@@ -113,7 +113,7 @@ const MIN_OBSTACLE_HEIGHT = 0.5;
 const MAX_OBSTACLE_FOOTPRINT = 20;
 /** GLB payloads per visual model. Missing keys use that model's distinct fallback. */
 export type ZombieModelSources = Partial<Record<ZombieModelId, ZombieModelSource | null>>;
-const ZOMBIE_POOL_MODELS = (Object.keys(ZOMBIE_MODEL_POOL_CAPACITIES) as ZombieModelId[])
+export const ZOMBIE_POOL_MODELS = (Object.keys(ZOMBIE_MODEL_POOL_CAPACITIES) as ZombieModelId[])
   .flatMap((modelId) => Array<ZombieModelId>(ZOMBIE_MODEL_POOL_CAPACITIES[modelId]).fill(modelId));
 
 interface EntryRoute {
@@ -170,6 +170,14 @@ interface NavPath {
 }
 
 export type ZombieKillSource = 'default' | 'knife';
+export type ZombieTargetId = 'host' | 'guest';
+export interface ZombiePlayerTarget {
+  readonly id: ZombieTargetId;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly floor: number;
+}
 
 /**
  * Owns the zombie population: pooling, spawning, steering (seek + soft
@@ -181,7 +189,10 @@ export class ZombieManager {
   readonly group = new THREE.Group();
 
   onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource) => void) | null = null;
-  onPlayerAttack: ((damage: number) => void) | null = null;
+  onPlayerAttack: ((damage: number, targetId?: ZombieTargetId) => void) | null = null;
+  /** Authority hooks for networked play; unused (null) in single player. */
+  public onZombieSpawned: ((zombie: Zombie) => void) | null = null;
+  public onZombieAttack: ((zombie: Zombie, targetId: ZombieTargetId) => void) | null = null;
   onBruteAttack: (() => void) | null = null;
   onBarrierImpact: (() => void) | null = null;
 
@@ -229,6 +240,9 @@ export class ZombieManager {
   private navigationComputations = 0;
   private readonly zombieIds = new Map<Zombie, number>();
   private nextZombieId = 1;
+  /** Unique per spawn (pool slots are reused), so stale network events never hit a newer body. */
+  private readonly networkIds = new Map<Zombie, number>();
+  private nextNetworkId = 1;
   private recoveryCount = 0;
   private navigationDebug = false;
   private navigationBounds: ReadonlyArray<ZombieNavigationBounds> = [];
@@ -242,6 +256,7 @@ export class ZombieManager {
   private lastPlayerY = EYE_HEIGHT;
   private lastPlayerZ = 0;
   private lastPlayerFloor = 0;
+  private otherPlayers: readonly ZombiePlayerTarget[] = [];
 
   constructor(
     rng: () => number = Math.random,
@@ -268,7 +283,7 @@ export class ZombieManager {
     }, MAX_ALIVE);
   }
 
-  /** The mutable collider array shared with ballistics (range + zombies). */
+  /** The mutable arena collider array shared with ballistics. */
   registerColliders(colliders: THREE.Object3D[]): void {
     this.colliders = colliders;
     this.rebuildObstacles();
@@ -371,6 +386,16 @@ export class ZombieManager {
   /** Read-only view of the pooled actives (footstep sources pick from it). */
   get actives(): ReadonlySet<Zombie> {
     return this.pool.actives;
+  }
+
+  public networkIdOf(zombie: Zombie): number {
+    return this.networkIds.get(zombie) ?? 0;
+  }
+
+  /** Living or dying zombie with this spawn id; null for stale ids. */
+  public findByNetworkId(id: number): Zombie | null {
+    for (const zombie of this.pool.actives) if (this.networkIds.get(zombie) === id) return zombie;
+    return null;
   }
 
   get activeCount(): number {
@@ -487,6 +512,8 @@ export class ZombieManager {
     );
     this.assignSpawnRoute(zombie, spawn);
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
+    this.networkIds.set(zombie, this.nextNetworkId++);
+    this.onZombieSpawned?.(zombie);
     return true;
   }
 
@@ -626,7 +653,10 @@ export class ZombieManager {
     playerY = EYE_HEIGHT,
     playerFacingX = 0,
     playerFacingZ = 0,
+    otherPlayers: readonly ZombiePlayerTarget[] = [],
+    hostAlive = true,
   ): void {
+    this.otherPlayers = otherPlayers;
     this.lastPlayerX = playerX;
     this.lastPlayerY = playerY;
     this.lastPlayerZ = playerZ;
@@ -644,6 +674,25 @@ export class ZombieManager {
     }
     this.drainPathQueue();
     for (const zombie of this.pool.actives) {
+      let targetId: ZombieTargetId = 'host';
+      let targetX = playerX;
+      let targetY = playerY;
+      let targetZ = playerZ;
+      let targetFloor = playerFloor;
+      let nearest = hostAlive
+        ? Math.hypot(playerX - zombie.position.x, playerZ - zombie.position.z) + (playerFloor === zombie.floor ? 0 : 100)
+        : Infinity;
+      for (const candidate of otherPlayers) {
+        const distance = Math.hypot(candidate.x - zombie.position.x, candidate.z - zombie.position.z) + (candidate.floor === zombie.floor ? 0 : 100);
+        if (distance < nearest) {
+          targetId = candidate.id;
+          targetX = candidate.x;
+          targetY = candidate.y;
+          targetZ = candidate.z;
+          targetFloor = candidate.floor;
+          nearest = distance;
+        }
+      }
       const previousX = zombie.position.x;
       const previousZ = zombie.position.z;
       const previousYaw = zombie.group.rotation.y;
@@ -667,15 +716,15 @@ export class ZombieManager {
           this.recoveryCount++;
           this.debugNavigation(zombie, 'out-of-bounds-relocated', null, 0, 0, 'valid-placement');
         }
-        this.steer(zombie, dt, playerX, playerZ, playerFloor, playerY);
+        this.steer(zombie, dt, targetX, targetZ, targetFloor, targetY, targetId);
         this.applyFloorTransition(zombie, dt);
         this.updateStuckRecovery(
           zombie,
           dt,
-          playerX,
-          playerZ,
-          playerFloor,
-          playerY,
+          targetX,
+          targetZ,
+          targetFloor,
+          targetY,
           playerFacingX,
           playerFacingZ,
         );
@@ -888,6 +937,7 @@ export class ZombieManager {
     playerZ: number,
     playerFloor: number,
     playerY: number,
+    targetId: ZombieTargetId = 'host',
   ): void {
     if (zombie.barrierTarget?.isOpen) {
       zombie.barrierTarget = null;
@@ -980,14 +1030,18 @@ export class ZombieManager {
       this.setStrikeTarget(zombie, playerX, playerY - 0.3, playerZ);
       if (zombie.tryAttack()) {
         if (zombie.typeId === 'brute') this.onBruteAttack?.();
+        this.onZombieAttack?.(zombie, targetId);
         // The wind-up only SCHEDULES the bite: whether it connects is decided
         // at the hit moment, against the player's current position. A player
         // who retreats out of range during the wind-up dodges the hit while
         // the zombie finishes its swing; each attack lands at most once.
         zombie.onAttackLanded = () => {
-          if (Math.hypot(this.lastPlayerX - playerX, this.lastPlayerZ - playerZ) <= 0.6
-            && this.attackStillConnects(zombie)) {
-            this.onPlayerAttack?.(zombie.attackDamage);
+          const live = targetId === 'host'
+            ? { x: this.lastPlayerX, y: this.lastPlayerY, z: this.lastPlayerZ, floor: this.lastPlayerFloor }
+            : this.otherPlayers.find((candidate) => candidate.id === targetId);
+          if (live && Math.hypot(live.x - playerX, live.z - playerZ) <= 0.6
+            && this.attackStillConnects(zombie, live.x, live.z, live.floor, live.y)) {
+            this.onPlayerAttack?.(zombie.attackDamage, targetId);
           }
         };
       }
@@ -1518,13 +1572,13 @@ export class ZombieManager {
    * The zombie side is already guaranteed alive by the state machine: the
    * callback only fires from the attack state, and death leaves it.
    */
-  private attackStillConnects(zombie: Zombie): boolean {
-    return this.facingTarget(zombie, this.lastPlayerX, this.lastPlayerZ) && this.canAttackPlayer(
+  private attackStillConnects(zombie: Zombie, x = this.lastPlayerX, z = this.lastPlayerZ, floor = this.lastPlayerFloor, y = this.lastPlayerY): boolean {
+    return this.facingTarget(zombie, x, z) && this.canAttackPlayer(
       zombie,
-      this.lastPlayerX,
-      this.lastPlayerZ,
-      this.lastPlayerFloor,
-      this.lastPlayerY,
+      x,
+      z,
+      floor,
+      y,
     );
   }
 

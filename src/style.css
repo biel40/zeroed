@@ -588,6 +588,251 @@ body {
     linear-gradient(105deg, #050708 0%, #0a0d0d 48%, #020303 100%);
 }
 
+#coop-lobby {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 78% 20%, rgba(106, 24, 18, 0.16), transparent 34%),
+    linear-gradient(120deg, #070a0b, #101513 55%, #070909);
+}
+
+.coop-select {
+  margin-top: 24px;
+  padding: 12px 20px;
+  cursor: pointer;
+  border: 1px solid rgba(152, 161, 147, 0.35);
+  background: rgba(18, 31, 31, 0.85);
+  color: #d9e4df;
+  font: 700 13px 'Consolas', monospace;
+  letter-spacing: 0.14em;
+}
+
+.coop-lobby-content {
+  width: min(100%, 560px);
+  margin-block: auto;
+}
+
+#coop-lobby .start-panel {
+  position: relative;
+  width: 100%;
+  padding: clamp(28px, 5vw, 44px);
+  border: 1px solid rgba(160, 170, 157, 0.24);
+  border-left: 3px solid #a43128;
+  border-radius: 2px;
+  background: linear-gradient(125deg, rgba(20, 26, 27, 0.98), rgba(12, 17, 17, 0.98));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+  text-align: left;
+}
+
+#coop-back {
+  display: inline-flex;
+  min-width: 116px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 0 14px;
+  cursor: pointer;
+  border: 1px solid rgba(155, 166, 156, 0.36);
+  border-radius: 2px;
+  background: #1d2624;
+  color: #d1d9d1;
+  font: 700 12px/1 'Consolas', monospace;
+  letter-spacing: 0.1em;
+}
+
+#coop-back span {
+  font: 28px/1 Arial, sans-serif;
+}
+
+#coop-back:hover,
+#coop-back:focus-visible {
+  border-color: #aeb9ac;
+  background: #2b3733;
+  outline: none;
+}
+
+#coop-lobby h1 {
+  margin: 0;
+  font: 800 clamp(27px, 5vw, 36px)/1.1 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.16em;
+}
+
+#coop-lobby .mode-hint {
+  margin: 12px 0 34px;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+}
+
+#coop-lobby label {
+  display: block;
+  margin: 0 0 8px;
+  color: #b9c3bd;
+  font: 700 11px 'Consolas', monospace;
+  letter-spacing: 0.16em;
+}
+
+#coop-lobby input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(154, 166, 154, 0.38);
+  border-radius: 2px;
+  background: #0c1211;
+  color: #f1f2ec;
+  font: 15px 'Consolas', monospace;
+  letter-spacing: 0.04em;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#coop-lobby input::placeholder {
+  color: #78847e;
+}
+
+#coop-lobby input:focus-visible {
+  outline: none;
+  border-color: #c9665b;
+  box-shadow: 0 0 0 3px rgba(169, 49, 40, 0.2);
+}
+
+.coop-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.coop-actions button,
+#coop-join-submit {
+  min-height: 46px;
+  padding: 10px 8px;
+  cursor: pointer;
+  border: 1px solid #8b3d36;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #56231e, #381a17);
+  color: #f1eeea;
+  font: 700 11px 'Consolas', monospace;
+  letter-spacing: 0.04em;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.coop-actions button:hover,
+.coop-actions button:focus-visible,
+#coop-join-submit:hover,
+#coop-join-submit:focus-visible {
+  border-color: #cf6b5d;
+  background: #692b24;
+}
+
+.coop-join-fields {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+#coop-join-submit {
+  justify-self: start;
+  min-width: 140px;
+}
+
+#coop-status {
+  min-height: 44px;
+  margin: 26px 0 0;
+  padding: 12px 14px;
+  border-left: 2px solid #9b5147;
+  background: rgba(6, 10, 10, 0.48);
+  color: #c3cdc4;
+  overflow-wrap: anywhere;
+  font: 12px/1.5 'Consolas', monospace;
+}
+
+.coop-room-share {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.coop-room-code {
+  display: flex;
+  flex: 1 1 150px;
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 13px;
+  border: 1px solid rgba(165, 176, 162, 0.35);
+  background: #0c1211;
+  color: #f0eee7;
+  font: 700 18px 'Consolas', monospace;
+  letter-spacing: 0.14em;
+  user-select: text;
+}
+
+.coop-room-share button {
+  min-height: 42px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border: 1px solid rgba(165, 176, 162, 0.4);
+  border-radius: 2px;
+  background: #25302c;
+  color: #e4ebe2;
+  font: 700 11px 'Consolas', monospace;
+}
+
+.coop-room-share button:hover,
+.coop-room-share button:focus-visible {
+  border-color: #d2dbce;
+  background: #34443d;
+}
+
+#coop-connection-options {
+  margin-top: 22px;
+  color: #89978e;
+  font: 11px 'Consolas', monospace;
+}
+
+#coop-connection-options summary {
+  width: fit-content;
+  cursor: pointer;
+  letter-spacing: 0.12em;
+}
+
+#coop-connection-options summary:hover,
+#coop-connection-options summary:focus-visible {
+  color: #d1d9d1;
+}
+
+.coop-server-field {
+  margin-top: 18px;
+}
+
+.coop-server-field p {
+  margin-top: 9px;
+  color: #89978e;
+  line-height: 1.5;
+}
+
+@media (max-width: 430px) {
+  #coop-lobby { padding: 16px; }
+  #coop-lobby .start-panel { padding: 26px 20px; }
+  #coop-lobby .mode-hint { margin-bottom: 26px; }
+  .coop-room-code { flex-basis: 100%; }
+  .coop-room-share button { flex: 1 1 0; }
+}
+
+html.coop-mode [data-coop-hidden],
+html.coop-mode #btn-weapon,
+html.coop-mode #btn-knife,
+html.coop-guest #pause-restart {
+  display: none !important;
+}
+
 #map-select::before,
 #map-select::after {
   content: '';

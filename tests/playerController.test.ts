@@ -30,18 +30,15 @@ function step(player: PlayerController, input: Input, seconds: number): void {
 }
 
 describe('PlayerController movement bounds', () => {
-  it('the bench is a hard frontier: walking forward never crosses it', () => {
+  it('stays within the ground-floor bounds when moving forward', () => {
     const player = new PlayerController(1);
-    // Sprint straight at the lanes far longer than needed to reach them.
     step(player, inputStub(new Set(['KeyW'])), 6);
-    // The bench back edge is z = 1.6; the player must stay behind it.
-    expect(player.rig.position.z).toBeGreaterThanOrEqual(1.6);
     expect(player.rig.position.z).toBeCloseTo(PLAYER_BOUNDS.minZ, 3);
   });
 
-  it('snaps a position beyond the bench line back into the walkable area', () => {
+  it('clamps a position beyond the map edge back into the walkable area', () => {
     const player = new PlayerController(1);
-    player.rig.position.z = 0; // somehow past the bench (teleport, bug, ...)
+    player.rig.position.z = PLAYER_BOUNDS.minZ - 2;
     step(player, inputStub(new Set()), DT * 2);
     expect(player.rig.position.z).toBeGreaterThanOrEqual(PLAYER_BOUNDS.minZ);
   });

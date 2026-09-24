@@ -159,6 +159,16 @@ export class AudioSystem {
     this.music.stop();
   }
 
+  /** Closes this run's AudioContext; the shared MusicManager keeps the menu theme. */
+  public dispose(): void {
+    this.stopWind();
+    const ctx = this.ctx;
+    this.ctx = null;
+    this.master = null;
+    this.noiseBuffer = null;
+    if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => undefined);
+  }
+
   public playShot(config: WeaponAudioConfig): void {
     if (config.energy) {
       this.playEnergyShot(config);

@@ -44,17 +44,14 @@ class FakeElement {
 }
 
 describe('Zombies map selection flow', () => {
-  it('keeps every supported map wired while exposing only Zombies publicly', () => {
-    expect(html).toMatch(/<button type="button" data-map="classic">/);
+  it('exposes Burned Mansion as the only Zombies map', () => {
     expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
-    expect(html.match(/data-map=/g)).toHaveLength(2);
+    expect(html.match(/data-map=/g)).toHaveLength(1);
     expect(html).not.toContain('data-mode=');
-    expect(html).toContain('CLASSIC');
     expect(html).toContain('ZOMBIES');
     expect(html).toContain('BURNED MANSION');
-    expect(ZOMBIE_MAPS.classic.visible).toBe(false);
     expect(ZOMBIE_MAPS['burned-mansion'].visible).toBe(true);
-    expect(isZombieMapId('classic')).toBe(true);
+    expect(isZombieMapId('classic')).toBe(false);
   });
 
   it('keeps the map picker above the fixed game canvas', () => {
@@ -63,12 +60,10 @@ describe('Zombies map selection flow', () => {
     );
   });
 
-  it('handles both map buttons once after reopening the picker', () => {
-    const outdoor = new FakeElement();
-    outdoor.dataset.map = 'classic';
+  it('handles the mansion button again after reopening the picker', () => {
     const mansion = new FakeElement();
     mansion.dataset.map = 'burned-mansion';
-    const mapSelect = new FakeElement([outdoor, mansion]);
+    const mapSelect = new FakeElement([mansion]);
     const startScreen = new FakeElement();
     const loadingBar = new FakeElement([new FakeElement()]);
     const generic = new FakeElement();
@@ -92,18 +87,14 @@ describe('Zombies map selection flow', () => {
       const ui = new HUD();
       ui.showMapSelect((mapId) => selected.push(mapId));
       expect(startScreen.classList.contains('hidden')).toBe(true);
-      expect(outdoor.classList.contains('hidden')).toBe(true);
       expect(mansion.classList.contains('hidden')).toBe(false);
       expect(mansion.focused).toBe(true);
-      outdoor.onclick?.();
-
-      ui.showMapSelect((mapId) => selected.push(mapId));
       mansion.onclick?.();
-      expect(selected).toEqual(['classic', 'burned-mansion']);
+      expect(selected).toEqual(['burned-mansion']);
 
       ui.showMapSelect((mapId) => selected.push(`again:${mapId}`));
       mansion.onclick?.();
-      expect(selected).toEqual(['classic', 'burned-mansion', 'again:burned-mansion']);
+      expect(selected).toEqual(['burned-mansion', 'again:burned-mansion']);
     } finally {
       Object.defineProperty(globalThis, 'document', {
         configurable: true,

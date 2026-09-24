@@ -45,8 +45,7 @@ describe('ZombieSpawner', () => {
   });
 
   it('every configured spawn point is outside the minimum distance from the play area', () => {
-    // Design invariant: with the player confined to the firing platform,
-    // all spawn points are valid at all times.
+    // These isolated fallback points remain outside this test's player area.
     for (const point of SPAWN_POINTS) {
       for (const px of [-7, 0, 7]) {
         for (const pz of [-0.5, 8]) {

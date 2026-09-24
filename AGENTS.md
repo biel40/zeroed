@@ -8,6 +8,8 @@
 - Elimina codigo muerto o duplicado derivado de tus cambios.
 - Valida con los comandos disponibles y revisa regresiones antes de finalizar.
 - La documentacion describe el codigo; no debe sustituirlo ni repetir detalles faciles de obtener al leerlo.
+- Burned Mansion es el unico mapa jugable de Zeroed, tanto en individual como en cooperativo. El usuario ha decidido retirar definitivamente el campo de tiro/Classic; no lo reintroduzcas como modo, mapa ni dependencia de gameplay.
+- El modo individual sigue siendo la prioridad: los cambios cooperativos no deben degradar su funcionamiento.
 
 ## Flujo de trabajo
 
