@@ -140,8 +140,8 @@ export class Game {
     // The ballistics layer raycasts against this shared, mutable array.
     // The mode registers its map and dynamic hitboxes during init.
     this.ballistics = new BallisticsSystem(this.hitColliders, this.scene);
-    this.ballistics.onTargetHit = (target, distance, point, normal, object) => {
-      this.mode.onTargetHit(target, distance, point, normal, object, this.currentWeapon);
+    this.ballistics.onTargetHit = (target, distance, point, normal, object, shotWeapon) => {
+      this.mode.onTargetHit(target, distance, point, normal, object, shotWeapon ?? this.currentWeapon);
     };
     this.ballistics.onEnvironmentHit = (point, normal, object) => {
       const surface = (object.userData.surface as SurfaceType | undefined) ?? 'dirt';
@@ -532,7 +532,7 @@ export class Game {
     // else goes through the classic ballistic simulation.
     const handledByMode = this.mode.onWeaponFired?.(weapon, this.tmpOrigin, this.tmpDirection);
     if (!handledByMode) {
-      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile);
+      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile, weapon);
     }
 
     this.audio.playShot(weapon.definition.audio);

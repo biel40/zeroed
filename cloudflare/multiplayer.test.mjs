@@ -27,15 +27,15 @@ test('Durable Object room creates, joins, relays and closes with the host', asyn
   }
 
   const host = await connect('host');
-  host.send(JSON.stringify({ type: 'hello', version: 2 }));
-  assert.deepEqual(await nextMessage(host, 'relayReady'), { type: 'relayReady', version: 2 });
+  host.send(JSON.stringify({ type: 'hello', version: 4 }));
+  assert.deepEqual(await nextMessage(host, 'relayReady'), { type: 'relayReady', version: 4 });
   host.send(JSON.stringify({ type: 'create' }));
   const { code } = await nextMessage(host, 'created');
   assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/);
 
   const guest = await connect('guest', code);
-  guest.send(JSON.stringify({ type: 'hello', version: 2 }));
-  assert.deepEqual(await nextMessage(guest, 'relayReady'), { type: 'relayReady', version: 2 });
+  guest.send(JSON.stringify({ type: 'hello', version: 4 }));
+  assert.deepEqual(await nextMessage(guest, 'relayReady'), { type: 'relayReady', version: 4 });
   const joinedHost = nextMessage(host, 'peerJoined');
   guest.send(JSON.stringify({ type: 'join', code }));
   assert.deepEqual(await nextMessage(guest, 'joined'), { type: 'joined', code });

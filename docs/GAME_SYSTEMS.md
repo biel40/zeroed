@@ -89,13 +89,16 @@ como cue independiente sobre la música de fondo.
 ## Cooperativo
 
 `CoopHostMode` es la unica autoridad: rondas, spawns, IA y objetivo de los
-zombis, daño, muertes, salud, Points y puertas. `CoopGuestMode` solo simula su
+zombis, daño, muertes, salud, Points, puertas, Mystery Box, reparaciones,
+secretos y compras. `CoopGuestMode` solo simula su
 propio jugador y arma; recibe `matchState` a 15 Hz y eventos puntuales
 (`zombieSpawn/Attack/Hit/Death`, `roundStart/End`, `doorOpened`...).
 `ZombieReplica` interpola los zombis en una linea temporal retrasada y nunca
 ejecuta IA. Los impactos del invitado son reclamaciones que el anfitrion
-valida (`ShotValidator`) y aplica una sola vez. `CoopWorld` comparte mapa,
-puertas y tablas de barricada entre ambos roles. El menu de pausa es local y
+valida (`ShotValidator`) y aplica una sola vez; el cuchillo usa el mismo ataque
+local que individual y daño autorizado por el anfitrion. Ray Gun y ZEUS-77
+dibujan proyectiles en ambos clientes; el anfitrion aplica splash y cadenas.
+`CoopWorld` comparte mapa, puertas, tablas, objetivos y final entre ambos roles. El menu de pausa es local y
 no detiene la partida. `MULTIPLAYER.md` define el alcance y los limites.
 
 ## Rendimiento

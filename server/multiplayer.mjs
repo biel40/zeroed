@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 const port = Number(process.env.PORT ?? 8787);
 const rooms = new Map();
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const relayProtocolVersion = 2;
+const relayProtocolVersion = 4;
 
 function roomCode() {
   let code;

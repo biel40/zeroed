@@ -18,6 +18,14 @@ const HIDDEN_POINT = -1000;
 const RITUAL_TEXTURE_SIZE = 256;
 const RITUAL_SCARE_DURATION = 0.82;
 
+export interface SecretRoomSnapshot {
+  readonly lamps: readonly { readonly activated: boolean; readonly currentSouls: number;
+    readonly completed: boolean }[];
+  readonly unlocked: boolean;
+  readonly doorOpen: boolean;
+  readonly ritualScareTriggered: boolean;
+}
+
 function makeRitualTexture(): THREE.DataTexture {
   const size = RITUAL_TEXTURE_SIZE;
   const data = new Uint8Array(size * size * 4);
@@ -361,6 +369,52 @@ export class SecretRoomSystem {
 
   get isDoorOpen(): boolean {
     return this.doorOpen;
+  }
+
+  snapshot(): SecretRoomSnapshot {
+    return {
+      lamps: this.state.lamps.map(({ activated, currentSouls, completed }) =>
+        ({ activated, currentSouls, completed })),
+      unlocked: this.state.unlocked,
+      doorOpen: this.doorOpen,
+      ritualScareTriggered: this.state.ritualScareTriggered,
+    };
+  }
+
+  /** Guest-only snapshot reconciliation, including late joins after the wall opens. */
+  applySnapshot(snapshot: SecretRoomSnapshot): void {
+    for (let index = 0; index < this.state.lamps.length; index++) {
+      const source = snapshot.lamps[index];
+      if (!source) continue;
+      const lamp = this.state.lamps[index];
+      if (lamp.activated !== source.activated || lamp.currentSouls !== source.currentSouls
+        || lamp.completed !== source.completed) {
+        const absorbed = source.currentSouls > lamp.currentSouls;
+        const completed = source.completed && !lamp.completed;
+        lamp.activated = source.activated;
+        lamp.currentSouls = source.currentSouls;
+        lamp.pendingSouls = 0;
+        lamp.completed = source.completed;
+        this.syncLampVisual(index);
+        const position = this.state.definitions[index].position;
+        if (absorbed) this.onSoulAbsorbed?.(new THREE.Vector3(position.x, position.y, position.z));
+        if (completed) this.onLampCompleted?.(new THREE.Vector3(position.x, position.y, position.z));
+      }
+    }
+    if (snapshot.unlocked && !this.state.unlocked) {
+      this.state.unlocked = true;
+      if (!snapshot.doorOpen) this.doorOpening = true;
+      this.onUnlocked?.(new THREE.Vector3(MANSION_SECRET_ROOM.entranceX,
+        MANSION_BUNKER_Y + 1.4, MANSION_SECRET_ROOM.entranceZ));
+    }
+    if (snapshot.doorOpen && !this.doorOpen) {
+      this.doorOpen = true;
+      this.doorOpening = false;
+      this.doorProgress = 1;
+      this.secretWall.position.y = this.doorStartY - 3.5;
+      this.onDoorOpened?.();
+    }
+    if (snapshot.ritualScareTriggered) this.state.ritualScareTriggered = true;
   }
 
   activateLamp(lampIndex: number): boolean {

@@ -53,6 +53,13 @@ export const MYSTERY_BOX_TUNING = {
 
 export type MysteryBoxPhase = 'closed' | 'opening' | 'rolling' | 'awaitingPickup' | 'closing';
 
+/** Read-only state sent to a co-op replica; the host alone advances the machine. */
+export interface MysteryBoxSnapshot {
+  readonly phase: MysteryBoxPhase;
+  readonly displayWeapon: WeaponId;
+  readonly result: WeaponId | null;
+}
+
 export type MysteryBoxEventType =
   | 'opened'
   | 'rollTick'
@@ -146,6 +153,17 @@ export class MysteryBoxMachine {
   /** True only while closed: one activation at a time, no E-spam exploits. */
   get canUse(): boolean {
     return this.phase === 'closed';
+  }
+
+  snapshot(): MysteryBoxSnapshot {
+    return { phase: this.phase, displayWeapon: this.displayId, result: this.resultId };
+  }
+
+  applySnapshot(snapshot: MysteryBoxSnapshot): void {
+    this.phase = snapshot.phase;
+    this.displayId = snapshot.displayWeapon;
+    this.resultId = snapshot.result;
+    this.pendingEvents.length = 0;
   }
 
   tryActivate(excludedWeaponId: WeaponId | null = null): boolean {

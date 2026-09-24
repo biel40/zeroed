@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 import type { PlayerEconomy } from '../src/game/PlayerEconomy';
+import type { WeaponInventory } from '../src/game/WeaponInventory';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
+import { Weapon } from '../src/weapons/Weapon';
+import type { MysteryBoxMachine } from '../src/zombies/MysteryBox';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
 import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
@@ -29,6 +33,11 @@ interface HostInternals {
   readonly targets: ZombiePlayerTarget[];
   readonly phase: string;
   readonly guestState: PlayerNetState | null;
+  readonly guestInventory: WeaponInventory;
+  readonly box: MysteryBoxMachine;
+  readonly boxOwner: 'host' | 'guest' | null;
+  onEnergyImpact(point: THREE.Vector3, config: NonNullable<typeof WEAPON_DEFINITIONS.raygun.energy>,
+    object: THREE.Object3D | null, distance: number, shooter: 'host' | 'guest'): void;
 }
 
 interface GuestInternals {
@@ -107,6 +116,61 @@ describe('co-op session', () => {
 });
 
 describe('co-op combat authority', () => {
+  it('charges the guest for a wall weapon and validates its own shot damage', () => {
+    const match = startedMatch();
+    earn(host(match).players.guest.economy, 1750);
+    placePlayer(match.guestSide.player, -5.8, -5.4);
+    match.guestSide.player.rig.rotation.y = Math.PI / 2;
+    match.step(0.1, 2);
+    match.relay.host.onMessage?.({ type: 'wallBuyPurchase', wallBuyId: 'box-ak47', refill: false, equippedWeapon: 'm1911' });
+    match.relay.flush();
+    expect(host(match).guestInventory.has('ak47')).toBe(true);
+    expect(host(match).players.guest.economy.points).toBe(0);
+    expect(match.guestSide.ctx.grantWeapon).toHaveBeenCalledWith('ak47');
+
+    const zombie = spawnOne(match);
+    const replica = replicaOf(match, zombie);
+    const weapon = new Weapon(WEAPON_DEFINITIONS.ak47);
+    const hp = zombie.hp;
+    match.guest.onWeaponFired(weapon, ORIGIN, NORMAL);
+    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox, weapon);
+    match.step();
+    expect(zombie.hp).toBe(hp - WEAPON_DEFINITIONS.ak47.damage);
+    expect(host(match).players.guest.economy.points).toBe(10);
+  });
+
+  it('replaces the guest weapon selected at purchase time when both slots are full', () => {
+    const match = startedMatch();
+    earn(host(match).players.guest.economy, 3250);
+    placePlayer(match.guestSide.player, -5.8, -5.4);
+    match.guestSide.player.rig.rotation.y = Math.PI / 2;
+    match.step(0.1, 2);
+    match.relay.host.onMessage?.({ type: 'wallBuyPurchase', wallBuyId: 'box-ak47', refill: false, equippedWeapon: 'm1911' });
+    match.relay.flush();
+    placePlayer(match.guestSide.player, 3.2, -5.4);
+    match.guestSide.player.rig.rotation.y = -Math.PI / 2;
+    match.step(0.1, 10);
+    match.relay.host.onMessage?.({ type: 'wallBuyPurchase', wallBuyId: 'east-hall-m4a1', refill: false,
+      equippedWeapon: 'm1911' });
+    match.relay.flush();
+    expect(host(match).guestInventory.weapons).toEqual(['m4a1', 'ak47']);
+    expect(host(match).players.guest.economy.points).toBe(0);
+  });
+
+  it('awards a nearby guest knife kill once and rejects repeated claims', () => {
+    const match = startedMatch();
+    const zombie = spawnOne(match);
+    const id = host(match).zombies.networkIdOf(zombie);
+    const guestPosition = match.guestSide.player.rig.position;
+    zombie.group.position.set(guestPosition.x, zombie.group.position.y, guestPosition.z - 1);
+    zombie.hp = 1;
+    match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
+    match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
+    expect(host(match).players.guest.kills).toBe(1);
+    expect(host(match).players.guest.economy.points).toBe(200);
+    expect(match.relay.sent('host', 'zombieDeath')).toHaveLength(1);
+  });
+
   it('kills a zombie exactly once when both players shoot it', () => {
     const match = startedMatch();
     const zombie = spawnOne(match);
@@ -114,7 +178,7 @@ describe('co-op combat authority', () => {
     match.guest.onWeaponFired(match.guestSide.weapon, ORIGIN, NORMAL);
     zombie.hp = 1;
     match.host.onTargetHit(zombie, 5, ORIGIN, NORMAL, zombie.torsoHitbox, match.hostSide.weapon);
-    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.headHitbox);
+    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.headHitbox, match.guestSide.weapon);
     match.step();
     const players = host(match).players;
     expect(match.relay.sent('host', 'zombieDeath')).toHaveLength(1);
@@ -127,12 +191,12 @@ describe('co-op combat authority', () => {
     const zombie = spawnOne(match);
     const replica = replicaOf(match, zombie);
     const hp = zombie.hp;
-    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox);
+    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox, match.guestSide.weapon);
     match.step();
     expect(zombie.hp).toBe(hp);
     match.guest.onWeaponFired(match.guestSide.weapon, ORIGIN, NORMAL);
-    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox);
-    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox);
+    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox, match.guestSide.weapon);
+    match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox, match.guestSide.weapon);
     match.step();
     expect(zombie.hp).toBe(hp - 30);
     expect(host(match).players.guest.economy.points).toBe(10);
@@ -156,6 +220,155 @@ describe('co-op combat authority', () => {
     expect(guest(match).match?.stats.guest.hp).toBe(50);
     expect(match.guestSide.hud.flashDamage).toHaveBeenCalledOnce();
     expect(match.hostSide.hud.flashDamage).not.toHaveBeenCalled();
+  });
+});
+
+describe('co-op Mystery Box', () => {
+  it('charges once, reserves the result for the buyer and grants the host-selected weapon', () => {
+    const match = startedMatch();
+    earn(host(match).players.guest.economy, 950);
+    placePlayer(match.guestSide.player, -5.2, -4.2);
+    match.step(0.1, 2);
+    match.relay.host.onMessage?.({ type: 'boxUse', action: 'activate', equippedWeapon: 'm1911' });
+    expect(host(match).players.guest.economy.points).toBe(0);
+    expect(host(match).boxOwner).toBe('guest');
+    match.relay.host.onMessage?.({ type: 'boxUse', action: 'activate', equippedWeapon: 'm1911' });
+    expect(host(match).players.guest.economy.points).toBe(0);
+    match.step(0.1, 51);
+    const result = host(match).box.result;
+    expect(result).not.toBeNull();
+    expect(result).not.toBe('m1911');
+    expect(guest(match).match?.box.result).toBe(result);
+    match.relay.host.onMessage?.({ type: 'boxUse', action: 'pickup', equippedWeapon: 'm1911' });
+    match.relay.flush();
+    expect(host(match).guestInventory.has(result!)).toBe(true);
+    expect(match.guestSide.ctx.grantWeapon).toHaveBeenCalledWith(result);
+    expect(host(match).boxOwner).toBeNull();
+  });
+});
+
+describe('co-op special weapons', () => {
+  it('awards a guest Ray Gun splash kill to the guest only', () => {
+    const match = startedMatch();
+    const zombie = spawnOne(match);
+    const object = new THREE.Object3D();
+    object.userData.zombie = zombie;
+    object.userData.hitPart = 'torso';
+    host(match).onEnergyImpact(zombie.position.clone().add(new THREE.Vector3(0, 1, 0)),
+      WEAPON_DEFINITIONS.raygun.energy!, object, 3, 'guest');
+    match.step(1 / 30, 3);
+    expect(host(match).players.guest.kills).toBe(1);
+    expect(host(match).players.host.kills).toBe(0);
+    expect(guest(match).match?.stats.guest.kills).toBe(1);
+  });
+
+  it('credits ZEUS-77 chain kills once to their shooter', () => {
+    const match = startedMatch();
+    const first = spawnOne(match);
+    const second = spawnOne(match);
+    second.position.set(first.position.x + 1, first.position.y, first.position.z);
+    const object = new THREE.Object3D();
+    object.userData.zombie = first;
+    object.userData.hitPart = 'torso';
+    host(match).onEnergyImpact(first.position.clone().add(new THREE.Vector3(0, 1, 0)),
+      WEAPON_DEFINITIONS.tesla.energy!, object, 3, 'guest');
+    match.step();
+    expect(host(match).players.guest.kills).toBe(2);
+    expect(host(match).players.host.kills).toBe(0);
+    expect(guest(match).match?.stats.guest.kills).toBe(2);
+  });
+
+  it('grants the 115-kill Ray Gun milestone only to the player who reached it', () => {
+    const match = startedMatch();
+    host(match).players.guest.kills = 114;
+    const zombie = spawnOne(match);
+    const object = new THREE.Object3D();
+    object.userData.zombie = zombie;
+    host(match).onEnergyImpact(zombie.position.clone().add(new THREE.Vector3(0, 1, 0)),
+      WEAPON_DEFINITIONS.raygun.energy!, object, 3, 'guest');
+    match.relay.flush();
+    expect(host(match).guestInventory.has('raygun')).toBe(true);
+    expect(match.guestSide.ctx.grantWeapon).toHaveBeenCalledWith('raygun');
+    expect(match.hostSide.ctx.grantWeapon).not.toHaveBeenCalledWith('raygun');
+  });
+});
+
+describe('co-op Burned Mansion interactions', () => {
+  it('lets the guest activate a soul lamp and replicates it to both views', () => {
+    const match = startedMatch();
+    const lamp = host(match).world.arena.soulLampInteractions[0];
+    placePlayer(match.guestSide.player, lamp.position.x, lamp.position.z);
+    match.step(1 / 30, 60);
+    match.relay.host.onMessage?.({ type: 'mapUse', kind: 'lamp', id: lamp.id, equippedWeapon: 'm1911' });
+    match.step(1 / 30, 3);
+    expect(lamp.activated).toBe(true);
+    expect(guest(match).world.arena.soulLampInteractions[0].activated).toBe(true);
+    expect(guest(match).match?.secret.lamps[0].activated).toBe(true);
+  });
+
+  it('rebuilds a barricade on the host and credits the repairing guest', () => {
+    const match = startedMatch();
+    const barrier = host(match).world.arena.barriers.find((entry) => entry.id === 'start-south');
+    if (!barrier) throw new Error('Barricade missing');
+    barrier.damage(1000);
+    placePlayer(match.guestSide.player, barrier.position.x, barrier.position.z);
+    match.step(1 / 30, 60);
+    vi.spyOn(match.guestSide.ctx.input, 'isDown').mockImplementation((key) => key === 'KeyE');
+    match.step(1 / 30, 45);
+    expect(barrier.isDamaged).toBe(false);
+    expect(host(match).players.guest.economy.points).toBeGreaterThan(0);
+    expect(host(match).players.host.economy.points).toBe(0);
+    expect(guest(match).world.arena.barriers.find((entry) => entry.id === barrier.id)?.isDamaged).toBe(false);
+  });
+
+  it('charges the buyer once for a shared special-weapon case', () => {
+    const match = startedMatch();
+    match.step();
+    vi.mocked(match.hostSide.ctx.hasWeapon).mockReturnValue(true);
+    vi.mocked(match.hostSide.ctx.grantWeapon).mockReturnValue(true);
+    const world = host(match).world;
+    const pickup = world.arena.weaponPickups[0];
+    const door = world.findDoor(pickup.requiredDoorId!);
+    if (!door) throw new Error('Bunker door missing');
+    world.unlockDoor(door, () => true);
+    earn(host(match).players.host.economy, pickup.cost);
+    placePlayer(match.hostSide.player, pickup.position.x, pickup.position.z, pickup.floor, pickup.position.y - 1.1);
+    expect(world.findFacingPickup()).toBe(pickup);
+    expect(world.findFacingDoor()).toBeNull();
+    expect(world.findFacingWallBuy()).toBeNull();
+    expect(match.host.isGameplayInputEnabled()).toBe(true);
+    expect(host(match).phase).toBe('playing');
+    expect(world.findFacingRitual()).toBeNull();
+    expect(world.findFacingSoulLamp()).toBeNull();
+    match.host.onInteract();
+    match.step(1 / 30, 3);
+    expect(host(match).players.host.economy.points).toBe(0);
+    expect(pickup.available).toBe(false);
+    expect(guest(match).world.arena.weaponPickups[0].available).toBe(false);
+    match.host.onInteract();
+    expect(host(match).players.host.economy.points).toBe(0);
+  });
+
+  it('ends the shared match when the final is bought', () => {
+    const match = startedMatch();
+    match.step();
+    vi.mocked(match.hostSide.ctx.hasWeapon).mockReturnValue(true);
+    const world = host(match).world;
+    const completion = world.arena.completionInteraction;
+    const door = world.findDoor(completion.requiredDoorId!);
+    if (!door) throw new Error('Bunker door missing');
+    world.unlockDoor(door, () => true);
+    earn(host(match).players.host.economy, completion.cost);
+    placePlayer(match.hostSide.player, completion.position.x, completion.position.z,
+      completion.floor, completion.position.y - 1.55);
+    expect(world.findFacingCompletion()).not.toBeNull();
+    match.host.onInteract();
+    match.relay.flush();
+    expect(host(match).phase).toBe('ending');
+    expect(guest(match).match?.phase).toBe('ending');
+    match.step(0.1, 24);
+    expect(host(match).phase).toBe('credits');
+    expect(match.guestSide.hud.showCredits).toHaveBeenCalled();
   });
 });
 

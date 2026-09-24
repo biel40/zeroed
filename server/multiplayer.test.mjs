@@ -34,15 +34,15 @@ test('private room connects two players, forwards peer messages and rejects a th
     return socket;
   };
   const host = await connect();
-  host.send(JSON.stringify({ type: 'hello', version: 2 }));
-  assert.deepEqual(await nextMessage(host), { type: 'relayReady', version: 2 });
+  host.send(JSON.stringify({ type: 'hello', version: 4 }));
+  assert.deepEqual(await nextMessage(host), { type: 'relayReady', version: 4 });
   host.send(JSON.stringify({ type: 'create' }));
   const created = await nextMessage(host);
   assert.match(created.code, /^[A-HJ-NP-Z2-9]{6}$/);
 
   const guest = await connect();
-  guest.send(JSON.stringify({ type: 'hello', version: 2 }));
-  assert.deepEqual(await nextMessage(guest), { type: 'relayReady', version: 2 });
+  guest.send(JSON.stringify({ type: 'hello', version: 4 }));
+  assert.deepEqual(await nextMessage(guest), { type: 'relayReady', version: 4 });
   const peerJoined = nextMessage(host);
   guest.send(JSON.stringify({ type: 'join', code: created.code }));
   assert.equal((await nextMessage(guest)).type, 'joined');

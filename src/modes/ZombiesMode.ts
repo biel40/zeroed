@@ -1061,6 +1061,7 @@ export class ZombiesMode implements GameMode {
     this.economy.reset();
     this.health.reset();
     this.rounds.reset();
+    this.energy?.reset();
     if (this.zombies) this.zombies.reset();
     this.footsteps?.reset();
     if (this.arena instanceof BurnedMansionArena) {

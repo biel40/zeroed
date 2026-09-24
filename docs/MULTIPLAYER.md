@@ -1,8 +1,8 @@
-# Primer corte cooperativo
+# Modo cooperativo
 
 El modo individual sigue siendo la ruta principal: no abre WebSocket y funciona
 sin el servidor de salas. El cooperativo es una opción separada del menú y, en
-este corte, solo admite dos jugadores en Burned Mansion.
+este modo, admite dos jugadores en Burned Mansion.
 
 ## Probar en una máquina
 
@@ -96,19 +96,35 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 - Combate: el anfitrión aplica todo el daño. Las balas del invitado vuelan en
   local (impactos y hitmarker inmediatos), pero un impacto a zombi es una
   reclamación que el anfitrión acepta una sola vez por disparo validado
-  (`ShotValidator`: cadencia máxima y un crédito por disparo).
+  (`ShotValidator`: cadencia máxima y un crédito por disparo, según el arma).
+  El cuchillo reutiliza el ataque del modo individual; el anfitrión valida
+  alcance, cadencia, daño y puntos de cada impacto del invitado.
+- Arsenal especial: la Mystery Box cobra 950 Points al jugador que la activa,
+  muestra la misma tirada a ambos y reserva el resultado para ese comprador.
+  L96 usa la balistica compartida. Ray Gun y ZEUS-77 muestran proyectiles en
+  ambos clientes; el anfitrión resuelve impactos, splash y cadenas y atribuye
+  cada baja al tirador. El desbloqueo de Ray Gun a 115 bajas es individual.
+- Arsenal: ambos empiezan con la M1911 y pueden llevar dos armas. Las compras
+  de pared de Burned Mansion (AK-47, M4A1 y M60) cuestan puntos individuales;
+  el anfitrión valida la compra y confirma el arma al invitado. La munición
+  también puede reponerse en la pared con el precio del modo individual.
 - Puertas: empiezan cerradas; el anfitrión valida la puerta, cobra solo al
   comprador, la abre para ambos y la difunde. Quien se une recibe las puertas
   abiertas sin pagar. Las tablas de barricada se replican del anfitrión.
+- Burned Mansion: la reparación de barricadas se valida por alcance y premia
+  al jugador que repara. Las lámparas, almas, pared secreta, ritual y vitrinas
+  del búnker forman parte del estado compartido. Las vitrinas solo se compran
+  una vez y cobran al comprador. La recarga de munición es individual. El
+  final de 30000 Points detiene la partida compartida y abre los créditos.
 - La pausa es local en ambos lados: ESC abre el menú y libera el ratón, pero
   la partida, los zombis y la red siguen. Solo el anfitrión puede reiniciar;
   el invitado vuelve a la nueva partida automáticamente. Si sale el invitado,
   el anfitrión continúa solo y los zombis cambian de objetivo; si entra otro
   invitado recibe el estado completo. Si sale el anfitrión, la sala termina y
   el invitado conserva el menú para salir. Volver al menú no recarga la página.
-- Solo M1911: no están disponibles el cuchillo, Mystery Box, compras de pared,
-  reparaciones, secretos, Ray Gun ni ZEUS-77. No hay reconexión con estado ni
-  migración de anfitrión.
+- No hay migración de anfitrión ni recuperación de inventario del invitado
+  tras una desconexión. La munición del invitado se ejecuta en su cliente; el
+  anfitrión valida cadencia y propiedad de armas, pero no replica cargadores.
 - El compañero es un cuerpo animado sin cámara, input ni HUD. El soldado final
   es un GLB con esqueleto y clips (`public/assets/players/soldier.glb`, ver
   `ASSETS.md`); mientras falte se usa un cuerpo procedural de reserva.

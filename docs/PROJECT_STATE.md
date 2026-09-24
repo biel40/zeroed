@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-**Corte:** 2026-09-23. La fuente de verdad es el codigo actual.
+**Corte:** 2026-09-24. La fuente de verdad es el codigo actual.
 
 ## Funcional
 
@@ -16,8 +16,9 @@
   standalone. Capacitor prepara distribucion Android.
 - Música diferenciada para partida y menú/pausa, con reanudación de la pista de
   partida desde su posición anterior y cue independiente al iniciar ronda.
-- Primer cooperativo privado de dos jugadores en Burned Mansion: autoridad del
-  anfitrion, servidor de salas WebSocket y replica de jugadores/zombis. El modo
+- Cooperativo privado de dos jugadores en Burned Mansion: autoridad del
+  anfitrion, servidor de salas WebSocket, replica de jugadores/zombis, arsenal
+  completo, Mystery Box y progresion compartida de mapa. El modo
   individual conserva su ruta local y offline. Ver `MULTIPLAYER.md`.
 - Relay Cloudflare Worker con Durable Object por sala preparado para despliegue;
   el frontend Vercel apunta al Worker mediante `VITE_COOP_SERVER_URL`.
@@ -38,9 +39,9 @@
   blindarse o retirarse.
 - La suite de tests puede contener expectativas antiguas de headshots o casos
   de navegacion no deterministas.
-- Cooperativo de dos jugadores con M1911: las puertas empiezan cerradas y el
-  anfitrion cobra solo al comprador. El resto de compras, reparaciones y
-  secretos no estan disponibles. El compañero usa un cuerpo procedural de
+- Cooperativo de dos jugadores: las puertas empiezan cerradas y el
+  anfitrion cobra solo al comprador. La municion del invitado sigue en su
+  cliente; faltan pruebas manuales de sesiones reales con latencia. El compañero usa un cuerpo procedural de
   reserva hasta que exista `public/assets/players/soldier.glb`. Falta validar
   juego completo entre navegadores con Pointer Lock, latencia y Android.
 

@@ -9,7 +9,7 @@ import { PointDoorView } from '../doors/PointDoorView';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from '../ZombieSpawner';
 import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
-import { SecretRoomSystem } from '../secret-room/SecretRoomSystem';
+import { SecretRoomSystem, type SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
@@ -378,6 +378,10 @@ export class BurnedMansionArena implements ZombieArena {
   public get secretRoomState(): SecretRoomSystem['state'] {
     return this.secretRoom.state;
   }
+
+  public get secretSnapshot(): SecretRoomSnapshot { return this.secretRoom.snapshot(); }
+
+  public applySecretSnapshot(snapshot: SecretRoomSnapshot): void { this.secretRoom.applySnapshot(snapshot); }
 
   public refreshColliders(): void {
     this.group.updateMatrixWorld(true);

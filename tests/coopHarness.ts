@@ -28,6 +28,7 @@ export function installCanvasDocument(): () => void {
   const context = {
     fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textAlign: '', textBaseline: '',
     fillRect: () => undefined, strokeRect: () => undefined, fillText: () => undefined,
+    createRadialGradient: () => ({ addColorStop: () => undefined }),
   };
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -110,12 +111,16 @@ export function makeContext(): TestContext {
   const ctx = {
     scene: new THREE.Scene(),
     player,
-    input: {},
+    input: { isDown: () => false, wasPressed: () => false, leftButtonDown: false },
     hud,
     audio: mockObject(),
     effects: mockObject(),
     stats: mockObject(),
-    assets: { getZombieModels: () => ({}), getPlayerModel: () => null },
+    assets: {
+      getZombieModels: () => ({}), getPlayerModel: () => null,
+      getWeaponModel: () => null,
+      getTextureSet: () => ({ map: null, normalMap: null, roughnessMap: null }),
+    },
     profile: TEST_PROFILE,
     hitColliders: [] as THREE.Object3D[],
     lockPointer: vi.fn(),

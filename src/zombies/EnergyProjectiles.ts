@@ -19,6 +19,7 @@ interface EnergyBolt {
   dz: number;
   travelled: number;
   config: EnergyWeaponConfig | null;
+  sourceId: number;
   core: THREE.Mesh;
   coreMaterial: THREE.MeshBasicMaterial;
   glow: THREE.Sprite;
@@ -73,6 +74,7 @@ export class EnergyProjectiles {
         config: EnergyWeaponConfig,
         object: THREE.Object3D | null,
         distance: number,
+        sourceId: number,
       ) => void)
     | null = null;
 
@@ -130,6 +132,7 @@ export class EnergyProjectiles {
         dz: 1,
         travelled: 0,
         config: null,
+        sourceId: 0,
         core,
         coreMaterial,
         glow,
@@ -161,7 +164,7 @@ export class EnergyProjectiles {
     parent.add(this.burstLight);
   }
 
-  fire(origin: THREE.Vector3, direction: THREE.Vector3, config: EnergyWeaponConfig): void {
+  fire(origin: THREE.Vector3, direction: THREE.Vector3, config: EnergyWeaponConfig, sourceId = 0): void {
     const bolt = this.bolts[this.boltCursor];
     this.boltCursor = (this.boltCursor + 1) % MAX_PROJECTILES;
 
@@ -174,6 +177,7 @@ export class EnergyProjectiles {
     bolt.dz = direction.z;
     bolt.travelled = 0;
     bolt.config = config;
+    bolt.sourceId = sourceId;
     bolt.coreMaterial.color.setHex(config.color);
     bolt.glowMaterial.color.setHex(config.color);
     bolt.trailMaterial.color.setHex(config.color);
@@ -211,13 +215,13 @@ export class EnergyProjectiles {
         bolt.active = false;
         this.hideBolt(bolt);
         this.spawnBurst(hit.point, config);
-        this.onImpact?.(hit.point, config, hit.object, bolt.travelled);
+        this.onImpact?.(hit.point, config, hit.object, bolt.travelled, bolt.sourceId);
       } else if (bolt.travelled >= 80) {
         bolt.active = false;
         this.hideBolt(bolt);
         this.segmentOrigin.set(bolt.x, bolt.y, bolt.z);
         this.spawnBurst(this.segmentOrigin, config);
-        this.onImpact?.(this.segmentOrigin, config, null, bolt.travelled);
+        this.onImpact?.(this.segmentOrigin, config, null, bolt.travelled, bolt.sourceId);
       } else {
         bolt.core.position.set(bolt.x, bolt.y, bolt.z);
         bolt.glow.position.set(bolt.x, bolt.y, bolt.z);
@@ -246,6 +250,19 @@ export class EnergyProjectiles {
       this.burstLight.intensity > 0.02
         ? this.burstLight.intensity * Math.exp(-18 * dt)
         : 0;
+  }
+
+  reset(): void {
+    for (const bolt of this.bolts) {
+      bolt.active = false;
+      this.hideBolt(bolt);
+    }
+    for (const burst of this.bursts) {
+      burst.active = false;
+      burst.sprite.visible = false;
+      burst.material.opacity = 0;
+    }
+    this.burstLight.intensity = 0;
   }
 
   private spawnBurst(point: THREE.Vector3, config: EnergyWeaponConfig): void {

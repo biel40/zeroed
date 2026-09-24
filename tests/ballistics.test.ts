@@ -1,6 +1,8 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
-import { resolveSegmentHit } from '../src/shooting/BallisticsSystem';
+import { describe, expect, it, vi } from 'vitest';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
+import { Weapon } from '../src/weapons/Weapon';
+import { BallisticsSystem, resolveSegmentHit } from '../src/shooting/BallisticsSystem';
 
 /**
  * Minimal stand-in for a raycast intersection: the resolver only reads
@@ -64,4 +66,18 @@ describe('resolveSegmentHit (zombie head priority)', () => {
     const torso = fakeHit(10.3, { zombie, hitPart: 'torso' });
     expect(resolveSegmentHit([head, torso])).toBe(head);
   });
+});
+
+it('keeps the firing weapon attached to a bullet until impact', () => {
+  const target = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.2));
+  target.position.z = -1;
+  target.userData.target = { onHit: vi.fn() };
+  target.updateMatrixWorld(true);
+  const ballistics = new BallisticsSystem([target], new THREE.Group());
+  const firedWeapon = new Weapon(WEAPON_DEFINITIONS.ak47);
+  const hits: Array<Weapon | null> = [];
+  ballistics.onTargetHit = (_target, _distance, _point, _normal, _object, weapon) => hits.push(weapon);
+  ballistics.spawn(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), firedWeapon.definition.projectile, firedWeapon);
+  ballistics.update(0.1);
+  expect(hits).toEqual([firedWeapon]);
 });
