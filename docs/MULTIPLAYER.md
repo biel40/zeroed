@@ -81,18 +81,31 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 
 ## Alcance y límites
 
+- Salud cooperativa: un jugador a 0 HP entra en `DOWNED` durante 20 s. El
+  compañero puede usar E/USE a menos de 2 m; el anfitrión valida una única
+  transacción de 2 s, la cancela si pierde alcance o estado y devuelve 40 % de
+  salud. Al agotarse el tiempo pasa al flujo `DEAD` existente. El snapshot
+  replica estado, cuenta atrás y progreso; el gesto de manos, golpe y cámara
+  baja se reproducen localmente. El protocolo del relay es la versión 5:
+  desplegar el Worker antes que el frontend actualizado.
+  El alcance se mide desde el cuerpo tumbado; la posición validada del invitado
+  caído permanece utilizable mientras siga conectado aunque su ventana deje
+  de enviar movimiento en segundo plano.
+
 - Autoridad única: el navegador anfitrión (`CoopHostMode`) simula rondas,
   spawns, IA y objetivo de los zombis, daño, muertes, salud, Points y puertas.
   El servidor solo empareja y reenvía mensajes; nunca reenvía los mensajes
   reservados del propio relay (`peerJoined`, `peerLeft`...). El invitado
   (`CoopGuestMode`) solo simula su jugador y su arma (la munición es del
   jugador) y valida cada mensaje entrante (`Protocol.ts`).
-- Red y render son independientes: el anfitrión emite `matchState` a 15 Hz y
+- Red y render son independientes: durante la partida activa el anfitrión emite `matchState` a 15 Hz y
   el invitado `playerState` a 20 Hz. Zombis y compañero se interpolan con un
   retraso fijo (`Interpolation.ts`), sin extrapolar. Los eventos puntuales
   (`zombieSpawn`, `zombieAttack`, `zombieHit`, `zombieDeath`, `roundStart`,
   `roundEnd`, `doorOpened`, `playerDamaged`, `matchRestart`) llevan IDs
   únicos por spawn; los que refieren entidades desaparecidas se ignoran.
+  En espera, final y créditos se envían solo cambios puntuales; una sala sin
+  invitado no envía estados periódicos al relay.
 - Combate: el anfitrión aplica todo el daño. Las balas del invitado vuelan en
   local (impactos y hitmarker inmediatos), pero un impacto a zombi es una
   reclamación que el anfitrión acepta una sola vez por disparo validado
@@ -116,8 +129,9 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   del búnker forman parte del estado compartido. Las vitrinas solo se compran
   una vez y cobran al comprador. La recarga de munición es individual. El
   final de 30000 Points detiene la partida compartida y abre los créditos.
-- La pausa es local en ambos lados: ESC abre el menú y libera el ratón, pero
-  la partida, los zombis y la red siguen. Solo el anfitrión puede reiniciar;
+- La pausa del invitado solo abre su menú y libera el ratón; la partida sigue.
+  La pausa del anfitrión detiene la simulación para ambos hasta que reanuda.
+  Solo el anfitrión puede reiniciar;
   el invitado vuelve a la nueva partida automáticamente. Si sale el invitado,
   el anfitrión continúa solo y los zombis cambian de objetivo; si entra otro
   invitado recibe el estado completo. Si sale el anfitrión, la sala termina y
@@ -127,7 +141,9 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   anfitrión valida cadencia y propiedad de armas, pero no replica cargadores.
 - El compañero es un cuerpo animado sin cámara, input ni HUD. El soldado final
   es un GLB con esqueleto y clips (`public/assets/players/soldier.glb`, ver
-  `ASSETS.md`); mientras falte se usa un cuerpo procedural de reserva.
+  `ASSETS.md`); mientras falte se usa un cuerpo procedural de reserva con
+  brazos en postura de disparo y pistola sujeta a la mano derecha. Ambos
+  jugadores aparecen frente a frente en la sala inicial.
 - La suite cubre dos modos reales conectados por un relay en memoria
   (`tests/coopMatch.test.ts`): rondas, combate, puertas, desconexión y
   reinicio. Sigue haciendo falta prueba manual con Pointer Lock real, latencia

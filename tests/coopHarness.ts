@@ -19,7 +19,6 @@ export const TEST_PROFILE: DeviceProfile = {
   useReducedEffects: true,
   useTouchControls: false,
   anisotropyLimit: 8,
-  log: {},
 };
 
 /** Arena views paint labels on canvases; node has no DOM. */

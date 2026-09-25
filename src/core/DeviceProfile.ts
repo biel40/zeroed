@@ -7,7 +7,6 @@ export interface DeviceProfile {
   readonly useReducedEffects: boolean;
   readonly useTouchControls: boolean;
   readonly anisotropyLimit: number;
-  readonly log: Record<string, unknown>;
 }
 
 type DeviceNavigator = Partial<Navigator> & {
@@ -46,20 +45,5 @@ export function getDeviceProfile(navigatorLike: DeviceNavigator = navigator as D
     useReducedEffects,
     useTouchControls,
     anisotropyLimit: useReducedEffects ? 2 : 8,
-    log: {
-      userAgent,
-      touchPoints,
-      hardwareConcurrency,
-      deviceMemory,
-      isMobile,
-      isTouch,
-      isLowMemory,
-      coarsePointer,
-      useTouchControls,
-      reducedMotion,
-      pixelRatioLimit,
-      shadowQuality,
-      useReducedEffects,
-    },
   };
 }

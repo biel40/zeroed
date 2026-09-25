@@ -10,7 +10,7 @@ import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { BurnedMansionArena } from '../../zombies/maps/BurnedMansionArena';
 import type { ModeContext } from '../GameMode';
 
-const GUEST_SPAWN_OFFSET_X = 1.2;
+const GUEST_SPAWN_OFFSET_Z = -1.8;
 const DOOR_USE_RANGE = 2.5;
 const DOOR_LOOK_DOT = 0.6;
 /** Host-side reach for a remote request: latency moved the buyer, facing was checked by their client. */
@@ -62,8 +62,11 @@ export class CoopWorld {
 
   public placeLocalPlayer(slot: CoopPlayerId): void {
     const spawn = this.arena.playerSpawn;
-    this.ctx.player.teleport(slot === 'host' ? spawn.x : spawn.x + GUEST_SPAWN_OFFSET_X,
-      spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
+    this.ctx.player.teleport(spawn.x,
+      spawn.y, slot === 'host' ? spawn.z : spawn.z + GUEST_SPAWN_OFFSET_Z,
+      spawn.floor, this.arena.playerBounds);
+    // Both players start in sight of each other, rather than side by side outside the camera FOV.
+    this.ctx.player.face(slot === 'host' ? 0 : Math.PI);
   }
 
   public update(dt: number): void {

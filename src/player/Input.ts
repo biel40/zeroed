@@ -12,7 +12,6 @@ const DESKTOP_PROFILE: DeviceProfile = {
   useReducedEffects: false,
   useTouchControls: false,
   anisotropyLimit: 8,
-  log: {},
 };
 
 /**

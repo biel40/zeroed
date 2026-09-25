@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { performance } from 'node:perf_hooks';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { describe, expect, it, vi } from 'vitest';
@@ -391,7 +390,6 @@ describe('zombie animation synchronization', () => {
       return zombie;
     });
     const counts = zombies.map((zombie) => zombie.group.getObjectsByProperty('isObject3D', true).length);
-    const begin = performance.now();
     for (let frame = 0; frame < 240; frame++) {
       for (const zombie of zombies) {
         if (frame === 40) zombie.applyDamage(5, false, zombie.position.x - 2, 0);
@@ -402,7 +400,6 @@ describe('zombie animation synchronization', () => {
         zombie.group.updateMatrixWorld(true);
       }
     }
-    console.info(`24 real zombie rigs: ${((performance.now() - begin) / 240).toFixed(2)} ms/frame headless animation + matrices`);
     zombies.forEach((zombie, i) => {
       expect(zombie.group.getObjectsByProperty('isObject3D', true).length).toBe(counts[i]);
       zombie.group.traverse((object) => expect(object.matrixWorld.elements.every(Number.isFinite)).toBe(true));

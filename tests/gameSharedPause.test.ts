@@ -62,6 +62,16 @@ describe('local pause vs shared simulation', () => {
     expect(game.effects.update).toHaveBeenCalledOnce();
   });
 
+  it('stops the shared simulation while the host pause is active', () => {
+    const { game, weapon } = stubGame(true, false);
+    game.mode.isSimulationPaused = () => true;
+    prototype.frame.call(game);
+    expect(game.mode.update).not.toHaveBeenCalled();
+    expect(game.player.update).not.toHaveBeenCalled();
+    expect(weapon.update).not.toHaveBeenCalled();
+    expect(game.renderer.render).toHaveBeenCalledOnce();
+  });
+
   it('restores local input once the shared-match menu closes', () => {
     const { game, weapon } = stubGame(true, false);
     prototype.frame.call(game);

@@ -14,7 +14,8 @@ import type { SecretRoomSnapshot } from '../zombies/secret-room/SecretRoomSystem
  */
 export type CoopPlayerId = 'host' | 'guest';
 export type MatchPhase = 'waiting' | 'playing' | 'gameOver' | 'ending' | 'credits';
-export const RELAY_PROTOCOL_VERSION = 4;
+export const RELAY_PROTOCOL_VERSION = 6;
+export type PlayerLifeState = 'alive' | 'downed' | 'dead';
 
 export interface Vec3 {
   readonly x: number;
@@ -43,7 +44,10 @@ export interface PlayerMatchStats {
   readonly points: number;
   readonly kills: number;
   readonly headshots: number;
-  readonly alive: boolean;
+  readonly life: PlayerLifeState;
+  readonly bleedRemaining: number;
+  readonly reviver: CoopPlayerId | null;
+  readonly reviveProgress: number;
 }
 
 export interface ZombieNetState {
@@ -69,6 +73,7 @@ export interface BarrierNetState {
 export interface MatchState {
   readonly t: number;
   readonly phase: MatchPhase;
+  readonly hostPaused: boolean;
   readonly round: number;
   readonly host: PlayerNetState;
   readonly stats: Readonly<Record<CoopPlayerId, PlayerMatchStats>>;
@@ -85,6 +90,8 @@ export type DoorFailureReason = 'insufficientPoints' | 'unavailable';
 
 export type GuestMessage =
   | { readonly type: 'ready' }
+  | { readonly type: 'reviveStart'; readonly target: CoopPlayerId }
+  | { readonly type: 'reviveCancel'; readonly target: CoopPlayerId }
   | { readonly type: 'playerState'; readonly state: PlayerNetState }
   | { readonly type: 'playerShoot'; readonly weapon: WeaponId; readonly origin: Vec3; readonly direction: Vec3 }
   | { readonly type: 'zombieHitClaim'; readonly weapon: WeaponId; readonly zombieId: number; readonly part: HitPart }
@@ -97,6 +104,7 @@ export type GuestMessage =
 
 export type HostMessage =
   | { readonly type: 'matchState'; readonly state: MatchState }
+  | { readonly type: 'reviveCompleted'; readonly target: CoopPlayerId }
   | { readonly type: 'playerShoot'; readonly weapon: WeaponId; readonly origin: Vec3; readonly direction: Vec3 }
   | { readonly type: 'teslaChain'; readonly points: readonly Vec3[] }
   | { readonly type: 'zombieSpawn'; readonly zombie: ZombieNetState }
@@ -195,7 +203,11 @@ export function isPlayerNetState(value: unknown): value is PlayerNetState {
 
 function isStats(value: unknown): value is PlayerMatchStats {
   return isObject(value) && isFiniteNumber(value.hp) && isFiniteNumber(value.points)
-    && isFiniteNumber(value.kills) && isFiniteNumber(value.headshots) && typeof value.alive === 'boolean';
+    && isFiniteNumber(value.kills) && isFiniteNumber(value.headshots)
+    && (value.life === 'alive' || value.life === 'downed' || value.life === 'dead')
+    && isFiniteNumber(value.bleedRemaining) && value.bleedRemaining >= 0
+    && (value.reviver === null || isPlayerId(value.reviver))
+    && isFiniteNumber(value.reviveProgress) && value.reviveProgress >= 0 && value.reviveProgress <= 1;
 }
 
 export function isZombieNetState(value: unknown): value is ZombieNetState {
@@ -235,6 +247,7 @@ function isSecretState(value: unknown): value is SecretRoomSnapshot {
 function isMatchState(value: unknown): value is MatchState {
   return isObject(value)
     && isFiniteNumber(value.t)
+    && typeof value.hostPaused === 'boolean'
     && (value.phase === 'waiting' || value.phase === 'playing' || value.phase === 'gameOver'
       || value.phase === 'ending' || value.phase === 'credits')
     && Number.isInteger(value.round)
@@ -253,6 +266,9 @@ export function parseGuestMessage(message: IncomingMessage): GuestMessage | null
   switch (message.type) {
     case 'ready':
       return { type: 'ready' };
+    case 'reviveStart':
+    case 'reviveCancel':
+      return isPlayerId(raw.target) ? { type: message.type, target: raw.target } : null;
     case 'playerState':
       return isPlayerNetState(raw.state) ? { type: 'playerState', state: raw.state } : null;
     case 'playerShoot':
@@ -290,6 +306,8 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
   switch (message.type) {
     case 'matchState':
       return isMatchState(raw.state) ? { type: 'matchState', state: raw.state } : null;
+    case 'reviveCompleted':
+      return isPlayerId(raw.target) ? { type: 'reviveCompleted', target: raw.target } : null;
     case 'playerShoot':
       return isWeaponId(raw.weapon) && isVec3(raw.origin) && isVec3(raw.direction)
         ? { type: 'playerShoot', weapon: raw.weapon, origin: raw.origin, direction: raw.direction }

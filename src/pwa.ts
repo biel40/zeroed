@@ -17,10 +17,16 @@ function isStandalone(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone === true;
 }
 
+function isIOS(): boolean {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 export class PwaLifecycle {
   private readonly profile: ReturnType<typeof getDeviceProfile>;
   private readonly standalone: boolean;
   private readonly installButton: HTMLButtonElement;
+  private readonly iosInstallHint: HTMLElement;
   private readonly updateButtons: HTMLButtonElement[];
   private readonly mapSelect: HTMLElement;
   private readonly pauseMenu: HTMLElement;
@@ -40,6 +46,9 @@ export class PwaLifecycle {
     this.profile = getDeviceProfile();
     this.standalone = isStandalone();
     this.installButton = button('pwa-install');
+    const iosInstallHint = document.getElementById('ios-install-hint');
+    if (!iosInstallHint) throw new Error('Missing #ios-install-hint');
+    this.iosInstallHint = iosInstallHint;
     this.updateButtons = [button('pwa-update-menu'), button('pwa-update-pause')];
     const mapSelect = document.getElementById('map-select');
     const pauseMenu = document.getElementById('pause-menu');
@@ -48,7 +57,8 @@ export class PwaLifecycle {
     this.pauseMenu = pauseMenu;
     this.serviceWorker = 'serviceWorker' in navigator ? navigator.serviceWorker : null;
     this.controllerSeen = this.serviceWorker?.controller != null;
-    this.installButton.classList.toggle('hidden', !this.profile.isMobile || this.standalone);
+    this.installButton.classList.add('hidden');
+    this.iosInstallHint.classList.toggle('hidden', !isIOS() || this.standalone);
   }
 
   private _setUpdateAvailable(available: boolean): void {
@@ -69,8 +79,8 @@ export class PwaLifecycle {
     this.applyingUpdate = true;
     try {
       await this.updateSW();
-    } catch (error: unknown) {
-      console.error('[Zeroed PWA] Could not apply the browser update.', error);
+    } catch {
+      // Keep the current version if the update fails.
     } finally {
       this.applyingUpdate = false;
     }
@@ -124,8 +134,8 @@ export class PwaLifecycle {
     for (const updateButton of this.updateButtons) updateButton.disabled = true;
     try {
       await this.updateSW();
-    } catch (error: unknown) {
-      console.error('[Zeroed PWA] Could not apply the waiting update.', error);
+    } catch {
+      // Leave the update available for another attempt.
     } finally {
       this.applyingUpdate = false;
       for (const updateButton of this.updateButtons) updateButton.disabled = false;
@@ -157,12 +167,8 @@ export class PwaLifecycle {
             // update() resolves as soon as the new worker starts installing, not when it waits.
             this._applyWhenInstalled(registration);
           })
-          .catch((error: unknown) =>
-            console.error('[Zeroed PWA] Immediate update check failed; using the current version.', error),
-          );
+          .catch(() => { });
       },
-      onOfflineReady: () => console.info('[Zeroed PWA] Offline app shell is ready.'),
-      onRegisterError: (error) => console.error('[Zeroed PWA] Service worker registration failed.', error),
     });
 
     for (const updateButton of this.updateButtons) {

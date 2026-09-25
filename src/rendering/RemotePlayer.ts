@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../network/Interpolation';
 import type { PlayerNetState } from '../network/Protocol';
+import type { PlayerLifeState } from '../network/Protocol';
 import { EYE_HEIGHT } from '../player/PlayerController';
 import type { RemoteAvatar, RemoteAvatarMotion } from './RemotePlayerAvatar';
 
@@ -23,6 +24,7 @@ export class RemotePlayer {
   private readonly bracket: SampleBracket<PlayerNetState> = { from: null, to: null, alpha: 0 };
   private readonly motion: RemoteAvatarMotion = {
     speed: 0, forwardSpeed: 0, pitch: 0, aiming: false, reloading: false, alive: true,
+    life: 'alive', reviving: false,
   };
   private hasPosition = false;
   private lastX = 0;
@@ -43,8 +45,10 @@ export class RemotePlayer {
     if (this.samples.push(state)) this.root.visible = true;
   }
 
-  public setAlive(alive: boolean): void {
-    this.motion.alive = alive;
+  public setLife(life: PlayerLifeState, reviving: boolean): void {
+    this.motion.life = life;
+    this.motion.alive = life !== 'dead';
+    this.motion.reviving = reviving;
   }
 
   public playFire(): void {
@@ -88,6 +92,8 @@ export class RemotePlayer {
     this.motion.speed = 0;
     this.motion.forwardSpeed = 0;
     this.motion.alive = true;
+    this.motion.life = 'alive';
+    this.motion.reviving = false;
     this.root.visible = false;
   }
 

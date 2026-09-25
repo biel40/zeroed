@@ -47,7 +47,6 @@ const profile: DeviceProfile = {
   useReducedEffects: false,
   useTouchControls: false,
   anisotropyLimit: 8,
-  log: {},
 };
 
 const previousDocument = globalThis.document;

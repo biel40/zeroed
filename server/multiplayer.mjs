@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 const port = Number(process.env.PORT ?? 8787);
 const rooms = new Map();
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const relayProtocolVersion = 4;
+const relayProtocolVersion = 6;
 
 function roomCode() {
   let code;
@@ -90,4 +90,4 @@ const heartbeat = setInterval(() => {
 }, 30_000);
 
 server.on('close', () => clearInterval(heartbeat));
-server.listen(port, () => console.info(`Zeroed relay listening on :${server.address().port}`));
+server.listen(port, () => process.send?.({ port: server.address().port }));

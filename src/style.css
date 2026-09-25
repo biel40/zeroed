@@ -505,6 +505,33 @@ body {
   pointer-events: none;
 }
 
+#downed-filter {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(31, 24, 18, 0.16) 28%, rgba(7, 5, 4, 0.75) 100%);
+  backdrop-filter: grayscale(0.9) sepia(0.28) brightness(0.72);
+  z-index: 3;
+}
+#downed-status, #revive-status {
+  position: absolute; left: 50%; transform: translateX(-50%); z-index: 4;
+  color: #eee7db; font: 700 16px 'Consolas', monospace;
+  letter-spacing: 0.18em; text-align: center; text-shadow: 0 2px 8px #000;
+  pointer-events: none;
+}
+#downed-status { top: 35%; display: grid; gap: 9px; }
+#downed-status strong { color: #d8584e; font-size: 28px; letter-spacing: 0.25em; }
+#revive-status { top: 68%; width: min(300px, 70vw); }
+#revive-status div { height: 5px; margin-top: 10px; background: #241b19; border: 1px solid #ac7d68; }
+#revive-progress { display: block; height: 100%; background: #e1b494; }
+#host-pause-status {
+  position: absolute; top: 42%; left: 50%; transform: translateX(-50%);
+  z-index: 5; pointer-events: none; padding: 12px 18px;
+  color: #e9ddd1; background: rgba(13, 12, 12, 0.78);
+  border: 1px solid rgba(164, 120, 96, 0.6);
+  font: 700 18px 'Consolas', monospace; letter-spacing: 0.16em;
+  text-align: center; white-space: nowrap;
+}
+#downed-filter.hidden, #downed-status.hidden, #revive-status.hidden { display: none; }
+
 @keyframes bannerfade {
   0% {
     opacity: 0;
@@ -828,7 +855,6 @@ body {
 
 html.coop-mode [data-coop-hidden],
 html.coop-mode #btn-weapon,
-html.coop-mode #btn-knife,
 html.coop-guest #pause-restart {
   display: none !important;
 }
@@ -991,7 +1017,8 @@ html.coop-guest #pause-restart {
 }
 
 .pwa-actions {
-  display: flex;
+  /* Install and update entry points in the start menu are temporarily hidden. */
+  display: none;
   justify-content: center;
   gap: 12px;
   min-height: 34px;
@@ -1013,6 +1040,13 @@ html.coop-guest #pause-restart {
 .pwa-action:focus-visible {
   color: #cf5e55;
   border-color: #cf5e55;
+}
+
+.ios-install-hint {
+  max-width: 370px;
+  margin: 12px auto 0;
+  color: #b8c0ca;
+  font: 12px/1.5 'Segoe UI', sans-serif;
 }
 
 @keyframes menu-fog-drift {
@@ -1220,6 +1254,129 @@ html.coop-guest #pause-restart {
   justify-content: center;
   background: rgba(6, 9, 13, 0.78);
   cursor: pointer;
+}
+
+#rotate-prompt {
+  display: none;
+}
+
+@media (orientation: portrait) {
+  html.touch-controls-enabled #start-screen.ready {
+    background: #050606;
+    cursor: default;
+  }
+
+  html.touch-controls-enabled #start-screen.ready > .start-panel {
+    display: none;
+  }
+
+  html.touch-controls-enabled #start-screen.ready #rotate-prompt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(20px, 6vw, 40px);
+    width: 100%;
+    padding: 24px;
+    color: #f4f1e9;
+  }
+}
+
+.rotate-art {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  flex: none;
+}
+
+.rotate-orbit {
+  position: absolute;
+  inset: 16px;
+  border: 1px solid rgba(239, 237, 228, 0.25);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: rotate-orbit 2.6s ease-in-out infinite;
+}
+
+.rotate-orbit::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid #d25246;
+  border-left: 2px solid #d25246;
+  transform: rotate(-23deg);
+}
+
+.rotate-phone {
+  position: absolute;
+  top: 33px;
+  left: 40px;
+  width: 37px;
+  height: 62px;
+  border: 2px solid #f4f1e9;
+  border-radius: 7px;
+  box-shadow: 0 0 18px rgba(210, 82, 70, 0.17);
+  transform: rotate(-90deg);
+  animation: rotate-phone 2.6s ease-in-out infinite;
+}
+
+.rotate-phone::before {
+  content: '';
+  position: absolute;
+  top: 22px;
+  left: 4px;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: #f4f1e9;
+}
+
+.rotate-phone > span {
+  position: absolute;
+  inset: 4px 4px 4px 9px;
+  border: 1px solid rgba(244, 241, 233, 0.55);
+  border-radius: 2px;
+}
+
+.rotate-copy strong {
+  display: block;
+  font: 900 clamp(22px, 6vw, 36px)/0.96 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.075em;
+}
+
+.rotate-copy > span {
+  display: block;
+  margin-top: 12px;
+  color: #b2aea5;
+  font: 700 10px/1.4 'Consolas', monospace;
+  letter-spacing: 0.12em;
+}
+
+@keyframes rotate-phone {
+  0%, 15% { transform: rotate(0deg); }
+  55%, 85% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes rotate-orbit {
+  0%, 15% { transform: rotate(0deg); opacity: 0.35; }
+  55%, 85% { transform: rotate(-90deg); opacity: 1; }
+  100% { transform: rotate(0deg); opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-phone { animation: none; transform: rotate(-90deg); }
+  .rotate-orbit { animation: none; }
+}
+
+@media (orientation: portrait) and (max-width: 350px) {
+  html.touch-controls-enabled #start-screen.ready #rotate-prompt {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
 }
 
 .start-panel {

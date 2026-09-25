@@ -9,6 +9,7 @@ import {
   type MatchState,
 } from '../../network/Protocol';
 import { RemotePlayer } from '../../rendering/RemotePlayer';
+import { ReviveGesture } from '../../rendering/ReviveGesture';
 import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { Weapon } from '../../weapons/Weapon';
@@ -23,6 +24,7 @@ import { ZombieReplica } from '../../zombies/ZombieReplica';
 import type { GameMode, ModeContext } from '../GameMode';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
+import { isDownedBodyInRange } from './CoopRevive';
 
 const PLAYER_STATE_INTERVAL = 1 / 20;
 const INITIAL_MATCH_TIMEOUT = 10;
@@ -48,6 +50,7 @@ export class CoopGuestMode implements GameMode {
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
   private hostAvatar!: RemotePlayer;
+  private gesture!: ReviveGesture;
   private readonly box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
   private boxView!: MysteryBoxView;
   private match: MatchState | null = null;
@@ -62,6 +65,7 @@ export class CoopGuestMode implements GameMode {
   private wallBuyWait = 0;
   private boxPending = false;
   private boxWait = 0;
+  private revivePending = 0;
   private readonly knife = new Knife();
   private readonly knifeRaycaster = new THREE.Raycaster();
   private readonly knifeOrigin = new THREE.Vector3();
@@ -90,6 +94,7 @@ export class CoopGuestMode implements GameMode {
     ctx.player.camera.add(this.knife.root);
     this.hostAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(), castShadows));
     ctx.scene.add(this.hostAvatar.root);
+    this.gesture = new ReviveGesture(ctx.player.camera);
     ctx.hud.setZombiesPanelVisible(true);
     ctx.hud.setCoopPresentation('guest');
     ctx.hud.setZombiesRestartHandler(() => ctx.returnToMainMenu());
@@ -100,6 +105,8 @@ export class CoopGuestMode implements GameMode {
   }
 
   public update(dt: number): void {
+    if (this.match?.hostPaused) return;
+    this.revivePending = Math.max(0, this.revivePending - dt);
     if (this.boxPending) {
       this.boxWait += dt;
       if (this.boxWait >= 5) {
@@ -124,6 +131,11 @@ export class CoopGuestMode implements GameMode {
     this.energy.update(dt);
     this.chain.update(dt);
     this.hostAvatar.update(dt);
+    const own = this.match?.stats.guest;
+    const host = this.match?.stats.host;
+    this.gesture.update(dt, host?.reviver === 'guest' ? 'reviver'
+      : own?.life === 'downed' && own.reviver ? 'downed' : null,
+    host?.reviver === 'guest' ? host.reviveProgress : own?.reviveProgress ?? 0);
     if (this.playing && !this.hostLost) {
       if (!this.match) {
         this.initialMatchWait += dt;
@@ -171,17 +183,35 @@ export class CoopGuestMode implements GameMode {
     this.send({ type: 'ready' });
   }
 
+  public isSimulationPaused(): boolean { return this.match?.hostPaused ?? false; }
+
   /** The game-over panel owns the cursor; otherwise ESC opens the local menu. */
   public onPointerUnlock(): boolean {
     return !this.hostLost && (this.gameOverShown || this.match?.phase === 'ending' || this.match?.phase === 'credits');
   }
 
   public isGameplayInputEnabled(): boolean {
-    return this.playing && !this.hostLost && this.match?.phase === 'playing' && this.match.stats.guest.alive;
+    return this.playing && !this.hostLost && !this.match?.hostPaused && this.match?.phase === 'playing'
+      && this.match.stats.guest.life === 'alive';
   }
+
+  public isCombatInputEnabled(): boolean {
+    return this.revivePending === 0 && this.match?.stats.host.reviver !== 'guest';
+  }
+  public isDownedLookEnabled(): boolean { return this.match?.stats.guest.life === 'downed'; }
 
   public onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
+    if (!this.isCombatInputEnabled()) {
+      this.revivePending = 0;
+      this.send({ type: 'reviveCancel', target: 'host' });
+      return;
+    }
+    if (this.canReviveHost()) {
+      this.revivePending = 0.5;
+      this.send({ type: 'reviveStart', target: 'host' });
+      return;
+    }
     const door = this.world.findFacingDoor();
     if (door) { this.send({ type: 'doorPurchase', doorId: door.id }); return; }
     if (this.world.findRepairableBarrier()) return;
@@ -222,16 +252,21 @@ export class CoopGuestMode implements GameMode {
 
   public usesFallbackAttack(): boolean { return this.isGameplayInputEnabled() && this.knife.isAttacking; }
 
-  public getFallbackWeaponName(): string | null { return this.usesFallbackAttack() ? 'KNIFE' : null; }
+  public getFallbackWeaponName(): string | null {
+    return this.match?.stats.guest.life === 'downed' ? 'DOWNED'
+      : this.match?.stats.host.reviver === 'guest' ? 'REVIVING' : this.usesFallbackAttack() ? 'KNIFE' : null;
+  }
 
   public onMeleeAttack(): void {
-    if (!this.isGameplayInputEnabled()) return;
+    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled()) return;
     this.knife.setEnabled(true);
     this.knife.trigger();
   }
 
   public getInteractPrompt(): string | null {
     if (!this.isGameplayInputEnabled()) return null;
+    if (!this.isCombatInputEnabled()) return null;
+    if (this.canReviveHost()) return `REVIVE PLAYER\n${this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E'}`;
     const door = this.world.findFacingDoor();
     if (door) return this.world.doorPrompt(door);
     const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
@@ -256,6 +291,8 @@ export class CoopGuestMode implements GameMode {
 
   public onExit(): void {
     this.knife.reset();
+    this.ctx.hud.setHostPauseVisible(false);
+    this.gesture.dispose();
     this.connection.dispose();
     this.hostAvatar.dispose();
     this.replica.reset();
@@ -274,6 +311,11 @@ export class CoopGuestMode implements GameMode {
 
   private apply(message: HostMessage): void {
     switch (message.type) {
+      case 'reviveCompleted':
+        this.ctx.audio.playReviveContact();
+        this.ctx.player.playReviveImpulse();
+        this.gesture.contact();
+        break;
       case 'matchState':
         this.applyMatchState(message.state);
         break;
@@ -380,10 +422,12 @@ export class CoopGuestMode implements GameMode {
     const previousBox = this.box.snapshot();
     const previousPhase = this.match?.phase;
     this.match = state;
+    this.ctx.hud.setHostPauseVisible(state.hostPaused);
+    if (state.stats.host.reviver === 'guest') this.revivePending = 0;
     this.initialMatchWait = 0;
     this.round = state.round;
     this.hostAvatar.push(state.host);
-    this.hostAvatar.setAlive(state.stats.host.alive);
+    this.hostAvatar.setLife(state.stats.host.life, state.stats.host.reviver !== null);
     this.replica.applyStates(state.t, state.zombies);
     this.world.applyOpenDoors(state.openDoorIds);
     this.world.applyBarrierStates(state.barriers);
@@ -420,6 +464,7 @@ export class CoopGuestMode implements GameMode {
     this.knife.reset();
     this.wallBuyPending = false;
     this.boxPending = false;
+    this.revivePending = 0;
     this.box.reset();
     this.energy.reset();
     this.replica.reset();
@@ -428,6 +473,7 @@ export class CoopGuestMode implements GameMode {
     this.ctx.resetArsenal();
     this.hostAvatar.clear();
     this.match = null;
+    this.ctx.hud.setHostPauseVisible(false);
     this.initialMatchWait = 0;
     this.round = 0;
     if (this.gameOverShown) {
@@ -474,12 +520,27 @@ export class CoopGuestMode implements GameMode {
   private onHostLost(message: string): void {
     if (this.hostLost) return;
     this.hostLost = true;
+    this.revivePending = 0;
+    this.match = null;
+    this.ctx.hud.setHostPauseVisible(false);
+    this.ctx.hud.setDownedState('alive', 0, 0);
+    this.ctx.player.setDownedCamera(false);
     this.ctx.hud.showRoundBanner(message, 'OPEN THE MENU TO LEAVE');
     this.ctx.unlockPointer();
   }
 
   private send(message: GuestMessage): void {
     if (!this.hostLost) this.connection.send(message);
+  }
+
+  private canReviveHost(): boolean {
+    const host = this.hostAvatar.latest;
+    const life = this.match?.stats.host;
+    const player = this.ctx.player;
+    return !!host && life?.life === 'downed' && life.reviver === null
+      && host.floor === player.floor
+      && isDownedBodyInRange(player.rig.position.x, player.rig.position.z,
+        host.x, host.z, host.yaw);
   }
 
   private pushHud(): void {
@@ -493,5 +554,8 @@ export class CoopGuestMode implements GameMode {
       headshots: guest?.headshots ?? 0,
       points: guest?.points ?? 0,
     });
+    this.ctx.hud.setDownedState(guest?.life ?? 'alive', guest?.bleedRemaining ?? 0,
+      this.match?.stats.host.reviver === 'guest' ? this.match.stats.host.reviveProgress : 0);
+    this.ctx.player.setDownedCamera(guest?.life === 'downed');
   }
 }

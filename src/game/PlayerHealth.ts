@@ -64,4 +64,11 @@ export class PlayerHealth {
     this.regenTimer = 0;
     this.invincible = false;
   }
+
+  /** Cooperative revive restores a fraction without resetting the run. */
+  revive(fraction: number): void {
+    this.hp = Math.max(1, Math.min(this.maxHp, this.maxHp * fraction));
+    this.invulnTimer = this.invulnDuration;
+    this.regenTimer = 0;
+  }
 }

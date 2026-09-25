@@ -144,8 +144,8 @@ dependencias). Para sustituirlo, coloca:
 - **Licencia**: CC0 o equivalente, como el resto de assets; anota aquí la
   fuente cuando lo añadas.
 
-Si el archivo falta o no decodifica, el juego registra un `console.warn` y sigue
-con el fallback: la ausencia nunca rompe nada.
+Si el archivo falta o no decodifica, el juego sigue con el fallback: la ausencia
+nunca rompe nada.
 
 ## Resto
 

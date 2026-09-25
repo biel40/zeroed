@@ -57,12 +57,6 @@ class ZeroedBoot {
     const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode, this.music,
       () => this.onGameExited(game));
     this.game = game;
-    console.info('[Zeroed boot] Game initialized successfully.', {
-      mode: mode.id,
-      mobile: this.profile.isMobile,
-      touch: this.profile.useTouchControls,
-      pixelRatioLimit: this.profile.pixelRatioLimit,
-    });
     this.hud.showStartScreen(false);
   }
 
@@ -153,11 +147,10 @@ class ZeroedBoot {
 
   private async initialize(): Promise<void> {
     document.documentElement.classList.toggle('touch-controls-enabled', this.profile.useTouchControls);
-    console.info('[Zeroed boot] Device profile', this.profile.log);
 
     if (!ZeroedBoot.hasWebGL()) {
       this.hud.setError('WebGL no está disponible en este navegador.');
-      throw new Error('[Zeroed boot] WebGL is unavailable in this browser.');
+      return;
     }
 
     const manifest: AssetManifest = {
@@ -184,9 +177,7 @@ class ZeroedBoot {
         this.showMapMenu();
       }
     } catch (error: unknown) {
-      console.error('[Zeroed boot] Initialization failed.', error);
-      this.hud.setError('La inicialización falló. Revisa la consola del navegador para más detalles.');
-      throw error;
+      this.hud.setError(error instanceof Error ? `La inicialización falló: ${error.message}` : 'La inicialización falló.');
     }
   }
 

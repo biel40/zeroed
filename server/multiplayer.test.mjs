@@ -16,15 +16,12 @@ function nextMessage(socket) {
 
 test('private room connects two players, forwards peer messages and rejects a third', async (t) => {
   const relay = spawn(process.execPath, ['server/multiplayer.mjs'], {
-    cwd: process.cwd(), env: { ...process.env, PORT: '0' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: process.cwd(), env: { ...process.env, PORT: '0' }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
   });
   t.after(() => relay.kill());
   const port = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Relay did not start')), 3000);
-    relay.stdout.on('data', (bytes) => {
-      const match = bytes.toString().match(/listening on :(\d+)/);
-      if (match) { clearTimeout(timer); resolve(Number(match[1])); }
-    });
+    relay.once('message', ({ port }) => { clearTimeout(timer); resolve(port); });
     relay.once('exit', (code) => { clearTimeout(timer); reject(new Error(`Relay exited: ${code}`)); });
   });
   const connect = async () => {
@@ -34,15 +31,15 @@ test('private room connects two players, forwards peer messages and rejects a th
     return socket;
   };
   const host = await connect();
-  host.send(JSON.stringify({ type: 'hello', version: 4 }));
-  assert.deepEqual(await nextMessage(host), { type: 'relayReady', version: 4 });
+  host.send(JSON.stringify({ type: 'hello', version: 6 }));
+  assert.deepEqual(await nextMessage(host), { type: 'relayReady', version: 6 });
   host.send(JSON.stringify({ type: 'create' }));
   const created = await nextMessage(host);
   assert.match(created.code, /^[A-HJ-NP-Z2-9]{6}$/);
 
   const guest = await connect();
-  guest.send(JSON.stringify({ type: 'hello', version: 4 }));
-  assert.deepEqual(await nextMessage(guest), { type: 'relayReady', version: 4 });
+  guest.send(JSON.stringify({ type: 'hello', version: 6 }));
+  assert.deepEqual(await nextMessage(guest), { type: 'relayReady', version: 6 });
   const peerJoined = nextMessage(host);
   guest.send(JSON.stringify({ type: 'join', code: created.code }));
   assert.equal((await nextMessage(guest)).type, 'joined');

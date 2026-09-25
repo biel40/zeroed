@@ -74,6 +74,10 @@ export interface GameMode {
    * this player's input and the Game loop keeps simulating behind it.
    */
   readonly sharedSimulation?: boolean;
+  /** An authority-owned pause freezes the shared frame on every client. */
+  isSimulationPaused?(): boolean;
+  /** The local pause menu changed after gameplay began. */
+  onLocalPauseChanged?(paused: boolean): void;
   onGameplayStarted?(): void;
   /**
    * Starting reserve ammunition per weapon, when the mode overrides the
@@ -110,6 +114,10 @@ export interface GameMode {
   onPointerUnlock?(): boolean;
   /** Shell-level gate for movement, weapons and interactions. */
   isGameplayInputEnabled?(): boolean;
+  /** Movement may continue during a committed interaction while weapons are gated. */
+  isCombatInputEnabled?(): boolean;
+  /** Allow aiming the view while movement remains locked (for example DOWNED). */
+  isDownedLookEnabled?(): boolean;
   /** Ordered desktop keyboard input for mode-owned developer commands. */
   onKeyInput?(key: string): void;
   /** Interact key (E) pressed while gameplay input is active. */

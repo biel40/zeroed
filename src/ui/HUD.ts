@@ -88,6 +88,12 @@ export class HUD {
   private readonly mapSelect: HTMLElement = mustGet('map-select');
   private readonly coopLobby: HTMLElement = mustGet('coop-lobby');
   private readonly interactPrompt: HTMLElement = mustGet('interact-prompt');
+  private readonly downedFilter: HTMLElement = mustGet('downed-filter');
+  private readonly downedStatus: HTMLElement = mustGet('downed-status');
+  private readonly downedCountdown: HTMLElement = mustGet('downed-countdown');
+  private readonly reviveStatus: HTMLElement = mustGet('revive-status');
+  private readonly reviveProgress: HTMLElement = mustGet('revive-progress');
+  private readonly hostPauseStatus: HTMLElement = mustGet('host-pause-status');
   private readonly endingScreen: HTMLElement = mustGet('ending-screen');
   private readonly endingRound: HTMLElement = mustGet('ending-round');
 
@@ -113,12 +119,14 @@ export class HUD {
 
   public setReady(): void {
     this.ready = true;
+    this.startScreen.classList.add('ready');
     this.loadingBar.classList.add('hidden');
     this.startHint.textContent = 'CLICK TO START';
   }
 
   public setError(message: string): void {
     this.ready = false;
+    this.startScreen.classList.remove('ready');
     this.loadingBar.classList.remove('hidden');
     this.loadingBarFill.style.width = '0%';
     this.startHint.textContent = message;
@@ -142,7 +150,8 @@ export class HUD {
   public setStartHandler(handler: () => void): void {
     // Assignment, not addEventListener: every run replaces the previous handler.
     this.startScreen.onclick = () => {
-      if (this.ready) handler();
+      if (this.ready && !(document.documentElement.classList.contains('touch-controls-enabled') &&
+        window.matchMedia('(orientation: portrait)').matches)) handler();
     };
   }
 
@@ -296,7 +305,22 @@ export class HUD {
 
   public clearCoopPresentation(): void {
     document.documentElement.classList.remove('coop-mode', 'coop-guest');
+    this.setDownedState('alive', 0, 0);
+    this.setHostPauseVisible(false);
     mustGet('go-restart').textContent = 'RESTART';
+  }
+
+  public setHostPauseVisible(visible: boolean): void {
+    this.hostPauseStatus.classList.toggle('hidden', !visible);
+  }
+
+  public setDownedState(life: 'alive' | 'downed' | 'dead', seconds: number, reviveProgress: number): void {
+    const downed = life === 'downed';
+    this.downedFilter.classList.toggle('hidden', !downed);
+    this.downedStatus.classList.toggle('hidden', !downed);
+    if (downed) this.downedCountdown.textContent = `BLEEDING OUT: ${Math.ceil(seconds)}s`;
+    this.reviveStatus.classList.toggle('hidden', reviveProgress <= 0);
+    this.reviveProgress.style.width = `${Math.min(1, reviveProgress) * 100}%`;
   }
 
   public setZombiesPanelVisible(visible: boolean): void {

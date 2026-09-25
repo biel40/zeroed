@@ -3,7 +3,7 @@ import { DurableObject } from 'cloudflare:workers';
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
 const maxMessageBytes = 32 * 1024;
-const relayProtocolVersion = 4;
+const relayProtocolVersion = 6;
 
 function randomRoomCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));

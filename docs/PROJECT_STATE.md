@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-**Corte:** 2026-09-24. La fuente de verdad es el codigo actual.
+**Corte:** 2026-09-25. La fuente de verdad es el codigo actual.
 
 ## Funcional
 
@@ -20,6 +20,8 @@
   anfitrion, servidor de salas WebSocket, replica de jugadores/zombis, arsenal
   completo, Mystery Box y progresion compartida de mapa. El modo
   individual conserva su ruta local y offline. Ver `MULTIPLAYER.md`.
+- Caida y reanimacion cooperativas autoritativas con sangrado de 20 s,
+  interacción E/USE, salud parcial, cuerpo caído y gesto de manos.
 - Relay Cloudflare Worker con Durable Object por sala preparado para despliegue;
   el frontend Vercel apunta al Worker mediante `VITE_COOP_SERVER_URL`.
 

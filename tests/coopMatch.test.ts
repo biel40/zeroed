@@ -88,13 +88,22 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ['performance'] }); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('co-op session', () => {
+  it('does not send periodic snapshots while a room has no guest', () => {
+    const match = makeMatch();
+    match.step(1 / 30, 60);
+    expect(match.relay.sent('host', 'matchState')).toHaveLength(0);
+    match.relay.presence('host', 'peerJoined');
+    match.step();
+    expect(match.relay.sent('host', 'matchState').length).toBeGreaterThan(0);
+  });
+
   it('spawns both players apart and synchronizes presence both ways', () => {
     const match = startedMatch();
     match.step(1 / 30, 3);
     expect(host(match).phase).toBe('playing');
     expect(host(match).guestState?.x).toBeCloseTo(match.guestSide.player.rig.position.x);
     expect(guest(match).match?.host.x).toBeCloseTo(match.hostSide.player.rig.position.x);
-    expect(match.hostSide.player.rig.position.x).not.toBeCloseTo(match.guestSide.player.rig.position.x);
+    expect(match.hostSide.player.rig.position.distanceTo(match.guestSide.player.rig.position)).toBeGreaterThan(1);
   });
 
   it('keeps every round decision on the host and mirrors it to the guest', () => {
@@ -228,6 +237,7 @@ describe('co-op Mystery Box', () => {
     const match = startedMatch();
     earn(host(match).players.guest.economy, 950);
     placePlayer(match.guestSide.player, -5.2, -4.2);
+    match.guestSide.player.face(0);
     match.step(0.1, 2);
     match.relay.host.onMessage?.({ type: 'boxUse', action: 'activate', equippedWeapon: 'm1911' });
     expect(host(match).players.guest.economy.points).toBe(0);

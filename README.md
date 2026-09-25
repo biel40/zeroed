@@ -28,10 +28,9 @@ npm run test
 ## 🎮 Juego
 
 - 🏚️ **Burned Mansion**: una mansión en ruinas con rutas, puertas, barreras, compras de pared y secretos.
-- 💰 Rondas de Zombies con economía, salud, inventario de dos armas y un cuchillo..
-- 🧟‍♂️ Enemigos normales, shiny y "brutus" con combate cuerpo a cuerpo.
-- 📱 PWA instalable y empaquetado Android mediante Capacitor.
-
+- 💰 Rondas de Zombies con economía, salud, inventario de dos armas y un cuchillo.
+- 🧟‍♂️ Enemigos normales, "brutus", y un posible encuentro con un zombie Shiny...
+- 📱 PWA instalable versión de Android mediante Capacitor.
 ## 🕹️ Controles
 
 | Entrada | Acción |

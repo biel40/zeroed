@@ -27,7 +27,6 @@ describe.skipIf(!existsSync(path))('remote soldier asset contract', () => {
     const joints = (gltf.skins ?? []).flatMap((skin) => skin.joints.map((joint) => gltf.nodes?.[joint]?.name ?? ''));
     const roles: ClipRole[] = ['idle', 'walk', 'run', 'aim', 'fire', 'reload', 'death'];
     const resolved = Object.fromEntries(roles.map((role) => [role, findClip(clips, role)?.name ?? null]));
-    console.info('[soldier.glb] clips', clips.map((clip) => clip.name), 'resolved', resolved);
     expect(gltf.skins?.length ?? 0).toBeGreaterThan(0);
     expect(joints.some((name) => /head/i.test(name))).toBe(true);
     expect(joints.some((name) => /spine|chest|torso|abdomen/i.test(name))).toBe(true);

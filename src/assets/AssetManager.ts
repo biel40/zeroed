@@ -27,8 +27,8 @@ export interface AssetManifest {
 
 /**
  * Single entry point for external assets: one GLTFLoader/TextureLoader,
- * caches everything, and reports real per-item progress. Every failure
- * degrades to null with one console.warn so callers can fall back.
+ * caches everything, and reports real per-item progress. Failed assets
+ * remain unavailable so callers can use their fallbacks.
  * Owns the cached resources and disposes them in dispose().
  */
 export class AssetManager {
@@ -48,7 +48,6 @@ export class AssetManager {
   ): Promise<void> {
     const total = manifest.weapons.length + manifest.textures.length + manifest.zombies.length;
     let loaded = 0;
-    console.info(`[AssetManager] Starting load: ${total} assets`);
     const track = <T>(promise: Promise<T>): Promise<T> =>
       promise.then((value) => {
         onProgress(++loaded, total);
@@ -60,7 +59,6 @@ export class AssetManager {
       ...manifest.textures.map((name) => track(this.loadTexture(name))),
       ...manifest.zombies.map((z) => track(this.loadZombie(z.id, z.url))),
     ]);
-    console.info(`[AssetManager] Completed load: ${loaded}/${total} assets loaded`);
   }
 
   /** Returns the cached model, or null when missing/failed (use fallback). */
@@ -93,12 +91,7 @@ export class AssetManager {
       .then((gltf) => {
         this.playerModel = { scene: gltf.scene, clips: gltf.animations };
       })
-      .catch((error: unknown) => {
-        console.warn(
-          `[AssetManager] Remote soldier model missing (${REMOTE_SOLDIER_MODEL_URL}). Procedural stand-in will be used.`,
-          error,
-        );
-      });
+      .catch(() => { });
     return this.playerModelLoad;
   }
 
@@ -148,11 +141,8 @@ export class AssetManager {
     try {
       const gltf = await this.gltfLoader.loadAsync(this.resolve(url));
       this.models.set(id, gltf.scene);
-    } catch (error) {
-      console.warn(
-        `[AssetManager] Could not load weapon model "${id}" (${url}). Procedural fallback will be used.`,
-        error,
-      );
+    } catch {
+      // The weapon view uses its procedural fallback.
     }
   }
 
@@ -160,11 +150,8 @@ export class AssetManager {
     try {
       const gltf = await this.gltfLoader.loadAsync(this.resolve(url));
       this.zombies.set(id, { scene: gltf.scene, clips: gltf.animations });
-    } catch (error) {
-      console.warn(
-        `[AssetManager] Could not load zombie model "${id}" (${url}). Procedural fallback will be used.`,
-        error,
-      );
+    } catch {
+      // The zombie view uses its procedural fallback.
     }
   }
 
@@ -178,8 +165,8 @@ export class AssetManager {
       texture.wrapT = THREE.RepeatWrapping;
       texture.anisotropy = Math.min(this.anisotropyLimit, 8);
       this.textures.set(name, texture);
-    } catch (error) {
-      console.warn(`[AssetManager] Could not load texture "${name}". Flat colors will be used.`, error);
+    } catch {
+      // The map uses flat colors when this texture is unavailable.
     }
   }
 

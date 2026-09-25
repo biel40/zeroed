@@ -62,8 +62,8 @@ export class Game {
    * Local menu state: true while this player is on the start screen or the
    * pause menu. In single player it also HALTS the simulation (the tick
    * renders the frozen frame and advances nothing). A mode with
-   * `sharedSimulation` keeps simulating: the flag then only removes this
-   * player's gameplay input, so a local menu can never stop a shared match.
+   * `sharedSimulation` keeps simulating behind a local menu unless the mode's
+   * authority has explicitly paused the shared match.
    */
   private paused = true;
   /** Desktop lock requests only complete after the browser confirms the canvas. */
@@ -105,7 +105,6 @@ export class Game {
       precision: this.profile.isMobile ? 'mediump' : 'highp',
     };
 
-    console.info('[Game] Initializing renderer with profile', this.profile.log);
     this.viewportWidth = container.clientWidth || window.innerWidth || 1;
     this.viewportHeight = container.clientHeight || window.innerHeight || 1;
     this.renderer = new THREE.WebGLRenderer(rendererOptions);
@@ -272,7 +271,7 @@ export class Game {
   start(): void {
     if (
       this.profile.isMobile &&
-      document.fullscreenElement === null &&
+      !document.fullscreenElement &&
       typeof document.documentElement.requestFullscreen === 'function'
     ) {
       try {
@@ -285,6 +284,7 @@ export class Game {
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
       this.paused = false;
+      this.mode?.onLocalPauseChanged?.(false);
       this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
@@ -317,6 +317,7 @@ export class Game {
       this.pointerLockRequested = false;
       this.gameplayStarted = true;
       this.paused = false;
+      this.mode?.onLocalPauseChanged?.(false);
       this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
@@ -347,6 +348,7 @@ export class Game {
   private pause(): void {
     if (this.paused) return;
     this.paused = true;
+    this.mode.onLocalPauseChanged?.(true);
     this.audio.pauseMusic();
     if (this.mode.id === 'zombies') this.audio.music.startMenuLoop();
     this.hud.showPauseMenu();
@@ -470,12 +472,9 @@ export class Game {
    */
   private grantWeapon(id: WeaponId): boolean {
     const entry = this.arsenal.get(id);
-    if (!entry) {
-      console.warn(`[Game] Cannot grant "${id}": not preloaded in mode "${this.mode.id}"`);
-      return false;
-    }
+    if (!entry) return false;
     const previousId = this.inventory.currentWeapon;
-    const { equipped, dropped } = this.inventory.grant(id);
+    const { equipped } = this.inventory.grant(id);
     entry.weapon.resetAmmo();
     if (previousId !== equipped) {
       const previous = this.entry(previousId);
@@ -486,9 +485,6 @@ export class Game {
     entry.view.reset();
     entry.view.root.visible = true;
     entry.weapon.equip();
-    console.info(
-      `[Game] Weapon granted: ${equipped}` + (dropped ? ` (replaced ${dropped})` : ''),
-    );
     return true;
   }
 
@@ -611,7 +607,7 @@ export class Game {
     // Single player on a menu: render the frozen frame and nothing else. No
     // player, weapon, ballistics, mode, effects or timers advance. A shared
     // (networked) match never halts here; the menu only gates local input.
-    if (this.paused && !this.mode.sharedSimulation) {
+    if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
       this.renderer.render(this.scene, this.player.camera);
       this.input.endFrame();
       return;
@@ -622,38 +618,44 @@ export class Game {
       !this.paused &&
       (this.input.pointerLocked || this.profile.useTouchControls) &&
       (this.mode.isGameplayInputEnabled?.() ?? true);
+    let allowCombatInput = allowGameplayInput && (this.mode.isCombatInputEnabled?.() ?? true);
 
     if (allowGameplayInput) {
-      for (let i = 0; i < this.inventory.weapons.length; i++) {
+      for (let i = 0; i < this.inventory.weapons.length && allowCombatInput; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
       // Selection is processed before actions, so reload/fire-mode apply to
       // the weapon visible in this frame rather than the stale pre-switch one.
       weapon = this.currentWeapon;
-      if (this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
-      if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
+      if (allowCombatInput && this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
+      if (allowCombatInput && this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
-      if (
+      if (allowCombatInput && (
         this.input.wasPressed('Digit3') ||
         this.input.wasPressed('Numpad3') ||
         this.input.wasPressed('TouchKnife')
-      ) {
+      )) {
         this.mode.onMeleeAttack?.();
       }
       allowGameplayInput =
         !this.paused &&
         (this.input.pointerLocked || this.profile.useTouchControls) &&
         (this.mode.isGameplayInputEnabled?.() ?? true);
+      allowCombatInput = allowGameplayInput && (this.mode.isCombatInputEnabled?.() ?? true);
     }
 
     // Interactions may equip a purchased/picked-up weapon in this same frame.
     weapon = this.currentWeapon;
 
     const fallbackAttack = this.mode.usesFallbackAttack?.() ?? false;
-    this.player.update(dt, this.input, weapon, allowGameplayInput);
-    this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown && !fallbackAttack;
-    this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown && !fallbackAttack;
-    this.frameInput.repeatSemiAuto = allowGameplayInput && this.input.repeatSemiAuto;
+    if (!allowGameplayInput && !this.paused
+      && (this.input.pointerLocked || this.profile.useTouchControls)
+      && this.mode.isDownedLookEnabled?.()) {
+      this.player.update(dt, this.input, weapon, false, true);
+    } else this.player.update(dt, this.input, weapon, allowGameplayInput);
+    this.frameInput.trigger = allowCombatInput && this.input.leftButtonDown && !fallbackAttack;
+    this.frameInput.ads = allowCombatInput && this.input.rightButtonDown && !fallbackAttack;
+    this.frameInput.repeatSemiAuto = allowCombatInput && this.input.repeatSemiAuto;
     // In a shared match reloads and in-flight bullets keep resolving while
     // this player's input is gated (menu open, downed); triggers stay off.
     if (allowGameplayInput || this.mode.sharedSimulation) {

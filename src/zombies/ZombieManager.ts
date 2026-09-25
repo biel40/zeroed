@@ -244,7 +244,6 @@ export class ZombieManager {
   private readonly networkIds = new Map<Zombie, number>();
   private nextNetworkId = 1;
   private recoveryCount = 0;
-  private navigationDebug = false;
   private navigationBounds: ReadonlyArray<ZombieNavigationBounds> = [];
   /**
    * Latest player snapshot, refreshed every update(). The attack callback
@@ -461,11 +460,6 @@ export class ZombieManager {
     return this.navigationComputations;
   }
 
-  /** Event-only navigation diagnostics. Disabled by default for production. */
-  setNavigationDebug(enabled: boolean): void {
-    this.navigationDebug = enabled;
-  }
-
   /** Spawns one zombie for the round; false when the pool is exhausted. */
   spawnZombie(config: RoundConfig, playerX: number, playerZ: number, round = 1): boolean {
     let typeId = selectZombieType(round, this.activeTypeCounts(), this.typeRng);
@@ -482,7 +476,6 @@ export class ZombieManager {
     const spawn = this.pickValidSpawn(playerX, playerZ, profile.bodyRadius);
     if (!spawn) {
       this.pool.release(zombie);
-      this.debugNavigation(zombie, 'spawn-rejected', null, 0, 0, 'no-valid-spawn');
       return false;
     }
     this.roundState.delete(zombie);
@@ -714,7 +707,6 @@ export class ZombieManager {
           this.stuckState.delete(zombie);
           this.navPaths.delete(zombie);
           this.recoveryCount++;
-          this.debugNavigation(zombie, 'out-of-bounds-relocated', null, 0, 0, 'valid-placement');
         }
         this.steer(zombie, dt, targetX, targetZ, targetFloor, targetY, targetId);
         this.applyFloorTransition(zombie, dt);
@@ -868,10 +860,8 @@ export class ZombieManager {
     this.roundState.delete(zombie);
 
     const existingPath = this.navPaths.get(zombie);
-    let pathResult = existingPath ? `${existingPath.points.length - existingPath.index}-waypoints-active` : 'not-needed';
     if (objective.kind === 'unreachable-player') {
       state.pathFailed = true;
-      pathResult = 'no-floor-route';
     }
     if (
       !existingPath &&
@@ -888,20 +878,10 @@ export class ZombieManager {
           points: path,
           index: 0,
         });
-        pathResult = `${path.length}-waypoints`;
       } else {
         state.pathFailed = true;
-        pathResult = 'no-path';
       }
     }
-    this.debugNavigation(
-      zombie,
-      'path-recalculated',
-      objective,
-      state.travelled,
-      state.stuckFor,
-      pathResult,
-    );
     state.travelled = 0;
 
     if (
@@ -910,7 +890,6 @@ export class ZombieManager {
       this.nudgeToNearbyClearPoint(zombie, objective)
     ) {
       state.nudged = true;
-      this.debugNavigation(zombie, 'local-nudge', objective, 0, state.stuckFor, 'moved');
     }
     if (
       state.stuckFor >= STUCK_RELOCATE_AFTER &&
@@ -924,7 +903,6 @@ export class ZombieManager {
         playerFacingZ,
       )
     ) {
-      this.debugNavigation(zombie, 'relocated', objective, 0, state.stuckFor, 'valid-placement');
       this.stuckState.delete(zombie);
       this.navPaths.delete(zombie);
     }
@@ -1386,7 +1364,6 @@ export class ZombieManager {
     );
     if (!points || points.length === 0) {
       this.pathCooldowns.set(zombie, this.frameIndex + PATH_RETRY_COOLDOWN);
-      this.debugNavigation(zombie, 'nav-path-failed', null, 0, 0, 'no-path');
       return undefined;
     }
     const path: NavPath = {
@@ -1398,7 +1375,6 @@ export class ZombieManager {
       index: 0,
     };
     this.navPaths.set(zombie, path);
-    this.debugNavigation(zombie, 'nav-path-computed', null, 0, 0, `${points.length}-waypoints`);
     return path;
   }
 
@@ -1982,30 +1958,6 @@ export class ZombieManager {
     const probeZ = zombie.position.z + directionZ * probeDistance;
     if (this.hitsObstacle(probeX, probeZ, zombie.position.y, zombie.bodyRadius)) return Infinity;
     return Math.hypot(targetX - probeX, targetZ - probeZ);
-  }
-
-  private debugNavigation(
-    zombie: Zombie,
-    event: string,
-    objective: NavigationObjective | null,
-    travelled: number,
-    stuckFor: number,
-    result: string,
-  ): void {
-    if (!this.navigationDebug) return;
-    console.debug('[ZombieNav]', {
-      zombieId: this.zombieIds.get(zombie) ?? -1,
-      event,
-      state: zombie.state,
-      typeId: zombie.typeId,
-      health: zombie.hp,
-      position: { x: zombie.position.x, y: zombie.position.y, z: zombie.position.z },
-      objective: objective ? { kind: objective.kind, x: objective.x, z: objective.z } : null,
-      speed: zombie.speed,
-      travelled,
-      stuckFor,
-      result,
-    });
   }
 
   private followEntryRoute(zombie: Zombie, dt: number): boolean {
