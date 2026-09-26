@@ -86,7 +86,14 @@ export class HUD {
   private readonly goKills: HTMLElement = mustGet('go-kills');
   private readonly goHeadshots: HTMLElement = mustGet('go-headshots');
   private readonly mapSelect: HTMLElement = mustGet('map-select');
+  private readonly coopLobby: HTMLElement = mustGet('coop-lobby');
   private readonly interactPrompt: HTMLElement = mustGet('interact-prompt');
+  private readonly downedFilter: HTMLElement = mustGet('downed-filter');
+  private readonly downedStatus: HTMLElement = mustGet('downed-status');
+  private readonly downedCountdown: HTMLElement = mustGet('downed-countdown');
+  private readonly reviveStatus: HTMLElement = mustGet('revive-status');
+  private readonly reviveProgress: HTMLElement = mustGet('revive-progress');
+  private readonly hostPauseStatus: HTMLElement = mustGet('host-pause-status');
   private readonly endingScreen: HTMLElement = mustGet('ending-screen');
   private readonly endingRound: HTMLElement = mustGet('ending-round');
 
@@ -112,12 +119,14 @@ export class HUD {
 
   public setReady(): void {
     this.ready = true;
+    this.startScreen.classList.add('ready');
     this.loadingBar.classList.add('hidden');
     this.startHint.textContent = 'CLICK TO START';
   }
 
   public setError(message: string): void {
     this.ready = false;
+    this.startScreen.classList.remove('ready');
     this.loadingBar.classList.remove('hidden');
     this.loadingBarFill.style.width = '0%';
     this.startHint.textContent = message;
@@ -139,14 +148,17 @@ export class HUD {
   }
 
   public setStartHandler(handler: () => void): void {
-    this.startScreen.addEventListener('click', () => {
-      if (this.ready) handler();
-    });
+    // Assignment, not addEventListener: every run replaces the previous handler.
+    this.startScreen.onclick = () => {
+      if (this.ready && !(document.documentElement.classList.contains('touch-controls-enabled') &&
+        window.matchMedia('(orientation: portrait)').matches)) handler();
+    };
   }
 
   /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
   public showMapSelect(onSelect: (mapId: ZombieMapId) => void): void {
     this.startScreen.classList.add('hidden');
+    this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
     let firstVisibleButton: HTMLButtonElement | null = null;
@@ -166,6 +178,149 @@ export class HUD {
       };
     }
     firstVisibleButton?.focus();
+  }
+
+  public setCoopSelectHandler(handler: () => void): void {
+    (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
+  }
+
+  public showCoopLobby(defaultServerUrl: string, handlers: {
+    host: (url: string) => void;
+    join: (url: string, code: string) => void;
+    back: () => void;
+  }): void {
+    this.mapSelect.classList.add('hidden');
+    this.coopLobby.classList.remove('hidden');
+    const server = mustGet('coop-server') as HTMLInputElement;
+    const code = mustGet('coop-code') as HTMLInputElement;
+    const joinFields = mustGet('coop-join-fields');
+    const back = mustGet('coop-back') as HTMLButtonElement;
+    server.value = defaultServerUrl;
+    code.value = '';
+    joinFields.classList.add('hidden');
+    back.setAttribute('aria-label', 'Back to main menu');
+    this.hideCoopRoomCode();
+    (mustGet('coop-connection-options') as HTMLDetailsElement).open = false;
+    (mustGet('coop-host') as HTMLButtonElement).onclick = () => {
+      joinFields.classList.add('hidden');
+      back.setAttribute('aria-label', 'Back to main menu');
+      handlers.host(server.value.trim());
+    };
+    (mustGet('coop-join') as HTMLButtonElement).onclick = () => {
+      joinFields.classList.remove('hidden');
+      back.setAttribute('aria-label', 'Back to room choices');
+      code.focus();
+      this.setCoopStatus('Enter the code your friend shared.');
+    };
+    const submitJoin = () => handlers.join(server.value.trim(), code.value.trim().toUpperCase());
+    (mustGet('coop-join-submit') as HTMLButtonElement).onclick = submitJoin;
+    code.onkeydown = (event) => { if (event.key === 'Enter') submitJoin(); };
+    back.onclick = () => {
+      if (joinFields.classList.contains('hidden')) {
+        handlers.back();
+        return;
+      }
+      joinFields.classList.add('hidden');
+      code.value = '';
+      back.setAttribute('aria-label', 'Back to main menu');
+      this.setCoopStatus('Create a room to get a code, or join a friend.');
+      (mustGet('coop-join') as HTMLButtonElement).focus();
+    };
+    this.setCoopStatus('Create a room to get a code, or join a friend.');
+  }
+
+  public setCoopStatus(message: string): void {
+    mustGet('coop-status').textContent = message;
+  }
+
+  public showCoopRoomCode(code: string): void {
+    const roomCode = mustGet('coop-room-code');
+    const copyButton = mustGet('coop-copy-code') as HTMLButtonElement;
+    const shareButton = mustGet('coop-share-code') as HTMLButtonElement;
+    roomCode.textContent = code;
+    copyButton.textContent = 'COPY CODE';
+    mustGet('coop-room-share').classList.remove('hidden');
+    shareButton.classList.toggle('hidden', typeof navigator.share !== 'function');
+
+    copyButton.onclick = async () => {
+      let copied = false;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(code);
+          copied = true;
+        }
+      } catch { /* Try the fallback below. */ }
+      if (!copied) {
+        const input = document.createElement('textarea');
+        input.value = code;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        input.style.userSelect = 'text';
+        document.body.append(input);
+        input.select();
+        try {
+          copied = document.execCommand('copy');
+        } catch { /* The player can still select the visible code. */ }
+        finally { input.remove(); }
+      }
+      if (!copied) {
+        this.setCoopStatus('Could not copy the code. Select it to copy manually.');
+        return;
+      }
+      copyButton.textContent = 'COPIED';
+      window.setTimeout(() => {
+        if (roomCode.textContent === code) copyButton.textContent = 'COPY CODE';
+      }, 2000);
+    };
+
+    shareButton.onclick = async () => {
+      const data: ShareData = { title: 'Zeroed room', text: `Join my Zeroed room with code ${code}.` };
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) {
+        data.url = new URL(location.pathname, location.origin).href;
+      }
+      try {
+        await navigator.share(data);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          this.setCoopStatus('Could not share the room. Use Copy Code instead.');
+        }
+      }
+    };
+  }
+
+  public hideCoopRoomCode(): void {
+    mustGet('coop-room-share').classList.add('hidden');
+  }
+
+  public hideCoopLobby(): void {
+    this.coopLobby.classList.add('hidden');
+  }
+
+  public setCoopPresentation(role: 'host' | 'guest'): void {
+    document.documentElement.classList.add('coop-mode');
+    document.documentElement.classList.toggle('coop-guest', role === 'guest');
+    // Only the host restarts; a guest can always leave, and follows a host restart automatically.
+    mustGet('go-restart').textContent = role === 'host' ? 'RESTART' : 'LEAVE MATCH';
+  }
+
+  public clearCoopPresentation(): void {
+    document.documentElement.classList.remove('coop-mode', 'coop-guest');
+    this.setDownedState('alive', 0, 0);
+    this.setHostPauseVisible(false);
+    mustGet('go-restart').textContent = 'RESTART';
+  }
+
+  public setHostPauseVisible(visible: boolean): void {
+    this.hostPauseStatus.classList.toggle('hidden', !visible);
+  }
+
+  public setDownedState(life: 'alive' | 'downed' | 'dead', seconds: number, reviveProgress: number): void {
+    const downed = life === 'downed';
+    this.downedFilter.classList.toggle('hidden', !downed);
+    this.downedStatus.classList.toggle('hidden', !downed);
+    if (downed) this.downedCountdown.textContent = `BLEEDING OUT: ${Math.ceil(seconds)}s`;
+    this.reviveStatus.classList.toggle('hidden', reviveProgress <= 0);
+    this.reviveProgress.style.width = `${Math.min(1, reviveProgress) * 100}%`;
   }
 
   public setZombiesPanelVisible(visible: boolean): void {
@@ -227,7 +382,7 @@ export class HUD {
   }
 
   public setZombiesRestartHandler(handler: () => void): void {
-    mustGet('go-restart').addEventListener('click', handler);
+    mustGet('go-restart').onclick = handler;
   }
 
   public showEnding(round: number): void {
@@ -270,9 +425,9 @@ export class HUD {
     onRestart: () => void;
     onMainMenu: () => void;
   }): void {
-    mustGet('pause-resume').addEventListener('click', handlers.onResume);
-    mustGet('pause-restart').addEventListener('click', handlers.onRestart);
-    mustGet('pause-menu-btn').addEventListener('click', handlers.onMainMenu);
+    mustGet('pause-resume').onclick = handlers.onResume;
+    mustGet('pause-restart').onclick = handlers.onRestart;
+    mustGet('pause-menu-btn').onclick = handlers.onMainMenu;
   }
 
   public showHitmarker(headshot = false): void {

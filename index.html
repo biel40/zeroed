@@ -6,6 +6,8 @@
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="Zeroed — A browser round-based Zombies FPS game." />
   <link rel="icon" href="/favicon.ico" sizes="48x48" />
   <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
@@ -71,25 +73,62 @@
     </div>
     <div id="damage-overlay"></div>
     <div id="interact-prompt" class="hidden"></div>
+    <div id="downed-filter" class="hidden"></div>
+    <div id="downed-status" class="hidden" role="status"><strong>DOWNED</strong><span id="downed-countdown"></span></div>
+    <div id="revive-status" class="hidden"><span>REVIVING TEAMMATE</span><div><i id="revive-progress"></i></div></div>
+    <div id="host-pause-status" class="hidden" role="status">HOST PAUSED THE MATCH</div>
   </div>
 
   <div id="map-select" class="hidden">
     <div class="start-panel">
       <h1 class="zeroed-title">ZEROED</h1>
-      <p class="mode-hint">THE DEAD ARE WAITING</p>
+      <p class="mode-hint">THE DEAD ARE COMING</p>
       <div class="mode-grid" role="group" aria-label="Zombies">
-        <button type="button" data-map="classic">
-          <span class="mode-name">CLASSIC</span>
-          <span class="mode-desc">Outdoor variant</span>
-        </button>
         <button type="button" data-map="burned-mansion">
           <span class="mode-name">ZOMBIES</span>
           <span class="mode-desc">BURNED MANSION</span>
         </button>
       </div>
+      <button type="button" id="coop-select" class="coop-select">MULTIPLAYER MODE</button>
       <div class="pwa-actions" aria-live="polite">
         <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
+      </div>
+      <p id="ios-install-hint" class="ios-install-hint hidden">En Safari, toca Compartir y «Añadir a pantalla de inicio» para jugar sin las barras del navegador.</p>
+    </div>
+  </div>
+
+  <div id="coop-lobby" class="hidden">
+    <div class="coop-lobby-content">
+      <button type="button" id="coop-back" aria-label="Back to main menu" title="Back">
+        <span aria-hidden="true">←</span> BACK
+      </button>
+      <div class="start-panel">
+        <h1>CO-OP ZOMBIES</h1>
+        <p class="mode-hint">BURNED MANSION · TWO-PLAYER ROOM</p>
+        <div class="coop-actions">
+          <button type="button" id="coop-host">CREATE ROOM</button>
+          <button type="button" id="coop-join">JOIN ROOM</button>
+        </div>
+        <div id="coop-join-fields" class="coop-join-fields hidden">
+          <label for="coop-code">FRIEND'S ROOM CODE</label>
+          <input id="coop-code" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123" />
+          <button type="button" id="coop-join-submit">CONNECT</button>
+        </div>
+        <p id="coop-status" role="status" aria-live="polite"></p>
+        <div id="coop-room-share" class="coop-room-share hidden">
+          <span id="coop-room-code" class="coop-room-code"></span>
+          <button type="button" id="coop-copy-code">COPY CODE</button>
+          <button type="button" id="coop-share-code">SHARE</button>
+        </div>
+        <details id="coop-connection-options" class="hidden">
+          <summary>CONNECTION OPTIONS</summary>
+          <div class="coop-server-field">
+            <label for="coop-server">ROOM SERVER</label>
+            <input id="coop-server" type="url" spellcheck="false" placeholder="wss://your-server.example" />
+            <p>Only change this if you use a different room server.</p>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -132,6 +171,13 @@
   </div>
 
   <div id="start-screen">
+    <div id="rotate-prompt" role="status" aria-label="Gira el móvil para jugar en horizontal">
+      <div class="rotate-art" aria-hidden="true">
+        <span class="rotate-orbit"></span>
+        <span class="rotate-phone"><span></span></span>
+      </div>
+      <div class="rotate-copy"><strong>GIRA TU<br />MÓVIL</strong><span>PARA JUGAR EN HORIZONTAL</span></div>
+    </div>
     <div class="start-panel">
       <h1>Zeroed</h1>
       <p id="start-hint">LOADING ASSETS</p>
@@ -142,11 +188,11 @@
         <span><kbd>LMB</kbd></span><span>Fire</span>
         <span><kbd>RMB</kbd></span><span>ADS</span>
         <span><kbd>R</kbd></span><span>Reload</span>
-        <span><kbd>X</kbd></span><span>Fire mode</span>
+        <span data-coop-hidden><kbd>X</kbd></span><span data-coop-hidden>Fire mode</span>
         <span><kbd>E</kbd></span><span>Interact</span>
-        <span><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span>Knife</span>
+        <span data-coop-hidden><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span data-coop-hidden>Knife</span>
         <span><kbd>Space</kbd></span><span>Jump</span>
-        <span><kbd>1</kbd>–<kbd>2</kbd></span><span>Weapon slots</span>
+        <span data-coop-hidden><kbd>1</kbd>–<kbd>2</kbd></span><span data-coop-hidden>Weapon slots</span>
         <span><kbd>ESC</kbd></span><span>Release mouse</span>
       </div>
     </div>

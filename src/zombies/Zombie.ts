@@ -194,6 +194,37 @@ export class Zombie implements HitTarget {
     if (!this.isAlive) return false;
     this.hp -= amount;
     this.visual.hitFlash();
+    this.reactToDamage(amount, headshot, sourceX, sourceZ);
+    if (this.hp <= 0) {
+      this.enterDeath();
+      return true;
+    }
+    return false;
+  }
+
+  /** Network replica: host-confirmed hit feedback; the replica never owns health. */
+  public playReplicatedHit(amount: number, headshot: boolean, sourceX: number, sourceZ: number): void {
+    if (!this.isAlive) return;
+    this.visual.hitFlash();
+    this.reactToDamage(amount, headshot, sourceX, sourceZ);
+  }
+
+  /** Network replica: the host decided this zombie died. */
+  public playReplicatedDeath(): void {
+    if (this.isAlive) this.enterDeath();
+  }
+
+  /** Network replica: animation-only swing; it can never emit onAttackLanded. */
+  public playReplicatedAttack(kind: 'attack' | 'barrierAttack'): void {
+    if (!this.isAlive) return;
+    this.state = kind;
+    this.stateTimer = ZOMBIE_ATTACK_DURATION;
+    this.attackApplied = true;
+    this.visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
+    this.visual.setState(kind);
+  }
+
+  private reactToDamage(amount: number, headshot: boolean, sourceX?: number, sourceZ?: number): void {
     const dx = sourceX === undefined ? -Math.sin(this.group.rotation.y) : this.position.x - sourceX;
     const dz = sourceZ === undefined ? -Math.cos(this.group.rotation.y) : this.position.z - sourceZ;
     const length = Math.hypot(dx, dz) || 1;
@@ -203,14 +234,13 @@ export class Zombie implements HitTarget {
       (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / length,
       Math.min(0.3, 0.07 + amount / Math.max(1, this.maxHp) * 0.3 + (headshot ? 0.06 : 0)),
     );
-    if (this.hp <= 0) {
-      this.deathGroundY = this.position.y;
-      this.state = 'death';
-      this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
-      this.visual.setState('death');
-      return true;
-    }
-    return false;
+  }
+
+  private enterDeath(): void {
+    this.deathGroundY = this.position.y;
+    this.state = 'death';
+    this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
+    this.visual.setState('death');
   }
 
   /** Starts the attack lunge if the cooldown allows it. */

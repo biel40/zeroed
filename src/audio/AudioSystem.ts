@@ -159,6 +159,16 @@ export class AudioSystem {
     this.music.stop();
   }
 
+  /** Closes this run's AudioContext; the shared MusicManager keeps the menu theme. */
+  public dispose(): void {
+    this.stopWind();
+    const ctx = this.ctx;
+    this.ctx = null;
+    this.master = null;
+    this.noiseBuffer = null;
+    if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => undefined);
+  }
+
   public playShot(config: WeaponAudioConfig): void {
     if (config.energy) {
       this.playEnergyShot(config);
@@ -395,6 +405,12 @@ export class AudioSystem {
     this.tick(0.012, 1150, 0.22, 1.1, 0.055);
   }
 
+  /** Dry palm contact with a low body thump for the cooperative revive. */
+  public playReviveContact(): void {
+    this.tick(0, 900, 0.3, 0.7, 0.07);
+    this.tick(0.018, 180, 0.28, 0.7, 0.09);
+  }
+
   /** Standalone skull impact: a fleshy body followed by a distinct dry crack. */
   public playHeadshotHit(): void {
     // Delaying the crack slightly keeps it perceptually separate from the
@@ -579,8 +595,8 @@ export class AudioSystem {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const audioData: ArrayBuffer = await response.arrayBuffer();
       this.mysteryBoxOpenBuffer = await ctx.decodeAudioData(audioData.slice(0));
-    } catch (error) {
-      console.warn('[AudioSystem] Mystery box open MP3 not available; procedural fallback will be used.', error);
+    } catch {
+      // The procedural opening sound remains available.
     }
   }
 
@@ -605,8 +621,8 @@ export class AudioSystem {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const audioData: ArrayBuffer = await response.arrayBuffer();
       this.dryFireBuffer = await ctx.decodeAudioData(audioData.slice(0));
-    } catch (error) {
-      console.warn('[AudioSystem] Dry-fire MP3 not available; procedural fallback will be used.', error);
+    } catch {
+      // The procedural dry-fire sound remains available.
     }
   }
 

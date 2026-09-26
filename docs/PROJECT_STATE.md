@@ -1,10 +1,10 @@
 # Estado del proyecto
 
-**Corte:** 2026-09-15. La fuente de verdad es el codigo actual.
+**Corte:** 2026-09-25. La fuente de verdad es el codigo actual.
 
 ## Funcional
 
-- Entrada WebGL, menu Zombies, mapas `classic` y `burned-mansion`, carga de
+- Entrada WebGL, menu Zombies, mapa `burned-mansion`, carga de
   assets con fallback y shell FPS compartido desktop/tactil.
 - Armas declarativas, balistica segmentada, energia, headshots, recargas,
   economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.
@@ -16,6 +16,14 @@
   standalone. Capacitor prepara distribucion Android.
 - Música diferenciada para partida y menú/pausa, con reanudación de la pista de
   partida desde su posición anterior y cue independiente al iniciar ronda.
+- Cooperativo privado de dos jugadores en Burned Mansion: autoridad del
+  anfitrion, servidor de salas WebSocket, replica de jugadores/zombis, arsenal
+  completo, Mystery Box y progresion compartida de mapa. El modo
+  individual conserva su ruta local y offline. Ver `MULTIPLAYER.md`.
+- Caida y reanimacion cooperativas autoritativas con sangrado de 20 s,
+  interacción E/USE, salud parcial, cuerpo caído y gesto de manos.
+- Relay Cloudflare Worker con Durable Object por sala preparado para despliegue;
+  el frontend Vercel apunta al Worker mediante `VITE_COOP_SERVER_URL`.
 
 ## Limitaciones y bugs abiertos
 
@@ -29,13 +37,18 @@
   fade vertical de cadaveres tienen casos pendientes.
 - La cache de texturas de Burned Mansion y el registro de colliders dinamicos
   necesitan consolidacion.
-- Energia aun se distingue por color; cambiar modo/mapa requiere recarga por
-  falta de `dispose()`. Existen flags de debug que deben blindarse o retirarse.
+- Energia aun se distingue por color. Existen flags de debug que deben
+  blindarse o retirarse.
 - La suite de tests puede contener expectativas antiguas de headshots o casos
   de navegacion no deterministas.
+- Cooperativo de dos jugadores: las puertas empiezan cerradas y el
+  anfitrion cobra solo al comprador. La municion del invitado sigue en su
+  cliente; faltan pruebas manuales de sesiones reales con latencia. El compañero usa un cuerpo procedural de
+  reserva hasta que exista `public/assets/players/soldier.glb`. Falta validar
+  juego completo entre navegadores con Pointer Lock, latencia y Android.
 
 ## Fuente complementaria
 
-`V0.9.md` resume el producto; `ROADMAP.md` ordena el trabajo; `ARCHITECTURE.md`
+`V0.9.md` conserva el resumen historico de esa version; `ROADMAP.md` ordena el trabajo; `ARCHITECTURE.md`
 describe fronteras; `GAME_SYSTEMS.md` describe runtime; `PWA.md` y
 `ANDROID_DOCS.md` describen distribucion.

@@ -122,7 +122,7 @@ export interface ZombieArena {
   readonly playerSpawn?: ArenaPlayerSpawn;
   /** True when the arena wants swept wall collision for the player. */
   readonly useWallCollision: boolean;
-  /** Optional movement bounds; classic arena leaves this undefined. */
+  /** Optional movement bounds for the current arena. */
   readonly playerBounds?: PlayerBounds;
   /** Per-floor envelope containing valid zombie spawns and pursuit routes. */
   readonly navigationBounds: ReadonlyArray<ZombieNavigationBounds>;

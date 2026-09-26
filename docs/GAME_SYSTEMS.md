@@ -66,10 +66,9 @@ como cue independiente sobre la música de fondo.
 
 ## Mapas e interacciones
 
-- `ClassicArena`: arena clásica nocturna, spawns abiertos y Mystery Box.
 - `BurnedMansionArena`: dos plantas, colision, nueve ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta.
-- Las luminarias ambientales de ambos mapas emiten rojo y sufren parpadeos
+- Las luminarias ambientales de Burned Mansion emiten rojo y sufren parpadeos
   electricos irregulares y desfasados; las luces funcionales de armas,
   recompensas y objetivos conservan su identidad visual.
 - `ZombiesMode` posee run, rondas, salud, economia y progresion; el arena posee
@@ -86,6 +85,21 @@ como cue independiente sobre la música de fondo.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
   una pared una sola vez por run. El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
+
+## Cooperativo
+
+`CoopHostMode` es la unica autoridad: rondas, spawns, IA y objetivo de los
+zombis, daño, muertes, salud, Points, puertas, Mystery Box, reparaciones,
+secretos y compras. `CoopGuestMode` solo simula su
+propio jugador y arma; recibe `matchState` a 15 Hz y eventos puntuales
+(`zombieSpawn/Attack/Hit/Death`, `roundStart/End`, `doorOpened`...).
+`ZombieReplica` interpola los zombis en una linea temporal retrasada y nunca
+ejecuta IA. Los impactos del invitado son reclamaciones que el anfitrion
+valida (`ShotValidator`) y aplica una sola vez; el cuchillo usa el mismo ataque
+local que individual y daño autorizado por el anfitrion. Ray Gun y ZEUS-77
+dibujan proyectiles en ambos clientes; el anfitrion aplica splash y cadenas.
+`CoopWorld` comparte mapa, puertas, tablas, objetivos y final entre ambos roles. El menu de pausa es local y
+no detiene la partida. `MULTIPLAYER.md` define el alcance y los limites.
 
 ## Rendimiento
 

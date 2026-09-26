@@ -202,12 +202,7 @@ export class ZombieFootsteps {
       .then((buffer) => {
         for (const slot of this.slots) slot.audio.setBuffer(buffer);
       })
-      .catch((error: unknown) => {
-        console.warn(
-          '[ZombieFootsteps] No footstep sample available; synthesized fallback stays active.',
-          error,
-        );
-      });
+      .catch(() => { });
   }
 
   /**

@@ -68,6 +68,42 @@ Notas:
   anclas locales pueden declararse por arma; los cargadores soltados se
   reciclan en un pool de 12 (`src/weapons/MagazineDrop.ts`).
 
+## Compañero cooperativo (`public/assets/players/`) — PENDIENTE
+
+El jugador remoto se renderiza desde un GLB con esqueleto que **aún no está en
+el repositorio**. Mientras falte, `createRemoteAvatar()` usa un cuerpo
+procedural de reserva (no es el arte final). Para sustituirlo, coloca:
+
+- **Ruta**: `public/assets/players/soldier.glb` (se carga solo al abrir el
+  lobby cooperativo; el modo individual nunca lo pide).
+- **Contenido**: soldado de infantería estadounidense genérico de la Segunda
+  Guerra Mundial, low/mid poly realista (proporciones humanas, casco M1, chaqueta
+  y pantalón verde oliva, correaje, botas). Nada identificable de otro juego.
+- **Rig**: un `SkinnedMesh` humanoide; origen en los pies, mirando a +Z (norma
+  glTF). La altura se normaliza a 1,80 m. Un hueso `Spine`/`Spine1`/`Spine2`/
+  `Chest` recibe la inclinación de la mirada.
+- **Clips** (por nombre, sin distinguir mayúsculas): obligatorios `Idle` y
+  `Walk`; opcionales `Run`, `Aim`, `Fire`/`Shoot`, `Reload`, `Death`. `Aim`,
+  `Fire` y `Reload` se filtran a huesos de torso/brazos y se mezclan sobre la
+  locomoción.
+- **Fuente elegida**: personaje y animaciones de **Mixamo** (Adobe). Uso libre
+  de royalties dentro del juego; los FBX originales no se redistribuyen, por eso
+  `assets/players/mixamo/` está en `.gitignore` y solo se versiona el GLB.
+
+### Construir desde Mixamo
+
+1. En https://www.mixamo.com → *Characters*, elige el soldado. Descárgalo con
+   *Format* `FBX Binary (.fbx)`, *Pose* `T-pose` → `character.fbx`.
+2. Con ese personaje seleccionado, en *Animations* descarga cada clip con
+   *Format* `FBX Binary`, *Skin* `Without Skin`, *Frames per Second* `30` y
+   **In Place** marcado cuando exista. Nombres de archivo: `idle.fbx`,
+   `walk.fbx` (obligatorios), `run.fbx`, `aim.fbx`, `fire.fbx`, `reload.fbx`,
+   `death.fbx` (opcionales). Busca las versiones de pistola (M1911).
+3. Copia los FBX en `assets/players/mixamo/` y ejecuta
+   `npm run build:player-asset`. El script convierte con FBX2glTF, une los clips
+   en un solo esqueleto, bloquea el desplazamiento horizontal de la cadera y
+   escribe `public/assets/players/soldier.glb`.
+
 ## Texturas PBR (`public/assets/textures/`)
 
 Autor: **Poly Haven** — https://polyhaven.com (CC0):
@@ -75,10 +111,9 @@ https://polyhaven.com/license
 
 | Textura | Uso | Resolución |
 | --- | --- | --- |
-| `concrete_{diff,nor,rough}.jpg` | Plataforma, paredes | 1K |
-| `brown_planks_03_{diff,nor,rough}.jpg` | Banco, cajas | 1K |
-| `metal_plate_{diff,nor,rough}.jpg` | Barreras, estructura metálica | 1K |
-| `brown_mud_dry_{diff,nor,rough}.jpg` | Suelo, berm | 1K |
+| `concrete_{diff,nor,rough}.jpg` | Suelos, paredes y techos de Burned Mansion | 1K |
+| `brown_planks_03_{diff,nor,rough}.jpg` | Burned Mansion y Mystery Box | 1K |
+| `metal_plate_{diff,nor,rough}.jpg` | Mystery Box | 1K |
 
 ## Environment map
 
@@ -109,8 +144,8 @@ dependencias). Para sustituirlo, coloca:
 - **Licencia**: CC0 o equivalente, como el resto de assets; anota aquí la
   fuente cuando lo añadas.
 
-Si el archivo falta o no decodifica, el juego registra un `console.warn` y sigue
-con el fallback: la ausencia nunca rompe nada.
+Si el archivo falta o no decodifica, el juego sigue con el fallback: la ausencia
+nunca rompe nada.
 
 ## Resto
 

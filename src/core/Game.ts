@@ -10,7 +10,6 @@ import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
-import { OutdoorArena } from '../range/OutdoorArena';
 import { Effects } from '../rendering/Effects';
 import { BallisticsSystem } from '../shooting/BallisticsSystem';
 import type { SurfaceType } from '../shooting/HitTarget';
@@ -32,24 +31,6 @@ const MAX_SPREAD_PIXELS = 130;
 const UP = new THREE.Vector3(0, 1, 0);
 const FALLBACK_UP = new THREE.Vector3(1, 0, 0);
 
-function makeSkyTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 2;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D canvas context unavailable');
-  const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-  gradient.addColorStop(0, '#7fa8d0');
-  gradient.addColorStop(0.55, '#a8c3dc');
-  gradient.addColorStop(0.8, '#cfdde8');
-  gradient.addColorStop(1, '#dfe7ec');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 2, 256);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
 /**
  * Composition root: owns the renderer and the frame loop, and wires input,
  * player, weapons, ballistics, effects, audio and HUD together. Mode-specific
@@ -62,7 +43,6 @@ export class Game {
   private readonly clock = new THREE.Clock();
   private readonly input: Input;
   private readonly player: PlayerController;
-  private readonly range: OutdoorArena;
   private readonly ballistics: BallisticsSystem;
   private readonly effects: Effects;
   private readonly audio: AudioSystem;
@@ -71,23 +51,25 @@ export class Game {
   private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
   private inventory!: WeaponInventory;
   private readonly magazineDrops: MagazineDropPool;
-  /** Range colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
-  private readonly hitColliders: THREE.Object3D[];
+  /** Map colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
+  private readonly hitColliders: THREE.Object3D[] = [];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
 
   private readonly debugElement: HTMLElement | null = null;
   private debugTimer = 0;
   private fpsEstimate = 60;
   /**
-   * Real pause: while true the tick renders the frozen frame but advances
-   * NOTHING — no player, weapon, ballistics, mode, effects or timers. This
-   * is a simulation halt, not hidden UI or blocked input. Owned here because
-   * only Game controls the loop and the pointer lock.
+   * Local menu state: true while this player is on the start screen or the
+   * pause menu. In single player it also HALTS the simulation (the tick
+   * renders the frozen frame and advances nothing). A mode with
+   * `sharedSimulation` keeps simulating behind a local menu unless the mode's
+   * authority has explicitly paused the shared match.
    */
   private paused = true;
   /** Desktop lock requests only complete after the browser confirms the canvas. */
   private pointerLockRequested = false;
   private gameplayStarted = false;
+  private disposed = false;
 
   /** Last applied viewport size in CSS pixels; also drives the spread math. */
   private viewportWidth = 1;
@@ -111,6 +93,7 @@ export class Game {
     private readonly profile: DeviceProfile = getDeviceProfile(),
     private readonly mode: GameMode,
     music: MusicManager = new MusicManager(),
+    private readonly onExitToMenu: () => void = () => undefined,
   ) {
     this.audio = new AudioSystem(music);
     const rendererOptions = {
@@ -122,7 +105,6 @@ export class Game {
       precision: this.profile.isMobile ? 'mediump' : 'highp',
     };
 
-    console.info('[Game] Initializing renderer with profile', this.profile.log);
     this.viewportWidth = container.clientWidth || window.innerWidth || 1;
     this.viewportHeight = container.clientHeight || window.innerHeight || 1;
     this.renderer = new THREE.WebGLRenderer(rendererOptions);
@@ -140,9 +122,6 @@ export class Game {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = makeSkyTexture();
-    this.scene.fog = new THREE.Fog(0xc3d3e0, 80, 380);
-
     // Image-based lighting from the built-in room environment: no download,
     // MIT-licensed, and enough to make metals and plastics read as PBR.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -154,18 +133,14 @@ export class Game {
     this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
     this.scene.add(this.player.rig);
 
-    this.range = new OutdoorArena(this.assets);
-    this.scene.add(this.range.group);
-
     this.effects = new Effects(this.scene);
     this.magazineDrops = new MagazineDropPool(this.scene);
 
-    // The ballistics layer raycasts against this shared, mutable array:
-    // range geometry is static, modes may add/remove dynamic hitboxes.
-    this.hitColliders = [...this.range.colliders];
+    // The ballistics layer raycasts against this shared, mutable array.
+    // The mode registers its map and dynamic hitboxes during init.
     this.ballistics = new BallisticsSystem(this.hitColliders, this.scene);
-    this.ballistics.onTargetHit = (target, distance, point, normal, object) => {
-      this.mode.onTargetHit(target, distance, point, normal, object, this.currentWeapon);
+    this.ballistics.onTargetHit = (target, distance, point, normal, object, shotWeapon) => {
+      this.mode.onTargetHit(target, distance, point, normal, object, shotWeapon ?? this.currentWeapon);
     };
     this.ballistics.onEnvironmentHit = (point, normal, object) => {
       const surface = (object.userData.surface as SurfaceType | undefined) ?? 'dirt';
@@ -191,8 +166,7 @@ export class Game {
     };
 
     for (const id of this.mode.weaponIds) {
-      // The mode decides the starting reserve (Zombies: finite; Range:
-      // bottomless). When the mode defines reserveAmmoFor, its return value
+      // The mode decides the starting reserve. When it defines reserveAmmoFor, its return value
       // wins over the shared definition — see Weapon's reserveOverride.
       const weapon = this.mode.reserveAmmoFor
         ? new Weapon(WEAPON_DEFINITIONS[id], Math.random, this.mode.reserveAmmoFor(id))
@@ -225,17 +199,14 @@ export class Game {
       stats: this.stats,
       assets: this.assets,
       profile: this.profile,
-      range: this.range,
       hitColliders: this.hitColliders,
-      setExposure: (exposure) => {
-        this.renderer.toneMappingExposure = exposure;
-      },
       lockPointer: () => this.start(),
       unlockPointer: () => document.exitPointerLock(),
       grantWeapon: (id) => this.grantWeapon(id),
       canGrantWeapon: (id) => this.arsenal.has(id),
       hasWeapon: (id) => this.inventory.has(id),
       getEquippedWeaponId: () => this.inventory.currentWeapon,
+      getEquippedWeapon: () => this.currentWeapon,
       canRefillWeaponAmmo: (id) => {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && !entry.weapon.isAmmoFull;
@@ -275,9 +246,7 @@ export class Game {
       onMainMenu: () => this.returnToMainMenu(),
     });
     // ESC to resume while the menu is open and the pointer is unlocked.
-    document.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' && this.paused && this.gameplayStarted) this.resume();
-    });
+    document.addEventListener('keydown', this.handleEscapeKey);
 
     if (new URLSearchParams(window.location.search).has('debug')) {
       this.debugElement = document.createElement('div');
@@ -302,7 +271,7 @@ export class Game {
   start(): void {
     if (
       this.profile.isMobile &&
-      document.fullscreenElement === null &&
+      !document.fullscreenElement &&
       typeof document.documentElement.requestFullscreen === 'function'
     ) {
       try {
@@ -315,6 +284,8 @@ export class Game {
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
       this.paused = false;
+      this.mode?.onLocalPauseChanged?.(false);
+      this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
       if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
@@ -335,14 +306,19 @@ export class Game {
     if (this.profile.useTouchControls) return;
 
     if (locked) {
-      // Never accept a delayed/unexpected lock behind a pause or mode menu.
       if (!this.pointerLockRequested) {
+        // A repeated lock notification while already playing is harmless;
+        // forcing an unlock here re-opened the pause menu in a loop.
+        if (!this.paused) return;
+        // Never accept a delayed/unexpected lock behind a pause or mode menu.
         document.exitPointerLock();
         return;
       }
       this.pointerLockRequested = false;
       this.gameplayStarted = true;
       this.paused = false;
+      this.mode?.onLocalPauseChanged?.(false);
+      this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
       if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
@@ -365,13 +341,14 @@ export class Game {
   }
 
   /**
-   * Pause/resume. Pausing halts the simulation (see `paused`) and releases
-   * the pointer on desktop; resuming re-locks it and continues from the exact
-   * same state — nothing is reset or advanced while paused.
+   * Pause/resume. Pausing opens the local menu and releases the pointer on
+   * desktop; in single player it also halts the simulation. Resuming re-locks
+   * and continues from the exact same state.
    */
   private pause(): void {
     if (this.paused) return;
     this.paused = true;
+    this.mode.onLocalPauseChanged?.(true);
     this.audio.pauseMusic();
     if (this.mode.id === 'zombies') this.audio.music.startMenuLoop();
     this.hud.showPauseMenu();
@@ -395,24 +372,51 @@ export class Game {
   }
 
   private returnToMainMenu(): void {
+    if (this.disposed) return;
+    this.mode.onExit?.();
     this.paused = true;
     this.gameplayStarted = false;
     this.pointerLockRequested = false;
-    this.renderer.setAnimationLoop(null);
     this.audio.stopMusic();
     this.audio.music.startMenuLoop();
-    this.audio.stopWind();
     this.hud.hideEnding();
     this.hud.hideGameOver();
     this.hud.hidePauseMenu();
     this.hud.setHudVisible(false);
-    if (document.pointerLockElement) document.exitPointerLock();
-    this.hud.showMapSelect((mapId) => {
-      const url = new URL(window.location.href);
-      url.searchParams.set('map', mapId);
-      window.location.assign(url);
-    });
+    this.hud.setZombiesPanelVisible(false);
+    this.hud.setInteractionPrompt(null);
+    this.dispose();
+    this.onExitToMenu();
   }
+
+  /**
+   * Releases everything this run registered outside its own object graph:
+   * the frame loop, DOM/window listeners, the WebGL context, the canvas and
+   * the AudioContext. A later Game starts from a clean page, no reload needed.
+   */
+  public dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.renderer.setAnimationLoop(null);
+    this.input.dispose();
+    document.removeEventListener('keydown', this.handleEscapeKey);
+    window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('orientationchange', this.handleResize);
+    window.visualViewport?.removeEventListener('resize', this.handleResize);
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.debugElement?.remove();
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.audio.dispose();
+    this.scene.environment?.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.renderer.domElement.remove();
+  }
+
+  private readonly handleEscapeKey = (event: KeyboardEvent): void => {
+    if (event.code === 'Escape' && this.paused && this.gameplayStarted) this.resume();
+  };
 
   /** Arsenal lookup; every WeaponId the modes reference is preloaded. */
   private entry(id: WeaponId): ArsenalEntry {
@@ -468,12 +472,9 @@ export class Game {
    */
   private grantWeapon(id: WeaponId): boolean {
     const entry = this.arsenal.get(id);
-    if (!entry) {
-      console.warn(`[Game] Cannot grant "${id}": not preloaded in mode "${this.mode.id}"`);
-      return false;
-    }
+    if (!entry) return false;
     const previousId = this.inventory.currentWeapon;
-    const { equipped, dropped } = this.inventory.grant(id);
+    const { equipped } = this.inventory.grant(id);
     entry.weapon.resetAmmo();
     if (previousId !== equipped) {
       const previous = this.entry(previousId);
@@ -484,9 +485,6 @@ export class Game {
     entry.view.reset();
     entry.view.root.visible = true;
     entry.weapon.equip();
-    console.info(
-      `[Game] Weapon granted: ${equipped}` + (dropped ? ` (replaced ${dropped})` : ''),
-    );
     return true;
   }
 
@@ -530,7 +528,7 @@ export class Game {
     // else goes through the classic ballistic simulation.
     const handledByMode = this.mode.onWeaponFired?.(weapon, this.tmpOrigin, this.tmpDirection);
     if (!handledByMode) {
-      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile);
+      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile, weapon);
     }
 
     this.audio.playShot(weapon.definition.audio);
@@ -600,13 +598,16 @@ export class Game {
       `textures ${memory.textures}`;
   }
 
-  private readonly tick = (): void => {
+  private readonly tick = (): void => this.frame();
+
+  private frame(): void {
     // Always consume the clock delta so resuming never sees a huge dt spike.
     const dt = Math.min(this.clock.getDelta(), MAX_DELTA);
 
-    // Paused: render the frozen frame and nothing else. No player, weapon,
-    // ballistics, mode, effects or timers advance — the simulation halts.
-    if (this.paused) {
+    // Single player on a menu: render the frozen frame and nothing else. No
+    // player, weapon, ballistics, mode, effects or timers advance. A shared
+    // (networked) match never halts here; the menu only gates local input.
+    if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
       this.renderer.render(this.scene, this.player.camera);
       this.input.endFrame();
       return;
@@ -614,44 +615,53 @@ export class Game {
 
     let weapon = this.currentWeapon;
     let allowGameplayInput =
+      !this.paused &&
       (this.input.pointerLocked || this.profile.useTouchControls) &&
       (this.mode.isGameplayInputEnabled?.() ?? true);
+    let allowCombatInput = allowGameplayInput && (this.mode.isCombatInputEnabled?.() ?? true);
 
     if (allowGameplayInput) {
-      for (let i = 0; i < this.inventory.weapons.length; i++) {
+      for (let i = 0; i < this.inventory.weapons.length && allowCombatInput; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
       // Selection is processed before actions, so reload/fire-mode apply to
       // the weapon visible in this frame rather than the stale pre-switch one.
       weapon = this.currentWeapon;
-      if (this.input.wasPressed('KeyR')) weapon.reload();
-      if (this.input.wasPressed('KeyX')) weapon.cycleFireMode();
+      if (allowCombatInput && this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
+      if (allowCombatInput && this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
-      if (
+      if (allowCombatInput && (
         this.input.wasPressed('Digit3') ||
         this.input.wasPressed('Numpad3') ||
         this.input.wasPressed('TouchKnife')
-      ) {
+      )) {
         this.mode.onMeleeAttack?.();
       }
       allowGameplayInput =
+        !this.paused &&
         (this.input.pointerLocked || this.profile.useTouchControls) &&
         (this.mode.isGameplayInputEnabled?.() ?? true);
+      allowCombatInput = allowGameplayInput && (this.mode.isCombatInputEnabled?.() ?? true);
     }
 
     // Interactions may equip a purchased/picked-up weapon in this same frame.
     weapon = this.currentWeapon;
 
     const fallbackAttack = this.mode.usesFallbackAttack?.() ?? false;
-    this.player.update(dt, this.input, weapon, allowGameplayInput);
-    this.frameInput.trigger = allowGameplayInput && this.input.leftButtonDown && !fallbackAttack;
-    this.frameInput.ads = allowGameplayInput && this.input.rightButtonDown && !fallbackAttack;
-    this.frameInput.repeatSemiAuto = allowGameplayInput && this.input.repeatSemiAuto;
-    if (allowGameplayInput) {
+    if (!allowGameplayInput && !this.paused
+      && (this.input.pointerLocked || this.profile.useTouchControls)
+      && this.mode.isDownedLookEnabled?.()) {
+      this.player.update(dt, this.input, weapon, false, true);
+    } else this.player.update(dt, this.input, weapon, allowGameplayInput);
+    this.frameInput.trigger = allowCombatInput && this.input.leftButtonDown && !fallbackAttack;
+    this.frameInput.ads = allowCombatInput && this.input.rightButtonDown && !fallbackAttack;
+    this.frameInput.repeatSemiAuto = allowCombatInput && this.input.repeatSemiAuto;
+    // In a shared match reloads and in-flight bullets keep resolving while
+    // this player's input is gated (menu open, downed); triggers stay off.
+    if (allowGameplayInput || this.mode.sharedSimulation) {
       weapon.update(dt, this.frameInput);
       this.processWeaponEvents();
       this.ballistics.update(dt);
-      this.range.update(dt);
     }
 
     this.mode.update(dt);
@@ -686,5 +696,5 @@ export class Game {
     this.renderer.render(this.scene, this.player.camera);
     this.updateDebug(dt);
     this.input.endFrame();
-  };
+  }
 }

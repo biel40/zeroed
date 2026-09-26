@@ -1,6 +1,9 @@
 node_modules/
 dist/
 coverage/
+.wrangler/
 *.local
 .DS_Store
 Thumbs.db
+# Raw Mixamo downloads may not be redistributed; only the built GLB ships.
+assets/players/mixamo/

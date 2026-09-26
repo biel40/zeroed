@@ -3,6 +3,7 @@ import type { Weapon } from '../weapons/Weapon';
 import { clamp, damp, lerp } from '../utils/math';
 import type { Input } from './Input';
 import type { PlayerBounds } from '../zombies/maps/ZombieArena';
+import { MANSION_GROUND_BOUNDS } from '../zombies/maps/BurnedMansionConfig';
 
 export const BASE_FOV = 75;
 
@@ -54,20 +55,8 @@ export function stairGroundY(ramp: StairRamp, x: number, z: number): number {
   return lerp(ramp.top.y, ramp.bottom.y, progress);
 }
 
-/**
- * Delimited walkable area, enforced by the movement clamp below. minZ is
- * the frontier: the firing-line bench (top spanning z 0.8–1.6) plus the
- * angled barriers form a physical barrier the player can neither cross nor
- * round — the field beyond (target lanes, zombie grounds) stays off-limits
- * in every mode. 1.7 keeps a hair of clearance so the view never clips the
- * bench top.
- */
-export const PLAYER_BOUNDS: PlayerBounds = {
-  minX: -7,
-  maxX: 7,
-  minZ: 1.7,
-  maxZ: 8,
-};
+/** Default movement area before the active arena finishes initialization. */
+export const PLAYER_BOUNDS: PlayerBounds = MANSION_GROUND_BOUNDS;
 
 /**
  * First-person rig: rig (yaw + position) → pitch node → camera (recoil
@@ -92,6 +81,8 @@ export class PlayerController {
   private jumpOffset = 0;
   private jumpVelocity = 0;
   private readonly tmpBox = new THREE.Box3();
+  private downedCamera = false;
+  private cameraImpulse = 0;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.08, 700);
@@ -132,18 +123,33 @@ export class PlayerController {
     this.jumpOffset = 0;
     this.jumpVelocity = 0;
     this.currentFloor = floor;
+    this.downedCamera = false;
+    this.camera.position.y = 0;
     if (bounds) this.bounds = bounds;
   }
 
-  update(dt: number, input: Input, weapon: Weapon, allowMovement = true): void {
+  /** Set the standing view direction when placing a player in the world. */
+  public face(yaw: number): void {
+    this.yaw = yaw;
+    this.rig.rotation.y = yaw;
+  }
+
+  /** Changes only the view height; the standing rig remains the network/collision anchor. */
+  public setDownedCamera(enabled: boolean): void { this.downedCamera = enabled; }
+  public playReviveImpulse(): void { this.cameraImpulse = 0.035; }
+
+  update(dt: number, input: Input, weapon: Weapon, allowMovement = true, allowLook = allowMovement): void {
     const definition = weapon.definition;
 
     const sensitivity = SENSITIVITY * lerp(1, definition.ads.sensitivity, weapon.adsAlpha);
-    this.yaw -= (allowMovement ? input.mouseDeltaX : 0) * sensitivity;
-    this.pitch = clamp(this.pitch - (allowMovement ? input.mouseDeltaY : 0) * sensitivity, -PITCH_LIMIT, PITCH_LIMIT);
+    this.yaw -= (allowLook ? input.mouseDeltaX : 0) * sensitivity;
+    this.pitch = clamp(this.pitch - (allowLook ? input.mouseDeltaY : 0) * sensitivity, -PITCH_LIMIT, PITCH_LIMIT);
     this.rig.rotation.y = this.yaw;
     this.pitchNode.rotation.x = this.pitch;
-    this.camera.rotation.set(weapon.recoil.pitch, weapon.recoil.yaw, 0);
+    this.cameraImpulse *= Math.exp(-18 * dt);
+    this.camera.rotation.set(weapon.recoil.pitch + this.cameraImpulse, weapon.recoil.yaw,
+      this.downedCamera ? 0.06 : 0);
+    this.camera.position.y = damp(this.camera.position.y, this.downedCamera ? -1.2 : 0, 8, dt);
 
     // Digital keys plus the analog touch axes (virtual joystick); the clamp
     // keeps combined input from exceeding full deflection, and desktop is

@@ -6,7 +6,7 @@ const MAX_DROPPED = 12;
 const LIFETIME = 5;
 const FADE_SECONDS = 1;
 const GRAVITY = 9.8;
-/** Firing-line platform top; the player never leaves it. */
+/** Default landing height for magazine drop effects. */
 const GROUND_Y = 0.17;
 const BOUNCE = 0.28;
 

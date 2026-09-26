@@ -4,6 +4,12 @@ Zeroed usa `vite-plugin-pwa`/Workbox sobre Vite. No cambia Three.js ni el
  gameplay. El manifest es `standalone`, scope `/`, orientacion landscape e
 iconos generados desde `public/favicon.svg`.
 
+En iOS, la pantalla completa sin barras requiere abrir la web desde la pantalla
+de inicio. El menu indica como anadirla; los metadatos Apple habilitan el modo
+standalone y el juego sigue intentando Fullscreen API al pulsar START cuando el
+navegador la ofrece. En movil vertical, START muestra una guia animada para
+girar el dispositivo antes de jugar.
+
 ## Cache
 
 El Service Worker solo se registra en produccion. El shell (HTML, JS, CSS,
@@ -25,9 +31,9 @@ Offline solo funciona para assets ya solicitados online.
 
 - Navegador normal: `registration.update()` al entrar; activa y recarga una
   vez cuando hay worker nuevo.
-- PWA standalone: conserva el worker pendiente y muestra `UPDATE ZEROED` en
-  selector/pausa; aplicar desde pausa requiere confirmacion porque descarta la
-  run.
+- PWA standalone: conserva el worker pendiente. Los botones `INSTALL ZEROED`
+  y `UPDATE ZEROED` del selector estan ocultos temporalmente; la actualizacion
+  desde pausa requiere confirmacion porque descarta la run.
 - Un unico `controllerchange` evita dobles recargas. Fallos de comprobacion no
   rompen la version actual.
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { HitTarget } from './HitTarget';
 import type { ProjectileConfig } from '../weapons/WeaponTypes';
+import type { Weapon } from '../weapons/Weapon';
 import { stepTrajectory, type TrajectoryState } from './trajectory';
 
 const MAX_PROJECTILES = 32;
@@ -48,6 +49,7 @@ export function resolveSegmentHit(
 interface Projectile extends TrajectoryState {
   active: boolean;
   config: ProjectileConfig | null;
+  weapon: Weapon | null;
   tracer: THREE.Mesh;
 }
 
@@ -64,6 +66,7 @@ export class BallisticsSystem {
         point: THREE.Vector3,
         normal: THREE.Vector3,
         object: THREE.Object3D,
+        weapon: Weapon | null,
       ) => void)
     | null = null;
   onEnvironmentHit: ((point: THREE.Vector3, normal: THREE.Vector3, object: THREE.Object3D) => void) | null =
@@ -106,12 +109,13 @@ export class BallisticsSystem {
         vz: 0,
         travelled: 0,
         config: null,
+        weapon: null,
         tracer,
       });
     }
   }
 
-  spawn(origin: THREE.Vector3, direction: THREE.Vector3, config: ProjectileConfig): void {
+  spawn(origin: THREE.Vector3, direction: THREE.Vector3, config: ProjectileConfig, weapon: Weapon | null = null): void {
     const p = this.projectiles[this.cursor];
     this.cursor = (this.cursor + 1) % MAX_PROJECTILES;
 
@@ -124,6 +128,7 @@ export class BallisticsSystem {
     p.vz = direction.z * config.muzzleVelocity;
     p.travelled = 0;
     p.config = config;
+    p.weapon = weapon;
     p.tracer.visible = true;
   }
 
@@ -172,7 +177,7 @@ export class BallisticsSystem {
           const target = hit.object.userData.target as HitTarget | undefined;
           if (target) {
             target.onHit();
-            this.onTargetHit?.(target, p.travelled + hit.distance, hit.point, this.hitNormal, hit.object);
+            this.onTargetHit?.(target, p.travelled + hit.distance, hit.point, this.hitNormal, hit.object, p.weapon);
           } else {
             this.onEnvironmentHit?.(hit.point, this.hitNormal, hit.object);
           }

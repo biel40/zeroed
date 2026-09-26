@@ -149,4 +149,3 @@ function frame(): void {
   requestAnimationFrame(frame);
 }
 frame();
-console.info('[viewer] ready:', weaponId, mode);
