@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { EYE_HEIGHT } from '../player/PlayerController';
 import type { PlayerLifeState } from '../network/Protocol';
+import { WEAPON_DEFINITIONS } from '../config/weapons';
+import type { WeaponId } from '../weapons/WeaponTypes';
+import { buildWeaponDisplayModel } from '../weapons/WeaponView';
 
 /**
  * Remote teammate body. The final look is a skinned, animated WWII infantry
@@ -35,19 +38,77 @@ export interface RemoteAvatar {
   readonly group: THREE.Group;
   readonly isSkinned: boolean;
   update(dt: number, motion: Readonly<RemoteAvatarMotion>): void;
+  setWeapon(weapon: WeaponId | null): void;
   playFire(): void;
   dispose(): void;
 }
 
-export function createRemoteAvatar(source: RemotePlayerModelSource | null, castShadow: boolean): RemoteAvatar {
+export function createRemoteAvatar(source: RemotePlayerModelSource | null, castShadow: boolean,
+  getWeaponModel: (id: WeaponId) => THREE.Group | null = () => null): RemoteAvatar {
   if (source) {
     try {
-      return new SkinnedSoldierAvatar(source, castShadow);
+      return new SkinnedSoldierAvatar(source, castShadow, getWeaponModel);
     } catch {
       // Use the procedural avatar when the optional model is unusable.
     }
   }
-  return new ProceduralSoldierAvatar(castShadow);
+  return new ProceduralSoldierAvatar(castShadow, getWeaponModel);
+}
+
+/** Display instances are detached and reused on switches. Only procedural geometry is owned here. */
+class RemoteWeaponMount {
+  private readonly models = new Map<WeaponId, { group: THREE.Group; owned: boolean }>();
+  private current: WeaponId | null = null;
+
+  public constructor(private readonly mount: THREE.Group, private readonly fallback: THREE.Object3D,
+    private readonly getWeaponModel: (id: WeaponId) => THREE.Group | null,
+    private readonly castShadow: boolean) {}
+
+  public setWeapon(weapon: WeaponId | null): void {
+    const id = weapon && Object.prototype.hasOwnProperty.call(WEAPON_DEFINITIONS, weapon) ? weapon : null;
+    if (id === this.current) return;
+    if (this.current) this.models.get(this.current)?.group.removeFromParent();
+    this.current = null;
+    this.fallback.visible = true;
+    if (!id) return;
+    let model = this.models.get(id);
+    if (!model) {
+      try {
+        const source = this.getWeaponModel(id);
+        const length = id === 'm1911' ? 0.3 : id === 'raygun' ? 0.43
+          : id === 'l96' ? 1.03 : id === 'm60' || id === 'tesla' ? 0.95 : 0.84;
+        const group = buildWeaponDisplayModel(WEAPON_DEFINITIONS[id], source, length);
+        group.position.z = -length * (id === 'm1911' ? 0.23 : 0.17);
+        group.traverse((object) => { if ((object as THREE.Mesh).isMesh) object.castShadow = this.castShadow; });
+        model = { group, owned: source === null };
+        this.models.set(id, model);
+      } catch {
+        // Invalid or incomplete optional model: keep the neutral weapon visible.
+        return;
+      }
+    }
+    this.current = id;
+    this.fallback.visible = false;
+    this.mount.add(model.group);
+  }
+
+  public dispose(): void {
+    for (const { group, owned } of this.models.values()) {
+      group.removeFromParent();
+      if (!owned) continue; // GLB instances share AssetManager geometry and materials.
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      group.traverse((object) => {
+        if (!(object as THREE.Mesh).isMesh) return;
+        const mesh = object as THREE.Mesh;
+        geometries.add(mesh.geometry);
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) materials.add(material);
+      });
+      for (const geometry of geometries) geometry.dispose();
+      for (const material of materials) material.dispose();
+    }
+    this.models.clear();
+  }
 }
 
 export type ClipRole = 'idle' | 'walk' | 'run' | 'aim' | 'fire' | 'reload' | 'death';
@@ -121,6 +182,7 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
   private readonly pitchBoneRest = new THREE.Quaternion();
   private readonly pitchBoneAnimated: boolean;
   private readonly tmpQuaternion = new THREE.Quaternion();
+  private readonly weapons: RemoteWeaponMount;
   private idleWeight = 1;
   private walkWeight = 0;
   private runWeight = 0;
@@ -128,7 +190,8 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
   private reloadWeight = 0;
   private dead = false;
 
-  public constructor(source: RemotePlayerModelSource, castShadow: boolean) {
+  public constructor(source: RemotePlayerModelSource, castShadow: boolean,
+    getWeaponModel: (id: WeaponId) => THREE.Group | null) {
     const idleClip = findClip(source.clips, 'idle');
     const walkClip = findClip(source.clips, 'walk');
     if (!idleClip || !walkClip) throw new Error('Soldier GLB needs at least Idle and Walk clips');
@@ -143,6 +206,15 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
     this.modelBaseY = this.model.position.y;
     // glTF characters face +Z; gameplay bodies face -Z.
     this.model.rotation.y = Math.PI;
+    const fallbackRifle = this.model.getObjectByName('teammate-rifle');
+    if (!fallbackRifle?.parent) throw new Error('Soldier GLB needs its weapon grip anchor');
+    const weaponGrip = new THREE.Group();
+    weaponGrip.name = 'remote-weapon-grip';
+    weaponGrip.position.copy(fallbackRifle.position);
+    weaponGrip.quaternion.copy(fallbackRifle.quaternion)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+    fallbackRifle.parent.add(weaponGrip);
+    this.weapons = new RemoteWeaponMount(weaponGrip, fallbackRifle, getWeaponModel, castShadow);
     let pitchBone: THREE.Bone | null = null;
     const bones: THREE.Bone[] = [];
     this.model.traverse((object) => {
@@ -218,7 +290,12 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
     this.fire.reset().setEffectiveWeight(1).play();
   }
 
+  public setWeapon(weapon: WeaponId | null): void {
+    this.weapons.setWeapon(weapon);
+  }
+
   public dispose(): void {
+    this.weapons.dispose();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.model);
     this.group.removeFromParent();
@@ -281,6 +358,8 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
   private readonly arms: [THREE.Group, THREE.Group];
   private readonly forearms: [THREE.Group, THREE.Group];
   private readonly pistol = new THREE.Group();
+  private readonly weaponGrip = new THREE.Group();
+  private readonly weapons: RemoteWeaponMount;
   private readonly armDirection = new THREE.Vector3();
   private readonly elbowPosition = new THREE.Vector3();
   private readonly wristPosition = new THREE.Vector3();
@@ -293,7 +372,7 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
   private reloadBlend = 0;
   private deathBlend = 0;
 
-  public constructor(castShadow: boolean) {
+  public constructor(castShadow: boolean, getWeaponModel: (id: WeaponId) => THREE.Group | null) {
     // Parts were authored around the eye point; the body group lifts them onto the feet origin.
     this.body.position.y = EYE_HEIGHT;
     this.group.add(this.body);
@@ -408,6 +487,9 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
     add(this.pistol, new THREE.BoxGeometry(0.017, 0.022, 0.01), steel, 0, 0.076, 0.001);
     const triggerGuard = add(this.pistol, new THREE.TorusGeometry(0.029, 0.005, 6, 12), steel, 0, -0.036, -0.044);
     triggerGuard.rotation.y = Math.PI / 2;
+    this.weaponGrip.name = 'remote-weapon-grip';
+    root.add(this.weaponGrip);
+    this.weapons = new RemoteWeaponMount(this.weaponGrip, this.pistol, getWeaponModel, castShadow);
 
     this.legs = [-1, 1].map((side) => {
       const hip = new THREE.Group();
@@ -446,6 +528,8 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
       lowered ? 0.3 : 0.085, handY, handZ);
     this.pistol.position.set(lowered ? 0.3 : 0.085, handY, handZ);
     this.pistol.rotation.x = lowered ? -0.5 : aim;
+    this.weaponGrip.position.copy(this.pistol.position);
+    this.weaponGrip.rotation.copy(this.pistol.rotation);
     this.deathBlend = approach(this.deathBlend, motion.life === 'alive' ? 0 : motion.life === 'downed' ? 0.72 : 1, dt * 0.5);
     this.body.rotation.x = -this.deathBlend * Math.PI * 0.5;
     this.body.position.y = EYE_HEIGHT - this.deathBlend * (EYE_HEIGHT - 0.25);
@@ -470,7 +554,12 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
     this.fireKick = 1;
   }
 
+  public setWeapon(weapon: WeaponId | null): void {
+    this.weapons.setWeapon(weapon);
+  }
+
   public dispose(): void {
+    this.weapons.dispose();
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
     this.group.removeFromParent();

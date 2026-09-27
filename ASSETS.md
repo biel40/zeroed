@@ -68,29 +68,37 @@ Notas:
   anclas locales pueden declararse por arma; los cargadores soltados se
   reciclan en un pool de 12 (`src/weapons/MagazineDrop.ts`).
 
-## Compañero cooperativo (`public/assets/players/`) — PENDIENTE
+## Compañero cooperativo (`public/assets/players/`)
 
-El jugador remoto se renderiza desde un GLB con esqueleto que **aún no está en
-el repositorio**. Mientras falte, `createRemoteAvatar()` usa un cuerpo
-procedural de reserva (no es el arte final). Para sustituirlo, coloca:
+El jugador remoto usa `soldier.glb`, un personaje original del proyecto generado
+por `scripts/generate-soldier-asset.mjs` (`npm run generate:player`). No descarga
+materiales externos. Si falta el GLB, `createRemoteAvatar()` conserva el cuerpo
+procedural de reserva.
 
 - **Ruta**: `public/assets/players/soldier.glb` (se carga solo al abrir el
   lobby cooperativo; el modo individual nunca lo pide).
-- **Contenido**: soldado de infantería estadounidense genérico de la Segunda
-  Guerra Mundial, low/mid poly realista (proporciones humanas, casco M1, chaqueta
-  y pantalón verde oliva, correaje, botas). Nada identificable de otro juego.
-- **Rig**: un `SkinnedMesh` humanoide; origen en los pies, mirando a +Z (norma
-  glTF). La altura se normaliza a 1,80 m. Un hueso `Spine`/`Spine1`/`Spine2`/
-  `Chest` recibe la inclinación de la mirada.
+- **Contenido**: superviviente militar genérico con prendas oscuras, casco,
+  mochila, correaje, guantes, botas y un fusil compacto de reserva sin marcas. El rostro
+  modelado conserva ojos, nariz y mandíbula visibles sobre una máscara ajustada.
+  Diseño original sin insignias ni marcas.
+- **Rig**: 16 articulaciones; chaqueta, mangas y pantalones usan `SkinnedMesh`;
+  las piezas menores siguen los mismos huesos. Origen en los pies, mirando a
+  +Z (norma glTF). La altura se normaliza a 1,80 m; `Spine` recibe la
+  inclinación de la mirada.
+- **Agarre**: ambos brazos se resuelven contra la empuñadura y el guardamanos.
+  El grupo `teammate-rifle` fija el agarre del torso; el render remoto oculta
+  sus mallas y monta el modelo del arma equipada usando su ID de red. Solo
+  vuelve a mostrar el fusil de reserva si no puede resolver ese ID. Los modelos
+  sustituidos se separan de la escena y se reutilizan al volver a equiparlos.
 - **Clips** (por nombre, sin distinguir mayúsculas): obligatorios `Idle` y
   `Walk`; opcionales `Run`, `Aim`, `Fire`/`Shoot`, `Reload`, `Death`. `Aim`,
   `Fire` y `Reload` se filtran a huesos de torso/brazos y se mezclan sobre la
   locomoción.
-- **Fuente elegida**: personaje y animaciones de **Mixamo** (Adobe). Uso libre
-  de royalties dentro del juego; los FBX originales no se redistribuyen, por eso
-  `assets/players/mixamo/` está en `.gitignore` y solo se versiona el GLB.
+- **Coste**: ~6k triángulos, 59 meshes, 16 materiales y ~291 KiB.
+  La textura de desgaste está embebida. Se carga solo al abrir el lobby
+  cooperativo. Los clips y geometría son originales.
 
-### Construir desde Mixamo
+### Ruta alternativa: construir desde Mixamo
 
 1. En https://www.mixamo.com → *Characters*, elige el soldado. Descárgalo con
    *Format* `FBX Binary (.fbx)`, *Pose* `T-pose` → `character.fbx`.

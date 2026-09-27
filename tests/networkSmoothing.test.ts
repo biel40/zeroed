@@ -68,6 +68,7 @@ describe('snapshot interpolation', () => {
       group: new THREE.Group(),
       isSkinned: false,
       update: (_dt, motion) => { motions.push({ ...motion }); },
+      setWeapon: vi.fn(),
       playFire: vi.fn(),
       dispose: vi.fn(),
     };
@@ -86,6 +87,24 @@ describe('snapshot interpolation', () => {
     expect(remote.root.visible).toBe(true);
     remote.clear();
     expect(remote.root.visible).toBe(false);
+    expect(avatar.setWeapon).toHaveBeenLastCalledWith(null);
+  });
+
+  it('applies the newest accepted weapon immediately and ignores older packets', () => {
+    const avatar: RemoteAvatar = {
+      group: new THREE.Group(), isSkinned: false, update: vi.fn(),
+      setWeapon: vi.fn(), playFire: vi.fn(), dispose: vi.fn(),
+    };
+    const remote = new RemotePlayer(avatar);
+    remote.push(playerState(1, 0, { weapon: 'm1911' }));
+    expect(avatar.setWeapon).toHaveBeenLastCalledWith('m1911');
+    remote.push(playerState(2, 0, { weapon: 'ak47' }));
+    expect(avatar.setWeapon).toHaveBeenLastCalledWith('ak47');
+    remote.push(playerState(1.5, 0, { weapon: 'm60' }));
+    expect(avatar.setWeapon).toHaveBeenCalledTimes(2);
+    remote.push(playerState(3, 0, { weapon: 'm1911' }));
+    expect(avatar.setWeapon).toHaveBeenLastCalledWith('m1911');
+    remote.dispose();
   });
 });
 

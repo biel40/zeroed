@@ -16,6 +16,7 @@
     "multiplayer:cloudflare:deploy": "wrangler deploy",
     "multiplayer:cloudflare:test": "node --test cloudflare/multiplayer.test.mjs",
     "generate:zombie-brute": "node scripts/generate-brute-asset.mjs",
+    "generate:player": "node scripts/generate-soldier-asset.mjs",
     "generate:zombies": "npm run generate:zombie-brute",
     "build:player-asset": "node scripts/build-player-asset.mjs",
     "test": "vitest run",

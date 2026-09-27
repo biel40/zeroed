@@ -139,11 +139,12 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 - No hay migración de anfitrión ni recuperación de inventario del invitado
   tras una desconexión. La munición del invitado se ejecuta en su cliente; el
   anfitrión valida cadencia y propiedad de armas, pero no replica cargadores.
-- El compañero es un cuerpo animado sin cámara, input ni HUD. El soldado final
+- El compañero es un cuerpo animado sin cámara, input ni HUD. Su modelo original
   es un GLB con esqueleto y clips (`public/assets/players/soldier.glb`, ver
-  `ASSETS.md`); mientras falte se usa un cuerpo procedural de reserva con
-  brazos en postura de disparo y pistola sujeta a la mano derecha. Ambos
-  jugadores aparecen frente a frente en la sala inicial.
+  `ASSETS.md`); si no carga se usa el cuerpo procedural de reserva. El arma
+  visible sigue el ID del último estado del jugador y reutiliza los modelos
+  de exhibición del arsenal; el arma de reserva aparece solo si el ID no se puede
+  resolver. Ambos jugadores aparecen frente a frente en la sala inicial.
 - La suite cubre dos modos reales conectados por un relay en memoria
   (`tests/coopMatch.test.ts`): rondas, combate, puertas, desconexión y
   reinicio. Sigue haciendo falta prueba manual con Pointer Lock real, latencia

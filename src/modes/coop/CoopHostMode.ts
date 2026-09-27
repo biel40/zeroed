@@ -177,7 +177,8 @@ export class CoopHostMode implements GameMode {
     this.knife.onImpact = () => this.applyLocalKnifeImpact();
     ctx.player.camera.add(this.knife.root);
 
-    this.guestAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(), !ctx.profile.useReducedEffects));
+    this.guestAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(),
+      !ctx.profile.useReducedEffects, (id) => ctx.assets.getWeaponModel(id)));
     ctx.scene.add(this.guestAvatar.root);
     this.gesture = new ReviveGesture(ctx.player.camera);
 

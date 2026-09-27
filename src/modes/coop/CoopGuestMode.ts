@@ -92,7 +92,8 @@ export class CoopGuestMode implements GameMode {
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyKnifeImpact();
     ctx.player.camera.add(this.knife.root);
-    this.hostAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(), castShadows));
+    this.hostAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(),
+      castShadows, (id) => ctx.assets.getWeaponModel(id)));
     ctx.scene.add(this.hostAvatar.root);
     this.gesture = new ReviveGesture(ctx.player.camera);
     ctx.hud.setZombiesPanelVisible(true);

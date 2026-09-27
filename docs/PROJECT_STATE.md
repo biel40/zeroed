@@ -43,8 +43,8 @@
   de navegacion no deterministas.
 - Cooperativo de dos jugadores: las puertas empiezan cerradas y el
   anfitrion cobra solo al comprador. La municion del invitado sigue en su
-  cliente; faltan pruebas manuales de sesiones reales con latencia. El compañero usa un cuerpo procedural de
-  reserva hasta que exista `public/assets/players/soldier.glb`. Falta validar
+  cliente; faltan pruebas manuales de sesiones reales con latencia. El compañero usa
+  `public/assets/players/soldier.glb` con fallback procedural. Falta validar
   juego completo entre navegadores con Pointer Lock, latencia y Android.
 
 ## Fuente complementaria

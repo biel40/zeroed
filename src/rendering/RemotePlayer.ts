@@ -42,7 +42,12 @@ export class RemotePlayer {
 
   public push(state: PlayerNetState): void {
     this.clock.observe(state.t);
-    if (this.samples.push(state)) this.root.visible = true;
+    if (this.samples.push(state)) {
+      // A weapon switch is discrete state: show the newest accepted ID now,
+      // while position and facing continue to use buffered interpolation.
+      this.avatar.setWeapon(state.weapon);
+      this.root.visible = true;
+    }
   }
 
   public setLife(life: PlayerLifeState, reviving: boolean): void {
@@ -94,6 +99,7 @@ export class RemotePlayer {
     this.motion.alive = true;
     this.motion.life = 'alive';
     this.motion.reviving = false;
+    this.avatar.setWeapon(null);
     this.root.visible = false;
   }
 
