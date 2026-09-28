@@ -854,7 +854,6 @@ body {
 }
 
 html.coop-mode [data-coop-hidden],
-html.coop-mode #btn-weapon,
 html.coop-guest #pause-restart {
   display: none !important;
 }
