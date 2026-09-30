@@ -446,9 +446,15 @@ export class CoopGuestMode implements GameMode {
     }
     if (state.phase === 'gameOver') this.showGameOver(state);
     else if (previousPhase !== state.phase && state.phase === 'ending') {
+      this.ctx.audio.stopMusic();
+      this.ctx.audio.stopWind();
+      this.ctx.audio.startEndingAudio();
       this.ctx.hud.showEnding(state.round);
       this.ctx.unlockPointer();
-    } else if (previousPhase !== state.phase && state.phase === 'credits') this.ctx.hud.showCredits();
+    } else if (previousPhase !== state.phase && state.phase === 'credits') {
+      this.ctx.audio.stopEndingAudio();
+      this.ctx.hud.showCredits();
+    }
   }
 
   private replicateAttack(zombieId: number, target: 'host' | 'guest'): void {
@@ -520,6 +526,7 @@ export class CoopGuestMode implements GameMode {
   /** Without the authority the match cannot continue; the local menu stays usable to leave. */
   private onHostLost(message: string): void {
     if (this.hostLost) return;
+    this.ctx.audio.stopEndingAudio();
     this.hostLost = true;
     this.revivePending = 0;
     this.match = null;

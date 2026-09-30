@@ -211,7 +211,10 @@ export class ZombiesMode implements GameMode {
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
     if (this.runFlow.state === 'ENDING') {
       this.arena.update(dt, this.ctx.player?.rig.position);
-      if (this.runFlow.update(dt)) this.ctx.hud.showCredits();
+      if (this.runFlow.update(dt)) {
+        this.ctx.audio.stopEndingAudio();
+        this.ctx.hud.showCredits();
+      }
       return;
     }
     if (this.runFlow.state === 'CREDITS' || this.runFlow.state === 'FINISHED') return;
@@ -1097,6 +1100,7 @@ export class ZombiesMode implements GameMode {
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
     this.ctx.audio.stopWind?.();
+    this.ctx.audio.startEndingAudio();
     this.ctx.hud.setInteractionPrompt(null);
     this.pushHudState();
     this.ctx.hud.showEnding(this.rounds.round);

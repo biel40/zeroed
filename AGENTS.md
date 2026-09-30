@@ -11,6 +11,8 @@
 - Burned Mansion es el unico mapa jugable de Zeroed, tanto en individual como en cooperativo. El usuario ha decidido retirar definitivamente el campo de tiro/Classic; no lo reintroduzcas como modo, mapa ni dependencia de gameplay.
 - El modo individual sigue siendo la prioridad: los cambios cooperativos no deben degradar su funcionamiento.
 
+- Trabaja directamente en el checkout principal. No crees ni uses worktrees salvo peticion explicita del usuario.
+
 ## Flujo de trabajo
 
 1. Leer las instrucciones y documentacion relevante.

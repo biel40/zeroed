@@ -1,5 +1,6 @@
 import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { clamp } from '../utils/math';
+import { NUCLEAR_ENDING_DURATION } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 
 /** Live state shown on the Zombies mode panel. */
@@ -386,7 +387,9 @@ export class HUD {
   }
 
   public showEnding(round: number): void {
+    this.root.classList.add('hidden');
     this.setInteractionPrompt(null);
+    this.endingScreen.style.setProperty('--ending-duration', `${NUCLEAR_ENDING_DURATION}s`);
     this.endingRound.textContent = `${round}`;
     this.endingScreen.classList.remove('hidden', 'credits');
     this.endingScreen.classList.add('ending');
@@ -394,7 +397,7 @@ export class HUD {
 
   public showCredits(): void {
     this.root.classList.add('hidden');
-    this.endingScreen.classList.remove('ending');
+    this.endingScreen.classList.remove('hidden', 'ending');
     this.endingScreen.classList.add('credits');
   }
 

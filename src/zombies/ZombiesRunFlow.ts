@@ -1,10 +1,12 @@
 export type ZombiesRunState = 'PLAYING' | 'ENDING' | 'CREDITS' | 'FINISHED' | 'GAME_OVER';
 
+export const NUCLEAR_ENDING_DURATION = 18;
+
 export class ZombiesRunFlow {
   private current: ZombiesRunState = 'PLAYING';
   private endingElapsed = 0;
 
-  constructor(readonly endingDuration = 2.2) {}
+  constructor(readonly endingDuration = NUCLEAR_ENDING_DURATION) {}
 
   get state(): ZombiesRunState {
     return this.current;

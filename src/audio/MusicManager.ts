@@ -1,12 +1,18 @@
 export type MusicTrackName =
   | 'zombies_round_start'
   | 'menu_theme'
+  | 'nuclear_alarm'
+  | 'nuclear_explosion'
+  | 'radioactivity'
   | 'background_music_theme';
 
 export const ZOMBIES_MUSIC_PATHS = {
   roundStart: `${import.meta.env.BASE_URL}assets/audio/zombies_round_start.mp3`,
   menu: `${import.meta.env.BASE_URL}assets/audio/menu_theme.mp3`,
   gameplay: `${import.meta.env.BASE_URL}assets/audio/background_music_theme.mp3`,
+  nuclearAlarm: `${import.meta.env.BASE_URL}assets/audio/nuclear_alarm.mp3`,
+  nuclearExplosion: `${import.meta.env.BASE_URL}assets/audio/nuclear_explosion.mp3`,
+  radioactivity: `${import.meta.env.BASE_URL}assets/audio/radioactivity.mp3`,
 } as const;
 
 interface MusicTrackDef {
@@ -17,6 +23,24 @@ interface MusicTrackDef {
 }
 
 const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
+  nuclear_explosion: {
+    name: 'nuclear_explosion',
+    path: ZOMBIES_MUSIC_PATHS.nuclearExplosion,
+    volume: 0.45,
+    loop: false,
+  },
+  radioactivity: {
+    name: 'radioactivity',
+    path: ZOMBIES_MUSIC_PATHS.radioactivity,
+    volume: 0.25,
+    loop: true,
+  },
+  nuclear_alarm: {
+    name: 'nuclear_alarm',
+    path: ZOMBIES_MUSIC_PATHS.nuclearAlarm,
+    volume: 0.6,
+    loop: true,
+  },
   zombies_round_start: {
     name: 'zombies_round_start',
     path: ZOMBIES_MUSIC_PATHS.roundStart,
@@ -37,10 +61,13 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
   },
 };
 
+const ENDING_TRACKS: readonly MusicTrackName[] = ['nuclear_alarm', 'nuclear_explosion', 'radioactivity'];
+
 export class MusicManager {
   public enabled = false;
   private readonly players = new Map<MusicTrackName, HTMLAudioElement>();
   private readonly pauseOffsets = new Map<MusicTrackName, number>();
+  private endingAudioStarted = false;
 
   public setEnabled(enabled: boolean): void {
     this.enabled = enabled;
@@ -96,6 +123,7 @@ export class MusicManager {
   }
 
   stop(): void {
+    this.endingAudioStarted = false;
     this.pauseOffsets.clear();
     for (const player of this.players.values()) {
       player.pause();
@@ -112,6 +140,28 @@ export class MusicManager {
     this.pauseOffsets.delete('menu_theme');
     player.pause();
     player.currentTime = 0;
+  }
+
+  /** Starts all three layers together; the explosion plays once, ambience loops. */
+  startEndingAudio(): void {
+    if (!this.enabled || this.endingAudioStarted) return;
+    this.stop();
+    this.endingAudioStarted = true;
+    for (const name of ENDING_TRACKS) {
+      const player = this.getPlayer(name);
+      if (player) void player.play().catch(() => undefined);
+    }
+  }
+
+  stopEndingAudio(): void {
+    this.endingAudioStarted = false;
+    for (const name of ENDING_TRACKS) {
+      this.pauseOffsets.delete(name);
+      const player = this.players.get(name);
+      if (!player) continue;
+      player.pause();
+      player.currentTime = 0;
+    }
   }
 
   playRoundStartOnce(): void {

@@ -85,6 +85,15 @@ como cue independiente sobre la música de fondo.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
   una pared una sola vez por run. El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
+  La secuencia nuclear dura 18 s: alerta, resplandor y onda expansiva con
+  creditos que aparecen durante la explosion. Al terminar quedan los creditos
+  y se habilita volver al menu. Sustituye musica/viento y arranca juntos
+  `nuclear_alarm.mp3` y `radioactivity.mp3` en bucle y `nuclear_explosion.mp3`
+  una sola vez; los tres se detienen al terminar la secuencia o salir.
+  Individual y ambos clientes cooperativos comparten la secuencia; la ausencia
+  de un asset no bloquea el final ni las otras capas. Para incorporar los
+  sonidos basta con colocar los MP3 en `public/assets/audio/` y reconstruir
+  (en Android, `npm run android:sync`).
 
 ## Cooperativo
 

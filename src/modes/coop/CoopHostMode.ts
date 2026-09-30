@@ -213,6 +213,7 @@ export class CoopHostMode implements GameMode {
     }
     if (this.phase === 'ending' && this.runFlow.update(dt)) {
       this.phase = 'credits';
+      this.ctx.audio.stopEndingAudio();
       this.ctx.hud.showCredits();
       this.sendMatchState();
     }
@@ -1006,6 +1007,7 @@ export class CoopHostMode implements GameMode {
     this.energy.reset();
     this.ctx.audio.stopMusic?.();
     this.ctx.audio.stopWind?.();
+    this.ctx.audio.startEndingAudio();
     this.ctx.hud.setInteractionPrompt(null);
     this.ctx.hud.showEnding(this.rounds.round);
     this.ctx.unlockPointer();

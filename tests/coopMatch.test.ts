@@ -376,9 +376,17 @@ describe('co-op Burned Mansion interactions', () => {
     match.relay.flush();
     expect(host(match).phase).toBe('ending');
     expect(guest(match).match?.phase).toBe('ending');
-    match.step(0.1, 24);
+    expect(match.hostSide.ctx.audio.startEndingAudio).toHaveBeenCalledTimes(1);
+    expect(match.guestSide.ctx.audio.startEndingAudio).toHaveBeenCalledTimes(1);
+    match.step(0.1, 170);
+    expect(host(match).phase).toBe('ending');
+    expect(match.hostSide.ctx.audio.stopEndingAudio).not.toHaveBeenCalled();
+    expect(match.guestSide.ctx.audio.stopEndingAudio).not.toHaveBeenCalled();
+    match.step(0.1, 11);
     expect(host(match).phase).toBe('credits');
     expect(match.guestSide.hud.showCredits).toHaveBeenCalled();
+    expect(match.hostSide.ctx.audio.stopEndingAudio).toHaveBeenCalledTimes(1);
+    expect(match.guestSide.ctx.audio.stopEndingAudio).toHaveBeenCalledTimes(1);
   });
 });
 

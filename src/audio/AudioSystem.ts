@@ -159,8 +159,17 @@ export class AudioSystem {
     this.music.stop();
   }
 
+  public startEndingAudio(): void {
+    this.music.startEndingAudio();
+  }
+
+  public stopEndingAudio(): void {
+    this.music.stopEndingAudio();
+  }
+
   /** Closes this run's AudioContext; the shared MusicManager keeps the menu theme. */
   public dispose(): void {
+    this.stopEndingAudio();
     this.stopWind();
     const ctx = this.ctx;
     this.ctx = null;
