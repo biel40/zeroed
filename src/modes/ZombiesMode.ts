@@ -92,6 +92,7 @@ export class ZombiesMode implements GameMode {
   );
   /** Centralized Points wallet: every reward and purchase routes through it. */
   private readonly economy = new PlayerEconomy();
+  private totalDamage = 0;
   private kills = 0;
   private headshots = 0;
   private rayGunUnlocked = false;
@@ -145,6 +146,7 @@ export class ZombiesMode implements GameMode {
       zombie.floor,
       source,
     );
+    this.zombies.onZombieDamaged = (damage) => { this.totalDamage += damage; };
     this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
     this.zombies.onBruteAttack = () => ctx.audio.playBruteRoar();
     this.zombies.onBarrierImpact = () => ctx.audio.playBarrierBreak();
@@ -163,7 +165,6 @@ export class ZombiesMode implements GameMode {
       this.arena.onSecretRoomUnlocked = (position) => {
         const spatial = this.spatialCueFor(position);
         ctx.audio.playSecretRoomUnlock(spatial.pan, spatial.attenuation);
-        ctx.hud.showRoundBanner('A HIDDEN CHAMBER OPENS');
       };
       this.arena.onRitualScare = (position) => {
         const spatial = this.spatialCueFor(position);
@@ -463,7 +464,7 @@ export class ZombiesMode implements GameMode {
     }
 
     const soulLamp = this.findFacingSoulLamp();
-    if (soulLamp) return `ACTIVATE SOUL LAMP\n${tapKey}`;
+    if (soulLamp) return `ENCENDER FAROL\n${tapKey}`;
 
     const ritual = this.findFacingRitualCircle();
     if (ritual) return `TOUCH THE RITUAL CIRCLE\n${tapKey}`;
@@ -1055,6 +1056,7 @@ export class ZombiesMode implements GameMode {
   private restart(): void {
     this.gameOver = false;
     this.runFlow.reset();
+    this.totalDamage = 0;
     this.kills = 0;
     this.headshots = 0;
     this.rayGunUnlocked = false;
@@ -1121,6 +1123,9 @@ export class ZombiesMode implements GameMode {
       kills: this.kills,
       headshots: this.headshots,
       points: this.economy.points,
+      totalPoints: this.economy.totalEarned,
+      totalDamage: this.totalDamage,
+      lamps: (this.arena?.soulLampInteractions ?? []).map((lamp) => lamp.activated),
     });
   }
 }

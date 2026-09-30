@@ -78,6 +78,12 @@ como cue independiente sobre la música de fondo.
 - Los golpes a ventanas validan separacion del marco, alineacion lateral y
   linea de contacto. Cada tiron hace vibrar la tabla o la arranca hacia fuera;
   el ultimo completa su recuperacion antes de retomar la ruta de entrada.
+  Cada ventana mantiene una cola estable: el mas cercano toma una ventana
+  libre y conserva el turno hasta terminar el tiron y atravesar el hueco.
+  Los demas esperan en posiciones escalonadas exteriores sin empujar al
+  primero ni activar anti-stuck por la espera. La muerte libera el turno;
+  las ventanas abiertas conservan el orden de entrada y las reparaciones
+  vuelven a detener a quienes aun no han cruzado.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega el arma equipada
   al activarla. Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
@@ -120,3 +126,19 @@ Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla y mantiene un presupuesto local estable de luces puntuales: seis en el
 perfil completo y cuatro con efectos reducidos. Asi el hueco que deja visibles
 ambas plantas no obliga a evaluar simultaneamente todas las luces decorativas.
+
+## HUD y estadisticas de partida
+
+El HUD y la pausa consumen la misma instantanea por jugador. La cartera separa
+Points disponibles de todos los obtenidos durante la run, incluidas reparaciones;
+las compras no reducen el acumulado. ZombieManager notifica la vida realmente
+retirada por impactos directos, cuchillo, splash y cadenas, sin contar overkill
+ni impactos sobre muertos. En cooperativo el anfitrion atribuye estos datos al
+atacante y los replica al invitado. Reiniciar limpia los acumulados.
+
+Los faroles muestran solo su estado de activacion y el numero real de
+interacciones del mapa, con iconos, marcas y etiquetas compartidos entre HUD
+y pausa. El HUD de combate usa una presentacion compacta sin leyenda de puntos
+ni resumen textual de faroles; la pausa conserva el detalle. Las primeras diez
+rondas se representan solo con aranazos. La interfaz no anuncia la sala oculta ni el desbloqueo. Las rondas
+combinan aranazos decorativos limitados con el numero exacto para rondas altas.

@@ -341,126 +341,57 @@ body {
 /* ---------- Zombies mode ---------- */
 
 #hud-zombies {
-  right: 24px;
-  bottom: 24px;
-  width: clamp(210px, 18vw, 270px);
-  min-width: 0;
-  padding: 15px 18px 14px;
-  overflow: hidden;
-  border: 1px solid rgba(118, 105, 90, 0.28);
-  border-left: 3px solid rgba(117, 20, 15, 0.78);
-  border-radius: 0;
-  clip-path: polygon(2% 0, 97% 2%, 100% 12%, 98% 92%, 91% 100%, 4% 97%, 0 84%, 1% 9%);
-  background:
-    linear-gradient(112deg, transparent 22%, rgba(255, 255, 255, 0.025) 22.5%, transparent 23%),
-    linear-gradient(24deg, transparent 68%, rgba(123, 17, 12, 0.12) 69%, transparent 72%),
-    radial-gradient(circle at 82% 18%, rgba(99, 19, 14, 0.2), transparent 34%),
-    rgba(8, 9, 9, 0.82);
-  box-shadow:
-    inset 0 0 28px rgba(0, 0, 0, 0.8),
-    inset 3px 0 12px rgba(98, 12, 8, 0.16),
-    0 8px 26px rgba(0, 0, 0, 0.48);
-  text-shadow: 0 1px 2px #000;
+  right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));
+  width: min(260px, calc(100vw - 36px)); min-width: 0; padding: 10px 12px;
+  border: 1px solid #74675250; border-bottom: 2px solid #91473b; border-radius: 0;
+  background: linear-gradient(145deg, #1c201ded, #111514eb);
+  color: #e7dfcc; text-shadow: 0 1px 2px #000; font-family: inherit; font-size: 12px;
+  font-variant-numeric: tabular-nums; box-shadow: 0 5px 22px #0006;
 }
+.icon-definitions { position: absolute; width: 0; height: 0; overflow: hidden; }
+.survival-icon { width: 19px; height: 19px; flex: 0 0 19px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.survival-label { display: block; font-size: 11px; letter-spacing: .1em; color: #cec2ac; }
+.survival-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: center; }
+.points-counter { margin-left: auto; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+#z-points { display: block; font-size: 24px; color: #d1b477; line-height: 1.2; }
+#z-points.denied { animation: pointsdenied .5s ease; }
+@keyframes pointsdenied { 25%, 75% { color: #ef7767; transform: translateX(-2px); } 50% { transform: translateX(2px); } }
+#z-round { display: flex; align-items: center; gap: 9px; min-height: 28px; color: #c96956; }
+.round-number { font-size: 23px; font-weight: 700; }
+.round-scratches { display: flex; gap: 3px; filter: drop-shadow(0 0 4px #b1373466); }
+.round-scratches i { width: 5px; height: 30px; background: #c96956; transform: rotate(13deg); clip-path: polygon(80% 0, 100% 21%, 62% 36%, 95% 43%, 48% 65%, 67% 73%, 0 100%, 15% 65%, 0 51%, 35% 29%); }
+.round-scratches i:nth-child(3n) { height: 26px; transform: rotate(18deg); }
+.round-scratches i:nth-child(5n) { margin-right: 5px; }
+#z-health { margin: 8px 0; }
+.health-heading, .lamp-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.health-heading strong { font-weight: 500; }
+#z-hp-bar { position: relative; margin-top: 6px; height: 8px; background: #0008; overflow: hidden; transform: skewX(-8deg); }
+#z-hp-bar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), #101110 calc(10% - 2px) 10%); }
+#z-hp-fill { display: block; height: 100%; background: #94aa86; transition: width .15s; }
+#z-hp-fill.low { background: #c75b4c; }
+.survival-counters { display: flex; flex-wrap: wrap; gap: 8px 16px; padding-bottom: 10px; border-bottom: 1px solid #ece1cb24; }
+.survival-counters > div { display: flex; flex: 1 1 110px; align-items: center; gap: 6px; }
+.survival-counters span { font-size: 11px; color: #cec2ac; }
+.survival-counters strong { margin-left: auto; font-size: 19px; flex-shrink: 0; }
+.lamp-progress { margin-top: 10px; text-align: left; }
+.lamp-heading { font-size: 12px; }
+.lamp-icons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; }
+.lamp { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 3px 6px; border: 1px dashed #817969; color: #aba596; }
+.lamp.lit { border: 1px solid #a3864d; color: #e1ba6c; background: #d9af5b12; box-shadow: inset 0 0 14px #d9af5b18; }
+.lamp.lit svg { filter: drop-shadow(0 0 4px #d9af5b66); }
+.lamp small { font-size: 11px; }
+.lamp-summary { margin: 7px 0 0; font-size: 11px; color: #cec2ac; }
 
-#hud-zombies::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.32;
-  background:
-    repeating-linear-gradient(167deg, transparent 0 16px, rgba(210, 199, 176, 0.08) 17px, transparent 18px 31px),
-    repeating-linear-gradient(93deg, transparent 0 46px, rgba(0, 0, 0, 0.3) 47px 49px);
-  mix-blend-mode: screen;
-}
-
-#z-round {
-  position: relative;
-  font-size: 18px;
-  font-weight: 800;
-  font-style: italic;
-  letter-spacing: 0.18em;
-  color: #d8c5a3;
-  margin-bottom: 5px;
-  text-shadow: 2px 2px 0 #35100d, 0 0 8px rgba(145, 28, 20, 0.45);
-}
-
-#z-points {
-  position: relative;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  color: #c8a75d;
-  margin-bottom: 10px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid rgba(139, 35, 27, 0.42);
-}
-
-/* Purchase refused: a quick red flash on the points counter. */
-#z-points.denied {
-  animation: pointsdenied 0.5s ease;
-}
-
-@keyframes pointsdenied {
-  0%, 100% { color: #ffd25c; transform: translateX(0); }
-  25% { color: #ff5c5c; transform: translateX(-3px); }
-  50% { color: #ff5c5c; transform: translateX(3px); }
-  75% { color: #ff5c5c; transform: translateX(-2px); }
-}
-
-#z-health {
-  position: relative;
-  margin-bottom: 10px;
-}
-
-#z-health .hud-label {
-  display: block;
-  margin-bottom: 4px;
-  color: #aaa396;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-}
-
-#z-hp-bar {
-  height: 7px;
-  background: rgba(1, 3, 2, 0.82);
-  border: 1px solid rgba(178, 167, 143, 0.25);
-  transform: skewX(-7deg);
-  overflow: hidden;
-  box-shadow: inset 0 1px 3px #000, 0 0 5px rgba(0, 0, 0, 0.8);
-}
-
-#z-hp-fill {
-  display: block;
-  height: 100%;
-  width: 100%;
-  background: linear-gradient(90deg, #486f3a, #7aa85c 72%, #a4c979);
-  box-shadow: 0 0 7px rgba(111, 164, 77, 0.48);
-  transition: width 0.15s ease;
-}
-
-#z-hp-fill.low {
-  background: linear-gradient(90deg, #68120e, #b52a20 70%, #e04a37);
-  box-shadow: 0 0 8px rgba(191, 35, 25, 0.75);
-}
-
-#hud-zombies .hud-row {
-  position: relative;
-  padding-top: 4px;
-  color: #d2cec4;
-  font-weight: 700;
-}
-
-#hud-zombies .hud-row + .hud-row {
-  margin-top: 3px;
-  border-top: 1px solid rgba(255, 255, 255, 0.045);
-}
-
-#hud-zombies .hud-label {
-  color: #85817a;
-}
+#hud-zombies .survival-icon { width: 16px; height: 16px; flex-basis: 16px; color: #bdb7a4; }
+#hud-zombies .survival-label, #hud-zombies .survival-counters span { color: #bdb7a4; }
+#hud-zombies .survival-counters { gap: 6px 10px; padding-bottom: 7px; }
+#hud-zombies .survival-counters > div { flex-basis: 100px; gap: 5px; }
+#hud-zombies .survival-counters strong { font-size: 16px; }
+#hud-zombies .lamp-progress { margin-top: 7px; }
+#hud-zombies .lamp-icons { gap: 6px; margin-top: 5px; }
+#hud-zombies .lamp { flex-direction: row; gap: 4px; padding: 2px 4px; border-color: #a39c8759; color: #aaa894; }
+#hud-zombies .lamp.lit { border-color: #d1b47780; color: #e2c88d; background: #d1b47718; box-shadow: none; }
+#hud-zombies .lamp.lit .survival-icon { color: #e2c88d; }
 
 #round-banner {
   position: absolute;
@@ -1631,12 +1562,6 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled .hud-label { font-size: 8px; }
   html.touch-controls-enabled #hud-weapon-name { font-size: 10px; letter-spacing: 0.08em; }
   html.touch-controls-enabled #hud-ammo { font-size: 17px; margin: 0; }
-  html.touch-controls-enabled #hud-zombies { max-width: 120px; padding: 7px 9px 6px; }
-  html.touch-controls-enabled #z-round { font-size: 11px; letter-spacing: 0.08em; margin-bottom: 2px; }
-  html.touch-controls-enabled #z-points { font-size: 10px; margin-bottom: 4px; padding-bottom: 3px; }
-  html.touch-controls-enabled #z-health { margin-bottom: 4px; }
-  html.touch-controls-enabled #z-health .hud-label { font-size: 7px; margin-bottom: 2px; }
-  html.touch-controls-enabled #z-hp-bar { height: 3px; }
   html.touch-controls-enabled #banner-title { font-size: 26px; letter-spacing: 0.2em; }
   html.touch-controls-enabled #banner-sub { font-size: 11px; letter-spacing: 0.25em; }
   html.touch-controls-enabled #interact-prompt { top: 56%; font-size: 13px; letter-spacing: 0.16em; }
@@ -1653,11 +1578,9 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled .menu-footnote { margin-top: 12px; }
   html.touch-controls-enabled .pwa-actions { min-height: 24px; margin-top: 8px; }
   html.touch-controls-enabled .hud-panel { padding: 4px 7px; }
-  html.touch-controls-enabled #hud-zombies { width: 150px; padding: 6px 9px; }
   html.touch-controls-enabled .hud-row-secondary { display: none; }
   html.touch-controls-enabled .hud-row { font-size: 10px; }
   html.touch-controls-enabled #hud-ammo { font-size: 15px; margin: 0; }
-  html.touch-controls-enabled #z-round { font-size: 11px; margin-bottom: 2px; }
   html.touch-controls-enabled #joystick { width: 96px; height: 96px; }
   html.touch-controls-enabled #joystick-knob { width: 42px; height: 42px; }
   html.touch-controls-enabled #banner-title { font-size: 24px; }
@@ -1667,4 +1590,54 @@ html.touch-controls-enabled .start-panel {
   #map-select::before { animation: none; }
   .mode-grid button,
   .mode-grid button::after { transition: none; }
+}
+
+/* Survival panels retain every counter at narrow widths and browser UI scales. */
+#pause-menu { padding: 16px; overflow-y: auto; }
+#pause-menu .start-panel { width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; color: #eee5d3; background: #101110f2; border-radius: 0; border-color: #51483a; border-bottom: 3px solid #8e362d; }
+#pause-menu h1 { color: #eee5d3; margin: 10px 0 18px; }
+.pause-stats { width: 100%; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; }
+.pause-stats caption { text-align: left; color: #d4ad62; margin-bottom: 7px; font-size: 13px; }
+.pause-stats th, .pause-stats td { padding: 9px 0; border-bottom: 1px solid #ece1cb24; }
+.pause-stats th { font-weight: 400; font-size: 14px; padding-right: 12px; }
+.pause-stats td { text-align: right; overflow-wrap: anywhere; }
+#pause-menu .pause-actions { min-width: 0; }
+#pause-menu .pause-actions button { letter-spacing: .1em; padding: 12px; }
+@media (max-width: 600px) {
+  #hud-zombies { right: 10px; bottom: 10px; width: min(260px, calc(100vw - 20px)); padding: 10px 12px; }
+  #hud-weapon { left: 10px; top: 10px; bottom: auto; min-width: 0; }
+}
+html.touch-controls-enabled #hud-zombies { width: min(250px, calc(100vw - 20px)); max-width: none; }
+@media (max-height: 500px) {
+  #hud-zombies, html.touch-controls-enabled #hud-zombies { width: min(260px, calc(100vw - 20px)); padding: 8px 12px; }
+  #z-health { margin: 7px 0; }
+  .lamp-progress { margin-top: 7px; }
+  .lamp-icons { gap: 5px; margin-top: 4px; }
+  .lamp { flex-direction: row; padding: 2px 5px; }
+  .survival-counters { padding-bottom: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { #z-hp-fill { transition: none; } }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  html.touch-controls-enabled #hud-zombies {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    right: calc(70px + env(safe-area-inset-right, 0px));
+    left: calc(90px + env(safe-area-inset-left, 0px));
+    width: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 16px;
+    line-height: 1.2;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  html.touch-controls-enabled #z-health { margin: 0; align-self: center; }
+  html.touch-controls-enabled .survival-counters { gap: 4px; padding: 0; border: 0; }
+  html.touch-controls-enabled .survival-counters > div { flex-basis: 100%; }
+  html.touch-controls-enabled #z-lamps { margin: 0; }
+  html.touch-controls-enabled .survival-top { gap: 6px; }
+  html.touch-controls-enabled .round-scratches { gap: 2px; }
+  html.touch-controls-enabled .round-scratches i { width: 3px; height: 22px; }
+  html.touch-controls-enabled .round-number { font-size: 20px; }
 }

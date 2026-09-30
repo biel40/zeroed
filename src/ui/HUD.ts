@@ -2,6 +2,7 @@ import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { clamp } from '../utils/math';
 import { NUCLEAR_ENDING_DURATION } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
+import { lampProgress, roundMarks } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
 export interface ZombieHudState {
@@ -12,42 +13,15 @@ export interface ZombieHudState {
   readonly kills: number;
   readonly headshots: number;
   readonly points: number;
+  readonly totalPoints: number;
+  readonly totalDamage: number;
+  readonly lamps: readonly boolean[];
 }
 
 export interface GameOverStats {
   readonly round: number;
   readonly kills: number;
   readonly headshots: number;
-}
-
-const ROMAN_NUMERALS: readonly (readonly [number, string])[] = [
-  [1000, 'M'],
-  [900, 'CM'],
-  [500, 'D'],
-  [400, 'CD'],
-  [100, 'C'],
-  [90, 'XC'],
-  [50, 'L'],
-  [40, 'XL'],
-  [10, 'X'],
-  [9, 'IX'],
-  [5, 'V'],
-  [4, 'IV'],
-  [1, 'I'],
-];
-
-/** Roman rounds stay compact through 3999; extreme endless rounds fall back safely. */
-export function formatRomanRound(round: number): string {
-  if (!Number.isInteger(round) || round < 1 || round > 3999) return `${round}`;
-  let remaining = round;
-  let result = '';
-  for (const [value, numeral] of ROMAN_NUMERALS) {
-    while (remaining >= value) {
-      result += numeral;
-      remaining -= value;
-    }
-  }
-  return result;
 }
 
 function mustGet(id: string): HTMLElement {
@@ -102,6 +76,8 @@ export class HUD {
   private lastAmmo: string = '';
   private lastMode: string = '';
   private lastZombies: string = '';
+  private lastRound = -1;
+  private lastLamps = '';
   private lastPrompt: string | null = null;
   private ready: boolean = false;
 
@@ -330,12 +306,17 @@ export class HUD {
 
   /** Zombies panel; the whole block only re-renders when something changed. */
   public updateZombies(state: ZombieHudState): void {
-    const key = `${state.round}|${state.hp}|${state.maxHp}|${state.lethalHitDamage}|${state.kills}|${state.headshots}|${state.points}`;
+    const key = `${state.round}|${state.hp}|${state.maxHp}|${state.lethalHitDamage}|${state.kills}|${state.headshots}|${state.points}|${state.totalPoints}|${state.totalDamage}|${state.lamps.join(',')}`;
     if (key === this.lastZombies) return;
     this.lastZombies = key;
-    this.zRound.textContent = state.round > 0 ? `ROUND ${formatRomanRound(state.round)}` : 'GET READY';
-    this.zPoints.textContent = `${state.points} PTS`;
-    const ratio = clamp(state.hp / state.maxHp, 0, 1);
+    if (this.lastRound !== state.round) {
+      this.lastRound = state.round;
+      this.zRound.innerHTML = roundMarks(state.round);
+      this.zRound.setAttribute('aria-label', `Ronda ${state.round}`);
+    }
+    this.zPoints.textContent = state.points.toLocaleString('es-ES');
+    mustGet('z-hp').textContent = `${Math.ceil(state.hp)} / ${state.maxHp}`;
+    const ratio = state.maxHp > 0 ? clamp(state.hp / state.maxHp, 0, 1) : 0;
     this.zHpFill.style.width = `${ratio * 100}%`;
     this.zHpFill.classList.toggle('low', ratio <= 0.3);
     this.damageOverlay.classList.toggle(
@@ -344,6 +325,16 @@ export class HUD {
     );
     this.zKills.textContent = `${state.kills}`;
     this.zHeadshots.textContent = `${state.headshots}`;
+    mustGet('pause-damage').textContent = Math.round(state.totalDamage).toLocaleString('es-ES');
+    mustGet('pause-points').textContent = state.totalPoints.toLocaleString('es-ES');
+    mustGet('pause-kills').textContent = `${state.kills}`;
+    mustGet('pause-headshots').textContent = `${state.headshots}`;
+    const lampKey = `${state.lamps.length}|${state.lamps.join(',')}`;
+    if (this.lastLamps !== lampKey) {
+      this.lastLamps = lampKey;
+      mustGet('z-lamps').innerHTML = lampProgress(state.lamps, true);
+      mustGet('pause-lamps').innerHTML = lampProgress(state.lamps);
+    }
   }
 
   /** Brief red flash on the points counter: a purchase was refused. */

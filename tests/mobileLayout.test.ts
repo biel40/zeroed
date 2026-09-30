@@ -12,9 +12,9 @@ function ruleIndex(selector: string): number {
 }
 
 describe('mobile stylesheet cascade', () => {
-  it('uses the health bar without rendering a numeric HP value', () => {
+  it('shows both segmented health and current / maximum HP', () => {
     expect(html).toContain('id="z-hp-bar"');
-    expect(html).not.toContain('id="z-hp"');
+    expect(html).toContain('id="z-hp"');
   });
 
   /**

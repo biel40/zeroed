@@ -40,6 +40,8 @@ export interface PlayerNetState {
 }
 
 export interface PlayerMatchStats {
+  readonly totalPoints?: number;
+  readonly totalDamage?: number;
   readonly hp: number;
   readonly points: number;
   readonly kills: number;
@@ -202,7 +204,9 @@ export function isPlayerNetState(value: unknown): value is PlayerNetState {
 }
 
 function isStats(value: unknown): value is PlayerMatchStats {
-  return isObject(value) && isFiniteNumber(value.hp) && isFiniteNumber(value.points)
+  return isObject(value)
+    && (value.totalPoints === undefined || (isFiniteNumber(value.totalPoints) && value.totalPoints >= 0))
+    && (value.totalDamage === undefined || (isFiniteNumber(value.totalDamage) && value.totalDamage >= 0)) && isFiniteNumber(value.hp) && isFiniteNumber(value.points)
     && isFiniteNumber(value.kills) && isFiniteNumber(value.headshots)
     && (value.life === 'alive' || value.life === 'downed' || value.life === 'dead')
     && isFiniteNumber(value.bleedRemaining) && value.bleedRemaining >= 0

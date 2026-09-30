@@ -18,15 +18,23 @@ export const POINTS_REPAIR = 10;
 
 export class PlayerEconomy {
   private balance = 0;
+  private earned = 0;
   private unlimitedSpending = false;
 
   get points(): number {
     return this.balance;
   }
 
+  get totalEarned(): number { return this.earned; }
+
+  private award(amount: number): void {
+    this.balance += amount;
+    this.earned += amount;
+  }
+
   /** Non-lethal direct-hit reward. Call only when the zombie survived. */
   awardHit(headshot = false): void {
-    this.balance += headshot ? HEADSHOT_POINTS : POINTS_HIT;
+    this.award(headshot ? HEADSHOT_POINTS : POINTS_HIT);
   }
 
   /**
@@ -34,12 +42,12 @@ export class PlayerEconomy {
    * lethal; the two branches remain mutually exclusive.
    */
   awardKill(headshot: boolean): void {
-    this.balance += headshot ? HEADSHOT_POINTS : POINTS_KILL;
+    this.award(headshot ? HEADSHOT_POINTS : POINTS_KILL);
   }
 
   /** Dedicated lethal melee reward; never stacked with the normal kill. */
   public awardKnifeKill(): void {
-    this.balance += POINTS_KNIFE_KILL;
+    this.award(POINTS_KNIFE_KILL);
   }
 
   /**
@@ -48,7 +56,7 @@ export class PlayerEconomy {
    * single-source-of-truth rule: points are only ever added here.
    */
   awardRepair(): void {
-    this.balance += POINTS_REPAIR;
+    this.award(POINTS_REPAIR);
   }
 
   public setUnlimitedSpending(enabled: boolean): void {
@@ -73,6 +81,7 @@ export class PlayerEconomy {
   /** Zombies restart: back to a fresh wallet. */
   reset(): void {
     this.balance = 0;
+    this.earned = 0;
     this.unlimitedSpending = false;
   }
 }

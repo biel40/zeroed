@@ -105,6 +105,9 @@ const PORTAL_OBJECTIVE_RADIUS = 0.7;
 /** Closed barriers seal their window aperture for navigation (boards are gameplay-only). */
 const BARRIER_VOLUME_LENGTH = 1.5;
 const BARRIER_VOLUME_THICKNESS = 0.34;
+/** Staggered waiting positions keep the horde outside the contact lane. */
+const BARRIER_QUEUE_SPACING = ZOMBIE_SEPARATION_RADIUS;
+const BARRIER_QUEUE_LANES = [0, -1, 1, -2, 2] as const;
 /** Surfaces solid enough to stop a walking body (targets are steel/paper). */
 const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'metal']);
 /** A collider blocks movement only if it is tall enough to matter. */
@@ -189,6 +192,8 @@ export class ZombieManager {
   readonly group = new THREE.Group();
 
   onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource) => void) | null = null;
+  /** Actual health removed, including direct, melee, splash and chain hits. */
+  public onZombieDamaged: ((damage: number) => void) | null = null;
   onPlayerAttack: ((damage: number, targetId?: ZombieTargetId) => void) | null = null;
   /** Authority hooks for networked play; unused (null) in single player. */
   public onZombieSpawned: ((zombie: Zombie) => void) | null = null;
@@ -219,6 +224,7 @@ export class ZombieManager {
   /** Smoothed unit walking direction the body visibly faces. */
   private readonly headings = new Map<Zombie, { x: number; z: number }>();
   private readonly entryRoutes = new Map<Zombie, EntryRoute>();
+  private readonly barrierQueues = new Map<WindowBarrier, Zombie[]>();
   private readonly stairTraversals = new Map<Zombie, StairTraversal>();
   private readonly stuckState = new Map<Zombie, StuckState>();
   private readonly navPaths = new Map<Zombie, NavPath>();
@@ -573,7 +579,7 @@ export class ZombieManager {
     source: ZombieKillSource = 'default',
   ): boolean {
     const damage = computeDamage(baseDamage, part);
-    if (zombie.applyDamage(damage, part === 'head', this.lastPlayerX, this.lastPlayerZ)) {
+    if (this.applyTrackedDamage(zombie, damage, part === 'head', this.lastPlayerX, this.lastPlayerZ)) {
       this.kill(zombie, part === 'head', source);
       return true;
     }
@@ -617,7 +623,7 @@ export class ZombieManager {
       const appliedDamage = isDirectHit ? computeDamage(damage, directPart) : damage;
       const sourceX = isDirectHit ? this.lastPlayerX : impact.position.x;
       const sourceZ = isDirectHit ? this.lastPlayerZ : impact.position.z;
-      if (zombie.applyDamage(appliedDamage, headshot, sourceX, sourceZ)) this.kill(zombie, headshot);
+      if (this.applyTrackedDamage(zombie, appliedDamage, headshot, sourceX, sourceZ)) this.kill(zombie, headshot);
     }
     return chain;
   }
@@ -634,8 +640,16 @@ export class ZombieManager {
       const damage = splashDamageAt(splashDamage, Math.hypot(dx, dz), radius);
       if (damage <= 0) continue;
       // applyDamage already triggers the red hit flash.
-      if (zombie.applyDamage(damage, false, center.x, center.z)) this.kill(zombie, false);
+      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z)) this.kill(zombie, false);
     }
+  }
+
+  private applyTrackedDamage(zombie: Zombie, damage: number, headshot: boolean, x: number, z: number): boolean {
+    const before = Math.max(0, zombie.hp);
+    const lethal = zombie.applyDamage(damage, headshot, x, z);
+    const removed = before - Math.max(0, zombie.hp);
+    if (removed > 0) this.onZombieDamaged?.(removed);
+    return lethal;
   }
 
   update(
@@ -665,6 +679,7 @@ export class ZombieManager {
       this.lastBarrierSignature = barrierSignature;
       this.rebuildNavigation();
     }
+    this.refreshBarrierQueues();
     this.drainPathQueue();
     for (const zombie of this.pool.actives) {
       let targetId: ZombieTargetId = 'host';
@@ -763,6 +778,7 @@ export class ZombieManager {
     this.roundState.clear();
     this.headings.clear();
     this.entryRoutes.clear();
+    this.barrierQueues.clear();
     this.stairTraversals.clear();
     this.stuckState.clear();
     this.navPaths.clear();
@@ -944,33 +960,14 @@ export class ZombieManager {
     if (zombie.state !== 'walk') return;
 
     if (target) {
-      const toBarrier = this.tmpToPlayer.set(
-        target.position.x - zombie.position.x,
-        0,
-        target.position.z - zombie.position.z,
-      );
+      if (this.waitForBarrierTurn(zombie, target, dt)) return;
       if (this.barrierPositionValid(zombie, target)) {
-        if (!this.alignedForStrike(zombie, target.position.x, target.position.z)) return;
-        // Remove the tiny remaining angular error before converting the board
-        // contact point into local animation space. The committed swing then
-        // stays straight instead of landing diagonally across the body.
-        zombie.faceTowards(target.position.x, target.position.z);
-        this.updateBarrierContact(zombie, target);
-        if (zombie.tryBarrierAttack()) {
-          zombie.onAttackLanded = () => {
-            if (!this.barrierPositionValid(zombie, target) || !this.facingTarget(zombie, target.position.x, target.position.z)) return;
-            this.hitBarrier(target);
-            if (target.isOpen) {
-              zombie.barrierTarget = null;
-              zombie.finishBarrierAttack();
-            }
-          };
-        }
+        this.tryStrikeBarrier(zombie, target);
         return;
       }
       const approachX = target.position.x + target.outward.x * 0.9;
       const approachZ = target.position.z + target.outward.z * 0.9;
-      toBarrier.set(approachX - zombie.position.x, 0, approachZ - zombie.position.z).normalize();
+      const toBarrier = this.tmpToPlayer.set(approachX - zombie.position.x, 0, approachZ - zombie.position.z).normalize();
       this.seek(zombie, dt, toBarrier, approachX, approachZ);
       return;
     }
@@ -1154,8 +1151,12 @@ export class ZombieManager {
 
     // Soft neighbor separation so the horde never stacks into one body.
     const separation = this.tmpSeparation.set(0, 0, 0);
+    const queue = this.queueFor(zombie);
+    const queueIndex = queue?.indexOf(zombie) ?? -1;
     for (const other of this.pool.actives) {
       if (other === zombie || !other.isAlive) continue;
+      // Followers must never push the contact/entry owner away from its lane.
+      if (queue && queue.indexOf(other) > queueIndex) continue;
       const sharesFloor = other.floor === zombie.floor;
       const sharesRamp = stairRamp !== null && this.findRampAt(other.position.x, other.position.z) === stairRamp;
       if (!sharesFloor && !sharesRamp) continue;
@@ -1439,16 +1440,21 @@ export class ZombieManager {
    */
   private moveWithCollision(zombie: Zombie, dx: number, dz: number): boolean {
     const pos = zombie.position;
+    // Exterior spawns can sit on the arena boundary. Crowd separation must
+    // not push queued bodies out of it and trigger an unrelated relocation.
+    const queued = this.queueFor(zombie) !== undefined;
     let moved = false;
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (zombie.bodyRadius * 0.45)));
     const stepX = dx / steps;
     const stepZ = dz / steps;
     for (let step = 0; step < steps; step++) {
-      if (stepX !== 0 && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y, zombie.bodyRadius)) {
+      if (stepX !== 0 && (!queued || this.isWithinNavigationBounds(pos.x + stepX, pos.z, zombie.floor))
+        && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y, zombie.bodyRadius)) {
         pos.x += stepX;
         moved = true;
       }
-      if (stepZ !== 0 && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y, zombie.bodyRadius)) {
+      if (stepZ !== 0 && (!queued || this.isWithinNavigationBounds(pos.x, pos.z + stepZ, zombie.floor))
+        && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y, zombie.bodyRadius)) {
         pos.z += stepZ;
         moved = true;
       }
@@ -1473,6 +1479,18 @@ export class ZombieManager {
       };
     }
     const route = this.entryRoutes.get(zombie);
+    const queue = this.queueFor(zombie);
+    if (queue && queue.indexOf(zombie) > 0) {
+      const barrier = this.barrierFor(zombie)!;
+      const target = this.barrierWaitingPosition(zombie, barrier, this.tmpDelta);
+      return {
+        key: `barrier-wait:${barrier.id}:${queue.indexOf(zombie)}`,
+        kind: 'approach',
+        x: target.x,
+        z: target.z,
+        radius: WAYPOINT_EPSILON,
+      };
+    }
     if (route) {
       const approach = route.stage === 'approach';
       return {
@@ -1964,6 +1982,14 @@ export class ZombieManager {
     const route = this.entryRoutes.get(zombie);
     if (!route) return false;
     const barrier = this.barriers.find((candidate) => candidate.id === route.barrierId) ?? null;
+    if (barrier && this.waitForBarrierTurn(zombie, barrier, dt)) return true;
+    // A repair can close the aperture while the next owner approaches it.
+    // Bodies already inside finish entering instead of turning through the wall.
+    if (barrier && !barrier.isOpen && route.stage === 'breach') {
+      const depth = (zombie.position.x - barrier.position.x) * barrier.outward.x
+        + (zombie.position.z - barrier.position.z) * barrier.outward.z;
+      if (depth >= zombie.bodyRadius + 0.17) route.stage = 'approach';
+    }
 
     if (route.stage === 'approach') {
       const dx = route.approachX - zombie.position.x;
@@ -1980,18 +2006,7 @@ export class ZombieManager {
       if (barrier && !barrier.isOpen) {
         zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
         this.updateBarrierContact(zombie, barrier);
-        if (zombie.state === 'walk'
-          && this.barrierPositionValid(zombie, barrier)
-          && this.alignedForStrike(zombie, barrier.position.x, barrier.position.z)) {
-          zombie.faceTowards(barrier.position.x, barrier.position.z);
-          this.updateBarrierContact(zombie, barrier);
-          if (!zombie.tryBarrierAttack()) return true;
-          zombie.onAttackLanded = () => {
-            if (!this.barrierPositionValid(zombie, barrier) || !this.facingTarget(zombie, barrier.position.x, barrier.position.z)) return;
-            this.hitBarrier(barrier);
-            if (barrier.isOpen) zombie.finishBarrierAttack();
-          };
-        }
+        this.tryStrikeBarrier(zombie, barrier);
         return true;
       }
       route.stage = 'breach';
@@ -2010,6 +2025,94 @@ export class ZombieManager {
     if (zombie.state === 'walk') {
       const direction = this.tmpToPlayer.set(dx, 0, dz).normalize();
       this.seek(zombie, dt, direction, route.breachX, route.breachZ);
+    }
+    return true;
+  }
+
+  private barrierFor(zombie: Zombie): WindowBarrier | null {
+    const route = this.entryRoutes.get(zombie);
+    return route
+      ? this.barriers.find((barrier) => barrier.id === route.barrierId) ?? null
+      : zombie.barrierTarget;
+  }
+
+  private tryStrikeBarrier(zombie: Zombie, barrier: WindowBarrier): void {
+    if (zombie.state !== 'walk' || !this.barrierPositionValid(zombie, barrier)
+      || !this.alignedForStrike(zombie, barrier.position.x, barrier.position.z)) return;
+    // Commit from the contact frame without changing the existing animation.
+    zombie.faceTowards(barrier.position.x, barrier.position.z);
+    this.updateBarrierContact(zombie, barrier);
+    if (!zombie.tryBarrierAttack()) return;
+    zombie.onAttackLanded = () => {
+      if (this.barrierQueues.get(barrier)?.[0] !== zombie
+        || !this.barrierPositionValid(zombie, barrier)
+        || !this.facingTarget(zombie, barrier.position.x, barrier.position.z)) return;
+      this.hitBarrier(barrier);
+      if (barrier.isOpen) {
+        zombie.barrierTarget = null;
+        zombie.finishBarrierAttack();
+      }
+    };
+  }
+
+  private queueFor(zombie: Zombie): Zombie[] | undefined {
+    const barrier = this.barrierFor(zombie);
+    return barrier ? this.barrierQueues.get(barrier) : undefined;
+  }
+
+  /** Keep the owner through the final swing and breach; never reshuffle a live queue. */
+  private refreshBarrierQueues(): void {
+    for (const [barrier, queue] of this.barrierQueues) {
+      for (let index = queue.length - 1; index >= 0; index--) {
+        const zombie = queue[index];
+        if (!this.pool.actives.has(zombie) || !zombie.isAlive || this.barrierFor(zombie) !== barrier) {
+          queue.splice(index, 1);
+        }
+      }
+      if (queue.length === 0) this.barrierQueues.delete(barrier);
+    }
+    for (const zombie of this.pool.actives) {
+      if (!zombie.isAlive) continue;
+      const barrier = this.barrierFor(zombie);
+      if (!barrier) continue;
+      let queue = this.barrierQueues.get(barrier);
+      if (!queue) {
+        // The closest body takes an unclaimed window, independent of pool order.
+        queue = [...this.pool.actives].filter((candidate) => candidate.isAlive && this.barrierFor(candidate) === barrier);
+        queue.sort((a, b) => (a.position.x - barrier.position.x) ** 2 + (a.position.z - barrier.position.z) ** 2
+          - (b.position.x - barrier.position.x) ** 2 - (b.position.z - barrier.position.z) ** 2);
+        this.barrierQueues.set(barrier, queue);
+      } else if (!queue.includes(zombie)) {
+        queue.push(zombie);
+      }
+    }
+  }
+
+  private barrierWaitingPosition(zombie: Zombie, barrier: WindowBarrier, out: THREE.Vector3): THREE.Vector3 {
+    const index = this.barrierQueues.get(barrier)!.indexOf(zombie) - 1;
+    const row = Math.floor(index / BARRIER_QUEUE_LANES.length) + 1;
+    const lane = BARRIER_QUEUE_LANES[index % BARRIER_QUEUE_LANES.length];
+    const route = this.entryRoutes.get(zombie);
+    const x = route?.approachX ?? barrier.position.x + barrier.outward.x * 0.9;
+    const z = route?.approachZ ?? barrier.position.z + barrier.outward.z * 0.9;
+    return out.set(x + barrier.outward.x * row * BARRIER_QUEUE_SPACING + barrier.outward.z * lane * BARRIER_QUEUE_SPACING,
+      0, z + barrier.outward.z * row * BARRIER_QUEUE_SPACING - barrier.outward.x * lane * BARRIER_QUEUE_SPACING);
+  }
+
+  private waitForBarrierTurn(zombie: Zombie, barrier: WindowBarrier, dt: number): boolean {
+    const queue = this.barrierQueues.get(barrier);
+    if (!queue || queue.indexOf(zombie) <= 0) return false;
+    const target = this.barrierWaitingPosition(zombie, barrier, this.tmpToPlayer);
+    const x = target.x;
+    const z = target.z;
+    const dx = x - zombie.position.x;
+    const dz = z - zombie.position.z;
+    if (zombie.state === 'walk' && Math.hypot(dx, dz) > WAYPOINT_EPSILON) {
+      target.set(dx, 0, dz).normalize();
+      this.seek(zombie, dt, target, x, z);
+    } else {
+      this.movement.delete(zombie);
+      zombie.faceTowards(barrier.position.x, barrier.position.z, TURN_SPEED * dt);
     }
     return true;
   }
@@ -2087,6 +2190,9 @@ export class ZombieManager {
   }
 
   private finishDeath(zombie: Zombie): void {
+    const queue = this.queueFor(zombie);
+    const index = queue?.indexOf(zombie) ?? -1;
+    if (queue && index >= 0) queue.splice(index, 1);
     this.entryRoutes.delete(zombie);
     this.stairTraversals.delete(zombie);
     this.roundState.delete(zombie);

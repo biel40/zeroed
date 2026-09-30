@@ -57,6 +57,100 @@ function stepUntilState(
 }
 
 describe('ZombieManager barrier feedback', () => {
+  function crowd(count: number, boardCount = 6, boardHp = ZOMBIE_BARRIER_ATTACK_DAMAGE) {
+    const barrier = new WindowBarrier('window', 0, 0, 0, 1, {
+      boardCount, boardHp, repairInterval: 0.1, repairRewardCap: 6,
+    });
+    const manager = new ZombieManager(() => 0, {}, false, [{
+      x: 0, z: 6, barrierId: barrier.id,
+      approachX: 0, approachZ: 0.9, breachX: 0, breachZ: -0.9, exterior: true,
+    }], [barrier], [], () => 1);
+    manager.registerColliders([]);
+    for (let index = 0; index < count; index++) {
+      expect(manager.spawnZombie(roundConfig(6), 0, -5, 6)).toBe(true);
+    }
+    const zombies = [...manager.actives];
+    zombies.forEach((zombie, index) => {
+      zombie.state = 'walk';
+      zombie.position.set((index % 3 - 1) * 0.8, 0, 2 + Math.floor(index / 3) * 0.8);
+    });
+    return { manager, barrier, zombies };
+  }
+
+  it.each([3, 8, 24])('organizes %i zombies and lets every body enter without recovery teleports', (count) => {
+    const { manager, barrier, zombies } = crowd(count);
+    const entered = new Set<Zombie>();
+    let maxStep = 0;
+    const previous = zombies.map((zombie) => zombie.position.clone());
+    for (let frame = 0; frame < 60 * 90 && entered.size < count; frame++) {
+      manager.update(DT, 0, -5);
+      expect(zombies.filter((zombie) => zombie.state === 'barrierAttack').length).toBeLessThanOrEqual(1);
+      zombies.forEach((zombie, index) => {
+        maxStep = Math.max(maxStep, zombie.position.distanceTo(previous[index]));
+        previous[index].copy(zombie.position);
+        if (!barrier.isOpen) expect(zombie.position.z).toBeGreaterThan(0);
+        if (zombie.position.z < -0.7) entered.add(zombie);
+      });
+    }
+    expect(barrier.isOpen).toBe(true);
+    expect(entered.size).toBe(count);
+    expect(maxStep).toBeLessThan(0.1);
+    expect(manager.stuckRecoveryCount).toBe(0);
+  });
+
+  it('hands the window to the next zombie immediately when its attacker dies', () => {
+    const { manager, barrier, zombies } = crowd(3);
+    for (let frame = 0; frame < 600 && !zombies.some((zombie) => zombie.state === 'barrierAttack'); frame++) {
+      manager.update(DT, 0, -5);
+    }
+    const owner = zombies.find((zombie) => zombie.state === 'barrierAttack')!;
+    expect(owner).toBeDefined();
+    owner.applyDamage(owner.hp);
+    step(manager, 30, 0, -5);
+    expect(barrier.isOpen).toBe(true);
+    expect(zombies.filter((zombie) => zombie.isAlive).every((zombie) => zombie.position.z < 0)).toBe(true);
+    expect(manager.stuckRecoveryCount).toBe(0);
+  });
+
+  it('treats a long wait for boards as intentional instead of relocating the followers', () => {
+    const { manager, zombies } = crowd(8, 6, 5000);
+    step(manager, 30, 0, -5);
+    expect(zombies.every((zombie) => zombie.position.z > 0)).toBe(true);
+    expect(manager.stuckRecoveryCount).toBe(0);
+    const positions = zombies.map((zombie) => zombie.position.clone());
+    step(manager, 2, 0, -5);
+    zombies.forEach((zombie, index) => expect(zombie.position.distanceTo(positions[index])).toBeLessThan(0.2));
+  });
+
+  it('queues arrivals even when their assigned window was already open', () => {
+    const { manager, barrier, zombies } = crowd(8);
+    barrier.damage(10000);
+    for (let index = 1; index < barrier.boards.length; index++) barrier.damage(10000);
+    step(manager, 30, 0, -5);
+    expect(zombies.every((zombie) => zombie.position.z < 0)).toBe(true);
+    expect(manager.stuckRecoveryCount).toBe(0);
+  });
+
+  it('breaks repaired boards before letting the waiting followers enter', () => {
+    const { manager, barrier, zombies } = crowd(8, 1);
+    for (let frame = 0; frame < 1200 && !zombies.some((zombie) => zombie.position.z < -0.7); frame++) {
+      manager.update(DT, 0, -5);
+    }
+    expect(barrier.isOpen).toBe(true);
+    barrier.repair(0.1);
+    expect(barrier.isOpen).toBe(false);
+    const outside = zombies.filter((zombie) => zombie.position.z > 0.6);
+    expect(outside.length).toBe(7);
+    for (let frame = 0; frame < 1200 && !barrier.isOpen; frame++) {
+      manager.update(DT, 0, -5);
+      if (!barrier.isOpen) expect(outside.every((zombie) => zombie.position.z > 0)).toBe(true);
+    }
+    expect(barrier.isOpen).toBe(true);
+    step(manager, 30, 0, -5);
+    expect(zombies.every((zombie) => zombie.position.z < 0)).toBe(true);
+    expect(manager.stuckRecoveryCount).toBe(0);
+  });
+
   it('emits at most one wood impact per frame', () => {
     const barrier = new WindowBarrier('window', 0, 0, 0, 1, {
       boardCount: 2,

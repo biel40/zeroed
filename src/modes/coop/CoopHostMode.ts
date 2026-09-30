@@ -50,18 +50,20 @@ interface PlayerRecord {
   readonly health: PlayerHealth;
   readonly life: CoopRevive;
   readonly economy: PlayerEconomy;
+  totalDamage: number;
   kills: number;
   headshots: number;
 }
 
 function createRecord(): PlayerRecord {
-  return { health: new PlayerHealth(PLAYER_MAX_HP, 0.9, 5, 8), life: new CoopRevive(), economy: new PlayerEconomy(), kills: 0, headshots: 0 };
+  return { health: new PlayerHealth(PLAYER_MAX_HP, 0.9, 5, 8), life: new CoopRevive(), economy: new PlayerEconomy(), totalDamage: 0, kills: 0, headshots: 0 };
 }
 
 function resetRecord(record: PlayerRecord): void {
   record.health.reset();
   record.life.reset();
   record.economy.reset();
+  record.totalDamage = 0;
   record.kills = 0;
   record.headshots = 0;
 }
@@ -70,6 +72,8 @@ function stats(record: PlayerRecord): PlayerMatchStats {
   return {
     hp: record.health.hp,
     points: record.economy.points,
+    totalPoints: record.economy.totalEarned,
+    totalDamage: record.totalDamage,
     kills: record.kills,
     headshots: record.headshots,
     life: record.life.state,
@@ -164,6 +168,7 @@ export class CoopHostMode implements GameMode {
     this.zombies.onZombieAttack = (zombie, target) => {
       this.send({ type: 'zombieAttack', zombieId: this.zombies.networkIdOf(zombie), target });
     };
+    this.zombies.onZombieDamaged = (damage) => { this.players[this.shooter].totalDamage += damage; };
     this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(zombie, headshot, source);
     this.zombies.onPlayerAttack = (damage, target) => this.onPlayerAttacked(damage, target ?? 'host');
     this.zombies.onBruteAttack = () => ctx.audio.playBruteRoar();
@@ -336,7 +341,7 @@ export class CoopHostMode implements GameMode {
     if (door) return this.world.doorPrompt(door);
     const tapKey = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
     if (this.world.findRepairableBarrier()) return `REPAIR BARRICADE\n${this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E'}`;
-    if (this.world.findFacingSoulLamp()) return `ACTIVATE SOUL LAMP\n${tapKey}`;
+    if (this.world.findFacingSoulLamp()) return `ENCENDER FAROL\n${tapKey}`;
     if (this.world.findFacingRitual()) return `TOUCH THE RITUAL CIRCLE\n${tapKey}`;
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
@@ -1095,6 +1100,9 @@ export class CoopHostMode implements GameMode {
       kills: host.kills,
       headshots: host.headshots,
       points: host.economy.points,
+      totalPoints: host.economy.totalEarned,
+      totalDamage: host.totalDamage,
+      lamps: this.world.arena.soulLampInteractions.map((lamp) => lamp.activated),
     });
     this.ctx.hud.setDownedState(host.life.state, host.life.bleedRemaining,
       this.players.guest.life.reviver === 'host' ? this.players.guest.life.reviveElapsed / REVIVE_DURATION : 0);

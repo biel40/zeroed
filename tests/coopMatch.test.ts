@@ -270,6 +270,9 @@ describe('co-op special weapons', () => {
     expect(host(match).players.guest.kills).toBe(1);
     expect(host(match).players.host.kills).toBe(0);
     expect(guest(match).match?.stats.guest.kills).toBe(1);
+    expect(guest(match).match?.stats.guest.totalDamage).toBe(zombie.maxHp);
+    expect(guest(match).match?.stats.host.totalDamage).toBe(0);
+    expect(guest(match).match?.stats.guest.totalPoints).toBe(host(match).players.guest.economy.totalEarned);
   });
 
   it('credits ZEUS-77 chain kills once to their shooter', () => {
@@ -286,6 +289,8 @@ describe('co-op special weapons', () => {
     expect(host(match).players.guest.kills).toBe(2);
     expect(host(match).players.host.kills).toBe(0);
     expect(guest(match).match?.stats.guest.kills).toBe(2);
+    expect(guest(match).match?.stats.guest.totalDamage).toBe(first.maxHp + second.maxHp);
+    expect(guest(match).match?.stats.host.totalDamage).toBe(0);
   });
 
   it('grants the 115-kill Ray Gun milestone only to the player who reached it', () => {

@@ -44,7 +44,6 @@ export class CoopWorld {
     this.arena.onSecretRoomUnlocked = (position) => {
       const cue = this.spatialCueFor(position);
       ctx.audio.playSecretRoomUnlock(cue.pan, cue.attenuation);
-      ctx.hud.showRoundBanner('A HIDDEN CHAMBER OPENS');
     };
     this.arena.onRitualScare = (position) => {
       const cue = this.spatialCueFor(position);

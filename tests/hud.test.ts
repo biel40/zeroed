@@ -1,21 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { formatRomanRound } from '../src/ui/HUD';
+import { roundMarks } from '../src/ui/SurvivalPresentation';
 
 describe('Zombies HUD round formatting', () => {
-  it.each([
-    [1, 'I'],
-    [4, 'IV'],
-    [9, 'IX'],
-    [14, 'XIV'],
-    [49, 'XLIX'],
-    [944, 'CMXLIV'],
-    [1994, 'MCMXCIV'],
-    [3999, 'MMMCMXCIX'],
-  ])('formats round %i as %s', (round, expected) => {
-    expect(formatRomanRound(round)).toBe(expected);
-  });
-
-  it('falls back to arabic digits beyond the compact Roman range', () => {
-    expect(formatRomanRound(4000)).toBe('4000');
+  it.each([1, 4, 9, 14, 49, 944, 1994, 3999, 4000])('keeps round %i readable with bounded scratches', (round) => {
+    const markup = roundMarks(round);
+    if (round <= 10) {
+      expect(markup).not.toContain('round-number');
+      expect(markup.match(/<i>/g)).toHaveLength(round);
+    } else {
+      expect(markup).toContain('<span class="round-number">' + round + '</span>');
+    }
+    expect(markup.match(/<i>/g)?.length).toBeLessThanOrEqual(10);
   });
 });

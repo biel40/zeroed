@@ -272,7 +272,7 @@ export class CoopGuestMode implements GameMode {
     if (door) return this.world.doorPrompt(door);
     const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
     if (this.world.findRepairableBarrier()) return `REPAIR BARRICADE\n${this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E'}`;
-    if (this.world.findFacingSoulLamp()) return `ACTIVATE SOUL LAMP\n${key}`;
+    if (this.world.findFacingSoulLamp()) return `ENCENDER FAROL\n${key}`;
     if (this.world.findFacingRitual()) return `TOUCH THE RITUAL CIRCLE\n${key}`;
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
@@ -561,6 +561,9 @@ export class CoopGuestMode implements GameMode {
       kills: guest?.kills ?? 0,
       headshots: guest?.headshots ?? 0,
       points: guest?.points ?? 0,
+      totalPoints: guest?.totalPoints ?? 0,
+      totalDamage: guest?.totalDamage ?? 0,
+      lamps: this.world.arena.soulLampInteractions.map((lamp) => lamp.activated),
     });
     this.ctx.hud.setDownedState(guest?.life ?? 'alive', guest?.bleedRemaining ?? 0,
       this.match?.stats.host.reviver === 'guest' ? this.match.stats.host.reviveProgress : 0);

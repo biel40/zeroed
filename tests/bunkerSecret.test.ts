@@ -53,10 +53,10 @@ describe('Burned Mansion secret bunker interaction', () => {
     (mode as any).findRepairableBarrier = () => null;
     (mode as any).findFacingSoulLamp = () => activated ? null : lamp;
 
-    expect(mode.getInteractPrompt()).toBe('ACTIVATE SOUL LAMP\nPress E');
+    expect(mode.getInteractPrompt()).toBe('ENCENDER FAROL\nPress E');
     mode.onInteract();
     expect(activated).toBe(true);
-    expect(mode.getInteractPrompt()).not.toBe('ACTIVATE SOUL LAMP\nPress E');
+    expect(mode.getInteractPrompt()).not.toBe('ENCENDER FAROL\nPress E');
   });
 
   it('triggers the ritual-circle scare once and then removes its prompt', () => {

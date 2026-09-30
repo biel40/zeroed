@@ -1345,6 +1345,42 @@ describe('Burned Mansion topology', () => {
     expect(barrierImpacts).toBe(BARRIER_CONFIG.boardCount);
   });
 
+  it.each(['start-west-a', 'start-south', 'box-north', 'bunker-east'])(
+    'queues a full horde through %s with real walls and navigation bounds', (id) => {
+      const arena = makeArena();
+      unlock(arena, 'to-dining');
+      unlock(arena, 'to-east-hall');
+      unlock(arena, 'nuclear-bunker');
+      const barrier = arena.barriers.find((candidate) => candidate.id === id)!;
+      const spawn = Object.values(MANSION_SPAWNS).flat().find((candidate) => candidate.barrierId === id)!;
+      const manager = new ZombieManager(() => 0, {}, false, [spawn], arena.barriers, [], () => 1);
+      manager.registerColliders([...arena.colliders]);
+      manager.setNavigationBounds(arena.navigationBounds);
+      const px = barrier.position.x - barrier.outward.x * 3;
+      const pz = barrier.position.z - barrier.outward.z * 3;
+      for (let index = 0; index < 24; index++) expect(manager.spawnZombie(roundConfig(6), px, pz, 6)).toBe(true);
+      const zombies = [...manager.actives];
+      for (const zombie of zombies) zombie.state = 'walk';
+      const entered = new Set<Zombie>();
+      const previous = zombies.map((zombie) => zombie.position.clone());
+      let maxStep = 0;
+      for (let frame = 0; frame < 60 * 90 && entered.size < zombies.length; frame++) {
+        manager.update(1 / 60, px, pz);
+        zombies.forEach((zombie, index) => {
+          maxStep = Math.max(maxStep, zombie.position.distanceTo(previous[index]));
+          previous[index].copy(zombie.position);
+          const depth = (zombie.position.x - barrier.position.x) * barrier.outward.x
+            + (zombie.position.z - barrier.position.z) * barrier.outward.z;
+          if (!barrier.isOpen) expect(depth).toBeGreaterThan(0);
+          if (depth < -0.45) entered.add(zombie);
+        });
+      }
+      expect(entered.size).toBe(24);
+      expect(maxStep).toBeLessThan(0.1);
+      expect(manager.stuckRecoveryCount).toBe(0);
+    }, 15000,
+  );
+
   it('uses scaled PBR surfaces, instanced frames and room-specific unshadowed point lights', () => {
     const arena = makeArena();
     const walls = arena.group.children.filter((child) => child.userData.mapRole === 'wall') as THREE.Mesh[];
