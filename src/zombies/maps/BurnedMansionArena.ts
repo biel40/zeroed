@@ -379,6 +379,11 @@ export class BurnedMansionArena implements ZombieArena {
     return this.secretRoom.state;
   }
 
+  /** Developer access to the final room without completing the soul lamps. */
+  public unlockSecretRoom(): boolean {
+    return this.secretRoom.unlockDoor();
+  }
+
   public get secretSnapshot(): SecretRoomSnapshot { return this.secretRoom.snapshot(); }
 
   public applySecretSnapshot(snapshot: SecretRoomSnapshot): void { this.secretRoom.applySnapshot(snapshot); }

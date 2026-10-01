@@ -424,6 +424,25 @@ export class SecretRoomSystem {
     return true;
   }
 
+  /** Shared reveal path for the completed ritual and developer access. */
+  unlockDoor(): boolean {
+    if (this.doorOpening || this.doorOpen) return false;
+    this.state.unlocked = true;
+    this.doorOpening = true;
+    this.spawnSparks(
+      MANSION_SECRET_ROOM.entranceX + 0.3,
+      MANSION_BUNKER_Y + 1.4,
+      MANSION_SECRET_ROOM.entranceZ,
+      this.profile.useReducedEffects ? 8 : 16,
+    );
+    this.onUnlocked?.(new THREE.Vector3(
+      MANSION_SECRET_ROOM.entranceX,
+      MANSION_BUNKER_Y + 1.4,
+      MANSION_SECRET_ROOM.entranceZ,
+    ));
+    return true;
+  }
+
   triggerRitualScare(): boolean {
     if (!this.state.triggerRitualScare()) return false;
     this.ritualScareTime = RITUAL_SCARE_DURATION;
@@ -755,20 +774,7 @@ export class SecretRoomSystem {
       this.spawnSparks(target.x, target.y, target.z, this.profile.useReducedEffects ? 5 : 10);
       this.onLampCompleted?.(new THREE.Vector3(target.x, target.y, target.z));
     }
-    if (result.unlocked) {
-      this.doorOpening = true;
-      this.spawnSparks(
-        MANSION_SECRET_ROOM.entranceX + 0.3,
-        MANSION_BUNKER_Y + 1.4,
-        MANSION_SECRET_ROOM.entranceZ,
-        this.profile.useReducedEffects ? 8 : 16,
-      );
-      this.onUnlocked?.(new THREE.Vector3(
-        MANSION_SECRET_ROOM.entranceX,
-        MANSION_BUNKER_Y + 1.4,
-        MANSION_SECRET_ROOM.entranceZ,
-      ));
-    }
+    if (result.unlocked) this.unlockDoor();
   }
 
   private updateLampPulses(dt: number): void {

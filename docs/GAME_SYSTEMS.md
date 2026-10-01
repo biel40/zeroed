@@ -89,7 +89,9 @@ como cue independiente sobre la música de fondo.
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
-  una pared una sola vez por run. El final de 30000 Points pasa por
+  una pared una sola vez por run. El comando individual `MOTDRULES` tambien
+  abre esa pared sin rellenar los faroles; reiniciar restaura el cierre.
+  El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
   La secuencia nuclear dura 18 s: alerta, resplandor y onda expansiva con
   creditos que aparecen durante la explosion. Al terminar quedan los creditos
@@ -142,3 +144,7 @@ y pausa. El HUD de combate usa una presentacion compacta sin leyenda de puntos
 ni resumen textual de faroles; la pausa conserva el detalle. Las primeras diez
 rondas se representan solo con aranazos. La interfaz no anuncia la sala oculta ni el desbloqueo. Las rondas
 combinan aranazos decorativos limitados con el numero exacto para rondas altas.
+
+En dispositivos tactiles el panel permanece pequeno arriba a la derecha, bajo
+el boton de pausa, con ronda, puntos, vida y bajas; headshots y faroles se consultan
+en la pausa para dejar libre la vista de combate.

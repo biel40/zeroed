@@ -940,6 +940,7 @@ export class ZombiesMode implements GameMode {
     this.godModeEnabled = true;
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
+    if (this.arena instanceof BurnedMansionArena) this.arena.unlockSecretRoom();
     this.ctx.grantWeapon('tesla');
     this.ctx.setWeaponInfiniteReserve('tesla');
     this.ctx.hud.showRoundBanner('GOD MODE ENABLED', 'MOTDRULES');

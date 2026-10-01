@@ -674,6 +674,56 @@ describe('Burned Mansion topology', () => {
     expect(light.intensity).toBeCloseTo(emptyIntensity);
   });
 
+  it('opens the final room with MOTDRULES without filling lamps and restores it on reset', () => {
+    const arena = makeArena();
+    const mode = new ZombiesMode('burned-mansion');
+    (mode as unknown as { arena: BurnedMansionArena }).arena = arena;
+    (mode as unknown as { ctx: unknown }).ctx = {
+      grantWeapon: () => true,
+      setWeaponInfiniteReserve: () => true,
+      hud: { showRoundBanner: () => undefined },
+      audio: { playTeslaUnlock: () => undefined },
+    };
+    let topologyChanges = 0;
+    let unlocks = 0;
+    arena.onTopologyChanged = () => { topologyChanges++; };
+    arena.onSecretRoomUnlocked = () => { unlocks++; };
+    const wall = arena.group.getObjectByName('secret-room-wall') as THREE.Mesh;
+    const collider = arena.group.getObjectByName('secret-room-wall-collider') as THREE.Mesh;
+    const closedY = wall.position.y;
+    expect(arena.secretSnapshot.doorOpen).toBe(false);
+    expect(arena.colliders).toContain(collider);
+
+    for (const key of 'MOTDRULES') mode.onKeyInput(key);
+    for (const key of 'MOTDRULES') mode.onKeyInput(key);
+    expect(arena.secretRoomState.unlocked).toBe(true);
+    expect(arena.secretRoomState.completedLamps).toBe(0);
+    expect(unlocks).toBe(1);
+    arena.update(1);
+    expect(arena.colliders).toContain(collider);
+    arena.update(1);
+    expect(arena.secretSnapshot.doorOpen).toBe(true);
+    expect(arena.colliders).not.toContain(collider);
+    expect(wall.position.y).toBeLessThan(closedY);
+    expect(topologyChanges).toBe(1);
+    expect(arena.ritualInteraction.available).toBe(true);
+    expect(arena.unlockSecretRoom()).toBe(false);
+    expect(unlocks).toBe(1);
+    expect(canWalk(
+      [-5.8, MANSION_SECRET_ROOM.entranceZ],
+      [MANSION_SECRET_ROOM.centerX, MANSION_SECRET_ROOM.centerZ],
+      arena.wallColliders,
+      MANSION_BUNKER_BOUNDS,
+      MANSION_BUNKER_Y,
+    )).toBe(true);
+
+    arena.reset();
+    expect(arena.secretRoomState.unlocked).toBe(false);
+    expect(arena.secretSnapshot.doorOpen).toBe(false);
+    expect(arena.colliders).toContain(collider);
+    expect(wall.position.y).toBe(closedY);
+  });
+
   it('charges each lamp on soul arrival and removes the secret collider only after reveal', () => {
     const arena = makeArena();
     let topologyChanges = 0;
