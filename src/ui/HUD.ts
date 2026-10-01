@@ -85,6 +85,14 @@ export class HUD {
     const fill = this.loadingBar.querySelector('span');
     if (!fill) throw new Error('Missing #loading-bar span');
     this.loadingBarFill = fill as HTMLElement;
+
+    const privacyDialog = mustGet('privacy-dialog') as HTMLDialogElement;
+    const privacyFrame = mustGet('privacy-frame') as HTMLIFrameElement;
+    mustGet('privacy-open').onclick = () => {
+      if (!privacyFrame.hasAttribute('src')) privacyFrame.src = './privacy.html';
+      privacyDialog.showModal();
+    };
+    mustGet('privacy-close').onclick = () => privacyDialog.close();
   }
 
   /** Real asset loading progress, 0..1. */

@@ -946,6 +946,43 @@ html.coop-guest #pause-restart {
   letter-spacing: 0.31em;
 }
 
+.privacy-link {
+  display: block;
+  margin: 16px auto 0;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  color: #b8c0ca;
+  font: 12px 'Segoe UI', sans-serif;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.privacy-link:focus-visible,
+#privacy-close:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+#privacy-dialog {
+  margin: auto;
+  width: min(860px, 92vw);
+  height: 88dvh;
+  max-height: 88dvh;
+  padding: 0;
+  border: 1px solid #475569;
+  border-radius: 12px;
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+#privacy-dialog[open] { display: flex; flex-direction: column; }
+#privacy-dialog::backdrop { background: rgba(0, 0, 0, 0.8); }
+.privacy-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; }
+.privacy-dialog-header h2 { margin: 0; font: 600 16px 'Segoe UI', sans-serif; }
+#privacy-close { padding: 10px 14px; border: 1px solid #64748b; border-radius: 6px; background: #1e293b; color: #f8fafc; cursor: pointer; }
+#privacy-frame { flex: 1; min-height: 0; width: 100%; border: 0; }
+
 .pwa-actions {
   /* Install and update entry points in the start menu are temporarily hidden. */
   display: none;

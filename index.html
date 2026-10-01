@@ -93,6 +93,7 @@
         </button>
       </div>
       <button type="button" id="coop-select" class="coop-select">MULTIPLAYER MODE</button>
+      <button type="button" id="privacy-open" class="privacy-link">Política de privacidad</button>
       <div class="pwa-actions" aria-live="polite">
         <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
@@ -100,6 +101,14 @@
       <p id="ios-install-hint" class="ios-install-hint hidden">En Safari, toca Compartir y «Añadir a pantalla de inicio» para jugar sin las barras del navegador.</p>
     </div>
   </div>
+
+  <dialog id="privacy-dialog" aria-labelledby="privacy-title">
+    <div class="privacy-dialog-header">
+      <h2 id="privacy-title">Privacidad de Zeroed</h2>
+      <button type="button" id="privacy-close" aria-label="Cerrar política de privacidad">Cerrar</button>
+    </div>
+    <iframe id="privacy-frame" title="Política de privacidad de Zeroed"></iframe>
+  </dialog>
 
   <div id="coop-lobby" class="hidden">
     <div class="coop-lobby-content">
