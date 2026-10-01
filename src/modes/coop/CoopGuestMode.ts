@@ -563,7 +563,7 @@ export class CoopGuestMode implements GameMode {
       points: guest?.points ?? 0,
       totalPoints: guest?.totalPoints ?? 0,
       totalDamage: guest?.totalDamage ?? 0,
-      lamps: this.world.arena.soulLampInteractions.map((lamp) => lamp.activated),
+      lamps: this.world.arena.soulLampInteractions.map((lamp) => lamp.completed),
     });
     this.ctx.hud.setDownedState(guest?.life ?? 'alive', guest?.bleedRemaining ?? 0,
       this.match?.stats.host.reviver === 'guest' ? this.match.stats.host.reviveProgress : 0);

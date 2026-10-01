@@ -245,6 +245,7 @@ export class BurnedMansionArena implements ZombieArena {
         useRange: lamp.useRange,
         lookDotMin: lamp.lookDotMin,
         get activated(): boolean { return secretRoom.state.lamps[index].activated; },
+        get completed(): boolean { return secretRoom.state.lamps[index].completed; },
         activate: () => secretRoom.activateLamp(index),
       };
     });

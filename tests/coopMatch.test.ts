@@ -11,6 +11,7 @@ import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
 import type { Zombie } from '../src/zombies/Zombie';
 import { roundConfig } from '../src/zombies/ZombieConfig';
+import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
 import type { ZombieManager, ZombiePlayerTarget } from '../src/zombies/ZombieManager';
 import type { ZombieReplica } from '../src/zombies/ZombieReplica';
 import type { RoundManager } from '../src/zombies/RoundManager';
@@ -383,7 +384,7 @@ describe('co-op Burned Mansion interactions', () => {
     expect(guest(match).match?.phase).toBe('ending');
     expect(match.hostSide.ctx.audio.startEndingAudio).toHaveBeenCalledTimes(1);
     expect(match.guestSide.ctx.audio.startEndingAudio).toHaveBeenCalledTimes(1);
-    match.step(0.1, 170);
+    match.step(0.1, Math.round(NUCLEAR_ENDING_DURATION * 10) - 10);
     expect(host(match).phase).toBe('ending');
     expect(match.hostSide.ctx.audio.stopEndingAudio).not.toHaveBeenCalled();
     expect(match.guestSide.ctx.audio.stopEndingAudio).not.toHaveBeenCalled();

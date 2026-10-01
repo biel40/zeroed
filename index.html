@@ -159,13 +159,15 @@
 
   <div id="pause-menu" class="hidden">
     <div class="start-panel">
-      <p class="survival-label">ZEROED / PARTIDA</p><h1>PAUSA</h1>
-      <table class="pause-stats"><caption>Estadísticas acumuladas</caption><tbody>
-        <tr><th scope="row">Daño a zombis</th><td id="pause-damage">0</td></tr>
-        <tr><th scope="row">Puntos obtenidos</th><td id="pause-points">0</td></tr>
-        <tr><th scope="row">Bajas totales</th><td id="pause-kills">0</td></tr>
-        <tr><th scope="row">Bajas a la cabeza</th><td id="pause-headshots">0</td></tr>
-      </tbody></table><div id="pause-lamps" class="lamp-progress"></div>
+      <p class="menu-kicker">BURNED MANSION · RONDA <span id="pause-round">1</span></p>
+      <h1>PAUSA</h1>
+      <dl class="pause-stats" aria-label="Estadísticas acumuladas">
+        <div><dt>Daño a zombis</dt><dd id="pause-damage">0</dd></div>
+        <div><dt>Puntos obtenidos</dt><dd id="pause-points">0</dd></div>
+        <div><dt>Bajas totales</dt><dd id="pause-kills">0</dd></div>
+        <div><dt>Bajas a la cabeza</dt><dd id="pause-headshots">0</dd></div>
+      </dl>
+      <div id="pause-lamps" class="lamp-progress"></div>
       <div class="pause-actions">
         <button type="button" id="pause-resume">RESUME</button>
         <button type="button" id="pause-restart">RESTART</button>
@@ -176,10 +178,47 @@
   </div>
 
   <div id="ending-screen" class="hidden" aria-live="polite">
-    <div class="nuclear-blast" aria-hidden="true"></div>
+    <div class="ending-cinematic" aria-hidden="true">
+      <div class="ending-world">
+        <div class="ending-sky"></div>
+        <div class="ending-horizon"></div>
+        <div class="ending-mushroom">
+          <div class="mushroom-stem"></div>
+          <div class="mushroom-ring"></div>
+          <div class="mushroom-cap"></div>
+        </div>
+        <div class="ending-fireball"></div>
+        <svg class="ending-ruins" viewBox="0 0 1600 300" preserveAspectRatio="xMidYMax slice">
+          <path d="M0 300V224C140 214 260 222 380 216S620 212 760 218S1060 226 1200 216S1460 210 1600 220V300Z
+            M310 222V138H730V222Z M296 140L370 78L444 140Z M340 104V60H356V90Z
+            M470 140V92H572V140Z M458 94L521 26L584 94Z M518 32V6L524 12V32Z
+            M590 140L622 104L648 118L664 96L700 112L744 140Z M680 116V70H694V122Z" />
+          <path class="ruin-branches" d="M1200 222L1198 140L1186 96M1198 150L1222 110L1240 100M1222 110L1218 82M1192 124L1168 104
+            M118 224L122 150L104 112M121 166L146 128L162 122M146 128L144 104M108 132L88 120
+            M1430 220L1428 172L1416 150M1428 180L1446 158M760 218V194M792 219V198M824 220V192M856 220V200M752 204L870 206" />
+          <path class="ruin-windows" d="M330 160h18v22h-18Z M370 160h18v22h-18Z M410 160h18v22h-18Z
+            M600 160h18v22h-18Z M640 160h18v22h-18Z M684 160h18v22h-18Z M330 192h18v20h-18Z M684 192h18v20h-18Z
+            M506 128v-14a15 15 0 0 1 30 0v14Z" />
+        </svg>
+        <div class="ending-shockwave"></div>
+        <div class="ending-dustwall"></div>
+        <div class="ending-dim"></div>
+      </div>
+      <div class="ending-alarm"></div>
+      <div class="ending-ash"></div>
+      <div class="ending-flash"></div>
+      <div class="ending-grain"></div>
+      <div class="ending-letterbox"></div>
+    </div>
     <div class="nuclear-alert">
-      <span class="nuclear-symbol" aria-hidden="true">☢</span>
+      <svg class="nuclear-symbol" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M44 39.61L27 10.16A46 46 0 0 1 73 10.16L56 39.61A12 12 0 0 0 44 39.61Z
+          M62 50L96 50A46 46 0 0 1 73 89.84L56 60.39A12 12 0 0 0 62 50Z
+          M44 60.39L27 89.84A46 46 0 0 1 4 50L38 50A12 12 0 0 0 44 60.39Z" />
+        <circle cx="50" cy="50" r="8" />
+      </svg>
       <p>NUCLEAR PROTOCOL ACTIVATED</p>
+      <div class="nuclear-countdown" aria-hidden="true"><span>3</span><span>2</span><span>1</span></div>
     </div>
     <div class="credits-panel">
       <h1>ZEROED</h1>

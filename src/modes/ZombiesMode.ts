@@ -1126,7 +1126,7 @@ export class ZombiesMode implements GameMode {
       points: this.economy.points,
       totalPoints: this.economy.totalEarned,
       totalDamage: this.totalDamage,
-      lamps: (this.arena?.soulLampInteractions ?? []).map((lamp) => lamp.activated),
+      lamps: (this.arena?.soulLampInteractions ?? []).map((lamp) => lamp.completed),
     });
   }
 }

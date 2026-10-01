@@ -53,10 +53,9 @@ describe('survival statistics', () => {
 });
 
 describe('survival presentation', () => {
-  it.each([0, 1, 3])('renders %i activated lamps without exposing their purpose', (on) => {
+  it.each([0, 1, 3])('renders %i filled lamps without exposing their purpose', (on) => {
     const markup = lampProgress(Array.from({ length: 3 }, (_, i) => i < on));
     expect(markup).toContain(`${on} / 3`);
-    expect(markup).toContain(`${on} encendidos · ${3 - on} apagados`);
     expect(markup.match(/aria-label="Farol/g)).toHaveLength(3);
     expect(markup.match(/class="lamp lit"/g) ?? []).toHaveLength(on);
     expect(markup).not.toMatch(/secret|sala|alma|recompensa|desbloque/i);
@@ -67,14 +66,13 @@ describe('survival presentation', () => {
     expect(lampProgress(Array(9).fill(true))).toContain('9 / 9');
   });
 
-  it('omits the HUD summary while retaining accessible lamp states and pause detail', () => {
+  it('keeps accessible lamp states without a textual summary', () => {
     const lamps = [true, false, false];
     const compact = lampProgress(lamps, true);
-    expect(compact).not.toContain('lamp-summary');
     expect(compact).toContain('1 / 3');
-    expect(compact).toContain('Farol 1: encendido');
-    expect(compact).toContain('Farol 2: apagado');
-    expect(lampProgress(lamps)).toContain('1 encendidos · 2 apagados');
+    expect(compact).toContain('Farol 1: lleno');
+    expect(compact).toContain('Farol 2: sin llenar');
+    expect(lampProgress(lamps)).not.toContain('llenos');
   });
 
   it('bounds scratch marks while keeping the exact high round legible', () => {

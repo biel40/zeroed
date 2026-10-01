@@ -67,6 +67,8 @@ export interface ArenaSoulLampInteraction {
   readonly useRange: number;
   readonly lookDotMin: number;
   readonly activated: boolean;
+  /** Filled with souls; only completed lamps count towards the ritual. */
+  readonly completed: boolean;
   activate(): boolean;
 }
 

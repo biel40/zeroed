@@ -1,6 +1,6 @@
 import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { clamp } from '../utils/math';
-import { NUCLEAR_ENDING_DURATION } from '../zombies/ZombiesRunFlow';
+import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { lampProgress, roundMarks } from './SurvivalPresentation';
 
@@ -321,6 +321,7 @@ export class HUD {
       this.lastRound = state.round;
       this.zRound.innerHTML = roundMarks(state.round);
       this.zRound.setAttribute('aria-label', `Ronda ${state.round}`);
+      mustGet('pause-round').textContent = `${state.round}`;
     }
     this.zPoints.textContent = state.points.toLocaleString('es-ES');
     mustGet('z-hp').textContent = `${Math.ceil(state.hp)} / ${state.maxHp}`;
@@ -388,7 +389,7 @@ export class HUD {
   public showEnding(round: number): void {
     this.root.classList.add('hidden');
     this.setInteractionPrompt(null);
-    this.endingScreen.style.setProperty('--ending-duration', `${NUCLEAR_ENDING_DURATION}s`);
+    this.endingScreen.style.setProperty('--detonation', `${NUCLEAR_DETONATION_TIME}s`);
     this.endingRound.textContent = `${round}`;
     this.endingScreen.classList.remove('hidden', 'credits');
     this.endingScreen.classList.add('ending');

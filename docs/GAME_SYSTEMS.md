@@ -93,11 +93,17 @@ como cue independiente sobre la música de fondo.
   abre esa pared sin rellenar los faroles; reiniciar restaura el cierre.
   El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
-  La secuencia nuclear dura 18 s: alerta, resplandor y onda expansiva con
-  creditos que aparecen durante la explosion. Al terminar quedan los creditos
-  y se habilita volver al menu. Sustituye musica/viento y arranca juntos
-  `nuclear_alarm.mp3` y `radioactivity.mp3` en bucle y `nuclear_explosion.mp3`
-  una sola vez; los tres se detienen al terminar la secuencia o salir.
+  La secuencia nuclear dura 25 s y es CSS puro (transform/opacity, sin bordes
+  expuestos): alarma con cuenta atras, detonacion a `NUCLEAR_DETONATION_TIME`
+  (flash, bola de fuego, hongo tras la silueta de la mansion y onda
+  expansiva). La onda llega a camara (`--impact`, 1.4 s despues) con muro de
+  polvo y un temblor fuerte que decae; los creditos esperan ~13 s de
+  plano del hongo y la ceniza. El estilo base de cada capa es el fotograma
+  final, asi que CREDITS y `prefers-reduced-motion` no saltan. Al terminar
+  quedan los creditos y se habilita volver al menu. Sustituye musica/viento y
+  arranca `nuclear_alarm.mp3` y `radioactivity.mp3` en bucle;
+  `nuclear_explosion.mp3` suena una vez, retrasado para coincidir con el flash.
+  Los tres se detienen (y el retraso se cancela) al terminar o salir.
   Individual y ambos clientes cooperativos comparten la secuencia; la ausencia
   de un asset no bloquea el final ni las otras capas. Para incorporar los
   sonidos basta con colocar los MP3 en `public/assets/audio/` y reconstruir
@@ -138,7 +144,7 @@ retirada por impactos directos, cuchillo, splash y cadenas, sin contar overkill
 ni impactos sobre muertos. En cooperativo el anfitrion atribuye estos datos al
 atacante y los replica al invitado. Reiniciar limpia los acumulados.
 
-Los faroles muestran solo su estado de activacion y el numero real de
+Los faroles cuentan solo cuando estan llenos de almas (no al activarlos) y el numero real de
 interacciones del mapa, con iconos, marcas y etiquetas compartidos entre HUD
 y pausa. El HUD de combate usa una presentacion compacta sin leyenda de puntos
 ni resumen textual de faroles; la pausa conserva el detalle. Las primeras diez

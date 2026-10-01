@@ -46,6 +46,7 @@ describe('Burned Mansion secret bunker interaction', () => {
       useRange: 2,
       lookDotMin: 0.45,
       get activated() { return activated; },
+      completed: false,
       activate: () => { activated = true; return true; },
     } satisfies ArenaSoulLampInteraction;
     (mode as unknown as { ctx: unknown }).ctx = { profile: { useTouchControls: false } };

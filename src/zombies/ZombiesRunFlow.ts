@@ -1,6 +1,8 @@
 export type ZombiesRunState = 'PLAYING' | 'ENDING' | 'CREDITS' | 'FINISHED' | 'GAME_OVER';
 
-export const NUCLEAR_ENDING_DURATION = 18;
+export const NUCLEAR_ENDING_DURATION = 25;
+/** Seconds from the start of the ending cinematic to the on-screen detonation flash. */
+export const NUCLEAR_DETONATION_TIME = 3.2;
 
 export class ZombiesRunFlow {
   private current: ZombiesRunState = 'PLAYING';

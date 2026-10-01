@@ -1,3 +1,5 @@
+import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
+
 export type MusicTrackName =
   | 'zombies_round_start'
   | 'menu_theme'
@@ -62,12 +64,17 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
 };
 
 const ENDING_TRACKS: readonly MusicTrackName[] = ['nuclear_alarm', 'nuclear_explosion', 'radioactivity'];
+/** nuclear_explosion.mp3 opens with ~0.5 s of silence before the blast. */
+const NUCLEAR_EXPLOSION_ONSET = 0.5;
+/** Seconds to hold the explosion track so its blast lands on the visual flash. */
+export const NUCLEAR_EXPLOSION_AUDIO_DELAY = NUCLEAR_DETONATION_TIME - NUCLEAR_EXPLOSION_ONSET;
 
 export class MusicManager {
   public enabled = false;
   private readonly players = new Map<MusicTrackName, HTMLAudioElement>();
   private readonly pauseOffsets = new Map<MusicTrackName, number>();
   private endingAudioStarted = false;
+  private explosionTimer: ReturnType<typeof setTimeout> | null = null;
 
   public setEnabled(enabled: boolean): void {
     this.enabled = enabled;
@@ -124,6 +131,7 @@ export class MusicManager {
 
   stop(): void {
     this.endingAudioStarted = false;
+    this.cancelPendingExplosion();
     this.pauseOffsets.clear();
     for (const player of this.players.values()) {
       player.pause();
@@ -142,19 +150,30 @@ export class MusicManager {
     player.currentTime = 0;
   }
 
-  /** Starts all three layers together; the explosion plays once, ambience loops. */
+  /**
+   * Alarm and ambience start together; the one-shot explosion waits so its
+   * blast lands on the cinematic's detonation flash.
+   */
   startEndingAudio(): void {
     if (!this.enabled || this.endingAudioStarted) return;
     this.stop();
     this.endingAudioStarted = true;
     for (const name of ENDING_TRACKS) {
+      // The explosion element is still created now so it buffers meanwhile.
       const player = this.getPlayer(name);
-      if (player) void player.play().catch(() => undefined);
+      if (player && name !== 'nuclear_explosion') void player.play().catch(() => undefined);
     }
+    this.explosionTimer = setTimeout(() => {
+      this.explosionTimer = null;
+      if (!this.endingAudioStarted) return;
+      const player = this.getPlayer('nuclear_explosion');
+      if (player) void player.play().catch(() => undefined);
+    }, NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000);
   }
 
   stopEndingAudio(): void {
     this.endingAudioStarted = false;
+    this.cancelPendingExplosion();
     for (const name of ENDING_TRACKS) {
       this.pauseOffsets.delete(name);
       const player = this.players.get(name);
@@ -162,6 +181,12 @@ export class MusicManager {
       player.pause();
       player.currentTime = 0;
     }
+  }
+
+  private cancelPendingExplosion(): void {
+    if (this.explosionTimer === null) return;
+    clearTimeout(this.explosionTimer);
+    this.explosionTimer = null;
   }
 
   playRoundStartOnce(): void {

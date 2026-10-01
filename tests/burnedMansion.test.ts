@@ -730,11 +730,15 @@ describe('Burned Mansion topology', () => {
     arena.onTopologyChanged = () => { topologyChanges++; };
 
     for (const lamp of MANSION_SOUL_LAMPS) {
-      expect(arena.soulLampInteractions.find((interaction) => interaction.id === lamp.id)!.activate()).toBe(true);
+      const interaction = arena.soulLampInteractions.find((entry) => entry.id === lamp.id)!;
+      expect(interaction.activate()).toBe(true);
+      // The HUD counts a lamp only once it is filled, not when it is switched on.
+      expect(interaction.completed).toBe(false);
       for (let soul = 0; soul < SOUL_LAMP_REQUIRED_SOULS; soul++) {
         expect(arena.captureSoul(lamp.position, lamp.floor)).toBe(true);
         arena.update(1);
       }
+      expect(interaction.completed).toBe(true);
     }
 
     const wall = arena.group.getObjectByName('secret-room-wall') as THREE.Mesh;
