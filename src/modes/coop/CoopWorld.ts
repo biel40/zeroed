@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { t } from '../../i18n/i18n';
+import { doorPrompt, wallBuyPrompt } from '../../ui/InteractionPrompts';
 import { defaultNow } from '../../network/Interpolation';
 import type { BarrierNetState, CoopPlayerId, PlayerNetState } from '../../network/Protocol';
 import type { PointDoor } from '../../zombies/doors/PointDoor';
@@ -236,11 +238,7 @@ export class CoopWorld {
   }
 
   public wallBuyPrompt(wallBuy: WallBuy, owned: boolean): string {
-    const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
-    const label = WEAPON_DEFINITIONS[wallBuy.weaponId].name;
-    return owned
-      ? `${key} — ${label} Ammo — ${wallBuy.ammoPrice} PTS`
-      : `${key} — Buy ${label} — ${wallBuy.price} PTS`;
+    return wallBuyPrompt(WEAPON_DEFINITIONS[wallBuy.weaponId].name, owned, wallBuy, this.ctx.profile.useTouchControls);
   }
 
   public isLocalInBoxRange(): boolean {
@@ -267,16 +265,13 @@ export class CoopWorld {
   }
 
   public doorPrompt(door: PointDoor): string {
-    const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
-    return door.prompt
-      ? `USE — ${door.prompt} — ${door.cost} PTS`
-      : `UNLOCK ${door.id.toUpperCase().replace(/-/g, ' ')}\n${key} — ${door.cost} PTS`;
+    return doorPrompt(door, this.ctx.profile.useTouchControls);
   }
 
   public showDoorDenied(door: PointDoor): void {
     this.ctx.hud.flashNotEnoughPoints();
-    this.ctx.hud.showRoundBanner(door.requiredMessage ?? 'NOT ENOUGH POINTS',
-      door.requiredMessage ? undefined : `${door.cost} PTS NEEDED`);
+    if (door.requiredMessage) this.ctx.hud.showRoundBanner(t(door.requiredMessage, { cost: door.cost }));
+    else this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: door.cost }));
   }
 
   /**

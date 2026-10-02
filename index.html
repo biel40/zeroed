@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
@@ -20,6 +20,7 @@
 <symbol id="icon-health" viewBox="0 0 24 24"><path d="M12 20 3 11C-1 3 8 1 12 7c4-6 13-4 9 4Z"/><path d="M4 12h4l2-4 3 8 2-4h5"/></symbol>
 <symbol id="icon-kills" viewBox="0 0 24 24"><path d="M7 18v3h10v-3c7-5 4-15-5-15S0 13 7 18Z"/><circle cx="8" cy="11" r="1"/><circle cx="16" cy="11" r="1"/><path d="m10 16 2-2 2 2m-2 2v3"/></symbol>
 <symbol id="icon-headshots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 1v6m0 10v6M1 12h6m10 0h6"/></symbol>
+<symbol id="icon-round" viewBox="0 0 24 24"><path d="M5 4v16M9.5 4v16M14 4v16M18.5 4v16M2 17 22 7"/></symbol>
 </defs></svg>
   <div id="app"></div>
 
@@ -35,38 +36,38 @@
       <span></span><span></span><span></span><span></span>
     </div>
 
-    <div id="touch-controls" aria-label="Touch controls">
+    <div id="touch-controls" data-i18n-aria-label="touch.controls">
       <!-- Floating joystick visual: appears where the left-zone finger lands. -->
       <div id="joystick">
         <div id="joystick-knob"></div>
       </div>
       <!-- Secondary actions: small, out of the aiming thumb's way. -->
       <div class="touch-secondary">
-        <button type="button" data-action="reload" id="btn-reload" aria-label="Reload">RLD</button>
-        <button type="button" data-action="interact" id="btn-interact" aria-label="Interact">USE</button>
-        <button type="button" data-action="swap-weapon" id="btn-weapon" aria-label="Swap weapon">WPN</button>
-        <button type="button" data-action="knife" id="btn-knife" aria-label="Knife">KNIFE</button>
-        <button type="button" data-action="pause" id="btn-pause">| |</button>
+        <button type="button" data-action="reload" id="btn-reload" data-i18n-aria-label="touch.reloadLabel" data-i18n="touch.reload"></button>
+        <button type="button" data-action="interact" id="btn-interact" data-i18n-aria-label="touch.useLabel" data-i18n="touch.use"></button>
+        <button type="button" data-action="swap-weapon" id="btn-weapon" data-i18n-aria-label="touch.weaponLabel" data-i18n="touch.weapon"></button>
+        <button type="button" data-action="knife" id="btn-knife" data-i18n-aria-label="touch.knifeLabel" data-i18n="touch.knife"></button>
+        <button type="button" data-action="pause" id="btn-pause" data-i18n-aria-label="touch.pauseLabel">| |</button>
       </div>
       <!-- Primary actions: right thumb rest position. -->
       <div class="touch-primary">
-        <button type="button" data-action="fire" id="btn-fire" aria-label="Aim and fire">FIRE</button>
+        <button type="button" data-action="fire" id="btn-fire" data-i18n-aria-label="touch.fireLabel" data-i18n="touch.fire"></button>
       </div>
     </div>
 
     <div id="hud-weapon" class="hud-panel">
       <div id="hud-weapon-name">M4A1</div>
       <div id="hud-ammo">30 / ∞</div>
-      <div class="hud-row hud-row-secondary"><span class="hud-label">MODE</span><span id="hud-mode">AUTO</span></div>
+      <div class="hud-row hud-row-secondary"><span class="hud-label" data-i18n="hud.mode"></span><span id="hud-mode">AUTO</span></div>
     </div>
 
     <div id="hud-zombies" class="hud-panel hidden">
-      <div class="survival-top"><div><span class="survival-label">RONDA</span><div id="z-round"></div></div>
-        <div class="points-counter"><strong id="z-points" aria-label="Puntos disponibles">0</strong></div></div>
-      <div id="z-health"><div class="health-heading"><span><svg class="survival-icon" aria-hidden="true"><use href="#icon-health"/></svg> VIDA</span><strong id="z-hp">100 / 100</strong></div>
+      <div class="survival-top"><div><span class="survival-label" data-i18n="hud.round"></span><div id="z-round"></div></div>
+        <div class="points-counter"><strong id="z-points" data-i18n-aria-label="hud.points">0</strong></div></div>
+      <div id="z-health"><div class="health-heading"><span><svg class="survival-icon" aria-hidden="true"><use href="#icon-health"/></svg> <span data-i18n="hud.health"></span></span><strong id="z-hp">100 / 100</strong></div>
         <div id="z-hp-bar"><span id="z-hp-fill"></span></div></div>
-      <div class="survival-counters"><div><svg class="survival-icon" aria-hidden="true"><use href="#icon-kills"/></svg><span>BAJAS</span><strong id="z-kills">0</strong></div>
-        <div><svg class="survival-icon" aria-hidden="true"><use href="#icon-headshots"/></svg><span>CABEZA</span><strong id="z-headshots">0</strong></div></div>
+      <div class="survival-counters"><div><svg class="survival-icon" aria-hidden="true"><use href="#icon-kills"/></svg><span data-i18n="hud.kills"></span><strong id="z-kills">0</strong></div>
+        <div><svg class="survival-icon" aria-hidden="true"><use href="#icon-headshots"/></svg><span data-i18n="hud.headshots"></span><strong id="z-headshots">0</strong></div></div>
       <div id="z-lamps" class="lamp-progress"></div>
     </div>
 
@@ -77,102 +78,112 @@
     <div id="damage-overlay"></div>
     <div id="interact-prompt" class="hidden"></div>
     <div id="downed-filter" class="hidden"></div>
-    <div id="downed-status" class="hidden" role="status"><strong>DOWNED</strong><span id="downed-countdown"></span></div>
-    <div id="revive-status" class="hidden"><span>REVIVING TEAMMATE</span><div><i id="revive-progress"></i></div></div>
-    <div id="host-pause-status" class="hidden" role="status">HOST PAUSED THE MATCH</div>
+    <div id="downed-status" class="hidden" role="status"><strong data-i18n="hud.downed"></strong><span id="downed-countdown"></span></div>
+    <div id="revive-status" class="hidden"><span data-i18n="hud.revivingTeammate"></span><div><i id="revive-progress"></i></div></div>
+    <div id="host-pause-status" class="hidden" role="status" data-i18n="hud.hostPaused"></div>
   </div>
 
   <div id="map-select" class="hidden">
     <div class="start-panel">
       <h1 class="zeroed-title">ZEROED</h1>
-      <p class="mode-hint">THE DEAD ARE COMING</p>
-      <div class="mode-grid" role="group" aria-label="Zombies">
+      <p class="mode-hint" data-i18n="menu.tagline"></p>
+      <div class="mode-grid" role="group" data-i18n-aria-label="menu.zombies">
         <button type="button" data-map="burned-mansion">
-          <span class="mode-name">ZOMBIES</span>
+          <span class="mode-name" data-i18n="menu.zombies"></span>
           <span class="mode-desc">BURNED MANSION</span>
         </button>
       </div>
-      <button type="button" id="coop-select" class="coop-select">MULTIPLAYER MODE</button>
-      <button type="button" id="privacy-open" class="privacy-link">Política de privacidad</button>
-      <div class="pwa-actions" aria-live="polite">
-        <button type="button" id="pwa-install" class="pwa-action hidden">INSTALL ZEROED</button>
-        <button type="button" id="pwa-update-menu" class="pwa-action hidden">UPDATE ZEROED</button>
+      <button type="button" id="coop-select" class="coop-select" data-i18n="menu.multiplayer"></button>
+      <div id="language-select" class="language-select" role="group" data-i18n-aria-label="menu.language">
+        <span class="language-label" data-i18n="menu.language" aria-hidden="true"></span>
+        <button type="button" data-language="es" lang="es">ES</button>
+        <button type="button" data-language="en" lang="en">EN</button>
+        <button type="button" data-language="ca" lang="ca">CA</button>
       </div>
-      <p id="ios-install-hint" class="ios-install-hint hidden">En Safari, toca Compartir y «Añadir a pantalla de inicio» para jugar sin las barras del navegador.</p>
+      <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
+      <div class="pwa-actions" aria-live="polite">
+        <button type="button" id="pwa-install" class="pwa-action hidden" data-i18n="menu.install"></button>
+        <button type="button" id="pwa-update-menu" class="pwa-action hidden" data-i18n="menu.update"></button>
+      </div>
+      <p id="ios-install-hint" class="ios-install-hint hidden" data-i18n="menu.iosHint"></p>
     </div>
   </div>
 
   <dialog id="privacy-dialog" aria-labelledby="privacy-title">
     <div class="privacy-dialog-header">
-      <h2 id="privacy-title">Privacidad de Zeroed</h2>
-      <button type="button" id="privacy-close" aria-label="Cerrar política de privacidad">Cerrar</button>
+      <h2 id="privacy-title" data-i18n="privacy.title"></h2>
+      <button type="button" id="privacy-close" data-i18n-aria-label="privacy.closeLabel" data-i18n="privacy.close"></button>
     </div>
-    <iframe id="privacy-frame" title="Política de privacidad de Zeroed"></iframe>
+    <iframe id="privacy-frame" data-i18n-title="privacy.frameTitle"></iframe>
   </dialog>
 
   <div id="coop-lobby" class="hidden">
     <div class="coop-lobby-content">
-      <button type="button" id="coop-back" aria-label="Back to main menu" title="Back">
-        <span aria-hidden="true">←</span> BACK
+      <button type="button" id="coop-back" data-i18n-title="coop.back">
+        <span aria-hidden="true">←</span> <span data-i18n="coop.back"></span>
       </button>
       <div class="start-panel">
-        <h1>CO-OP ZOMBIES</h1>
-        <p class="mode-hint">BURNED MANSION · TWO-PLAYER ROOM</p>
+        <h1 data-i18n="coop.title"></h1>
+        <p class="mode-hint" data-i18n="coop.subtitle"></p>
         <div class="coop-actions">
-          <button type="button" id="coop-host">CREATE ROOM</button>
-          <button type="button" id="coop-join">JOIN ROOM</button>
+          <button type="button" id="coop-host" data-i18n="coop.create"></button>
+          <button type="button" id="coop-join" data-i18n="coop.join"></button>
         </div>
         <div id="coop-join-fields" class="coop-join-fields hidden">
-          <label for="coop-code">FRIEND'S ROOM CODE</label>
+          <label for="coop-code" data-i18n="coop.codeLabel"></label>
           <input id="coop-code" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123" />
-          <button type="button" id="coop-join-submit">CONNECT</button>
+          <button type="button" id="coop-join-submit" data-i18n="coop.connect"></button>
         </div>
         <p id="coop-status" role="status" aria-live="polite"></p>
         <div id="coop-room-share" class="coop-room-share hidden">
           <span id="coop-room-code" class="coop-room-code"></span>
-          <button type="button" id="coop-copy-code">COPY CODE</button>
-          <button type="button" id="coop-share-code">SHARE</button>
+          <button type="button" id="coop-copy-code"></button>
+          <button type="button" id="coop-share-code" data-i18n="coop.share"></button>
         </div>
         <details id="coop-connection-options" class="hidden">
-          <summary>CONNECTION OPTIONS</summary>
+          <summary data-i18n="coop.connectionOptions"></summary>
           <div class="coop-server-field">
-            <label for="coop-server">ROOM SERVER</label>
+            <label for="coop-server" data-i18n="coop.server"></label>
             <input id="coop-server" type="url" spellcheck="false" placeholder="wss://your-server.example" />
-            <p>Only change this if you use a different room server.</p>
+            <p data-i18n="coop.serverHint"></p>
           </div>
         </details>
       </div>
     </div>
   </div>
 
-  <div id="game-over" class="hidden">
+  <div id="game-over" class="hidden" role="alertdialog" aria-labelledby="go-title" aria-describedby="go-epitaph">
+    <div class="go-flash" aria-hidden="true"></div>
     <div class="start-panel">
-      <h1>GAME OVER</h1>
-      <div class="go-stats">
-        <div class="hud-row"><span class="hud-label">ROUND REACHED</span><span id="go-round">1</span></div>
-        <div class="hud-row"><span class="hud-label">KILLS</span><span id="go-kills">0</span></div>
-        <div class="hud-row"><span class="hud-label">HEADSHOTS</span><span id="go-headshots">0</span></div>
-      </div>
-      <button type="button" id="go-restart">RESTART</button>
+      <svg class="go-flatline" viewBox="0 0 440 36" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M0 18h150l6-8 6 8h10l5-15 8 30 6-19 5 4h244"/></svg>
+      <p class="menu-kicker" data-i18n="gameOver.kicker"></p>
+      <h1 id="go-title" data-i18n="gameOver.title"></h1>
+      <p id="go-epitaph"></p>
+      <dl class="go-stats">
+        <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-round"/></svg><span data-i18n="gameOver.round"></span></dt><dd id="go-round">1</dd></div>
+        <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-kills"/></svg><span data-i18n="gameOver.kills"></span></dt><dd id="go-kills">0</dd></div>
+        <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-headshots"/></svg><span data-i18n="gameOver.headshots"></span></dt><dd id="go-headshots">0</dd></div>
+      </dl>
+      <button type="button" id="go-restart"></button>
     </div>
   </div>
 
   <div id="pause-menu" class="hidden">
     <div class="start-panel">
-      <p class="menu-kicker">BURNED MANSION · RONDA <span id="pause-round">1</span></p>
-      <h1>PAUSA</h1>
-      <dl class="pause-stats" aria-label="Estadísticas acumuladas">
-        <div><dt>Daño a zombis</dt><dd id="pause-damage">0</dd></div>
-        <div><dt>Puntos obtenidos</dt><dd id="pause-points">0</dd></div>
-        <div><dt>Bajas totales</dt><dd id="pause-kills">0</dd></div>
-        <div><dt>Bajas a la cabeza</dt><dd id="pause-headshots">0</dd></div>
+      <p class="menu-kicker"><span data-i18n="pause.kicker"></span> <span id="pause-round">1</span></p>
+      <h1 data-i18n="pause.title"></h1>
+      <dl class="pause-stats" data-i18n-aria-label="pause.stats">
+        <div><dt data-i18n="pause.damage"></dt><dd id="pause-damage">0</dd></div>
+        <div><dt data-i18n="pause.points"></dt><dd id="pause-points">0</dd></div>
+        <div><dt data-i18n="pause.kills"></dt><dd id="pause-kills">0</dd></div>
+        <div><dt data-i18n="pause.headshots"></dt><dd id="pause-headshots">0</dd></div>
       </dl>
       <div id="pause-lamps" class="lamp-progress"></div>
       <div class="pause-actions">
-        <button type="button" id="pause-resume">RESUME</button>
-        <button type="button" id="pause-restart">RESTART</button>
-        <button type="button" id="pause-menu-btn">MAIN MENU</button>
-        <button type="button" id="pwa-update-pause" class="hidden">UPDATE ZEROED</button>
+        <button type="button" id="pause-resume" data-i18n="pause.resume"></button>
+        <button type="button" id="pause-restart" data-i18n="pause.restart"></button>
+        <button type="button" id="pause-menu-btn" data-i18n="pause.mainMenu"></button>
+        <button type="button" id="pwa-update-pause" class="hidden" data-i18n="menu.update"></button>
       </div>
     </div>
   </div>
@@ -217,45 +228,45 @@
           M44 60.39L27 89.84A46 46 0 0 1 4 50L38 50A12 12 0 0 0 44 60.39Z" />
         <circle cx="50" cy="50" r="8" />
       </svg>
-      <p>NUCLEAR PROTOCOL ACTIVATED</p>
+      <p data-i18n="ending.nuclear"></p>
       <div class="nuclear-countdown" aria-hidden="true"><span>3</span><span>2</span><span>1</span></div>
     </div>
     <div class="credits-panel">
       <h1>ZEROED</h1>
-      <p class="credits-round">ROUND <span id="ending-round">1</span></p>
-      <p class="credits-role">Designed and developed by</p>
+      <p class="credits-round"><span data-i18n="ending.round"></span> <span id="ending-round">1</span></p>
+      <p class="credits-role" data-i18n="ending.designedBy"></p>
       <p>Gabriel Borràs (Biel40)</p>
-      <p class="credits-role">Official Beta Testers</p>
+      <p class="credits-role" data-i18n="ending.betaTesters"></p>
       <p>Biel Frau Fuster<br />Ivan Cabellos Berber</p>
-      <p class="credits-thanks">Thank you for playing!</p>
-      <button type="button" id="credits-main-menu">RETURN TO MAIN MENU</button>
+      <p class="credits-thanks" data-i18n="ending.thanks"></p>
+      <button type="button" id="credits-main-menu" data-i18n="ending.mainMenu"></button>
     </div>
   </div>
 
   <div id="start-screen">
-    <div id="rotate-prompt" role="status" aria-label="Gira el móvil para jugar en horizontal">
+    <div id="rotate-prompt" role="status" data-i18n-aria-label="start.rotateLabel">
       <div class="rotate-art" aria-hidden="true">
         <span class="rotate-orbit"></span>
         <span class="rotate-phone"><span></span></span>
       </div>
-      <div class="rotate-copy"><strong>GIRA TU<br />MÓVIL</strong><span>PARA JUGAR EN HORIZONTAL</span></div>
+      <div class="rotate-copy"><strong><span data-i18n="start.rotateTitle1"></span><br /><span data-i18n="start.rotateTitle2"></span></strong><span data-i18n="start.rotateHint"></span></div>
     </div>
     <div class="start-panel">
       <h1>Zeroed</h1>
-      <p id="start-hint">LOADING ASSETS</p>
+      <p id="start-hint" data-i18n="start.loading"></p>
       <div id="loading-bar"><span></span></div>
       <div class="controls-grid">
-        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Move</span>
-        <span><kbd>Mouse</kbd></span><span>Aim</span>
-        <span><kbd>LMB</kbd></span><span>Fire</span>
-        <span><kbd>RMB</kbd></span><span>ADS</span>
-        <span><kbd>R</kbd></span><span>Reload</span>
-        <span data-coop-hidden><kbd>X</kbd></span><span data-coop-hidden>Fire mode</span>
-        <span><kbd>E</kbd></span><span>Interact</span>
-        <span data-coop-hidden><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span data-coop-hidden>Knife</span>
-        <span><kbd>Space</kbd></span><span>Jump</span>
-        <span><kbd>1</kbd>–<kbd>2</kbd></span><span>Weapon slots</span>
-        <span><kbd>ESC</kbd></span><span>Release mouse</span>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span data-i18n="controls.move"></span>
+        <span><kbd data-i18n="controls.mouse"></kbd></span><span data-i18n="controls.aim"></span>
+        <span><kbd data-i18n="controls.lmb"></kbd></span><span data-i18n="controls.fire"></span>
+        <span><kbd data-i18n="controls.rmb"></kbd></span><span data-i18n="controls.ads"></span>
+        <span><kbd>R</kbd></span><span data-i18n="controls.reload"></span>
+        <span data-coop-hidden><kbd>X</kbd></span><span data-coop-hidden data-i18n="controls.fireMode"></span>
+        <span><kbd>E</kbd></span><span data-i18n="controls.interact"></span>
+        <span data-coop-hidden><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span data-coop-hidden data-i18n="controls.knife"></span>
+        <span><kbd data-i18n="controls.space"></kbd></span><span data-i18n="controls.jump"></span>
+        <span><kbd>1</kbd>–<kbd>2</kbd></span><span data-i18n="controls.slots"></span>
+        <span><kbd>ESC</kbd></span><span data-i18n="controls.release"></span>
       </div>
     </div>
   </div>

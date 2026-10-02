@@ -1,7 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
+import { loadEnv } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  define: {
+    'import.meta.env.VITE_BETA_ENABLED': JSON.stringify(process.env.BETA_ENABLED ?? loadEnv(mode, process.cwd(), 'BETA_').BETA_ENABLED ?? 'false'),
+  },
   base: './',
   plugins: [
     VitePWA({
@@ -101,5 +105,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Gameplay tests assert English texts regardless of the machine locale.
+    setupFiles: ['tests/setup.ts'],
   },
-});
+}));

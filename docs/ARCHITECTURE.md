@@ -39,6 +39,7 @@ contexto WebGL, canvas y AudioContext; volver al menu no recarga la pagina.
 | `src/zombies/` | IA, pool, combate, barreras, puertas y wonder weapons |
 | `src/game/` | Inventario, salud, economia y estadisticas puras |
 | `src/pwa.ts` | Service Worker, instalacion y actualizaciones |
+| `src/i18n/` | Diccionarios es/en/ca, `t()` e idioma activo |
 
 ## Contratos
 

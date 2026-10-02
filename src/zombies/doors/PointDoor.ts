@@ -1,9 +1,13 @@
+import type { TranslationKey } from '../../i18n/i18n';
+
 export type DoorState = 'locked' | 'unlocked';
 
 export interface PointDoorConfig {
   readonly cost: number;
-  readonly prompt?: string;
-  readonly requiredMessage?: string;
+  /** Custom action text shown instead of the generic unlock prompt. */
+  readonly prompt?: TranslationKey;
+  /** Denial banner; receives the door `cost`. */
+  readonly requiredMessage?: TranslationKey;
 }
 
 export interface PointDoorActivation {
@@ -65,11 +69,11 @@ export class PointDoor {
     return { cost: this.config.cost, success };
   }
 
-  get prompt(): string | undefined {
+  get prompt(): TranslationKey | undefined {
     return this.config.prompt;
   }
 
-  get requiredMessage(): string | undefined {
+  get requiredMessage(): TranslationKey | undefined {
     return this.config.requiredMessage;
   }
 

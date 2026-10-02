@@ -11,6 +11,7 @@ import { ZombiesMode } from './modes/ZombiesMode';
 import { CoopGuestMode } from './modes/coop/CoopGuestMode';
 import { CoopHostMode } from './modes/coop/CoopHostMode';
 import { CoopConnection } from './network/CoopConnection';
+import { applyDocumentTranslations, t } from './i18n/i18n';
 import { HUD } from './ui/HUD';
 
 class ZeroedBoot {
@@ -101,8 +102,8 @@ class ZeroedBoot {
     try {
       this.hud.hideCoopRoomCode();
       const endpoint = new URL(url);
-      if (endpoint.protocol !== 'ws:' && endpoint.protocol !== 'wss:') throw new Error('Use a ws:// or wss:// server address.');
-      if (role === 'guest' && !/^[A-HJ-NP-Z2-9]{6}$/.test(code)) throw new Error('Enter a valid six-character room code.');
+      if (endpoint.protocol !== 'ws:' && endpoint.protocol !== 'wss:') throw new Error(t('coop.invalidServer'));
+      if (role === 'guest' && !/^[A-HJ-NP-Z2-9]{6}$/.test(code)) throw new Error(t('coop.invalidCode'));
       this.coopConnection?.dispose();
       this.coopConnection = null;
       replacedConnection = true;
@@ -114,16 +115,17 @@ class ZeroedBoot {
       activeConnection.onClose = () => {
         if (this.coopConnection !== activeConnection) return;
         this.hud.hideCoopRoomCode();
-        this.hud.setCoopStatus('Connection closed. Check the server and try again.');
+        this.hud.setCoopStatus(t('coop.closed'));
       };
       activeConnection.onMessage = (message) => {
-        if (message.type === 'error') this.hud.setCoopStatus(String(message.message));
+        // The relay's only error is an unavailable room; its text is not localized.
+        if (message.type === 'error') this.hud.setCoopStatus(t('coop.roomUnavailable'));
         if (message.type === 'created') {
           this.hud.showCoopRoomCode(String(message.code));
-          this.hud.setCoopStatus('Room created. Share the code and wait for your partner.');
+          this.hud.setCoopStatus(t('coop.created'));
         }
         if (message.type === 'peerLeft' && role === 'host') {
-          this.hud.setCoopStatus('Your partner left. Waiting for another player.');
+          this.hud.setCoopStatus(t('coop.partnerLeft'));
           return;
         }
         const ready = (message.type === 'peerJoined' && role === 'host') || (message.type === 'joined' && role === 'guest');
@@ -132,7 +134,7 @@ class ZeroedBoot {
         // request must never hold the match or its first state packet.
         this.startCoopGame(role, activeConnection);
       };
-      this.hud.setCoopStatus('Connecting…');
+      this.hud.setCoopStatus(t('coop.connecting'));
       await activeConnection.open();
       await activeConnection.checkRelay();
       if (this.coopConnection !== activeConnection) return;
@@ -141,7 +143,7 @@ class ZeroedBoot {
       if (connection && this.coopConnection !== connection) return;
       connection?.dispose();
       if (replacedConnection) this.coopConnection = null;
-      this.hud.setCoopStatus(error instanceof Error ? error.message : 'Connection failed.');
+      this.hud.setCoopStatus(error instanceof Error ? error.message : t('coop.failed'));
     }
   }
 
@@ -149,7 +151,7 @@ class ZeroedBoot {
     document.documentElement.classList.toggle('touch-controls-enabled', this.profile.useTouchControls);
 
     if (!ZeroedBoot.hasWebGL()) {
-      this.hud.setError('WebGL no está disponible en este navegador.');
+      this.hud.setError(t('start.noWebGL'));
       return;
     }
 
@@ -177,7 +179,7 @@ class ZeroedBoot {
         this.showMapMenu();
       }
     } catch (error: unknown) {
-      this.hud.setError(error instanceof Error ? `La inicialización falló: ${error.message}` : 'La inicialización falló.');
+      this.hud.setError(error instanceof Error ? t('start.initFailed', { message: error.message }) : t('start.initFailedGeneric'));
     }
   }
 
@@ -186,5 +188,21 @@ class ZeroedBoot {
   }
 }
 
-setupPWA();
-void new ZeroedBoot().run();
+applyDocumentTranslations();
+async function boot(): Promise<void> {
+  if (import.meta.env.VITE_BETA_ENABLED === 'true') {
+    try {
+      const response = await fetch('/api/beta', { cache: 'no-store', credentials: 'same-origin' });
+      if (!response.ok) throw new Error('Beta access unavailable');
+      const access = await response.json() as { authorized?: boolean };
+      if (!access.authorized) throw new Error('Beta access required');
+    } catch {
+      window.location.replace('/beta.html');
+      return;
+    }
+  } else {
+    setupPWA();
+  }
+  await new ZeroedBoot().run();
+}
+void boot();

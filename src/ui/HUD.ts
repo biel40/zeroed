@@ -1,8 +1,9 @@
 import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
+import { formatNumber, getLanguage, isLanguage, onLanguageChange, setLanguage, t } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
-import { lampProgress, roundMarks } from './SurvivalPresentation';
+import { gameOverEpitaph, lampProgress, roundMarks } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
 export interface ZombieHudState {
@@ -93,20 +94,41 @@ export class HUD {
       privacyDialog.showModal();
     };
     mustGet('privacy-close').onclick = () => privacyDialog.close();
+
+    // The language is only chosen from the main menu; in-game texts read it when rendered.
+    const languageButtons = mustGet('language-select').querySelectorAll<HTMLButtonElement>('[data-language]');
+    const syncLanguageButtons = (): void => {
+      for (const button of languageButtons) {
+        button.setAttribute('aria-pressed', String(button.dataset.language === getLanguage()));
+      }
+    };
+    for (const button of languageButtons) {
+      button.onclick = () => {
+        if (isLanguage(button.dataset.language)) setLanguage(button.dataset.language);
+      };
+    }
+    syncLanguageButtons();
+    onLanguageChange(() => {
+      syncLanguageButtons();
+      // Cached HUD texts were rendered in the previous language.
+      this.lastWeapon = this.lastAmmo = this.lastMode = this.lastZombies = this.lastLamps = '';
+      this.lastRound = -1;
+      this.lastPrompt = null;
+    });
   }
 
   /** Real asset loading progress, 0..1. */
   public setLoadProgress(ratio: number): void {
     const percent = Math.round(ratio * 100);
     this.loadingBarFill.style.width = `${percent}%`;
-    this.startHint.textContent = `LOADING ASSETS — ${percent} %`;
+    this.startHint.textContent = t('start.loadingProgress', { percent });
   }
 
   public setReady(): void {
     this.ready = true;
     this.startScreen.classList.add('ready');
     this.loadingBar.classList.add('hidden');
-    this.startHint.textContent = 'CLICK TO START';
+    this.startHint.textContent = t('start.clickToStart');
   }
 
   public setError(message: string): void {
@@ -124,7 +146,7 @@ export class HUD {
 
   public showStartScreen(paused: boolean): void {
     if (!this.ready) return;
-    this.startHint.textContent = paused ? 'PAUSED — CLICK TO RESUME' : 'CLICK TO START';
+    this.startHint.textContent = t(paused ? 'start.pausedClick' : 'start.clickToStart');
     this.startScreen.classList.remove('hidden');
   }
 
@@ -183,19 +205,19 @@ export class HUD {
     server.value = defaultServerUrl;
     code.value = '';
     joinFields.classList.add('hidden');
-    back.setAttribute('aria-label', 'Back to main menu');
+    back.setAttribute('aria-label', t('coop.backToMenu'));
     this.hideCoopRoomCode();
     (mustGet('coop-connection-options') as HTMLDetailsElement).open = false;
     (mustGet('coop-host') as HTMLButtonElement).onclick = () => {
       joinFields.classList.add('hidden');
-      back.setAttribute('aria-label', 'Back to main menu');
+      back.setAttribute('aria-label', t('coop.backToMenu'));
       handlers.host(server.value.trim());
     };
     (mustGet('coop-join') as HTMLButtonElement).onclick = () => {
       joinFields.classList.remove('hidden');
-      back.setAttribute('aria-label', 'Back to room choices');
+      back.setAttribute('aria-label', t('coop.backToChoices'));
       code.focus();
-      this.setCoopStatus('Enter the code your friend shared.');
+      this.setCoopStatus(t('coop.enterCode'));
     };
     const submitJoin = () => handlers.join(server.value.trim(), code.value.trim().toUpperCase());
     (mustGet('coop-join-submit') as HTMLButtonElement).onclick = submitJoin;
@@ -207,11 +229,11 @@ export class HUD {
       }
       joinFields.classList.add('hidden');
       code.value = '';
-      back.setAttribute('aria-label', 'Back to main menu');
-      this.setCoopStatus('Create a room to get a code, or join a friend.');
+      back.setAttribute('aria-label', t('coop.backToMenu'));
+      this.setCoopStatus(t('coop.chooseAction'));
       (mustGet('coop-join') as HTMLButtonElement).focus();
     };
-    this.setCoopStatus('Create a room to get a code, or join a friend.');
+    this.setCoopStatus(t('coop.chooseAction'));
   }
 
   public setCoopStatus(message: string): void {
@@ -223,7 +245,7 @@ export class HUD {
     const copyButton = mustGet('coop-copy-code') as HTMLButtonElement;
     const shareButton = mustGet('coop-share-code') as HTMLButtonElement;
     roomCode.textContent = code;
-    copyButton.textContent = 'COPY CODE';
+    copyButton.textContent = t('coop.copy');
     mustGet('coop-room-share').classList.remove('hidden');
     shareButton.classList.toggle('hidden', typeof navigator.share !== 'function');
 
@@ -249,17 +271,17 @@ export class HUD {
         finally { input.remove(); }
       }
       if (!copied) {
-        this.setCoopStatus('Could not copy the code. Select it to copy manually.');
+        this.setCoopStatus(t('coop.copyFailed'));
         return;
       }
-      copyButton.textContent = 'COPIED';
+      copyButton.textContent = t('coop.copied');
       window.setTimeout(() => {
-        if (roomCode.textContent === code) copyButton.textContent = 'COPY CODE';
+        if (roomCode.textContent === code) copyButton.textContent = t('coop.copy');
       }, 2000);
     };
 
     shareButton.onclick = async () => {
-      const data: ShareData = { title: 'Zeroed room', text: `Join my Zeroed room with code ${code}.` };
+      const data: ShareData = { title: t('coop.shareTitle'), text: t('coop.shareText', { code }) };
       if (!['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) {
         data.url = new URL(location.pathname, location.origin).href;
       }
@@ -267,7 +289,7 @@ export class HUD {
         await navigator.share(data);
       } catch (error) {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          this.setCoopStatus('Could not share the room. Use Copy Code instead.');
+          this.setCoopStatus(t('coop.shareFailed'));
         }
       }
     };
@@ -285,14 +307,14 @@ export class HUD {
     document.documentElement.classList.add('coop-mode');
     document.documentElement.classList.toggle('coop-guest', role === 'guest');
     // Only the host restarts; a guest can always leave, and follows a host restart automatically.
-    mustGet('go-restart').textContent = role === 'host' ? 'RESTART' : 'LEAVE MATCH';
+    mustGet('go-restart').textContent = t(role === 'host' ? 'gameOver.restart' : 'gameOver.leave');
   }
 
   public clearCoopPresentation(): void {
     document.documentElement.classList.remove('coop-mode', 'coop-guest');
     this.setDownedState('alive', 0, 0);
     this.setHostPauseVisible(false);
-    mustGet('go-restart').textContent = 'RESTART';
+    mustGet('go-restart').textContent = t('gameOver.restart');
   }
 
   public setHostPauseVisible(visible: boolean): void {
@@ -303,7 +325,7 @@ export class HUD {
     const downed = life === 'downed';
     this.downedFilter.classList.toggle('hidden', !downed);
     this.downedStatus.classList.toggle('hidden', !downed);
-    if (downed) this.downedCountdown.textContent = `BLEEDING OUT: ${Math.ceil(seconds)}s`;
+    if (downed) this.downedCountdown.textContent = t('hud.bleedingOut', { seconds: Math.ceil(seconds) });
     this.reviveStatus.classList.toggle('hidden', reviveProgress <= 0);
     this.reviveProgress.style.width = `${Math.min(1, reviveProgress) * 100}%`;
   }
@@ -320,10 +342,10 @@ export class HUD {
     if (this.lastRound !== state.round) {
       this.lastRound = state.round;
       this.zRound.innerHTML = roundMarks(state.round);
-      this.zRound.setAttribute('aria-label', `Ronda ${state.round}`);
+      this.zRound.setAttribute('aria-label', t('hud.roundLabel', { round: state.round }));
       mustGet('pause-round').textContent = `${state.round}`;
     }
-    this.zPoints.textContent = state.points.toLocaleString('es-ES');
+    this.zPoints.textContent = formatNumber(state.points);
     mustGet('z-hp').textContent = `${Math.ceil(state.hp)} / ${state.maxHp}`;
     const ratio = state.maxHp > 0 ? clamp(state.hp / state.maxHp, 0, 1) : 0;
     this.zHpFill.style.width = `${ratio * 100}%`;
@@ -334,8 +356,8 @@ export class HUD {
     );
     this.zKills.textContent = `${state.kills}`;
     this.zHeadshots.textContent = `${state.headshots}`;
-    mustGet('pause-damage').textContent = Math.round(state.totalDamage).toLocaleString('es-ES');
-    mustGet('pause-points').textContent = state.totalPoints.toLocaleString('es-ES');
+    mustGet('pause-damage').textContent = formatNumber(Math.round(state.totalDamage));
+    mustGet('pause-points').textContent = formatNumber(state.totalPoints);
     mustGet('pause-kills').textContent = `${state.kills}`;
     mustGet('pause-headshots').textContent = `${state.headshots}`;
     const lampKey = `${state.lamps.length}|${state.lamps.join(',')}`;
@@ -375,6 +397,11 @@ export class HUD {
     this.goRound.textContent = `${stats.round}`;
     this.goKills.textContent = `${stats.kills}`;
     this.goHeadshots.textContent = `${stats.headshots}`;
+    // A data-i18n key keeps the line translated if the language changes meanwhile.
+    const epitaph = mustGet('go-epitaph');
+    const epitaphKey = gameOverEpitaph(stats.round);
+    epitaph.dataset.i18n = epitaphKey;
+    epitaph.textContent = t(epitaphKey);
     this.gameOverPanel.classList.remove('hidden');
   }
 
@@ -456,13 +483,15 @@ export class HUD {
         this.weaponName.textContent = fallbackWeapon;
         this.lastWeapon = fallbackWeapon;
       }
-      if (this.lastAmmo !== 'MELEE') {
-        this.ammo.textContent = 'MELEE';
-        this.lastAmmo = 'MELEE';
+      const melee = t('hud.melee');
+      if (this.lastAmmo !== melee) {
+        this.ammo.textContent = melee;
+        this.lastAmmo = melee;
       }
-      if (this.lastMode !== 'BLADE') {
-        this.mode.textContent = 'BLADE';
-        this.lastMode = 'BLADE';
+      const blade = t('hud.blade');
+      if (this.lastMode !== blade) {
+        this.mode.textContent = blade;
+        this.lastMode = blade;
       }
       this.crosshair.style.setProperty('--gap', '10.0px');
       this.crosshair.style.opacity = '1';
@@ -484,7 +513,7 @@ export class HUD {
       this.ammo.textContent = ammoText;
       this.lastAmmo = ammoText;
     }
-    const mode = weapon.fireMode.toUpperCase();
+    const mode = t(weapon.fireMode === 'auto' ? 'hud.fireMode.auto' : 'hud.fireMode.semi');
     if (mode !== this.lastMode) {
       this.mode.textContent = mode;
       this.lastMode = mode;

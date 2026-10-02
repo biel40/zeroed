@@ -11,6 +11,7 @@ import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
 import { SecretRoomSystem, type SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
+import { t, type TranslationKey } from '../../i18n/i18n';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
 import { CreepyAreaLights } from '../../rendering/CreepyAreaLights';
@@ -129,7 +130,7 @@ class MansionAmmoRefill implements ArenaAmmoRefill {
   constructor(
     readonly id: string,
     readonly cost: number,
-    readonly interactionLabel: string,
+    private readonly labelKey: TranslationKey,
     readonly position: { readonly x: number; readonly y: number; readonly z: number },
     readonly floor: number,
     readonly useRange: number,
@@ -138,6 +139,10 @@ class MansionAmmoRefill implements ArenaAmmoRefill {
     private readonly lid: THREE.Object3D,
     private readonly glow: THREE.PointLight,
   ) {}
+
+  get interactionLabel(): string {
+    return t(this.labelKey, { cost: this.cost });
+  }
 
   activate(): void {
     this.feedbackTimer = 0.45;
@@ -888,7 +893,7 @@ export class BurnedMansionArena implements ZombieArena {
       return new MansionAmmoRefill(
         config.id,
         config.cost,
-        config.interactionLabel,
+        config.labelKey,
         config.position,
         config.floor,
         config.useRange,

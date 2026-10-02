@@ -48,7 +48,7 @@ describe('Zombies map selection flow', () => {
     expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
     expect(html.match(/data-map=/g)).toHaveLength(1);
     expect(html).not.toContain('data-mode=');
-    expect(html).toContain('ZOMBIES');
+    expect(html).toContain('data-i18n="menu.zombies"');
     expect(html).toContain('BURNED MANSION');
     expect(ZOMBIE_MAPS['burned-mansion'].visible).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);

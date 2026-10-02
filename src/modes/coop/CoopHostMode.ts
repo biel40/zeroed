@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { t } from '../../i18n/i18n';
+import { actionKey } from '../../ui/InteractionPrompts';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { PlayerEconomy } from '../../game/PlayerEconomy';
 import { PlayerHealth } from '../../game/PlayerHealth';
@@ -194,7 +196,7 @@ export class CoopHostMode implements GameMode {
     this.connection.onMessage = (message) => this.handleMessage(message);
     this.connection.onClose = () => {
       this.onGuestLeft();
-      ctx.hud.showRoundBanner('CONNECTION LOST', 'THE MATCH CONTINUES OFFLINE');
+      ctx.hud.showRoundBanner(t('banner.connectionLost'), t('banner.continuesOffline'));
     };
     this.pushHud();
   }
@@ -267,7 +269,7 @@ export class CoopHostMode implements GameMode {
   public onGameplayStarted(): void {
     this.hostStarted = true;
     if (this.phase === 'waiting' && this.guestConnected && !this.guestReady) {
-      this.ctx.hud.showRoundBanner('WAITING FOR PARTNER');
+      this.ctx.hud.showRoundBanner(t('banner.waitingForPartner'));
     }
   }
 
@@ -323,8 +325,8 @@ export class CoopHostMode implements GameMode {
   public usesFallbackAttack(): boolean { return this.isGameplayInputEnabled() && this.knife.isAttacking; }
 
   public getFallbackWeaponName(): string | null {
-    return this.players.host.life.state === 'downed' ? 'DOWNED'
-      : this.players.guest.life.reviver === 'host' ? 'REVIVING' : this.usesFallbackAttack() ? 'KNIFE' : null;
+    return this.players.host.life.state === 'downed' ? t('hud.downed')
+      : this.players.guest.life.reviver === 'host' ? t('hud.reviving') : this.usesFallbackAttack() ? t('hud.knife') : null;
   }
 
   public onMeleeAttack(): void {
@@ -336,21 +338,21 @@ export class CoopHostMode implements GameMode {
   public getInteractPrompt(): string | null {
     if (!this.isGameplayInputEnabled()) return null;
     if (!this.isCombatInputEnabled()) return null;
-    if (this.canRevive('host', 'guest')) return `REVIVE PLAYER\n${this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E'}`;
+    if (this.canRevive('host', 'guest')) return t('prompt.revive', { key: actionKey(this.ctx.profile.useTouchControls) });
     const door = this.world.findFacingDoor();
     if (door) return this.world.doorPrompt(door);
-    const tapKey = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
-    if (this.world.findRepairableBarrier()) return `REPAIR BARRICADE\n${this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E'}`;
-    if (this.world.findFacingSoulLamp()) return `ENCENDER FAROL\n${tapKey}`;
-    if (this.world.findFacingRitual()) return `TOUCH THE RITUAL CIRCLE\n${tapKey}`;
+    const tapKey = actionKey(this.ctx.profile.useTouchControls);
+    if (this.world.findRepairableBarrier()) return t('prompt.repairBarricade', { key: actionKey(this.ctx.profile.useTouchControls, true) });
+    if (this.world.findFacingSoulLamp()) return t('prompt.lightLamp', { key: tapKey });
+    if (this.world.findFacingRitual()) return t('prompt.ritual', { key: tapKey });
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
     const pickup = this.world.findFacingPickup();
-    if (pickup) return `${pickup.interactionLabel}\n${tapKey}`;
+    if (pickup) return t('prompt.pickup', { label: pickup.interactionLabel, key: tapKey });
     const refill = this.world.findFacingAmmoRefill();
-    if (refill) return `${refill.interactionLabel}\n${tapKey}`;
+    if (refill) return t('prompt.pickup', { label: refill.interactionLabel, key: tapKey });
     const completion = this.world.findFacingCompletion();
-    if (completion) return `ACTIVATE FINAL\n${tapKey} — ${completion.cost} PTS`;
+    if (completion) return t('prompt.activateFinal', { key: tapKey, cost: completion.cost });
     return this.boxPrompt('host');
   }
 
@@ -377,7 +379,7 @@ export class CoopHostMode implements GameMode {
     }
     if (raw.type === 'peerLeft') {
       this.onGuestLeft();
-      this.ctx.hud.showRoundBanner('PARTNER DISCONNECTED');
+      this.ctx.hud.showRoundBanner(t('banner.partnerDisconnected'));
       return;
     }
     if (!this.guestConnected) return;
@@ -506,14 +508,14 @@ export class CoopHostMode implements GameMode {
     for (const event of this.rounds.pendingEvents) {
       if (event.type === 'roundStarted') {
         for (const barrier of this.world.arena.barriers) barrier.resetRoundCap();
-        this.ctx.hud.showRoundBanner(`ROUND ${event.round}`);
+        this.ctx.hud.showRoundBanner(t('banner.round', { round: event.round }));
         this.ctx.audio.playRoundSting();
         this.send({ type: 'roundStart', round: event.round });
       } else if (event.type === 'spawnDue') {
         const anchor = this.spawnAnchor();
         if (!this.zombies.spawnZombie(event.config, anchor.x, anchor.z, event.round)) this.rounds.requeueSpawn();
       } else if (event.type === 'roundComplete') {
-        this.ctx.hud.showRoundBanner(`ROUND ${event.round} COMPLETE`);
+        this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: event.round }));
         this.send({ type: 'roundEnd', round: event.round });
       }
     }
@@ -691,7 +693,7 @@ export class CoopHostMode implements GameMode {
       this.rayGunUnlocked[shooter] = true;
       if (shooter === 'host') {
         this.ctx.grantWeapon('raygun');
-        this.ctx.hud.showRoundBanner('RAY GUN UNLOCKED', `${RAYGUN_UNLOCK_KILLS} KILLS`);
+        this.ctx.hud.showRoundBanner(t('banner.raygunUnlocked'), t('banner.kills', { kills: RAYGUN_UNLOCK_KILLS }));
         this.ctx.audio.playMysteryBoxReveal(true);
       } else {
         if (this.guestState) {
@@ -790,7 +792,7 @@ export class CoopHostMode implements GameMode {
       return;
     }
     if (!remote && owned && !this.ctx.canRefillWeaponAmmo(wallBuy.weaponId)) {
-      this.ctx.hud.showRoundBanner('AMMO FULL', WEAPON_DEFINITIONS[wallBuy.weaponId].name);
+      this.ctx.hud.showRoundBanner(t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
       return;
     }
     const cost = owned ? wallBuy.ammoPrice : wallBuy.price;
@@ -798,7 +800,7 @@ export class CoopHostMode implements GameMode {
       if (remote) this.send({ type: 'wallBuyFailed', reason: 'insufficientPoints' });
       else {
         this.ctx.hud.flashNotEnoughPoints();
-        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${cost} PTS NEEDED`);
+        this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
       }
       return;
     }
@@ -861,7 +863,7 @@ export class CoopHostMode implements GameMode {
     } else if (kind === 'ammo') {
       const refill = this.world.arena.ammoRefills.find((entry) => entry.id === id)!;
       if (!remote && !this.ctx.canRefillEquippedWeaponAmmo()) {
-        this.ctx.hud.showRoundBanner('AMMO FULL');
+        this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
         return;
       }
       if (!record.economy.spend(refill.cost)) {
@@ -888,16 +890,16 @@ export class CoopHostMode implements GameMode {
     if (remote) this.send({ type: 'mapUseFailed', reason: 'insufficientPoints' });
     else {
       this.ctx.hud.flashNotEnoughPoints();
-      this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${cost} PTS NEEDED`);
+      this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
     }
   }
 
   private boxPrompt(player: CoopPlayerId): string | null {
     if (!this.world.isLocalInBoxRange()) return null;
-    const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
-    if (this.box.state === 'closed') return `MYSTERY BOX\n${key} — ${MYSTERY_BOX_TUNING.cost} PTS`;
+    const key = actionKey(this.ctx.profile.useTouchControls);
+    if (this.box.state === 'closed') return t('prompt.mysteryBoxCost', { key, cost: MYSTERY_BOX_TUNING.cost });
     if (this.box.state === 'awaitingPickup' && this.boxOwner === player && this.box.result) {
-      return `${key} to take ${WEAPON_DEFINITIONS[this.box.result].name}`;
+      return t('prompt.takeWeapon', { key, weapon: WEAPON_DEFINITIONS[this.box.result].name });
     }
     return null;
   }
@@ -920,7 +922,7 @@ export class CoopHostMode implements GameMode {
         if (remote) this.send({ type: 'boxFailed', reason: 'insufficientPoints' });
         else {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${MYSTERY_BOX_TUNING.cost} PTS NEEDED`);
+          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
         }
         return;
       }
@@ -974,7 +976,7 @@ export class CoopHostMode implements GameMode {
     for (const validator of this.shots.values()) validator.reset();
     this.lastGuestKnife = -Infinity;
     this.guestAvatar.clear();
-    this.ctx.hud.showRoundBanner('PARTNER JOINED');
+    this.ctx.hud.showRoundBanner(t('banner.partnerJoined'));
     this.sendMatchState();
   }
 

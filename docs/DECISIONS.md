@@ -30,6 +30,11 @@
   empareja y reenvia (nunca mensajes reservados del propio relay). La pausa
   multijugador es local (`sharedSimulation`). `ZombiesMode` sigue local y no
   necesita red.
+- **Idioma solo desde el menu principal.** Espanol, ingles y catalan viven en
+  `src/i18n/`; `en.ts` define las claves y los demas diccionarios deben
+  cubrirlas. El HTML declara textos con `data-i18n`, el codigo usa `t()` al
+  renderizar y los datos del mapa guardan claves, no frases. La eleccion se
+  recuerda en `localStorage`; sin ella se usa el idioma del navegador.
 
 ## Deudas de contrato
 

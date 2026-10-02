@@ -1,3 +1,4 @@
+import type { TranslationKey } from '../../i18n/i18n';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
@@ -134,7 +135,7 @@ export const MANSION_AMMO_REFILLS = [
   {
     id: 'start-ammo-refill',
     cost: 800,
-    interactionLabel: 'REFILL AMMO — 800',
+    labelKey: 'arena.refillAmmo',
     position: { x: MANSION_EAST_WALL_X - 0.9, y: 0.45, z: 9.45 },
     floor: 0,
     useRange: 1.9,
@@ -147,7 +148,7 @@ export const MANSION_SECRET_AREAS = [
     id: 'nuclear_bunker',
     doorId: 'nuclear-bunker',
     unlockCost: MANSION_DOOR_COSTS.nuclearBunker,
-    prompt: 'Open sealed bunker',
+    prompt: 'door.openBunker',
     floor: -1,
     rewards: MANSION_SPECIAL_WEAPON_CASES,
   },
@@ -183,8 +184,8 @@ export const MANSION_DOORS: ReadonlyArray<{
   cost: number;
   y: number;
   floor: number;
-  prompt?: string;
-  requiredMessage?: string;
+  prompt?: TranslationKey;
+  requiredMessage?: TranslationKey;
 }> = [
   { id: 'to-dining', x: -3.5, z: 2, outwardX: 0, outwardZ: -1, cost: MANSION_DOOR_COSTS.diningHall, y: 0, floor: 0 },
   { id: 'to-east-hall', x: 0, z: -2.5, outwardX: 1, outwardZ: 0, cost: MANSION_DOOR_COSTS.eastHall, y: 0, floor: 0 },
@@ -197,8 +198,8 @@ export const MANSION_DOORS: ReadonlyArray<{
     cost: MANSION_DOOR_COSTS.nuclearBunker,
     y: 0,
     floor: 0,
-    prompt: 'Open sealed bunker',
-    requiredMessage: '9999 PTS REQUIRED',
+    prompt: 'door.openBunker',
+    requiredMessage: 'door.bunkerRequired',
   },
 ];
 

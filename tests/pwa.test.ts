@@ -61,7 +61,7 @@ describe('PWA contract', () => {
     expect(pwa).toContain('this.reloadPending = true');
     expect(pwa).toContain("!this.mapSelect.classList.contains('hidden')");
     expect(pwa).toContain("!this.pauseMenu.classList.contains('hidden')");
-    expect(pwa).toContain("window.confirm('Actualizar reiniciara la partida actual. Continuar?')");
+    expect(pwa).toContain("window.confirm(t('menu.updateConfirm'))");
     expect(pwa).toContain('await this.updateSW()');
   });
 

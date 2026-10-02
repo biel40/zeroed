@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { t } from '../../i18n/i18n';
+import { actionKey } from '../../ui/InteractionPrompts';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import type { CoopConnection } from '../../network/CoopConnection';
 import {
@@ -101,7 +103,7 @@ export class CoopGuestMode implements GameMode {
     ctx.hud.setZombiesRestartHandler(() => ctx.returnToMainMenu());
     ctx.hud.setCreditsMainMenuHandler(() => ctx.returnToMainMenu());
     this.connection.onMessage = (message) => this.handleMessage(message);
-    this.connection.onClose = () => this.onHostLost('CONNECTION LOST');
+    this.connection.onClose = () => this.onHostLost(t('banner.connectionLost'));
     this.pushHud();
   }
 
@@ -112,14 +114,14 @@ export class CoopGuestMode implements GameMode {
       this.boxWait += dt;
       if (this.boxWait >= 5) {
         this.boxPending = false;
-        this.ctx.hud.showRoundBanner('BOX NOT CONFIRMED');
+        this.ctx.hud.showRoundBanner(t('banner.boxNotConfirmed'));
       }
     }
     if (this.wallBuyPending) {
       this.wallBuyWait += dt;
       if (this.wallBuyWait >= 5) {
         this.wallBuyPending = false;
-        this.ctx.hud.showRoundBanner('PURCHASE NOT CONFIRMED');
+        this.ctx.hud.showRoundBanner(t('banner.purchaseNotConfirmed'));
       }
     }
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
@@ -141,7 +143,7 @@ export class CoopGuestMode implements GameMode {
       if (!this.match) {
         this.initialMatchWait += dt;
         if (this.initialMatchWait >= INITIAL_MATCH_TIMEOUT) {
-          this.onHostLost('MATCH NOT SYNCHRONIZED');
+          this.onHostLost(t('banner.notSynchronized'));
           this.pushHud();
           return;
         }
@@ -226,7 +228,7 @@ export class CoopGuestMode implements GameMode {
       if (this.wallBuyPending) return;
       const refill = this.ctx.hasWeapon(wallBuy.weaponId);
       if (refill && !this.ctx.canRefillWeaponAmmo(wallBuy.weaponId)) {
-        this.ctx.hud.showRoundBanner('AMMO FULL', WEAPON_DEFINITIONS[wallBuy.weaponId].name);
+        this.ctx.hud.showRoundBanner(t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
         return;
       }
       this.wallBuyPending = true;
@@ -238,7 +240,7 @@ export class CoopGuestMode implements GameMode {
     if (pickup) { this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon }); return; }
     const refill = this.world.findFacingAmmoRefill();
     if (refill) {
-      if (!this.ctx.canRefillEquippedWeaponAmmo()) { this.ctx.hud.showRoundBanner('AMMO FULL'); return; }
+      if (!this.ctx.canRefillEquippedWeaponAmmo()) { this.ctx.hud.showRoundBanner(t('banner.ammoFull')); return; }
       this.send({ type: 'mapUse', kind: 'ammo', id: refill.id, equippedWeapon });
       return;
     }
@@ -254,8 +256,8 @@ export class CoopGuestMode implements GameMode {
   public usesFallbackAttack(): boolean { return this.isGameplayInputEnabled() && this.knife.isAttacking; }
 
   public getFallbackWeaponName(): string | null {
-    return this.match?.stats.guest.life === 'downed' ? 'DOWNED'
-      : this.match?.stats.host.reviver === 'guest' ? 'REVIVING' : this.usesFallbackAttack() ? 'KNIFE' : null;
+    return this.match?.stats.guest.life === 'downed' ? t('hud.downed')
+      : this.match?.stats.host.reviver === 'guest' ? t('hud.reviving') : this.usesFallbackAttack() ? t('hud.knife') : null;
   }
 
   public onMeleeAttack(): void {
@@ -267,25 +269,25 @@ export class CoopGuestMode implements GameMode {
   public getInteractPrompt(): string | null {
     if (!this.isGameplayInputEnabled()) return null;
     if (!this.isCombatInputEnabled()) return null;
-    if (this.canReviveHost()) return `REVIVE PLAYER\n${this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E'}`;
+    if (this.canReviveHost()) return t('prompt.revive', { key: actionKey(this.ctx.profile.useTouchControls) });
     const door = this.world.findFacingDoor();
     if (door) return this.world.doorPrompt(door);
-    const key = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
-    if (this.world.findRepairableBarrier()) return `REPAIR BARRICADE\n${this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E'}`;
-    if (this.world.findFacingSoulLamp()) return `ENCENDER FAROL\n${key}`;
-    if (this.world.findFacingRitual()) return `TOUCH THE RITUAL CIRCLE\n${key}`;
+    const key = actionKey(this.ctx.profile.useTouchControls);
+    if (this.world.findRepairableBarrier()) return t('prompt.repairBarricade', { key: actionKey(this.ctx.profile.useTouchControls, true) });
+    if (this.world.findFacingSoulLamp()) return t('prompt.lightLamp', { key: key });
+    if (this.world.findFacingRitual()) return t('prompt.ritual', { key: key });
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
     const pickup = this.world.findFacingPickup();
-    if (pickup) return `${pickup.interactionLabel}\n${key}`;
+    if (pickup) return t('prompt.pickup', { label: pickup.interactionLabel, key: key });
     const refill = this.world.findFacingAmmoRefill();
-    if (refill) return `${refill.interactionLabel}\n${key}`;
+    if (refill) return t('prompt.pickup', { label: refill.interactionLabel, key: key });
     const completion = this.world.findFacingCompletion();
-    if (completion) return `ACTIVATE FINAL\n${key} — ${completion.cost} PTS`;
+    if (completion) return t('prompt.activateFinal', { key: key, cost: completion.cost });
     if (!this.world.isLocalInBoxRange()) return null;
-    if (this.box.state === 'closed') return `MYSTERY BOX\n${key} — ${MYSTERY_BOX_TUNING.cost} PTS`;
+    if (this.box.state === 'closed') return t('prompt.mysteryBoxCost', { key, cost: MYSTERY_BOX_TUNING.cost });
     if (this.box.state === 'awaitingPickup' && this.match?.box.owner === 'guest' && this.box.result) {
-      return `${key} to take ${WEAPON_DEFINITIONS[this.box.result].name}`;
+      return t('prompt.takeWeapon', { key, weapon: WEAPON_DEFINITIONS[this.box.result].name });
     }
     return null;
   }
@@ -302,7 +304,7 @@ export class CoopGuestMode implements GameMode {
 
   private handleMessage(raw: IncomingMessage): void {
     if (raw.type === 'peerLeft') {
-      this.onHostLost('HOST LEFT THE MATCH');
+      this.onHostLost(t('banner.hostLeft'));
       return;
     }
     if (this.hostLost) return;
@@ -346,11 +348,11 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'roundStart':
         this.round = message.round;
-        this.ctx.hud.showRoundBanner(`ROUND ${message.round}`);
+        this.ctx.hud.showRoundBanner(t('banner.round', { round: message.round }));
         this.ctx.audio.playRoundSting();
         break;
       case 'roundEnd':
-        this.ctx.hud.showRoundBanner(`ROUND ${message.round} COMPLETE`);
+        this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: message.round }));
         break;
       case 'doorOpened': {
         const door = this.world.findDoor(message.doorId);
@@ -371,9 +373,9 @@ export class CoopGuestMode implements GameMode {
         this.wallBuyPending = false;
         if (message.reason === 'insufficientPoints') {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS');
-        } else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner('AMMO FULL');
-        else this.ctx.hud.showRoundBanner('PURCHASE UNAVAILABLE');
+          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'));
+        } else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
+        else this.ctx.hud.showRoundBanner(t('banner.purchaseUnavailable'));
         break;
       case 'boxGranted':
         this.boxPending = false;
@@ -382,16 +384,16 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'milestoneWeapon':
         this.ctx.grantWeapon(message.weapon);
-        this.ctx.hud.showRoundBanner('RAY GUN UNLOCKED');
+        this.ctx.hud.showRoundBanner(t('banner.raygunUnlocked'));
         this.ctx.audio.playMysteryBoxReveal(true);
         break;
       case 'boxFailed':
         this.boxPending = false;
         if (message.reason === 'insufficientPoints') {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${MYSTERY_BOX_TUNING.cost} PTS NEEDED`);
-        } else if (message.reason === 'reserved') this.ctx.hud.showRoundBanner('BOX RESERVED FOR PARTNER');
-        else this.ctx.hud.showRoundBanner('BOX UNAVAILABLE');
+          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
+        } else if (message.reason === 'reserved') this.ctx.hud.showRoundBanner(t('banner.boxReserved'));
+        else this.ctx.hud.showRoundBanner(t('banner.boxUnavailable'));
         break;
       case 'mapUsed':
         if (message.kind === 'lamp') this.world.arena.soulLampInteractions.find((entry) => entry.id === message.id)?.activate();
@@ -405,9 +407,9 @@ export class CoopGuestMode implements GameMode {
         }
         break;
       case 'mapUseFailed':
-        if (message.reason === 'insufficientPoints') this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS');
-        else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner('AMMO FULL');
-        else this.ctx.hud.showRoundBanner('UNAVAILABLE');
+        if (message.reason === 'insufficientPoints') this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'));
+        else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
+        else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
         break;
       case 'playerDamaged':
         this.ctx.audio.playPlayerHurt();
@@ -533,7 +535,7 @@ export class CoopGuestMode implements GameMode {
     this.ctx.hud.setHostPauseVisible(false);
     this.ctx.hud.setDownedState('alive', 0, 0);
     this.ctx.player.setDownedCamera(false);
-    this.ctx.hud.showRoundBanner(message, 'OPEN THE MENU TO LEAVE');
+    this.ctx.hud.showRoundBanner(message, t('banner.openMenuToLeave'));
     this.ctx.unlockPointer();
   }
 

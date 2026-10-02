@@ -416,8 +416,8 @@ describe('Burned Mansion topology', () => {
 
     expect(secret.unlockCost).toBe(9999);
     expect(door.cost).toBe(9999);
-    expect(door.prompt).toBe('Open sealed bunker');
-    expect(door.requiredMessage).toBe('9999 PTS REQUIRED');
+    expect(door.prompt).toBe('door.openBunker');
+    expect(door.requiredMessage).toBe('door.bunkerRequired');
     expect(secret.rewards.map((reward) => reward.weaponId)).toEqual(['raygun', 'tesla']);
     expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([2000, 3000]);
     expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.interactionLabel)).toEqual([
@@ -458,10 +458,11 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     expect(MANSION_AMMO_REFILLS).toHaveLength(1);
     expect(MANSION_AMMO_REFILLS[0].cost).toBe(800);
-    expect(MANSION_AMMO_REFILLS[0].interactionLabel).toBe('REFILL AMMO — 800');
+    expect(MANSION_AMMO_REFILLS[0].labelKey).toBe('arena.refillAmmo');
     expect(MANSION_AMMO_REFILLS[0].floor).toBe(0);
     expect(MANSION_AMMO_REFILLS[0].position.z).toBeGreaterThan(2);
     expect(arena.ammoRefills).toHaveLength(1);
+    expect(arena.ammoRefills[0].interactionLabel).toBe('REFILL AMMO — 800');
     const ammoBox = arena.group.getObjectByName('start-ammo-refill');
     expect(ammoBox?.userData.mapRole).toBe('ammo-refill');
     expect(ammoBox?.children.some((child) => child.userData.mapRole === 'ammo-box-lid')).toBe(true);

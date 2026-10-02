@@ -18,7 +18,7 @@ function bunkerDoor(): PointDoor {
     -2.5,
     1,
     0,
-    { cost: 9999, prompt: 'Open sealed bunker', requiredMessage: '9999 PTS REQUIRED' },
+    { cost: 9999, prompt: 'door.openBunker', requiredMessage: 'door.bunkerRequired' },
   );
 }
 
@@ -54,10 +54,10 @@ describe('Burned Mansion secret bunker interaction', () => {
     (mode as any).findRepairableBarrier = () => null;
     (mode as any).findFacingSoulLamp = () => activated ? null : lamp;
 
-    expect(mode.getInteractPrompt()).toBe('ENCENDER FAROL\nPress E');
+    expect(mode.getInteractPrompt()).toBe('LIGHT LANTERN\nPress E');
     mode.onInteract();
     expect(activated).toBe(true);
-    expect(mode.getInteractPrompt()).not.toBe('ENCENDER FAROL\nPress E');
+    expect(mode.getInteractPrompt()).not.toBe('LIGHT LANTERN\nPress E');
   });
 
   it('triggers the ritual-circle scare once and then removes its prompt', () => {

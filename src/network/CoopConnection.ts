@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n';
 import { RELAY_PROTOCOL_VERSION, type IncomingMessage, type OutgoingMessage } from './Protocol';
 
 const RELAY_HANDSHAKE_TIMEOUT_MS = 4000;
@@ -32,7 +33,7 @@ export class CoopConnection {
         return;
       }
       if (this.disposed || this.socket.readyState === WebSocket.CLOSED) {
-        reject(new Error('Room server connection closed.'));
+        reject(new Error(t('coop.serverClosed')));
         return;
       }
       const cleanup = (): void => {
@@ -42,12 +43,12 @@ export class CoopConnection {
         this.socket.removeEventListener('close', onClose);
       };
       const onOpen = (): void => { cleanup(); resolve(); };
-      const onError = (): void => { cleanup(); reject(new Error('Could not connect to the room server.')); };
-      const onClose = (): void => { cleanup(); reject(new Error('Room server connection closed.')); };
+      const onError = (): void => { cleanup(); reject(new Error(t('coop.serverUnreachable'))); };
+      const onClose = (): void => { cleanup(); reject(new Error(t('coop.serverClosed'))); };
       const timer = setTimeout(() => {
         cleanup();
         this.dispose();
-        reject(new Error('Room server did not respond. Check the server and try again.'));
+        reject(new Error(t('coop.serverNoResponse')));
       }, CONNECTION_TIMEOUT_MS);
       this.socket.addEventListener('open', onOpen);
       this.socket.addEventListener('error', onError);
@@ -57,7 +58,7 @@ export class CoopConnection {
 
   /** Fail in the lobby when a deployed relay still speaks an older protocol. */
   public checkRelay(): Promise<void> {
-    if (!this.isOpen || this.disposed) return Promise.reject(new Error('Room server connection closed.'));
+    if (!this.isOpen || this.disposed) return Promise.reject(new Error(t('coop.serverClosed')));
     return new Promise((resolve, reject) => {
       const cleanup = (): void => {
         clearTimeout(timer);
@@ -66,7 +67,7 @@ export class CoopConnection {
       };
       const onClose = (): void => {
         cleanup();
-        reject(new Error('Room server connection closed.'));
+        reject(new Error(t('coop.serverClosed')));
       };
       const onMessage = (event: MessageEvent): void => {
         let response: unknown;
@@ -75,11 +76,11 @@ export class CoopConnection {
           || response.type !== 'relayReady') return;
         cleanup();
         if ('version' in response && response.version === RELAY_PROTOCOL_VERSION) resolve();
-        else reject(new Error('Room server version differs from the game. Redeploy the room server.'));
+        else reject(new Error(t('coop.serverVersionMismatch')));
       };
       const timer = setTimeout(() => {
         cleanup();
-        reject(new Error('Room server did not confirm its version. Redeploy the room server.'));
+        reject(new Error(t('coop.serverVersionUnconfirmed')));
       }, RELAY_HANDSHAKE_TIMEOUT_MS);
       this.socket.addEventListener('message', onMessage);
       this.socket.addEventListener('close', onClose);

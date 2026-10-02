@@ -27,6 +27,10 @@
 
 ## Limitaciones y bugs abiertos
 
+- Acceso temporal de beta preparado para Vercel, mediante lista privada,
+  enlace por correo y solicitudes a Gmail. Requiere configurar variables,
+  contrasena de aplicacion de Gmail y validacion HTTPS antes de activarlo. Ver `BETA_ACCESS.md`.
+
 - No hay pruebas de WebGL, DOM real, Pointer Lock, fullscreen, audio real ni
   flujo end-to-end. PWA y offline requieren validacion manual en HTTPS.
 - Antes del primer START la simulacion puede avanzar; game over tactil aun

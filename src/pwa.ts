@@ -1,5 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
 import { getDeviceProfile } from './core/DeviceProfile';
+import { t } from './i18n/i18n';
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -119,7 +120,7 @@ export class PwaLifecycle {
     if (!safeMenuVisible) return;
     if (
       !this.pauseMenu.classList.contains('hidden') &&
-      !window.confirm('Actualizar reiniciara la partida actual. Continuar?')
+      !window.confirm(t('menu.updateConfirm'))
     ) {
       return;
     }

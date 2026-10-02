@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { t } from '../i18n/i18n';
+import { actionKey, doorPrompt, wallBuyPrompt } from '../ui/InteractionPrompts';
 import type { ZombieMapId } from '../config/zombieMaps';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
@@ -302,7 +304,7 @@ export class ZombiesMode implements GameMode {
   }
 
   getFallbackWeaponName(): string | null {
-    return this.usesFallbackAttack() ? 'KNIFE' : null;
+    return this.usesFallbackAttack() ? t('hud.knife') : null;
   }
 
   public onMeleeAttack(): void {
@@ -358,8 +360,8 @@ export class ZombiesMode implements GameMode {
         this.onDoorUnlocked(door);
       } else {
         this.ctx.hud.flashNotEnoughPoints();
-        if (door.requiredMessage) this.ctx.hud.showRoundBanner(door.requiredMessage);
-        else this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${result.cost} PTS NEEDED`);
+        if (door.requiredMessage) this.ctx.hud.showRoundBanner(t(door.requiredMessage, { cost: door.cost }));
+        else this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: result.cost }));
       }
       return;
     }
@@ -394,7 +396,7 @@ export class ZombiesMode implements GameMode {
       }
       if (!this.economy.spend(pickup.cost)) {
         this.ctx.hud.flashNotEnoughPoints();
-        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${pickup.cost} PTS NEEDED`);
+        this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: pickup.cost }));
         return;
       }
       if (this.ctx.grantWeapon(pickup.weaponId)) {
@@ -418,7 +420,7 @@ export class ZombiesMode implements GameMode {
     if (completion) {
       if (!this.economy.canAfford(completion.cost)) {
         this.ctx.hud.flashNotEnoughPoints();
-        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${completion.cost} PTS NEEDED`);
+        this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: completion.cost }));
         return;
       }
       if (!this.runFlow.beginEnding()) return;
@@ -434,7 +436,7 @@ export class ZombiesMode implements GameMode {
       // never double-charge: the box is no longer closed on the next press.
       if (!this.economy.spend(MYSTERY_BOX_TUNING.cost)) {
         this.ctx.hud.flashNotEnoughPoints();
-        this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${MYSTERY_BOX_TUNING.cost} PTS NEEDED`);
+        this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
         return;
       }
       this.box.tryActivate(this.ctx.getEquippedWeaponId());
@@ -449,53 +451,46 @@ export class ZombiesMode implements GameMode {
   /** Center-screen prompt: door > barrier repair > wall buy > box. */
   getInteractPrompt(): string | null {
     if (!this.isGameplayInputEnabled()) return null;
-    const key = this.ctx.profile.useTouchControls ? 'Hold USE' : 'Hold E';
-    const tapKey = this.ctx.profile.useTouchControls ? 'Tap USE' : 'Press E';
+    const touch = this.ctx.profile.useTouchControls;
+    const key = actionKey(touch);
 
     const door = this.findFacingDoor();
-    if (door && door.isLocked) {
-      if (door.prompt) return `USE — ${door.prompt} — ${door.cost} PTS`;
-      return `UNLOCK ${door.id.toUpperCase().replace(/-/g, ' ')}\n${tapKey} — ${door.cost} PTS`;
-    }
+    if (door && door.isLocked) return doorPrompt(door, touch);
 
     const barrier = this.findRepairableBarrier();
     if (barrier && barrier.isDamaged) {
-      return `REPAIR BARRICADE\n${key}`;
+      return t('prompt.repairBarricade', { key: actionKey(touch, true) });
     }
 
     const soulLamp = this.findFacingSoulLamp();
-    if (soulLamp) return `ENCENDER FAROL\n${tapKey}`;
+    if (soulLamp) return t('prompt.lightLamp', { key });
 
     const ritual = this.findFacingRitualCircle();
-    if (ritual) return `TOUCH THE RITUAL CIRCLE\n${tapKey}`;
+    if (ritual) return t('prompt.ritual', { key });
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
-      const owned = this.ctx.hasWeapon(wallBuy.weaponId);
-      const label = WEAPON_DEFINITIONS[wallBuy.weaponId].name;
-      return owned
-        ? `${tapKey} — ${label} Ammo — ${wallBuy.ammoPrice} PTS`
-        : `${tapKey} — Buy ${label} — ${wallBuy.price} PTS`;
+      return wallBuyPrompt(WEAPON_DEFINITIONS[wallBuy.weaponId].name, this.ctx.hasWeapon(wallBuy.weaponId), wallBuy, touch);
     }
 
     const pickup = this.findFacingWeaponPickup();
-    if (pickup) return `${pickup.interactionLabel}\n${tapKey}`;
+    if (pickup) return t('prompt.pickup', { label: pickup.interactionLabel, key });
 
     const ammoRefill = this.findFacingAmmoRefill();
-    if (ammoRefill) return `${ammoRefill.interactionLabel}\n${tapKey}`;
+    if (ammoRefill) return t('prompt.pickup', { label: ammoRefill.interactionLabel, key });
 
     const completion = this.findFacingCompletionInteraction();
-    if (completion) return `ACTIVATE FINAL\n${tapKey} — ${completion.cost} PTS`;
+    if (completion) return t('prompt.activateFinal', { key, cost: completion.cost });
 
     if (!this.box || !this.playerInBoxRange()) return null;
     switch (this.box.state) {
       case 'closed':
         return MYSTERY_BOX_TUNING.cost > 0
-          ? `MYSTERY BOX\n${tapKey} — ${MYSTERY_BOX_TUNING.cost} PTS`
-          : `MYSTERY BOX\n${tapKey}`;
+          ? t('prompt.mysteryBoxCost', { key, cost: MYSTERY_BOX_TUNING.cost })
+          : t('prompt.mysteryBox', { key });
       case 'awaitingPickup': {
         const result = this.box.result;
-        return result ? `${tapKey} to take ${WEAPON_DEFINITIONS[result].name}` : null;
+        return result ? t('prompt.takeWeapon', { key, weapon: WEAPON_DEFINITIONS[result].name }) : null;
       }
       default:
         return null;
@@ -714,13 +709,13 @@ export class ZombiesMode implements GameMode {
       throw new Error(`Wall buy "${wallBuy.id}" references a weapon that is not preloaded`);
     }
     if (owned && !this.ctx.canRefillWeaponAmmo(wallBuy.weaponId)) {
-      this.ctx.hud.showRoundBanner('AMMO FULL', WEAPON_DEFINITIONS[wallBuy.weaponId].name);
+      this.ctx.hud.showRoundBanner(t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
       return;
     }
     const cost = owned ? wallBuy.ammoPrice : wallBuy.price;
     if (!this.economy.spend(cost)) {
       this.ctx.hud.flashNotEnoughPoints();
-      this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${cost} PTS NEEDED`);
+      this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
       return;
     }
     const delivered = owned
@@ -732,12 +727,12 @@ export class ZombiesMode implements GameMode {
 
   private purchaseAmmoRefill(refill: ArenaAmmoRefill): void {
     if (!this.ctx.canRefillEquippedWeaponAmmo()) {
-      this.ctx.hud.showRoundBanner('AMMO FULL');
+      this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
       return;
     }
     if (!this.economy.spend(refill.cost)) {
       this.ctx.hud.flashNotEnoughPoints();
-      this.ctx.hud.showRoundBanner('NOT ENOUGH POINTS', `${refill.cost} PTS NEEDED`);
+      this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: refill.cost }));
       return;
     }
     if (!this.ctx.refillEquippedWeaponAmmo()) {
@@ -845,7 +840,7 @@ export class ZombiesMode implements GameMode {
     for (const event of this.rounds.pendingEvents) {
       switch (event.type) {
         case 'roundStarted':
-          this.ctx.hud.showRoundBanner(`ROUND ${event.round}`);
+          this.ctx.hud.showRoundBanner(t('banner.round', { round: event.round }));
           this.ctx.audio.playRoundSting();
           this.ctx.audio.music.playRoundStartOnce();
           if (this.arena) {
@@ -863,7 +858,7 @@ export class ZombiesMode implements GameMode {
           }
           break;
         case 'roundComplete':
-          this.ctx.hud.showRoundBanner(`ROUND ${event.round} COMPLETE`);
+          this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: event.round }));
           break;
       }
     }
@@ -928,7 +923,7 @@ export class ZombiesMode implements GameMode {
   private unlockRayGun(): void {
     this.rayGunUnlocked = true;
     this.ctx.grantWeapon('raygun');
-    this.ctx.hud.showRoundBanner('RAY GUN UNLOCKED', `${RAYGUN_UNLOCK_KILLS} KILLS`);
+    this.ctx.hud.showRoundBanner(t('banner.raygunUnlocked'), t('banner.kills', { kills: RAYGUN_UNLOCK_KILLS }));
     this.ctx.audio.playMysteryBoxReveal(true);
   }
 
@@ -943,7 +938,7 @@ export class ZombiesMode implements GameMode {
     if (this.arena instanceof BurnedMansionArena) this.arena.unlockSecretRoom();
     this.ctx.grantWeapon('tesla');
     this.ctx.setWeaponInfiniteReserve('tesla');
-    this.ctx.hud.showRoundBanner('GOD MODE ENABLED', 'MOTDRULES');
+    this.ctx.hud.showRoundBanner(t('banner.godMode'), 'MOTDRULES');
     this.ctx.audio.playTeslaUnlock();
   }
 
