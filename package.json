@@ -6,6 +6,7 @@
   "description": "Browser Zombies FPS in Burned Mansion, built with Three.js and TypeScript",
   "scripts": {
     "dev": "vite",
+    "beta:dev": "vite --mode beta --host localhost --port 5174 --strictPort --open /beta/index.html",
     "start": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -20,7 +21,6 @@
     "generate:zombies": "npm run generate:zombie-brute",
     "build:player-asset": "node scripts/build-player-asset.mjs",
     "test": "vitest run",
-    "beta:test": "node --test server/beta-access.test.mjs",
     "typecheck": "tsc --noEmit",
     "android:sync": "npm run build && npx cap sync android",
     "preandroid:apk": "node scripts/ensure-android-sdk.mjs",
@@ -32,8 +32,6 @@
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
-    "@vercel/functions": "^3.9.9",
-    "nodemailer": "^10.0.13",
     "three": "^0.178.0",
     "ws": "^8.21.3"
   },

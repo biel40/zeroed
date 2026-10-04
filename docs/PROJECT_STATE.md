@@ -27,9 +27,9 @@
 
 ## Limitaciones y bugs abiertos
 
-- Acceso temporal de beta preparado para Vercel, mediante lista privada,
-  enlace por correo y solicitudes a Gmail. Requiere configurar variables,
-  contrasena de aplicacion de Gmail y validacion HTTPS antes de activarlo. Ver `BETA_ACCESS.md`.
+- Acceso temporal de beta en el navegador: `bielet40@gmail.com` entra directamente,
+  sin API ni verificacion por correo. Es un filtro visual, no autenticacion.
+  Codigo y guia de retirada en `public/beta/`.
 
 - No hay pruebas de WebGL, DOM real, Pointer Lock, fullscreen, audio real ni
   flujo end-to-end. PWA y offline requieren validacion manual en HTTPS.

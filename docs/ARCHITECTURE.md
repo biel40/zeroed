@@ -40,6 +40,7 @@ contexto WebGL, canvas y AudioContext; volver al menu no recarga la pagina.
 | `src/game/` | Inventario, salud, economia y estadisticas puras |
 | `src/pwa.ts` | Service Worker, instalacion y actualizaciones |
 | `src/i18n/` | Diccionarios es/en/ca, `t()` e idioma activo |
+| `public/beta/` | Pantalla y filtro temporal de acceso; conectado al arranque desde `src/main.ts` |
 
 ## Contratos
 

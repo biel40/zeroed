@@ -24,11 +24,9 @@
     input { width: 100%; min-width: 0; padding: 12px; font: inherit; color: #f4f5f6; border: 1px solid #56606b; border-radius: 4px; background: #141a20; }
     button, .back { padding: 12px 16px; font: inherit; border-radius: 4px; text-align: center; cursor: pointer; }
     button { width: 100%; margin-top: 16px; background: #d6ef7e; color: #172008; border: 0; font-weight: 600; }
-    button:disabled { opacity: .55; cursor: wait; }
     .back { display: block; color: #c5ced8; margin-top: 8px; border: 1px solid #56606b; text-decoration: none; }
     :focus-visible { outline: 3px solid #d6ef7e; outline-offset: 3px; }
     #message { margin: 20px 0 0; min-height: 3.2em; overflow-wrap: anywhere; }
-    .trap { position: absolute; left: -10000px; }
     [hidden] { display: none !important; }
     footer { margin-top: 24px; font-size: 13px; color: #8995a2; }
     footer a { color: inherit; }
@@ -47,25 +45,25 @@
         <span>En mantenimiento</span>
       </div>
       <h2>Beta cerrada</h2>
-      <p>Estamos preparando la pr&oacute;xima versi&oacute;n. El acceso est&aacute; reservado a los participantes de la beta.</p>
+      <p>Estamos preparando la pr&oacute;xima versi&oacute;n. El acceso est&aacute; reservado únicamente a los participantes de la beta cerrada.</p>
       <form id="access-form">
         <label for="email">Tu correo electr&oacute;nico</label>
         <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>
-        <div class="trap" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
         <button id="continue" type="submit">Continuar</button>
       </form>
-      <button id="request" type="button" hidden>Solicitar acceso a la beta</button>
+      <a id="request" class="back" hidden>Solicitar acceso a la beta</a>
       <button id="change" type="button" hidden>Usar otro correo</button>
       <a class="back" href="about:blank">Salir</a>
       <p id="message" role="status" aria-live="polite"></p>
-      <footer>Usaremos tu correo para gestionar el acceso a la beta. <a href="/privacy.html">Privacidad</a></footer>
+      <footer>El acceso se recuerda en esta pesta&ntilde;a. <a href="/privacy.html">Privacidad</a></footer>
     </section>
   </main>
   <div id="snackbar" hidden>
     <span id="snackbar-text" role="alert" aria-atomic="true"></span>
     <button id="snackbar-close" type="button" aria-label="Cerrar aviso" title="Cerrar aviso">&times;</button>
   </div>
-  <script>
+  <script type="module">
+    import { acceptBetaEmail, hasBetaAccess } from './access.js';
     const form = document.getElementById('access-form');
     const email = document.getElementById('email');
     const requestButton = document.getElementById('request');
@@ -73,11 +71,7 @@
     const message = document.getElementById('message');
     const snackbar = document.getElementById('snackbar');
     const snackbarText = document.getElementById('snackbar-text');
-    const unavailableMessage = 'El acceso no est\u00e1 disponible ahora. Vuelve a intentarlo m\u00e1s tarde.';
-    const localPreview = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || location.protocol === 'file:';
     let snackbarTimer;
-    let deniedEmail = '';
-    let busy = false;
 
     function hideSnackbar() {
       clearTimeout(snackbarTimer);
@@ -93,72 +87,34 @@
     }
     document.getElementById('snackbar-close').addEventListener('click', hideSnackbar);
 
-    async function post(body) {
-      let response;
-      let data;
-      try {
-        response = await fetch('/api/beta', { method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        data = await response.json();
-      } catch { throw new Error(unavailableMessage); }
-      if (!response.ok) throw new Error(data?.error === 'expired'
-        ? 'El enlace ha caducado o ya no tienes acceso. Introduce tu correo para recibir otro.'
-        : unavailableMessage);
-      if (!data || !['denied', 'sent', 'requested', 'authorized'].includes(data.status)) throw new Error(unavailableMessage);
-      return data;
-    }
-
-    async function run(action) {
-      if (busy) return;
-      busy = true;
-      hideSnackbar();
-      const actionButtons = document.querySelectorAll('#access-form button, #request, #change');
-      actionButtons.forEach((button) => { button.disabled = true; });
-      try { await action(); }
-      catch (error) {
-        message.textContent = '';
-        showSnackbar(error.message || unavailableMessage);
-      }
-      finally {
-        busy = false;
-        actionButtons.forEach((button) => { button.disabled = false; });
-      }
-    }
-
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      void run(async () => {
-        message.textContent = 'Comprobando acceso...';
+      hideSnackbar();
+      try {
         const address = email.value.trim();
-        const result = await post({ action: 'login', email: address, website: document.getElementById('website').value });
+        if (acceptBetaEmail(address)) {
+          location.replace(`/${location.search}`);
+          return;
+        }
         form.hidden = true;
         changeButton.hidden = false;
-        if (result.status === 'denied') {
-          deniedEmail = address;
-          requestButton.hidden = false;
-          message.textContent = 'Este correo todav\u00eda no tiene acceso. Puedes solicitar una invitaci\u00f3n a la beta cerrada.';
-        } else {
-          requestButton.hidden = true;
-          message.textContent = 'Te hemos enviado un enlace para entrar. Revisa tu bandeja de entrada y la carpeta de spam.';
-        }
-      });
+        requestButton.href = `mailto:biel40aws@gmail.com?subject=${encodeURIComponent('Acceso a la beta de Zeroed')}&body=${encodeURIComponent(`Me gustaria solicitar acceso a la beta cerrada.\n\nMi correo: ${address}`)}`;
+        requestButton.hidden = false;
+        message.textContent = 'Este correo todav\u00eda no tiene acceso. Puedes solicitar una invitaci\u00f3n a la beta cerrada.';
+      } catch {
+        showSnackbar('No se puede recordar el acceso en esta pesta\u00f1a. Permite el almacenamiento del sitio y vuelve a intentarlo.');
+      }
     });
-    requestButton.addEventListener('click', () => void run(async () => {
-      message.textContent = 'Enviando solicitud...';
-      await post({ action: 'request', email: deniedEmail });
-      requestButton.hidden = true;
-      message.textContent = 'Solicitud enviada. Te avisaremos por correo si recibes acceso a la beta.';
-    }));
     changeButton.addEventListener('click', () => {
-      deniedEmail = '';
       form.hidden = false;
       requestButton.hidden = true;
       changeButton.hidden = true;
       message.textContent = '';
+      hideSnackbar();
       email.focus();
     });
 
-    async function initialize() {
+    async function clearOfflineCache() {
       // Retire the offline shell before entering the closed beta.
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
@@ -168,24 +124,9 @@
         const names = await caches.keys();
         await Promise.all(names.filter((name) => name.startsWith('zeroed') || name.startsWith('workbox-precache')).map((name) => caches.delete(name)));
       }
-      const token = new URLSearchParams(location.hash.slice(1)).get('access');
-      history.replaceState(null, '', location.pathname);
-      if (token) {
-        await run(async () => {
-          message.textContent = 'Verificando tu acceso...';
-          await post({ action: 'redeem', token });
-          location.replace('/');
-        });
-      } else {
-        const response = await fetch('/api/beta', { cache: 'no-store', credentials: 'same-origin' });
-        if (!response.ok) throw new Error('No se ha podido comprobar el acceso.');
-        const data = await response.json();
-        if (data.authorized) location.replace('/');
-      }
     }
-    initialize().catch(() => {
-      if (!localPreview) showSnackbar(unavailableMessage);
-    });
+    void clearOfflineCache().catch(() => {});
+    if (hasBetaAccess()) location.replace(`/${location.search}`);
   </script>
 </body>
 </html>

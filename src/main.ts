@@ -1,4 +1,5 @@
 import './style.css';
+import { hasBetaAccess } from '../public/beta/access.js';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { MusicManager } from './audio/MusicManager';
 import { isZombieMapId } from './config/zombieMaps';
@@ -191,13 +192,8 @@ class ZeroedBoot {
 applyDocumentTranslations();
 async function boot(): Promise<void> {
   if (import.meta.env.VITE_BETA_ENABLED === 'true') {
-    try {
-      const response = await fetch('/api/beta', { cache: 'no-store', credentials: 'same-origin' });
-      if (!response.ok) throw new Error('Beta access unavailable');
-      const access = await response.json() as { authorized?: boolean };
-      if (!access.authorized) throw new Error('Beta access required');
-    } catch {
-      window.location.replace('/beta.html');
+    if (!hasBetaAccess()) {
+      window.location.replace(`/beta/index.html${window.location.search}`);
       return;
     }
   } else {
