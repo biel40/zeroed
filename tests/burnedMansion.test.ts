@@ -62,6 +62,14 @@ beforeAll(() => {
     fillRect: () => undefined,
     strokeRect: () => undefined,
     fillText: () => undefined,
+    beginPath: () => undefined,
+    moveTo: () => undefined,
+    arc: () => undefined,
+    arcTo: () => undefined,
+    closePath: () => undefined,
+    fill: () => undefined,
+    stroke: () => undefined,
+    createRadialGradient: () => ({ addColorStop: () => undefined }),
   };
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -165,7 +173,7 @@ describe('Burned Mansion topology', () => {
   it('gates each ground-floor zone and clears the bunker only after its animation', () => {
     const arena = makeArena();
     const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
-    const boxRoom = [MANSION_BOX_PLACEMENT.position.x, MANSION_BOX_PLACEMENT.position.z] as const;
+    const boxRoom = [MANSION_BOX_PLACEMENT.position.x + 1.2, MANSION_BOX_PLACEMENT.position.z] as const;
     const eastHall = [1.6, -5] as const;
     const bunkerVestibule = [MANSION_STAIR_CENTER_X, -3.3] as const;
 
@@ -198,6 +206,55 @@ describe('Burned Mansion topology', () => {
 
   it('faces the Mystery Box toward the room instead of the west windows', () => {
     expect(MANSION_BOX_PLACEMENT.yaw).toBe(-Math.PI / 2);
+  });
+
+  it.each([
+    { side: 'front', x: -3.2, z: -5.6, key: 'KeyA' as const, axis: 'x' as const, sign: 1, halfExtent: 0.55 },
+    { side: 'back', x: -6.5, z: -5.6, key: 'KeyD' as const, axis: 'x' as const, sign: -1, halfExtent: 0.55 },
+    { side: 'south', x: -5.2, z: -3.6, key: 'KeyW' as const, axis: 'z' as const, sign: 1, halfExtent: 1.04 },
+    { side: 'north', x: -5.2, z: -7.5, key: 'KeyS' as const, axis: 'z' as const, sign: -1, halfExtent: 1.04 },
+  ])('blocks the player at the Mystery Box $side while keeping it within use range', ({ x, z, key, axis, sign, halfExtent }) => {
+    const arena = makeArena();
+    const player = new PlayerController(1);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(x, EYE_HEIGHT, z, 0, arena.playerBounds);
+
+    for (let frame = 0; frame < 120; frame++) player.update(1 / 60, movementInput(key), weaponStub);
+
+    const distance = sign * (player.rig.position[axis] - MANSION_BOX_PLACEMENT.position[axis]);
+    expect(distance).toBeGreaterThanOrEqual(halfExtent + 0.35);
+    expect(distance).toBeLessThan(halfExtent + 0.45);
+    expect(Math.hypot(
+      player.rig.position.x - MANSION_BOX_PLACEMENT.position.x,
+      player.rig.position.z - MANSION_BOX_PLACEMENT.position.z,
+    )).toBeLessThan(MANSION_BOX_PLACEMENT.useRange);
+  });
+
+  it('keeps the Mystery Box solid during jumps and after refreshing door colliders', () => {
+    const arena = makeArena();
+    unlock(arena, 'to-dining');
+    unlock(arena, 'to-east-hall');
+    const player = new PlayerController(1);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(-4.2, EYE_HEIGHT, -5.6, 0, arena.playerBounds);
+
+    for (let frame = 0; frame < 90; frame++) {
+      const input = movementInput('KeyA');
+      input.wasPressed = (code: string): boolean => code === 'Space' && frame === 0;
+      player.update(1 / 60, input, weaponStub);
+      expect(player.rig.position.x).toBeGreaterThanOrEqual(-5.2 + 0.55 + 0.35);
+    }
+  });
+
+  it('does not let the ground-floor Mystery Box block movement in the bunker below', () => {
+    const arena = makeArena();
+    const player = new PlayerController(1);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(-4.2, MANSION_BUNKER_Y + EYE_HEIGHT, -5.6, -1, MANSION_BUNKER_BOUNDS);
+
+    for (let frame = 0; frame < 30; frame++) player.update(1 / 60, movementInput('KeyA'), weaponStub);
+
+    expect(player.rig.position.x).toBeLessThan(MANSION_BOX_PLACEMENT.position.x);
   });
 
   it('builds a large enclosed underground bunker with an open stairwell', () => {
@@ -344,10 +401,16 @@ describe('Burned Mansion topology', () => {
 
   it('places each standard wall buy in its intended progression zone', () => {
     const arena = makeArena();
-    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'ak47', 'm4a1', 'm60']);
-    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 1750, 1500, 2500]);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'l96', 'ak47', 'm4a1', 'm60']);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 1250, 1750, 1500, 2500]);
     expect(MANSION_WALL_BUYS.every((buy) => buy.ammoPrice > 0)).toBe(true);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm1911')!.position.z).toBeGreaterThan(2);
+    // The L96 shares the starting-room wall without overlapping the pistol or the paid door.
+    const l96 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'l96')!;
+    expect(l96.position.z).toBeGreaterThan(2);
+    expect(l96.floor).toBe(0);
+    expect(l96.position.x - 0.9).toBeGreaterThan(0);
+    expect(l96.position.x + 0.9).toBeLessThan(MANSION_EAST_WALL_X);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'ak47')!.position.x).toBeLessThan(0);
     const m4a1 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm4a1')!;
     expect(m4a1.position.x).toBeGreaterThan(0);
@@ -355,8 +418,8 @@ describe('Burned Mansion topology', () => {
     expect(m4a1.position.x - 0.35).toBeGreaterThan(2.2);
     expect(MANSION_BUNKER_DIVIDER_X).toBe(4.2);
     expect(MANSION_EAST_WALL_X - MANSION_BUNKER_DIVIDER_X).toBeCloseTo(4.95);
-    expect(arena.wallBuys).toHaveLength(4);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(4);
+    expect(arena.wallBuys).toHaveLength(5);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(5);
   });
 
   it('keeps a clear turning lane between the bunker door and the stairs', () => {
@@ -1519,5 +1582,27 @@ describe('Burned Mansion topology', () => {
       2,
     );
     expect(ray.intersectObjects([...arena.colliders], false).some((hit) => hit.object === collider)).toBe(true);
+  });
+
+  it('breaks a paid door away visually without delaying its topology and restores it on reset', () => {
+    const arena = makeArena();
+    const visualOf = (id: string): THREE.Object3D => {
+      const collider = arena.group.getObjectByName(`point-door-collider:${id}`)!;
+      return collider.parent!.children.find((child) => child.userData.mapRole === 'point-door-visual')!;
+    };
+    const visual = visualOf('to-dining');
+    expect(visual.visible).toBe(true);
+
+    unlock(arena, 'to-dining');
+    expect(arena.colliders.some((object) => object.name === 'point-door-collider:to-dining')).toBe(false);
+    arena.update(0.5);
+    expect(visual.visible).toBe(true);
+    arena.update(2);
+    expect(visual.visible).toBe(false);
+    expect(visualOf('to-east-hall').visible).toBe(true);
+
+    arena.reset();
+    expect(visual.visible).toBe(true);
+    expect(arena.group.getObjectByName('point-door-collider:to-dining')!.visible).toBe(true);
   });
 });

@@ -13,19 +13,29 @@ footer { padding-bottom: max(40px, env(safe-area-inset-bottom)); }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; cursor: pointer; border: 0; }
 .quiet { background: transparent; color: #e0e4df; padding: 10px 12px; min-height: 44px; border-radius: 4px; }
-.quiet:hover, .social-actions a:hover { background: #ffffff12; }
+.quiet:hover { background: #ffffff12; }
 :focus-visible { outline: 2px solid #d6ef7e; outline-offset: 5px; }
 main { width: 100%; min-height: 0; overflow-y: auto; padding: 36px max(48px, env(safe-area-inset-right)) 36px max(48px, env(safe-area-inset-left)); display: flex; overscroll-behavior: contain; }
 .scenes { width: min(100%, 720px); margin: auto; flex-shrink: 0; display: grid; }
-.scene { grid-area: 1 / 1; min-width: 0; animation: reveal 900ms ease-out both; }
+.scene { grid-area: 1 / 1; min-width: 0; animation: reveal 900ms 250ms ease-out both; }
 /* Keep all scenes in the layout so transitions never move the controls. */
-.scene[hidden] { display: block !important; visibility: hidden; pointer-events: none; animation: none; }
+.scene[hidden] { display: block !important; visibility: hidden; opacity: 0; pointer-events: none; animation: none; transition: opacity 400ms ease, visibility 0s 400ms; }
 .eyebrow { color: #d6ef7e; font-size: 13px; font-weight: 600; margin: 0 0 22px; }
 h1, h2 { font-size: 52px; line-height: 1.12; margin: 0 0 28px; font-weight: 650; overflow-wrap: break-word; }
 .scene > p:not(.eyebrow):not(.signature):not(.share-status) { color: #e0e4df; font-size: 19px; line-height: 1.7; margin: 0; max-width: 640px; }
+.scene > p:not(.eyebrow):not(.signature):not(.share-status) + p:not(.signature):not(.share-status) { margin-top: 16px; }
 .signature { color: #d6ef7e; margin: 22px 0 0; font-size: 16px; }
 .social-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
-.social-actions a { color: #f5f6f3; text-decoration: none; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; border: 1px solid #8b9884; border-radius: 4px; }
+.social-action { font: inherit; font-size: 16px; font-weight: 600; line-height: 1.25; text-decoration: none; padding: 14px 20px; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid transparent; border-radius: 8px; transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+.social-action svg { width: 20px; height: 20px; flex-shrink: 0; }
+.social-action--feedback { color: #172008; background: linear-gradient(135deg, #e3f7a0, #c4e566); border-color: #d6ef7e; box-shadow: 0 4px 20px #c4e56618, inset 0 1px 0 #ffffff50; }
+.social-action--share { color: #f5f6f3; background: #172018cc; border-color: #d6ef7e55; box-shadow: inset 0 1px 0 #ffffff0d; }
+@media (hover: hover) {
+  .social-action:hover { transform: translateY(-2px); }
+  .social-action--feedback:hover { box-shadow: 0 6px 26px #c4e56635, inset 0 1px 0 #ffffff50; }
+  .social-action--share:hover { background: #283322; border-color: #d6ef7e; box-shadow: 0 4px 18px #00000030; }
+}
+.social-action:active { transform: translateY(1px); }
 .share-status { font-size: 14px; color: #d6ef7e; margin: 12px 0 0; min-height: 22px; overflow-wrap: anywhere; }
 .primary { background: #d6ef7e; color: #172008; border-radius: 4px; width: 164px; height: 48px; flex-shrink: 0; font-weight: 600; }
 .primary:hover { background: #e6ffa0; }
@@ -34,7 +44,12 @@ h1, h2 { font-size: 52px; line-height: 1.12; margin: 0 0 28px; font-weight: 650;
 .tracks span { height: 3px; background: #ffffff35; }
 .tracks span.active { background: #d6ef7e; }
 noscript { position: relative; z-index: 2; padding: 24px; }
+/* Curtain in the game's background colour: lifts on arrival and falls before entering the game. */
+body::after { content: ''; position: fixed; inset: 0; z-index: 3; background: #0b0e12; pointer-events: none; opacity: 0; animation: curtain-lift 700ms ease-out; }
+body.leaving::after { opacity: 1; pointer-events: auto; animation: curtain-fall 600ms ease-in; }
 @keyframes drift { from { transform: scale(1); } to { transform: scale(1.06); } }
+@keyframes curtain-lift { from { opacity: 1; } }
+@keyframes curtain-fall { from { opacity: 0; } }
 @keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 600px) {
   header, footer { padding: 16px max(24px, env(safe-area-inset-right)) 16px max(24px, env(safe-area-inset-left)); gap: 16px; }
@@ -71,5 +86,8 @@ noscript { position: relative; z-index: 2; padding: 24px; }
   .social-actions, .signature { margin-top: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .backdrop, .scene { animation: none; }
+  .backdrop, .scene, body::after { animation: none; }
+  .scene[hidden] { transition: none; }
+  .social-action { transition: none; }
+  .social-action:hover, .social-action:active { transform: none; }
 }

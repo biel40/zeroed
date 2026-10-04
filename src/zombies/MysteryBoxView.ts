@@ -5,25 +5,22 @@ import { damp } from '../utils/math';
 import { buildWeaponDisplayModel } from '../weapons/WeaponView';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxEntry, MysteryBoxMachine, MysteryBoxPhase } from './MysteryBox';
+import { MYSTERY_BOX_SIZE } from './MysteryBox';
 
 const GLOW_COLOR = 0x8f6bff;
 const RAYGUN_COLOR = WEAPON_DEFINITIONS.raygun.energy?.color ?? 0x63f2a4;
 export const LEGENDARY_MYSTERY_BOX_COLOR = 0xffc928;
 
-const BOX_WIDTH = 1.9;
-const BOX_DEPTH = 0.88;
-const BODY_HEIGHT = 0.6;
+const BOX_WIDTH = MYSTERY_BOX_SIZE.width;
+const BOX_DEPTH = MYSTERY_BOX_SIZE.depth;
+const BODY_HEIGHT = MYSTERY_BOX_SIZE.bodyHeight;
 const LID_OPEN_ANGLE = 1.72;
 const ANCHOR_HEIGHT = 1.3;
 const PARTICLE_COUNT = 48;
 const PARTICLE_TOP = 2.05;
 const WEAPON_EXIT_TIME = 0.72;
 
-export const MYSTERY_BOX_VISUAL_SIZE = Object.freeze({
-  width: BOX_WIDTH,
-  depth: BOX_DEPTH,
-  bodyHeight: BODY_HEIGHT,
-});
+export const MYSTERY_BOX_VISUAL_SIZE = MYSTERY_BOX_SIZE;
 
 export function getMysteryBoxResultColor(
   weaponId: WeaponId,

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
 
@@ -132,26 +132,7 @@ export function buildM4A1(config: ViewModelConfig): BuiltProcedural {
   }
   add('magazine-baseplate', box(0.029, 0.005, 0.057), magazineMaterial, 0, -0.067, -0.012, magazine);
 
-  for (const part of group.children) {
-    if (!(part instanceof THREE.Group)) continue;
-    const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
-    for (const child of [...part.children]) {
-      if (!(child instanceof THREE.Mesh)) continue;
-      child.updateMatrix();
-      const geometry = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
-      geometry.applyMatrix4(child.matrix);
-      const batch = batches.get(child.material) ?? [];
-      batch.push(geometry);
-      batches.set(child.material, batch);
-      child.geometry.dispose();
-      part.remove(child);
-    }
-    for (const [material, geometries] of batches) {
-      const merged = mergeGeometries(geometries);
-      if (merged) part.add(new THREE.Mesh(merged, material));
-      for (const geometry of geometries) geometry.dispose();
-    }
-  }
+  mergeAssemblies(group);
   group.scale.setScalar(config.scale);
   return {
     group,

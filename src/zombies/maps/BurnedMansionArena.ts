@@ -15,6 +15,7 @@ import { t, type TranslationKey } from '../../i18n/i18n';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
 import { CreepyAreaLights } from '../../rendering/CreepyAreaLights';
+import { MYSTERY_BOX_SIZE } from '../MysteryBox';
 import type {
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
@@ -300,7 +301,10 @@ export class BurnedMansionArena implements ZombieArena {
         ),
     );
     for (const door of this.doors) {
-      const view = new PointDoorView(door, this.group);
+      const view = new PointDoorView(door, this.group, {
+        woodMaterial: this.materials.floorWood,
+        reducedEffects: this.profile.useReducedEffects,
+      });
       if (this.profile.useReducedEffects) {
         view.group.traverse((object) => { object.castShadow = false; });
       }
@@ -459,6 +463,14 @@ export class BurnedMansionArena implements ZombieArena {
 
   private collectPlayerWallColliders(): ReadonlyArray<THREE.Box3> {
     const boxes = this.playerWallMeshes.map((mesh) => new THREE.Box3().setFromObject(mesh));
+    const { position, yaw } = this.mysteryBoxPlacement;
+    // Include the base rails, front hardware and closed lid, not the floating reward.
+    const boxHalfWidth = MYSTERY_BOX_SIZE.width / 2 + 0.09;
+    const boxHalfDepth = MYSTERY_BOX_SIZE.depth / 2 + 0.11;
+    boxes.push(new THREE.Box3(
+      new THREE.Vector3(-boxHalfWidth, 0, -boxHalfDepth),
+      new THREE.Vector3(boxHalfWidth, MYSTERY_BOX_SIZE.bodyHeight + 0.36, boxHalfDepth),
+    ).applyMatrix4(new THREE.Matrix4().makeRotationY(yaw).setPosition(position.x, position.y, position.z)));
     if (!this.secretRoom.isDoorOpen) boxes.push(new THREE.Box3().setFromObject(this.secretWallCollider));
     for (let i = 0; i < this.doors.length; i++) {
       if (!this.openDoorIds.has(this.doors[i].id)) boxes.push(new THREE.Box3().setFromObject(this.doorMeshes[i]));

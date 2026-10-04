@@ -15,7 +15,10 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 `Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga; `WeaponView` muestra el arma sin manos y
-`AudioSystem` sincroniza el foley. `BallisticsSystem` usa raycast segmentado,
+`AudioSystem` sincroniza el foley. Las armas de cerrojo (L96) expulsan el
+casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
+levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
+recarga vacia. `BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
 
@@ -74,7 +77,16 @@ como cue independiente sobre la música de fondo.
 - `ZombiesMode` posee run, rondas, salud, economia y progresion; el arena posee
   geometria, colliders, spawns, barreras y puertas.
 - Barreras: HP autoritativo, rotura visual independiente y reparacion limitada
-  por ronda. Puertas y wall buys cobran de forma atomica.
+  por ronda. Puertas y wall buys cobran de forma atomica. La sala de inicio
+  ofrece la M1911 (500) y la L96 (1250) en su pared norte.
+- Puertas de pago: el collider es una losa invisible y `BuyableDoorVisual`
+  dibuja tablones, cinchas, candado y una placa de precio con brillo pulsante
+  en ambas caras. Al comprarla tiembla y estalla en escombros hacia la sala
+  nueva; la topologia se abre al instante, sin esperar a la animacion. Suena
+  `door_purchase.mp3` (fallback procedural). El bunker sellado usa
+  `BunkerDoorVisual`: puerta blindada pintada con volante, cerrojos, mirilla
+  roja y marco de peligro con baliza; al abrirse gira el volante, suelta vapor
+  y la hoja se esconde dentro del muro antes de liberar la topologia.
 - Los golpes a ventanas validan separacion del marco, alineacion lateral y
   linea de contacto. Cada tiron hace vibrar la tabla o la arranca hacia fuera;
   el ultimo completa su recuperacion antes de retomar la ruta de entrada.
@@ -87,7 +99,9 @@ como cue independiente sobre la música de fondo.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega el arma equipada
   al activarla. Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
-  proyectiles de energia.
+  proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
+  ajustado al tamano y orientacion de la caja, tanto en individual como en
+  cooperativo; la tapa animada y el arma flotante no alteran ese volumen.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
   una pared una sola vez por run. El comando individual `MOTDRULES` tambien
   abre esa pared sin rellenar los faroles; reiniciar restaura el cierre.

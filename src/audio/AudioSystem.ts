@@ -123,8 +123,10 @@ export class AudioSystem {
   private wind: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private dryFireBuffer: AudioBuffer | null = null;
+  private doorPurchaseBuffer: AudioBuffer | null = null;
   private readonly mysteryBoxOpenUrl: string = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
   private readonly dryFireUrl: string = `${import.meta.env.BASE_URL}assets/audio/encasquillada_arma.mp3`;
+  private readonly doorPurchaseUrl: string = `${import.meta.env.BASE_URL}assets/audio/door_purchase.mp3`;
 
   public constructor(music: MusicManager = new MusicManager()) {
     this.music = music;
@@ -215,6 +217,38 @@ export class AudioSystem {
     oscGain.connect(master);
     osc.start(t);
     osc.stop(t + 0.11);
+
+    // Full-power rifle layers: the supersonic crack leads the report and
+    // the room keeps rumbling after it.
+    if (config.crack) this.tick(0, 4600, config.crack, 0.7, 0.028);
+    if (config.tail) this.playShotTail(config.volume, config.tail);
+  }
+
+  /** Decaying room echo after a heavy report: sub boom, rumble and two early reflections. */
+  private playShotTail(volume: number, tail: number): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const { ctx, master, noise } = audio;
+    const t: number = ctx.currentTime + 0.02;
+    const duration: number = Math.min(tail, 0.95);
+    const source: AudioBufferSourceNode = ctx.createBufferSource();
+    source.buffer = noise;
+    const filter: BiquadFilterNode = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1100, t);
+    filter.frequency.exponentialRampToValueAtTime(180, t + duration);
+    const gain: GainNode = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume * 0.26, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    source.start(t, 0, duration + 0.04);
+
+    this.sweep(0, 'sine', 64, 30, volume * 0.55, 0.3);
+    this.tick(0.075, 520, volume * 0.22, 0.8, 0.12);
+    this.tick(0.17, 380, volume * 0.13, 0.8, 0.16);
   }
 
   /**
@@ -222,9 +256,15 @@ export class AudioSystem {
    * sound always matches what the visible mechanism is doing. Each style has
    * its own
    * cadence so the same action feels different for a pistol, rifle, belt-fed,
-   * bolt-action or energy weapon.
+   * bolt-action or energy weapon. `actionDuration` (seconds of the
+   * charge window) lets a bolt action replay its full cycle in sync.
    */
-  public playReloadPhase(phase: ReloadPhase, energy: boolean = false, style: ReloadStyle = 'rifle'): void {
+  public playReloadPhase(
+    phase: ReloadPhase,
+    energy: boolean = false,
+    style: ReloadStyle = 'rifle',
+    actionDuration: number = 0,
+  ): void {
     const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
     const boost = AudioSystem.boostReloadVolume;
 
@@ -269,10 +309,16 @@ export class AudioSystem {
         this.tick(0.015, profile.magIn * 1.2, boost(0.22));
         break;
       case 'chargeStart':
+        if (style === 'bolt' && actionDuration > 0) {
+          this.playBolt(actionDuration);
+          break;
+        }
         this.tick(0, profile.chargeStart, boost(0.3));
         this.tick(0.05, profile.magIn, boost(0.18));
         break;
       case 'chargeEnd':
+        // The bolt cycle already ends with its own lock-down.
+        if (style === 'bolt' && actionDuration > 0) break;
         this.metalClang(0, profile.chargeEnd, boost(0.36), 0.1);
         break;
       case 'coverOpen':
@@ -442,10 +488,24 @@ export class AudioSystem {
     this.tick(0.025, 230, 0.08, 1.1, 0.1);
   }
 
-  /** Metallic slide + low thud for unlocking a point door. */
+  /**
+   * Paid door opening: `door_purchase.mp3` when present, otherwise a coin
+   * chime over a splintering crack and a low thud.
+   */
   public playDoorUnlock(): void {
-    this.tick(0, 260, 0.32);
-    this.sweep(0, 'sine', 160, 55, 0.24, 0.22);
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    if (this.doorPurchaseBuffer) {
+      this.playSample(audio, this.doorPurchaseBuffer, 0.9, 0.04);
+      return;
+    }
+    const t: number = audio.ctx.currentTime;
+    this.tone(t, 'triangle', 988, 0.13, 0.12);
+    this.tone(t + 0.07, 'triangle', 1319, 0.12, 0.26);
+    this.tick(0.12, 260, 0.32);
+    this.tick(0.14, 780, 0.2, 1.6, 0.09);
+    this.tick(0.2, 420, 0.16, 1.2, 0.08);
+    this.sweep(0.12, 'sine', 160, 48, 0.28, 0.3);
   }
 
   /** Low guttural drop when a zombie dies. */
@@ -578,61 +638,37 @@ export class AudioSystem {
     this.tone(t + 0.16, 'square', 277, 0.14, 0.2);
   }
 
-  public playBolt(): void {
-    this.tick(0, 1500, 0.3);
-    this.tick(0.16, 1050, 0.36);
+  /**
+   * Bolt-action cycle timed to the ReloadAnimator stroke (lift, rear at 40 %,
+   * forward from 55 %, lock-down at the end) so each sound matches the
+   * visible bolt: cam lift, rearward slide and stop, ejected case, forward
+   * stroke chambering the round and the handle locking down.
+   */
+  public playBolt(cycleTime: number = 0.7): void {
+    const at = (fraction: number): number => fraction * cycleTime;
+    this.metalClang(0, 1850, 0.34, 0.06);
+    this.tick(0.012, 620, 0.22, 2.2, 0.05);
+    this.scrape(at(0.1), 900, 2300, 0.2, at(0.3));
+    this.metalClang(at(0.4), 1250, 0.42, 0.09);
+    this.tick(at(0.44), 4200, 0.12, 18, 0.12);
+    this.scrape(at(0.55), 2100, 850, 0.18, at(0.25));
+    this.metalClang(at(0.8), 700, 0.4, 0.1);
+    this.metalClang(at(0.92), 2300, 0.38, 0.07);
   }
 
   public async loadMysteryBoxOpenAsset(): Promise<void> {
-    if (this.mysteryBoxOpenBuffer) return;
-
-    const ctx: AudioContext = this.ctx ?? new AudioContext();
-    this.ctx = ctx;
-    if (!this.master) {
-      this.master = ctx.createGain();
-      this.master.gain.value = 0.55;
-      this.master.connect(ctx.destination);
-
-      const length: number = ctx.sampleRate;
-      this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
-      const data: Float32Array = this.noiseBuffer.getChannelData(0);
-      for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
-    }
-
-    try {
-      const response: Response = await fetch(this.mysteryBoxOpenUrl);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const audioData: ArrayBuffer = await response.arrayBuffer();
-      this.mysteryBoxOpenBuffer = await ctx.decodeAudioData(audioData.slice(0));
-    } catch {
-      // The procedural opening sound remains available.
-    }
+    // Without the asset the procedural opening sound remains available.
+    this.mysteryBoxOpenBuffer ??= await this.loadSample(this.mysteryBoxOpenUrl);
   }
 
   public async loadDryFireAsset(): Promise<void> {
-    if (this.dryFireBuffer) return;
+    // Without the asset the procedural dry-fire sound remains available.
+    this.dryFireBuffer ??= await this.loadSample(this.dryFireUrl);
+  }
 
-    const ctx: AudioContext = this.ctx ?? new AudioContext();
-    this.ctx = ctx;
-    if (!this.master) {
-      this.master = ctx.createGain();
-      this.master.gain.value = 0.55;
-      this.master.connect(ctx.destination);
-
-      const length: number = ctx.sampleRate;
-      this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
-      const data: Float32Array = this.noiseBuffer.getChannelData(0);
-      for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
-    }
-
-    try {
-      const response: Response = await fetch(this.dryFireUrl);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const audioData: ArrayBuffer = await response.arrayBuffer();
-      this.dryFireBuffer = await ctx.decodeAudioData(audioData.slice(0));
-    } catch {
-      // The procedural dry-fire sound remains available.
-    }
+  public async loadDoorPurchaseAsset(): Promise<void> {
+    // Without the asset the procedural purchase cue remains available.
+    this.doorPurchaseBuffer ??= await this.loadSample(this.doorPurchaseUrl);
   }
 
   /** Mystery Box opening: a hollow rising creak with a wooden knock. */
@@ -641,15 +677,7 @@ export class AudioSystem {
     if (!audio) return;
 
     if (this.mysteryBoxOpenBuffer) {
-      const source: AudioBufferSourceNode = audio.ctx.createBufferSource();
-      const gain: GainNode = audio.ctx.createGain();
-      source.buffer = this.mysteryBoxOpenBuffer;
-      gain.gain.value = 0.85;
-      source.connect(gain);
-      gain.connect(audio.master);
-      // Compensate for browser scheduling latency so the audio starts on the
-      // same moment the player presses the interaction button.
-      source.start(Math.max(0, audio.ctx.currentTime - 0.06));
+      this.playSample(audio, this.mysteryBoxOpenBuffer, 0.85, 0.06);
       return;
     }
 
@@ -698,13 +726,7 @@ export class AudioSystem {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     if (this.dryFireBuffer) {
-      const source: AudioBufferSourceNode = audio.ctx.createBufferSource();
-      const gain: GainNode = audio.ctx.createGain();
-      source.buffer = this.dryFireBuffer;
-      gain.gain.value = 0.5;
-      source.connect(gain);
-      gain.connect(audio.master);
-      source.start();
+      this.playSample(audio, this.dryFireBuffer, 0.5);
       return;
     }
     this.tick(0, 2500, 0.16);
@@ -823,6 +845,29 @@ export class AudioSystem {
     source.start(t, Math.random() * 0.5, Math.max(0.06, duration + 0.02));
   }
 
+  /** Band-passed noise glide: metal parts sliding against each other. */
+  private scrape(offset: number, fromFrequency: number, toFrequency: number, volume: number, duration: number): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const { ctx, master, noise } = audio;
+    const t: number = ctx.currentTime + offset;
+    const source: AudioBufferSourceNode = ctx.createBufferSource();
+    source.buffer = noise;
+    const filter: BiquadFilterNode = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(fromFrequency, t);
+    filter.frequency.exponentialRampToValueAtTime(toFrequency, t + duration);
+    filter.Q.value = 2.4;
+    const gain: GainNode = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume, t + duration * 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    source.start(t, Math.random() * 0.5, duration + 0.02);
+  }
+
   /** Resonant core tone plus a detuned overtone, for a metal-on-metal clang instead of a plain click. */
   private metalClang(offset: number, frequency: number, volume: number, duration: number = 0.1): void {
     this.tick(offset, frequency, volume, 16, duration);
@@ -882,6 +927,45 @@ export class AudioSystem {
     gain.connect(output);
     oscillator.start(at);
     oscillator.stop(at + duration + 0.02);
+  }
+
+  /** Decodes an optional MP3; null keeps the caller on its procedural fallback. */
+  private async loadSample(url: string): Promise<AudioBuffer | null> {
+    const ctx: AudioContext = this.ctx ?? new AudioContext();
+    this.ctx = ctx;
+    if (!this.master) {
+      this.master = ctx.createGain();
+      this.master.gain.value = 0.55;
+      this.master.connect(ctx.destination);
+
+      const length: number = ctx.sampleRate;
+      this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const data: Float32Array = this.noiseBuffer.getChannelData(0);
+      for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    }
+
+    try {
+      const response: Response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const audioData: ArrayBuffer = await response.arrayBuffer();
+      return await ctx.decodeAudioData(audioData.slice(0));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * `lead` starts the sample slightly in the past to compensate for browser
+   * scheduling latency, so it lands on the moment the player pressed USE.
+   */
+  private playSample(audio: AudioContextParts, buffer: AudioBuffer, volume: number, lead: number = 0): void {
+    const source: AudioBufferSourceNode = audio.ctx.createBufferSource();
+    const gain: GainNode = audio.ctx.createGain();
+    source.buffer = buffer;
+    gain.gain.value = volume;
+    source.connect(gain);
+    gain.connect(audio.master);
+    source.start(Math.max(0, audio.ctx.currentTime - lead));
   }
 
   private context(): AudioContextParts | null {

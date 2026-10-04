@@ -3,6 +3,12 @@ import type { WeaponId } from '../weapons/WeaponTypes';
 
 const TIMER_EPSILON = 1e-9;
 
+export const MYSTERY_BOX_SIZE = Object.freeze({
+  width: 1.9,
+  depth: 0.88,
+  bodyHeight: 0.6,
+});
+
 /** One weapon on the Mystery Box wheel; weights are relative, not percent. */
 export type MysteryBoxRarity = 'standard' | 'rare' | 'legendary';
 

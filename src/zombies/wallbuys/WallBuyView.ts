@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { L96_PROFILE } from '../../weapons/L96ViewModel';
 import type { WeaponDefinition } from '../../weapons/WeaponTypes';
 import type { WallBuy } from './WallBuy';
 
@@ -25,6 +26,9 @@ export class WallBuyView {
     } else if (definition.id === 'm1911') {
       this.buildM1911Silhouette();
       this.group.userData.silhouette = 'm1911';
+    } else if (definition.id === 'l96') {
+      this.buildL96Silhouette(view.sightHeight);
+      this.group.userData.silhouette = 'l96';
     } else {
       const totalLength = view.stockLength + view.receiverLength + view.barrelLength;
       const scale = 1.35 / totalLength;
@@ -213,6 +217,60 @@ export class WallBuyView {
     this.addPart(0.055, 0.045, -0.38, 0.055, -0.38).name = 'm1911-wall-spur-hammer';
     this.addPart(0.026, 0.025, 0.28, 0.104).name = 'm1911-wall-front-sight';
     this.addPart(0.05, 0.027, -0.27, 0.105).name = 'm1911-wall-rear-sight';
+  }
+
+  /**
+   * L96A1 profile traced from the same L96_PROFILE as the view model:
+   * thumbhole stock, action, long barrel, scope with both bells, bolt knob,
+   * box magazine and folded bipod. +X points toward the muzzle.
+   */
+  private buildL96Silhouette(sightHeight: number): void {
+    const scale = 1.45;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.23) * scale, (y + 0.03) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): THREE.Shape =>
+      outline([[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]]);
+
+    const stock = outline(L96_PROFILE.stock);
+    stock.holes.push(new THREE.Path(L96_PROFILE.thumbhole.map(toWall)));
+    const opening = L96_PROFILE.triggerOpening;
+    const center = toWall([opening.z, opening.y]);
+    const guard = new THREE.Path();
+    guard.absellipse(center.x, center.y, opening.radiusZ * scale, opening.radiusY * scale, 0, Math.PI * 2, true);
+    stock.holes.push(guard);
+    this.addShape(stock, 'l96-wall-stock');
+    this.addShape(rect(0.338, 0.358, 0.018, -0.13), 'l96-wall-buttpad');
+    this.addShape(outline(L96_PROFILE.receiver), 'l96-wall-receiver');
+
+    const barrel = L96_PROFILE.barrel;
+    this.addShape(outline([
+      [barrel.rearZ, barrel.rearRadius], [barrel.muzzleZ, barrel.muzzleRadius],
+      [barrel.muzzleZ, -barrel.muzzleRadius], [barrel.rearZ, -barrel.rearRadius],
+    ]), 'l96-wall-barrel');
+
+    const scope = L96_PROFILE.scope;
+    this.addShape(outline([
+      ...scope.map(([radius, z]) => [z, sightHeight + radius] as const),
+      ...[...scope].reverse().map(([radius, z]) => [z, sightHeight - radius] as const),
+    ]), 'l96-wall-scope');
+    const turretZ = L96_PROFILE.turretZ;
+    this.addShape(rect(turretZ + 0.0135, turretZ - 0.0135, sightHeight + 0.042, sightHeight), 'l96-wall-turret');
+    for (const z of L96_PROFILE.ringZ) this.addShape(rect(z + 0.008, z - 0.008, sightHeight, 0.02), 'l96-wall-scope-mount');
+
+    const knob = L96_PROFILE.boltKnob;
+    this.addShape(rect(0.115, 0.07, 0.012, -0.012), 'l96-wall-bolt-shroud');
+    this.addShape(outline([[0.055, 0.004], [knob.z, knob.y + 0.004], [knob.z, knob.y - 0.004], [0.055, -0.004]]), 'l96-wall-bolt-handle');
+    const knobCenter = toWall([knob.z, knob.y]);
+    const knobShape = new THREE.Shape();
+    knobShape.absarc(knobCenter.x, knobCenter.y, knob.radius * scale, 0, Math.PI * 2, false);
+    this.addShape(knobShape, 'l96-wall-bolt-knob');
+
+    const magazine = L96_PROFILE.magazine;
+    this.addShape(rect(magazine.z + magazine.depth / 2, magazine.z - magazine.depth / 2, -0.05, magazine.bottomY), 'l96-wall-magazine');
+    const bipod = L96_PROFILE.bipod;
+    this.addShape(rect(bipod.mountZ + 0.017, bipod.mountZ - 0.017, -0.044, -0.066), 'l96-wall-bipod');
+    this.addShape(rect(bipod.mountZ, bipod.footZ, bipod.legY + 0.006, bipod.legY - 0.006), 'l96-wall-bipod');
   }
 
   private addShape(shape: THREE.Shape, name: string): THREE.Mesh {

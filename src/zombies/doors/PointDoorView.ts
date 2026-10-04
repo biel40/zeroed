@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { PointDoor } from './PointDoor';
+import { BuyableDoorVisual } from './BuyableDoorVisual';
+import { BunkerDoorVisual } from './BunkerDoorVisual';
 
 const DOOR_WIDTH = 1.6;
 const DOOR_HEIGHT = 2.1;
@@ -8,66 +10,64 @@ const BUNKER_OPEN_DURATION = 2.4;
 
 export type DoorOpeningState = 'CLOSED' | 'OPENING' | 'OPEN';
 
+export interface PointDoorViewOptions {
+  readonly woodMaterial?: THREE.MeshStandardMaterial;
+  readonly reducedEffects?: boolean;
+}
+
 /**
- * Simple wooden door visual. On unlock it slides outward and fades so the
- * passage is clear without deleting colliders immediately.
+ * Point door visual. Paid doors keep an invisible slab as their collider and
+ * delegate presentation to `BuyableDoorVisual`; the sealed bunker door is the
+ * collider itself, dressed and animated by `BunkerDoorVisual`.
  */
 export class PointDoorView {
   readonly group = new THREE.Group();
   readonly collider: THREE.Mesh;
   private readonly mesh: THREE.Mesh;
-  private readonly sign: THREE.Mesh;
   private readonly sealed: boolean;
-  private wheel: THREE.Mesh | null = null;
+  private readonly visual: BuyableDoorVisual | null = null;
+  private readonly bunker: BunkerDoorVisual | null = null;
   private openingState: DoorOpeningState = 'CLOSED';
   private openingElapsed = 0;
 
   constructor(
     private readonly door: PointDoor,
     parent: THREE.Object3D,
+    options: PointDoorViewOptions = {},
   ) {
     const geometry = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICK);
     const sealed = door.id === 'nuclear-bunker';
     this.sealed = sealed;
-    const material = new THREE.MeshStandardMaterial({
-      color: sealed ? 0x252d2f : 0x4a3c32,
-      roughness: sealed ? 0.48 : 0.85,
-      metalness: sealed ? 0.82 : 0.05,
-    });
+    // Raycasts and Box3 ignore material visibility, so the hidden slab still blocks.
+    const material = new THREE.MeshStandardMaterial({ visible: false });
     this.mesh = new THREE.Mesh(geometry, material);
     this.collider = this.mesh;
     this.mesh.name = `point-door-collider:${door.id}`;
     this.mesh.position.y = DOOR_HEIGHT / 2;
-    this.mesh.castShadow = true;
-    this.mesh.receiveShadow = true;
+    this.mesh.castShadow = sealed;
+    this.mesh.receiveShadow = sealed;
     this.mesh.userData.surface = sealed ? 'metal' : 'wood';
     this.mesh.userData.mapRole = sealed ? 'sealed-bunker-door' : 'point-door';
     if (sealed) {
-      const wheel = new THREE.Mesh(
-        new THREE.TorusGeometry(0.3, 0.045, 8, 20),
-        new THREE.MeshStandardMaterial({ color: 0x596164, metalness: 0.9, roughness: 0.38 }),
-      );
-      wheel.position.set(0, 0.95, DOOR_THICK / 2 + 0.06);
-      this.wheel = wheel;
-      const viewport = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.12, 0.035),
-        new THREE.MeshBasicMaterial({ color: 0x5c0906 }),
-      );
-      viewport.position.set(0, 1.55, DOOR_THICK / 2 + 0.04);
-      viewport.userData.mapRole = 'bunker-red-leak';
-      this.mesh.add(wheel, viewport);
+      this.bunker = new BunkerDoorVisual(this.mesh, {
+        width: DOOR_WIDTH,
+        height: DOOR_HEIGHT,
+        thickness: DOOR_THICK,
+        cost: door.cost,
+        reducedEffects: options.reducedEffects,
+      });
+      this.group.add(this.bunker.group);
+    } else {
+      this.visual = new BuyableDoorVisual({
+        width: DOOR_WIDTH,
+        height: DOOR_HEIGHT,
+        cost: door.cost,
+        woodMaterial: options.woodMaterial,
+        reducedEffects: options.reducedEffects,
+      });
+      this.visual.group.userData.mapRole = 'point-door-visual';
+      this.group.add(this.visual.group);
     }
-
-    // Cost label floating in front of the door.
-    const signGeometry = new THREE.PlaneGeometry(0.5, 0.25);
-    const signMaterial = new THREE.MeshBasicMaterial({
-      map: this.makeCostTexture(door.cost),
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
-    this.sign = new THREE.Mesh(signGeometry, signMaterial);
-    this.sign.position.set(0, DOOR_HEIGHT - 0.35, DOOR_THICK / 2 + 0.02);
-    this.mesh.add(this.sign);
 
     this.group.add(this.mesh);
     this.group.position.set(door.position.x, door.y, door.position.z);
@@ -90,36 +90,26 @@ export class PointDoorView {
 
   /** Returns true only on the frame where the sealed door reaches OPEN. */
   public update(dt: number): boolean {
-    if (this.sealed) {
-      if (this.openingState !== 'OPENING') return false;
-      this.openingElapsed = Math.min(BUNKER_OPEN_DURATION, this.openingElapsed + dt);
-      const progress = this.openingElapsed / BUNKER_OPEN_DURATION;
-      const eased = progress * progress * (3 - 2 * progress);
-      if (this.wheel) this.wheel.rotation.z = -Math.PI * 2 * Math.min(1, progress / 0.45);
-      const slide = Math.max(0, (eased - 0.22) / 0.78);
-      this.mesh.position.z = slide * 2.25;
-      if (progress < 1) return false;
-      this.mesh.visible = false;
-      this.openingState = 'OPEN';
-      return true;
+    if (this.visual) {
+      const unlocked = this.door.state === 'unlocked';
+      if (unlocked && this.openingState === 'CLOSED') {
+        this.openingState = 'OPENING';
+        // Hides bullet holes parented to the slab along with it.
+        this.mesh.visible = false;
+      }
+      if (this.visual.update(dt, unlocked)) this.openingState = 'OPEN';
+      return false;
     }
 
-    if (this.door.state === 'unlocked' && this.openingState !== 'OPEN') {
-      // Slide outward and sink slightly, then hide.
-      const speed = 2.2;
-      // The group's local +Z is aligned with the configured outward normal.
-      this.mesh.position.z += speed * dt;
-      this.mesh.position.y -= 0.4 * dt;
-      const material = this.mesh.material as THREE.MeshStandardMaterial;
-      if (material.opacity > 0.02) {
-        material.transparent = true;
-        material.opacity = Math.max(0, material.opacity - 1.5 * dt);
-      } else {
-        this.mesh.visible = false;
-        this.openingState = 'OPEN';
-      }
+    if (this.openingState === 'OPENING') {
+      this.openingElapsed = Math.min(BUNKER_OPEN_DURATION, this.openingElapsed + dt);
     }
-    return false;
+    const progress = this.openingElapsed / BUNKER_OPEN_DURATION;
+    this.bunker?.update(dt, this.openingState, progress);
+    if (this.openingState !== 'OPENING' || progress < 1) return false;
+    this.mesh.visible = false;
+    this.openingState = 'OPEN';
+    return true;
   }
 
   public reset(): void {
@@ -127,30 +117,7 @@ export class PointDoorView {
     this.mesh.visible = true;
     this.openingState = 'CLOSED';
     this.openingElapsed = 0;
-    if (this.wheel) this.wheel.rotation.z = 0;
-    const material = this.mesh.material as THREE.MeshStandardMaterial;
-    material.opacity = 1;
-    material.transparent = false;
-  }
-
-  private makeCostTexture(cost: number): THREE.CanvasTexture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('2D canvas context unavailable');
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, 128, 64);
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, 124, 60);
-    ctx.fillStyle = '#d4af37';
-    ctx.font = 'bold 28px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${cost}`, 64, 32);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
+    this.visual?.reset();
+    this.bunker?.reset();
   }
 }
