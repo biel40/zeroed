@@ -27,6 +27,7 @@ export const es: Record<TranslationKey, string> = {
   'start.rotateTitle1': 'GIRA TU',
   'start.rotateTitle2': 'MÓVIL',
   'start.rotateHint': 'PARA JUGAR EN HORIZONTAL',
+  'mapLoading.preparing': 'PREPARANDO EL MAPA',
 
   'controls.mouse': 'Ratón',
   'controls.lmb': 'Clic izq.',

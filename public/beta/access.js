@@ -1,13 +1,14 @@
-const ALLOWED_EMAIL = 'bielet40@gmail.com';
+import { BETA_EMAILS } from './emails.js';
 const ACCESS_KEY = 'zeroed.betaAccess';
 
 export function hasBetaAccess() {
-  try { return sessionStorage.getItem(ACCESS_KEY) === ALLOWED_EMAIL; }
+  try { return BETA_EMAILS.includes(sessionStorage.getItem(ACCESS_KEY)); }
   catch { return false; }
 }
 
 export function acceptBetaEmail(email) {
-  if (email.trim().toLowerCase() !== ALLOWED_EMAIL) return false;
-  sessionStorage.setItem(ACCESS_KEY, ALLOWED_EMAIL);
+  const normalized = email.trim().toLowerCase();
+  if (!BETA_EMAILS.includes(normalized)) return false;
+  sessionStorage.setItem(ACCESS_KEY, normalized);
   return true;
 }

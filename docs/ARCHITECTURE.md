@@ -22,6 +22,10 @@ menu local: en individual congela la simulacion y conserva el frame visible;
 un modo con `sharedSimulation` (cooperativo) sigue simulando y el menu solo
 retira el input de ese jugador. `Game.dispose()` libera loop, listeners,
 contexto WebGL, canvas y AudioContext; volver al menu no recarga la pagina.
+El loop no arranca en el constructor: `Game.prepare()` compila todos los
+materiales (incluidos pools ocultos), sube sus texturas y dibuja un frame
+mientras `#map-loading` cubre la pantalla, para que la entrada al mapa no
+sufra tirones de compilacion de shaders.
 
 ## Responsabilidades
 

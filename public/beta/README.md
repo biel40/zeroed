@@ -1,10 +1,23 @@
 # Acceso temporal
 
 Con `BETA_ENABLED=true`, el arranque muestra la pantalla de mantenimiento.
-Introducir `bielet40@gmail.com` y pulsar Continuar permite entrar directamente.
+Introducir cualquiera de los correos de `emails.js` y pulsar Continuar permite
+entrar sin verificar el correo. El listado contiene los seis participantes originales.
 La comprobacion ocurre en el navegador, sin peticiones de autenticacion,
 servidor de correo, claves ni enlaces de verificacion. El permiso se recuerda
 en `sessionStorage` para esa pestaña.
+
+Tras aceptar un correo se muestra `welcome.html`: una bienvenida de tres escenas
+con captura del mapa, transiciones suaves, agradecimiento y acciones para enviar
+feedback o compartir el enlace de Zeroed. Se puede omitir o avanzar manualmente;
+la ultima escena espera a que el jugador pulse Jugar. Con movimiento reducido
+las escenas solo avanzan manualmente. No modifica el gameplay ni necesita API.
+Las entradas posteriores al menu con permiso recordado evitan la bienvenida.
+
+Para dar o retirar acceso, editar la lista `BETA_EMAILS` en `emails.js` y volver
+a desplegar. Mantener un correo por linea, en minusculas. Tambien se comprueba
+la lista al recuperar el permiso de una pestaña; retirar un correo invalida
+ese permiso cuando se carga la nueva version.
 
 Otros correos muestran la opcion Solicitar acceso, que abre la aplicacion de
 correo con un mensaje a `biel40aws@gmail.com`. El usuario debe enviarlo.
@@ -26,7 +39,7 @@ cuando `BETA_ENABLED` no esta activo.
 ## Organizacion y retirada
 
 El codigo especifico de esta funcion vive en `public/beta/`: pantalla
-`index.html`, comprobacion y permiso de la pestaña en `access.js`, y sus tipos
+`index.html`, listado en `emails.js`, comprobacion y permiso de la pestaña en `access.js`, y sus tipos
 en `access.d.ts`. `src/main.ts` solo conecta esa comprobacion al arranque.
 
 Para desactivarla sin borrar codigo, poner `BETA_ENABLED=false` y desplegar.

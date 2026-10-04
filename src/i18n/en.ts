@@ -29,6 +29,7 @@ export const en = {
   'start.rotateTitle1': 'ROTATE YOUR',
   'start.rotateTitle2': 'PHONE',
   'start.rotateHint': 'TO PLAY IN LANDSCAPE',
+  'mapLoading.preparing': 'PREPARING THE MAP',
 
   'controls.mouse': 'Mouse',
   'controls.lmb': 'LMB',

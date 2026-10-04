@@ -27,6 +27,7 @@ export const ca: Record<TranslationKey, string> = {
   'start.rotateTitle1': 'GIRA EL',
   'start.rotateTitle2': 'MÒBIL',
   'start.rotateHint': 'PER JUGAR EN HORITZONTAL',
+  'mapLoading.preparing': 'PREPARANT EL MAPA',
 
   'controls.mouse': 'Ratolí',
   'controls.lmb': 'Clic esq.',

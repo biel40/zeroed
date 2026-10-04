@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "zeroed-dev",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set BETA_ENABLED=false&& npm run dev -- --port 5173 --strictPort"],
+      "port": 5173
+    }
+  ]
+}

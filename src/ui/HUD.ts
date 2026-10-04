@@ -25,6 +25,10 @@ export interface GameOverStats {
   readonly headshots: number;
 }
 
+/** Keep in sync with the #map-loading opacity transition in style.css. */
+const MAP_LOADING_FADE_MS = 450;
+const MAP_LOADING_MIN_MS = 700;
+
 function mustGet(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing HUD element #${id}`);
@@ -81,6 +85,9 @@ export class HUD {
   private lastLamps = '';
   private lastPrompt: string | null = null;
   private ready: boolean = false;
+  private readonly mapLoading: HTMLElement = mustGet('map-loading');
+  private mapLoadingShownAt = 0;
+  private mapLoadingTimer = 0;
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -138,6 +145,27 @@ export class HUD {
     this.loadingBarFill.style.width = '0%';
     this.startHint.textContent = message;
     this.startScreen.classList.remove('hidden');
+  }
+
+  /** Opaque cover shown from the map pick until the first frame is ready. */
+  public showMapLoading(): void {
+    clearTimeout(this.mapLoadingTimer);
+    this.mapLoadingShownAt = performance.now();
+    this.mapLoading.classList.remove('hidden', 'leaving');
+  }
+
+  /** Fades the cover out; a minimum on-screen time keeps fast loads from flickering. */
+  public hideMapLoading(immediate = false): void {
+    clearTimeout(this.mapLoadingTimer);
+    if (immediate) {
+      this.mapLoading.classList.add('hidden');
+      return;
+    }
+    const remaining = Math.max(0, MAP_LOADING_MIN_MS - (performance.now() - this.mapLoadingShownAt));
+    this.mapLoadingTimer = window.setTimeout(() => {
+      this.mapLoading.classList.add('leaving');
+      this.mapLoadingTimer = window.setTimeout(() => this.mapLoading.classList.add('hidden'), MAP_LOADING_FADE_MS);
+    }, remaining);
   }
 
   public setHudVisible(visible: boolean): void {

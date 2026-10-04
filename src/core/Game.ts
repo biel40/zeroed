@@ -28,6 +28,8 @@ interface ArsenalEntry {
 const MAX_DELTA = 0.05;
 const FLASH_LIGHT_DECAY = 26;
 const MAX_SPREAD_PIXELS = 130;
+/** A driver that never reports its programs ready must not hold the loading screen. */
+const SHADER_WARMUP_TIMEOUT_MS = 10000;
 const UP = new THREE.Vector3(0, 1, 0);
 const FALLBACK_UP = new THREE.Vector3(1, 0, 0);
 
@@ -264,6 +266,32 @@ export class Game {
       this.resizeObserver.observe(container);
     }
     window.visualViewport?.addEventListener('resize', this.handleResize);
+  }
+
+  /**
+   * Warms the GPU behind the loading screen, then starts the frame loop.
+   * Every material is compiled (hidden weapons and pooled zombies included),
+   * their textures are uploaded and one frame is drawn so the shadow maps
+   * exist; otherwise all that work lands on the first visible frames.
+   */
+  public async prepare(): Promise<void> {
+    const camera = this.player.camera;
+    await Promise.race([
+      this.renderer.compileAsync(this.scene, camera).catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, SHADER_WARMUP_TIMEOUT_MS)),
+    ]);
+    if (this.disposed) return;
+    const textures = new Set<THREE.Texture>();
+    this.scene.traverse((object) => {
+      const material = (object as THREE.Mesh).material;
+      for (const entry of Array.isArray(material) ? material : material ? [material] : []) {
+        for (const value of Object.values(entry)) {
+          if ((value as THREE.Texture | null)?.isTexture) textures.add(value as THREE.Texture);
+        }
+      }
+    });
+    for (const texture of textures) this.renderer.initTexture(texture);
+    this.renderer.render(this.scene, camera);
     this.renderer.setAnimationLoop(this.tick);
   }
 

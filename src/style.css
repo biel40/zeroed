@@ -2069,6 +2069,85 @@ html.coop-guest #pause-restart {
   transition: width 0.15s ease;
 }
 
+/* ---------- Map loading ---------- */
+
+/* Opaque so the GPU warm-up behind it is never seen. Only opacity and
+   transform animate, which keeps the cover moving on the compositor while
+   the main thread builds the arena. */
+#map-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(105, 15, 12, 0.22), transparent 42%),
+    linear-gradient(105deg, #050708 0%, #0a0d0d 48%, #020303 100%);
+  cursor: progress;
+  transition: opacity 0.45s ease;
+}
+
+#map-loading.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.map-loading-content {
+  width: min(100%, 520px);
+  text-align: center;
+  animation: map-loading-in 0.5s ease-out both;
+}
+
+.map-loading-kicker {
+  color: #8e968a;
+  font: 600 11px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.32em;
+}
+
+.map-loading-title {
+  margin: 10px 0 22px;
+  color: #dedfd8;
+  font: 900 clamp(34px, 7vw, 64px)/0.95 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.075em;
+  text-shadow: 3px 4px 0 rgba(0, 0, 0, 0.62), 0 0 46px rgba(123, 17, 13, 0.25);
+}
+
+.map-loading-bar {
+  height: 3px;
+  overflow: hidden;
+  background: rgba(164, 172, 157, 0.14);
+}
+
+.map-loading-bar span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: #9a2a22;
+  box-shadow: 0 0 14px rgba(190, 40, 30, 0.6);
+  animation: map-loading-sweep 1.3s ease-in-out infinite;
+}
+
+.map-loading-tagline {
+  margin-top: 18px;
+  color: #6f766c;
+  font: 600 10px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.28em;
+}
+
+@keyframes map-loading-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes map-loading-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(290%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #map-loading { transition: none; }
+  .map-loading-content { animation: none; }
+  .map-loading-bar span { width: 100%; animation: none; opacity: 0.6; }
+}
+
 #debug-stats {
   position: fixed;
   top: 8px;
@@ -2223,8 +2302,8 @@ html.touch-controls-enabled .start-panel {
 #pause-menu .menu-kicker { margin: 0; }
 #pause-round { color: #dedfd8; }
 #pause-menu h1 {
-  margin: 6px 0 22px; color: #dedfd8;
-  font: 900 clamp(56px, 10vw, 86px)/.9 Impact, 'Arial Narrow', sans-serif;
+  margin: 4px 0 18px; color: #dedfd8;
+  font: 900 clamp(36px, 6vw, 50px)/.9 Impact, 'Arial Narrow', sans-serif;
   letter-spacing: .075em;
   text-shadow: 3px 4px 0 #0009, 0 0 46px #7b110d40;
 }
@@ -2267,7 +2346,7 @@ html.touch-controls-enabled .start-panel {
 }
 @media (max-height: 600px) {
   #pause-menu .start-panel { padding: 20px 24px 20px 28px; }
-  #pause-menu h1 { margin-bottom: 14px; font-size: 48px; }
+  #pause-menu h1 { margin-bottom: 12px; font-size: 34px; }
   .pause-stats dd { font-size: 22px; }
   #pause-menu .pause-actions { margin-top: 14px; }
   #pause-menu .pause-actions button { padding-top: 10px; padding-bottom: 10px; }

@@ -93,7 +93,7 @@
       try {
         const address = email.value.trim();
         if (acceptBetaEmail(address)) {
-          location.replace(`/${location.search}`);
+          location.replace(`./welcome.html${location.search}`);
           return;
         }
         form.hidden = true;
