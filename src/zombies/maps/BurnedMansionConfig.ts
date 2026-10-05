@@ -114,8 +114,9 @@ export const MANSION_SPECIAL_WEAPON_CASES = [
   {
     id: 'bunker-raygun',
     weaponId: 'raygun' as const,
-    cost: 2000,
-    interactionLabel: 'RAY GUN — 2000',
+    cost: 6000,
+    requiredKills: 200,
+    interactionLabel: 'RAY GUN — 6000',
     position: { x: -2.2, y: MANSION_BUNKER_Y + 1.1, z: -2.35 },
     useRange: 2,
     lookDotMin: 0.42,
@@ -123,8 +124,9 @@ export const MANSION_SPECIAL_WEAPON_CASES = [
   {
     id: 'bunker-zeus',
     weaponId: 'tesla' as const,
-    cost: 3000,
-    interactionLabel: 'ZEUS-77 — 3000',
+    cost: 10000,
+    requiredKills: 300,
+    interactionLabel: 'ZEUS-77 — 10000',
     position: { x: -2.2, y: MANSION_BUNKER_Y + 1.1, z: -6.05 },
     useRange: 2,
     lookDotMin: 0.42,

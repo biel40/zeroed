@@ -25,6 +25,7 @@ export interface ArenaWeaponPickup {
   readonly id: string;
   readonly weaponId: WeaponId;
   readonly cost: number;
+  readonly requiredKills?: number;
   readonly interactionLabel: string;
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly floor: number;
@@ -33,6 +34,8 @@ export interface ArenaWeaponPickup {
   readonly requiredDoorId?: string;
   readonly available: boolean;
   claim(): boolean;
+  /** Local player's progress drives the display; the mode validates purchases. */
+  setKillProgress?(kills: number): void;
   update?(dt: number): void;
   reset(): void;
 }

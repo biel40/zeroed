@@ -103,7 +103,14 @@ como cue independiente sobre la música de fondo.
   ajustado al tamano y orientacion de la caja, tanto en individual como en
   cooperativo; la tapa animada y el arma flotante no alteran ese volumen.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
-  una pared una sola vez por run. El comando individual `MOTDRULES` tambien
+  una pared una sola vez por run. Las vitrinas del bunker exigen bajas personales:
+  Ray Gun, 200 bajas y 6000 Points; ZEUS-77, 300 bajas y 10000 Points.
+  Cada vitrina se compra una sola vez por run. El cierre se retrae con un pulso
+  de energia al alcanzar el requisito; comprar eleva el cristal y el arma.
+  El cooperativo valida las bajas y cobra al comprador en el anfitrion;
+  cada cliente muestra su propio progreso y ambos ven la apertura compartida.
+  Se conservan la Mystery Box y la recompensa Ray Gun de 115 bajas.
+  El comando individual `MOTDRULES` tambien
   abre esa pared sin rellenar los faroles; reiniciar restaura el cierre.
   El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.

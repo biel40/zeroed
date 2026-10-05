@@ -76,6 +76,30 @@ function ammoRefill(): ArenaAmmoRefill {
 }
 
 describe('Burned Mansion purchases', () => {
+  it.each([
+    ['raygun', 200, 6000],
+    ['tesla', 300, 10000],
+  ] as const)('requires personal kills and the exact price for %s', (weaponId, requiredKills, cost) => {
+    const { mode, economy, calls } = makeMode(cost);
+    const pickup = { ...weaponPickup(cost), weaponId, requiredKills };
+    const internals = mode as unknown as { findFacingWeaponPickup(): ArenaWeaponPickup; kills: number };
+    internals.findFacingWeaponPickup = () => pickup;
+    internals.kills = requiredKills - 1;
+    mode.onInteract();
+    expect(economy.points).toBe(cost);
+    expect(calls.grants).toEqual([]);
+    expect(mode.getInteractPrompt()).toContain(`${requiredKills - 1}/${requiredKills} kills`);
+    internals.kills = requiredKills;
+    economy.spend(10);
+    mode.onInteract();
+    expect(economy.points).toBe(cost - 10);
+    expect(calls.grants).toEqual([]);
+    economy.awardHit();
+    mode.onInteract();
+    expect(economy.points).toBe(0);
+    expect(calls.grants).toEqual([weaponId]);
+  });
+
   it('charges a Wonder Weapon case exactly once and grants its weapon', () => {
     const { mode, economy, calls } = makeMode(3000);
     const pickup = weaponPickup(2000);

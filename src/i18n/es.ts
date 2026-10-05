@@ -110,6 +110,7 @@ export const es: Record<TranslationKey, string> = {
   'banner.pointsNeeded': 'SE NECESITAN {cost} PTS',
   'banner.ammoFull': 'MUNICIÓN COMPLETA',
   'banner.raygunUnlocked': 'RAY GUN DESBLOQUEADA',
+  'prompt.weaponCaseLocked': '{label}\nBLOQUEADA — {kills}/{required} bajas',
   'banner.kills': '{kills} BAJAS',
   'banner.godMode': 'MODO DIOS ACTIVADO',
   'banner.boxNotConfirmed': 'CAJA NO CONFIRMADA',

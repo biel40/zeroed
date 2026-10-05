@@ -112,6 +112,7 @@ export const en = {
   'banner.pointsNeeded': '{cost} PTS NEEDED',
   'banner.ammoFull': 'AMMO FULL',
   'banner.raygunUnlocked': 'RAY GUN UNLOCKED',
+  'prompt.weaponCaseLocked': '{label}\nLOCKED — {kills}/{required} kills',
   'banner.kills': '{kills} KILLS',
   'banner.godMode': 'GOD MODE ENABLED',
   'banner.boxNotConfirmed': 'BOX NOT CONFIRMED',

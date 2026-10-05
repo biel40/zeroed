@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { t } from '../../i18n/i18n';
-import { actionKey } from '../../ui/InteractionPrompts';
+import { actionKey, weaponCaseLocked, weaponCasePrompt } from '../../ui/InteractionPrompts';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { PlayerEconomy } from '../../game/PlayerEconomy';
 import { PlayerHealth } from '../../game/PlayerHealth';
@@ -348,7 +348,7 @@ export class CoopHostMode implements GameMode {
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
     const pickup = this.world.findFacingPickup();
-    if (pickup) return t('prompt.pickup', { label: pickup.interactionLabel, key: tapKey });
+    if (pickup) return weaponCasePrompt(pickup, this.players.host.kills, this.ctx.profile.useTouchControls);
     const refill = this.world.findFacingAmmoRefill();
     if (refill) return t('prompt.pickup', { label: refill.interactionLabel, key: tapKey });
     const completion = this.world.findFacingCompletion();
@@ -684,6 +684,9 @@ export class CoopHostMode implements GameMode {
     const shooter = this.shooter;
     const killer = this.players[shooter];
     killer.kills++;
+    if (shooter === 'host') {
+      for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(killer.kills);
+    }
     if (headshot) killer.headshots++;
     if (source === 'knife') killer.economy.awardKnifeKill();
     else killer.economy.awardKill(headshot);
@@ -848,6 +851,11 @@ export class CoopHostMode implements GameMode {
     } else if (kind === 'pickup') {
       const pickup = this.world.arena.weaponPickups.find((entry) => entry.id === id)!;
       if (!pickup.available || (pickup.requiredDoorId && this.world.findDoor(pickup.requiredDoorId)?.isLocked)) return;
+      if (weaponCaseLocked(pickup, record.kills)) {
+        if (remote) this.send({ type: 'mapUseFailed', reason: 'unavailable' });
+        else this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, record.kills, this.ctx.profile.useTouchControls));
+        return;
+      }
       if (!record.economy.spend(pickup.cost)) {
         this.mapDenied(remote, pickup.cost);
         return;

@@ -127,7 +127,10 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 - Burned Mansion: la reparación de barricadas se valida por alcance y premia
   al jugador que repara. Las lámparas, almas, pared secreta, ritual y vitrinas
   del búnker forman parte del estado compartido. Las vitrinas solo se compran
-  una vez y cobran al comprador. La recarga de munición es individual. El
+  una vez y cobran al comprador: Ray Gun exige 200 bajas personales y 6000 Points;
+  ZEUS-77 exige 300 bajas personales y 10000 Points. El anfitrion valida ambos
+  requisitos. El desbloqueo visual refleja las bajas locales y la apertura se
+  replica para ambos. La recarga de munición es individual. El
   final de 30000 Points detiene la partida compartida y abre los créditos.
 - La pausa del invitado solo abre su menú y libera el ratón; la partida sigue.
   La pausa del anfitrión detiene la simulación para ambos hasta que reanuda.

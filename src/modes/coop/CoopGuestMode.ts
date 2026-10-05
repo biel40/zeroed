@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { t } from '../../i18n/i18n';
-import { actionKey } from '../../ui/InteractionPrompts';
+import { actionKey, weaponCaseLocked, weaponCasePrompt } from '../../ui/InteractionPrompts';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import type { CoopConnection } from '../../network/CoopConnection';
 import {
@@ -237,7 +237,15 @@ export class CoopGuestMode implements GameMode {
       return;
     }
     const pickup = this.world.findFacingPickup();
-    if (pickup) { this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon }); return; }
+    if (pickup) {
+      const kills = this.match?.stats.guest.kills ?? 0;
+      if (weaponCaseLocked(pickup, kills)) {
+        this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, kills, this.ctx.profile.useTouchControls));
+        return;
+      }
+      this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon });
+      return;
+    }
     const refill = this.world.findFacingAmmoRefill();
     if (refill) {
       if (!this.ctx.canRefillEquippedWeaponAmmo()) { this.ctx.hud.showRoundBanner(t('banner.ammoFull')); return; }
@@ -279,7 +287,7 @@ export class CoopGuestMode implements GameMode {
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
     const pickup = this.world.findFacingPickup();
-    if (pickup) return t('prompt.pickup', { label: pickup.interactionLabel, key: key });
+    if (pickup) return weaponCasePrompt(pickup, this.match?.stats.guest.kills ?? 0, this.ctx.profile.useTouchControls);
     const refill = this.world.findFacingAmmoRefill();
     if (refill) return t('prompt.pickup', { label: refill.interactionLabel, key: key });
     const completion = this.world.findFacingCompletion();
@@ -425,6 +433,7 @@ export class CoopGuestMode implements GameMode {
     const previousBox = this.box.snapshot();
     const previousPhase = this.match?.phase;
     this.match = state;
+    for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(state.stats.guest.kills);
     this.ctx.hud.setHostPauseVisible(state.hostPaused);
     if (state.stats.host.reviver === 'guest') this.revivePending = 0;
     this.initialMatchWait = 0;

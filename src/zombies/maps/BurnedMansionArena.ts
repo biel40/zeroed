@@ -82,6 +82,11 @@ type WallAxis = 'x' | 'z';
 class MansionWeaponPickup implements ArenaWeaponPickup {
   private claimed = false;
   private openProgress = 0;
+  private unlocked = false;
+  private unlockProgress = 0;
+  private elapsed = 0;
+  private readonly displayScale: THREE.Vector3;
+  private readonly displayYaw: number;
 
   constructor(
     readonly id: string,
@@ -92,11 +97,22 @@ class MansionWeaponPickup implements ArenaWeaponPickup {
     readonly lookDotMin: number,
     readonly requiredDoorId: string,
     readonly cost: number,
+    readonly requiredKills: number,
     readonly interactionLabel: string,
     private readonly view: THREE.Group,
     private readonly weaponDisplay: THREE.Object3D,
     private readonly glassDoor: THREE.Object3D,
-  ) {}
+    private readonly locks: readonly THREE.Mesh[],
+    private readonly energyRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>,
+    private readonly halo: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>,
+    private readonly light: THREE.PointLight,
+    private readonly color: number,
+    private readonly lightIntensity: number,
+  ) {
+    this.displayScale = weaponDisplay.scale.clone();
+    this.displayYaw = weaponDisplay.rotation.y;
+    this.reset();
+  }
 
   get available(): boolean {
     return !this.claimed;
@@ -105,23 +121,63 @@ class MansionWeaponPickup implements ArenaWeaponPickup {
   claim(): boolean {
     if (this.claimed) return false;
     this.claimed = true;
-    this.weaponDisplay.visible = false;
+    // Replicated purchases can arrive before the local player's kill threshold.
+    this.setKillProgress(this.requiredKills);
     this.view.userData.purchased = true;
     return true;
   }
 
   update(dt: number): void {
-    if (!this.claimed || this.openProgress >= 1) return;
-    this.openProgress = Math.min(1, this.openProgress + dt * 2.8);
-    this.glassDoor.position.y = 1.05 + this.openProgress * 1.15;
+    this.elapsed += dt;
+    if (this.unlocked) this.unlockProgress = Math.min(1, this.unlockProgress + dt / 1.3);
+    if (this.claimed) this.openProgress = Math.min(1, this.openProgress + dt / 1.35);
+    const release = THREE.MathUtils.smoothstep(this.unlockProgress, 0, 0.6);
+    for (let i = 0; i < this.locks.length; i++) {
+      this.locks[i].position.x = (i === 0 ? -1 : 1) * (0.26 + release * 0.32);
+      this.locks[i].visible = release < 1;
+    }
+    const flash = this.unlocked ? Math.sin(Math.PI * this.unlockProgress) : 0;
+    const open = THREE.MathUtils.smoothstep(this.openProgress, 0.1, 0.75);
+    const take = THREE.MathUtils.smoothstep(this.openProgress, 0.65, 1);
+    this.glassDoor.position.y = 1.05 + open * 0.72;
+    this.glassDoor.rotation.x = -open * 0.22;
+    this.weaponDisplay.position.y = 1.05 + (this.unlocked ? Math.sin(this.elapsed * 2.4) * 0.035 : 0) + open * 0.42;
+    this.weaponDisplay.rotation.y = this.displayYaw + open * Math.PI * 2;
+    this.weaponDisplay.scale.copy(this.displayScale).multiplyScalar(1 - take);
+    this.weaponDisplay.visible = this.openProgress < 1;
+    this.halo.material.opacity = this.unlocked ? 0.32 + flash * 0.45 : 0.08;
+    this.halo.scale.setScalar(1 + flash * 0.5);
+    this.energyRing.visible = flash > 0.001 || (this.claimed && this.openProgress < 1);
+    this.energyRing.scale.setScalar(1 + this.unlockProgress * 1.5 + open);
+    this.energyRing.material.opacity = Math.max(flash * 0.65, this.claimed ? Math.sin(Math.PI * this.openProgress) * 0.6 : 0);
+    this.light.intensity = this.lightIntensity * (this.unlocked ? 1 + flash * 2 : 0.15) * (1 - take);
+  }
+
+  setKillProgress(kills: number): void {
+    if (this.unlocked || kills < this.requiredKills) return;
+    this.unlocked = true;
+    this.view.userData.unlocked = true;
+    this.halo.material.color.setHex(this.color);
+    this.light.color.setHex(this.color);
   }
 
   reset(): void {
     this.claimed = false;
     this.openProgress = 0;
+    this.unlocked = false;
+    this.unlockProgress = 0;
+    this.elapsed = 0;
     this.weaponDisplay.visible = true;
+    this.weaponDisplay.position.y = 1.05;
+    this.weaponDisplay.rotation.y = this.displayYaw;
+    this.weaponDisplay.scale.copy(this.displayScale);
     this.glassDoor.position.y = 1.05;
+    this.glassDoor.rotation.x = 0;
+    this.view.userData.unlocked = false;
     this.view.userData.purchased = false;
+    this.halo.material.color.setHex(0xff3838);
+    this.light.color.setHex(0xff3838);
+    this.update(0);
   }
 }
 
@@ -790,6 +846,21 @@ export class BurnedMansionArena implements ZombieArena {
       glassDoor.userData.mapRole = 'case-glass';
       caseGroup.add(glassDoor);
 
+      const color = reward.weaponId === 'tesla' ? 0x66dfff : 0x79ff86;
+      const lockMaterial = new THREE.MeshStandardMaterial({ color: 0x332222, emissive: 0xff2424, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.35 });
+      const locks = [-1, 1].map((side) => {
+        const lock = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.09, 0.08), lockMaterial);
+        lock.position.set(side * 0.26, 1.05, 0.47);
+        lock.userData.mapRole = 'case-lock';
+        caseGroup.add(lock);
+        return lock;
+      });
+      const energyRing = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.34, 32),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+      energyRing.position.set(0, 1.05, 0.49);
+      energyRing.userData.mapRole = 'case-energy-burst';
+      caseGroup.add(energyRing);
+
       const pickupGroup = buildWeaponDisplayModel(
         WEAPON_DEFINITIONS[reward.weaponId],
         null,
@@ -836,10 +907,17 @@ export class BurnedMansionArena implements ZombieArena {
           reward.lookDotMin,
           secret.doorId,
           reward.cost,
+          reward.requiredKills,
           reward.interactionLabel,
           caseGroup,
           pickupGroup,
           glassDoor,
+          locks,
+          energyRing,
+          halo,
+          light,
+          color,
+          this.profile.useReducedEffects ? 0.35 : 0.65,
         ),
       );
     }

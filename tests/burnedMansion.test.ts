@@ -482,13 +482,14 @@ describe('Burned Mansion topology', () => {
     expect(door.prompt).toBe('door.openBunker');
     expect(door.requiredMessage).toBe('door.bunkerRequired');
     expect(secret.rewards.map((reward) => reward.weaponId)).toEqual(['raygun', 'tesla']);
-    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([2000, 3000]);
+    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([6000, 10000]);
+    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.requiredKills)).toEqual([200, 300]);
     expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.interactionLabel)).toEqual([
-      'RAY GUN — 2000',
-      'ZEUS-77 — 3000',
+      'RAY GUN — 6000',
+      'ZEUS-77 — 10000',
     ]);
     expect(pickups.map((pickup) => pickup.weaponId)).toEqual(['raygun', 'tesla']);
-    expect(pickups.map((pickup) => pickup.cost)).toEqual([2000, 3000]);
+    expect(pickups.map((pickup) => pickup.cost)).toEqual([6000, 10000]);
     expect(pickups.every((pickup) => pickup.requiredDoorId === secret.doorId)).toBe(true);
     for (const pickup of pickups) {
       expect(pickup.available).toBe(true);
@@ -515,6 +516,48 @@ describe('Burned Mansion topology', () => {
     for (const weaponCase of MANSION_SPECIAL_WEAPON_CASES) {
       expect(canWalk([MANSION_STAIR_CENTER_X, -6.9], [weaponCase.position.x + 1.2, weaponCase.position.z], bunkerObstacles, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
     }
+  });
+
+  it.each([0, 1])('animates case %i unlocking, opening and resetting without moving its collider', (index) => {
+    const arena = makeArena();
+    const pickup = arena.weaponPickups[index];
+    const required = pickup.requiredKills!;
+    const view = arena.group.getObjectByName(`${pickup.id}-case`)!;
+    const weapon = arena.group.getObjectByName(pickup.id)!;
+    const glass = view.children.find((child) => child.userData.mapRole === 'case-glass')!;
+    const collider = view.children.find((child) => child.userData.mapRole === 'case-collider')!;
+    const colliderPosition = collider.position.clone();
+    const scale = weapon.scale.clone();
+    pickup.setKillProgress!(required - 1);
+    arena.update(0.1);
+    expect(view.userData.unlocked).toBe(false);
+    expect(glass.position.y).toBe(1.05);
+    pickup.setKillProgress!(required);
+    arena.update(0.3);
+    expect(view.userData.unlocked).toBe(true);
+    expect(view.children.find((child) => child.userData.mapRole === 'case-energy-burst')?.visible).toBe(true);
+    expect(weapon.visible).toBe(true);
+    expect(glass.position.y).toBe(1.05);
+    pickup.setKillProgress!(required + 1);
+    arena.update(1.3);
+    expect(view.children.filter((child) => child.userData.mapRole === 'case-lock').every((child) => !child.visible)).toBe(true);
+    expect(pickup.claim()).toBe(true);
+    expect(pickup.claim()).toBe(false);
+    arena.update(0.5);
+    expect(glass.position.y).toBeGreaterThan(1.05);
+    expect(weapon.visible).toBe(true);
+    expect(weapon.position.y).toBeGreaterThan(1.05);
+    arena.update(2);
+    expect(weapon.visible).toBe(false);
+    expect(collider.position.equals(colliderPosition)).toBe(true);
+    arena.reset();
+    expect(pickup.available).toBe(true);
+    expect(view.userData.unlocked).toBe(false);
+    expect(weapon.visible).toBe(true);
+    expect(weapon.scale.equals(scale)).toBe(true);
+    expect(glass.position.y).toBe(1.05);
+    expect(glass.rotation.x).toBeCloseTo(0);
+    expect(view.children.filter((child) => child.userData.mapRole === 'case-lock').every((child) => child.visible)).toBe(true);
   });
 
   it('places a reusable 800-point ammo refill in the starting room and resets its feedback', () => {

@@ -110,6 +110,7 @@ export const ca: Record<TranslationKey, string> = {
   'banner.pointsNeeded': 'CALEN {cost} PTS',
   'banner.ammoFull': 'MUNICIÓ COMPLETA',
   'banner.raygunUnlocked': 'RAY GUN DESBLOQUEJADA',
+  'prompt.weaponCaseLocked': '{label}\nBLOQUEJADA — {kills}/{required} baixes',
   'banner.kills': '{kills} BAIXES',
   'banner.godMode': 'MODE DÉU ACTIVAT',
   'banner.boxNotConfirmed': 'CAIXA NO CONFIRMADA',

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { t } from '../i18n/i18n';
-import { actionKey, doorPrompt, wallBuyPrompt } from '../ui/InteractionPrompts';
+import { actionKey, doorPrompt, wallBuyPrompt, weaponCaseLocked, weaponCasePrompt } from '../ui/InteractionPrompts';
 import type { ZombieMapId } from '../config/zombieMaps';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
@@ -391,6 +391,10 @@ export class ZombiesMode implements GameMode {
 
     const pickup = this.findFacingWeaponPickup();
     if (pickup) {
+      if (weaponCaseLocked(pickup, this.kills)) {
+        this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, this.kills, this.ctx.profile.useTouchControls));
+        return;
+      }
       if (!this.ctx.canGrantWeapon(pickup.weaponId)) {
         throw new Error(`Map pickup "${pickup.id}" references a weapon that is not preloaded`);
       }
@@ -474,7 +478,7 @@ export class ZombiesMode implements GameMode {
     }
 
     const pickup = this.findFacingWeaponPickup();
-    if (pickup) return t('prompt.pickup', { label: pickup.interactionLabel, key });
+    if (pickup) return weaponCasePrompt(pickup, this.kills, this.ctx.profile.useTouchControls);
 
     const ammoRefill = this.findFacingAmmoRefill();
     if (ammoRefill) return t('prompt.pickup', { label: ammoRefill.interactionLabel, key });
@@ -874,6 +878,7 @@ export class ZombiesMode implements GameMode {
   ): void {
     if (!this.isGameplayInputEnabled()) return;
     this.kills++;
+    for (const pickup of this.arena?.weaponPickups ?? []) pickup.setKillProgress?.(this.kills);
 
     if (headshot) {
       this.headshots++;

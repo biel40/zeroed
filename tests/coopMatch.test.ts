@@ -344,6 +344,7 @@ describe('co-op Burned Mansion interactions', () => {
     vi.mocked(match.hostSide.ctx.grantWeapon).mockReturnValue(true);
     const world = host(match).world;
     const pickup = world.arena.weaponPickups[0];
+    host(match).players.host.kills = pickup.requiredKills!;
     const door = world.findDoor(pickup.requiredDoorId!);
     if (!door) throw new Error('Bunker door missing');
     world.unlockDoor(door, () => true);
@@ -363,6 +364,51 @@ describe('co-op Burned Mansion interactions', () => {
     expect(guest(match).world.arena.weaponPickups[0].available).toBe(false);
     match.host.onInteract();
     expect(host(match).players.host.economy.points).toBe(0);
+  });
+
+  it.each([0, 1])('validates the guest own kills and wallet for special case %i', (index) => {
+    const match = startedMatch();
+    const authority = host(match);
+    const pickup = authority.world.arena.weaponPickups[index];
+    const required = pickup.requiredKills!;
+    const door = authority.world.findDoor(pickup.requiredDoorId!)!;
+    authority.world.unlockDoor(door, () => true);
+    authority.players.host.kills = 300;
+    authority.players.guest.kills = required - 1;
+    earn(authority.players.guest.economy, pickup.cost);
+    placePlayer(match.guestSide.player, pickup.position.x, pickup.position.z, pickup.floor, pickup.position.y - 1.1);
+    match.step(0.1, 3);
+    const request = { type: 'mapUse' as const, kind: 'pickup' as const, id: pickup.id, equippedWeapon: 'm1911' as const };
+    match.relay.host.onMessage?.(request);
+    match.relay.flush();
+    expect(pickup.available).toBe(true);
+    expect(authority.players.guest.economy.points).toBe(pickup.cost);
+    expect(authority.guestInventory.has(pickup.weaponId)).toBe(false);
+    expect(match.guest.getInteractPrompt()).toContain(`${required - 1}/${required} kills`);
+
+    authority.players.guest.kills = required;
+    authority.players.guest.economy.spend(10);
+    match.relay.host.onMessage?.(request);
+    match.relay.flush();
+    expect(pickup.available).toBe(true);
+    expect(authority.players.guest.economy.points).toBe(pickup.cost - 10);
+    authority.players.guest.economy.awardHit();
+    match.relay.host.onMessage?.(request);
+    match.step(0.1, 3);
+    expect(pickup.available).toBe(false);
+    expect(authority.players.guest.economy.points).toBe(0);
+    expect(authority.players.host.economy.points).toBe(0);
+    expect(authority.guestInventory.has(pickup.weaponId)).toBe(true);
+    expect(match.guestSide.ctx.grantWeapon).toHaveBeenCalledWith(pickup.weaponId);
+    expect(guest(match).world.arena.weaponPickups[index].available).toBe(false);
+    match.relay.host.onMessage?.(request);
+    match.step(0.1, 2);
+    expect(authority.players.guest.economy.points).toBe(0);
+    match.host.onRestartRequested();
+    match.step(0.1, 3);
+    expect(pickup.available).toBe(true);
+    expect(guest(match).world.arena.weaponPickups[index].available).toBe(true);
+    expect(authority.players.guest.kills).toBe(0);
   });
 
   it('ends the shared match when the final is bought', () => {
