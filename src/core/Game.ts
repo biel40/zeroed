@@ -11,6 +11,7 @@ import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
 import { Effects } from '../rendering/Effects';
+import { isFadeMaterial, setFadeBlending } from '../rendering/FadeMaterials';
 import { BallisticsSystem } from '../shooting/BallisticsSystem';
 import type { SurfaceType } from '../shooting/HitTarget';
 import { HUD } from '../ui/HUD';
@@ -279,20 +280,30 @@ export class Game {
    */
   public async prepare(): Promise<void> {
     const camera = this.player.camera;
-    await Promise.race([
+    const compile = (): Promise<unknown> => Promise.race([
       this.renderer.compileAsync(this.scene, camera).catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, SHADER_WARMUP_TIMEOUT_MS)),
     ]);
+    await compile();
     if (this.disposed) return;
     const textures = new Set<THREE.Texture>();
+    const fadeMaterials = new Set<THREE.Material>();
     this.scene.traverse((object) => {
       const material = (object as THREE.Mesh).material;
       for (const entry of Array.isArray(material) ? material : material ? [material] : []) {
+        if (isFadeMaterial(entry)) fadeMaterials.add(entry);
         for (const value of Object.values(entry)) {
           if ((value as THREE.Texture | null)?.isTexture) textures.add(value as THREE.Texture);
         }
       }
     });
+    // The blended variant is first used mid-game, when a corpse fades out.
+    if (fadeMaterials.size > 0) {
+      for (const material of fadeMaterials) setFadeBlending(material, true);
+      await compile();
+      for (const material of fadeMaterials) setFadeBlending(material, false);
+      if (this.disposed) return;
+    }
     for (const texture of textures) this.renderer.initTexture(texture);
     this.renderer.render(this.scene, camera);
     this.renderer.setAnimationLoop(this.tick);

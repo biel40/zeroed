@@ -181,6 +181,10 @@ export class AudioSystem {
   }
 
   public playShot(config: WeaponAudioConfig): void {
+    if (config.energy === 'raygun') {
+      this.playRayGunShot(config);
+      return;
+    }
     if (config.energy) {
       this.playEnergyShot(config);
       return;
@@ -417,21 +421,86 @@ export class AudioSystem {
     return Math.min(1, volume * RELOAD_VOLUME_BOOST);
   }
 
-  /** Ray Gun shot: bright descending zap with a short high sizzle. */
+  /** Arc weapon shot: bright descending zap with a short high sizzle. */
   private playEnergyShot(config: WeaponAudioConfig): void {
     this.sweep(0, 'sawtooth', 950, 170, config.volume * 0.45, 0.16);
     this.sweep(0, 'square', 1900, 340, config.volume * 0.16, 0.09);
     this.tick(0, 3900, config.volume * 0.18);
   }
 
-  /** Ray Gun impact: energetic pop with a low sub tail. */
+  /**
+   * Ray Gun shot: a warbling sawtooth zap dropping through a resonant
+   * low-pass sweep, over a sub punch, a bright sizzle and a softer echo zap.
+   */
+  private playRayGunShot(config: WeaponAudioConfig): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const { ctx, master } = audio;
+    const t: number = ctx.currentTime;
+    const volume: number = config.volume;
+
+    const zap: OscillatorNode = ctx.createOscillator();
+    zap.type = 'sawtooth';
+    zap.frequency.setValueAtTime(1500, t);
+    zap.frequency.exponentialRampToValueAtTime(140, t + 0.22);
+    // Fast vibrato that settles as the pitch falls: the unstable "wobble".
+    const vibrato: OscillatorNode = ctx.createOscillator();
+    vibrato.type = 'sine';
+    vibrato.frequency.setValueAtTime(42, t);
+    const vibratoDepth: GainNode = ctx.createGain();
+    vibratoDepth.gain.setValueAtTime(90, t);
+    vibratoDepth.gain.exponentialRampToValueAtTime(8, t + 0.22);
+    vibrato.connect(vibratoDepth);
+    vibratoDepth.connect(zap.frequency);
+    const filter: BiquadFilterNode = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.Q.value = 9;
+    filter.frequency.setValueAtTime(config.lowpass, t);
+    filter.frequency.exponentialRampToValueAtTime(320, t + 0.24);
+    const gain: GainNode = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume * 0.5, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    zap.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    zap.start(t);
+    vibrato.start(t);
+    zap.stop(t + 0.28);
+    vibrato.stop(t + 0.28);
+
+    this.sweep(0, 'sine', config.thump, 45, volume * 0.6, 0.16);
+    this.tick(0, 5200, volume * 0.22, 1.2, 0.07);
+    this.sweep(0, 'square', 2600, 900, volume * 0.08, 0.08);
+    this.sweep(0.075, 'triangle', 900, 160, volume * 0.16, 0.2);
+  }
+
+  /** Ray Gun impact: a plasma whoomph through a closing low-pass, sub drop and crackle. */
   public playRayImpact(): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
-    const t: number = audio.ctx.currentTime;
-    this.tick(0, 1500, 0.4);
-    this.tick(0.015, 420, 0.32);
-    this.sweep(0, 'sine', 120, 42, 0.5, 0.3, t);
+    const { ctx, master, noise } = audio;
+    const t: number = ctx.currentTime;
+    const source: AudioBufferSourceNode = ctx.createBufferSource();
+    source.buffer = noise;
+    const filter: BiquadFilterNode = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.Q.value = 1.2;
+    filter.frequency.setValueAtTime(2600, t);
+    filter.frequency.exponentialRampToValueAtTime(160, t + 0.4);
+    const gain: GainNode = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    source.start(t, Math.random() * 0.5, 0.45);
+
+    this.sweep(0, 'sine', 120, 38, 0.55, 0.38, t);
+    this.tick(0, 1500, 0.32);
+    this.tick(0.02, 3400, 0.18, 2, 0.06);
+    this.tick(0.05, 900, 0.16, 3, 0.08);
   }
 
   /**

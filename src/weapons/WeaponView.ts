@@ -6,6 +6,7 @@ import type { MagazineDropPool } from './MagazineDrop';
 import { buildAk47 } from './AK47ViewModel';
 import { buildL96 } from './L96ViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
+import { buildRayGun } from './RayGunViewModel';
 import { BOLT_REAR_FRACTION, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import type { Weapon } from './Weapon';
@@ -114,99 +115,12 @@ export interface BuiltProcedural {
   sightY: number;
   /** Emissive materials that pulse over time on procedural energy weapons. */
   energyMaterials?: THREE.MeshStandardMaterial[];
+  /** Emissive map scrolled over time so the energy visibly flows. */
+  energyFlow?: THREE.Texture;
   /** Reload parts the animator drives (magazine, feed cover, handle, cell). */
   reloadParts?: Partial<ReloadParts>;
   /** Pistol slide: kicks back per shot and is racked by the reload charge. */
   slide?: THREE.Object3D;
-}
-
-/**
- * Ray Gun view model: an original retro-futuristic homage built from
- * primitives — brushed-metal body, brass accents, glowing accelerator rings
- * around a tapered barrel and a caged power cell on top. No external assets.
- */
-function buildRaygun(config: ViewModelConfig): BuiltProcedural {
-  const group = new THREE.Group();
-  const glowColor = config.energyColor ?? 0x63f2a4;
-
-  const body = new THREE.MeshStandardMaterial({
-    color: config.bodyColor,
-    roughness: 0.34,
-    metalness: 0.85,
-  });
-  const brass = new THREE.MeshStandardMaterial({
-    color: config.accentColor,
-    roughness: 0.3,
-    metalness: 0.9,
-  });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.55, metalness: 0.4 });
-  const energyMaterials: THREE.MeshStandardMaterial[] = [];
-  const makeGlow = (): THREE.MeshStandardMaterial => {
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x0b0e12,
-      roughness: 0.4,
-      metalness: 0.2,
-      emissive: glowColor,
-      emissiveIntensity: 1.5,
-    });
-    energyMaterials.push(material);
-    return material;
-  };
-
-  const add = (
-    geometry: THREE.BufferGeometry,
-    material: THREE.Material,
-    x: number,
-    y: number,
-    z: number,
-    rx = 0,
-    rz = 0,
-  ): void => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    mesh.rotation.x = rx;
-    mesh.rotation.z = rz;
-    group.add(mesh);
-  };
-
-  // Grip and receiver.
-  add(new THREE.BoxGeometry(0.042, 0.115, 0.052), dark, 0, -0.078, 0.055, 0.32);
-  add(new THREE.BoxGeometry(0.058, 0.07, 0.21), body, 0, 0, -0.01);
-  // Brass fin strips along the receiver — pure pulp sci-fi.
-  for (const side of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.004, 0.05, 0.16), brass, side * 0.032, 0.012, -0.01);
-  }
-
-  // Tapered barrel with glowing accelerator rings.
-  add(new THREE.CylinderGeometry(0.024, 0.015, 0.18, 12), body, 0, 0.006, -0.2, Math.PI / 2);
-  const ringGeometry = new THREE.TorusGeometry(0.028, 0.0065, 8, 18);
-  for (const z of [-0.145, -0.2, -0.255]) {
-    add(ringGeometry, makeGlow(), 0, 0.006, z);
-  }
-  // Emitter tip.
-  add(new THREE.SphereGeometry(0.019, 10, 8), makeGlow(), 0, 0.006, -0.295);
-
-  // Caged power cell on top: glowing sphere inside a brass frame. The cell
-  // is the reloadable part — the animator lifts it out of the cage.
-  const cell = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), makeGlow());
-  cell.position.set(0, 0.062, 0.01);
-  group.add(cell);
-  add(new THREE.TorusGeometry(0.03, 0.004, 6, 16), brass, 0, 0.062, 0.01, Math.PI / 2);
-  add(new THREE.BoxGeometry(0.008, 0.028, 0.008), brass, 0, 0.032, 0.01);
-
-  // Rear coil housing + iron sights.
-  add(new THREE.CylinderGeometry(0.026, 0.03, 0.07, 10), brass, 0, 0.004, 0.115, Math.PI / 2);
-  add(new THREE.BoxGeometry(0.006, 0.02, 0.006), dark, 0, 0.062, -0.11);
-  add(new THREE.BoxGeometry(0.026, 0.018, 0.01), dark, 0, 0.06, 0.09);
-
-  return {
-    group,
-    muzzlePosition: new THREE.Vector3(0, 0.006, -0.31),
-    ejectionPosition: new THREE.Vector3(0.035, 0, 0.02),
-    sightY: 0.068,
-    energyMaterials,
-    reloadParts: { magazine: cell },
-  };
 }
 
 /**
@@ -1265,7 +1179,7 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
  */
 export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural {
   if (view.teslaFrame === 'tesla') return buildTesla(view);
-  if (view.energyColor !== undefined) return buildRaygun(view);
+  if (view.energyColor !== undefined) return buildRayGun(view);
   if (view.frame === 'pistol') return buildPistol(view);
   if (view.frame === 'lmg') return buildM60(view);
   if (view.frame === 'ak47') return buildAk47(view);
@@ -1349,6 +1263,9 @@ export class WeaponView {
   private swayY = 0;
   private pulseTime = 0;
   private readonly energyMaterials: THREE.MeshStandardMaterial[] = [];
+  private energyFlow: THREE.Texture | null = null;
+  /** 1 on a shot, decaying: the energy parts flare as the bolt leaves. */
+  private energySurge = 0;
   private slide: THREE.Object3D | null = null;
   private slideHomeZ = 0;
   private slideBlowback = 0;
@@ -1383,6 +1300,7 @@ export class WeaponView {
       this.ejectionPort.position.copy(built.ejectionPosition);
       this.adsPosition = new THREE.Vector3(view.ads[0], -built.sightY + view.ads[1], view.ads[2]);
       if (built.energyMaterials) this.energyMaterials.push(...built.energyMaterials);
+      this.energyFlow = built.energyFlow ?? null;
       if (built.slide) {
         this.slide = built.slide;
         this.slideHomeZ = built.slide.position.z;
@@ -1547,6 +1465,7 @@ export class WeaponView {
     this.spring.kick();
     // Pistol slide cycles with every shot.
     if (this.slide) this.slideBlowback = 1;
+    this.energySurge = 1;
   }
 
   /** Clears every transient pose when this view is hidden or the run resets. */
@@ -1558,6 +1477,7 @@ export class WeaponView {
     this.swayX = 0;
     this.swayY = 0;
     this.slideBlowback = 0;
+    this.energySurge = 0;
     this.boltEjected = false;
     if (this.slide) this.slide.position.z = this.slideHomeZ;
     this.root.position.copy(this.hipPosition);
@@ -1671,12 +1591,15 @@ export class WeaponView {
       }
     }
 
-    // Ray Gun power cell and rings pulse gently; the reload spin-up surges.
+    // Energy parts pulse gently, flare on each shot and surge during the
+    // reload spin-up; the plasma map drifts so the energy reads as flowing.
     if (this.energyMaterials.length > 0) {
       this.pulseTime += dt;
-      const pulse =
-        1.35 + Math.sin(this.pulseTime * 5) * 0.45 + (this.animator?.chargeGlow ?? 0) * 2.2;
+      this.energySurge *= Math.exp(-9 * dt);
+      const pulse = 1.35 + Math.sin(this.pulseTime * 5) * 0.45
+        + (this.animator?.chargeGlow ?? 0) * 2.2 + this.energySurge * 2.5;
       for (const material of this.energyMaterials) material.emissiveIntensity = pulse;
+      if (this.energyFlow) this.energyFlow.offset.y = (this.pulseTime * 0.22) % 1;
     }
 
     // Inside a real scope you would not see the rifle body at all.

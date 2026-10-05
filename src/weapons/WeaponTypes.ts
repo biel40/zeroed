@@ -68,8 +68,11 @@ export interface WeaponAudioConfig {
   readonly tail?: number;
   /** Optional volume of the reciprocating carrier slamming home after each shot. */
   readonly mechanism?: number;
-  /** Energy weapons get a sci-fi synth shot instead of a powder report. */
-  readonly energy?: boolean;
+  /**
+   * Energy weapons get a sci-fi synth shot instead of a powder report; the
+   * value picks the voice: the Ray Gun's warbling zap or the arc weapon's.
+   */
+  readonly energy?: 'raygun' | 'arc';
 }
 
 /** Behaviour of an energy projectile weapon (Ray Gun). Zombies mode only. */

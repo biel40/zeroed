@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { registerFadeMaterial, setFadeOpacity } from '../rendering/FadeMaterials';
 import type { ZombieState } from './Zombie';
 import { ShinyStars } from './ShinyStars';
 import { ZombieLimb } from './ZombieLimb';
@@ -121,9 +122,9 @@ function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
     color: EYE_SOCKET_COLOR,
     roughness: 1,
     metalness: 0,
-    transparent: true,
     side: THREE.DoubleSide,
   });
+  // Additive layers are order independent: one pass instead of back+front.
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: EYE_GLOW_COLOR,
     transparent: true,
@@ -132,6 +133,7 @@ function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
     depthWrite: false,
     toneMapped: false,
     side: THREE.DoubleSide,
+    forceSinglePass: true,
   });
   const coreMaterial = new THREE.MeshBasicMaterial({
     color: EYE_CORE_COLOR,
@@ -141,6 +143,7 @@ function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
     depthWrite: false,
     toneMapped: false,
     side: THREE.DoubleSide,
+    forceSinglePass: true,
   });
   for (const x of [-0.045, 0.045]) {
     const socket = new THREE.Mesh(eyeSocketGeometry, socketMaterial);
@@ -221,7 +224,6 @@ function buildProceduralHumanoid(
     color: tint,
     roughness: 0.92,
     metalness: 0,
-    transparent: true,
     emissive: FLASH_COLOR,
     emissiveIntensity: 0,
   });
@@ -229,7 +231,6 @@ function buildProceduralHumanoid(
     color: new THREE.Color(tint).multiplyScalar(0.5).getHex(),
     roughness: 0.98,
     metalness: 0,
-    transparent: true,
     emissive: FLASH_COLOR,
     emissiveIntensity: 0,
   });
@@ -317,7 +318,6 @@ function buildProceduralBrute(
     color: new THREE.Color(0x727c62).multiply(new THREE.Color(tint)),
     roughness: 0.96,
     metalness: 0,
-    transparent: true,
     emissive: FLASH_COLOR,
     emissiveIntensity: 0,
     flatShading: true,
@@ -326,7 +326,6 @@ function buildProceduralBrute(
     color: 0x202923,
     roughness: 1,
     metalness: 0,
-    transparent: true,
     emissive: FLASH_COLOR,
     emissiveIntensity: 0,
     flatShading: true,
@@ -475,6 +474,8 @@ export class ZombieVisual {
   private readonly boneBasis = new THREE.Quaternion();
   private readonly shinyStars: ShinyStars | null;
   private readonly eyeMaterials: readonly THREE.Material[];
+  /** Opaque while alive; blended only during the death fade. */
+  private readonly fadeMaterials: readonly THREE.Material[];
   private readonly tmpShinyAnchor = new THREE.Vector3();
   private readonly modelConfig: ZombieModelConfig;
   /** End of the head bone chain, when the rig has one (skull midpoint math). */
@@ -587,7 +588,6 @@ export class ZombieVisual {
           c.envMapIntensity = modelId === 'walker' ? 0.72 : Math.max(0.8, c.envMapIntensity);
           c.emissive = new THREE.Color(UNDEAD_GLOW);
           c.emissiveIntensity = modelId === 'walker' ? 0.12 : 0.2;
-          c.transparent = true;
           this.materials.push(c);
           return c;
         });
@@ -689,6 +689,9 @@ export class ZombieVisual {
     this.basePositions.push(...this.poseBones.map(bone => bone.position.clone()));
     this.baseScales.push(...this.poseBones.map(bone => bone.scale.clone()));
     this.eyeMaterials = eyes?.materials ?? [];
+    this.fadeMaterials = [...this.materials, ...this.eyeMaterials]
+      .filter((material) => material.blending === THREE.NormalBlending);
+    for (const material of this.fadeMaterials) registerFadeMaterial(material);
     this.root.updateMatrixWorld(true);
     if (eyes) placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
 
@@ -954,10 +957,9 @@ export class ZombieVisual {
   public setOpacity(opacity: number): void {
     if (this.shinyStars) this.shinyStars.points.material.opacity = opacity;
     for (const material of this.eyeMaterials) material.opacity = opacity;
-    for (const material of this.materials) {
-      material.opacity = opacity;
-      if (this.flash <= 0) material.emissiveIntensity = this.glowIntensity * opacity;
-    }
+    for (const material of this.fadeMaterials) setFadeOpacity(material, opacity);
+    if (this.flash > 0) return;
+    for (const material of this.materials) material.emissiveIntensity = this.glowIntensity * opacity;
   }
 
   public update(dt: number, speed: number): void {

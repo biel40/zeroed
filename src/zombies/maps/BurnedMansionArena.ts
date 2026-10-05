@@ -71,9 +71,14 @@ const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
 const DESKTOP_POINT_LIGHT_BUDGET = 6;
 const REDUCED_EFFECTS_POINT_LIGHT_BUDGET = 4;
 
+/** Score bonus that keeps an active light until a rival is clearly better. */
+const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
+
 interface RankedPointLight {
   readonly light: THREE.PointLight;
   readonly position: THREE.Vector3;
+  /** Flickering area lights rank by their authored intensity. */
+  readonly baseIntensity: number | undefined;
   score: number;
 }
 
@@ -758,7 +763,12 @@ export class BurnedMansionArena implements ZombieArena {
     );
 
     const slopeLength = Math.hypot(run, Math.abs(MANSION_BUNKER_Y));
-    const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.08, slopeLength), this.materials.metal);
+    // Raycast-only surface: drawn, its top face poked through every tread
+    // as thin wedges that shimmered without MSAA.
+    const ramp = new THREE.Mesh(
+      new THREE.BoxGeometry(2.15, 0.08, slopeLength),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
     ramp.position.set(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y / 2 - 0.04, (topZ + bottomZ) / 2);
     ramp.rotation.x = -Math.atan2(Math.abs(MANSION_BUNKER_Y), run);
     ramp.name = 'bunker-stair-navigation-ramp';
@@ -1365,6 +1375,7 @@ export class BurnedMansionArena implements ZombieArena {
       this.rankedPointLights.push({
         light: object,
         position: object.getWorldPosition(new THREE.Vector3()),
+        baseIntensity: this.areaLights.baseIntensityOf(object),
         score: 0,
       });
     });
@@ -1377,9 +1388,13 @@ export class BurnedMansionArena implements ZombieArena {
 
   private updatePointLightBudget(observerPosition: THREE.Vector3): void {
     for (const entry of this.rankedPointLights) {
+      // A light outside the observer's position still lights surfaces in
+      // view, so range weights the score instead of zeroing it: zero ties
+      // used to keep stale distant lights on. Flicker must not reorder lights.
       const distanceSq = entry.position.distanceToSquared(observerPosition);
-      const outsideRange = entry.light.distance > 0 && distanceSq > entry.light.distance ** 2;
-      entry.score = outsideRange ? 0 : entry.light.intensity / (1 + distanceSq);
+      const intensity = entry.baseIntensity ?? entry.light.intensity;
+      entry.score = intensity * entry.light.distance ** 2 / (1 + distanceSq)
+        * (entry.light.visible ? ACTIVE_POINT_LIGHT_HYSTERESIS : 1);
     }
     this.rankedPointLights.sort((left, right) => right.score - left.score);
     const budget = this.profile.useReducedEffects

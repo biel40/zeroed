@@ -610,6 +610,8 @@ describe('Burned Mansion topology', () => {
     const ramp = arena.group.getObjectByName('bunker-stair-navigation-ramp');
     expect(ramp?.userData.mapRole).toBe('walkable-stair-ramp');
     expect(ramp?.userData.walkableSurface).toBe(true);
+    // Drawn, its sloped top pokes through the back of every tread.
+    expect(((ramp as THREE.Mesh).material as THREE.Material).visible).toBe(false);
     expect(arena.group.children.filter((child) => child.name === 'bunker-stair-handrail')).toHaveLength(2);
   });
 
@@ -1023,6 +1025,34 @@ describe('Burned Mansion topology', () => {
     }
     expect(zombie.floor).toBe(-1);
     expect(zombie.position.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+  });
+
+  it.each([
+    { round: 1, typeId: 'shiny', startX: 3, startZ: -5.5 },
+    { round: 1, typeId: 'shiny', startX: 2.5, startZ: -7.9 },
+    { round: 5, typeId: 'brute', startX: 3, startZ: -5.5 },
+    { round: 5, typeId: 'brute', startX: 1.5, startZ: -8.8 },
+  ])('routes a $typeId from the west bunker around the stair wall to the upper floor', ({ round, typeId, startX, startZ }) => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const manager = new ZombieManager(() => 0, {}, false, [[-5.5, 18]], [], arena.floorTransitions, () => 0);
+    manager.registerColliders([...arena.colliders]);
+    manager.setNavigationBounds(arena.navigationBounds);
+    manager.spawnZombie(roundConfig(round), MANSION_STAIR_CENTER_X, -2.6, round);
+    const zombie = [...manager.actives][0];
+    expect(zombie.typeId).toBe(typeId);
+    zombie.state = 'walk';
+    zombie.floor = -1;
+    zombie.position.set(startX, MANSION_BUNKER_Y, startZ);
+
+    // The straight line to the stair bottom crosses the side-wall fill, so
+    // the portal must be routed rather than slid into until relocation.
+    for (let frame = 0; frame < 900 && zombie.floor !== 0; frame++) {
+      manager.update(1 / 60, MANSION_STAIR_CENTER_X, -2.6, 0, EYE_HEIGHT);
+    }
+    expect(zombie.floor).toBe(0);
+    expect(zombie.position.x).toBeGreaterThan(5);
+    expect(manager.stuckRecoveryCount).toBe(0);
   });
 
   it('makes a zombie clear the lower stair channel before turning toward the player', () => {
@@ -1590,6 +1620,24 @@ describe('Burned Mansion topology', () => {
     arena.update(1 / 60, new THREE.Vector3(MANSION_STAIR_CENTER_X, 0.6, -5.5));
     expect(pointLights.filter((light) => light.visible)).toHaveLength(6);
     expect(pointLights.some((light) => light.visible && light.position.z < -4)).toBe(true);
+  });
+
+  it('lights the stairwell from both floors without flicker-driven swaps', () => {
+    const arena = makeArena();
+    const pointLights: THREE.PointLight[] = [];
+    arena.group.traverse((object) => {
+      if (object instanceof THREE.PointLight) pointLights.push(object);
+    });
+    const stair = new THREE.Vector3(MANSION_STAIR_CENTER_X, 0.6, -5.5);
+    arena.update(1 / 60, stair);
+    const active = pointLights.filter((light) => light.visible);
+    // Nearest bulb on each floor; the sealed secret room stays out of budget.
+    expect(active.some((light) => light.position.y > 0 && light.position.x > 0 && light.position.z < -4)).toBe(true);
+    expect(active.some((light) => light.position.y < 0 && light.position.x > 0 && light.position.z < -4)).toBe(true);
+    expect(active.some((light) => light.name === 'secret-room-ambient-light')).toBe(false);
+
+    for (let frame = 0; frame < 600; frame++) arena.update(1 / 60, stair);
+    expect(pointLights.filter((light) => light.visible)).toEqual(active);
   });
 
   it('restores doors, active zones, colliders and barrier state on restart', () => {

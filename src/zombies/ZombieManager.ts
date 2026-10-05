@@ -975,15 +975,17 @@ export class ZombieManager {
     if (zombie.floor !== playerFloor) {
       const portal = this.findNextFloorTransition(zombie.floor, playerFloor);
       if (portal) {
-        const center = this.resolveTransitionTarget(portal, zombie, this.tmpToPlayer);
-        zombie.faceTowards(center.x, center.z, TURN_SPEED * dt);
-        const toPortal = this.tmpToPlayer.set(center.x - zombie.position.x, 0, center.z - zombie.position.z);
+        // Copied out: the direction below reuses the same scratch vector, and
+        // routing must receive the portal position, not the unit direction.
+        const { x: centerX, z: centerZ } = this.resolveTransitionTarget(portal, zombie, this.tmpToPlayer);
+        zombie.faceTowards(centerX, centerZ, TURN_SPEED * dt);
+        const toPortal = this.tmpToPlayer.set(centerX - zombie.position.x, 0, centerZ - zombie.position.z);
         // Ramp endpoints sit only 3 cm inside their volume. The generic
         // 10 cm tolerance stopped centered bodies before they reached it.
         const portalEpsilonSq = portal.ramp ? 0.0001 : 0.01;
         if (toPortal.lengthSq() > portalEpsilonSq) {
           toPortal.normalize();
-          this.seek(zombie, dt, toPortal, center.x, center.z, true);
+          this.seek(zombie, dt, toPortal, centerX, centerZ, true);
         }
       }
       return;

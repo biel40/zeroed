@@ -383,7 +383,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 600,
-    energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 1200, color: 0x63f2a4 },
+    energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 1200, color: 0x5cff3a },
     recoil: {
       verticalKick: 0.012,
       horizontalKick: 0.004,
@@ -405,18 +405,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 48, gravity: 0, maxDistance: 80, drag: 0 },
     moveSpeedMultiplier: 1,
     equipTime: 0.4,
-    audio: { volume: 0.5, duration: 0.22, lowpass: 4200, thump: 200, energy: true },
+    audio: { volume: 0.5, duration: 0.22, lowpass: 4200, thump: 200, energy: 'raygun' },
     view: {
-      // No GLB: dedicated procedural Ray Gun builder (see WeaponView).
-      energyColor: 0x63f2a4,
-      hip: [0.22, -0.2, -0.4],
+      // No GLB: dedicated procedural builder (RayGunViewModel). Body is the
+      // chipped red enamel, accent the worn fitting metal under it.
+      energyColor: 0x5cff3a,
+      hip: [0.25, -0.21, -0.42],
       ads: [0, 0, -0.28],
       sway: 0.9,
       bob: 1,
       visualRecoil: { kickImpulse: 0.7, pitchImpulse: 1.4, rollImpulse: 0.6, stiffness: 160, damping: 15 },
       scale: 1,
-      bodyColor: 0x8f9aa4,
-      accentColor: 0xb87333,
+      bodyColor: 0x9c2a1f,
+      accentColor: 0x7f766a,
       barrelLength: 0.16,
       barrelRadius: 0.02,
       receiverLength: 0.2,
@@ -435,7 +436,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         charge: 0.68,
         chargeEnd: 0.95,
         magSize: [0.048, 0.048, 0.048],
-        magColor: 0x63f2a4,
+        magColor: 0x5cff3a,
       },
     },
   },
@@ -486,7 +487,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 90, gravity: 0, maxDistance: 80, drag: 0 },
     moveSpeedMultiplier: 0.98,
     equipTime: 0.45,
-    audio: { volume: 0.6, duration: 0.2, lowpass: 5200, thump: 240, energy: true },
+    audio: { volume: 0.6, duration: 0.2, lowpass: 5200, thump: 240, energy: 'arc' },
     view: {
       // Dedicated procedural builder: exposed helical coil, removable caged
       // capacitor and fork emitter. No GLB, like the Ray Gun.

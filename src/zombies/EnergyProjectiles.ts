@@ -6,7 +6,9 @@ const MAX_PROJECTILES = 12;
 const MAX_BURSTS = 8;
 const BURST_LIFETIME = 0.35;
 const TRAIL_LENGTH = 1.4;
+const TRAIL_RADIUS = 0.05;
 const PROJECTILE_RADIUS = 0.07;
+const GLOW_SCALE = 0.42;
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 interface EnergyBolt {
@@ -86,6 +88,7 @@ export class EnergyProjectiles {
   private readonly segmentOrigin = new THREE.Vector3();
   private readonly segmentDirection = new THREE.Vector3();
   private boltCursor = 0;
+  private time = 0;
   private burstCursor = 0;
 
   constructor(
@@ -93,7 +96,9 @@ export class EnergyProjectiles {
     parent: THREE.Object3D,
   ) {
     const coreGeometry = new THREE.SphereGeometry(PROJECTILE_RADIUS, 10, 8);
-    const trailGeometry = new THREE.BoxGeometry(0.045, 0.045, TRAIL_LENGTH);
+    // Tapered streak: full width at the bolt (+Z), fading to a point behind.
+    const trailGeometry = new THREE.ConeGeometry(TRAIL_RADIUS, TRAIL_LENGTH, 10, 1, true);
+    trailGeometry.rotateX(-Math.PI / 2);
 
     for (let i = 0; i < MAX_PROJECTILES; i++) {
       const coreMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
@@ -115,7 +120,7 @@ export class EnergyProjectiles {
       });
       const core = new THREE.Mesh(coreGeometry, coreMaterial);
       const glow = new THREE.Sprite(glowMaterial);
-      glow.scale.setScalar(0.42);
+      glow.scale.setScalar(GLOW_SCALE);
       const trail = new THREE.Mesh(trailGeometry, trailMaterial);
       trail.frustumCulled = false;
       core.visible = false;
@@ -187,7 +192,9 @@ export class EnergyProjectiles {
   }
 
   update(dt: number): void {
-    for (const bolt of this.bolts) {
+    this.time += dt;
+    for (let index = 0; index < this.bolts.length; index++) {
+      const bolt = this.bolts[index];
       if (!bolt.active || !bolt.config) continue;
       const config = bolt.config;
 
@@ -225,6 +232,8 @@ export class EnergyProjectiles {
       } else {
         bolt.core.position.set(bolt.x, bolt.y, bolt.z);
         bolt.glow.position.set(bolt.x, bolt.y, bolt.z);
+        // Unstable plasma: the halo shimmers instead of holding a fixed size.
+        bolt.glow.scale.setScalar(GLOW_SCALE * (1 + Math.sin(this.time * 47 + index * 1.7) * 0.16));
         bolt.trail.position
           .set(bolt.x, bolt.y, bolt.z)
           .addScaledVector(this.segmentDirection, -TRAIL_LENGTH / 2);

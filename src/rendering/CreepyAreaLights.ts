@@ -50,6 +50,11 @@ export class CreepyAreaLights {
     });
   }
 
+  /** Authored intensity of a registered light, independent of the flicker. */
+  baseIntensityOf(light: THREE.PointLight): number | undefined {
+    return this.fixtures.find((fixture) => fixture.light === light)?.baseIntensity;
+  }
+
   update(dt: number): void {
     this.time += Math.max(0, dt);
     for (const fixture of this.fixtures) {

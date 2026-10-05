@@ -19,6 +19,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | AK-47 | Builder procedural dedicado `buildAk47` (frame `'ak47'`) en `src/weapons/AK47ViewModel.ts` | Original del proyecto | ~5.7k | Sin descarga |
 | M60 | — (builder procedural dedicado `buildM60` en `WeaponView.ts`; no se encontró LMG CC0 adecuada) | — | ~40 meshes | — |
 | M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
+| Ray Gun | Builder procedural dedicado `buildRayGun` en `src/weapons/RayGunViewModel.ts` | Original del proyecto | ~7k | Sin descarga |
 
 El GLB anterior de la M4A1, "Assault Rifle" (AssaultRifle2_1) de Quaternius
 (https://poly.pizza/m/Bgvuu4CUMV, CC0, 131 KB), se conserva en el repositorio
@@ -38,6 +39,12 @@ el guardamanos de dos piezas, el punto de mira con orejetas, la baqueta y el
 cargador curvo sobre un arco. La madera usa veta procedural y barniz
 (`clearcoat`); el acero, una textura de microdesgaste. Ambas se generan en
 canvas en runtime, sin descargas. Los mismos perfiles trazan su wall buy.
+
+La Ray Gun procedural combina carcasas de esmalte rojo desconchado, ventanas
+de plasma con un mapa emisivo que fluye, discos aceleradores, tres brazos con
+puas y una mira tubular abierta por la que se apunta. Pintura, desgaste y
+plasma se dibujan en canvas en runtime (`ProceduralTextures.ts`); su disparo e
+impacto son sintesis Web Audio propia, distinta del zap de la ZEUS-77.
 
 ## Modelos de zombies (`public/assets/zombies/`)
 

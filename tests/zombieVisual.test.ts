@@ -418,3 +418,31 @@ describe('ZombieVisual eyes vs authored assets', () => {
     expect(visual.root.getObjectByName('zombie-eyes')).toBeDefined();
   });
 });
+
+describe('ZombieVisual death fade', () => {
+  it('renders opaque while alive and blends only during the fade', () => {
+    const scene = makeSkinnedModel(1, 1.8);
+    const head = new THREE.Group();
+    head.name = 'Head';
+    scene.add(head);
+    for (const visual of [
+      new ZombieVisual('walker', { scene, clips: [] }, 0xffffff, false),
+      new ZombieVisual('brute', null, 0xffffff, false),
+    ]) {
+      const materials = new Set<THREE.Material>();
+      visual.root.traverse((object) => {
+        if (object instanceof THREE.Mesh) materials.add(object.material as THREE.Material);
+      });
+      const normal = [...materials].filter((material) => material.blending === THREE.NormalBlending);
+      const additive = [...materials].filter((material) => material.blending === THREE.AdditiveBlending);
+      expect(normal.length).toBeGreaterThan(0);
+      expect(normal.every((material) => !material.transparent)).toBe(true);
+      expect(additive.every((material) => material.transparent && material.forceSinglePass)).toBe(true);
+
+      visual.setOpacity(0.4);
+      expect(normal.every((material) => material.transparent && material.opacity === 0.4)).toBe(true);
+      visual.setOpacity(1);
+      expect(normal.every((material) => !material.transparent && material.opacity === 1)).toBe(true);
+    }
+  });
+});
