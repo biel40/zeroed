@@ -82,6 +82,12 @@ src/
 public/assets/            GLBs y texturas PBR (ver ASSETS.md).
 ```
 
+## Lista de correos beta
+
+Para añadir o retirar participantes, editar `BETA_EMAILS` en
+[`public/beta/emails.js`](../public/beta/emails.js), un correo por linea y en
+minusculas. La guia esta en [`public/beta/README.md`](../public/beta/README.md).
+
 ## Dos modos, un solo shell
 
 `Game` es agnóstico del modo. Cada modo implementa `GameMode` y recibe un
