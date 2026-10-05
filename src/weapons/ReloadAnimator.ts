@@ -171,8 +171,8 @@ export class ReloadAnimator {
     mag.quaternion.copy(home.quaternion);
     switch (this.config.style) {
       case 'rock':
-        // AK rock: pivot nose-forward around the front lug, then away.
-        mag.rotateX(-t * 0.9);
+        // AK rock: pivot on the front lug so the base swings forward, then away.
+        mag.rotateX(t * 0.9);
         mag.position.y -= t * height * 0.9;
         mag.position.z -= t * height * 0.35;
         break;
@@ -211,7 +211,7 @@ export class ReloadAnimator {
     const inv = 1 - t;
     switch (this.config.style) {
       case 'rock':
-        mag.rotateX(-inv * 0.9);
+        mag.rotateX(inv * 0.9);
         mag.position.y -= inv * height * 0.9;
         mag.position.z -= inv * height * 0.35;
         break;

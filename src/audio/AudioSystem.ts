@@ -222,6 +222,11 @@ export class AudioSystem {
     // the room keeps rumbling after it.
     if (config.crack) this.tick(0, 4600, config.crack, 0.7, 0.028);
     if (config.tail) this.playShotTail(config.volume, config.tail);
+    // Gas-operated actions: the carrier rides back and slams into battery.
+    if (config.mechanism) {
+      this.metalClang(0.038, 1250, config.mechanism, 0.05);
+      this.tick(0.052, 430, config.mechanism * 0.8, 3, 0.06);
+    }
   }
 
   /** Decaying room echo after a heavy report: sub boom, rumble and two early reflections. */
@@ -294,6 +299,10 @@ export class AudioSystem {
       }
       return;
     }
+    if (style === 'rock') {
+      this.playRockReloadPhase(phase, profile);
+      return;
+    }
     switch (phase) {
       case 'magOut':
         this.tick(0, profile.magOut, boost(0.24));
@@ -326,6 +335,46 @@ export class AudioSystem {
         break;
       case 'coverClose':
         this.metalClang(0, profile.coverClose, boost(0.3), 0.09);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * AK rock-and-lock foley: the catch paddle and the magazine rocking off
+   * its front lug, the fresh one hooking in and slapping home, then the long
+   * carrier stroke against its spring and the heavy slam into battery.
+   */
+  private playRockReloadPhase(phase: ReloadPhase, profile: ReloadProfile): void {
+    const boost = AudioSystem.boostReloadVolume;
+    switch (phase) {
+      case 'magOut':
+        this.metalClang(0.15, profile.magOut, boost(0.2), 0.07);
+        this.scrape(0.02, profile.magOut * 1.4, profile.magOut * 0.7, boost(0.2), 0.16);
+        this.tick(0, 2600, boost(0.16), 10, 0.03);
+        break;
+      case 'magDrop':
+        this.tick(0, profile.magDrop, boost(0.12), 4, 0.08);
+        break;
+      case 'magIn':
+        this.scrape(0, profile.magIn * 1.6, profile.magIn, boost(0.18), 0.12);
+        this.metalClang(0.1, profile.magIn * 1.5, boost(0.24), 0.06);
+        break;
+      case 'magSeat':
+        this.sweep(0, 'triangle', 140, 55, boost(0.4), 0.1);
+        this.metalClang(0, profile.magSeat, boost(0.42), 0.12);
+        this.tick(0.012, 2400, boost(0.2), 10, 0.04);
+        break;
+      case 'chargeStart':
+        this.metalClang(0, profile.chargeStart * 1.4, boost(0.26), 0.05);
+        this.scrape(0.01, 1500, 2600, boost(0.22), 0.2);
+        this.metalClang(0.22, profile.chargeStart * 0.8, boost(0.28), 0.07);
+        break;
+      case 'chargeEnd':
+        this.sweep(0, 'triangle', 170, 50, boost(0.5), 0.12);
+        this.metalClang(0, profile.chargeEnd * 0.6, boost(0.48), 0.13);
+        this.metalClang(0.01, profile.chargeEnd * 1.3, boost(0.24), 0.08);
         break;
       default:
         break;

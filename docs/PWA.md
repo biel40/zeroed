@@ -55,3 +55,17 @@ npx pwa-assets-generator --preset minimal-2023 public/favicon.svg
 ```
 
 Android usa Capacitor; ver `ANDROID_DOCS.md`.
+
+## Avatar para Instagram
+
+El [PNG de perfil](../output/instagram/zeroed-profile.png) es una exportacion
+independiente de 1080 x 1080, con fondo opaco y margen para el recorte circular.
+No usar el icono PWA para este fin: sus esquinas transparentes pueden aparecer
+blancas. No se modifican los iconos de instalacion.
+
+La fuente editable es [zeroed-profile.svg](../output/instagram/zeroed-profile.svg).
+Para regenerar el PNG con `sharp`, disponible con las herramientas de assets:
+
+```powershell
+node --input-type=module -e "import sharp from 'sharp'; await sharp('output\\instagram\\zeroed-profile.svg').flatten({ background: '#0a1020' }).png().toFile('output\\instagram\\zeroed-profile.png');"
+```

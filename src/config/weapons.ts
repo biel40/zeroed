@@ -185,24 +185,28 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 715, gravity: 9.8, maxDistance: 400, drag: 0.05 },
     moveSpeedMultiplier: 0.96,
     equipTime: 0.4,
-    audio: { volume: 0.6, duration: 0.1, lowpass: 2600, thump: 130 },
+    // 7.62x39 bark: lower and heavier than the 5.56 M4, a short crack, the
+    // long-stroke carrier slamming home and a brief room echo.
+    audio: { volume: 0.66, duration: 0.12, lowpass: 2300, thump: 104, crack: 0.24, tail: 0.42, mechanism: 0.2 },
     view: {
-      hip: [0.25, -0.22, -0.44],
+      // No GLB: dedicated AK-47 Type 3 builder (see AK47ViewModel.ts).
+      hip: [0.19, -0.195, -0.4],
       ads: [0, 0, -0.3],
       sway: 1.05,
       bob: 1,
       visualRecoil: { kickImpulse: 1.25, pitchImpulse: 2.4, rollImpulse: 0.9, stiffness: 140, damping: 13 },
       scale: 1,
-      // Parkerized near-black steel + reddish-brown birch laminate (Type 3).
-      bodyColor: 0x1c1e21,
-      accentColor: 0x6a3d1d,
+      // Blued steel (a metal's color is its reflectance, so it reads dark
+      // without being black) + lacquered reddish birch (grain is procedural).
+      bodyColor: 0x3a3e43,
+      accentColor: 0x7e3f1e,
       barrelLength: 0.415,
-      barrelRadius: 0.011,
-      receiverLength: 0.26,
-      stockLength: 0.22,
+      barrelRadius: 0.0105,
+      receiverLength: 0.28,
+      stockLength: 0.23,
       magazine: 'curved',
       optic: 'irons',
-      sightHeight: 0.07,
+      sightHeight: 0.046,
       bulk: 1.02,
       frame: 'ak47',
       reloadAnim: {
@@ -213,9 +217,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         magSeat: 0.6,
         charge: 0.68,
         chargeEnd: 0.92,
-        magSize: [0.042, 0.16, 0.052],
-        // Worn stamped-steel 30-round magazine: dark, faintly metallic.
-        magColor: 0x2b2d30,
+        magSize: [0.03, 0.19, 0.059],
+        // Blued stamped-steel 30-round magazine, a shade lighter than the receiver.
+        magColor: 0x404347,
       },
     },
   },

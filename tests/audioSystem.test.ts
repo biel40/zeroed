@@ -379,7 +379,7 @@ describe('AudioSystem reload sound profiles', () => {
       createBuffer: () => ({ getChannelData: () => new Float32Array(1) }),
       createBiquadFilter: () => ({
         type: 'bandpass',
-        frequency: { value: 0 },
+        frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
         Q: { value: 0 },
         connect: vi.fn(),
       }),

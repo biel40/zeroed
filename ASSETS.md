@@ -16,7 +16,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | --- | --- | --- | --- | --- |
 | M4A1 | Builder procedural dedicado `buildM4A1` en `src/weapons/M4A1ViewModel.ts` | Original del proyecto | 1984 | Sin descarga |
 | L96 | Builder procedural dedicado `buildL96` (frame `'l96'`) en `src/weapons/L96ViewModel.ts` | Original del proyecto | ~4.5k | Sin descarga |
-| AK-47 | — (builder procedural dedicado `buildAk47`, frame `'ak47'`, en `WeaponView.ts`; el GLB de Quaternius leía como híbrido AKS-74U y se retiró) | — | primitivas low-poly | — |
+| AK-47 | Builder procedural dedicado `buildAk47` (frame `'ak47'`) en `src/weapons/AK47ViewModel.ts` | Original del proyecto | ~5.7k | Sin descarga |
 | M60 | — (builder procedural dedicado `buildM60` en `WeaponView.ts`; no se encontró LMG CC0 adecuada) | — | ~40 meshes | — |
 | M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
 
@@ -30,12 +30,14 @@ extraíble, el bípode plegado y un cerrojo que gira sobre el eje del ánima. Su
 perfiles laterales (`L96_PROFILE`) también trazan la silueta de su wall buy.
 
 Los materiales PBR (metalness/roughness por nombre de material) se ajustan en
-tiempo de carga en `src/weapons/WeaponView.ts`. La AK-47 es íntegramente
-procedural (Tipo 3: culata fija de madera, guardamanos de dos piezas sobre el
-gas tube, cañón largo con poste protegido, alza tangente y cargador "banana"
-de 30 cartuchos) con **acabado de armas reales**: acero parkerizado casi negro
-(metalness alto, roughness bajo, `envMapIntensity` reforzado) y madera laminada
-rojiza satinada que contrasta con el metal.
+tiempo de carga en `src/weapons/WeaponView.ts`. La AK-47 Tipo 3 es íntegramente
+procedural y sus perfiles (`AK47_PROFILE`) se trazaron sobre una foto de
+referencia a ~1 mm/px (880 mm totales). Reproduce el receptor fresado con sus
+rebajes, la tapa redondeada, el alza tangente con muesca en U, el tubo de gases,
+el guardamanos de dos piezas, el punto de mira con orejetas, la baqueta y el
+cargador curvo sobre un arco. La madera usa veta procedural y barniz
+(`clearcoat`); el acero, una textura de microdesgaste. Ambas se generan en
+canvas en runtime, sin descargas. Los mismos perfiles trazan su wall buy.
 
 ## Modelos de zombies (`public/assets/zombies/`)
 

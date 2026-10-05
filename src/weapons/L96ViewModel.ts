@@ -1,11 +1,9 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { cylinderZ, extrudeProfile, profilePath, profileShape, strut, type ProfilePoint } from './ProfileGeometry';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
-
-/** Side-profile point: [z, y] in meters. -Z is the muzzle, y = 0 the bore axis. */
-type ProfilePoint = readonly [number, number];
 
 /** The AI chassis stock is noticeably wider than the action it carries. */
 const STOCK_WIDTH = 0.055;
@@ -53,56 +51,6 @@ export const L96_PROFILE = {
   /** Folded Harris-style bipod under the forend. */
   bipod: { mountZ: -0.43, footZ: -0.69, legY: -0.068 },
 } as const;
-
-/** Shape in the profile plane: x = -z so the extrusion maps back to +Z after rotateY. */
-function profileShape(points: readonly ProfilePoint[]): THREE.Shape {
-  const shape = new THREE.Shape();
-  shape.moveTo(-points[0][0], points[0][1]);
-  for (const [z, y] of points.slice(1)) shape.lineTo(-z, y);
-  shape.closePath();
-  return shape;
-}
-
-function profilePath(points: readonly ProfilePoint[]): THREE.Path {
-  const path = new THREE.Path();
-  path.moveTo(-points[0][0], points[0][1]);
-  for (const [z, y] of points.slice(1)) path.lineTo(-z, y);
-  path.closePath();
-  return path;
-}
-
-/** Extrudes a side profile across X, centered on the bore plane, with a soft edge chamfer. */
-function extrudeProfile(shape: THREE.Shape, width: number, bevel = 0): THREE.ExtrudeGeometry {
-  const depth = width - bevel * 2;
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: bevel > 0,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: 2,
-    curveSegments: 8,
-    steps: 1,
-  });
-  geometry.translate(0, 0, -depth / 2);
-  geometry.rotateY(Math.PI / 2);
-  return geometry;
-}
-
-/** Cylinder along Z; the first radius is the rear (+Z) end. */
-function cylinderZ(rearRadius: number, frontRadius: number, length: number, segments = 14): THREE.CylinderGeometry {
-  const geometry = new THREE.CylinderGeometry(rearRadius, frontRadius, length, segments);
-  geometry.rotateX(Math.PI / 2);
-  return geometry;
-}
-
-/** Cylinder spanning two points (bolt arm, bipod braces). */
-function strut(from: THREE.Vector3, to: THREE.Vector3, radius: number): THREE.CylinderGeometry {
-  const direction = to.clone().sub(from);
-  const geometry = new THREE.CylinderGeometry(radius, radius, direction.length(), 10);
-  geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()));
-  geometry.translate((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
-  return geometry;
-}
 
 /**
  * L96A1 view model: olive thumbhole stock, flat-sided action with a full

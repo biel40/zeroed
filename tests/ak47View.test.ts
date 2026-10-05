@@ -1,262 +1,195 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { AudioSystem } from '../src/audio/AudioSystem';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
+import { AK47_PROFILE, ak47MagazineOutline } from '../src/weapons/AK47ViewModel';
+import { ReloadAnimator } from '../src/weapons/ReloadAnimator';
+import type { Weapon } from '../src/weapons/Weapon';
 import { buildProceduralViewModel, buildWeaponDisplayModel } from '../src/weapons/WeaponView';
 import { WallBuy } from '../src/zombies/wallbuys/WallBuy';
 import { WallBuyView } from '../src/zombies/wallbuys/WallBuyView';
 
 /**
- * Contract tests for the procedural AK-47 (Type 3) view model. The old
- * Quaternius GLB read as an AKS-74U hybrid: blocky receiver, short barrel,
- * prism stock. The dedicated builder must produce the classic full-size
- * silhouette — fixed wood stock, two-piece handguard over a visible gas
- * tube, full-length barrel with a protected front post, tangent rear sight
- * and a pronounced banana magazine — with every piece under one root group.
+ * Contract tests for the procedural AK-47 Type 3: real proportions traced
+ * from a reference photo, a clean iron-sight picture, the curved magazine
+ * seated under the receiver, and the rock-in reload driving its live parts.
  */
 
 const definition = WEAPON_DEFINITIONS.ak47;
-const SIGHT_Y = definition.view.sightHeight * definition.view.scale;
+const view = definition.view;
 
-interface MeshBounds {
-  name: string;
-  center: THREE.Vector3;
-  size: THREE.Vector3;
+function fakeWeapon(state: Weapon['state'], stateProgress: number): Weapon {
+  return { state, stateProgress, adsAlpha: 0, reloadType: 'empty' } as Weapon;
 }
 
-function meshBounds(root: THREE.Object3D): MeshBounds[] {
-  root.updateMatrixWorld(true);
-  const out: MeshBounds[] = [];
-  root.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      const box = new THREE.Box3().setFromObject(object);
-      out.push({
-        name: object.name,
-        center: box.getCenter(new THREE.Vector3()),
-        size: box.getSize(new THREE.Vector3()),
-      });
-    }
-  });
-  return out;
+function worldBox(object: THREE.Object3D): THREE.Box3 {
+  object.updateWorldMatrix(true, true);
+  return new THREE.Box3().setFromObject(object);
 }
 
-describe('AK-47 procedural view model', () => {
-  it('dispatches to the dedicated builder through the shared entry point', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const receiver = built.group.getObjectByName('ak47-receiver') as THREE.Mesh;
-    expect(receiver).toBeTruthy();
-    expect(receiver.geometry.type).toBe('ExtrudeGeometry');
-  });
-
-  it('lays out the classic full-size silhouette along -Z: butt → muzzle', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const bounds = meshBounds(built.group);
-    const stock = bounds.find((m) => m.name === 'ak47-stock')!;
-    const receiver = bounds.find((m) => m.name === 'ak47-receiver')!;
-    const lower = bounds.find((m) => m.name === 'ak47-handguard-lower')!;
-    const barrel = bounds.find((m) => m.name === 'ak47-barrel')!;
-    const grip = bounds.find((m) => m.name === 'ak47-grip')!;
-
-    // stock → receiver → handguard → barrel, strictly rear to front.
-    expect(stock.center.z).toBeGreaterThan(receiver.center.z);
-    expect(receiver.center.z).toBeGreaterThan(lower.center.z);
-    expect(lower.center.z).toBeGreaterThan(barrel.center.z);
-    // The grip hangs below the receiver, behind the magazine well.
-    expect(grip.center.y).toBeLessThan(receiver.center.y);
-    expect(grip.center.z).toBeGreaterThan(0);
-    // Full-size barrel: the exposed tube runs well past the handguard.
-    expect(barrel.center.z - barrel.size.z / 2).toBeLessThan(lower.center.z - lower.size.z / 2);
-  });
-
-  it('joins every assembly: no floating pieces along the weapon spine', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const bounds = meshBounds(built.group);
-    // From butt to muzzle, consecutive spine pieces must overlap in Z.
-    const spine = ['ak47-stock', 'ak47-receiver', 'ak47-handguard-lower', 'ak47-barrel']
-      .map((n) => bounds.find((m) => m.name === n)!)
-      .sort((a, b) => b.center.z - a.center.z);
-    for (let i = 0; i < spine.length - 1; i++) {
-      const rear = spine[i];
-      const front = spine[i + 1];
-      const rearFront = rear.center.z - rear.size.z / 2;
-      const frontRear = front.center.z + front.size.z / 2;
-      expect(frontRear).toBeGreaterThan(rearFront);
+describe('AK-47 view model', () => {
+  it('builds the dedicated rifle with its animated assemblies', () => {
+    expect(view.modelUrl).toBeUndefined();
+    const built = buildProceduralViewModel(view);
+    expect(built.group.name).toBe('ak47-root');
+    for (const name of ['stock', 'grip', 'receiver', 'barrel', 'charging-handle', 'magazine']) {
+      expect(built.group.getObjectByName(`ak47-${name}`), name).toBeDefined();
     }
+    expect(built.reloadParts?.magazine).toBe(built.group.getObjectByName('ak47-magazine'));
+    expect(built.reloadParts?.handle).toBe(built.group.getObjectByName('ak47-charging-handle'));
+    // The charging handle rides the right flank, like the real rifle.
+    expect(worldBox(built.reloadParts!.handle!).max.x).toBeGreaterThan(0.025);
   });
 
-  it('runs a visible gas tube over the barrel, into the upper handguard', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const bounds = meshBounds(built.group);
-    const tube = bounds.find((m) => m.name === 'ak47-gas-tube')!;
-    const barrel = bounds.find((m) => m.name === 'ak47-barrel')!;
-    const upper = bounds.find((m) => m.name === 'ak47-handguard-upper')!;
-    const gasBlock = bounds.find((m) => m.name === 'ak47-gas-block')!;
-
-    // Tube above the bore line, handguard wood wrapping it mid-run.
-    expect(tube.center.y).toBeGreaterThan(barrel.center.y);
-    const upperFront = upper.center.z - upper.size.z / 2;
-    const upperRear = upper.center.z + upper.size.z / 2;
-    expect(tube.center.z - tube.size.z / 2).toBeLessThan(upperFront); // enters the gas block zone
-    expect(tube.center.z + tube.size.z / 2).toBeGreaterThan(upperRear); // exits into the sight block
-    // Gas block straddles barrel and tube ahead of the handguard.
-    expect(gasBlock.center.z).toBeLessThan(upperFront);
-    expect(gasBlock.center.y + gasBlock.size.y / 2).toBeGreaterThan(tube.center.y);
-    expect(gasBlock.center.y - gasBlock.size.y / 2).toBeLessThan(barrel.center.y);
+  it('matches the real rifle: 880 mm overall, slim receiver, muzzle at the nut', () => {
+    const built = buildProceduralViewModel(view);
+    const size = worldBox(built.group).getSize(new THREE.Vector3());
+    expect(size.z).toBeGreaterThan(0.86);
+    expect(size.z).toBeLessThan(0.91);
+    expect(size.x).toBeLessThan(0.07);
+    expect(built.muzzlePosition.z).toBeLessThan(AK47_PROFILE.muzzleNut.frontZ);
+    expect(built.muzzlePosition.y).toBeCloseTo(0, 6);
   });
 
-  it('puts a protected front post at the muzzle, tip exactly on the sight line', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const bounds = meshBounds(built.group);
-    const barrel = bounds.find((m) => m.name === 'ak47-barrel')!;
-    const post = bounds.find((m) => m.name === 'ak47-front-sight-post')!;
-    const wings = bounds.filter((m) => m.name === 'ak47-front-sight-wing');
-
-    // Post sits near the muzzle (not mid-barrel like an AKS-74U assembly).
-    const muzzleZ = barrel.center.z - barrel.size.z / 2;
-    expect(post.center.z).toBeLessThan(barrel.center.z);
-    expect(post.center.z).toBeLessThan(muzzleZ + 0.08);
-    expect(post.center.y + post.size.y / 2).toBeCloseTo(SIGHT_Y, 3);
-    // Protected: a wing on each side, just below the post tip.
-    expect(wings).toHaveLength(2);
-    for (const wing of wings) {
-      expect(wing.center.y + wing.size.y / 2).toBeLessThanOrEqual(SIGHT_Y + 1e-6);
-      expect(Math.abs(wing.center.x)).toBeGreaterThan(0);
-    }
+  it('tops out exactly on the sight line, so ADS sees post and notch level', () => {
+    const built = buildProceduralViewModel(view);
+    expect(built.sightY).toBeCloseTo(view.sightHeight, 6);
+    expect(worldBox(built.group).max.y).toBeCloseTo(built.sightY, 4);
   });
 
-  it('carries a tangent rear sight whose notch rides the sight line', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const bounds = meshBounds(built.group);
-    const leaf = bounds.find((m) => m.name === 'ak47-tangent-leaf')!;
-    const ears = bounds.filter((m) => m.name === 'ak47-tangent-ear');
-    const handguard = bounds.find((m) => m.name === 'ak47-handguard-lower')!;
+  it('hangs a forward-curving magazine whose top stays below the lightening cuts', () => {
+    const outline = ak47MagazineOutline();
+    const { wellY, hidden, length } = AK47_PROFILE.magazine;
+    const cutBottom = Math.min(...AK47_PROFILE.lighteningCut.map(([, y]) => y));
+    expect(Math.max(...outline.map(([, y]) => y))).toBeCloseTo(hidden, 6);
+    expect(wellY + hidden).toBeLessThan(cutBottom);
 
-    // The tangent sits between receiver front and handguard rear.
-    expect(leaf.center.z).toBeLessThan(0);
-    expect(leaf.center.z).toBeGreaterThan(handguard.center.z - handguard.size.z / 2);
-    expect(leaf.center.y).toBeGreaterThan(0.04);
-    // Two ears leave the rear notch; nothing may rise above the post line.
-    expect(ears).toHaveLength(2);
-    for (const ear of ears) {
-      expect(ear.center.y + ear.size.y / 2).toBeLessThanOrEqual(SIGHT_Y + 1e-6);
-      expect(ear.center.y + ear.size.y / 2).toBeGreaterThan(SIGHT_Y - 0.012);
-    }
+    // Front edge: every step down also moves forward, faster near the base.
+    const front = outline.slice(1, outline.length / 2);
+    const slopes = front.slice(1).map(([z, y], i) => (front[i][0] - z) / (front[i][1] - y));
+    for (const slope of slopes) expect(slope).toBeGreaterThan(0);
+    expect(slopes[slopes.length - 1]).toBeGreaterThan(slopes[0] * 1.5);
+    const built = buildProceduralViewModel(view);
+    const box = worldBox(built.reloadParts!.magazine!);
+    expect(box.min.y).toBeLessThan(wellY - length * 0.8);
   });
 
-  it('keeps every part at or below the front-post sight line (clean ADS)', () => {
-    const built = buildProceduralViewModel(definition.view);
-    for (const m of meshBounds(built.group)) {
-      expect(m.center.y + m.size.y / 2).toBeLessThanOrEqual(SIGHT_Y + 1e-3);
-    }
-  });
-
-  it('keeps the procedural detail within a mobile-friendly geometry budget', () => {
-    const built = buildProceduralViewModel(definition.view);
+  it('keeps the procedural detail within a mobile-friendly budget', () => {
+    const built = buildProceduralViewModel(view);
     let meshes = 0;
     let triangles = 0;
-    built.group.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
+    built.group.traverse((part) => {
+      if (!(part instanceof THREE.Mesh)) return;
       meshes++;
-      triangles += object.geometry.index
-        ? object.geometry.index.count / 3
-        : object.geometry.attributes.position.count / 3;
+      triangles += (part.geometry.index?.count ?? part.geometry.attributes.position.count) / 3;
     });
-
-    expect(meshes).toBeLessThanOrEqual(50);
-    expect(triangles).toBeLessThanOrEqual(6000);
+    expect(meshes).toBeLessThanOrEqual(16);
+    expect(triangles).toBeLessThan(6500);
   });
 
-  it('hangs a strongly curved banana magazine from the well', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const mag = built.group.getObjectByName('ak47-magazine') as THREE.Group;
-    expect(mag).toBeTruthy();
-    expect(mag.getObjectByName('ak47-magazine-body')).toBeTruthy();
-    const segments = mag.children.filter((c) => c.name === 'ak47-magazine-segment');
-    expect(segments.length).toBeGreaterThanOrEqual(4);
+  it('rocks the magazine out base-first and reseats it', () => {
+    const built = buildProceduralViewModel(view);
+    const magazine = built.reloadParts!.magazine!;
+    const home = magazine.position.clone();
+    const homeFront = worldBox(magazine).min.z;
+    const animator = new ReloadAnimator(view.reloadAnim!, { magazine, handle: built.reloadParts!.handle!, cover: null }, null);
+    const anim = view.reloadAnim!;
 
-    mag.updateMatrixWorld(true);
-    const centers = segments.map((s) => s.getWorldPosition(new THREE.Vector3()));
-    // Each segment hangs lower AND further forward (-Z) than the previous:
-    // the defining 7.62×39 banana curve.
-    for (let i = 1; i < centers.length; i++) {
-      expect(centers[i].y).toBeLessThan(centers[i - 1].y);
-      expect(centers[i].z).toBeLessThan(centers[i - 1].z);
-    }
-    // Pronounced sweep: the floor plate sits well ahead of the feed lips.
-    expect(centers[0].z - centers[centers.length - 1].z).toBeGreaterThan(0.08);
-    // Well placement: ahead of the trigger guard, lips inside the receiver.
-    expect(mag.position.z).toBeLessThan(0);
+    animator.update(fakeWeapon('reloading', (anim.magOut + anim.magDrop) / 2));
+    expect(worldBox(magazine).min.z).toBeLessThan(homeFront);
+    expect(magazine.position.y).toBeLessThan(home.y);
+
+    animator.update(fakeWeapon('reloading', anim.magSeat + 0.01));
+    expect(magazine.position.toArray()).toEqual(home.toArray());
   });
 
-  it('exposes the banana magazine and charging handle as live reload parts', () => {
-    const built = buildProceduralViewModel(definition.view);
-    expect(built.reloadParts?.magazine?.name).toBe('ak47-magazine');
-    expect(built.reloadParts?.handle?.name).toBe('ak47-charging-handle');
-    // The handle rides the right flank so the rock-and-lock rack reads.
-    expect(built.reloadParts!.handle!.position.x).toBeGreaterThan(0);
-  });
+  it('racks the charging handle and carrier rearward and returns them', () => {
+    const built = buildProceduralViewModel(view);
+    const handle = built.reloadParts!.handle!;
+    const homeZ = handle.position.z;
+    const animator = new ReloadAnimator(view.reloadAnim!, { magazine: built.reloadParts!.magazine!, handle, cover: null }, null);
+    const anim = view.reloadAnim!;
 
-  it('reports the muzzle at the muzzle-nut tip, ahead of the barrel', () => {
-    const built = buildProceduralViewModel(definition.view);
-    const barrel = meshBounds(built.group).find((m) => m.name === 'ak47-barrel')!;
-    const barrelTip = barrel.center.z - barrel.size.z / 2;
-    expect(built.muzzlePosition.z).toBeLessThan(barrelTip);
-    expect(built.muzzlePosition.y).toBeCloseTo(barrel.center.y, 2);
+    animator.update(fakeWeapon('reloading', anim.charge + (anim.chargeEnd - anim.charge) * 0.45));
+    expect(handle.position.z - homeZ).toBeGreaterThan(0.03);
+    animator.update(fakeWeapon('reloading', anim.chargeEnd));
+    expect(handle.position.z).toBeCloseTo(homeZ, 6);
   });
 
   it('builds the same AK for world display models (Mystery Box, pickups)', () => {
     const display = buildWeaponDisplayModel(definition, null, 0.72);
-    expect(display.getObjectByName('ak47-receiver')).toBeTruthy();
-    expect(display.getObjectByName('ak47-stock')).toBeTruthy();
-    expect(display.getObjectByName('ak47-magazine')).toBeTruthy();
-    const size = new THREE.Box3().setFromObject(display).getSize(new THREE.Vector3());
-    expect(size.z).toBeGreaterThan(size.x); // long gun, not a stub
+    expect(display.getObjectByName('ak47-root')).toBeDefined();
+    const size = worldBox(display).getSize(new THREE.Vector3());
+    expect(size.z).toBeGreaterThan(size.x * 5);
   });
 });
 
 describe('AK-47 wall-buy silhouette', () => {
-  it('renders the dedicated AK profile instead of the generic long-gun', () => {
-    const parent = new THREE.Group();
+  it('traces the rifle from the shared profile, stock to front sight', () => {
     const buy = new WallBuy({
-      id: 'test-ak47',
-      weaponId: 'ak47',
-      price: 300,
-      ammoPrice: 150,
-      position: { x: 0, y: 0, z: 0 },
-      yaw: 0,
-      floor: 0,
+      id: 'test-ak47', weaponId: 'ak47', price: 300, ammoPrice: 150, position: { x: 0, y: 0, z: 0 }, yaw: 0, floor: 0,
     });
-    const view = new WallBuyView(buy, definition, parent);
+    const wall = new WallBuyView(buy, definition, new THREE.Group());
 
-    expect(view.group.userData.silhouette).toBe('ak47');
-    // The required read: stock → receiver → curved mag → handguard/gas → barrel/post.
-    expect(view.group.getObjectByName('ak47-stock')).toBeTruthy();
-    expect(view.group.getObjectByName('ak47-receiver')).toBeTruthy();
-    expect(view.group.getObjectByName('ak47-handguard')).toBeTruthy();
-    expect(view.group.getObjectByName('ak47-gas-tube')).toBeTruthy();
-    expect(view.group.getObjectByName('ak47-barrel')).toBeTruthy();
-    expect(view.group.getObjectByName('ak47-front-sight')).toBeTruthy();
-    expect(view.group.getObjectByName('ak47-tangent-sight')).toBeTruthy();
-
-    // The magazine is a multi-plate banana, not one straight slab.
-    const magPlates: THREE.Object3D[] = [];
-    view.group.traverse((o) => {
-      if (o.name === 'ak47-magazine') magPlates.push(o);
-    });
-    expect(magPlates.length).toBeGreaterThanOrEqual(3);
-    view.group.updateMatrixWorld(true);
-    const centers = magPlates.map((p) => p.getWorldPosition(new THREE.Vector3()));
-    for (let i = 1; i < centers.length; i++) {
-      expect(centers[i].y).toBeLessThan(centers[i - 1].y);
-      expect(centers[i].x).toBeGreaterThan(centers[i - 1].x); // sweeps toward the muzzle
+    expect(wall.group.userData.silhouette).toBe('ak47');
+    for (const part of [
+      'stock', 'buttplate', 'grip', 'receiver', 'dust-cover', 'trigger-guard', 'magazine',
+      'rear-sight', 'handguard', 'gas-tube', 'gas-block', 'barrel', 'front-sight',
+    ]) {
+      expect(wall.group.getObjectByName(`ak47-wall-${part}`), part).toBeDefined();
     }
+    const box = worldBox(wall.group);
+    const size = box.getSize(new THREE.Vector3());
+    expect(size.x).toBeGreaterThan(1.3);
+    expect(size.x).toBeLessThan(1.45);
+    expect(size.y).toBeLessThan(0.5);
+    // Butt at the left edge, muzzle at the right.
+    expect(worldBox(wall.group.getObjectByName('ak47-wall-buttplate')!).min.x).toBeCloseTo(box.min.x, 2);
+    expect(worldBox(wall.group.getObjectByName('ak47-wall-front-sight')!).max.x).toBeGreaterThan(box.max.x - 0.05);
+  });
+});
 
-    // Left-to-right order: stock (min x) → … → front sight / muzzle (max x).
-    const box = new THREE.Box3().setFromObject(view.group);
-    const stock = view.group.getObjectByName('ak47-stock')!;
-    const post = view.group.getObjectByName('ak47-front-sight')!;
-    const stockBox = new THREE.Box3().setFromObject(stock);
-    const postBox = new THREE.Box3().setFromObject(post);
-    expect(stockBox.min.x).toBeCloseTo(box.min.x, 3);
-    expect(postBox.max.x).toBeGreaterThan(box.max.x - 0.12);
+describe('AK-47 audio', () => {
+  it('layers crack, room tail and the carrier slamming home over the report', () => {
+    const audio = new AudioSystem() as any;
+    const param = () => ({ value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() });
+    const node = () => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn() });
+    audio.context = vi.fn(() => ({
+      ctx: {
+        currentTime: 0,
+        createBufferSource: () => ({ ...node(), buffer: null }),
+        createBiquadFilter: () => ({ ...node(), type: 'lowpass', frequency: param(), Q: param() }),
+        createGain: () => ({ ...node(), gain: param() }),
+        createOscillator: () => ({ ...node(), type: 'sine', frequency: param() }),
+      },
+      master: {},
+      noise: {},
+    }));
+    vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    const clang = vi.spyOn(audio, 'metalClang').mockImplementation(() => {});
+    const tail = vi.spyOn(audio, 'playShotTail').mockImplementation(() => {});
+
+    audio.playShot(definition.audio);
+
+    expect(tail).toHaveBeenCalledWith(definition.audio.volume, definition.audio.tail);
+    expect(clang).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), definition.audio.mechanism, expect.any(Number));
+    // Shorter, lighter tail than the full-power L96 report.
+    expect(definition.audio.tail!).toBeLessThan(WEAPON_DEFINITIONS.l96.audio.tail!);
+  });
+
+  it('gives the rock-and-lock reload its own scrape and heavy carrier slam', () => {
+    const audio = new AudioSystem() as any;
+    const clang = vi.spyOn(audio, 'metalClang').mockImplementation(() => {});
+    const scrape = vi.spyOn(audio, 'scrape').mockImplementation(() => {});
+    vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    vi.spyOn(audio, 'sweep').mockImplementation(() => {});
+
+    audio.playReloadPhase('magOut', false, 'rock');
+    audio.playReloadPhase('chargeStart', false, 'rock');
+    expect(scrape).toHaveBeenCalledTimes(2);
+
+    clang.mockClear();
+    audio.playReloadPhase('chargeEnd', false, 'rock');
+    expect(clang.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

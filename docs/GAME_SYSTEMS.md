@@ -18,7 +18,9 @@ ADS, recoil y recarga; `WeaponView` muestra el arma sin manos y
 `AudioSystem` sincroniza el foley. Las armas de cerrojo (L96) expulsan el
 casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
 levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
-recarga vacia. `BallisticsSystem` usa raycast segmentado,
+recarga vacia. La AK-47 suma a cada disparo el golpe del portacerrojo y su
+recarga bascula el cargador sobre el teton delantero con foley propio.
+`BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
 
