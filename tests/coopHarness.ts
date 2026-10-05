@@ -28,6 +28,8 @@ export function installCanvasDocument(): () => void {
     fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textAlign: '', textBaseline: '',
     fillRect: () => undefined, strokeRect: () => undefined, fillText: () => undefined,
     createRadialGradient: () => ({ addColorStop: () => undefined }),
+    beginPath: () => undefined, moveTo: () => undefined, arc: () => undefined, arcTo: () => undefined,
+    closePath: () => undefined, fill: () => undefined, stroke: () => undefined,
   };
   Object.defineProperty(globalThis, 'document', {
     configurable: true,

@@ -3,8 +3,9 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clamp, damp } from '../utils/math';
 import type { MagazineDropPool } from './MagazineDrop';
+import { buildL96 } from './L96ViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
-import { ReloadAnimator, type ReloadParts } from './ReloadAnimator';
+import { BOLT_REAR_FRACTION, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import type { Weapon } from './Weapon';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
@@ -1256,9 +1257,9 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
 
 /**
  * Picks the procedural builder for a view config: dedicated builders for
- * the Wonder Weapons (Ray Gun, Tesla), the M1911 pistol, the AK-47 and the
- * M60 GPMG; the generic long-gun fallback otherwise (a GLB that failed to
- * load). Single dispatch shared by the first-person WeaponView and the
+ * the Wonder Weapons (Ray Gun, Tesla), the M1911 pistol, the AK-47, the
+ * M4A1, the L96A1 and the M60 GPMG; the generic long-gun fallback otherwise
+ * (a GLB that failed to load). Single dispatch shared by the first-person WeaponView and the
  * world-space display models so both always build the same weapon.
  */
 export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural {
@@ -1268,6 +1269,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'lmg') return buildM60(view);
   if (view.frame === 'ak47') return buildAk47(view);
   if (view.frame === 'm4a1') return buildM4A1(view);
+  if (view.frame === 'l96') return buildL96(view);
   return buildProcedural(view);
 }
 
@@ -1729,6 +1731,9 @@ export class WeaponView {
   private slide: THREE.Object3D | null = null;
   private slideHomeZ = 0;
   private slideBlowback = 0;
+  private boltEjected = false;
+  /** Wired by Game: bolt-action weapons eject their case mid-cycle, not on the shot. */
+  onBoltEject: (() => void) | null = null;
 
   constructor(
     private readonly definition: WeaponDefinition,
@@ -1932,6 +1937,7 @@ export class WeaponView {
     this.swayX = 0;
     this.swayY = 0;
     this.slideBlowback = 0;
+    this.boltEjected = false;
     if (this.slide) this.slide.position.z = this.slideHomeZ;
     this.root.position.copy(this.hipPosition);
     this.root.rotation.set(0, 0, 0);
@@ -1988,6 +1994,7 @@ export class WeaponView {
     // 5. State-driven animations. The reload animator runs every frame so
     // it can restore parts the moment the state is left (weapon switch).
     this.animator?.update(weapon);
+    if (weapon.state !== 'cycling') this.boltEjected = false;
     switch (weapon.state) {
       case 'reloading': {
         if (this.animator) {
@@ -2013,6 +2020,11 @@ export class WeaponView {
         this.root.position.z += curve * 0.035;
         this.root.rotation.x -= curve * 0.12;
         this.animator?.updateCycling(weapon.stateProgress);
+        // The spent case leaves the port when the bolt reaches the rear.
+        if (!this.boltEjected && weapon.stateProgress >= BOLT_REAR_FRACTION) {
+          this.boltEjected = true;
+          this.onBoltEject?.();
+        }
         break;
       }
       default:

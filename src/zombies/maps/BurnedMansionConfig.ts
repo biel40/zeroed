@@ -215,6 +215,16 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
   {
+    // Same starting-room wall as the M1911, on its long eastern span.
+    id: 'start-l96',
+    weaponId: 'l96',
+    price: 1250,
+    ammoPrice: 625,
+    position: { x: 4.6, y: 1.45, z: 2.17 },
+    yaw: 0,
+    floor: 0,
+  },
+  {
     id: 'box-ak47',
     weaponId: 'ak47',
     price: 1750,

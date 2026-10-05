@@ -27,7 +27,7 @@
 
 ## Limitaciones y bugs abiertos
 
-- Acceso temporal de beta en el navegador: los ocho correos de `public/beta/emails.js` entran directamente,
+- Acceso temporal de beta en el navegador: los correos autorizados de `public/beta/emails.js` entran directamente,
   sin API ni verificacion por correo. Es un filtro visual, no autenticacion.
   Codigo y guia de retirada en `public/beta/`.
   Tras introducir un correo autorizado se muestra una bienvenida cinematica

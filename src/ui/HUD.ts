@@ -28,6 +28,8 @@ export interface GameOverStats {
 /** Keep in sync with the #map-loading opacity transition in style.css. */
 const MAP_LOADING_FADE_MS = 450;
 const MAP_LOADING_MIN_MS = 700;
+/** Matches the #start-screen opacity transition in style.css. */
+const START_SCREEN_FADE_MS = 450;
 
 function mustGet(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -88,6 +90,7 @@ export class HUD {
   private readonly mapLoading: HTMLElement = mustGet('map-loading');
   private mapLoadingShownAt = 0;
   private mapLoadingTimer = 0;
+  private startScreenTimer = 0;
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -144,7 +147,7 @@ export class HUD {
     this.loadingBar.classList.remove('hidden');
     this.loadingBarFill.style.width = '0%';
     this.startHint.textContent = message;
-    this.startScreen.classList.remove('hidden');
+    this.revealStartScreen();
   }
 
   /** Opaque cover shown from the map pick until the first frame is ready. */
@@ -175,11 +178,26 @@ export class HUD {
   public showStartScreen(paused: boolean): void {
     if (!this.ready) return;
     this.startHint.textContent = t(paused ? 'start.pausedClick' : 'start.clickToStart');
-    this.startScreen.classList.remove('hidden');
+    this.revealStartScreen();
   }
 
   public hideStartScreen(): void {
+    clearTimeout(this.startScreenTimer);
+    this.startScreen.classList.remove('leaving');
     this.startScreen.classList.add('hidden');
+  }
+
+  private revealStartScreen(): void {
+    clearTimeout(this.startScreenTimer);
+    this.startScreen.classList.remove('hidden', 'leaving');
+  }
+
+  /** Cross-fades the loading screen into the menu shown beneath it. */
+  private fadeOutStartScreen(): void {
+    if (this.startScreen.classList.contains('hidden')) return;
+    clearTimeout(this.startScreenTimer);
+    this.startScreen.classList.add('leaving');
+    this.startScreenTimer = window.setTimeout(() => this.hideStartScreen(), START_SCREEN_FADE_MS);
   }
 
   public setStartHandler(handler: () => void): void {
@@ -192,7 +210,7 @@ export class HUD {
 
   /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
   public showMapSelect(onSelect: (mapId: ZombieMapId) => void): void {
-    this.startScreen.classList.add('hidden');
+    this.fadeOutStartScreen();
     this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');

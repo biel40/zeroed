@@ -174,12 +174,15 @@ export class Game {
         ? new Weapon(WEAPON_DEFINITIONS[id], Math.random, this.mode.reserveAmmoFor(id))
         : new Weapon(WEAPON_DEFINITIONS[id]);
       const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops);
+      const reloadAnim = weapon.definition.view.reloadAnim;
       view.onReloadPhase = (phase) =>
         this.audio.playReloadPhase(
           phase,
           !!weapon.definition.audio.energy,
-          weapon.definition.view.reloadAnim?.style ?? 'rifle',
+          reloadAnim?.style ?? 'rifle',
+          reloadAnim ? (reloadAnim.chargeEnd - reloadAnim.charge) * weapon.definition.reloadTime : 0,
         );
+      if (weapon.definition.boltAction) view.onBoltEject = () => this.ejectShell(view);
       this.player.camera.add(view.root);
       this.arsenal.set(id, { weapon, view });
     }
@@ -309,6 +312,7 @@ export class Game {
     this.audio.resume();
     void this.audio.loadMysteryBoxOpenAsset();
     void this.audio.loadDryFireAsset();
+    void this.audio.loadDoorPurchaseAsset();
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
       this.paused = false;
@@ -570,10 +574,15 @@ export class Game {
       this.effects.puff(this.tmpMuzzle, energy.color, 0.2);
     } else {
       this.effects.puff(this.tmpMuzzle, 0xdedede, 0.26);
-      this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
-      view.getEjectionWorldPosition(this.tmpEject);
-      this.effects.ejectShell(this.tmpEject, this.tmpRight);
+      // Bolt actions keep the case chambered until the bolt is worked.
+      if (!weapon.definition.boltAction) this.ejectShell(view);
     }
+  }
+
+  private ejectShell(view: WeaponView): void {
+    this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
+    view.getEjectionWorldPosition(this.tmpEject);
+    this.effects.ejectShell(this.tmpEject, this.tmpRight);
   }
 
   private processWeaponEvents(): void {
@@ -599,7 +608,7 @@ export class Game {
           );
           break;
         case 'boltStart':
-          this.audio.playBolt();
+          this.audio.playBolt(weapon.definition.boltCycleTime);
           break;
         case 'fireModeChanged':
           this.audio.playFireMode();

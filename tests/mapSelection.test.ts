@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import { HUD } from '../src/ui/HUD';
 
@@ -82,11 +82,18 @@ describe('Zombies map selection flow', () => {
       },
     });
 
+    vi.useFakeTimers();
+    vi.stubGlobal('window', globalThis);
+
     try {
       const selected: string[] = [];
       const ui = new HUD();
       ui.showMapSelect((mapId) => selected.push(mapId));
+      // The loading screen cross-fades out over the menu before hiding.
+      expect(startScreen.classList.contains('leaving')).toBe(true);
+      vi.runAllTimers();
       expect(startScreen.classList.contains('hidden')).toBe(true);
+      expect(startScreen.classList.contains('leaving')).toBe(false);
       expect(mansion.classList.contains('hidden')).toBe(false);
       expect(mansion.focused).toBe(true);
       mansion.onclick?.();
@@ -96,6 +103,8 @@ describe('Zombies map selection flow', () => {
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:burned-mansion']);
     } finally {
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
       Object.defineProperty(globalThis, 'document', {
         configurable: true,
         value: previousDocument,

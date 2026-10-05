@@ -221,6 +221,7 @@ describe('Game pause resume', () => {
       resumeMusic: vi.fn(),
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
+      loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.profile = { isMobile: true, useTouchControls: true };
     game.input = { requestPointerLock: vi.fn() };
@@ -242,6 +243,7 @@ describe('Game pause resume', () => {
       music: { stopMenuLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
+      loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { showPauseMenu: vi.fn() };
@@ -313,6 +315,7 @@ describe('Game pause resume', () => {
       music: { stopMenuLoop: vi.fn() },
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
+      loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
     };
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { showPauseMenu: vi.fn() };
@@ -584,9 +587,12 @@ describe('AudioSystem sampled effects', () => {
     audio.playMysteryBoxOpen();
     await audio.loadDryFireAsset();
     audio.playDryFire();
+    await audio.loadDoorPurchaseAsset();
+    audio.playDoorUnlock();
 
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('mystery_box_open.mp3'));
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('encasquillada_arma.mp3'));
-    expect(starts).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('door_purchase.mp3'));
+    expect(starts).toHaveLength(3);
   });
 });

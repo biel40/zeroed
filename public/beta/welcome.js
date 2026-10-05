@@ -7,18 +7,23 @@ if (!hasBetaAccess()) {
   const tracks = [...document.querySelectorAll('.tracks span')];
   const next = document.getElementById('next');
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  const SCENE_DURATION_MS = 10000;
+  // Matches the curtain-fall animation in welcome.css.
+  const EXIT_FADE_MS = 600;
   let current = 0;
   let timer;
 
   function enterGame() {
     clearTimeout(timer);
-    location.replace(`/${location.search}`);
+    if (document.body.classList.contains('leaving')) return;
+    document.body.classList.add('leaving');
+    setTimeout(() => location.replace(`/${location.search}`), motion.matches ? 0 : EXIT_FADE_MS);
   }
 
   function schedule() {
     clearTimeout(timer);
     if (!motion.matches && !document.hidden && current < scenes.length - 1) {
-      timer = setTimeout(() => showScene(current + 1), 6000);
+      timer = setTimeout(() => showScene(current + 1), SCENE_DURATION_MS);
     }
   }
 

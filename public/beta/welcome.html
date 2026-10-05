@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -9,33 +10,64 @@
   <link rel="stylesheet" href="./welcome.css">
   <title>Bienvenido a la beta | Zeroed</title>
 </head>
+
 <body>
   <img class="backdrop" src="./welcome.jpg" alt="" fetchpriority="high">
   <div class="shade" aria-hidden="true"></div>
   <header>
-    <a class="brand" href="/" aria-label="Zeroed"><img src="/favicon.svg" alt="" width="32" height="32"><span>ZEROED</span></a>
+    <a class="brand" href="/" aria-label="Zeroed"><img src="/favicon.svg" alt="" width="32"
+        height="32"><span>ZEROED</span></a>
     <button id="skip" class="quiet" type="button">Omitir</button>
   </header>
   <main aria-label="Bienvenida a la beta cerrada">
     <div class="scenes" aria-live="polite" aria-atomic="true">
       <section class="scene" data-scene>
         <p class="eyebrow">BETA CERRADA</p>
-        <h1>Gracias por estar aqu&iacute;.</h1>
-        <p>Detr&aacute;s de Zeroed hay muchas horas de trabajo y mucha ilusi&oacute;n. Que quieras formar parte de esta beta significa mucho para m&iacute;.</p>
-        <p class="signature">Biel40</p>
+        <h1>Gracias por estar aqu&iacute;</h1>
+        <p>Detr&aacute;s de Zeroed hay muchas horas de trabajo, y sobretodo mucha ilusi&oacute;n. Que formes parte de
+          esta Beta Cerrada significa much&iacute;simo para m&iacute;.
+          <br> Gracias por jugar, y por acompa&ntilde;arme en esta incre&iacute;ble aventura.
+        </p>
       </section>
       <section class="scene" data-scene hidden>
-        <p class="eyebrow">BURNED MANSION TE ESPERA</p>
+        <p class="eyebrow">¡"BURNED MANSION" TE ESPERA!</p>
         <h2>Disfruta. Sobrevive. Repite.</h2>
-        <p>Ojal&aacute; disfrutes cada partida, cada descubrimiento y cada ronda compartida. Esta peque&ntilde;a aventura tambi&eacute;n es tuya.</p>
+        <p>Explora cada rinc&oacute;n, descubre todos los secretos ocultos, y sobrevive una ronda m&aacute;s. A solas o
+          en compa&ntilde;&iacute;a, espero que disfrutes del mapa de "Burned Mansion" tanto como yo he disfrutado
+          cre&aacute;ndolo.</p>
       </section>
       <section class="scene" data-scene hidden>
         <p class="eyebrow">AY&Uacute;DAME A MEJORAR ZEROED</p>
         <h2>Tu opini&oacute;n cuenta.</h2>
-        <p>Cu&eacute;ntame qu&eacute; te gusta, qu&eacute; cambiar&iacute;as y qu&eacute; falla. Y si lo est&aacute;s disfrutando, compartir Zeroed y apoyarlo en redes ayuda much&iacute;simo.</p>
+        <p>Cu&eacute;ntame qu&eacute; te gusta, qu&eacute; mejorar&iacute;as y qu&eacute; crees que no funciona. ¡Cada
+          comentario me ayuda a seguir mejorando Zeroed!</p>
+        <p>Si est&aacute;s disfrutando de la Beta Cerrada, por favor, comp&aacute;rtela con tus amigos o en redes.
+          <br> Tu apoyo hace que esta aventura llegue m&aacute;s lejos. 
+          <br> De nuevo, muchas gracias por tu apoyo ❤️
+          <br>
+          ¡Disfruta la Beta Cerrada! Y recuerda... esto es solo el comienzo... 🧟
+        </p>
+        <p class="signature">Biel40 - Desarrollador y creador de Zeroed</p>
         <div class="social-actions">
-          <a href="mailto:biel40aws@gmail.com?subject=Feedback%20de%20la%20beta%20de%20Zeroed">Enviar feedback</a>
-          <button id="share" class="quiet" type="button">Compartir Zeroed</button>
+          <a class="social-action social-action--feedback"
+            href="mailto:biel40aws@gmail.com?subject=Feedback%20de%20la%20beta%20de%20Zeroed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-3 3V11.5A8.5 8.5 0 0 1 9.5 3h3a8.5 8.5 0 0 1 8.5 8.5Z" />
+              <path d="M7 9h8M7 13h5" />
+            </svg>
+            <span>Enviar opini&oacute;n</span>
+          </a>
+          <button id="share" class="social-action social-action--share" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" />
+            </svg>
+            <span>Compartir Zeroed</span>
+          </button>
         </div>
         <p id="share-status" class="share-status" role="status"></p>
       </section>
@@ -48,7 +80,10 @@
     </div>
     <button id="next" class="primary" type="button">Siguiente</button>
   </footer>
-  <noscript><p>Activa JavaScript para continuar. <a href="/">Volver a Zeroed</a></p></noscript>
+  <noscript>
+    <p>Activa JavaScript para continuar. <a href="/">Volver a Zeroed</a></p>
+  </noscript>
   <script type="module" src="./welcome.js"></script>
 </body>
+
 </html>

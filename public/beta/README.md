@@ -2,7 +2,7 @@
 
 Con `BETA_ENABLED=true`, el arranque muestra la pantalla de mantenimiento.
 Introducir cualquiera de los correos de `emails.js` y pulsar Continuar permite
-entrar sin verificar el correo. El listado contiene los ocho participantes actuales.
+entrar sin verificar el correo. El listado contiene los participantes de la beta.
 La comprobacion ocurre en el navegador, sin peticiones de autenticacion,
 servidor de correo, claves ni enlaces de verificacion. El permiso se recuerda
 en `sessionStorage` para esa pestaña.
@@ -13,6 +13,11 @@ feedback o compartir el enlace de Zeroed. Se puede omitir o avanzar manualmente;
 la ultima escena espera a que el jugador pulse Jugar. Con movimiento reducido
 las escenas solo avanzan manualmente. No modifica el gameplay ni necesita API.
 Las entradas posteriores al menu con permiso recordado evitan la bienvenida.
+Los textos mantienen un tono cercano y los dos botones sociales comparten
+tipografia e iconos: opinion en verde y compartir con fondo oscuro. Sus estados
+de foco son visibles y el movimiento respeta la preferencia de movimiento reducido.
+Las escenas se funden entre si y la salida al juego cae a negro antes de navegar,
+para enlazar con la entrada gradual del menu principal.
 
 Para dar o retirar acceso, editar la lista `BETA_EMAILS` en `emails.js` y volver
 a desplegar. Mantener un correo por linea, en minusculas. Tambien se comprueba

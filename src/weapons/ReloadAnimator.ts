@@ -3,6 +3,14 @@ import type { Weapon } from './Weapon';
 import type { MagazineDropPool } from './MagazineDrop';
 import type { ReloadAnimConfig, ReloadPhase } from './WeaponTypes';
 
+/** Charging-handle rack travel in meters. */
+const HANDLE_TRAVEL = 0.042;
+/** Bolt-action stroke (meters) and knob lift (radians) of the L96A1 action. */
+const BOLT_TRAVEL = 0.085;
+const BOLT_LIFT = 0.9;
+/** Fraction of an action cycle at which the bolt reaches its rearmost point. */
+export const BOLT_REAR_FRACTION = 0.4;
+
 /** View-model parts the animator drives; any of them may be absent. */
 export interface ReloadParts {
   /** Detachable magazine / power cell (Mesh or small Group). */
@@ -253,13 +261,14 @@ export class ReloadAnimator {
     handle.position.copy(home.position);
     handle.quaternion.copy(home.quaternion);
     // Pull back over the first 40 %, hold, return by the end.
-    const pull = t < 0.4 ? ramp(t, 0, 0.4) : t < 0.55 ? 1 : 1 - ramp(t, 0.55, 1);
-    handle.position.z += pull * 0.042;
-    if (this.config.style === 'bolt') {
-      // Bolt knob: lift, ride back, slam forward, lock down.
+    const pull = t < BOLT_REAR_FRACTION ? ramp(t, 0, BOLT_REAR_FRACTION) : t < 0.55 ? 1 : 1 - ramp(t, 0.55, 1);
+    const bolt = this.config.style === 'bolt';
+    handle.position.z += pull * (bolt ? BOLT_TRAVEL : HANDLE_TRAVEL);
+    if (bolt) {
+      // The bolt group pivots on the bore axis: lift the knob, ride back,
+      // slam forward and lock down.
       const lift = t < 0.12 ? ramp(t, 0, 0.12) : t > 0.88 ? 1 - ramp(t, 0.88, 1) : 1;
-      handle.rotateZ(lift * 0.7);
-      handle.position.y += lift * 0.008;
+      handle.rotateZ(lift * BOLT_LIFT);
     }
   }
 

@@ -62,6 +62,10 @@ export interface WeaponAudioConfig {
   readonly duration: number;
   readonly lowpass: number;
   readonly thump: number;
+  /** Optional supersonic crack layer (volume) for full-power rifle rounds. */
+  readonly crack?: number;
+  /** Optional room echo tail in seconds; absent keeps the dry report. */
+  readonly tail?: number;
   /** Energy weapons get a sci-fi synth shot instead of a powder report. */
   readonly energy?: boolean;
 }
@@ -183,9 +187,10 @@ export interface ViewModelConfig {
    * 'pistol' uses the handgun builder (slide, hammer, grip magazine);
    * 'lmg' uses the dedicated M60 builder (belt box, feed cover, bipod);
    * 'ak47' uses the dedicated Type-3 AK builder (wood furniture, gas tube,
-   * banana magazine). Default: generic long gun.
+   * banana magazine); 'l96' uses the dedicated L96A1 builder (thumbhole
+   * stock, scope, liftable bolt). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
