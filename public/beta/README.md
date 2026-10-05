@@ -2,7 +2,7 @@
 
 Con `BETA_ENABLED=true`, el arranque muestra la pantalla de mantenimiento.
 Introducir cualquiera de los correos de `emails.js` y pulsar Continuar permite
-entrar sin verificar el correo. El listado contiene los seis participantes originales.
+entrar sin verificar el correo. El listado contiene los ocho participantes actuales.
 La comprobacion ocurre en el navegador, sin peticiones de autenticacion,
 servidor de correo, claves ni enlaces de verificacion. El permiso se recuerda
 en `sessionStorage` para esa pestaña.
