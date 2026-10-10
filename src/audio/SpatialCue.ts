@@ -42,16 +42,10 @@ export function spatialCue(listener: Point3, forward: Point3, source: Point3): S
   const distance = Math.hypot(horizontal, dy);
   const forwardLength = Math.hypot(forward.x, forward.z);
   let pan = 0;
-  let rear = 0;
   if (horizontal > 0.001 && forwardLength > 0.001) {
-    const fx = forward.x / forwardLength;
-    const fz = forward.z / forwardLength;
     // Right-hand vector of the horizontal forward is (-fz, fx).
-    pan = THREE.MathUtils.clamp((dx * -fz + dz * fx) / horizontal, -1, 1);
-    rear = THREE.MathUtils.clamp(-(dx * fx + dz * fz) / horizontal, 0, 1);
+    pan = THREE.MathUtils.clamp((dx * -forward.z + dz * forward.x) / (horizontal * forwardLength), -1, 1);
   }
-  const floorMuffle = THREE.MathUtils.clamp((Math.abs(dy) - FLOOR_MUFFLE_START) / FLOOR_MUFFLE_RANGE, 0, 1)
-    * FLOOR_MUFFLE;
   return {
     pan,
     attenuation: THREE.MathUtils.clamp(
@@ -59,8 +53,25 @@ export function spatialCue(listener: Point3, forward: Point3, source: Point3): S
       MIN_ATTENUATION,
       1,
     ),
-    muffle: Math.max(rear * REAR_MUFFLE, floorMuffle),
+    muffle: spatialMuffle(listener, forward, source),
   };
+}
+
+/** Muffle alone, without allocating: per-frame callers (footsteps) use this. */
+export function spatialMuffle(listener: Point3, forward: Point3, source: Point3): number {
+  const dx = source.x - listener.x;
+  const dz = source.z - listener.z;
+  const horizontal = Math.hypot(dx, dz);
+  const forwardLength = Math.hypot(forward.x, forward.z);
+  const rear = horizontal > 0.001 && forwardLength > 0.001
+    ? THREE.MathUtils.clamp(-(dx * forward.x + dz * forward.z) / (horizontal * forwardLength), 0, 1)
+    : 0;
+  const floorMuffle = THREE.MathUtils.clamp(
+    (Math.abs(source.y - listener.y) - FLOOR_MUFFLE_START) / FLOOR_MUFFLE_RANGE,
+    0,
+    1,
+  ) * FLOOR_MUFFLE;
+  return Math.max(rear * REAR_MUFFLE, floorMuffle);
 }
 
 /** Exponential so each muffle step sounds equally darker. */

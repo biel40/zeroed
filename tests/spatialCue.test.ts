@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
-import { cameraSpatialCue, muffleCutoff, spatialCue, voicePoint } from '../src/audio/SpatialCue';
+import { cameraSpatialCue, muffleCutoff, spatialCue, spatialMuffle, voicePoint } from '../src/audio/SpatialCue';
 
 /**
  * Directional zombie audio: the cue must tell left from right, front from
@@ -36,6 +36,12 @@ describe('spatialCue', () => {
     expect(sameFloor.muffle).toBe(0);
     expect(upstairs.muffle).toBeGreaterThan(0.8);
     expect(bunker.muffle).toBeGreaterThan(0.8);
+  });
+
+  it('exposes the same muffle without building a cue (per-frame footsteps)', () => {
+    for (const source of [{ x: 0, y: 1.7, z: 5 }, { x: 3, y: 4.9, z: -2 }, { x: -2, y: 1.7, z: 1 }]) {
+      expect(spatialMuffle(EYE, FORWARD, source)).toBe(spatialCue(EYE, FORWARD, source).muffle);
+    }
   });
 
   it('fades with distance but keeps far threats audible', () => {

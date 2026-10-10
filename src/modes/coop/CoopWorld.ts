@@ -295,10 +295,11 @@ export class CoopWorld {
     }));
   }
 
-  public applyBarrierStates(states: readonly BarrierNetState[]): void {
+  /** `audible` false adopts the boards silently (a baseline, not new strikes). */
+  public applyBarrierStates(states: readonly BarrierNetState[], audible: boolean): void {
     for (const state of states) {
       const barrier = this.arena.barriers.find((candidate) => candidate.id === state.id);
-      if (barrier?.applyReplicatedBoards(state.boards)) this.playBarrierBreak(barrier);
+      if (barrier?.applyReplicatedBoards(state.boards) && audible) this.playBarrierBreak(barrier);
     }
   }
 

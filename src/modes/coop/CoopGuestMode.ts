@@ -436,6 +436,8 @@ export class CoopGuestMode implements GameMode {
   private applyMatchState(state: MatchState): void {
     const previousBox = this.box.snapshot();
     const previousPhase = this.match?.phase;
+    // The first snapshot (join or restart) is a baseline, not a stream of new strikes.
+    const firstSnapshot = this.match === null;
     this.match = state;
     for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(state.stats.guest.kills);
     this.ctx.hud.setHostPauseVisible(state.hostPaused);
@@ -446,7 +448,7 @@ export class CoopGuestMode implements GameMode {
     this.hostAvatar.setLife(state.stats.host.life, state.stats.host.reviver !== null);
     this.replica.applyStates(state.t, state.zombies);
     this.world.applyOpenDoors(state.openDoorIds);
-    this.world.applyBarrierStates(state.barriers);
+    this.world.applyBarrierStates(state.barriers, !firstSnapshot);
     this.world.arena.applySecretSnapshot(state.secret);
     for (const id of state.claimedPickupIds) this.world.arena.weaponPickups.find((entry) => entry.id === id)?.claim();
     this.box.applySnapshot(state.box);

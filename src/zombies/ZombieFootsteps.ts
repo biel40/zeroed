@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Zombie } from './Zombie';
-import { muffleCutoff, spatialCue, voicePoint } from '../audio/SpatialCue';
+import { muffleCutoff, spatialMuffle, voicePoint } from '../audio/SpatialCue';
 
 /** Pooled positional sources: only the nearest zombies ever get one. */
 const MAX_AUDIBLE_ZOMBIES = 8;
@@ -148,7 +148,7 @@ export class ZombieFootsteps {
       }
       const pos = zombie.position;
       slot.audio.position.set(pos.x, pos.y + STEP_EMIT_HEIGHT, pos.z);
-      const { muffle } = spatialCue(this.tmpListenerPos, this.tmpListenerForward, voicePoint(pos, this.tmpVoice));
+      const muffle = spatialMuffle(this.tmpListenerPos, this.tmpListenerForward, voicePoint(pos, this.tmpVoice));
       slot.muffle.frequency.setTargetAtTime(
         muffleCutoff(muffle),
         slot.muffle.context.currentTime,

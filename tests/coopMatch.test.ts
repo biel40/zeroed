@@ -246,6 +246,22 @@ describe('co-op combat authority', () => {
     );
   });
 
+  it('adopts damaged boards silently on the first snapshot, then cracks on new strikes', () => {
+    const match = startedMatch();
+    const barrier = host(match).world.arena.barriers[0];
+    const playBarrierBreak = match.guestSide.ctx.audio.playBarrierBreak as ReturnType<typeof vi.fn>;
+    // A late join or a restart: the guest has no snapshot yet, the host already has damage.
+    (guest(match) as unknown as { match: MatchState | null }).match = null;
+    barrier.damage(1);
+    match.step(1 / 30, 4);
+    expect(guest(match).world.arena.barriers[0].boards.some((board) => board.hp < board.maxHp)).toBe(true);
+    expect(playBarrierBreak).not.toHaveBeenCalled();
+
+    barrier.damage(1);
+    match.step(1 / 30, 4);
+    expect(playBarrierBreak).toHaveBeenCalledOnce();
+  });
+
   it('accepts damage events with or without a valid attacker id', () => {
     expect(parseHostMessage({ type: 'playerDamaged', damage: 25 })).toEqual({ type: 'playerDamaged', damage: 25 });
     expect(parseHostMessage({ type: 'playerDamaged', damage: 25, attackerId: 7 }))
