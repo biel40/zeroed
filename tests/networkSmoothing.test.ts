@@ -150,13 +150,15 @@ describe('barrier replication', () => {
   it('adopts host board health and bumps the revisions the view animates from', () => {
     const barrier = new WindowBarrier('w', 0, 0, 0, 1, { boardCount: 3, boardHp: 2, repairInterval: 1, repairRewardCap: 4 });
     const revision = barrier.boards[0].revision;
-    barrier.applyReplicatedBoards([0, 1, 2]);
+    expect(barrier.applyReplicatedBoards([0, 1, 2])).toBe(true);
     expect(barrier.boards.map((board) => board.hp)).toEqual([0, 1, 2]);
     expect(barrier.boards[0].revision).toBe(revision + 1);
     expect(barrier.state).toBe('damaged');
     barrier.applyReplicatedBoards([0, 0, 0]);
     expect(barrier.isOpen).toBe(true);
-    barrier.applyReplicatedBoards([2, 2, 2]);
+    // Repairs and unchanged states are not strikes: the guest plays no crack.
+    expect(barrier.applyReplicatedBoards([2, 2, 2])).toBe(false);
+    expect(barrier.applyReplicatedBoards([2, 2, 2])).toBe(false);
     expect(barrier.state).toBe('intact');
   });
 });

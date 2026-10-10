@@ -78,6 +78,12 @@ export class ZombieReplica {
     return entry && !entry.dying ? entry.id : null;
   }
 
+  /** Living replica for a host zombie id; null once it is dying or released. */
+  public zombieOf(id: number): Zombie | null {
+    const entry = this.entries.get(id);
+    return entry && !entry.dying ? entry.zombie : null;
+  }
+
   public spawn(state: ZombieNetState): void {
     if (!this.entries.has(state.id)) this.create(state, true);
   }
@@ -104,9 +110,10 @@ export class ZombieReplica {
     }
   }
 
-  public attack(id: number, targetX: number, targetY: number, targetZ: number): void {
+  /** Replays a wind-up; returns the attacker so its cue can play from it. */
+  public attack(id: number, targetX: number, targetY: number, targetZ: number): Zombie | null {
     const entry = this.entries.get(id);
-    if (!entry || entry.dying) return;
+    if (!entry || entry.dying) return null;
     const zombie = entry.zombie;
     zombie.playReplicatedAttack('attack');
     const dx = targetX - zombie.position.x;
@@ -116,6 +123,7 @@ export class ZombieReplica {
     zombie.visual.setAttackReach(Math.min(ZOMBIE_ATTACK_LUNGE, Math.max(0, Math.hypot(dx, dz) - 1.1)) / scale);
     zombie.visual.setStrikeTarget((dx * Math.cos(yaw) - dz * Math.sin(yaw)) / scale,
       (targetY - 0.3 - zombie.position.y) / scale, (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / scale);
+    return zombie;
   }
 
   public hit(id: number, headshot: boolean, amount: number, fromX: number, fromZ: number): void {

@@ -194,12 +194,11 @@ export class ZombieManager {
   onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource) => void) | null = null;
   /** Actual health removed, including direct, melee, splash and chain hits. */
   public onZombieDamaged: ((damage: number) => void) | null = null;
-  onPlayerAttack: ((damage: number, targetId?: ZombieTargetId) => void) | null = null;
-  /** Authority hooks for networked play; unused (null) in single player. */
+  public onPlayerAttack: ((damage: number, targetId: ZombieTargetId, attacker: Zombie) => void) | null = null;
+  /** Spawn and wind-up start: spatial audio cues and network replication. */
   public onZombieSpawned: ((zombie: Zombie) => void) | null = null;
   public onZombieAttack: ((zombie: Zombie, targetId: ZombieTargetId) => void) | null = null;
-  onBruteAttack: (() => void) | null = null;
-  onBarrierImpact: (() => void) | null = null;
+  public onBarrierImpact: ((barrier: WindowBarrier) => void) | null = null;
 
   private readonly pool: ZombiePool;
   private spawner: ZombieSpawner;
@@ -1006,7 +1005,6 @@ export class ZombieManager {
       this.updateAttackReach(zombie, playerX, playerZ);
       this.setStrikeTarget(zombie, playerX, playerY - 0.3, playerZ);
       if (zombie.tryAttack()) {
-        if (zombie.typeId === 'brute') this.onBruteAttack?.();
         this.onZombieAttack?.(zombie, targetId);
         // The wind-up only SCHEDULES the bite: whether it connects is decided
         // at the hit moment, against the player's current position. A player
@@ -1018,7 +1016,7 @@ export class ZombieManager {
             : this.otherPlayers.find((candidate) => candidate.id === targetId);
           if (live && Math.hypot(live.x - playerX, live.z - playerZ) <= 0.6
             && this.attackStillConnects(zombie, live.x, live.z, live.floor, live.y)) {
-            this.onPlayerAttack?.(zombie.attackDamage, targetId);
+            this.onPlayerAttack?.(zombie.attackDamage, targetId, zombie);
           }
         };
       }
@@ -2124,7 +2122,7 @@ export class ZombieManager {
     barrier.damage(ZOMBIE_BARRIER_ATTACK_DAMAGE);
     if (this.lastBarrierImpactAudioFrame === this.frameIndex) return;
     this.lastBarrierImpactAudioFrame = this.frameIndex;
-    this.onBarrierImpact?.();
+    this.onBarrierImpact?.(barrier);
   }
 
   /** Circle-vs-AABB test in XZ, with the body radius folded into the box. */

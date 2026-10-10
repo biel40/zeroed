@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Zombie } from './Zombie';
+import { muffleCutoff, spatialMuffle, voicePoint } from '../audio/SpatialCue';
 
 /** Pooled positional sources: only the nearest zombies ever get one. */
 const MAX_AUDIBLE_ZOMBIES = 8;
@@ -31,6 +32,8 @@ const FALLBACK_STEP_DURATION = 0.16;
 const RESUME_STEP_DELAY = 0.12;
 /** Height above the zombie origin (floor) the steps emit from. */
 const STEP_EMIT_HEIGHT = 0.1;
+/** Seconds for the muffle filter to follow a turn: smooth, never zippered. */
+const MUFFLE_SMOOTHING = 0.06;
 
 /**
  * Optional real footstep sample overriding the synthesized fallback: drop a
@@ -77,6 +80,8 @@ export function stepIntervalForSpeed(speed: number): number {
 
 interface FootstepSlot {
   readonly audio: THREE.PositionalAudio;
+  /** Darkens steps behind the player or on another floor (see SpatialCue). */
+  readonly muffle: BiquadFilterNode;
   zombie: Zombie | null;
   lastX: number;
   lastZ: number;
@@ -95,6 +100,8 @@ interface FootstepSlot {
  * attacking, spawning, blocked and dying zombies stay silent. Death releases
  * the source immediately. One shared AudioBuffer for every source; a real
  * sample dropped at FOOTSTEP_URL replaces the synthesized fallback at load.
+ * HRTF panning alone blurs front and back, so each source also runs through
+ * a low-pass that closes for steps behind the player or on another floor.
  */
 export class ZombieFootsteps {
   private readonly root = new THREE.Group();
@@ -102,6 +109,8 @@ export class ZombieFootsteps {
   private listener: THREE.AudioListener | null = null;
   private reassessTimer = 0;
   private readonly tmpListenerPos = new THREE.Vector3();
+  private readonly tmpListenerForward = new THREE.Vector3();
+  private readonly tmpVoice = new THREE.Vector3();
 
   constructor(
     parent: THREE.Object3D,
@@ -121,6 +130,7 @@ export class ZombieFootsteps {
       this.initAudio(audioContext);
     }
     this.camera.getWorldPosition(this.tmpListenerPos);
+    this.camera.getWorldDirection(this.tmpListenerForward);
 
     this.reassessTimer -= dt;
     if (this.reassessTimer <= 0) {
@@ -138,6 +148,12 @@ export class ZombieFootsteps {
       }
       const pos = zombie.position;
       slot.audio.position.set(pos.x, pos.y + STEP_EMIT_HEIGHT, pos.z);
+      const muffle = spatialMuffle(this.tmpListenerPos, this.tmpListenerForward, voicePoint(pos, this.tmpVoice));
+      slot.muffle.frequency.setTargetAtTime(
+        muffleCutoff(muffle),
+        slot.muffle.context.currentTime,
+        MUFFLE_SMOOTHING,
+      );
 
       if (dt <= 0) {
         slot.lastX = pos.x;
@@ -185,8 +201,13 @@ export class ZombieFootsteps {
       audio.setRolloffFactor(ROLLOFF_FACTOR);
       audio.setBuffer(fallback);
       audio.setVolume(STEP_VOLUME);
+      const muffle = context.createBiquadFilter();
+      muffle.type = 'lowpass';
+      muffle.frequency.value = muffleCutoff(0);
+      muffle.Q.value = 0.5;
+      audio.setFilter(muffle);
       this.root.add(audio);
-      this.slots.push({ audio, zombie: null, lastX: 0, lastZ: 0, stepTimer: 0 });
+      this.slots.push({ audio, muffle, zombie: null, lastX: 0, lastZ: 0, stepTimer: 0 });
     }
     this.loadFootstepAsset(context);
   }

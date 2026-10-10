@@ -159,16 +159,22 @@ export class WindowBarrier {
   }
 
   /** Network replica: adopt the host's board health, bumping the revisions the view animates from. */
-  public applyReplicatedBoards(hps: readonly number[]): void {
+  /** Returns true when any board lost HP (a zombie strike to replay as audio). */
+  public applyReplicatedBoards(hps: readonly number[]): boolean {
+    let damaged = false;
     for (let index = 0; index < this.mutableBoards.length && index < hps.length; index++) {
       const board = this.mutableBoards[index];
       const hp = Math.max(0, Math.min(board.maxHp, hps[index]));
       if (hp === board.hp) continue;
       if ((hp <= 0) !== (board.hp <= 0)) board.revision++;
-      if (hp < board.hp) board.impactRevision++;
+      if (hp < board.hp) {
+        board.impactRevision++;
+        damaged = true;
+      }
       board.hp = hp;
     }
     this.updateState();
+    return damaged;
   }
 
   private rebuildOneBoard(): boolean {

@@ -499,9 +499,14 @@ describe('AudioSystem zombie impact sounds', () => {
     audio.context = vi.fn(() => ({ ctx: { currentTime: 0 }, master: {}, noise: {} }));
     const sweepSpy = vi.spyOn(audio, 'sweep').mockImplementation(() => {});
     const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    const bus = {};
+    const busSpy = vi.spyOn(audio, 'spatialBus').mockReturnValue(bus);
 
-    audio.playBruteRoar();
+    audio.playBruteRoar({ pan: 0, attenuation: 0.1, muffle: 0 });
 
+    // A lethal warning never fades below audibility, wherever Brutus stands.
+    expect(busSpy.mock.calls[0][2]).toBeGreaterThanOrEqual(0.5);
+    expect(sweepSpy.mock.calls.every((call) => call[7] === bus)).toBe(true);
     expect(sweepSpy).toHaveBeenCalledTimes(2);
     expect(sweepSpy.mock.calls[0][2]).toBeLessThan(100);
     expect(tickSpy).toHaveBeenCalledOnce();
