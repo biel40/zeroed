@@ -110,6 +110,7 @@ export class ZombieFootsteps {
   private reassessTimer = 0;
   private readonly tmpListenerPos = new THREE.Vector3();
   private readonly tmpListenerForward = new THREE.Vector3();
+  private readonly tmpVoice = new THREE.Vector3();
 
   constructor(
     parent: THREE.Object3D,
@@ -147,7 +148,7 @@ export class ZombieFootsteps {
       }
       const pos = zombie.position;
       slot.audio.position.set(pos.x, pos.y + STEP_EMIT_HEIGHT, pos.z);
-      const { muffle } = spatialCue(this.tmpListenerPos, this.tmpListenerForward, voicePoint(pos));
+      const { muffle } = spatialCue(this.tmpListenerPos, this.tmpListenerForward, voicePoint(pos, this.tmpVoice));
       slot.muffle.frequency.setTargetAtTime(
         muffleCutoff(muffle),
         slot.muffle.context.currentTime,

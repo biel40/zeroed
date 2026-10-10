@@ -11,6 +11,8 @@ import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
 import type { Zombie } from '../src/zombies/Zombie';
 import { roundConfig } from '../src/zombies/ZombieConfig';
+import { voicePoint } from '../src/audio/SpatialCue';
+import { parseHostMessage } from '../src/network/Protocol';
 import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
 import type { ZombieManager, ZombiePlayerTarget } from '../src/zombies/ZombieManager';
 import type { ZombieReplica } from '../src/zombies/ZombieReplica';
@@ -218,6 +220,37 @@ describe('co-op combat authority', () => {
     match.relay.guest.onMessage?.({ type: 'zombieDeath', zombieId: 999, killer: 'host' });
     match.relay.guest.onMessage?.({ type: 'zombieAttack', zombieId: 999, target: 'guest' });
     expect(guest(match).replica.aliveCount).toBe(0);
+  });
+
+  it('plays the guest hurt cue from the zombie that landed the hit, not the latest wind-up', () => {
+    const match = startedMatch();
+    const striker = spawnOne(match);
+    const other = spawnOne(match);
+    const strikerReplica = replicaOf(match, striker);
+    const otherReplica = replicaOf(match, other);
+    const guestPos = match.guestSide.player.rig.position;
+    strikerReplica.position.set(guestPos.x + 1, guestPos.y, guestPos.z);
+    otherReplica.position.set(guestPos.x - 1, guestPos.y, guestPos.z);
+    const playPlayerHurt = match.guestSide.ctx.audio.playPlayerHurt as ReturnType<typeof vi.fn>;
+
+    // The striker winds up first; another zombie winds up before it lands.
+    match.relay.guest.onMessage?.({ type: 'zombieAttack', zombieId: host(match).zombies.networkIdOf(striker), target: 'guest' });
+    match.relay.guest.onMessage?.({ type: 'zombieAttack', zombieId: host(match).zombies.networkIdOf(other), target: 'guest' });
+    host(match).zombies.onPlayerAttack?.(25, 'guest', striker);
+    match.relay.flush();
+
+    const sent = match.relay.sent('host', 'playerDamaged') as Array<{ attackerId?: number }>;
+    expect(sent.at(-1)?.attackerId).toBe(host(match).zombies.networkIdOf(striker));
+    expect(playPlayerHurt).toHaveBeenLastCalledWith(
+      guest(match).world.spatialCueFor(voicePoint(strikerReplica.position)),
+    );
+  });
+
+  it('accepts damage events with or without a valid attacker id', () => {
+    expect(parseHostMessage({ type: 'playerDamaged', damage: 25 })).toEqual({ type: 'playerDamaged', damage: 25 });
+    expect(parseHostMessage({ type: 'playerDamaged', damage: 25, attackerId: 7 }))
+      .toEqual({ type: 'playerDamaged', damage: 25, attackerId: 7 });
+    expect(parseHostMessage({ type: 'playerDamaged', damage: 25, attackerId: 'x' })).toBeNull();
   });
 
   it('routes zombie damage only to the targeted player', () => {

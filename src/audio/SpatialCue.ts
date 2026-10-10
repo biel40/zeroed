@@ -74,7 +74,9 @@ export function muffleCutoff(muffle: number): number {
  */
 const VOICE_HEIGHT = 1.5;
 
-export function voicePoint(position: Point3): Point3 {
+/** Pass `out` on per-frame paths to reuse a vector instead of allocating. */
+export function voicePoint(position: Point3, out?: THREE.Vector3): Point3 {
+  if (out) return out.set(position.x, position.y + VOICE_HEIGHT, position.z);
   return { x: position.x, y: position.y + VOICE_HEIGHT, z: position.z };
 }
 

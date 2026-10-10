@@ -194,11 +194,11 @@ export class ZombieManager {
   onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource) => void) | null = null;
   /** Actual health removed, including direct, melee, splash and chain hits. */
   public onZombieDamaged: ((damage: number) => void) | null = null;
-  onPlayerAttack: ((damage: number, targetId: ZombieTargetId, attacker: Zombie) => void) | null = null;
+  public onPlayerAttack: ((damage: number, targetId: ZombieTargetId, attacker: Zombie) => void) | null = null;
   /** Spawn and wind-up start: spatial audio cues and network replication. */
   public onZombieSpawned: ((zombie: Zombie) => void) | null = null;
   public onZombieAttack: ((zombie: Zombie, targetId: ZombieTargetId) => void) | null = null;
-  onBarrierImpact: ((barrier: WindowBarrier) => void) | null = null;
+  public onBarrierImpact: ((barrier: WindowBarrier) => void) | null = null;
 
   private readonly pool: ZombiePool;
   private spawner: ZombieSpawner;

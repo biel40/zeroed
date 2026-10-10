@@ -717,7 +717,11 @@ export class CoopHostMode implements GameMode {
   private onPlayerAttacked(damage: number, target: CoopPlayerId, attacker?: Zombie): void {
     if (target === 'guest') {
       if (this.guestConnected && this.players.guest.life.state === 'alive' && this.players.guest.health.damage(damage)) {
-        this.send({ type: 'playerDamaged', damage });
+        this.send({
+          type: 'playerDamaged',
+          damage,
+          attackerId: attacker && this.zombies.networkIdOf(attacker),
+        });
         if (this.players.guest.health.isDead) this.players.guest.life.down();
         this.sendMatchState();
       }

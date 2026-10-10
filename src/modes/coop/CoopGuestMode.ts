@@ -65,8 +65,6 @@ export class CoopGuestMode implements GameMode {
   private sendElapsed = 0;
   private initialMatchWait = 0;
   private wallBuyPending = false;
-  /** Last zombie that wound up on this guest: the host's damage event carries no attacker. */
-  private lastAttacker: Zombie | null = null;
   private wallBuyWait = 0;
   private boxPending = false;
   private boxWait = 0;
@@ -310,7 +308,6 @@ export class CoopGuestMode implements GameMode {
     this.connection.dispose();
     this.hostAvatar.dispose();
     this.replica.reset();
-    this.lastAttacker = null;
     this.ctx.hud.clearCoopPresentation();
   }
 
@@ -424,12 +421,12 @@ export class CoopGuestMode implements GameMode {
         else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
         else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
         break;
-      case 'playerDamaged':
-        this.ctx.audio.playPlayerHurt(this.lastAttacker?.isAlive
-          ? this.world.spatialCueFor(voicePoint(this.lastAttacker.position))
-          : undefined);
+      case 'playerDamaged': {
+        const attacker = message.attackerId === undefined ? null : this.replica.zombieOf(message.attackerId);
+        this.ctx.audio.playPlayerHurt(attacker ? this.world.spatialCueFor(voicePoint(attacker.position)) : undefined);
         this.ctx.hud.flashDamage();
         break;
+      }
       case 'matchRestart':
         this.restartFromHost();
         break;
@@ -480,7 +477,6 @@ export class CoopGuestMode implements GameMode {
     if (target === 'guest') {
       const position = this.ctx.player.rig.position;
       attacker = this.replica.attack(zombieId, position.x, position.y, position.z);
-      this.lastAttacker = attacker;
     } else {
       const host = this.hostAvatar.latest;
       if (host) attacker = this.replica.attack(zombieId, host.x, host.y, host.z);
@@ -498,7 +494,6 @@ export class CoopGuestMode implements GameMode {
     this.box.reset();
     this.energy.reset();
     this.replica.reset();
-    this.lastAttacker = null;
     this.world.reset();
     this.world.placeLocalPlayer('guest');
     this.ctx.resetArsenal();

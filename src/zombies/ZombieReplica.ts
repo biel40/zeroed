@@ -78,6 +78,12 @@ export class ZombieReplica {
     return entry && !entry.dying ? entry.id : null;
   }
 
+  /** Living replica for a host zombie id; null once it is dying or released. */
+  public zombieOf(id: number): Zombie | null {
+    const entry = this.entries.get(id);
+    return entry && !entry.dying ? entry.zombie : null;
+  }
+
   public spawn(state: ZombieNetState): void {
     if (!this.entries.has(state.id)) this.create(state, true);
   }
