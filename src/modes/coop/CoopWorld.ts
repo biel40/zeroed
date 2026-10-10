@@ -11,6 +11,7 @@ import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { BurnedMansionArena } from '../../zombies/maps/BurnedMansionArena';
 import type { ModeContext } from '../GameMode';
+import { cameraSpatialCue, type SpatialCue } from '../../audio/SpatialCue';
 
 const GUEST_SPAWN_OFFSET_Z = -1.8;
 const DOOR_USE_RANGE = 2.5;
@@ -35,22 +36,10 @@ export class CoopWorld {
     this.arena = new BurnedMansionArena(ctx.scene, ctx.profile);
     this.arena.init();
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
-    this.arena.onSoulAbsorbed = (position) => {
-      const cue = this.spatialCueFor(position);
-      ctx.audio.playSoulAbsorb(cue.pan, cue.attenuation);
-    };
-    this.arena.onSoulLampCompleted = (position) => {
-      const cue = this.spatialCueFor(position);
-      ctx.audio.playSoulLampComplete(cue.pan, cue.attenuation);
-    };
-    this.arena.onSecretRoomUnlocked = (position) => {
-      const cue = this.spatialCueFor(position);
-      ctx.audio.playSecretRoomUnlock(cue.pan, cue.attenuation);
-    };
-    this.arena.onRitualScare = (position) => {
-      const cue = this.spatialCueFor(position);
-      ctx.audio.playRitualScare(cue.pan, cue.attenuation);
-    };
+    this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
+    this.arena.onSoulLampCompleted = (position) => ctx.audio.playSoulLampComplete(this.spatialCueFor(position));
+    this.arena.onSecretRoomUnlocked = (position) => ctx.audio.playSecretRoomUnlock(this.spatialCueFor(position));
+    this.arena.onRitualScare = (position) => ctx.audio.playRitualScare(this.spatialCueFor(position));
     ctx.scene.add(this.arena.group);
     ctx.hitColliders.length = 0;
     ctx.hitColliders.push(...this.arena.colliders);
@@ -308,7 +297,8 @@ export class CoopWorld {
 
   public applyBarrierStates(states: readonly BarrierNetState[]): void {
     for (const state of states) {
-      this.arena.barriers.find((barrier) => barrier.id === state.id)?.applyReplicatedBoards(state.boards);
+      const barrier = this.arena.barriers.find((candidate) => candidate.id === state.id);
+      if (barrier?.applyReplicatedBoards(state.boards)) this.playBarrierBreak(barrier);
     }
   }
 
@@ -331,18 +321,15 @@ export class CoopWorld {
     this.onTopologyChanged?.();
   }
 
-  private spatialCueFor(position: THREE.Vector3): { pan: number; attenuation: number } {
-    const camera = this.ctx.player.camera;
-    const listener = camera.getWorldPosition(new THREE.Vector3());
-    const forward = camera.getWorldDirection(new THREE.Vector3());
-    const dx = position.x - listener.x;
-    const dy = position.y - listener.y;
-    const dz = position.z - listener.z;
-    const horizontal = Math.hypot(dx, dz);
-    const distance = Math.hypot(horizontal, dy);
-    return {
-      pan: horizontal > 0.001 ? THREE.MathUtils.clamp((-forward.z * dx + forward.x * dz) / horizontal, -1, 1) : 0,
-      attenuation: THREE.MathUtils.clamp(1 / (1 + Math.max(0, distance - 2) * 0.12), 0.18, 1),
-    };
+  /** Cue for a world point as heard by the local player; both roles share it. */
+  public spatialCueFor(position: { readonly x: number; readonly y: number; readonly z: number }): SpatialCue {
+    return cameraSpatialCue(this.ctx.player.camera, position);
+  }
+
+  /** Barrier board crack from its window, for both the host and the replaying guest. */
+  public playBarrierBreak(barrier: WindowBarrier): void {
+    this.ctx.audio.playBarrierBreak(
+      this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
+    );
   }
 }

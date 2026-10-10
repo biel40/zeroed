@@ -1,6 +1,7 @@
 import type { SurfaceType } from '../shooting/HitTarget';
 import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
 import { MusicManager } from './MusicManager';
+import { muffleCutoff, type SpatialCue } from './SpatialCue';
 
 const PING_THROTTLE = 0.045;
 // Reload foley was hard to hear over gunfire/music; boost it above the raw profile values.
@@ -600,10 +601,13 @@ export class AudioSystem {
     this.tick(0.04, 180, 0.18);
   }
 
-  /** Quiet layered crack as a zombie tears one board away from a window. */
-  public playBarrierBreak(): void {
-    this.tick(0, 680, 0.12, 1.4, 0.07);
-    this.tick(0.025, 230, 0.08, 1.1, 0.1);
+  /** Layered crack from the window where a zombie tears a board away. */
+  public playBarrierBreak(cue: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue);
+    this.tick(0, 680, 0.2, 1.4, 0.07, output);
+    this.tick(0.025, 230, 0.14, 1.1, 0.1, output);
   }
 
   /**
@@ -633,20 +637,20 @@ export class AudioSystem {
   }
 
   /** Quiet stereo cue emitted from a soul lamp when one soul reaches it. */
-  public playSoulAbsorb(pan: number, attenuation: number): void {
+  public playSoulAbsorb(cue: SpatialCue): void {
     const audio = this.context();
     if (!audio) return;
-    const output = this.spatialBus(audio, pan, attenuation);
+    const output = this.spatialBus(audio, cue);
     const t = audio.ctx.currentTime;
     this.sweepTo(audio.ctx, output, t, 'sine', 430, 820, 0.12, 0.13);
     this.toneTo(audio.ctx, output, t + 0.045, 'triangle', 1120, 0.055, 0.09);
   }
 
   /** Bright two-stage chime for a fully charged soul lamp. */
-  public playSoulLampComplete(pan: number, attenuation: number): void {
+  public playSoulLampComplete(cue: SpatialCue): void {
     const audio = this.context();
     if (!audio) return;
-    const output = this.spatialBus(audio, pan, attenuation);
+    const output = this.spatialBus(audio, cue);
     const t = audio.ctx.currentTime;
     this.toneTo(audio.ctx, output, t, 'triangle', 392, 0.24, 0.24);
     this.toneTo(audio.ctx, output, t + 0.1, 'triangle', 587, 0.2, 0.3);
@@ -654,10 +658,10 @@ export class AudioSystem {
   }
 
   /** Heavy map-wide cue for the hidden bunker wall beginning to move. */
-  public playSecretRoomUnlock(pan: number, attenuation: number): void {
+  public playSecretRoomUnlock(cue: SpatialCue): void {
     const audio = this.context();
     if (!audio) return;
-    const output = this.spatialBus(audio, pan, Math.max(0.5, attenuation));
+    const output = this.spatialBus(audio, cue, 0.5);
     const t = audio.ctx.currentTime;
     this.sweepTo(audio.ctx, output, t, 'sawtooth', 105, 42, 0.38, 0.7);
     this.sweepTo(audio.ctx, output, t + 0.15, 'triangle', 240, 720, 0.2, 0.55);
@@ -665,33 +669,77 @@ export class AudioSystem {
   }
 
   /** Abrupt layered sting for the secret-room ritual apparition. */
-  public playRitualScare(pan: number, attenuation: number): void {
+  public playRitualScare(cue: SpatialCue): void {
     const audio = this.context();
     if (!audio) return;
-    const output = this.spatialBus(audio, pan, Math.max(0.65, attenuation));
+    const output = this.spatialBus(audio, cue, 0.65);
     const t = audio.ctx.currentTime;
     this.sweepTo(audio.ctx, output, t, 'sawtooth', 760, 58, 0.2, 0.78);
     this.toneTo(audio.ctx, output, t + 0.025, 'square', 46, 0.32, 0.62);
     this.sweepTo(audio.ctx, output, t + 0.13, 'triangle', 120, 510, 0.18, 0.4);
   }
 
-  /** Brutus attack tell: a layered sub-bass roar distinct from common zombie vocals. */
-  public playBruteRoar(): void {
-    const audio: AudioContextParts | null = this.context();
+  /**
+   * Rising earthy groan from the point where a zombie enters the map: an
+   * upward glide reads as "arriving", the opposite of the death drop.
+   */
+  public playZombieSpawn(cue: SpatialCue): void {
+    const audio = this.context();
     if (!audio) return;
-    const t: number = audio.ctx.currentTime;
-    this.sweep(0, 'sawtooth', 92, 38, 0.48, 0.62, t);
-    this.sweep(0.035, 'triangle', 138, 54, 0.3, 0.48, t);
-    this.tick(0.09, 78, 0.34, 0.7, 0.22);
+    const output = this.spatialBus(audio, cue);
+    const t = audio.ctx.currentTime;
+    this.tick(0, 120, 0.3, 0.8, 0.32, output);
+    this.sweep(0.08, 'sawtooth', 58, 96, 0.2, 0.7, t + 0.08, output);
+    this.sweep(0.14, 'triangle', 90, 150, 0.12, 0.55, t + 0.14, output);
   }
 
-  /** Heavy thump when the player takes a hit. */
-  public playPlayerHurt(): void {
+  /** Wind-up cue from the attacker: Brutus roars, every other zombie snarls. */
+  public playZombieAttack(cue: SpatialCue, brute: boolean): void {
+    if (brute) this.playBruteRoar(cue);
+    else this.playZombieAttackTell(cue);
+  }
+
+  /**
+   * Snarl at the start of a zombie wind-up, from the attacker's position:
+   * it lands ~0.5 s before the hit, enough to turn or step out of reach.
+   */
+  private playZombieAttackTell(cue: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue);
+    const t = audio.ctx.currentTime;
+    this.sweep(0, 'sawtooth', 210, 120, 0.26, 0.24, t, output);
+    this.sweep(0.02, 'square', 140, 90, 0.08, 0.2, t + 0.02, output);
+    this.tick(0, 1100, 0.16, 1.2, 0.12, output);
+  }
+
+  /** Brutus attack tell: a layered sub-bass roar distinct from common zombie vocals. */
+  public playBruteRoar(cue: SpatialCue): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    // The roar is a lethal warning: never let distance bury it.
+    const output = this.spatialBus(audio, cue, 0.6);
+    const t: number = audio.ctx.currentTime;
+    this.sweep(0, 'sawtooth', 92, 38, 0.48, 0.62, t, output);
+    this.sweep(0.035, 'triangle', 138, 54, 0.3, 0.48, t, output);
+    this.tick(0.09, 78, 0.34, 0.7, 0.22, output);
+  }
+
+  /**
+   * Heavy thump when the player takes a hit, centered. With the attacker's
+   * cue, a claw rasp also comes from the side the hit came from.
+   */
+  public playPlayerHurt(from?: SpatialCue): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     const t: number = audio.ctx.currentTime;
     this.sweep(0, 'triangle', 130, 65, 0.55, 0.18, t);
     this.tick(0, 380, 0.35);
+    if (!from) return;
+    // Point-blank by definition: keep the direction, not the distance.
+    const output = this.spatialBus(audio, { ...from, attenuation: 1 });
+    this.tick(0, 1600, 0.3, 1.5, 0.08, output);
+    this.tick(0.03, 620, 0.2, 1.1, 0.1, output);
   }
 
   /**
@@ -737,14 +785,15 @@ export class AudioSystem {
     this.wind = null;
   }
 
-  /** Far-away groan: low, slow, and quiet enough to be half-imagined. */
-  public playDistantMoan(): void {
+  /** Low, slow groan from a living zombie, quiet enough to be half-imagined. */
+  public playDistantMoan(cue: SpatialCue): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
+    const output = this.spatialBus(audio, cue);
     const t: number = audio.ctx.currentTime;
     const base: number = 65 + Math.random() * 40;
-    this.sweep(0, 'sawtooth', base, base * 0.6, 0.05, 1.4, t);
-    this.sweep(0.1, 'triangle', base * 1.5, base, 0.035, 1.1, t);
+    this.sweep(0, 'sawtooth', base, base * 0.6, 0.09, 1.4, t, output);
+    this.sweep(0.1, 'triangle', base * 1.5, base, 0.06, 1.1, t + 0.1, output);
   }
 
   /** Two-note ominous sting when a new round begins. */
@@ -924,6 +973,7 @@ export class AudioSystem {
     volume: number,
     duration: number,
     at?: number,
+    output?: AudioNode,
   ): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
@@ -937,12 +987,19 @@ export class AudioSystem {
     gain.gain.setValueAtTime(volume, t);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     osc.connect(gain);
-    gain.connect(master);
+    gain.connect(output ?? master);
     osc.start(t);
     osc.stop(t + duration + 0.02);
   }
 
-  private tick(offset: number, frequency: number, volume: number, q: number = 6, duration: number = 0.05): void {
+  private tick(
+    offset: number,
+    frequency: number,
+    volume: number,
+    q: number = 6,
+    duration: number = 0.05,
+    output?: AudioNode,
+  ): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     const { ctx, master, noise } = audio;
@@ -959,7 +1016,7 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(master);
+    gain.connect(output ?? master);
     source.start(t, Math.random() * 0.5, Math.max(0.06, duration + 0.02));
   }
 
@@ -992,14 +1049,27 @@ export class AudioSystem {
     this.tick(offset + 0.006, frequency * 1.85, volume * 0.42, 22, duration * 0.6);
   }
 
-  private spatialBus(audio: AudioContextParts, pan: number, attenuation: number): AudioNode {
+  /**
+   * Per-cue chain: [panner] -> low-pass (muffle) -> gain -> master.
+   * `minAttenuation` keeps critical warnings audible across the map.
+   */
+  private spatialBus(audio: AudioContextParts, cue: SpatialCue, minAttenuation: number = 0): AudioNode {
     const gain = audio.ctx.createGain();
-    gain.gain.value = clamp(attenuation, 0, 1);
+    gain.gain.value = clamp(Math.max(minAttenuation, cue.attenuation), 0, 1);
     gain.connect(audio.master);
-    if (typeof audio.ctx.createStereoPanner !== 'function') return gain;
+    let input: AudioNode = gain;
+    if (cue.muffle > 0) {
+      const lowpass = audio.ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = muffleCutoff(cue.muffle);
+      lowpass.Q.value = 0.5;
+      lowpass.connect(input);
+      input = lowpass;
+    }
+    if (typeof audio.ctx.createStereoPanner !== 'function') return input;
     const panner = audio.ctx.createStereoPanner();
-    panner.pan.value = clamp(pan, -1, 1);
-    panner.connect(gain);
+    panner.pan.value = clamp(cue.pan, -1, 1);
+    panner.connect(input);
     return panner;
   }
 

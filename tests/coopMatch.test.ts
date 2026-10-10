@@ -223,7 +223,7 @@ describe('co-op combat authority', () => {
   it('routes zombie damage only to the targeted player', () => {
     const match = startedMatch();
     const zombieManager = host(match).zombies;
-    zombieManager.onPlayerAttack?.(25, 'guest');
+    zombieManager.onPlayerAttack?.(25, 'guest', { position: new THREE.Vector3() } as Zombie);
     match.step();
     expect(host(match).players.guest.health.hp).toBe(50);
     expect(host(match).players.host.health.hp).toBe(75);

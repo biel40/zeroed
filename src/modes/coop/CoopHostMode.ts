@@ -38,6 +38,7 @@ import { RoundManager } from '../../zombies/RoundManager';
 import { ZombiesRunFlow } from '../../zombies/ZombiesRunFlow';
 import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
 import type { GameMode, ModeContext } from '../GameMode';
+import { voicePoint } from '../../audio/SpatialCue';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { CoopRevive, isDownedBodyInRange, REVIVE_DURATION, REVIVE_HEALTH_PERCENT } from './CoopRevive';
@@ -166,15 +167,18 @@ export class CoopHostMode implements GameMode {
       this.zombies.setBarriers(arena.barriers);
       this.zombies.registerColliders(ctx.hitColliders);
     };
-    this.zombies.onZombieSpawned = (zombie) => this.send({ type: 'zombieSpawn', zombie: this.zombieState(zombie) });
+    this.zombies.onZombieSpawned = (zombie) => {
+      this.send({ type: 'zombieSpawn', zombie: this.zombieState(zombie) });
+      ctx.audio.playZombieSpawn(this.world.spatialCueFor(voicePoint(zombie.position)));
+    };
     this.zombies.onZombieAttack = (zombie, target) => {
       this.send({ type: 'zombieAttack', zombieId: this.zombies.networkIdOf(zombie), target });
+      ctx.audio.playZombieAttack(this.world.spatialCueFor(voicePoint(zombie.position)), zombie.typeId === 'brute');
     };
     this.zombies.onZombieDamaged = (damage) => { this.players[this.shooter].totalDamage += damage; };
     this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(zombie, headshot, source);
-    this.zombies.onPlayerAttack = (damage, target) => this.onPlayerAttacked(damage, target ?? 'host');
-    this.zombies.onBruteAttack = () => ctx.audio.playBruteRoar();
-    this.zombies.onBarrierImpact = () => ctx.audio.playBarrierBreak();
+    this.zombies.onPlayerAttack = (damage, target, attacker) => this.onPlayerAttacked(damage, target, attacker);
+    this.zombies.onBarrierImpact = (barrier) => this.world.playBarrierBreak(barrier);
     ctx.scene.add(this.zombies.group);
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
     this.energy.onImpact = (point, config, object, distance, sourceId) =>
@@ -710,7 +714,7 @@ export class CoopHostMode implements GameMode {
     this.sendMatchState();
   }
 
-  private onPlayerAttacked(damage: number, target: CoopPlayerId): void {
+  private onPlayerAttacked(damage: number, target: CoopPlayerId, attacker?: Zombie): void {
     if (target === 'guest') {
       if (this.guestConnected && this.players.guest.life.state === 'alive' && this.players.guest.health.damage(damage)) {
         this.send({ type: 'playerDamaged', damage });
@@ -720,7 +724,7 @@ export class CoopHostMode implements GameMode {
       return;
     }
     if (this.players.host.life.state === 'alive' && this.players.host.health.damage(damage)) {
-      this.ctx.audio.playPlayerHurt();
+      this.ctx.audio.playPlayerHurt(attacker && this.world.spatialCueFor(voicePoint(attacker.position)));
       this.ctx.hud.flashDamage();
       if (this.players.host.health.isDead) this.players.host.life.down();
       this.sendMatchState();

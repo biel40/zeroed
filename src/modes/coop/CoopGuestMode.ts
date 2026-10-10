@@ -24,6 +24,7 @@ import type { Zombie } from '../../zombies/Zombie';
 import { PLAYER_MAX_HP } from '../../zombies/ZombieConfig';
 import { ZombieReplica } from '../../zombies/ZombieReplica';
 import type { GameMode, ModeContext } from '../GameMode';
+import { voicePoint } from '../../audio/SpatialCue';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { isDownedBodyInRange } from './CoopRevive';
@@ -64,6 +65,8 @@ export class CoopGuestMode implements GameMode {
   private sendElapsed = 0;
   private initialMatchWait = 0;
   private wallBuyPending = false;
+  /** Last zombie that wound up on this guest: the host's damage event carries no attacker. */
+  private lastAttacker: Zombie | null = null;
   private wallBuyWait = 0;
   private boxPending = false;
   private boxWait = 0;
@@ -307,6 +310,7 @@ export class CoopGuestMode implements GameMode {
     this.connection.dispose();
     this.hostAvatar.dispose();
     this.replica.reset();
+    this.lastAttacker = null;
     this.ctx.hud.clearCoopPresentation();
   }
 
@@ -344,6 +348,7 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'zombieSpawn':
         this.replica.spawn(message.zombie);
+        this.ctx.audio.playZombieSpawn(this.world.spatialCueFor(voicePoint(message.zombie)));
         break;
       case 'zombieAttack':
         this.replicateAttack(message.zombieId, message.target);
@@ -420,7 +425,9 @@ export class CoopGuestMode implements GameMode {
         else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
         break;
       case 'playerDamaged':
-        this.ctx.audio.playPlayerHurt();
+        this.ctx.audio.playPlayerHurt(this.lastAttacker?.isAlive
+          ? this.world.spatialCueFor(voicePoint(this.lastAttacker.position))
+          : undefined);
         this.ctx.hud.flashDamage();
         break;
       case 'matchRestart':
@@ -469,13 +476,18 @@ export class CoopGuestMode implements GameMode {
   }
 
   private replicateAttack(zombieId: number, target: 'host' | 'guest'): void {
+    let attacker: Zombie | null = null;
     if (target === 'guest') {
       const position = this.ctx.player.rig.position;
-      this.replica.attack(zombieId, position.x, position.y, position.z);
-      return;
+      attacker = this.replica.attack(zombieId, position.x, position.y, position.z);
+      this.lastAttacker = attacker;
+    } else {
+      const host = this.hostAvatar.latest;
+      if (host) attacker = this.replica.attack(zombieId, host.x, host.y, host.z);
     }
-    const host = this.hostAvatar.latest;
-    if (host) this.replica.attack(zombieId, host.x, host.y, host.z);
+    if (attacker) {
+      this.ctx.audio.playZombieAttack(this.world.spatialCueFor(voicePoint(attacker.position)), attacker.typeId === 'brute');
+    }
   }
 
   private restartFromHost(): void {
@@ -486,6 +498,7 @@ export class CoopGuestMode implements GameMode {
     this.box.reset();
     this.energy.reset();
     this.replica.reset();
+    this.lastAttacker = null;
     this.world.reset();
     this.world.placeLocalPlayer('guest');
     this.ctx.resetArsenal();
