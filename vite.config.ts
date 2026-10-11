@@ -107,5 +107,9 @@ export default defineConfig(({ mode }) => ({
     include: ['tests/**/*.test.ts'],
     // Gameplay tests assert English texts regardless of the machine locale.
     setupFiles: ['tests/setup.ts'],
+    // Co-op and zombie integration tests build the real Burned Mansion synchronously (~0.2 s alone),
+    // which a saturated machine stretches past the 5 s default. A synchronous test cannot be
+    // interrupted anyway, so the default only produced load-dependent failures.
+    testTimeout: 30_000,
   },
 }));
