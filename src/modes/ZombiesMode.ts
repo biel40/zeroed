@@ -43,6 +43,7 @@ import type {
 import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
+import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
@@ -149,29 +150,21 @@ export class ZombiesMode implements GameMode {
       source,
     );
     this.zombies.onZombieDamaged = (damage) => { this.totalDamage += damage; };
-    this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
-    this.zombies.onBruteAttack = () => ctx.audio.playBruteRoar();
-    this.zombies.onBarrierImpact = () => ctx.audio.playBarrierBreak();
+    this.zombies.onPlayerAttack = (damage, _target, attacker) => this.onPlayerHit(damage, voicePoint(attacker.position));
+    this.zombies.onZombieSpawned = (zombie) => ctx.audio.playZombieSpawn(this.spatialCueFor(voicePoint(zombie.position)));
+    this.zombies.onZombieAttack = (zombie) =>
+      ctx.audio.playZombieAttack(this.spatialCueFor(voicePoint(zombie.position)), zombie.typeId === 'brute');
+    this.zombies.onBarrierImpact = (barrier) => ctx.audio.playBarrierBreak(
+      this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
+    );
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     ctx.scene.add(this.zombies.group);
     if (this.arena instanceof BurnedMansionArena) {
       this.arena.onTopologyChanged = () => this.syncMansionArena(this.mansionStaticColliders);
-      this.arena.onSoulAbsorbed = (position) => {
-        const spatial = this.spatialCueFor(position);
-        ctx.audio.playSoulAbsorb(spatial.pan, spatial.attenuation);
-      };
-      this.arena.onSoulLampCompleted = (position) => {
-        const spatial = this.spatialCueFor(position);
-        ctx.audio.playSoulLampComplete(spatial.pan, spatial.attenuation);
-      };
-      this.arena.onSecretRoomUnlocked = (position) => {
-        const spatial = this.spatialCueFor(position);
-        ctx.audio.playSecretRoomUnlock(spatial.pan, spatial.attenuation);
-      };
-      this.arena.onRitualScare = (position) => {
-        const spatial = this.spatialCueFor(position);
-        ctx.audio.playRitualScare(spatial.pan, spatial.attenuation);
-      };
+      this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
+      this.arena.onSoulLampCompleted = (position) => ctx.audio.playSoulLampComplete(this.spatialCueFor(position));
+      this.arena.onSecretRoomUnlocked = (position) => ctx.audio.playSecretRoomUnlock(this.spatialCueFor(position));
+      this.arena.onRitualScare = (position) => ctx.audio.playRitualScare(this.spatialCueFor(position));
     }
 
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
@@ -902,21 +895,8 @@ export class ZombiesMode implements GameMode {
     }
   }
 
-  private spatialCueFor(position: THREE.Vector3): { pan: number; attenuation: number } {
-    this.ctx.player.camera.getWorldPosition(this.tmpAudioPosition);
-    this.ctx.player.camera.getWorldDirection(this.tmpDirection);
-    const dx = position.x - this.tmpAudioPosition.x;
-    const dy = position.y - this.tmpAudioPosition.y;
-    const dz = position.z - this.tmpAudioPosition.z;
-    const horizontalDistance = Math.hypot(dx, dz);
-    const distance = Math.hypot(horizontalDistance, dy);
-    const rightX = -this.tmpDirection.z;
-    const rightZ = this.tmpDirection.x;
-    const pan = horizontalDistance > 0.001
-      ? THREE.MathUtils.clamp((dx * rightX + dz * rightZ) / horizontalDistance, -1, 1)
-      : 0;
-    const attenuation = THREE.MathUtils.clamp(1 / (1 + Math.max(0, distance - 2) * 0.12), 0.18, 1);
-    return { pan, attenuation };
+  private spatialCueFor(position: { readonly x: number; readonly y: number; readonly z: number }): SpatialCue {
+    return cameraSpatialCue(this.ctx.player.camera, position);
   }
 
   /**
@@ -947,10 +927,10 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.playTeslaUnlock();
   }
 
-  private onPlayerHit(damage: number): void {
+  private onPlayerHit(damage: number, from?: { readonly x: number; readonly y: number; readonly z: number }): void {
     if (!this.isGameplayInputEnabled()) return;
     if (!this.health.damage(damage)) return;
-    this.ctx.audio.playPlayerHurt();
+    this.ctx.audio.playPlayerHurt(from && this.spatialCueFor(from));
     this.ctx.hud.flashDamage();
     // Trauma-based shake: offsets pile up and decay smoothly.
     this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);
@@ -976,8 +956,15 @@ export class ZombiesMode implements GameMode {
     this.moanTimer -= dt;
     if (this.moanTimer <= 0) {
       this.moanTimer = MOAN_MIN_DELAY + Math.random() * MOAN_SPREAD;
-      this.ctx.audio.playDistantMoan();
+      // Moans come from a real zombie, so the ambience doubles as a radar.
+      const moaner = this.randomLivingZombie();
+      if (moaner) this.ctx.audio.playDistantMoan(this.spatialCueFor(voicePoint(moaner.position)));
     }
+  }
+
+  private randomLivingZombie(): Zombie | null {
+    const living = [...this.zombies.actives].filter((zombie) => zombie.isAlive);
+    return living.length > 0 ? living[Math.floor(Math.random() * living.length)] : null;
   }
 
   private onEnergyImpact(

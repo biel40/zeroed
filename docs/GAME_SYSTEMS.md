@@ -55,6 +55,12 @@ como cue independiente sobre la música de fondo.
   continua de canal unico, sin teletransporte.
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
   fallback sintetizado si falta el asset.
+- Audio direccional (`SpatialCue`): aparicion, inicio del ataque (gruñido o
+  rugido del Brute), tablas arrancadas, gemidos ambientales (siempre de un
+  zombie vivo) y el golpe recibido suenan desde su origen. Las fuentes a la
+  espalda o en otra planta pasan por un paso bajo que las apaga, tambien en
+  los pasos, para distinguir delante/detras y arriba/abajo. En cooperativo el
+  invitado reproduce las mismas señales a partir de los eventos del anfitrion.
 - Animacion: el walker conserva completos los clips originales de idle, marcha
   y muerte del GLB. El mixer sincroniza la marcha con la velocidad y mezcla los
   cambios de estado, mientras una capa aditiva limitada aporta inercia de giro,

@@ -24,6 +24,7 @@ import type { Zombie } from '../../zombies/Zombie';
 import { PLAYER_MAX_HP } from '../../zombies/ZombieConfig';
 import { ZombieReplica } from '../../zombies/ZombieReplica';
 import type { GameMode, ModeContext } from '../GameMode';
+import { voicePoint } from '../../audio/SpatialCue';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { isDownedBodyInRange } from './CoopRevive';
@@ -344,6 +345,7 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'zombieSpawn':
         this.replica.spawn(message.zombie);
+        this.ctx.audio.playZombieSpawn(this.world.spatialCueFor(voicePoint(message.zombie)));
         break;
       case 'zombieAttack':
         this.replicateAttack(message.zombieId, message.target);
@@ -419,10 +421,12 @@ export class CoopGuestMode implements GameMode {
         else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
         else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
         break;
-      case 'playerDamaged':
-        this.ctx.audio.playPlayerHurt();
+      case 'playerDamaged': {
+        const attacker = message.attackerId === undefined ? null : this.replica.zombieOf(message.attackerId);
+        this.ctx.audio.playPlayerHurt(attacker ? this.world.spatialCueFor(voicePoint(attacker.position)) : undefined);
         this.ctx.hud.flashDamage();
         break;
+      }
       case 'matchRestart':
         this.restartFromHost();
         break;
@@ -432,6 +436,8 @@ export class CoopGuestMode implements GameMode {
   private applyMatchState(state: MatchState): void {
     const previousBox = this.box.snapshot();
     const previousPhase = this.match?.phase;
+    // The first snapshot (join or restart) is a baseline, not a stream of new strikes.
+    const firstSnapshot = this.match === null;
     this.match = state;
     for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(state.stats.guest.kills);
     this.ctx.hud.setHostPauseVisible(state.hostPaused);
@@ -442,7 +448,7 @@ export class CoopGuestMode implements GameMode {
     this.hostAvatar.setLife(state.stats.host.life, state.stats.host.reviver !== null);
     this.replica.applyStates(state.t, state.zombies);
     this.world.applyOpenDoors(state.openDoorIds);
-    this.world.applyBarrierStates(state.barriers);
+    this.world.applyBarrierStates(state.barriers, !firstSnapshot);
     this.world.arena.applySecretSnapshot(state.secret);
     for (const id of state.claimedPickupIds) this.world.arena.weaponPickups.find((entry) => entry.id === id)?.claim();
     this.box.applySnapshot(state.box);
@@ -469,13 +475,17 @@ export class CoopGuestMode implements GameMode {
   }
 
   private replicateAttack(zombieId: number, target: 'host' | 'guest'): void {
+    let attacker: Zombie | null = null;
     if (target === 'guest') {
       const position = this.ctx.player.rig.position;
-      this.replica.attack(zombieId, position.x, position.y, position.z);
-      return;
+      attacker = this.replica.attack(zombieId, position.x, position.y, position.z);
+    } else {
+      const host = this.hostAvatar.latest;
+      if (host) attacker = this.replica.attack(zombieId, host.x, host.y, host.z);
     }
-    const host = this.hostAvatar.latest;
-    if (host) this.replica.attack(zombieId, host.x, host.y, host.z);
+    if (attacker) {
+      this.ctx.audio.playZombieAttack(this.world.spatialCueFor(voicePoint(attacker.position)), attacker.typeId === 'brute');
+    }
   }
 
   private restartFromHost(): void {

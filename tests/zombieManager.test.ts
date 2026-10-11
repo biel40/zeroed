@@ -162,12 +162,18 @@ describe('ZombieManager barrier feedback', () => {
     const hitBarrier = (manager as unknown as { hitBarrier: (target: WindowBarrier) => void })
       .hitBarrier.bind(manager);
     let impacts = 0;
-    manager.onBarrierImpact = () => impacts++;
+    let struck: WindowBarrier | null = null;
+    manager.onBarrierImpact = (target) => {
+      impacts++;
+      struck = target;
+    };
 
     manager.update(DT, 0, 0);
     hitBarrier(barrier);
     hitBarrier(barrier);
     expect(impacts).toBe(1);
+    // The window itself is reported so the crack plays from where zombies break in.
+    expect(struck).toBe(barrier);
 
     barrier.repair(0.1);
     manager.update(DT, 0, 0);
@@ -451,7 +457,7 @@ describe('ZombieManager movement', () => {
     brute.state = 'walk';
     const roar = vi.fn();
     let damage = 0;
-    manager.onBruteAttack = roar;
+    manager.onZombieAttack = (zombie) => { if (zombie.typeId === 'brute') roar(); };
     manager.onPlayerAttack = (amount) => { damage += amount; };
 
     // Brutus first turns its whole body toward the target, then commits the

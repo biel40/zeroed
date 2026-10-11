@@ -132,7 +132,7 @@ export type HostMessage =
     readonly buyer: CoopPlayerId; readonly weapon?: WeaponId }
   | { readonly type: 'mapUseFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'ammoFull' }
   | { readonly type: 'boxFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'reserved' }
-  | { readonly type: 'playerDamaged'; readonly damage: number }
+  | { readonly type: 'playerDamaged'; readonly damage: number; readonly attackerId?: number }
   | { readonly type: 'matchRestart' };
 
 export type LobbyClientMessage =
@@ -370,7 +370,11 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
       return raw.reason === 'unavailable' || raw.reason === 'insufficientPoints' || raw.reason === 'reserved'
         ? { type: 'boxFailed', reason: raw.reason } : null;
     case 'playerDamaged':
-      return isFiniteNumber(raw.damage) ? { type: 'playerDamaged', damage: raw.damage } : null;
+      if (!isFiniteNumber(raw.damage)) return null;
+      if (raw.attackerId === undefined) return { type: 'playerDamaged', damage: raw.damage };
+      return Number.isInteger(raw.attackerId)
+        ? { type: 'playerDamaged', damage: raw.damage, attackerId: raw.attackerId as number }
+        : null;
     case 'matchRestart':
       return { type: 'matchRestart' };
     default:

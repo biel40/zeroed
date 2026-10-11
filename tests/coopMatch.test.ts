@@ -11,6 +11,8 @@ import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
 import type { Zombie } from '../src/zombies/Zombie';
 import { roundConfig } from '../src/zombies/ZombieConfig';
+import { voicePoint } from '../src/audio/SpatialCue';
+import { parseHostMessage } from '../src/network/Protocol';
 import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
 import type { ZombieManager, ZombiePlayerTarget } from '../src/zombies/ZombieManager';
 import type { ZombieReplica } from '../src/zombies/ZombieReplica';
@@ -220,10 +222,57 @@ describe('co-op combat authority', () => {
     expect(guest(match).replica.aliveCount).toBe(0);
   });
 
+  it('plays the guest hurt cue from the zombie that landed the hit, not the latest wind-up', () => {
+    const match = startedMatch();
+    const striker = spawnOne(match);
+    const other = spawnOne(match);
+    const strikerReplica = replicaOf(match, striker);
+    const otherReplica = replicaOf(match, other);
+    const guestPos = match.guestSide.player.rig.position;
+    strikerReplica.position.set(guestPos.x + 1, guestPos.y, guestPos.z);
+    otherReplica.position.set(guestPos.x - 1, guestPos.y, guestPos.z);
+    const playPlayerHurt = match.guestSide.ctx.audio.playPlayerHurt as ReturnType<typeof vi.fn>;
+
+    // The striker winds up first; another zombie winds up before it lands.
+    match.relay.guest.onMessage?.({ type: 'zombieAttack', zombieId: host(match).zombies.networkIdOf(striker), target: 'guest' });
+    match.relay.guest.onMessage?.({ type: 'zombieAttack', zombieId: host(match).zombies.networkIdOf(other), target: 'guest' });
+    host(match).zombies.onPlayerAttack?.(25, 'guest', striker);
+    match.relay.flush();
+
+    const sent = match.relay.sent('host', 'playerDamaged') as Array<{ attackerId?: number }>;
+    expect(sent.at(-1)?.attackerId).toBe(host(match).zombies.networkIdOf(striker));
+    expect(playPlayerHurt).toHaveBeenLastCalledWith(
+      guest(match).world.spatialCueFor(voicePoint(strikerReplica.position)),
+    );
+  });
+
+  it('adopts damaged boards silently on the first snapshot, then cracks on new strikes', () => {
+    const match = startedMatch();
+    const barrier = host(match).world.arena.barriers[0];
+    const playBarrierBreak = match.guestSide.ctx.audio.playBarrierBreak as ReturnType<typeof vi.fn>;
+    // A late join or a restart: the guest has no snapshot yet, the host already has damage.
+    (guest(match) as unknown as { match: MatchState | null }).match = null;
+    barrier.damage(1);
+    match.step(1 / 30, 4);
+    expect(guest(match).world.arena.barriers[0].boards.some((board) => board.hp < board.maxHp)).toBe(true);
+    expect(playBarrierBreak).not.toHaveBeenCalled();
+
+    barrier.damage(1);
+    match.step(1 / 30, 4);
+    expect(playBarrierBreak).toHaveBeenCalledOnce();
+  });
+
+  it('accepts damage events with or without a valid attacker id', () => {
+    expect(parseHostMessage({ type: 'playerDamaged', damage: 25 })).toEqual({ type: 'playerDamaged', damage: 25 });
+    expect(parseHostMessage({ type: 'playerDamaged', damage: 25, attackerId: 7 }))
+      .toEqual({ type: 'playerDamaged', damage: 25, attackerId: 7 });
+    expect(parseHostMessage({ type: 'playerDamaged', damage: 25, attackerId: 'x' })).toBeNull();
+  });
+
   it('routes zombie damage only to the targeted player', () => {
     const match = startedMatch();
     const zombieManager = host(match).zombies;
-    zombieManager.onPlayerAttack?.(25, 'guest');
+    zombieManager.onPlayerAttack?.(25, 'guest', { position: new THREE.Vector3() } as Zombie);
     match.step();
     expect(host(match).players.guest.health.hp).toBe(50);
     expect(host(match).players.host.health.hp).toBe(75);
