@@ -14,7 +14,7 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 
 `Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. `Weapon` gobierna cadencia, municion,
-ADS, recoil y recarga; `WeaponView` muestra el arma sin manos y
+ADS, recoil y recarga; `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
 `AudioSystem` sincroniza el foley. Las armas de cerrojo (L96) expulsan el
 casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
 levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la

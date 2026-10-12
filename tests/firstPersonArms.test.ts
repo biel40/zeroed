@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { ARM_DETAIL, FirstPersonArm } from '../src/weapons/FirstPersonArm';
+import { FINGER_LAYOUT, FINGERS, HAND_POSES, PHALANX_TAPER } from '../src/weapons/HandPoses';
 import { KNIFE_ATTACK_DURATION, KNIFE_HIDE_PROGRESS, KNIFE_SHOW_PROGRESS, Knife } from '../src/weapons/Knife';
 import { ViewArms } from '../src/weapons/ViewArms';
 import { Weapon } from '../src/weapons/Weapon';
 import { WeaponView } from '../src/weapons/WeaponView';
-import type { WeaponDefinition, WeaponId } from '../src/weapons/WeaponTypes';
+import type { HandGripConfig, WeaponDefinition, WeaponId } from '../src/weapons/WeaponTypes';
 
 const originalDocument = globalThis.document;
 
@@ -58,24 +59,45 @@ function frame({ weapon, view, arms }: Rig, options: { ads?: boolean; lowering?:
 /** Distance between the glove's grip point and the weapon's target for that hand. */
 function gripError({ view, arms }: Rig, side: 'left' | 'right'): number {
   const target = new THREE.Vector3();
-  view.hands.read(side, target, new THREE.Quaternion(), new THREE.Vector3());
+  view.hands.read(side, target, new THREE.Quaternion());
   return arms[side].getGripWorldPosition(new THREE.Vector3()).distanceTo(target);
 }
 
 /**
- * Interior elbow angle, and whether the elbow points the natural way: below
- * the shoulder-wrist line or out to the arm's own side, never up and inward.
+ * Interior elbow angle, and whether the elbow sits the natural way: the
+ * forearm drops from the hand to it and it stays out on the arm's own side,
+ * never rising toward the eye or crossing in front of the other hand.
  */
 function elbowShape(arm: FirstPersonArm): { angle: number; natural: boolean } {
   const shoulder = arm.getShoulderWorldPosition(new THREE.Vector3());
   const elbow = arm.getElbowWorldPosition(new THREE.Vector3());
   const wrist = arm.getWristWorldPosition(new THREE.Vector3());
   const angle = shoulder.clone().sub(elbow).angleTo(wrist.clone().sub(elbow));
-  const line = new THREE.Line3(shoulder, wrist);
-  const closest = line.closestPointToPoint(elbow, true, new THREE.Vector3());
-  const offset = elbow.sub(closest);
-  const outward = arm.side === 'right' ? offset.x : -offset.x;
-  return { angle, natural: offset.y < 0 || outward > 0 };
+  const outward = arm.side === 'right' ? elbow.x - wrist.x : wrist.x - elbow.x;
+  return { angle, natural: elbow.y < wrist.y && outward > 0 };
+}
+
+/** Wrist bend between the forearm and the knuckles, and the glove's roll against the forearm. */
+function wristShape(arm: FirstPersonArm): { bend: number; twist: number } {
+  const forearm = arm.getWristWorldPosition(new THREE.Vector3()).sub(arm.getElbowWorldPosition(new THREE.Vector3()));
+  const wrist = arm.mesh.skeleton.bones[2];
+  const knuckles = new THREE.Vector3(0, 0, -1).applyQuaternion(wrist.getWorldQuaternion(new THREE.Quaternion()));
+  // Twist part of the wrist's local rotation about its own length (Z).
+  const twist = 2 * Math.atan2(wrist.quaternion.z, wrist.quaternion.w);
+  return { bend: forearm.angleTo(knuckles), twist: Math.atan2(Math.sin(twist), Math.cos(twist)) };
+}
+
+/** Signed distance from a weapon-space point to a grip's held part (a rounded prism). */
+function holdDistance(grip: HandGripConfig, point: THREE.Vector3): number {
+  const length = new THREE.Vector3(...grip.hold!.axis).normalize();
+  const across = new THREE.Vector3(1, 0, 0).addScaledVector(length, -length.x).normalize();
+  const through = new THREE.Vector3().crossVectors(length, across);
+  const offset = point.clone().sub(new THREE.Vector3(...grip.position));
+  const [width, depth] = grip.hold!.size;
+  const corner = Math.min(width, depth) / 2 * 0.7;
+  const qu = Math.abs(offset.dot(across)) - (width / 2 - corner);
+  const qv = Math.abs(offset.dot(through)) - (depth / 2 - corner);
+  return Math.hypot(Math.max(qu, 0), Math.max(qv, 0)) + Math.min(Math.max(qu, qv), 0) - corner;
 }
 
 describe('Weapon hand anchors', () => {
@@ -122,22 +144,75 @@ describe('Weapon hand anchors', () => {
       }
     }
   });
+
+  it.each(WEAPONS)('%s: forearms continue the hands, wrists barely bend and never twist', (id) => {
+    const definition = WEAPON_DEFINITIONS[id];
+    for (const options of [{}, { ads: true }]) {
+      const setup = rig(definition);
+      for (let step = 0; step < 90; step++) frame(setup, options);
+      if (!setup.view.root.visible) continue;
+      for (const arm of definition.view.hands.left ? [setup.arms.right, setup.arms.left] : [setup.arms.right]) {
+        const { bend, twist } = wristShape(arm);
+        expect(bend, `${id} ${arm.side} wrist bend`).toBeLessThan(THREE.MathUtils.degToRad(32));
+        expect(Math.abs(twist), `${id} ${arm.side} wrist twist`).toBeLessThan(THREE.MathUtils.degToRad(5));
+      }
+    }
+  });
+
+  it.each(WEAPONS)('%s: wrapping fingers rest on the held part and the index on the trigger', (id) => {
+    const definition = WEAPON_DEFINITIONS[id];
+    const setup = rig(definition);
+    for (let step = 0; step < 90; step++) frame(setup);
+    for (const side of ['right', 'left'] as const) {
+      const grip = definition.view.hands[side];
+      if (!grip?.hold) continue;
+      const bones = setup.arms[side].mesh.skeleton.bones;
+      const local = (bone: number, length: number) => setup.view.root.worldToLocal(bones[bone].localToWorld(new THREE.Vector3(0, 0, -length)));
+      for (const name of HAND_POSES[grip.pose].wrap ?? []) {
+        const finger = FINGERS.indexOf(name);
+        const { lengths, radius } = FINGER_LAYOUT[name];
+        const depths = lengths.map((length, segment) => holdDistance(grip, local(3 + finger * 3 + segment, length)) - radius * PHALANX_TAPER ** segment);
+        // Glove padding may sink a few millimetres; the finger must touch somewhere.
+        expect(Math.min(...depths), `${id} ${side} ${name} sinks`).toBeGreaterThan(-0.006);
+        expect(Math.min(...depths), `${id} ${side} ${name} floats`).toBeLessThan(0.004);
+      }
+      if (grip.trigger) {
+        const { lengths, radius } = FINGER_LAYOUT.index;
+        const pad = local(5, lengths[2] * 0.6);
+        expect(pad.distanceTo(new THREE.Vector3(...grip.trigger)), `${id} trigger finger`).toBeLessThan(radius + 0.008);
+      }
+    }
+  });
+
+  it.each(WEAPONS)('%s: the gloves stay under the sight line when aiming', (id) => {
+    const definition = WEAPON_DEFINITIONS[id];
+    const setup = rig(definition);
+    for (let step = 0; step < 90; step++) frame(setup, { ads: true });
+    const sightLine = definition.view.sightHeight * definition.view.scale;
+    for (const side of ['right', 'left'] as const) {
+      if (!definition.view.hands[side]) continue;
+      for (const bone of setup.arms[side].mesh.skeleton.bones.slice(3)) {
+        const tip = setup.view.root.worldToLocal(bone.localToWorld(new THREE.Vector3(0, 0, -0.02)));
+        expect(tip.y, `${id} ${side} ${bone.name}`).toBeLessThan(sightLine - 0.015);
+      }
+    }
+  });
 });
 
 describe('Glove fingers', () => {
   it('eases between poses without jumping', () => {
     const arm = new FirstPersonArm('right');
-    arm.setHandPose('rifleGrip', 1);
+    arm.setHandPose(HAND_POSES.rifleGrip, 1);
     const start = Float32Array.from(arm.poseValues);
-    arm.setHandPose('magazineGrab', 1);
+    arm.setHandPose(HAND_POSES.magazineGrab, 1);
     const end = Float32Array.from(arm.poseValues);
     const total = Math.max(...start.map((value, slot) => Math.abs(end[slot] - value)));
-    arm.setHandPose('rifleGrip', 1);
+    arm.setHandPose(HAND_POSES.rifleGrip, 1);
 
     const blend = 1 - Math.exp(-22 * DT);
     let previous = Float32Array.from(arm.poseValues);
     for (let step = 0; step < 40; step++) {
-      arm.setHandPose('magazineGrab', blend);
+      arm.setHandPose(HAND_POSES.magazineGrab, blend);
       const current = arm.poseValues;
       const jump = Math.max(...current.map((value, slot) => Math.abs(value - previous[slot])));
       expect(jump).toBeLessThanOrEqual(total * blend + 1e-6);
@@ -269,7 +344,7 @@ describe('Reload hands', () => {
     expect(gripError(setup, 'left')).toBeLessThan(TOLERANCE);
     expect(gripError(setup, 'right')).toBeLessThan(TOLERANCE);
     const target = new THREE.Vector3();
-    setup.view.hands.read('left', target, new THREE.Quaternion(), new THREE.Vector3());
+    setup.view.hands.read('left', target, new THREE.Quaternion());
     const anchor = WEAPON_DEFINITIONS.m4a1.view.hands.left!.position;
     expect(setup.view.root.worldToLocal(target).distanceTo(new THREE.Vector3(...anchor))).toBeLessThan(1e-6);
   });
@@ -279,7 +354,7 @@ describe('Reload hands', () => {
     const setup = rig(definition);
     for (let step = 0; step < 30; step++) frame(setup);
     const restingGrip = new THREE.Vector3();
-    setup.view.hands.read('right', restingGrip, new THREE.Quaternion(), new THREE.Vector3());
+    setup.view.hands.read('right', restingGrip, new THREE.Quaternion());
     setup.weapon.update(DT, { trigger: true, ads: false });
     setup.weapon.clearEvents();
     let farthest = 0;

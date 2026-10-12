@@ -58,10 +58,16 @@ sufra tirones de compilacion de shaders.
   arma y cuanto de la mano derecha toma el tajo.
 - Los brazos en primera persona (`ViewArms`) son un servicio de `Game` en la
   camara, unico para todas las armas y el cuchillo. Cada arma declara en
-  `view.hands` sus puntos de agarre (posicion, eje del agarre, normal de la
-  palma, pose de dedos y polo del codo) en el espacio de su raiz;
-  `WeaponHands` los convierte en objetivos que siguen balanceo, retroceso,
-  ADS, equipamiento, recargas y bajada del arma sin duplicar esas capas.
+  `view.hands` sus puntos de agarre (centro de la pieza, eje del pulgar,
+  normal de la palma y pose de dedos, mas la seccion de la pieza sujetada y
+  el gatillo) en el espacio de su raiz; `WeaponHands` cierra una vez los
+  dedos sobre esa pieza (`fitHandPose`), sin subirlos nunca a menos de 1 cm
+  de la linea de mira en los agarres de reposo, y los convierte en objetivos que
+  siguen balanceo, retroceso, ADS, equipamiento, recargas y bajada del arma
+  sin duplicar esas capas. El antebrazo continua la mano y el hombro es un
+  ancla virtual fuera de pantalla, asi que la orientacion de cada agarre
+  decide tambien la del brazo. Una corredera o manivela con muelle se suelta al
+  final de su recorrido: la mano se abre alli y el muelle la devuelve sola.
 - Logica determinista y vistas Three.js permanecen separadas para poder probar
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
   municion la decide el modo.

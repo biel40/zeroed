@@ -1,17 +1,22 @@
 import * as THREE from 'three';
-import { ARM_DETAIL, ELBOW_HINT_SHARE, FirstPersonArm } from './FirstPersonArm';
+import { ARM_DETAIL, FirstPersonArm } from './FirstPersonArm';
 import type { ArmDetail } from './FirstPersonArm';
+import { HAND_POSES } from './HandPoses';
+import type { HandPose } from './HandPoses';
 import type { WeaponHands } from './WeaponHands';
-import type { HandPoseId } from './WeaponTypes';
 
-/** Camera-space shoulders: below the screen, the left one forward to reach handguards. */
+/** Camera-space shoulder of the knife's authored arm chain. */
 export const RIGHT_SHOULDER = new THREE.Vector3(0.27, -0.37, 0);
-export const LEFT_SHOULDER = new THREE.Vector3(-0.1, -0.42, -0.22);
+/**
+ * Camera-space points the upper arms reach back toward while holding a
+ * weapon: below and behind the screen, so the forearms leave it through the
+ * bottom corners and the shoulders follow the grips instead of the wrists.
+ */
+const RIGHT_REACH = new THREE.Vector3(0.42, -0.3, 0.3);
+const LEFT_REACH = new THREE.Vector3(-0.4, -0.34, 0.1);
 
 /** Finger poses settle in ~0.15 s instead of snapping. */
 const POSE_RATE = 22;
-/** Elbow hint distance along the anchor pole. */
-const POLE_REACH = 0.4;
 
 /** A mode-owned melee animation that borrows the right arm (the knife). */
 export interface MeleeArmDriver {
@@ -42,8 +47,7 @@ export class ViewArms {
 
   private readonly grip = new THREE.Vector3();
   private readonly rotation = new THREE.Quaternion();
-  private readonly pole = new THREE.Vector3();
-  private readonly hint = new THREE.Vector3();
+  private readonly shoulder = new THREE.Vector3();
   private readonly meleeGrip = new THREE.Vector3();
   private readonly meleeRotation = new THREE.Quaternion();
   private readonly meleeElbow = new THREE.Vector3();
@@ -52,8 +56,6 @@ export class ViewArms {
     this.root.name = 'view-arms';
     this.right = new FirstPersonArm('right', detail);
     this.left = new FirstPersonArm('left', detail);
-    this.right.root.position.copy(RIGHT_SHOULDER);
-    this.left.root.position.copy(LEFT_SHOULDER);
     this.root.add(this.right.root, this.left.root);
   }
 
@@ -68,30 +70,28 @@ export class ViewArms {
 
     // Right hand: weapon grip, blended into the melee hand when it takes over.
     // Every weapon declares a right grip, so read() never returns null here.
-    let pose: HandPoseId = hands.read('right', this.grip, this.rotation, this.pole) ?? 'fist';
+    let pose: HandPose = hands.read('right', this.grip, this.rotation) ?? HAND_POSES.fist;
     const rightVisible = weaponVisible || meleeWeight > 0;
     this.right.root.visible = rightVisible;
     if (rightVisible) {
-      this.right.getShoulderWorldPosition(this.hint).addScaledVector(this.pole, POLE_REACH);
+      // The knife's chain is authored from its own shoulder: follow it exactly while it owns the arm.
+      this.shoulder.lerpVectors(RIGHT_REACH, RIGHT_SHOULDER, meleeWeight);
       if (melee && meleeWeight > 0) {
         melee.readHandTarget(this.meleeGrip, this.meleeRotation, this.meleeElbow);
         this.grip.lerp(this.meleeGrip, meleeWeight);
         this.rotation.slerp(this.meleeRotation, meleeWeight);
-        this.hint.lerp(this.meleeElbow, meleeWeight);
-        if (meleeWeight >= 0.5) pose = 'fist';
+        if (meleeWeight >= 0.5) pose = HAND_POSES.fist;
       }
       this.right.setHandPose(pose, blend);
-      // The knife's own elbow is authored: follow it exactly while it owns the arm.
-      this.right.reachGrip(this.grip, this.rotation, this.hint, THREE.MathUtils.lerp(ELBOW_HINT_SHARE, 1, meleeWeight));
+      this.right.reachGrip(this.grip, this.rotation, this.root.localToWorld(this.shoulder), this.meleeElbow, meleeWeight);
     }
 
     // Left hand: always on the weapon (it keeps holding it during the knife).
-    const leftPose = weaponVisible ? hands.read('left', this.grip, this.rotation, this.pole) : null;
+    const leftPose = weaponVisible ? hands.read('left', this.grip, this.rotation) : null;
     this.left.root.visible = leftPose !== null;
     if (leftPose !== null) {
-      this.left.getShoulderWorldPosition(this.hint).addScaledVector(this.pole, POLE_REACH);
       this.left.setHandPose(leftPose, blend);
-      this.left.reachGrip(this.grip, this.rotation, this.hint);
+      this.left.reachGrip(this.grip, this.rotation, this.root.localToWorld(this.shoulder.copy(LEFT_REACH)));
     }
   }
 }

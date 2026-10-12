@@ -70,10 +70,24 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bulk: 0.75,
       // Two-handed: the support hand wraps the shooting hand and racks the slide.
       hands: {
-        right: { position: [0, -0.047, 0.07], axis: [0, 0.8, -0.6], palm: [-1, 0, 0], pose: 'pistolGrip', pole: [0.45, -1, -0.25] },
-        left: { position: [0.008, -0.075, 0.04], axis: [0, 0.8, -0.6], palm: [1, 0, 0.2], pose: 'supportPistol', pole: [-0.55, -1, -0.15] },
+        right: {
+          position: [0, -0.068, 0.075], axis: [0, 1, -0.087], palm: [-1, -0.1, 0], pose: 'pistolGrip',
+          hold: { size: [0.0336, 0.064], axis: [0, 0.956, -0.292] }, trigger: [0, -0.038, -0.001],
+        },
+        // Thumbs forward: the support palm fills the grip's left flank and its
+        // fingers wrap the shooting hand's from the front.
+        left: {
+          position: [0.009, -0.096, 0.062], axis: [-0.05, 0.99, -0.05], palm: [0.94, 0.1, 0.33], pose: 'supportPistol',
+          hold: { size: [0.088, 0.089], axis: [0, 0.956, -0.292] },
+        },
         actionHand: 'left',
-        action: { position: [0, 0.012, 0.08], axis: [0, 0, 1], palm: [0, -1, 0], pose: 'magazineGrab' },
+        // Overhand on the rear serrations: the palm on the slide's upper left
+        // edge, the fingers over the top onto the right flank and the thumb
+        // back along the left one; the forearm rises from below left.
+        action: {
+          position: [0, 0, 0.072], axis: [0, -0.25, 1], palm: [0.88, -0.47, 0], pose: 'magazineGrab',
+          hold: { size: [0.035, 0.034], axis: [0, 0, -1] },
+        },
       },
       reloadAnim: {
         style: 'pistol',
@@ -143,11 +157,17 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       sightHeight: 0.075,
       bulk: 1,
       hands: {
-        right: { position: [0, -0.07, 0.03], axis: [0, 0.85, -0.5], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
-        left: { position: [0, 0.008, -0.27], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        right: {
+          position: [0, -0.08, 0.028], axis: [0, 1, -0.14], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.033, 0.044], axis: [0, 0.94, -0.34] }, trigger: [0, -0.045, -0.051],
+        },
+        left: {
+          position: [0, 0.01, -0.29], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.059, 0.051], axis: [0, 0, -1] },
+        },
         // The charging-handle latch is on the left: the support hand racks it.
         actionHand: 'left',
-        action: { position: [-0.026, 0.004, 0.008], axis: [0, 0, -1], palm: [0.4, -1, 0.2], pose: 'boltPinch' },
+        action: { position: [-0.026, 0.004, 0.008], axis: [0.33, 0.74, 0.55], palm: [0.37, -0.65, 0.65], pose: 'boltPinch' },
       },
       reloadAnim: {
         style: 'rifle',
@@ -224,8 +244,15 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bulk: 1.02,
       frame: 'ak47',
       hands: {
-        right: { position: [0, -0.095, 0.078], axis: [0, 0.975, -0.22], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
-        left: { position: [0, -0.009, -0.25], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        right: {
+          position: [0, -0.088, 0.074], axis: [0, 1, -0.03], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.03, 0.057], axis: [0, 0.972, -0.233] }, trigger: [0, -0.058, 0.001],
+        },
+        // Under the lower handguard, fingers over the upper one.
+        left: {
+          position: [0, 0.004, -0.25], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.044, 0.072], axis: [0, 0, -1] },
+        },
         action: { position: [0.03, 0.007, -0.004], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
       },
       reloadAnim: {
@@ -299,8 +326,15 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bulk: 1.35,
       // The support hand rides under the gas tube, ahead of the ammo box.
       hands: {
-        right: { position: [0, -0.1, 0.079], axis: [0, 0.955, 0.296], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
-        left: { position: [0, -0.035, -0.17], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        right: {
+          position: [0, -0.105, 0.057], axis: [0, 0.97, 0.24], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.0315, 0.047], axis: [0, 0.955, 0.296] }, trigger: [0, -0.065, -0.002],
+        },
+        // Around the barrel and the gas cylinder slung under it.
+        left: {
+          position: [0, 0.0084, -0.25], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.03, 0.055], axis: [0, 0, -1] },
+        },
         action: { position: [0.013, 0, 0.011], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
         magazine: { position: [0, -0.075, 0], axis: [0, 0, -1], palm: [0, 1, 0], pose: 'magazineGrab' },
       },
@@ -378,8 +412,14 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bulk: 1.1,
       // The thumb of the shooting hand passes through the thumbhole.
       hands: {
-        right: { position: [0, -0.085, 0.08], axis: [0, 0.985, -0.17], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
-        left: { position: [0, -0.03, -0.28], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        right: {
+          position: [0, -0.098, 0.075], axis: [0, 1, -0.035], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.055, 0.058], axis: [0, 0.97, -0.242] }, trigger: [0, -0.066, -0.002],
+        },
+        left: {
+          position: [0, -0.0295, -0.28], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.055, 0.043], axis: [0, 0, -1] },
+        },
         action: { position: [0.05, -0.014, 0.055], axis: [0, 1, 0], palm: [-1, 0.3, 0], pose: 'boltPinch' },
       },
       reloadAnim: {
@@ -460,7 +500,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bulk: 0.9,
       // One-handed pistol: the left arm stays hidden.
       hands: {
-        right: { position: [0, -0.095, 0.08], axis: [0, 0.945, -0.33], palm: [-1, 0, 0], pose: 'pistolGrip', pole: [0.45, -1, -0.25] },
+        right: {
+          position: [0, -0.1, 0.086], axis: [0, 1, -0.12], palm: [-1, -0.1, 0], pose: 'pistolGrip',
+          hold: { size: [0.03, 0.049], axis: [0, 0.946, -0.326] }, trigger: [0, -0.07, 0.003],
+        },
       },
       reloadAnim: {
         style: 'cell',
@@ -548,8 +591,16 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       // Rifle hold, with the support hand on the insulated chamber floor
       // behind the exposed copper coil; it lifts the capacitor cell on reload.
       hands: {
-        right: { position: [0.012, -0.09, 0.09], axis: [0, 0.95, -0.32], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
-        left: { position: [0, -0.002, -0.16], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        // The trigger sits inside the transformer case: the whole hand closes on the grip.
+        right: {
+          position: [0, -0.085, 0.091], axis: [0, 1, -0.12], palm: [-1, -0.1, 0], pose: 'handleGrip',
+          hold: { size: [0.054, 0.054], axis: [0, 0.946, -0.326] },
+        },
+        // Around the insulated socket behind the exposed coil.
+        left: {
+          position: [0, 0.0126, -0.15], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.08, 0.08], axis: [0, 0, -1] },
+        },
         magazine: { position: [0, 0.04, 0], axis: [0, 0, 1], palm: [0, -1, 0], pose: 'magazineGrab' },
       },
       reloadAnim: {

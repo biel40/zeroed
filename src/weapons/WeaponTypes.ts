@@ -154,6 +154,7 @@ export type HandPoseId =
   | 'fist'
   | 'pistolGrip'
   | 'rifleGrip'
+  | 'handleGrip'
   | 'supportHandguard'
   | 'supportPistol'
   | 'magazineGrab'
@@ -164,26 +165,33 @@ type Vec3 = readonly [number, number, number];
 
 /**
  * Where a glove holds a part. `position` is the center of the held part;
- * `axis` runs along it toward the thumb side and `palm` is the direction the
- * palm faces. Together they fix the hand rotation (palm is orthogonalized).
+ * `axis` is the hand's thumb side (along the part, give or take the tilt of
+ * a natural wrist) and `palm` is the direction the palm faces. Together they
+ * fix the hand rotation (palm is orthogonalized).
  */
 export interface HandGripConfig {
   readonly position: Vec3;
   readonly axis: Vec3;
   readonly palm: Vec3;
   readonly pose: HandPoseId;
+  /**
+   * Section of the held part (width across the palm, depth along the
+   * fingers) and its long axis: the palm sits flush on it and the pose's
+   * wrapping fingers close around it.
+   */
+  readonly hold?: { readonly size: readonly [number, number]; readonly axis: Vec3 };
+  /** Trigger face the index finger rests on, in the same space as `position`. */
+  readonly trigger?: Vec3;
 }
 
-export interface HandAnchorConfig extends HandGripConfig {
-  /** Direction the elbow points. */
-  readonly pole: Vec3;
-}
-
-/** First-person hands on a weapon, in the weapon root's local space. */
+/**
+ * First-person hands on a weapon, in the weapon root's local space. The
+ * forearm continues each hand, so a grip's rotation also sets its arm.
+ */
 export interface WeaponHandsConfig {
-  readonly right: HandAnchorConfig;
+  readonly right: HandGripConfig;
   /** Absent for one-handed weapons: the left arm stays hidden. */
-  readonly left?: HandAnchorConfig;
+  readonly left?: HandGripConfig;
   /** Hand that works the charging handle / bolt / slide. Default right. */
   readonly actionHand?: 'left' | 'right';
   /** Grip on the reload handle part, in that part's local space. */

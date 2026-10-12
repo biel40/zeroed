@@ -152,7 +152,7 @@ if (mode === 'pov') {
   }
 } else if (mode === 'rig') {
   // The first-person rig seen from outside: arm reach, elbows, near-plane clearance.
-  const slot = makePovSlot(makeWeapon(params.get('pose') === 'ads'));
+  const slot = makePovSlot(Number.isFinite(single) ? makeReloading(Math.min(single, 0.999)) : makeWeapon(params.get('pose') === 'ads'));
   const external = new THREE.PerspectiveCamera(Number(params.get('fov') ?? 40), window.innerWidth / window.innerHeight, 0.01, 50);
   const [cx, cy, cz] = vectorParam('cam') ?? [1.1, 0.25, 0.15];
   const [lx, ly, lz] = vectorParam('look') ?? [0.05, -0.28, -0.35];

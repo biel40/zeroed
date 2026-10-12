@@ -13,7 +13,7 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=ak47&view=closeup`: inspecciona el receptor y el cañón. Acepta `pose=ads`, `cam=x,y,z` y `look=x,y,z`.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m1911&view=knife`: fases del tajo del cuchillo con el arma bajando y la mira marcada. Acepta `t=0.3` (un fotograma, progreso 0..1) y `play=1&slow=4` (bucle ralentizado).
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=ak47&view=reload`: fases de una recarga vacia con las dos manos. Acepta `t=0.5`.
-- `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m4a1&view=rig`: el rig de primera persona visto desde fuera (alcance de los brazos, codos, plano cercano). Acepta `pose=ads`, `cam=`, `look=` y `fov=`; con `cam=0,0,0` y un `fov` cerrado sirve de lupa sobre una mano.
+- `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m4a1&view=rig`: el rig de primera persona visto desde fuera (alcance de los brazos, codos, plano cercano). Acepta `pose=ads`, `t=` (fotograma de una recarga vacia), `cam=`, `look=` y `fov=`; con `cam=0,0,0` y un `fov` cerrado sirve de lupa sobre una mano.
 - Las vistas en primera persona dibujan los brazos: `arms=0` los oculta y `detail=mobile|lowMemory` elige el nivel de detalle. La esquina inferior derecha muestra draw calls y triangulos del fotograma.
 
 ## Visor de zombies

@@ -1,13 +1,16 @@
 import * as THREE from 'three';
+import { fitHandPose, HAND_POSES, holdGripPoint } from './HandPoses';
+import type { HandPose, HeldPart } from './HandPoses';
+import { HANDLE_RELEASE_FRACTION, HANDLE_TRAVEL } from './ReloadAnimator';
 import type { Weapon } from './Weapon';
-import type { HandGripConfig, HandPoseId, ReloadAnimConfig, WeaponHandsConfig } from './WeaponTypes';
+import type { HandGripConfig, ReloadAnimConfig, WeaponHandsConfig } from './WeaponTypes';
 
 type HandSide = 'left' | 'right';
 
 interface Grip {
   readonly position: THREE.Vector3;
   readonly quaternion: THREE.Quaternion;
-  readonly pose: HandPoseId;
+  readonly pose: HandPose;
 }
 
 /** Hand rotation from a grip axis (thumb side, hand +Y) and palm normal. */
@@ -21,12 +24,77 @@ function gripRotation(config: HandGripConfig, side: HandSide): THREE.Quaternion 
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
 }
 
-function toGrip(config: HandGripConfig, side: HandSide): Grip {
-  return {
-    position: new THREE.Vector3(...config.position),
-    quaternion: gripRotation(config, side),
-    pose: config.pose,
+/** How far under the sight line a resting grip keeps its fingers. */
+const SIGHT_CLEARANCE = 0.01;
+
+/** Fitted poses per static grip config; every config belongs to one hand. */
+const fittedPoses = new WeakMap<HandGripConfig, HandPose>();
+
+/**
+ * Finger pose of a grip: the authored pose, with its wrapping fingers closed
+ * on the held part and the index on the trigger when the config sizes them.
+ */
+function gripPose(config: HandGripConfig, quaternion: THREE.Quaternion, side: HandSide, sightLine: number | null): HandPose {
+  let pose = HAND_POSES[config.pose];
+  if (!config.hold && !config.trigger) return pose;
+  const cached = fittedPoses.get(config);
+  if (cached) return cached;
+  // Part-space directions as the hand sees them, in the right-glove convention.
+  const toHand = quaternion.clone().invert();
+  const inHand = (vector: THREE.Vector3): THREE.Vector3 => {
+    vector.applyQuaternion(toHand);
+    if (side === 'left') vector.x = -vector.x;
+    return vector;
   };
+  let part: HeldPart | null = null;
+  if (config.hold) {
+    // Section axes: across the weapon, and normal to that and the part's length.
+    const length = new THREE.Vector3(...config.hold.axis).normalize();
+    const across = new THREE.Vector3(1, 0, 0).addScaledVector(length, -length.x).normalize();
+    const through = new THREE.Vector3().crossVectors(length, across);
+    const [width, depth] = config.hold.size;
+    const section = { across: inHand(across), through: inHand(through), halfWidth: width / 2, halfDepth: depth / 2 };
+    pose = { ...pose, grip: holdGripPoint(pose, section) };
+    // The fingers stay under the sight line so they never cover the sights.
+    const ceiling = sightLine === null ? undefined : {
+      normal: inHand(new THREE.Vector3(0, 1, 0)),
+      height: sightLine - SIGHT_CLEARANCE - config.position[1],
+    };
+    // `position` is the part's center, so it sits on the grip point.
+    part = { center: new THREE.Vector3(...pose.grip), ...section, ceiling };
+  }
+  // The trigger as seen from the wrist: `position` sits on the grip point.
+  const trigger = config.trigger ? {
+    point: inHand(new THREE.Vector3(...config.trigger).sub(new THREE.Vector3(...config.position)))
+      .add(new THREE.Vector3(...pose.grip)),
+    across: inHand(new THREE.Vector3(1, 0, 0)),
+    through: inHand(new THREE.Vector3(0, 0, 1)),
+  } : null;
+  pose = fitHandPose(pose, part, trigger);
+  fittedPoses.set(config, pose);
+  return pose;
+}
+
+function toGrip(config: HandGripConfig, side: HandSide, sightLine: number | null = null): Grip {
+  const quaternion = gripRotation(config, side);
+  return { position: new THREE.Vector3(...config.position), quaternion, pose: gripPose(config, quaternion, side, sightLine) };
+}
+
+/** Default support-hand grip on each weapon's magazine, built once per reload config. */
+const magazineGrips = new WeakMap<ReloadAnimConfig, HandGripConfig>();
+
+function defaultMagazineGrip(reload: ReloadAnimConfig): HandGripConfig {
+  let grip = magazineGrips.get(reload);
+  if (!grip) {
+    const [width, height, depth] = reload.magSize;
+    // The support hand closes on the magazine's left flank, fingers around its front.
+    grip = {
+      position: [0, -height * 0.18, 0], axis: [0, 1, 0], palm: [1, 0, 0], pose: 'magazineGrab',
+      hold: { size: [width, depth], axis: [0, 1, 0] },
+    };
+    magazineGrips.set(reload, grip);
+  }
+  return grip;
 }
 
 /** 0→1 eased ramp over [start, end]. */
@@ -47,7 +115,7 @@ const REACH_LEAD = 0.07;
  * and the knife dip without duplicating those layers.
  */
 export class WeaponHands {
-  private readonly anchors: Partial<Record<HandSide, Grip & { readonly pole: THREE.Vector3 }>> = {};
+  private readonly anchors: Partial<Record<HandSide, Grip>> = {};
   private readonly magazineGrip: Grip | null = null;
   private readonly actionGrip: Grip | null = null;
   private readonly actionHand: HandSide;
@@ -55,9 +123,13 @@ export class WeaponHands {
   private progress = 0;
   private emptyReload = false;
 
+  /** Spring-loaded handle at the end of its stroke, in its parent's frame: where the hand lets go. */
+  private readonly handleRear: THREE.Matrix4 | null = null;
+
   private readonly blendPosition = new THREE.Vector3();
   private readonly blendRotation = new THREE.Quaternion();
-  private readonly worldRotation = new THREE.Quaternion();
+  private readonly rearFrame = new THREE.Matrix4();
+  private readonly rearScale = new THREE.Vector3();
 
   constructor(
     config: WeaponHandsConfig,
@@ -65,22 +137,23 @@ export class WeaponHands {
     private readonly parts: { readonly magazine: THREE.Object3D | null; readonly handle: THREE.Object3D | null },
     private readonly reload: ReloadAnimConfig | null,
     private readonly boltAction: boolean,
+    /** Height of the sight line in the root frame; the resting grips keep their fingers under it. */
+    sightLine: number,
   ) {
     for (const side of ['right', 'left'] as const) {
       const anchor = config[side];
-      if (anchor) this.anchors[side] = { ...toGrip(anchor, side), pole: new THREE.Vector3(...anchor.pole).normalize() };
+      if (anchor) this.anchors[side] = toGrip(anchor, side, sightLine);
     }
     this.actionHand = config.actionHand ?? 'right';
-    if (parts.handle && config.action) this.actionGrip = toGrip(config.action, this.actionHand);
+    if (parts.handle && config.action) {
+      this.actionGrip = toGrip(config.action, this.actionHand);
+      if (reload && reload.style !== 'bolt') {
+        parts.handle.updateMatrix();
+        this.handleRear = new THREE.Matrix4().makeTranslation(0, 0, HANDLE_TRAVEL).multiply(parts.handle.matrix);
+      }
+    }
     if (parts.magazine && reload && this.anchors.left) {
-      const [width, height] = reload.magSize;
-      // Default: the support hand closes on the magazine's left flank.
-      this.magazineGrip = toGrip(config.magazine ?? {
-        position: [-width * 0.15, -height * 0.18, 0],
-        axis: [0, 1, 0],
-        palm: [1, 0, 0],
-        pose: 'magazineGrab',
-      }, 'left');
+      this.magazineGrip = toGrip(config.magazine ?? defaultMagazineGrip(reload), 'left');
     }
   }
 
@@ -98,16 +171,14 @@ export class WeaponHands {
   }
 
   /**
-   * Writes the world-space grip target of `side`, its hand rotation and the
-   * elbow pole direction. Returns the finger pose, or null when the weapon
-   * has no grip for that hand.
+   * Writes the world-space grip target of `side` and its hand rotation.
+   * Returns the finger pose, or null when the weapon has no grip for that
+   * hand.
    */
-  read(side: HandSide, position: THREE.Vector3, rotation: THREE.Quaternion, pole: THREE.Vector3): HandPoseId | null {
+  read(side: HandSide, position: THREE.Vector3, rotation: THREE.Quaternion): HandPose | null {
     const anchor = this.anchors[side];
     if (!anchor) return null;
     this.root.updateWorldMatrix(true, false);
-    this.root.getWorldQuaternion(this.worldRotation);
-    pole.copy(anchor.pole).applyQuaternion(this.worldRotation);
     this.world(anchor, this.root, position, rotation);
     let pose = anchor.pose;
 
@@ -117,7 +188,7 @@ export class WeaponHands {
   }
 
   /** Support hand: grab the magazine, fetch a fresh one, seat it, return. */
-  private applyMagazine(position: THREE.Vector3, rotation: THREE.Quaternion, pose: HandPoseId): HandPoseId {
+  private applyMagazine(position: THREE.Vector3, rotation: THREE.Quaternion, pose: HandPose): HandPose {
     const reload = this.reload;
     const magazine = this.parts.magazine;
     const grip = this.magazineGrip;
@@ -141,19 +212,36 @@ export class WeaponHands {
   }
 
   /** Action hand on the charging handle / bolt / slide while it moves. */
-  private applyAction(position: THREE.Vector3, rotation: THREE.Quaternion, pose: HandPoseId): HandPoseId {
+  private applyAction(position: THREE.Vector3, rotation: THREE.Quaternion, pose: HandPose): HandPose {
     const grip = this.actionGrip;
     const handle = this.parts.handle;
     if (!grip || !handle) return pose;
     let weight = 0;
+    let released = false;
     const p = this.progress;
     if (this.state === 'reloading' && this.emptyReload && this.reload && this.reload.charge >= 0) {
-      weight = ramp(p, this.reload.charge - REACH_LEAD, this.reload.charge) * (1 - ramp(p, this.reload.chargeEnd, 1));
+      const { charge, chargeEnd } = this.reload;
+      weight = ramp(p, charge - REACH_LEAD, charge) * (1 - ramp(p, chargeEnd, 1));
+      // A spring-loaded handle is let go at the end of its stroke: the hand
+      // opens there and eases back to its grip while the handle slams home.
+      const letGo = charge + (chargeEnd - charge) * HANDLE_RELEASE_FRACTION;
+      if (this.handleRear && p >= letGo) {
+        released = true;
+        weight = 1 - ramp(p, letGo, chargeEnd);
+      }
     } else if (this.state === 'cycling' && this.boltAction) {
       weight = ramp(p, 0, 0.12) * (1 - ramp(p, 0.85, 1));
     }
     if (weight <= 0) return pose;
     handle.updateWorldMatrix(true, false);
+    if (released && this.handleRear && handle.parent) {
+      this.rearFrame.multiplyMatrices(handle.parent.matrixWorld, this.handleRear).decompose(this.blendPosition, this.blendRotation, this.rearScale);
+      this.blendPosition.copy(grip.position).applyMatrix4(this.rearFrame);
+      this.blendRotation.multiply(grip.quaternion);
+      position.lerp(this.blendPosition, weight);
+      rotation.slerp(this.blendRotation, weight);
+      return weight > 0.5 ? HAND_POSES.relaxed : pose;
+    }
     this.blend(position, rotation, grip, handle, weight);
     return weight > 0.5 ? grip.pose : pose;
   }

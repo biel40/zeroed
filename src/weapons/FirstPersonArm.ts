@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { ZombieLimb } from '../zombies/ZombieLimb';
-import { FINGERS, HAND_POSES } from './HandPoses';
-import type { HandPoseId } from './WeaponTypes';
+import { FINGER_LAYOUT, FINGERS, HAND_POSES, PHALANX_TAPER } from './HandPoses';
+import type { HandPose } from './HandPoses';
 
 export type ArmSide = 'left' | 'right';
 
@@ -33,23 +32,22 @@ export function armDetailFor(profile: { readonly isMobile: boolean; readonly isL
 
 // --- Skeleton (right hand, bind pose: everything points -Z, no rotation) ---
 
-/** Knuckle position relative to the wrist and phalanx lengths/radius per finger. */
-const FINGER_LAYOUT = {
-  index: { base: [0.001, 0.03, -0.092], lengths: [0.044, 0.027, 0.022], radius: 0.0112 },
-  middle: { base: [0.001, 0.0098, -0.096], lengths: [0.048, 0.03, 0.023], radius: 0.0116 },
-  ring: { base: [0.001, -0.0102, -0.093], lengths: [0.045, 0.028, 0.022], radius: 0.011 },
-  pinky: { base: [0.0, -0.029, -0.085], lengths: [0.036, 0.022, 0.019], radius: 0.0098 },
-} as const;
 const THUMB_BASE = [-0.012, 0.03, -0.024] as const;
 const THUMB_LENGTHS = [0.043, 0.033, 0.027] as const;
 const THUMB_RADIUS = 0.0128;
 /**
- * How much the owner's elbow hint wins over the elbow that would keep the
- * wrist straight. A real elbow goes wherever the hand needs the forearm.
+ * Share of the forearm that turns from the hand's own line toward the
+ * shoulder: a relaxed wrist gives a little, it never folds.
  */
-export const ELBOW_HINT_SHARE = 0.45;
+const WRIST_GIVE = 0.2;
+/**
+ * Widest angle between the forearm and the way to its shoulder: a hand
+ * turned further away (a hook on a charging handle) bends the wrist instead
+ * of swinging the arm in from the wrong side.
+ */
+const ARM_CONE = THREE.MathUtils.degToRad(50);
 /** First-person forearms always drop from the hand toward an elbow below it. */
-const MAX_FOREARM_RISE = -0.45;
+const MAX_FOREARM_RISE = -0.3;
 /** Fixed distal bend baked into the low-memory fingers. */
 const FUSED_DISTAL_BEND = 0.6;
 
@@ -64,8 +62,7 @@ const THUMB_SLOT = 16;
 const GRIP_SLOT = 21;
 const POSE_SIZE = 24;
 
-function writePose(id: HandPoseId, out: Float32Array): void {
-  const pose = HAND_POSES[id];
+function writePose(pose: HandPose, out: Float32Array): void {
   FINGERS.forEach((name, finger) => {
     const { curl, spread } = pose[name];
     out.set([curl[0], curl[1], curl[2], spread], finger * 4);
@@ -137,6 +134,23 @@ function rigid(geometry: THREE.BufferGeometry, bone: number, matrix: THREE.Matri
   geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(indices, 4));
   geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
   return geometry;
+}
+
+const frameX = new THREE.Vector3();
+const frameY = new THREE.Vector3();
+const frameBasis = new THREE.Matrix4();
+
+/**
+ * Rotation of a bone whose +Z runs along the unit vector `back` (bones point
+ * -Z, toward their child) and whose +X stays as close to `side` as it can.
+ */
+function boneFrame(back: THREE.Vector3, side: THREE.Vector3, out: THREE.Quaternion): THREE.Quaternion {
+  frameX.copy(side).addScaledVector(back, -side.dot(back));
+  if (frameX.lengthSq() < 1e-8) frameX.set(back.z, 0, -back.x);
+  if (frameX.lengthSq() < 1e-8) frameX.set(1, 0, 0);
+  frameX.normalize();
+  frameY.crossVectors(back, frameX);
+  return out.setFromRotationMatrix(frameBasis.makeBasis(frameX, frameY, back));
 }
 
 const placement = new THREE.Matrix4();
@@ -348,7 +362,7 @@ function buildArmGeometry(detail: ArmDetail): THREE.BufferGeometry {
     const { lengths, radius } = FINGER_LAYOUT[name];
     for (let segment = 0; segment < 3; segment++) {
       const bone = fingerBone(finger, segment);
-      const r = radius * 0.93 ** segment;
+      const r = radius * PHALANX_TAPER ** segment;
       if (segment === 2 && detail.fuseDistal) {
         // Low-memory tier: the fingertip rides the middle phalanx at a fixed bend.
         const tip = phalanx(lengths[2], r, detail);
@@ -416,20 +430,22 @@ function armGeometry(side: ArmSide, detail: ArmDetail): THREE.BufferGeometry {
  * draw calls. Pure presentation: owners decide where the hand goes.
  */
 export class FirstPersonArm {
-  /** Shoulder pivot; the owner places it in camera space. */
+  /** Shoulder pivot; reachGrip() places it in its parent's (camera) space. */
   readonly root = new THREE.Group();
   readonly mesh: THREE.SkinnedMesh;
-  /** Two-bone solver driving shoulder and elbow toward the wrist target. */
-  readonly limb: ZombieLimb;
   private readonly bones: THREE.Bone[];
   private readonly sign: 1 | -1;
   private readonly pose = new Float32Array(POSE_SIZE);
   private readonly targetPose = new Float32Array(POSE_SIZE);
   private readonly offset = new THREE.Vector3();
-  private readonly wristTarget = new THREE.Vector3();
-  private readonly hint = new THREE.Vector3();
-  private readonly forearmDirection = new THREE.Vector3();
-  private readonly localRotation = new THREE.Quaternion();
+  private readonly wrist = new THREE.Vector3();
+  private readonly elbowTarget = new THREE.Vector3();
+  private readonly shoulderTarget = new THREE.Vector3();
+  private readonly forearm = new THREE.Vector3();
+  private readonly upper = new THREE.Vector3();
+  private readonly sideAxis = new THREE.Vector3();
+  private readonly handRotation = new THREE.Quaternion();
+  private readonly forearmRotation = new THREE.Quaternion();
   private readonly parentRotation = new THREE.Quaternion();
 
   constructor(readonly side: ArmSide, detail: ArmDetail = ARM_DETAIL.desktop) {
@@ -451,14 +467,13 @@ export class FirstPersonArm {
     this.root.add(this.mesh);
     this.root.updateMatrixWorld(true);
     this.mesh.bind(new THREE.Skeleton(this.bones));
-    this.limb = new ZombieLimb(this.root, this.bones[SHOULDER], this.bones[ELBOW], this.bones[WRIST]);
-    writePose('relaxed', this.targetPose);
+    writePose(HAND_POSES.relaxed, this.targetPose);
     this.pose.set(this.targetPose);
     this.applyFingers();
   }
 
   /** Moves the fingers toward `pose`; `blend` 1 snaps, small values ease. */
-  setHandPose(pose: HandPoseId, blend: number): void {
+  setHandPose(pose: HandPose, blend: number): void {
     writePose(pose, this.targetPose);
     const t = THREE.MathUtils.clamp(blend, 0, 1);
     for (let slot = 0; slot < POSE_SIZE; slot++) {
@@ -474,33 +489,63 @@ export class FirstPersonArm {
 
   /**
    * Places the hand so its grip point sits on `grip` with the hand rotation
-   * `rotation` (world space). The elbow bends toward `elbowHint` by
-   * `hintShare`, the rest toward a straight wrist.
+   * `rotation`, all in world space. The forearm continues the hand (the
+   * wrist only gives a little toward `shoulder`, never letting the forearm
+   * rise toward the eye) and the upper arm reaches back from that elbow
+   * toward `shoulder`, below and behind the screen: the shoulder follows the
+   * hand instead of folding the wrist. `elbow` overrides the forearm by
+   * `elbowWeight` for authored chains (the knife).
    */
-  reachGrip(grip: THREE.Vector3, rotation: THREE.Quaternion, elbowHint: THREE.Vector3, hintShare = ELBOW_HINT_SHARE): void {
-    const [shoulder, elbow, wrist] = this.bones;
-    // Solve from the bind pose each frame: deterministic, no twist drift.
-    shoulder.quaternion.identity();
-    elbow.quaternion.identity();
-    this.root.updateWorldMatrix(true, false);
-    this.gripOffset(this.offset).applyQuaternion(rotation);
-    this.root.worldToLocal(this.wristTarget.copy(grip).sub(this.offset));
-    // Straight-wrist elbow: the forearm continuing behind the knuckles, in
-    // camera space and never rising toward the eye.
-    this.root.getWorldQuaternion(this.localRotation).invert().multiply(rotation);
-    this.forearmDirection.set(0, 0, 1).applyQuaternion(this.localRotation);
-    this.forearmDirection.y = Math.min(this.forearmDirection.y, MAX_FOREARM_RISE);
-    this.forearmDirection.normalize();
-    this.root.worldToLocal(this.hint.copy(elbowHint));
-    this.hint.lerp(this.offset.copy(this.wristTarget).addScaledVector(this.forearmDirection, ARM_FOREARM_LENGTH), 1 - hintShare);
-    this.limb.solve(
-      this.wristTarget.x, this.wristTarget.y, this.wristTarget.z,
-      this.hint.x, this.hint.y, this.hint.z,
-      1,
-    );
-    elbow.getWorldQuaternion(this.parentRotation).invert();
-    wrist.quaternion.copy(this.parentRotation).multiply(rotation);
-    wrist.updateMatrixWorld(true);
+  reachGrip(
+    grip: THREE.Vector3,
+    rotation: THREE.Quaternion,
+    shoulder: THREE.Vector3,
+    elbow: THREE.Vector3 | null = null,
+    elbowWeight = 0,
+  ): void {
+    const [upperBone, forearmBone, wristBone] = this.bones;
+    // Everything in the parent (camera) space, where the root is placed.
+    const parent = this.root.parent;
+    parent?.updateWorldMatrix(true, false);
+    const toParent = (point: THREE.Vector3) => (parent ? parent.worldToLocal(point) : point);
+    this.handRotation.copy(rotation);
+    if (parent) this.handRotation.premultiply(parent.getWorldQuaternion(this.parentRotation).invert());
+    this.gripOffset(this.offset).applyQuaternion(this.handRotation);
+    toParent(this.wrist.copy(grip)).sub(this.offset);
+    toParent(this.shoulderTarget.copy(shoulder));
+
+    // Forearm: behind the knuckles, eased toward the shoulder and kept
+    // within its cone.
+    this.forearm.set(0, 0, 1).applyQuaternion(this.handRotation);
+    this.offset.subVectors(this.shoulderTarget, this.wrist).normalize();
+    this.forearm.lerp(this.offset, WRIST_GIVE).normalize();
+    if (this.forearm.angleTo(this.offset) > ARM_CONE) {
+      this.sideAxis.copy(this.forearm).addScaledVector(this.offset, -this.forearm.dot(this.offset));
+      if (this.sideAxis.lengthSq() < 1e-8) this.forearm.copy(this.offset);
+      else this.forearm.copy(this.offset).multiplyScalar(Math.cos(ARM_CONE)).addScaledVector(this.sideAxis.normalize(), Math.sin(ARM_CONE));
+    }
+    this.forearm.y = Math.min(this.forearm.y, MAX_FOREARM_RISE);
+    this.forearm.normalize();
+    if (elbow && elbowWeight > 0) {
+      this.offset.subVectors(toParent(this.elbowTarget.copy(elbow)), this.wrist).normalize();
+      this.forearm.lerp(this.offset, THREE.MathUtils.clamp(elbowWeight, 0, 1)).normalize();
+    }
+    this.elbowTarget.copy(this.wrist).addScaledVector(this.forearm, ARM_FOREARM_LENGTH);
+    this.upper.subVectors(this.shoulderTarget, this.elbowTarget);
+    if (this.upper.lengthSq() < 1e-8) this.upper.set(0, -1, 0);
+    this.upper.normalize();
+    this.root.position.copy(this.elbowTarget).addScaledVector(this.upper, ARM_UPPER_LENGTH);
+    this.root.quaternion.identity();
+
+    // Bones from the elbow out carry the hand's roll, so the wrist only
+    // flexes: the forearm turns (as a real one pronates), never the glove cuff.
+    this.sideAxis.set(1, 0, 0).applyQuaternion(this.handRotation);
+    boneFrame(this.forearm, this.sideAxis, this.forearmRotation);
+    this.sideAxis.set(1, 0, 0).applyQuaternion(this.forearmRotation);
+    boneFrame(this.upper, this.sideAxis, upperBone.quaternion);
+    forearmBone.quaternion.copy(upperBone.quaternion).invert().multiply(this.forearmRotation);
+    wristBone.quaternion.copy(this.forearmRotation).invert().multiply(this.handRotation);
+    this.root.updateMatrixWorld(true);
   }
 
   /** World position of the point the hand is currently holding. */

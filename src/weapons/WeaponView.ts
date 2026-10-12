@@ -973,7 +973,8 @@ function buildM60(config: ViewModelConfig): BuiltProcedural {
   group.add(handle);
 
   // --- Grip, trigger guard, shoulder stock ---
-  add(new RoundedBoxGeometry(0.03, 0.09, 0.045, 2, 0.005), dark, 0, -0.098, 0.075, 0.3);
+  // Close enough behind the trigger for the index finger to reach it.
+  add(new RoundedBoxGeometry(0.03, 0.09, 0.045, 2, 0.005), dark, 0, -0.098, 0.055, 0.3);
   add(new THREE.BoxGeometry(0.024, 0.005, 0.07), dark, 0, -0.078, 0);
   add(new THREE.BoxGeometry(0.024, 0.03, 0.006), dark, 0, -0.064, -0.033, -0.15);
   add(new THREE.BoxGeometry(0.005, 0.02, 0.006), dark, 0, -0.062, -0.002, 0.15);
@@ -1318,6 +1319,8 @@ export class WeaponView {
       { magazine: reloadParts.magazine ?? null, handle: reloadParts.handle ?? null },
       view.reloadAnim ?? null,
       definition.boltAction,
+      // ADS centers the camera on the sight line: root y = sightY.
+      view.ads[1] - this.adsPosition.y,
     );
     if (view.reloadAnim) {
       this.animator = new ReloadAnimator(
