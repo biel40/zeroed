@@ -1,45 +1,147 @@
 import * as THREE from 'three';
+import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH } from './FirstPersonArm';
+import { RIGHT_SHOULDER } from './ViewArms';
+import type { MeleeArmDriver } from './ViewArms';
 
 export const KNIFE_ATTACK_DURATION = 0.72;
-export const KNIFE_HIT_MOMENT = 0.39;
 export const KNIFE_RANGE = 2.05;
 
 export function knifeDamageForRound(maxHp: number, round: number): number {
   return maxHp / Math.max(1, round);
 }
 
-const REST_POSITION = new THREE.Vector3(0.34, -0.31, -0.48);
-const WINDUP_POSITION = new THREE.Vector3(0.47, -0.37, -0.36);
-const HIT_POSITION = new THREE.Vector3(0.04, -0.15, -0.76);
-const FOLLOW_POSITION = new THREE.Vector3(-0.04, -0.18, -0.66);
-const REST_ROTATION = new THREE.Euler(-0.28, -0.18, 0.72);
-const WINDUP_ROTATION = new THREE.Euler(-0.18, -0.38, 0.94);
-const HIT_ROTATION = new THREE.Euler(-0.08, 0.04, 0.12);
-const FOLLOW_ROTATION = new THREE.Euler(-0.12, 0.08, -0.05);
-
-const REST_QUATERNION = new THREE.Quaternion().setFromEuler(REST_ROTATION);
-const WINDUP_QUATERNION = new THREE.Quaternion().setFromEuler(WINDUP_ROTATION);
-const HIT_QUATERNION = new THREE.Quaternion().setFromEuler(HIT_ROTATION);
-const FOLLOW_QUATERNION = new THREE.Quaternion().setFromEuler(FOLLOW_ROTATION);
-const WINDUP_END = 0.3;
-const CONTACT = KNIFE_HIT_MOMENT / KNIFE_ATTACK_DURATION;
-const FOLLOW_END = 0.7;
-
-function smoothStep(t: number): number {
-  return t * t * (3 - 2 * t);
+/**
+ * Arm chain in camera space: shoulder (yaw, pitch, roll) -> elbow (flex,
+ * forearm twist) -> hand, with the shared right arm's shoulder and lengths.
+ * The hand never rotates relative to the forearm, so the slash comes from
+ * the whole arm instead of an isolated wrist flick. The chain carries no arm
+ * geometry: the shared glove follows it through readHandTarget().
+ */
+interface ArmPose {
+  readonly yaw: number;
+  readonly pitch: number;
+  readonly roll: number;
+  readonly flex: number;
+  readonly twist: number;
 }
 
-/** Large procedural knife view model and its contact-timed attack sequence. */
-export class Knife {
+/** Hammer grip: the handle crosses the fist at ~70 degrees to the forearm. */
+const GRIP_ROTATION = new THREE.Euler(-0.987, 0.221, -0.962);
+const HANDLE_CENTER = 0.075;
+
+/**
+ * Glove rotation in the forearm frame: the handle runs along the hand's
+ * thumb axis (blade out of the thumb side) and the knuckles follow the
+ * forearm, so the wrist stays straight while the knife is cocked.
+ */
+const HAND_IN_FOREARM = (() => {
+  const y = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().setFromEuler(GRIP_ROTATION));
+  const z = new THREE.Vector3(0, 0, -1).addScaledVector(y, y.z).normalize().negate();
+  const x = new THREE.Vector3().crossVectors(y, z);
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+})();
+
+// Solved offline against hand targets, blade direction and a leading edge.
+// Hidden below the right edge of the screen.
+const REST: ArmPose = { yaw: -0.879, pitch: -2.067, roll: 0.394, flex: 2.009, twist: -0.851 };
+// Raised on the right, edge already facing the cut.
+const DRAW: ArmPose = { yaw: 0.144, pitch: 0.168, roll: -0.295, flex: 1.27, twist: -0.079 };
+// Blade spanning the crosshair: the instant the cut is resolved.
+const CROSS: ArmPose = { yaw: 0.375, pitch: 0.271, roll: -0.128, flex: 0.668, twist: -0.034 };
+const CUT_END: ArmPose = { yaw: 0.819, pitch: 0.118, roll: -0.164, flex: 0.443, twist: 0.202 };
+const FOLLOW: ArmPose = { yaw: 0.948, pitch: 0.033, roll: -0.247, flex: 0.414, twist: 0.274 };
+// Recovery drops the arm below the cut instead of retracing it.
+const RETRACT: ArmPose = { yaw: 0.89, pitch: -1.404, roll: -0.045, flex: 1.765, twist: 0.503 };
+
+// Phases: 15% anticipation, 25% slash, 15% follow-through, 45% recovery.
+const DRAW_END = 0.15;
+const CROSSING = 0.3;
+const SLASH_END = 0.4;
+const FOLLOW_END = 0.55;
+const RETRACT_POINT = 0.78;
+
+/** Contact is resolved when the blade crosses the centre of the screen. */
+export const KNIFE_HIT_MOMENT = KNIFE_ATTACK_DURATION * CROSSING;
+
+// The firearm dips out of the way before the hand enters and comes back up
+// while the arm is still leaving, so both read as one coordinated motion.
+const LOWER_IN_END = 0.09;
+const LOWER_OUT_START = 0.5;
+
+// The right hand drops off the dipping weapon grip and returns to it while
+// it and the whole blade are below the screen (measured: the blade enters
+// the frame after 3 % and has left it by 77 %). The knife only exists in
+// between, so it never pops into view.
+const ARM_TAKE_START = 0;
+export const KNIFE_SHOW_PROGRESS = 0.03;
+export const KNIFE_HIDE_PROGRESS = 0.77;
+const ARM_GIVE_END = 0.94;
+
+const easeOutQuad = (t: number): number => 1 - (1 - t) ** 2;
+const smoothStep = (t: number): number => t * t * (3 - 2 * t);
+
+const JOINTS = ['yaw', 'pitch', 'roll', 'flex', 'twist'] as const;
+
+interface Key {
+  readonly at: number;
+  readonly pose: ArmPose;
+  /** Joint velocity per unit of progress; zero where the arm settles. */
+  readonly velocity: ArmPose;
+}
+
+/**
+ * Hermite keys: the arm stops at the raised draw (anticipation), at the end
+ * of the follow-through and at rest, but keeps a continuous velocity through
+ * the cut, so it accelerates into the slash and brakes after it with no
+ * elbow snap at the contact frame.
+ */
+function buildKeys(keys: readonly { at: number; pose: ArmPose; flowing?: boolean }[]): Key[] {
+  const still: ArmPose = { yaw: 0, pitch: 0, roll: 0, flex: 0, twist: 0 };
+  return keys.map(({ at, pose, flowing }, index) => {
+    if (!flowing) return { at, pose, velocity: still };
+    const before = keys[index - 1];
+    const after = keys[index + 1];
+    const velocity: Record<(typeof JOINTS)[number], number> = { ...still };
+    for (const joint of JOINTS) velocity[joint] = (after.pose[joint] - before.pose[joint]) / (after.at - before.at);
+    return { at, pose, velocity };
+  });
+}
+
+const KEYS = buildKeys([
+  { at: 0, pose: REST },
+  { at: DRAW_END, pose: DRAW },
+  { at: CROSSING, pose: CROSS, flowing: true },
+  { at: SLASH_END, pose: CUT_END, flowing: true },
+  { at: FOLLOW_END, pose: FOLLOW },
+  { at: RETRACT_POINT, pose: RETRACT },
+  { at: 1, pose: REST },
+]);
+
+function hermite(from: Key, to: Key, joint: (typeof JOINTS)[number], s: number): number {
+  const span = to.at - from.at;
+  const s2 = s * s;
+  const s3 = s2 * s;
+  return (2 * s3 - 3 * s2 + 1) * from.pose[joint]
+    + (s3 - 2 * s2 + s) * span * from.velocity[joint]
+    + (3 * s2 - 2 * s3) * to.pose[joint]
+    + (s3 - s2) * span * to.velocity[joint];
+}
+
+/** First-person knife: the slash animation that borrows the right arm. */
+export class Knife implements MeleeArmDriver {
   public readonly root = new THREE.Group();
   public onSwing: (() => void) | null = null;
   public onImpact: (() => void) | null = null;
 
+  private readonly shoulder = new THREE.Group();
+  private readonly elbow = new THREE.Group();
+  private readonly hand = new THREE.Group();
+  private readonly model = new THREE.Group();
   private elapsed = KNIFE_ATTACK_DURATION;
   private impactApplied = false;
   private previousTrigger = false;
   private active = false;
-  private idleTime = 0;
+  private bobTime = 0;
 
   public constructor() {
     this.root.name = 'knife-view';
@@ -54,6 +156,35 @@ export class Knife {
 
   public get isAttacking(): boolean {
     return this.elapsed < KNIFE_ATTACK_DURATION;
+  }
+
+  /** 0..1: how far the equipped firearm view must dip to clear the arm. */
+  public get firearmLowering(): number {
+    if (!this.active || !this.isAttacking) return 0;
+    const progress = this.elapsed / KNIFE_ATTACK_DURATION;
+    if (progress < LOWER_IN_END) return easeOutQuad(progress / LOWER_IN_END);
+    if (progress < LOWER_OUT_START) return 1;
+    return 1 - smoothStep((progress - LOWER_OUT_START) / (1 - LOWER_OUT_START));
+  }
+
+  /** 0..1 share of the right hand owned by the slash (0 = on the weapon grip). */
+  public get armWeight(): number {
+    if (!this.active || !this.isAttacking) return 0;
+    const progress = this.elapsed / KNIFE_ATTACK_DURATION;
+    const take = THREE.MathUtils.smoothstep(progress, ARM_TAKE_START, KNIFE_SHOW_PROGRESS);
+    return Math.min(take, 1 - THREE.MathUtils.smoothstep(progress, KNIFE_HIDE_PROGRESS, ARM_GIVE_END));
+  }
+
+  /** Knife model shown in the hand; only while the slash owns the arm. */
+  public get knifeVisible(): boolean {
+    return this.root.visible && this.model.visible;
+  }
+
+  public readHandTarget(grip: THREE.Vector3, rotation: THREE.Quaternion, elbow: THREE.Vector3): void {
+    this.root.updateWorldMatrix(true, true);
+    this.hand.getWorldPosition(grip);
+    this.elbow.getWorldQuaternion(rotation).multiply(HAND_IN_FOREARM);
+    this.elbow.getWorldPosition(elbow);
   }
 
   public setEnabled(enabled: boolean): void {
@@ -88,64 +219,43 @@ export class Knife {
   }
 
   public update(dt: number, trigger: boolean, speed01: number): void {
-    this.idleTime += dt;
     const triggerEdge = trigger && !this.previousTrigger;
     this.previousTrigger = trigger;
     if (!this.active) return;
 
     if (triggerEdge) this.trigger();
-    if (this.isAttacking) {
-      const previous = this.elapsed;
-      this.elapsed = Math.min(KNIFE_ATTACK_DURATION, this.elapsed + dt);
-      this.applyPose(this.elapsed / KNIFE_ATTACK_DURATION);
-      if (!this.impactApplied && previous < KNIFE_HIT_MOMENT && this.elapsed >= KNIFE_HIT_MOMENT) {
-        this.impactApplied = true;
-        this.onImpact?.();
-      }
-      return;
-    }
+    // Same gait as the firearm bob so the arm stays grounded while moving.
+    this.bobTime += dt * (5 + speed01 * 5);
+    this.root.position.set(
+      Math.sin(this.bobTime) * 0.005 * speed01,
+      Math.abs(Math.cos(this.bobTime)) * 0.004 * speed01,
+      0,
+    );
+    if (!this.isAttacking) return;
 
-    const bob = Math.sin(this.idleTime * 7) * speed01;
-    this.root.position.copy(REST_POSITION);
-    this.root.position.y += Math.abs(bob) * 0.012;
-    this.root.position.x += bob * 0.009;
-    this.root.rotation.copy(REST_ROTATION);
+    const previous = this.elapsed;
+    this.elapsed = Math.min(KNIFE_ATTACK_DURATION, this.elapsed + dt);
+    this.applyPose(this.elapsed / KNIFE_ATTACK_DURATION);
+    if (!this.impactApplied && previous < KNIFE_HIT_MOMENT && this.elapsed >= KNIFE_HIT_MOMENT) {
+      this.impactApplied = true;
+      this.onImpact?.();
+    }
   }
 
   private applyPose(progress: number): void {
-    let fromPosition = REST_POSITION;
-    let toPosition = WINDUP_POSITION;
-    let fromRotation = REST_QUATERNION;
-    let toRotation = WINDUP_QUATERNION;
-    let local = progress / WINDUP_END;
-    let blend = smoothStep(THREE.MathUtils.clamp(local, 0, 1));
-    if (progress >= WINDUP_END && progress < CONTACT) {
-      fromPosition = WINDUP_POSITION;
-      toPosition = HIT_POSITION;
-      fromRotation = WINDUP_QUATERNION;
-      toRotation = HIT_QUATERNION;
-      local = (progress - WINDUP_END) / (CONTACT - WINDUP_END);
-      // A stab accelerates into contact instead of stopping between every
-      // authored pose, which was what made the old swing feel mechanical.
-      blend = THREE.MathUtils.clamp(local, 0, 1) ** 2;
-    } else if (progress >= CONTACT && progress < FOLLOW_END) {
-      fromPosition = HIT_POSITION;
-      toPosition = FOLLOW_POSITION;
-      fromRotation = HIT_QUATERNION;
-      toRotation = FOLLOW_QUATERNION;
-      local = (progress - CONTACT) / (FOLLOW_END - CONTACT);
-      const clamped = THREE.MathUtils.clamp(local, 0, 1);
-      blend = 1 - (1 - clamped) ** 2;
-    } else if (progress >= FOLLOW_END) {
-      fromPosition = FOLLOW_POSITION;
-      toPosition = REST_POSITION;
-      fromRotation = FOLLOW_QUATERNION;
-      toRotation = REST_QUATERNION;
-      local = (progress - FOLLOW_END) / (1 - FOLLOW_END);
-      blend = smoothStep(THREE.MathUtils.clamp(local, 0, 1));
-    }
-    this.root.position.lerpVectors(fromPosition, toPosition, blend);
-    this.root.quaternion.slerpQuaternions(fromRotation, toRotation, blend);
+    let index = 1;
+    while (index < KEYS.length - 1 && progress >= KEYS[index].at) index++;
+    const from = KEYS[index - 1];
+    const to = KEYS[index];
+    const s = THREE.MathUtils.clamp((progress - from.at) / (to.at - from.at), 0, 1);
+    this.shoulder.rotation.set(
+      hermite(from, to, 'pitch', s),
+      hermite(from, to, 'yaw', s),
+      hermite(from, to, 'roll', s),
+      'YXZ',
+    );
+    this.elbow.rotation.set(hermite(from, to, 'flex', s), 0, hermite(from, to, 'twist', s), 'XYZ');
+    this.model.visible = progress >= KNIFE_SHOW_PROGRESS && progress < KNIFE_HIDE_PROGRESS;
   }
 
   private buildView(): void {
@@ -157,7 +267,22 @@ export class Knife {
     });
     const darkMetal = new THREE.MeshStandardMaterial({ color: 0x25282a, metalness: 0.78, roughness: 0.45 });
     const wood = new THREE.MeshStandardMaterial({ color: 0x4b2415, metalness: 0.03, roughness: 0.78 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0x9b7359, metalness: 0, roughness: 0.86 });
+
+    this.shoulder.name = 'knife-upper-arm';
+    this.shoulder.position.copy(RIGHT_SHOULDER);
+    this.root.add(this.shoulder);
+    this.elbow.name = 'knife-forearm';
+    this.elbow.position.z = -ARM_UPPER_LENGTH;
+    this.shoulder.add(this.elbow);
+    // Handle center: the point the shared glove closes on.
+    this.hand.name = 'knife-hand';
+    this.hand.position.z = -ARM_FOREARM_LENGTH;
+    this.elbow.add(this.hand);
+    const knife = this.model;
+    knife.name = 'knife-model';
+    knife.quaternion.setFromEuler(GRIP_ROTATION);
+    knife.position.set(0, 0, -HANDLE_CENTER).applyQuaternion(knife.quaternion);
+    this.hand.add(knife);
 
     const bladeShape = new THREE.Shape();
     bladeShape.moveTo(0, -0.045);
@@ -174,38 +299,33 @@ export class Knife {
     bladeGeometry.translate(-0.006, 0.025, -0.055);
     const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
     blade.name = 'knife-blade';
-    this.root.add(blade);
+    knife.add(blade);
 
     const edge = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.012, 0.31), edgeMaterial);
     edge.name = 'knife-edge';
     edge.position.set(-0.007, -0.018, -0.25);
     edge.rotation.x = -0.035;
-    this.root.add(edge);
+    knife.add(edge);
 
     const guard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.035), darkMetal);
     guard.name = 'knife-guard';
     guard.position.z = -0.055;
     guard.rotation.z = 0.08;
-    this.root.add(guard);
-    const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.16, 4, 10), wood);
+    knife.add(guard);
+    const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.033, 0.1, 4, 10), wood);
     grip.name = 'knife-grip';
     grip.rotation.x = Math.PI / 2;
-    grip.position.z = 0.075;
-    this.root.add(grip);
-    for (const z of [0.015, 0.055, 0.095, 0.135]) {
-      const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.004, 5, 10), darkMetal);
+    grip.position.z = HANDLE_CENTER;
+    knife.add(grip);
+    for (const z of [0.012, 0.138]) {
+      const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.004, 5, 10), darkMetal);
       wrap.rotation.x = Math.PI / 2;
       wrap.position.z = z;
-      this.root.add(wrap);
+      knife.add(wrap);
     }
-    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.043, 10, 7), darkMetal);
-    pommel.position.z = 0.18;
+    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 7), darkMetal);
+    pommel.position.z = 0.155;
     pommel.scale.z = 0.65;
-    this.root.add(pommel);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.067, 10, 8), skin);
-    hand.name = 'knife-hand';
-    hand.position.set(0.018, -0.018, 0.08);
-    hand.scale.set(0.8, 1, 1.35);
-    this.root.add(hand);
+    knife.add(pommel);
   }
 }

@@ -46,6 +46,23 @@ puas y una mira tubular abierta por la que se apunta. Pintura, desgaste y
 plasma se dibujan en canvas en runtime (`ProceduralTextures.ts`); su disparo e
 impacto son sintesis Web Audio propia, distinta del zap de la ZEUS-77.
 
+## Brazos en primera persona (procedurales)
+
+Los brazos del viewmodel son geometria propia (`src/weapons/FirstPersonArm.ts`),
+sin descargas. Cada brazo es un `SkinnedMesh` con 18 huesos: hombro, codo,
+muneca y tres falanges por dedo (dos mas el metacarpiano en el pulgar). Manga
+y guante comparten esqueleto, asi que cada brazo cuesta cuatro draw calls
+(manga, sombra de tela, guante y protecciones de nudillos).
+
+- **Aspecto**: manga de la chaqueta de campo de `soldier.glb` y guante
+  tactico color coyote, elegido para leerse sobre armas oscuras. La muneca
+  se reparte entre antebrazo y mano para doblarse sin bisagras visibles.
+- **Densidad**: escritorio ~3,3k triangulos por brazo; movil ~1,5k; con
+  `isLowMemory` la falange distal queda fundida en la media con una flexion
+  fija. El esqueleto es el mismo en los tres niveles.
+- **Poses**: los agarres son datos (`src/weapons/HandPoses.ts`); los puntos de
+  agarre de cada arma viven en `view.hands` de `src/config/weapons.ts`.
+
 ## Modelos de zombies (`public/assets/zombies/`)
 
 El walker vuelve al asset original de **Quaternius**, via **Poly Pizza**,

@@ -20,6 +20,8 @@ import { Weapon } from '../weapons/Weapon';
 import { MagazineDropPool } from '../weapons/MagazineDrop';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import { WeaponView } from '../weapons/WeaponView';
+import { ViewArms } from '../weapons/ViewArms';
+import { armDetailFor } from '../weapons/FirstPersonArm';
 
 interface ArsenalEntry {
   readonly weapon: Weapon;
@@ -54,6 +56,8 @@ export class Game {
   private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
   private inventory!: WeaponInventory;
   private readonly magazineDrops: MagazineDropPool;
+  /** First-person gloves shared by every weapon view and the knife. */
+  private readonly viewArms: ViewArms;
   /** Map colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
   private readonly hitColliders: THREE.Object3D[] = [];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
@@ -138,6 +142,8 @@ export class Game {
 
     this.effects = new Effects(this.scene);
     this.magazineDrops = new MagazineDropPool(this.scene);
+    this.viewArms = new ViewArms(armDetailFor(this.profile));
+    this.player.camera.add(this.viewArms.root);
 
     // The ballistics layer raycasts against this shared, mutable array.
     // The mode registers its map and dynamic hitboxes during init.
@@ -714,6 +720,7 @@ export class Game {
 
     this.mode.update(dt);
     const fallbackName = this.mode.getFallbackWeaponName?.() ?? null;
+    const melee = this.mode.getMeleeArm?.() ?? null;
     this.currentView.root.visible = fallbackName === null;
     this.currentView.update(
       dt,
@@ -721,7 +728,9 @@ export class Game {
       this.player.speed01,
       this.input.mouseDeltaX,
       this.input.mouseDeltaY,
+      melee?.firearmLowering ?? 0,
     );
+    this.viewArms.update(dt, this.currentView, melee);
     this.effects.update(dt);
     this.magazineDrops.update(dt);
 

@@ -205,6 +205,20 @@ describe('M1911 first-person model', () => {
     expect(magazine.position.distanceTo(magazineHome)).toBeLessThan(1e-6);
     expect(slide.position.distanceTo(slideHome)).toBeLessThan(1e-6);
   });
+
+  it('dips out of the knife arm path and returns exactly to the hip pose', () => {
+    const weapon = new Weapon(definition, () => 0.5);
+    const view = new WeaponView(definition, null);
+    view.update(1 / 60, weapon, 0, 0, 0);
+    const hip = view.root.position.clone();
+
+    view.update(1 / 60, weapon, 0, 0, 0, 1);
+    expect(view.root.position.y).toBeLessThan(hip.y - 0.15);
+
+    view.update(1 / 60, weapon, 0, 0, 0, 0);
+    expect(view.root.position.distanceTo(hip)).toBeLessThan(1e-6);
+    expect(view.root.rotation.x).toBeCloseTo(0, 6);
+  });
 });
 
 describe('M1911 wall-buy silhouette', () => {

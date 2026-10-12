@@ -9,6 +9,7 @@ import { buildM4A1 } from './M4A1ViewModel';
 import { buildRayGun } from './RayGunViewModel';
 import { BOLT_REAR_FRACTION, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
+import { WeaponHands } from './WeaponHands';
 import type { Weapon } from './Weapon';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
@@ -1257,6 +1258,8 @@ export class WeaponView {
   private readonly hipPosition: THREE.Vector3;
   private readonly adsPosition: THREE.Vector3;
   private readonly animator: ReloadAnimator | null = null;
+  /** Glove targets: grips, reload choreography and the action hand. */
+  readonly hands: WeaponHands;
   private flashTime = 0;
   private bobPhase = 0;
   private swayX = 0;
@@ -1309,6 +1312,13 @@ export class WeaponView {
     }
     this.root.add(this.muzzle, this.ejectionPort);
 
+    this.hands = new WeaponHands(
+      view.hands,
+      this.root,
+      { magazine: reloadParts.magazine ?? null, handle: reloadParts.handle ?? null },
+      view.reloadAnim ?? null,
+      definition.boltAction,
+    );
     if (view.reloadAnim) {
       this.animator = new ReloadAnimator(
         view.reloadAnim,
@@ -1471,6 +1481,7 @@ export class WeaponView {
   /** Clears every transient pose when this view is hidden or the run resets. */
   reset(): void {
     this.animator?.reset();
+    this.hands.reset();
     this.spring.reset();
     this.flashTime = 0;
     this.flash.visible = false;
@@ -1498,6 +1509,7 @@ export class WeaponView {
     speed01: number,
     mouseDeltaX: number,
     mouseDeltaY: number,
+    lowering = 0,
   ): void {
     const view = this.definition.view;
     const ads = weapon.adsAlpha;
@@ -1535,6 +1547,7 @@ export class WeaponView {
     // 5. State-driven animations. The reload animator runs every frame so
     // it can restore parts the moment the state is left (weapon switch).
     this.animator?.update(weapon);
+    this.hands.update(weapon);
     if (weapon.state !== 'cycling') this.boltEjected = false;
     switch (weapon.state) {
       case 'reloading': {
@@ -1570,6 +1583,16 @@ export class WeaponView {
       }
       default:
         break;
+    }
+
+    // 6. Mode-owned melee (knife): dip down-left, muzzle low, out of the
+    // knife arm's path. Layered on top so reloads and ADS blends survive.
+    if (lowering > 0) {
+      this.root.position.x -= lowering * 0.03;
+      this.root.position.y -= lowering * 0.2;
+      this.root.position.z += lowering * 0.04;
+      this.root.rotation.x -= lowering * 0.5;
+      this.root.rotation.z += lowering * 0.3;
     }
     if (this.flashTime > 0) {
       this.flashTime -= dt;

@@ -9,11 +9,35 @@ import {
   knifeDamageForRound,
 } from '../src/weapons/Knife';
 
+/** Knife mounted on the game camera rig, sampled at a given attack time. */
+function knifeOnCamera(): { knife: Knife; camera: THREE.PerspectiveCamera } {
+  const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.08, 700);
+  const knife = new Knife();
+  camera.add(knife.root);
+  knife.setEnabled(true);
+  knife.trigger();
+  return { knife, camera };
+}
+
+function sampleBlade(knife: Knife, camera: THREE.PerspectiveCamera, time: number) {
+  knife.reset();
+  knife.setEnabled(true);
+  knife.trigger();
+  knife.update(time, false, 0);
+  camera.updateMatrixWorld(true);
+  const blade = knife.root.getObjectByName('knife-blade')!;
+  const hilt = blade.localToWorld(new THREE.Vector3(0, 0.02, -0.055));
+  const tip = blade.localToWorld(new THREE.Vector3(0, 0.035, -0.5));
+  const edge = new THREE.Vector3(0, -1, 0).applyQuaternion(blade.getWorldQuaternion(new THREE.Quaternion()));
+  const hand = knife.root.getObjectByName('knife-hand')!.getWorldPosition(new THREE.Vector3());
+  return { hilt, tip, edge, hand, hiltNdc: hilt.clone().project(camera), tipNdc: tip.clone().project(camera) };
+}
+
 describe('Knife', () => {
-  it('uses the slower attack timing while keeping contact synchronized', () => {
+  it('keeps the attack cadence and resolves contact inside the slash phase', () => {
     expect(KNIFE_ATTACK_DURATION).toBe(0.72);
-    expect(KNIFE_HIT_MOMENT).toBe(0.39);
-    expect(KNIFE_HIT_MOMENT).toBeLessThan(KNIFE_ATTACK_DURATION);
+    expect(KNIFE_HIT_MOMENT).toBeGreaterThan(KNIFE_ATTACK_DURATION * 0.15);
+    expect(KNIFE_HIT_MOMENT).toBeLessThan(KNIFE_ATTACK_DURATION * 0.4);
   });
 
   it('builds a large knife silhouette and only applies contact at the visible strike', () => {
@@ -25,8 +49,9 @@ describe('Knife', () => {
     knife.setEnabled(true);
 
     const blade = knife.root.getObjectByName('knife-blade')!;
-    const size = new THREE.Box3().setFromObject(blade).getSize(new THREE.Vector3());
-    expect(size.z).toBeGreaterThan(0.4);
+    const geometry = (blade as THREE.Mesh).geometry;
+    geometry.computeBoundingBox();
+    expect(geometry.boundingBox!.getSize(new THREE.Vector3()).z).toBeGreaterThan(0.4);
     knife.update(KNIFE_HIT_MOMENT - 0.01, true, 0);
     expect(swing).toHaveBeenCalledTimes(1);
     expect(impact).not.toHaveBeenCalled();
@@ -64,19 +89,86 @@ describe('Knife', () => {
     expect(knife.isAttacking).toBe(false);
   });
 
-  it('thrusts forward into contact and returns exactly to its resting pose', () => {
+  it('slashes edge-first across the crosshair from right to left', () => {
+    const { knife, camera } = knifeOnCamera();
+    const drawn = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * 0.15);
+    const contact = sampleBlade(knife, camera, KNIFE_HIT_MOMENT);
+    const cutEnd = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * 0.4);
+
+    // Raised on the right before the cut, out to the lower left after it.
+    expect(drawn.hiltNdc.x).toBeGreaterThan(0.3);
+    expect(cutEnd.hiltNdc.x).toBeLessThan(0);
+    expect(cutEnd.hiltNdc.y).toBeLessThan(drawn.hiltNdc.y);
+    // At contact the blade spans the crosshair horizontally.
+    expect(contact.hiltNdc.x).toBeGreaterThan(0);
+    expect(contact.tipNdc.x).toBeLessThan(0);
+    expect(Math.abs(contact.hiltNdc.y)).toBeLessThan(0.3);
+    // The edge leads the leftward cut; the tip is not aimed at the crosshair.
+    const justAfter = sampleBlade(knife, camera, KNIFE_HIT_MOMENT + 0.01);
+    const cutDirection = justAfter.hilt.clone().add(justAfter.tip)
+      .sub(contact.hilt).sub(contact.tip).normalize();
+    expect(contact.edge.dot(cutDirection)).toBeGreaterThan(0.6);
+    expect(contact.edge.x).toBeLessThan(-0.5);
+    // A sideways cut, not a lunge: lateral travel dominates depth travel.
+    const travel = cutEnd.hand.clone().sub(drawn.hand);
+    expect(Math.abs(travel.x)).toBeGreaterThan(Math.abs(travel.z) * 3);
+  });
+
+  it('recovers along a lower path and returns exactly to its resting pose', () => {
+    const { knife, camera } = knifeOnCamera();
+    const rest = sampleBlade(knife, camera, 0);
+    const recovery = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * 0.78);
+    const crossing = sampleBlade(knife, camera, KNIFE_HIT_MOMENT);
+    expect(recovery.hand.y).toBeLessThan(crossing.hand.y - 0.3);
+
+    const finished = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION);
+    expect(finished.hand.distanceTo(rest.hand)).toBeLessThan(1e-6);
+    expect(finished.tip.distanceTo(rest.tip)).toBeLessThan(1e-6);
+  });
+
+  it('bends the elbow smoothly, without snapping or hyperextending', () => {
+    const { knife, camera } = knifeOnCamera();
+    const elbowAngle = (time: number): number => {
+      sampleBlade(knife, camera, time);
+      const axis = (name: string) => new THREE.Vector3(0, 0, -1)
+        .applyQuaternion(knife.root.getObjectByName(name)!.getWorldQuaternion(new THREE.Quaternion()));
+      return axis('knife-upper-arm').angleTo(axis('knife-forearm'));
+    };
+    for (let time = 0; time <= KNIFE_ATTACK_DURATION; time += 1 / 120) {
+      const angle = elbowAngle(time);
+      expect(angle).toBeGreaterThan(THREE.MathUtils.degToRad(15));
+      expect(angle).toBeLessThan(THREE.MathUtils.degToRad(125));
+    }
+    // The contact frame is the fastest moment of the cut: the elbow must pass
+    // through it with a continuous velocity instead of a visible kink.
+    const step = 0.002;
+    const before = (elbowAngle(KNIFE_HIT_MOMENT) - elbowAngle(KNIFE_HIT_MOMENT - step)) / step;
+    const after = (elbowAngle(KNIFE_HIT_MOMENT + step) - elbowAngle(KNIFE_HIT_MOMENT)) / step;
+    expect(Math.abs(before)).toBeGreaterThan(2);
+    expect(Math.abs(after - before)).toBeLessThan(0.25);
+  });
+
+  it('keeps the knife locked in the fist through the whole attack', () => {
+    const { knife, camera } = knifeOnCamera();
+    const gripOffsets = [0.1, 0.3, 0.5, 0.8].map((fraction) => {
+      const { hilt, hand } = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * fraction);
+      const forearm = knife.root.getObjectByName('knife-forearm')!;
+      return forearm.worldToLocal(hilt.clone()).distanceTo(forearm.worldToLocal(hand.clone()));
+    });
+    for (const offset of gripOffsets) expect(offset).toBeCloseTo(gripOffsets[0], 6);
+  });
+
+  it('asks for the firearm to dip before the hand enters and restores it by the end', () => {
     const knife = new Knife();
+    expect(knife.firearmLowering).toBe(0);
     knife.setEnabled(true);
-    const restPosition = knife.root.position.clone();
-    const restQuaternion = knife.root.quaternion.clone();
     knife.trigger();
-
+    knife.update(KNIFE_ATTACK_DURATION * 0.1, false, 0);
+    expect(knife.firearmLowering).toBe(1);
     knife.update(KNIFE_HIT_MOMENT, false, 0);
-    expect(knife.root.position.z).toBeLessThan(restPosition.z - 0.2);
-
+    expect(knife.firearmLowering).toBe(1);
     knife.update(KNIFE_ATTACK_DURATION, false, 0);
-    expect(knife.root.position.distanceTo(restPosition)).toBeLessThan(1e-6);
-    expect(1 - Math.abs(knife.root.quaternion.dot(restQuaternion))).toBeLessThan(1e-6);
+    expect(knife.firearmLowering).toBe(0);
   });
 });
 

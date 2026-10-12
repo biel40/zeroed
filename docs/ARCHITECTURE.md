@@ -53,7 +53,15 @@ sufra tirones de compilacion de shaders.
 - El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
   inventario. Sirve como fallback sin municion y como ataque rapido dedicado;
   `GameMode.usesFallbackAttack()` permite que el shell ceda fire/ADS durante
-  la cuchillada sin convertirlo en un arma de proyectiles ficticia.
+  la cuchillada sin convertirlo en un arma de proyectiles ficticia, y
+  `getMeleeArm()` entrega el `Knife` como `MeleeArmDriver`: cuanto apartar el
+  arma y cuanto de la mano derecha toma el tajo.
+- Los brazos en primera persona (`ViewArms`) son un servicio de `Game` en la
+  camara, unico para todas las armas y el cuchillo. Cada arma declara en
+  `view.hands` sus puntos de agarre (posicion, eje del agarre, normal de la
+  palma, pose de dedos y polo del codo) en el espacio de su raiz;
+  `WeaponHands` los convierte en objetivos que siguen balanceo, retroceso,
+  ADS, equipamiento, recargas y bajada del arma sin duplicar esas capas.
 - Logica determinista y vistas Three.js permanecen separadas para poder probar
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
   municion la decide el modo.

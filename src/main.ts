@@ -1,5 +1,5 @@
 import './style.css';
-import { hasBetaAccess } from '../public/beta/access.js';
+import type * as BetaAccess from '../public/beta/access.js';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { MusicManager } from './audio/MusicManager';
 import { isZombieMapId } from './config/zombieMaps';
@@ -203,8 +203,12 @@ class ZeroedBoot {
 }
 
 applyDocumentTranslations();
+// Static file in public/, also loaded directly by the beta pages; it must not be bundled.
+const BETA_ACCESS_URL = new URL('/beta/access.js', window.location.origin).href;
+
 async function boot(): Promise<void> {
   if (import.meta.env.VITE_BETA_ENABLED === 'true') {
+    const { hasBetaAccess } = (await import(/* @vite-ignore */ BETA_ACCESS_URL)) as typeof BetaAccess;
     if (!hasBetaAccess()) {
       window.location.replace(`/beta/index.html${window.location.search}`);
       return;

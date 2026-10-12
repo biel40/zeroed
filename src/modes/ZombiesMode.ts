@@ -10,6 +10,7 @@ import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
 import { KNIFE_RANGE, Knife, knifeDamageForRound } from '../weapons/Knife';
+import type { MeleeArmDriver } from '../weapons/ViewArms';
 import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zombies/MysteryBox';
@@ -298,6 +299,10 @@ export class ZombiesMode implements GameMode {
 
   getFallbackWeaponName(): string | null {
     return this.usesFallbackAttack() ? t('hud.knife') : null;
+  }
+
+  getMeleeArm(): MeleeArmDriver | null {
+    return this.knife.enabled ? this.knife : null;
   }
 
   public onMeleeAttack(): void {

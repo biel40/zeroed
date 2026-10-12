@@ -30,6 +30,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     ballistics: { update: vi.fn() },
     effects: { update: vi.fn() },
     magazineDrops: { update: vi.fn() },
+    viewArms: { update: vi.fn() },
     flashLight: { intensity: 0 },
     viewportHeight: 100,
     hud: { update: vi.fn(), setInteractionPrompt: vi.fn() },

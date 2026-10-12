@@ -10,6 +10,7 @@ import type { HitTarget } from '../shooting/HitTarget';
 import type { HUD } from '../ui/HUD';
 import type { Weapon } from '../weapons/Weapon';
 import type { WeaponId } from '../weapons/WeaponTypes';
+import type { MeleeArmDriver } from '../weapons/ViewArms';
 
 /** Everything a mode needs from the shared Game shell. */
 export interface ModeContext {
@@ -107,6 +108,8 @@ export interface GameMode {
   /** Mode-owned fallback (for example the Zombies knife) replaces fire/ADS input. */
   usesFallbackAttack?(): boolean;
   getFallbackWeaponName?(): string | null;
+  /** Mode-owned melee (the knife): dips the firearm and borrows the right arm. */
+  getMeleeArm?(): MeleeArmDriver | null;
   /**
    * Called when the pointer lock is lost. Return true when the mode shows
    * its own UI (game over) and the default pause screen should be skipped.

@@ -47,9 +47,13 @@ como cue independiente sobre la música de fondo.
   bloqueado y una nueva pulsacion reproduce el sonido de encasquillamiento. El
   Knife no ocupa ranura y funciona exclusivamente como melee rapido mediante 3
   (o NUM 3) o el boton KNIFE del HUD tactil, sin cambiar el arma equipada. La
-  cuchillada aplica 150 de dano en su contacto visual, tiene 2.05 m de alcance
-  y usa el primer collider bajo la mira, por lo que paredes y enemigos cercanos
-  bloquean el golpe.
+  cuchillada es un tajo lateral de derecha a izquierda: el arma equipada baja
+  sujeta por la mano izquierda, la derecha suelta la empunadura y vuelve con el
+  cuchillo (que solo existe fuera de pantalla), cruza la pantalla con el filo
+  por delante y el golpe se resuelve
+  cuando la hoja pasa por la mira. Tiene 2.05 m de alcance y usa el primer
+  collider bajo la mira, por lo que paredes y enemigos cercanos bloquean el
+  golpe; el arco visible no es un ataque de area.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
   continua de canal unico, sin teletransporte.

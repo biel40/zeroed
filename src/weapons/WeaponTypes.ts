@@ -149,6 +149,49 @@ export interface VisualRecoilConfig {
   readonly damping: number;
 }
 
+/** Finger pose presets of the first-person gloves (see HandPoses.ts). */
+export type HandPoseId =
+  | 'fist'
+  | 'pistolGrip'
+  | 'rifleGrip'
+  | 'supportHandguard'
+  | 'supportPistol'
+  | 'magazineGrab'
+  | 'boltPinch'
+  | 'relaxed';
+
+type Vec3 = readonly [number, number, number];
+
+/**
+ * Where a glove holds a part. `position` is the center of the held part;
+ * `axis` runs along it toward the thumb side and `palm` is the direction the
+ * palm faces. Together they fix the hand rotation (palm is orthogonalized).
+ */
+export interface HandGripConfig {
+  readonly position: Vec3;
+  readonly axis: Vec3;
+  readonly palm: Vec3;
+  readonly pose: HandPoseId;
+}
+
+export interface HandAnchorConfig extends HandGripConfig {
+  /** Direction the elbow points. */
+  readonly pole: Vec3;
+}
+
+/** First-person hands on a weapon, in the weapon root's local space. */
+export interface WeaponHandsConfig {
+  readonly right: HandAnchorConfig;
+  /** Absent for one-handed weapons: the left arm stays hidden. */
+  readonly left?: HandAnchorConfig;
+  /** Hand that works the charging handle / bolt / slide. Default right. */
+  readonly actionHand?: 'left' | 'right';
+  /** Grip on the reload handle part, in that part's local space. */
+  readonly action?: HandGripConfig;
+  /** Left-hand grip on the magazine part, in its local space. */
+  readonly magazine?: HandGripConfig;
+}
+
 /** Drives the view model: GLB when available, procedural fallback otherwise. */
 export interface ViewModelConfig {
   // --- GLB model (optional; procedural fallback when missing/failed) ---
@@ -200,6 +243,8 @@ export interface ViewModelConfig {
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
   readonly reloadAnim?: ReloadAnimConfig;
+  /** First-person glove anchors. */
+  readonly hands: WeaponHandsConfig;
 }
 
 export interface WeaponDefinition {

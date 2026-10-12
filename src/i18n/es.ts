@@ -65,7 +65,7 @@ export const es: Record<TranslationKey, string> = {
   'hud.health': 'VIDA',
   'hud.kills': 'BAJAS',
   'hud.headshots': 'CABEZA',
-  'hud.lamps': 'FAROLES',
+  'hud.lamps': 'FAROLES RELLENADOS',
   'hud.lampLabel': 'Farol {index}: {state}',
   'hud.lampLit': 'lleno',
   'hud.lampUnlit': 'sin llenar',

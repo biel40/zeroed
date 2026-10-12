@@ -4,6 +4,10 @@ dist/
 coverage/
 .wrangler/
 *.local
+.env
+.env.*
+!.env.example
+!.env.*.example
 .DS_Store
 Thumbs.db
 # Raw Mixamo downloads may not be redistributed; only the built GLB ships.

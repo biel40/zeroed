@@ -16,6 +16,7 @@ import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { Weapon } from '../../weapons/Weapon';
 import { KNIFE_RANGE, Knife } from '../../weapons/Knife';
+import type { MeleeArmDriver } from '../../weapons/ViewArms';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../../zombies/MysteryBox';
 import { MysteryBoxView } from '../../zombies/MysteryBoxView';
 import { EnergyProjectiles } from '../../zombies/EnergyProjectiles';
@@ -263,6 +264,8 @@ export class CoopGuestMode implements GameMode {
   }
 
   public usesFallbackAttack(): boolean { return this.isGameplayInputEnabled() && this.knife.isAttacking; }
+
+  public getMeleeArm(): MeleeArmDriver | null { return this.knife.enabled ? this.knife : null; }
 
   public getFallbackWeaponName(): string | null {
     return this.match?.stats.guest.life === 'downed' ? t('hud.downed')

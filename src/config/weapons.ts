@@ -68,6 +68,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.047,
       bulk: 0.75,
+      // Two-handed: the support hand wraps the shooting hand and racks the slide.
+      hands: {
+        right: { position: [0, -0.047, 0.07], axis: [0, 0.8, -0.6], palm: [-1, 0, 0], pose: 'pistolGrip', pole: [0.45, -1, -0.25] },
+        left: { position: [0.008, -0.075, 0.04], axis: [0, 0.8, -0.6], palm: [1, 0, 0.2], pose: 'supportPistol', pole: [-0.55, -1, -0.15] },
+        actionHand: 'left',
+        action: { position: [0, 0.012, 0.08], axis: [0, 0, 1], palm: [0, -1, 0], pose: 'magazineGrab' },
+      },
       reloadAnim: {
         style: 'pistol',
         magOut: 0.08,
@@ -135,6 +142,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.075,
       bulk: 1,
+      hands: {
+        right: { position: [0, -0.07, 0.03], axis: [0, 0.85, -0.5], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
+        left: { position: [0, 0.008, -0.27], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        // The charging-handle latch is on the left: the support hand racks it.
+        actionHand: 'left',
+        action: { position: [-0.026, 0.004, 0.008], axis: [0, 0, -1], palm: [0.4, -1, 0.2], pose: 'boltPinch' },
+      },
       reloadAnim: {
         style: 'rifle',
         magOut: 0.1,
@@ -209,6 +223,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       sightHeight: 0.046,
       bulk: 1.02,
       frame: 'ak47',
+      hands: {
+        right: { position: [0, -0.095, 0.078], axis: [0, 0.975, -0.22], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
+        left: { position: [0, -0.009, -0.25], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        action: { position: [0.03, 0.007, -0.004], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
+      },
       reloadAnim: {
         style: 'rock',
         magOut: 0.07,
@@ -278,6 +297,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.085,
       bulk: 1.35,
+      // The support hand rides under the gas tube, ahead of the ammo box.
+      hands: {
+        right: { position: [0, -0.1, 0.079], axis: [0, 0.955, 0.296], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
+        left: { position: [0, -0.035, -0.17], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        action: { position: [0.013, 0, 0.011], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
+        magazine: { position: [0, -0.075, 0], axis: [0, 0, -1], palm: [0, 1, 0], pose: 'magazineGrab' },
+      },
       reloadAnim: {
         style: 'belt',
         magOut: 0.04,
@@ -350,6 +376,12 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'scope',
       sightHeight: 0.062,
       bulk: 1.1,
+      // The thumb of the shooting hand passes through the thumbhole.
+      hands: {
+        right: { position: [0, -0.085, 0.08], axis: [0, 0.985, -0.17], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
+        left: { position: [0, -0.03, -0.28], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        action: { position: [0.05, -0.014, 0.055], axis: [0, 1, 0], palm: [-1, 0.3, 0], pose: 'boltPinch' },
+      },
       reloadAnim: {
         style: 'bolt',
         magOut: 0.08,
@@ -426,6 +458,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.07,
       bulk: 0.9,
+      // One-handed pistol: the left arm stays hidden.
+      hands: {
+        right: { position: [0, -0.095, 0.08], axis: [0, 0.945, -0.33], palm: [-1, 0, 0], pose: 'pistolGrip', pole: [0.45, -1, -0.25] },
+      },
       reloadAnim: {
         style: 'cell',
         magOut: 0.1,
@@ -509,6 +545,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'reddot',
       sightHeight: 0.075,
       bulk: 1.05,
+      // Rifle hold, with the support hand on the insulated chamber floor
+      // behind the exposed copper coil; it lifts the capacitor cell on reload.
+      hands: {
+        right: { position: [0.012, -0.09, 0.09], axis: [0, 0.95, -0.32], palm: [-1, 0, 0], pose: 'rifleGrip', pole: [0.45, -1, -0.25] },
+        left: { position: [0, -0.002, -0.16], axis: [0, 0.08, -1], palm: [0.35, 1, 0], pose: 'supportHandguard', pole: [-0.55, -1, -0.15] },
+        magazine: { position: [0, 0.04, 0], axis: [0, 0, 1], palm: [0, -1, 0], pose: 'magazineGrab' },
+      },
       reloadAnim: {
         style: 'cell',
         magOut: 0.1,
