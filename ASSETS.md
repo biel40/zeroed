@@ -151,24 +151,24 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `background_music_theme.mp3` | Música en bucle durante la partida |
 | `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
 | `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
-| `door_purchase.mp3` | Opcional. Compra de una puerta por Points (con fallback procedural) |
+| `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
+| `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |
 
-### Opcional: pasos de zombie
+### Efectos de Kenney (CC0)
 
-`src/zombies/ZombieFootsteps.ts` reproduce pasos posicionales 3D. Sin asset usa
-un buffer sintetizado en runtime (thump grave + shuffle de ruido, sin base64 ni
-dependencias). Para sustituirlo, coloca:
+Autor: **Kenney** — https://kenney.nl (CC0):
+https://creativecommons.org/publicdomain/zero/1.0/
 
-- **Ruta**: `public/assets/audio/zombies/footsteps.mp3`
-- **Contenido**: UN solo paso de zombie, seco y corto (~0.2–0.5 s), mono,
-  sin silencio largo al inicio. La variación la aporta el motor
-  (playbackRate 0.9–1.12 y jitter de cadencia), así que basta un sample.
-- **Licencia**: CC0 o equivalente, como el resto de assets; anota aquí la
-  fuente cuando lo añadas.
+| Archivo | Origen | Procesado |
+| --- | --- | --- |
+| `zombies/footsteps.mp3` | *Impact Sounds*, `footstep_concrete_000.ogg` | Mono, tono al 85 % (más grave), sin silencio inicial, pico −2 dB |
+| `door_purchase.mp3` | *RPG Audio*, `handleCoins.ogg` + `doorOpen_1.ogg` (+180 ms) | Mezcla mono, pico −2 dB |
 
-Si el archivo falta o no decodifica, el juego sigue con el fallback: la ausencia
-nunca rompe nada.
+`src/zombies/ZombieFootsteps.ts` reproduce el paso como UN sample corto; la
+variación la aporta el motor (playbackRate 0.9–1.12 y jitter de cadencia).
+Si un archivo falta o no decodifica, ambos sonidos vuelven a su síntesis
+procedural.
 
 ## Resto
 
