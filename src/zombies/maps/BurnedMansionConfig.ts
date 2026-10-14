@@ -245,11 +245,13 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
   {
+    // Bunker east wall south of the stairwell: the stair side walls cover
+    // this wall between MANSION_STAIR_BOTTOM_Z and MANSION_STAIR_TOP_Z.
     id: 'bunker-m60',
     weaponId: 'm60',
     price: 2500,
     ammoPrice: 1250,
-    position: { x: MANSION_EAST_WALL_X - 0.73, y: MANSION_BUNKER_Y + 1.45, z: -5.7 },
+    position: { x: MANSION_EAST_WALL_X - 0.32, y: MANSION_BUNKER_Y + 1.45, z: -1.5 },
     yaw: -Math.PI / 2,
     floor: -1,
   },

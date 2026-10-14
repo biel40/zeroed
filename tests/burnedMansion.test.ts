@@ -18,6 +18,7 @@ import {
   MANSION_AMMO_REFILLS,
   MANSION_BUNKER_BOUNDS,
   MANSION_BUNKER_DIVIDER_X,
+  MANSION_BUNKER_ENDING,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
   MANSION_DOOR_COSTS,
@@ -420,6 +421,36 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_EAST_WALL_X - MANSION_BUNKER_DIVIDER_X).toBeCloseTo(4.95);
     expect(arena.wallBuys).toHaveLength(5);
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(5);
+  });
+
+  it('mounts the bunker M60 on a visible wall reachable from the stairs', () => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const m60 = arena.wallBuys.find((buy) => buy.id === 'bunker-m60')!;
+    expect(m60.floor).toBe(-1);
+    const target = new THREE.Vector3(m60.position.x, m60.position.y, m60.position.z);
+    expect(arena.wallColliders.some((box) => box.containsPoint(target))).toBe(false);
+
+    const stand: readonly [number, number] = [MANSION_BUNKER_BOUNDS.maxX, m60.position.z];
+    expect(canWalk([MANSION_STAIR_CENTER_X, -6.9], stand, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    const eye = new THREE.Vector3(stand[0], MANSION_BUNKER_Y + EYE_HEIGHT, stand[1]);
+    expect(Math.hypot(target.x - eye.x, target.z - eye.z)).toBeLessThan(m60.useRange);
+    // Nothing solid between the player's eye and the outline.
+    const sight = new THREE.Ray(eye, target.clone().sub(eye).normalize());
+    const sightLength = eye.distanceTo(target);
+    const hit = new THREE.Vector3();
+    expect(arena.wallColliders.some((box) =>
+      sight.intersectBox(box, hit) !== null && eye.distanceTo(hit) < sightLength,
+    )).toBe(false);
+
+    const bunkerInteractables = [
+      ...MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.position),
+      MANSION_BUNKER_ENDING.position,
+      ...MANSION_WALL_BUYS.filter((buy) => buy.floor === -1 && buy.id !== m60.id).map((buy) => buy.position),
+    ];
+    for (const position of bunkerInteractables) {
+      expect(Math.hypot(position.x - target.x, position.z - target.z)).toBeGreaterThan(m60.useRange * 2);
+    }
   });
 
   it('keeps a clear turning lane between the bunker door and the stairs', () => {
