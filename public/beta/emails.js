@@ -2,6 +2,7 @@ export const BETA_EMAILS = [
   'anavilmoy@gmail.com',
   'bielet40@gmail.com',
   'delta.centauri.k@gmail.com',
+  'dlemosf@hotmail.com',
   'enriquecabell930@gmail.com',
   'giani.1997@gmail.com',
   'icabe.96@gmail.com',
