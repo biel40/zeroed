@@ -555,8 +555,11 @@ export class BurnedMansionArena implements ZombieArena {
 
     this.addWindowedWall('z', -7.15, -8, 10, [-3.2, 3.2, 5.4]);
     this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10, [-2.5]);
-    this.addWindowedWall('x', -8.15, -7, 7, [-5.5, -3.5, 1.6]);
-    this.addWindowedWall('x', 10.15, -7, 7, [-5.5, -3.5]);
+    // North and south walls reach the outer face of the widened east wall so
+    // the east-wing corners stay closed.
+    const eastOuterX = MANSION_EAST_WALL_X + WALL_THICKNESS / 2;
+    this.addWindowedWall('x', -8.15, -7, eastOuterX, [-5.5, -3.5, 1.6]);
+    this.addWindowedWall('x', 10.15, -7, eastOuterX, [-5.5, -3.5]);
 
     this.addSlab('mansion-roof', 1, 3.28, 1, 16.6, 0.16, 18.6, this.materials.ceilingBurned);
 
@@ -711,16 +714,22 @@ export class BurnedMansionArena implements ZombieArena {
     const run = topZ - bottomZ;
     const depth = run / steps;
     const rise = Math.abs(MANSION_BUNKER_Y) / steps;
+    const sideWalls = [[4.35, 5.475], [7.825, 9]] as const;
+    // Treads span wall to wall so no slit opens beside them.
+    const stepWidth = sideWalls[1][0] - sideWalls[0][1];
     const stepGeometries: THREE.BoxGeometry[] = [];
     for (let index = 0; index < steps; index++) {
       const top = MANSION_BUNKER_Y + (index + 1) * rise;
       const height = top - MANSION_BUNKER_Y;
-      const geometry = new THREE.BoxGeometry(2.15, Math.max(0.12, height), depth);
-      this.projectSurfaceUVs(geometry, 2.15, Math.max(0.12, height), depth, this.materials.metal, index);
+      const startZ = bottomZ + index * depth;
+      // The top tread stops at the slab edge instead of sharing its y=0 plane.
+      const endZ = Math.min(startZ + depth, STAIR_APERTURE_MAX_Z);
+      const geometry = new THREE.BoxGeometry(stepWidth, Math.max(0.12, height), endZ - startZ);
+      this.projectSurfaceUVs(geometry, stepWidth, Math.max(0.12, height), endZ - startZ, this.materials.metal, index);
       geometry.translate(
         MANSION_STAIR_CENTER_X,
         MANSION_BUNKER_Y + height / 2,
-        bottomZ + (index + 0.5) * depth,
+        (startZ + endZ) / 2,
       );
       stepGeometries.push(geometry);
     }
@@ -734,12 +743,13 @@ export class BurnedMansionArena implements ZombieArena {
     mergedSteps.userData.stepCount = steps;
     this.group.add(mergedSteps);
 
-    const sideHeight = Math.abs(MANSION_BUNKER_Y) + 1;
+    const sideHeight = GROUND_CEILING_Y - MANSION_BUNKER_Y;
     const sideY = MANSION_BUNKER_Y + sideHeight / 2;
     const sideDepth = topZ - bottomZ;
-    // Fill the former side walkways so the room has one longitudinal route:
-    // enter at the upper landing, descend, then leave through the lower landing.
-    for (const [minX, maxX] of [[4.35, 5.475], [7.825, 9]] as const) {
+    // Full-height stairwell walls leave one longitudinal route: enter at the
+    // upper landing, descend, then leave through the lower landing. Low fills
+    // read as stray blocks and exposed an unreachable ledge behind the shaft.
+    for (const [minX, maxX] of sideWalls) {
       this.addWall(
         (minX + maxX) / 2,
         sideY,
@@ -750,6 +760,20 @@ export class BurnedMansionArena implements ZombieArena {
         this.materials.charredWood,
       );
     }
+    // Ground-floor end of the shaft: closes that ledge up to the north wall and
+    // overhangs the lower landing as a lintel, above any body on the stairs.
+    const northWallInnerZ = -8.15 + WALL_THICKNESS / 2;
+    const endWallMinX = sideWalls[0][0];
+    const endWallMaxX = sideWalls[1][1];
+    this.addWall(
+      (endWallMinX + endWallMaxX) / 2,
+      GROUND_CEILING_Y / 2,
+      (northWallInnerZ + bottomZ) / 2,
+      endWallMaxX - endWallMinX,
+      GROUND_CEILING_Y,
+      bottomZ - northWallInnerZ,
+      this.materials.charredWood,
+    );
     const backWallTopY = -0.5;
     const backWallHeight = backWallTopY - MANSION_BUNKER_Y;
     this.addWall(
@@ -1073,7 +1097,8 @@ export class BurnedMansionArena implements ZombieArena {
       { x: -7.0, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: -3.5, y: 2.42, z: 10.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.5, y: 2.4, z: -8.0, width: 1.8, height: 1.25, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
-      { x: MANSION_EAST_WALL_X - 0.15, y: 2.45, z: -4.5, width: 1.9, height: 1.35, rotationY: -Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
+      // On the east stairwell wall, which now hides that stretch of the outer wall.
+      { x: 7.81, y: 2.45, z: -5.6, width: 1.9, height: 1.35, rotationY: -Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.5, y: 2.55, z: 1.835, width: 2.05, height: 1.15, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: 0.165, y: 2.52, z: -2.5, width: 1.9, height: 1.1, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: 1.6, y: 2.45, z: 1.835, width: 2.1, height: 1.25, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },

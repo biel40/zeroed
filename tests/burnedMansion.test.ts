@@ -628,8 +628,9 @@ describe('Burned Mansion topology', () => {
     for (const wall of sideFills) {
       expect(wall.min.z).toBeLessThanOrEqual(MANSION_STAIR_BOTTOM_Z);
       expect(wall.max.z).toBeGreaterThanOrEqual(MANSION_STAIR_TOP_Z);
-      expect(wall.min.y).toBeLessThanOrEqual(MANSION_BUNKER_Y);
-      expect(wall.max.y).toBeGreaterThanOrEqual(1);
+      // Full height from the bunker floor to the ground-floor ceiling.
+      expect(wall.min.y).toBeCloseTo(MANSION_BUNKER_Y, 5);
+      expect(wall.max.y).toBeCloseTo(3.2, 5);
     }
 
     const stairSideMeshes = arena.group.children.filter((child) => {
@@ -644,6 +645,22 @@ describe('Burned Mansion topology', () => {
     expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.1], arena.wallColliders)).toBe(true);
     expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [4.9, -5], arena.wallColliders)).toBe(false);
     expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [8.4, -5], arena.wallColliders)).toBe(false);
+  });
+
+  it('closes the east-wing corners and the ledge behind the stairwell', () => {
+    const arena = makeArena();
+    const covered = (x: number, y: number, z: number) =>
+      arena.wallColliders.some((wall) => wall.containsPoint(new THREE.Vector3(x, y, z)));
+
+    for (const z of [-8.15, 10.15]) {
+      for (const x of [7.5, 8.5, 9.2]) expect(covered(x, 2.5, z)).toBe(true);
+    }
+    for (const x of [4.6, MANSION_STAIR_CENTER_X, 8.7]) {
+      expect(covered(x, 1, -7.7)).toBe(true);
+      expect(covered(x, 3, -7.7)).toBe(true);
+    }
+    // The ground-floor lintel stays clear of a body standing on the lower landing.
+    expect(covered(MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + EYE_HEIGHT + 0.25, MANSION_STAIR_BOTTOM_Z - 0.1)).toBe(false);
   });
 
   it('blocks the lower floor from crossing through the back of the stairs', () => {
