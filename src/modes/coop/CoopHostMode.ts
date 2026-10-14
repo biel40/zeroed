@@ -32,7 +32,7 @@ import { MysteryBoxView } from '../../zombies/MysteryBoxView';
 import { EnergyProjectiles } from '../../zombies/EnergyProjectiles';
 import { ChainLightning } from '../../zombies/ChainLightning';
 import type { Zombie } from '../../zombies/Zombie';
-import { CHAIN_ZAP_DAMAGE, PLAYER_MAX_HP, RAYGUN_UNLOCK_KILLS } from '../../zombies/ZombieConfig';
+import { CHAIN_ZAP_DAMAGE, PLAYER_MAX_HP, RAYGUN_UNLOCK_KILLS, ZOMBIE_TYPE_CONFIGS } from '../../zombies/ZombieConfig';
 import type { EnergyWeaponConfig } from '../../weapons/WeaponTypes';
 import { ZombieManager, type ZombiePlayerTarget } from '../../zombies/ZombieManager';
 import { RoundManager } from '../../zombies/RoundManager';
@@ -695,8 +695,9 @@ export class CoopHostMode implements GameMode {
       for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(killer.kills);
     }
     if (headshot) killer.headshots++;
-    if (source === 'knife') killer.economy.awardKnifeKill();
-    else killer.economy.awardKill(headshot);
+    const rewardMultiplier = ZOMBIE_TYPE_CONFIGS[zombie.typeId].killRewardMultiplier;
+    if (source === 'knife') killer.economy.awardKnifeKill(rewardMultiplier);
+    else killer.economy.awardKill(headshot, rewardMultiplier);
     this.world.arena.captureSoul(zombie.position, zombie.floor);
     this.send({ type: 'zombieDeath', zombieId: this.zombies.networkIdOf(zombie), killer: shooter });
     if (!this.rayGunUnlocked[shooter] && killer.kills >= RAYGUN_UNLOCK_KILLS) {

@@ -39,15 +39,16 @@ export class PlayerEconomy {
 
   /**
    * Kill reward. A headshot pays the same 150 points whether or not it was
-   * lethal; the two branches remain mutually exclusive.
+   * lethal; the two branches remain mutually exclusive. `multiplier` is the
+   * zombie type's kill reward factor (Brutus pays double).
    */
-  awardKill(headshot: boolean): void {
-    this.award(headshot ? HEADSHOT_POINTS : POINTS_KILL);
+  awardKill(headshot: boolean, multiplier = 1): void {
+    this.award((headshot ? HEADSHOT_POINTS : POINTS_KILL) * multiplier);
   }
 
   /** Dedicated lethal melee reward; never stacked with the normal kill. */
-  public awardKnifeKill(): void {
-    this.award(POINTS_KNIFE_KILL);
+  public awardKnifeKill(multiplier = 1): void {
+    this.award(POINTS_KNIFE_KILL * multiplier);
   }
 
   /**

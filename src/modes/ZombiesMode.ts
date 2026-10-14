@@ -17,7 +17,7 @@ import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zomb
 import { MysteryBoxView } from '../zombies/MysteryBoxView';
 import { RoundManager } from '../zombies/RoundManager';
 import { Zombie } from '../zombies/Zombie';
-import type { ZombieHitPart } from '../zombies/ZombieConfig';
+import { ZOMBIE_TYPE_CONFIGS, type ZombieHitPart } from '../zombies/ZombieConfig';
 import {
   CHAIN_ZAP_DAMAGE,
   PLAYER_HIT_INVULN,
@@ -149,6 +149,7 @@ export class ZombiesMode implements GameMode {
       { x: zombie.position.x, y: zombie.position.y, z: zombie.position.z },
       zombie.floor,
       source,
+      ZOMBIE_TYPE_CONFIGS[zombie.typeId].killRewardMultiplier,
     );
     this.zombies.onZombieDamaged = (damage) => { this.totalDamage += damage; };
     this.zombies.onPlayerAttack = (damage, _target, attacker) => this.onPlayerHit(damage, voicePoint(attacker.position));
@@ -873,6 +874,7 @@ export class ZombiesMode implements GameMode {
     deathPosition?: { readonly x: number; readonly y: number; readonly z: number },
     floor?: number,
     source: ZombieKillSource = 'default',
+    rewardMultiplier = 1,
   ): void {
     if (!this.isGameplayInputEnabled()) return;
     this.kills++;
@@ -890,8 +892,8 @@ export class ZombiesMode implements GameMode {
 
     // Rewards are mutually exclusive: the risky knife finisher beats a
     // headshot, and neither stacks with the ordinary kill payout.
-    if (source === 'knife') this.economy.awardKnifeKill();
-    else this.economy.awardKill(headshot);
+    if (source === 'knife') this.economy.awardKnifeKill(rewardMultiplier);
+    else this.economy.awardKill(headshot, rewardMultiplier);
     if (deathPosition && floor !== undefined && this.arena instanceof BurnedMansionArena) {
       this.arena.captureSoul(deathPosition, floor);
     }

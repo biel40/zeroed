@@ -48,8 +48,9 @@ describe('resolveClip', () => {
 });
 
 describe('zombie GLB assets', () => {
-  // The state machine needs at least these states animated per variant.
-  const REQUIRED: ZombieState[] = ['spawn', 'walk', 'attack'];
+  // Authored clips every variant needs; attacks, idle and death are solved
+  // at runtime for every known rig.
+  const REQUIRED: ZombieState[] = ['spawn', 'walk'];
 
   for (const modelId of Object.keys(GLB_FILES) as ZombieModelId[]) {
     it(`${modelId} ships clips for ${REQUIRED.join('/')}`, () => {
@@ -64,18 +65,20 @@ describe('zombie GLB assets', () => {
     });
   }
 
-  it('ships a purpose-built tall humanoid Brutus hierarchy', () => {
-    const json = gltfJson(`${GLB_DIR}/${GLB_FILES.brute}`);
-    const nodes = new Set((json.nodes ?? []).map((node) => node.name));
-    expect(nodes).toContain('BrutusRibcage');
-    expect(nodes).toContain('BrutusOpenChest');
-    expect(nodes).toContain('BrutusExposedRib4');
-    expect(nodes).toContain('BrutusTornLapL');
-    expect(nodes).toContain('BrutusMissingCheekR');
-    expect(nodes).toContain('BrutusJaw');
-    expect(nodes).toContain('BrutusHandL');
-    expect(nodes).toContain('BrutusBootR');
-    expect(nodes).not.toContain('BruteBelly');
+  it('derives Brutus from the walker rig as a single skinned draw', () => {
+    const brute = gltfJson(`${GLB_DIR}/${GLB_FILES.brute}`);
+    const walker = gltfJson(`${GLB_DIR}/${GLB_FILES.walker}`);
+    const bruteNodes = new Set((brute.nodes ?? []).map((node) => node.name));
+    const skinned = ['Hips', 'Spine2', 'Head', 'HeadTop_End', 'LeftHand', 'RightForeArm', 'LeftFoot'];
+    for (const name of skinned) {
+      expect((walker.nodes ?? []).some((node) => node.name === name)).toBe(true);
+      expect(bruteNodes).toContain(name);
+    }
+    expect(bruteNodes).toContain('Brutus');
+    expect((brute.materials ?? []).map((material) => material.name)).toEqual(['Brutus']);
+    expect(brute.skins).toHaveLength(1);
+    expect(brute.meshes).toHaveLength(1);
+    expect(brute.meshes?.[0].primitives).toHaveLength(1);
   });
 
   it('ships the original textured low-poly walker selected as the visual reference', () => {
@@ -107,16 +110,24 @@ describe('zombie GLB assets', () => {
     expect(buffer.byteLength).toBeLessThan(700_000);
   });
 
-  it('loads the Brute binary through the production GLTF loader', async () => {
+  it('loads Brutus through the production GLTF loader at its contract height', async () => {
     const buffer = readFileSync(`${GLB_DIR}/${GLB_FILES.brute}`);
     const data = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-    const gltf = await new Promise<{ scene: { getObjectByName(name: string): unknown }; animations: AnimationClip[] }>(
-      (resolve, reject) => new GLTFLoader().parse(data, '', resolve, reject),
-    );
-    expect(gltf.scene.getObjectByName('BrutusRibcage')).toBeTruthy();
-    expect(gltf.animations.map((clip) => clip.name)).toEqual([
-      'BruteRise', 'BruteWalk', 'BruteSmash', 'BruteHit', 'BruteDeath',
-    ]);
+    const loader = new GLTFLoader().register(() => ({ name: 'headless-texture', loadTexture: async () => new Texture() }));
+    const gltf = await loader.parseAsync(data, '');
+    const skinnedParts: SkinnedMesh[] = [];
+    gltf.scene.traverse((object) => {
+      if (object instanceof SkinnedMesh) skinnedParts.push(object);
+    });
+    expect(skinnedParts).toHaveLength(1);
+    expect(gltf.animations.map((clip) => clip.name)).toEqual(['BruteRise', 'BruteWalk']);
+    expect(buffer.byteLength).toBeLessThan(600_000);
+    const visual = new ZombieVisual('brute', { scene: gltf.scene, clips: gltf.animations }, ZOMBIE_MODELS.brute.tints[0], false);
+    visual.root.updateMatrixWorld(true);
+    const size = new Box3().setFromObject(visual.root).getSize(new Vector3());
+    expect(size.y).toBeCloseTo(2.3, 2);
+    // Far bulkier than the 1.78 m walker, not merely taller.
+    expect(size.x).toBeGreaterThan(1.2);
   });
 
   it('normalizes and animates the restored walker without losing its rig or freezing when stationary', async () => {

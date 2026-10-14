@@ -6,6 +6,7 @@ export const es: Record<TranslationKey, string> = {
   'menu.multiplayer': 'MODO MULTIJUGADOR',
   'menu.language': 'IDIOMA',
   'menu.privacy': 'Política de privacidad',
+  'menu.attribution': 'Zombis basados en',
   'menu.install': 'INSTALAR ZEROED',
   'menu.update': 'ACTUALIZAR ZEROED',
   'menu.iosHint': 'En Safari, toca Compartir y «Añadir a pantalla de inicio» para jugar sin las barras del navegador.',
@@ -189,6 +190,7 @@ export const es: Record<TranslationKey, string> = {
   'ending.round': 'RONDA',
   'ending.designedBy': 'Diseñado y desarrollado por',
   'ending.betaTesters': 'Beta testers oficiales',
+  'ending.assets': 'Recursos de terceros',
   'ending.thanks': '¡Gracias por jugar!',
   'ending.mainMenu': 'VOLVER AL MENÚ PRINCIPAL',
 };

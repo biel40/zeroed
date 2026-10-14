@@ -8,6 +8,7 @@ export const en = {
   'menu.multiplayer': 'MULTIPLAYER MODE',
   'menu.language': 'LANGUAGE',
   'menu.privacy': 'Privacy policy',
+  'menu.attribution': 'Zombies based on',
   'menu.install': 'INSTALL ZEROED',
   'menu.update': 'UPDATE ZEROED',
   'menu.iosHint': 'In Safari, tap Share and “Add to Home Screen” to play without the browser bars.',
@@ -191,6 +192,7 @@ export const en = {
   'ending.round': 'ROUND',
   'ending.designedBy': 'Designed and developed by',
   'ending.betaTesters': 'Official Beta Testers',
+  'ending.assets': 'Third-party assets',
   'ending.thanks': 'Thank you for playing!',
   'ending.mainMenu': 'RETURN TO MAIN MENU',
 } as const;

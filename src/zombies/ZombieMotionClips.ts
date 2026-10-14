@@ -14,23 +14,14 @@ export function buildZombieRestClips(root: THREE.Object3D, height: number): read
     return undefined;
   };
   const hips = find('Hips');
-  const torso = find('Spine1', 'Torso');
+  const torso = find('Spine1');
   const head = find('Head');
   const arms: ZombieLimb[] = [];
   const legs: ZombieLimb[] = [];
   root.updateMatrixWorld(true);
   for (const side of ['Left', 'Right']) {
-    const suffix = side === 'Left' ? 'L' : 'R';
-    const arm = [
-      find(`${side}Arm`, `Shoulder${suffix}`),
-      find(`${side}ForeArm`, `Elbow${suffix}`),
-      find(`${side}Hand`, `BrutusHand${suffix}`),
-    ];
-    const leg = [
-      find(`${side}UpLeg`, `Leg${suffix}`),
-      find(`${side}Leg`, `Knee${suffix}`),
-      find(`${side}Foot`, `BrutusBoot${suffix}`),
-    ];
+    const arm = [find(`${side}Arm`), find(`${side}ForeArm`), find(`${side}Hand`)];
+    const leg = [find(`${side}UpLeg`), find(`${side}Leg`), find(`${side}Foot`)];
     if (arm.every(Boolean)) arms.push(new ZombieLimb(root, arm[0]!, arm[1]!, arm[2]!));
     if (leg.every(Boolean)) legs.push(new ZombieLimb(root, leg[0]!, leg[1]!, leg[2]!));
   }

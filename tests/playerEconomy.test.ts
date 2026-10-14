@@ -6,6 +6,7 @@ import {
   POINTS_KILL,
 } from '../src/game/PlayerEconomy';
 import { HEADSHOT_POINTS } from '../src/game/CombatConfig';
+import { ZOMBIE_TYPE_CONFIGS } from '../src/zombies/ZombieConfig';
 
 /**
  * Centralized Points economy (CoD Zombies style). All rewards route through
@@ -57,6 +58,18 @@ describe('PlayerEconomy points', () => {
     eco.awardKnifeKill();
     expect(eco.points).toBe(POINTS_KNIFE_KILL);
     expect(eco.points).toBeGreaterThan(HEADSHOT_POINTS);
+  });
+
+  it('Brutus kills pay double the normal zombie rewards', () => {
+    const multiplier = ZOMBIE_TYPE_CONFIGS.brute.killRewardMultiplier;
+    expect(multiplier).toBe(2 * ZOMBIE_TYPE_CONFIGS.normal.killRewardMultiplier);
+    const eco = new PlayerEconomy();
+    eco.awardKill(false, multiplier);
+    expect(eco.points).toBe(2 * POINTS_KILL);
+    eco.awardKill(true, multiplier);
+    expect(eco.points).toBe(2 * (POINTS_KILL + HEADSHOT_POINTS));
+    eco.awardKnifeKill(multiplier);
+    expect(eco.points).toBe(2 * (POINTS_KILL + HEADSHOT_POINTS + POINTS_KNIFE_KILL));
   });
 
   it('a lethal hit does not also pay the +10 hit reward', () => {

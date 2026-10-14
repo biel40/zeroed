@@ -32,9 +32,10 @@ como cue independiente sobre la música de fondo.
 ## Zombies
 
 - Rondas con descanso de 6 s; limite global de 24 activos. `normal` y `shiny`
-  usan walker; `brute` usa modelo propio, reserva maxima 2, mas salud, menor
-  velocidad y muerte con impacto confirmado. Shiny anade diez estrellas
-  reutilizadas; Brutus anade rugido y ataque letal.
+  usan walker; `brute` usa un modelo derivado del walker, reserva maxima 2,
+  mas salud, menor velocidad y muerte con impacto confirmado. Shiny anade diez
+  estrellas reutilizadas; Brutus anade ojos rojos, rugido, ataque letal y paga
+  el doble por cada baja (cuerpo, headshot o cuchillo).
 - Las rondas 1–5 aplican una rampa de velocidad progresiva (65 %, 72 %, 80 %,
   88 % y 95 %) antes de alcanzar el ritmo normal en la ronda 6. Cada aparición
   recibe velocidad, escala y una fase de marcha independientes para evitar que

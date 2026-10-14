@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { describe, expect, it, vi } from 'vitest';
 import { Zombie } from '../src/zombies/Zombie';
 import { ZombieManager } from '../src/zombies/ZombieManager';
-import { ZombieVisual } from '../src/zombies/ZombieVisual';
+import { ZombieVisual, ZOMBIE_MODELS } from '../src/zombies/ZombieVisual';
 import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
 import { WindowBarrierView } from '../src/zombies/barriers/WindowBarrierView';
 import {
@@ -106,7 +106,9 @@ describe('zombie animation synchronization', () => {
     expect(visual.headAnchor.getWorldPosition(new THREE.Vector3()).distanceTo(head)).toBeLessThan(0.001);
     expect(hips.position.distanceTo(hipPosition)).toBeLessThan(0.001);
     for (let i = 0; i < 75; i++) visual.update(DT, 0);
-    expect(visual.headAnchor.getWorldPosition(new THREE.Vector3()).y).toBeLessThan(0.55);
+    // Brutus is taller and far bulkier, so its head rests proportionally higher.
+    expect(visual.headAnchor.getWorldPosition(new THREE.Vector3()).y)
+      .toBeLessThan(0.55 * ZOMBIE_MODELS[id].height / ZOMBIE_MODELS.walker.height);
   });
 
   it('keeps the original walk cycle active across the full chase-speed range', async () => {
@@ -129,15 +131,15 @@ describe('zombie animation synchronization', () => {
     visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
     visual.setStrikeTarget(0, 1.3, 0.9);
     visual.setState('barrierAttack');
-    const hand = visual.root.getObjectByName(id === 'walker' ? 'LeftHand' : 'BrutusHandL')!;
-    const foot = visual.root.getObjectByName(id === 'walker' ? 'LeftFoot' : 'BrutusBootL')!;
+    const hand = visual.root.getObjectByName('LeftHand')!;
+    const foot = visual.root.getObjectByName('LeftFoot')!;
     visual.update(0.25, 0);
     const grab = hand.getWorldPosition(new THREE.Vector3());
     const planted = foot.getWorldPosition(new THREE.Vector3());
     visual.update(ZOMBIE_ATTACK_HIT_MOMENT - 0.25, 0);
     const contact = hand.getWorldPosition(new THREE.Vector3());
     expect(contact.z).toBeGreaterThan(grab.z);
-    expect(contact.distanceTo(new THREE.Vector3(id === 'walker' ? 0.16 : -0.16, 1.3, 0.9))).toBeLessThan(0.25);
+    expect(contact.distanceTo(new THREE.Vector3(0.16, 1.3, 0.9))).toBeLessThan(0.25);
     visual.update(0.14, 0);
     const pull = hand.getWorldPosition(new THREE.Vector3());
     expect(pull.z).toBeLessThan(contact.z - 0.2);
@@ -153,8 +155,8 @@ describe('zombie animation synchronization', () => {
     visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
     visual.setAttackReach(0.35);
     visual.setStrikeTarget(0, 1.35, 1.1);
-    const left = visual.root.getObjectByName(id === 'walker' ? 'LeftHand' : 'BrutusHandL')!;
-    const right = visual.root.getObjectByName(id === 'walker' ? 'RightHand' : 'BrutusHandR')!;
+    const left = visual.root.getObjectByName('LeftHand')!;
+    const right = visual.root.getObjectByName('RightHand')!;
     const restingWrist = left.quaternion.clone();
     visual.setState('attack'); // first strike is left-handed
     visual.update(0.315, 0);
@@ -165,14 +167,13 @@ describe('zombie animation synchronization', () => {
     const contact = left.getWorldPosition(new THREE.Vector3());
     const guard = right.getWorldPosition(new THREE.Vector3());
     expect(contact.distanceTo(new THREE.Vector3(0, 1.35, 1.1))).toBeLessThan(0.2);
-    const direction = id === 'walker' ? -1 : 1;
-    expect((contact.x - windup.x) * direction).toBeGreaterThan(0.2);
+    expect(windup.x - contact.x).toBeGreaterThan(0.2);
     expect(contact.z).toBeGreaterThan(guard.z + 0.3);
     expect(left.quaternion.angleTo(wrist)).toBeLessThan(0.005); // wrist follows forearm
     visual.update(0.14, 0);
     const follow = left.getWorldPosition(new THREE.Vector3());
-    expect((follow.x - contact.x) * direction).toBeGreaterThan(0.05);
-    expect((follow.x - contact.x) * direction).toBeLessThan(0.15); // compact follow-through
+    expect(contact.x - follow.x).toBeGreaterThan(0.05);
+    expect(contact.x - follow.x).toBeLessThan(0.15); // compact follow-through
     expect(follow.y).toBeLessThan(contact.y - 0.08);
     visual.setState('walk');
     visual.update(0.35, 0);
@@ -194,8 +195,8 @@ describe('zombie animation synchronization', () => {
     const visual = new ZombieVisual(id, await loadModel(id), 0xffffff, false);
     visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
     visual.setStrikeTarget(0, 1.3, 0.9);
-    const left = visual.root.getObjectByName(id === 'walker' ? 'LeftHand' : 'BrutusHandL')!;
-    const right = visual.root.getObjectByName(id === 'walker' ? 'RightHand' : 'BrutusHandR')!;
+    const left = visual.root.getObjectByName('LeftHand')!;
+    const right = visual.root.getObjectByName('RightHand')!;
     const depths: Array<[number, number]> = [];
     for (let variant = 0; variant < 3; variant++) {
       visual.setState('barrierAttack');
@@ -221,7 +222,7 @@ describe('zombie animation synchronization', () => {
     visual.setStrikeTarget(0, 1.35, 1.65);
     visual.setState('attack');
     visual.update(ZOMBIE_ATTACK_HIT_MOMENT, 0);
-    const hand = visual.root.getObjectByName(id === 'walker' ? 'LeftHand' : 'BrutusHandL')!;
+    const hand = visual.root.getObjectByName('LeftHand')!;
     // Contact includes the fingers beyond the wrist joint. The player occupies
     // a body volume around the camera's XZ, not a point.
     const target = new THREE.Vector3(0, 1.35, 1.65);
@@ -235,8 +236,8 @@ describe('zombie animation synchronization', () => {
     const visual = new ZombieVisual(id, await loadModel(id), 0xffffff, false);
     visual.setState('walk');
     for (let i = 0; i < 90; i++) visual.update(DT, 1.2);
-    const leftFoot = visual.root.getObjectByName(id === 'walker' ? 'LeftFoot' : 'BrutusBootL')!;
-    const rightFoot = visual.root.getObjectByName(id === 'walker' ? 'RightFoot' : 'BrutusBootR')!;
+    const leftFoot = visual.root.getObjectByName('LeftFoot')!;
+    const rightFoot = visual.root.getObjectByName('RightFoot')!;
     expect(leftFoot).toBeDefined();
     expect(rightFoot).toBeDefined();
     const point = new THREE.Vector3();
@@ -250,10 +251,10 @@ describe('zombie animation synchronization', () => {
     visual.setStrikeTarget(0, 1.3, 0.9);
     visual.setState('barrierAttack');
     visual.update(ZOMBIE_ATTACK_HIT_MOMENT, 0);
-    const hand = visual.root.getObjectByName(id === 'walker' ? 'LeftHand' : 'BrutusHandL')!;
+    const hand = visual.root.getObjectByName('LeftHand')!;
     expect(hand).toBeDefined();
     hand.getWorldPosition(point);
-    expect(point.distanceTo(new THREE.Vector3(id === 'walker' ? 0.16 : -0.16, 1.3, 0.9))).toBeLessThan(0.25);
+    expect(point.distanceTo(new THREE.Vector3(0.16, 1.3, 0.9))).toBeLessThan(0.25);
     const before = hand.quaternion.clone();
     visual.setState('death');
     visual.update(0, 0);

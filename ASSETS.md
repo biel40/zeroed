@@ -2,8 +2,10 @@
 
 Los assets externos se sirven localmente desde `public/assets/`, con su licencia
 indicada en cada seccion. Predomina **CC0 (Public Domain)**; el walker original
-usa **CC-BY 3.0** y conserva la atribucion a Quaternius. El juego no realiza
-ninguna peticion externa en runtime.
+y Brutus, derivado de el, usan **CC-BY 3.0** y exigen atribucion a Quaternius.
+Esa atribucion (titulo, autor, enlace y licencia) se muestra siempre en el menu
+principal y en los creditos finales (`index.html`); no la retires mientras se
+usen esos modelos. El juego no realiza ninguna peticion externa en runtime.
 
 ## Modelos de armas (`public/assets/weapons/`)
 
@@ -66,18 +68,19 @@ y guante comparten esqueleto, asi que cada brazo cuesta cuatro draw calls
 ## Modelos de zombies (`public/assets/zombies/`)
 
 El walker vuelve al asset original de **Quaternius**, via **Poly Pizza**,
-ya incluido en el proyecto. El Brute es un modelo original generado localmente.
+ya incluido en el proyecto. Brutus se genera localmente a partir de ese walker.
 Los clips concretos por estado se resuelven por nombre en
 `src/zombies/ZombieVisual.ts` (contrato verificado en `tests/zombieAssets.test.ts`).
 
 | Variante | Modelo | Página | Licencia | Triángulos | Clips usados |
 | --- | --- | --- | --- | --- | --- |
 | `walker` | "Animated Zombie" | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0**, atribucion: Quaternius | 2116 | ZombieCrawl, ZombieIdle, ZombieWalk, ZombieRun |
-| `brute` | "Zeroed Brutus" | Asset original (`scripts/generate-brute-asset.mjs`) | Código/asset del proyecto | 1830 | BruteRise, BruteWalk, BruteDeath |
+| `brute` | "Zeroed Brutus", derivado de "Animated Zombie" (`scripts/generate-brute-asset.mjs`) | https://poly.pizza/m/jkrEvQZb8J | **CC-BY 3.0**, atribucion: Quaternius (obra derivada) | 2614 | BruteRise, BruteWalk |
 
-> `normal` y `shiny` comparten el walker; `brute` usa su propio GLB, jerarquía,
-> materiales y clips. El registro separa tipos de gameplay y modelos para que
-> futuros tipos puedan compartir un asset o reservar otro independiente.
+> `normal` y `shiny` comparten el walker; `brute` usa su propio GLB y pool,
+> pero hereda del walker esqueleto, paleta, cara y clips de locomocion. El
+> registro separa tipos de gameplay y modelos para que futuros tipos puedan
+> compartir un asset o reservar otro independiente.
 
 Notas:
 
@@ -90,10 +93,13 @@ Notas:
 - El walker conserva su rig, textura y clips originales: un material y 694500
   bytes. Las estrellas usan una textura procedural compartida de 32x32 y una
   llamada de dibujo adicional por Shiny, sin luces ni assets externos nuevos.
-- Brutus es un humanoide demacrado de 2.30 m: conserva proporciones humanas,
-  pero alarga extremidades y muestra chaqueta rota, pecho abierto, costillas,
-  mandíbula fracturada y un único ojo infectado. Solo su GLB se regenera con
-  `npm run generate:zombie-brute`.
+- Brutus mide 2.30 m y es el walker reconstruido como bestia: el generador
+  reescala huesos y malla (torso, hombros, antebrazos y puños enormes, cuello
+  hundido), arranca mangas y pecho de la camisa, añade grilletes de hierro,
+  espolones de hueso y una postura encorvada sobre ZombieCrawl/ZombieWalk.
+  Las piezas nuevas usan celdas añadidas a la paleta del walker y se fusionan
+  en la misma malla con skin: un material y una llamada de dibujo. Solo su GLB
+  se regenera con `npm run generate:zombie-brute`.
 - Cargadores, cerrojos y tapas de alimentación de las armas son meshes
   procedurales propios (los GLB de armas de Quaternius son mono-mesh). Sus
   anclas locales pueden declararse por arma; los cargadores soltados se

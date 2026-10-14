@@ -366,10 +366,10 @@ describe('ZombieVisual barrier attack', () => {
     expect(visual.root.rotation.z).toBe(0);
   });
 
-  it('anchors the Brute torso hitbox to its animated chest node', () => {
+  it('anchors the Brute torso hitbox to its animated hips', () => {
     const scene = new THREE.Group();
     const torso = new THREE.Group();
-    torso.name = 'Torso';
+    torso.name = 'Hips';
     torso.position.y = 0.8;
     const head = new THREE.Group();
     head.name = 'Head';
@@ -377,45 +377,36 @@ describe('ZombieVisual barrier attack', () => {
     torso.add(head);
     torso.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 0.8), new THREE.MeshStandardMaterial()));
     scene.add(torso);
-    const smash = new THREE.AnimationClip('BruteSmash', 0.75, [
-      new THREE.NumberKeyframeTrack('Torso.rotation[x]', [0, 0.4, 0.75], [0, 0.8, 0]),
+    const walk = new THREE.AnimationClip('BruteWalk', 0.75, [
+      new THREE.NumberKeyframeTrack('Hips.rotation[x]', [0, 0.4, 0.75], [0, 0.8, 0]),
     ]);
-    const visual = new ZombieVisual('brute', { scene, clips: [smash] }, 0xffffff, false);
+    const visual = new ZombieVisual('brute', { scene, clips: [walk] }, 0xffffff, false);
     const torsoHitbox = new THREE.Object3D();
     const headHitbox = new THREE.Object3D();
     visual.attachHitboxes(torsoHitbox, headHitbox);
     visual.root.updateMatrixWorld(true);
     const before = torsoHitbox.getWorldPosition(new THREE.Vector3());
 
-    visual.setAttackDuration(0.75);
-    visual.setState('attack');
-    visual.update(0.4, 1);
+    visual.setState('walk');
+    visual.update(0.4, ZOMBIE_MODELS.brute.walkReferenceSpeed);
     visual.root.updateMatrixWorld(true);
 
-    expect(visual.torsoAnchor.name).toBe('Torso');
+    expect(visual.torsoAnchor.name).toBe('Hips');
     expect(torsoHitbox.getWorldPosition(new THREE.Vector3()).distanceTo(before)).toBeGreaterThan(0.05);
   });
 });
 
-describe('ZombieVisual eyes vs authored assets', () => {
-  it('skips the generic eye overlay for a GLB model that already has authored eyes', () => {
+describe('ZombieVisual eyes', () => {
+  it.each(['walker', 'brute'] as const)('%s wears the shared eye overlay in its model colors', (id) => {
     const scene = new THREE.Group();
     const head = new THREE.Group();
     head.name = 'Head';
     scene.add(head);
-    const visual = new ZombieVisual('brute', { scene, clips: [] }, 0xffffff, false);
-
-    expect(visual.root.getObjectByName('zombie-eyes')).toBeUndefined();
-  });
-
-  it('keeps the generic eye overlay for a GLB model without authored eyes', () => {
-    const scene = new THREE.Group();
-    const head = new THREE.Group();
-    head.name = 'Head';
-    scene.add(head);
-    const visual = new ZombieVisual('walker', { scene, clips: [] }, 0xffffff, false);
+    const visual = new ZombieVisual(id, { scene, clips: [] }, 0xffffff, false);
+    const glow = visual.root.getObjectByName('zombie-eye-glow') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 
     expect(visual.root.getObjectByName('zombie-eyes')).toBeDefined();
+    expect(glow.material.color.getHex()).toBe(ZOMBIE_MODELS[id].eyes.glow);
   });
 });
 

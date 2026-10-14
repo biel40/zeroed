@@ -35,8 +35,8 @@ export interface ZombieModelConfig {
   readonly idleClip?: readonly string[];
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
   readonly tints: readonly number[];
-  /** True when the GLB already sculpts/textures its own eyes (skip the generic overlay). */
-  readonly hasAuthoredEyes: boolean;
+  /** Glow and core colors of the shared eye overlay. */
+  readonly eyes: { readonly glow: number; readonly core: number };
   readonly anchors: {
     readonly torso: readonly string[];
     readonly head: readonly string[];
@@ -62,31 +62,33 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
     walkReferenceSpeed: 1.35,
     idleClip: ['ZombieIdle', 'Idle'],
     tints: [0xb2b9a8],
-    hasAuthoredEyes: false,
+    eyes: { glow: 0xffb31a, core: 0xffe27a },
     anchors: {
       torso: ['Hips', 'Pelvis'],
       head: ['Head'],
       headTop: ['HeadTop_End', 'HeadTop'],
     },
   },
-  // Original Zeroed Brutus: a towering, gaunt humanoid related to the walker.
+  // Brutus is generated from the walker (scripts/generate-brute-asset.mjs):
+  // same palette, face and rig, rebuilt as a hulking, shackled brute.
   brute: {
     url: 'assets/zombies/zombie_brute.glb',
     height: 2.3,
     clips: {
       spawn: ['BruteRise'],
       walk: ['BruteWalk'],
-      attack: ['BruteSmash'],
-      barrierAttack: ['BruteBarrierAttack'],
-      barrierBreak: ['BruteBarrierBreak'],
-      hit: ['BruteHit'],
-      death: ['BruteDeath'],
+      attack: [],
+      barrierAttack: [],
+      barrierBreak: [],
+      hit: [],
+      death: [],
     },
-    walkReferenceSpeed: 1.05,
-    tints: [0xffffff],
-    hasAuthoredEyes: true,
+    walkReferenceSpeed: 1.71,
+    tints: [0xb2b9a8],
+    // Red instead of amber: the one-hit killer reads at a glance in the dark.
+    eyes: { glow: 0xff2a14, core: 0xff9a7a },
     anchors: {
-      torso: ['Torso'],
+      torso: ['Hips'],
       head: ['Head'],
       headTop: ['HeadTop_End'],
     },
@@ -101,9 +103,8 @@ const STATIONARY_SPEED = 0.05;
 const FLASH_COLOR = 0xff2211;
 /** Sickly undead glow kept very low so the bodies read in the dark. */
 const UNDEAD_GLOW = 0x1a2a12;
+const UNDEAD_GLOW_INTENSITY = 0.12;
 const EYE_SOCKET_COLOR = 0x080604;
-const EYE_GLOW_COLOR = 0xffb31a;
-const EYE_CORE_COLOR = 0xffe27a;
 /** How deep below ground the spawn rise starts, meters. */
 const SPAWN_DEPTH = 1.25;
 
@@ -115,7 +116,7 @@ const eyeCoreGeometry = new THREE.CircleGeometry(0.006, 10);
  * Flat dark sockets with a warm inner glow. Keeping both layers planar makes
  * the light read from inside the face rather than as spheres glued on top.
  */
-function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
+function buildEyes(colors: ZombieModelConfig['eyes']): { group: THREE.Group; materials: THREE.Material[] } {
   const group = new THREE.Group();
   group.name = 'zombie-eyes';
   const socketMaterial = new THREE.MeshStandardMaterial({
@@ -126,7 +127,7 @@ function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
   });
   // Additive layers are order independent: one pass instead of back+front.
   const glowMaterial = new THREE.MeshBasicMaterial({
-    color: EYE_GLOW_COLOR,
+    color: colors.glow,
     transparent: true,
     opacity: 0.88,
     blending: THREE.AdditiveBlending,
@@ -136,7 +137,7 @@ function buildEyes(): { group: THREE.Group; materials: THREE.Material[] } {
     forceSinglePass: true,
   });
   const coreMaterial = new THREE.MeshBasicMaterial({
-    color: EYE_CORE_COLOR,
+    color: colors.core,
     transparent: true,
     opacity: 0.94,
     blending: THREE.AdditiveBlending,
@@ -581,13 +582,11 @@ export class ZombieVisual {
           c.color.multiply(new THREE.Color(tint));
           // Corpse skin and fabric are dielectric. The source's 0.4
           // metalness made the whole textured body read like tinted plastic.
-          if (modelId === 'walker') {
-            c.metalness = Math.min(c.metalness, 0.04);
-          }
+          c.metalness = Math.min(c.metalness, 0.04);
           c.roughness = Math.min(0.94, Math.max(0.72, c.roughness));
-          c.envMapIntensity = modelId === 'walker' ? 0.72 : Math.max(0.8, c.envMapIntensity);
+          c.envMapIntensity = 0.72;
           c.emissive = new THREE.Color(UNDEAD_GLOW);
-          c.emissiveIntensity = modelId === 'walker' ? 0.12 : 0.2;
+          c.emissiveIntensity = UNDEAD_GLOW_INTENSITY;
           this.materials.push(c);
           return c;
         });
@@ -598,10 +597,10 @@ export class ZombieVisual {
       this.headAnchor = findByName(model, this.modelConfig.anchors.head) ?? this.root;
       this.headTop = findByName(model, this.modelConfig.anchors.headTop);
       this.barrierRig = {
-        torso: findByName(model, ['Spine2', 'Spine1', 'Torso']),
+        torso: findByName(model, ['Spine2', 'Spine1']),
         head: findByName(model, ['Head']),
-        shoulderL: findByName(model, ['LeftShoulder', 'ShoulderL']),
-        shoulderR: findByName(model, ['RightShoulder', 'ShoulderR']),
+        shoulderL: findByName(model, ['LeftShoulder']),
+        shoulderR: findByName(model, ['RightShoulder']),
       };
 
 
@@ -656,7 +655,6 @@ export class ZombieVisual {
       // world matrices. Stale pre-scale matrices create oversized attack arcs.
       this.root.updateMatrixWorld(true);
       for (const side of ['Left', 'Right']) {
-        const suffix = side === 'Left' ? 'L' : 'R';
         const makeLimb = (names: string[][], list: ZombieLimb[]): void => {
           const bones = names.map((candidates) => findByName(this.root, candidates));
           if (!bones[0] || !bones[1] || !bones[2]) return;
@@ -664,8 +662,7 @@ export class ZombieVisual {
           list.push(limb);
           for (const bone of bones) this.limbBones.add(bone!);
         };
-        makeLimb([[`${side}Arm`, `Shoulder${suffix}`], [`${side}ForeArm`, `Elbow${suffix}`],
-          [`${side}Hand`, `BrutusHand${suffix}`]], this.arms);
+        makeLimb([[`${side}Arm`], [`${side}ForeArm`], [`${side}Hand`]], this.arms);
       }
       this.root.traverse((bone) => {
         if (bone instanceof THREE.Bone || this.limbBones.has(bone) ||
@@ -674,7 +671,7 @@ export class ZombieVisual {
           this.poseFrom.push(bone.quaternion.clone());
         }
       });
-      for (const names of [['LeftFoot', 'FootL'], ['RightFoot', 'FootR']]) {
+      for (const names of [['LeftFoot'], ['RightFoot']]) {
         const foot = findByName(this.root, names);
         if (!foot) continue;
         this.feet.push(foot);
@@ -683,17 +680,17 @@ export class ZombieVisual {
       }
     }
 
-    const eyes = source && this.modelConfig.hasAuthoredEyes ? null : buildEyes();
+    const eyes = buildEyes(this.modelConfig.eyes);
     this.positionFrom.push(...this.poseBones.map(bone => bone.position.clone()));
     this.baseRotations.push(...this.poseBones.map(bone => bone.quaternion.clone()));
     this.basePositions.push(...this.poseBones.map(bone => bone.position.clone()));
     this.baseScales.push(...this.poseBones.map(bone => bone.scale.clone()));
-    this.eyeMaterials = eyes?.materials ?? [];
+    this.eyeMaterials = eyes.materials;
     this.fadeMaterials = [...this.materials, ...this.eyeMaterials]
       .filter((material) => material.blending === THREE.NormalBlending);
     for (const material of this.fadeMaterials) registerFadeMaterial(material);
     this.root.updateMatrixWorld(true);
-    if (eyes) placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
+    placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
 
     this.materialBases.push(...this.materials.map((material) => ({
       color: material.color.clone(),
@@ -732,7 +729,7 @@ export class ZombieVisual {
     this.root.scale.set(...config.bodyScale);
     this.walkAnimationMultiplier = config.walkAnimationMultiplier;
     this.glowColor = UNDEAD_GLOW;
-    this.glowIntensity = this.modelId === 'walker' ? 0.12 : 0.2;
+    this.glowIntensity = UNDEAD_GLOW_INTENSITY;
     this.shinyStars?.setEnabled(typeId === 'shiny');
 
     for (let index = 0; index < this.materials.length; index++) {
@@ -1187,7 +1184,7 @@ export class ZombieVisual {
 
     this.barrierQuaternion.setFromEuler(this.barrierEuler.set(x, y, z));
     // Anatomical offsets use the visual body's axes, not each export's
-    // arbitrary bone-local axes (the walker and Brutus differ here).
+    // arbitrary bone-local axes (GLB rigs and procedural fallbacks differ here).
     bone.getWorldQuaternion(this.boneWorldRotation).normalize();
     this.root.getWorldQuaternion(this.rootWorldRotation).normalize();
     this.boneBasis.copy(this.boneWorldRotation).invert().multiply(this.rootWorldRotation);

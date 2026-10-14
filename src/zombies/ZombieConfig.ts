@@ -43,6 +43,8 @@ export interface ZombieTypeConfig {
   readonly hitboxScale: readonly [number, number, number];
   readonly bodyRadius: number;
   readonly walkAnimationMultiplier: number;
+  /** Scales every kill payout (body, headshot and knife) for this type. */
+  readonly killRewardMultiplier: number;
   readonly spawnChance?: (round: number) => number;
   readonly maxActive?: number;
 }
@@ -66,6 +68,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     hitboxScale: [1, 1, 1],
     bodyRadius: 0.42,
     walkAnimationMultiplier: 1,
+    killRewardMultiplier: 1,
   },
   shiny: {
     modelId: 'walker',
@@ -78,6 +81,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     hitboxScale: [1, 1, 1],
     bodyRadius: 0.42,
     walkAnimationMultiplier: 1,
+    killRewardMultiplier: 1,
     spawnChance: () => SHINY_ZOMBIE_CHANCE,
   },
   brute: {
@@ -89,10 +93,13 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     damageMultiplier: PLAYER_MAX_HP / ZOMBIE_ATTACK_DAMAGE,
     attackRecovery: ZOMBIE_SPECIAL_ATTACK_RECOVERY,
     bodyScale: [1, 1, 1],
-    hitboxScale: [1.22, 1.28, 1.15],
+    // Broad shoulders and chest of the hulking walker-derived silhouette.
+    hitboxScale: [1.36, 1.28, 1.3],
     // Kept conservative so mansion doors and stairs remain navigable.
     bodyRadius: 0.46,
     walkAnimationMultiplier: 1,
+    // Double payout for the riskiest regular enemy.
+    killRewardMultiplier: 2,
     spawnChance: getBruteSpawnChance,
     maxActive: MAX_ACTIVE_BRUTES,
   },

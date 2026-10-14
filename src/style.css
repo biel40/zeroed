@@ -1018,6 +1018,22 @@ html.coop-guest #pause-restart {
   cursor: pointer;
 }
 
+.asset-attribution {
+  margin: 4px auto 0;
+  color: #8b95a3;
+  font: 11px 'Segoe UI', sans-serif;
+  text-align: center;
+}
+
+.asset-attribution a,
+.credits-assets a {
+  color: inherit;
+}
+
+.credits-panel .credits-assets {
+  font-size: 13px;
+}
+
 .privacy-link:focus-visible,
 #privacy-close:focus-visible {
   outline: 2px solid #93c5fd;

@@ -18,7 +18,7 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 
 ## Visor de zombies
 
-`zombie-viewer.html` carga al walker con cámara orbital. Sirve para revisar sus clips, acabados, variantes y coste de dibujo de manera aislada.
+`zombie-viewer.html` carga al walker (o a Brutus con `model=brute`) con cámara orbital. Sirve para revisar sus clips, acabados, variantes y coste de dibujo de manera aislada.
 
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?compare=1`: compara Shiny con zombies normales.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?shiny=1&night=1`: inspecciona el brillo de Shiny en baja luz.

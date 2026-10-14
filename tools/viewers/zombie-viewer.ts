@@ -37,11 +37,13 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStan
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -0.003;
 scene.add(floor);
+// Close-ups frame the face of either model; Brutus hunches below its height.
+const faceY = modelId === 'brute' ? 2.02 : 1.55;
 const camera = new THREE.PerspectiveCamera(close ? 32 : 38, innerWidth / innerHeight, 0.01, 30);
-camera.position.set(0, close ? 1.57 : 1.25, close ? 1.05 : 3.65 * ZOMBIE_MODELS[modelId].height / 1.78);
-camera.lookAt(0, close ? 1.55 : 0.91, 0);
+camera.position.set(0, close ? faceY + 0.02 : 1.25, close ? 1.05 : 3.65 * ZOMBIE_MODELS[modelId].height / 1.78);
+camera.lookAt(0, close ? faceY : 0.91, 0);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, close ? 1.55 : 0.91, 0);
+controls.target.set(0, close ? faceY : 0.91, 0);
 controls.enablePan = false;
 controls.minDistance = close ? 0.55 : 2.3;
 controls.maxDistance = 7;
@@ -100,7 +102,7 @@ function advanceVisual(visual: ZombieVisual, elapsed: number): void {
 function resize(): void {
   const compact = innerWidth < 700;
   camera.aspect = innerWidth / innerHeight;
-  camera.position.set(0, close ? 1.57 : 1.25, close ? Math.max(1.05, 0.25 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)) : 3.65 * ZOMBIE_MODELS[modelId].height / 1.78);
+  camera.position.set(0, close ? faceY + 0.02 : 1.25, close ? Math.max(1.05, 0.25 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)) : 3.65 * ZOMBIE_MODELS[modelId].height / 1.78);
   camera.updateProjectionMatrix();
   for (const [index, placement] of placements.entries()) {
     placement.visible = !compact || index === 0;
