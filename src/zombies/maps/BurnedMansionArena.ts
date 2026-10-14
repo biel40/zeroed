@@ -74,6 +74,17 @@ const REDUCED_EFFECTS_POINT_LIGHT_BUDGET = 4;
 /** Score bonus that keeps an active light until a rival is clearly better. */
 const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
 
+/** Bounds that make a visual mesh belong to a single floor (bunker ceiling tops out at -0.14). */
+const BUNKER_ONLY_MAX_Y = -0.1;
+const GROUND_ONLY_MIN_Y = -0.2;
+/**
+ * The stair room is the only place where one floor can see the other, and
+ * only that strip of it: a ray through both shaft openings stays at x >= 4.2
+ * on either floor. The margin keeps the divider-wall doorway on the safe side.
+ */
+const STAIR_ROOM_MIN_X = MANSION_BUNKER_DIVIDER_X - 0.5;
+const STAIR_ROOM_MAX_Z = 2;
+
 interface RankedPointLight {
   readonly light: THREE.PointLight;
   readonly position: THREE.Vector3;
@@ -83,6 +94,14 @@ interface RankedPointLight {
 }
 
 type WallAxis = 'x' | 'z';
+
+/** Visual meshes wholly on one floor, split by whether the stairwell exposes them. */
+interface FloorMeshSet {
+  readonly floor: 'ground' | 'bunker';
+  readonly nearStairs: boolean;
+  readonly meshes: THREE.Mesh[];
+  rendered: boolean;
+}
 
 class MansionWeaponPickup implements ArenaWeaponPickup {
   private claimed = false;
@@ -279,6 +298,9 @@ export class BurnedMansionArena implements ZombieArena {
   private wallMaterialIndex = 0;
   private readonly areaLights = new CreepyAreaLights();
   private readonly rankedPointLights: RankedPointLight[] = [];
+  private readonly floorMeshSets: FloorMeshSet[] = (['ground', 'bunker'] as const).flatMap((floor) =>
+    [false, true].map((nearStairs) => ({ floor, nearStairs, meshes: [], rendered: true })),
+  );
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -381,6 +403,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.floorTransitions = this.buildFloorTransitions();
     this.refreshProgressionState();
     this.initializePointLightBudget();
+    this.classifyFloorMeshes();
     if (DEBUG_MAP_COLLIDERS) this.addDebugHelpers();
   }
 
@@ -405,7 +428,10 @@ export class BurnedMansionArena implements ZombieArena {
       this.onTopologyChanged?.();
     }
     this.areaLights.update(dt);
-    if (observerPosition) this.updatePointLightBudget(observerPosition);
+    if (observerPosition) {
+      this.updatePointLightBudget(observerPosition);
+      this.updateFloorRendering(observerPosition);
+    }
   }
 
   public reset(): void {
@@ -1427,6 +1453,51 @@ export class BurnedMansionArena implements ZombieArena {
       : DESKTOP_POINT_LIGHT_BUDGET;
     for (let index = 0; index < this.rankedPointLights.length; index++) {
       this.rankedPointLights[index].light.visible = index < budget;
+    }
+  }
+
+  /**
+   * The renderer culls by frustum only, so a view across the map drew the
+   * other floor behind solid slabs: from the stairwell that was the map's
+   * costliest frame. Visual meshes bound to one floor leave the camera layer
+   * while they cannot be seen; from the stair room only the other floor's
+   * stair strip stays. Colliders keep their layer because raycasters test
+   * layers too, and lights are never touched: a different active light
+   * count would recompile every shader.
+   */
+  private classifyFloorMeshes(): void {
+    const colliders = new Set<THREE.Object3D>([
+      ...this.structureMeshes,
+      ...this.doorMeshes,
+      this.secretWallCollider,
+    ]);
+    const bounds = new THREE.Box3();
+    this.group.updateMatrixWorld(true);
+    this.group.traverse((object) => {
+      // Effects without frustum culling move freely and stay always rendered.
+      if (!(object instanceof THREE.Mesh) || !object.frustumCulled || colliders.has(object)) return;
+      bounds.setFromObject(object);
+      if (bounds.isEmpty()) return;
+      const floor = bounds.max.y < BUNKER_ONLY_MAX_Y ? 'bunker' : bounds.min.y > GROUND_ONLY_MIN_Y ? 'ground' : null;
+      if (!floor) return;
+      const nearStairs = bounds.max.x > STAIR_ROOM_MIN_X && bounds.min.z < STAIR_ROOM_MAX_Z;
+      this.floorMeshSets
+        .find((set) => set.floor === floor && set.nearStairs === nearStairs)!
+        .meshes.push(object);
+    });
+  }
+
+  private updateFloorRendering(observerPosition: THREE.Vector3): void {
+    const inStairRoom = observerPosition.x > STAIR_ROOM_MIN_X && observerPosition.z < STAIR_ROOM_MAX_Z;
+    const observerFloor = observerPosition.y >= 0 ? 'ground' : 'bunker';
+    for (const set of this.floorMeshSets) {
+      const rendered = set.floor === observerFloor || (inStairRoom && set.nearStairs);
+      if (rendered === set.rendered) continue;
+      set.rendered = rendered;
+      for (const mesh of set.meshes) {
+        if (rendered) mesh.layers.enable(0);
+        else mesh.layers.disable(0);
+      }
     }
   }
 

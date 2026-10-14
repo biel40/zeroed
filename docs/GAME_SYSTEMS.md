@@ -171,6 +171,13 @@ cuatro con efectos reducidos. El ranking pondera intensidad nominal (sin el
 parpadeo) por alcance y distancia, con histeresis, para iluminar el hueco
 desde ambas plantas sin intercambios bruscos.
 
+El renderer solo descarta por frustum, asi que el mapa saca de la capa de
+camara las mallas visuales que pertenecen a una sola planta cuando el jugador
+no puede verlas; desde la sala de la escalera solo conserva la franja de la
+otra planta visible a traves del hueco. Colliders y luces nunca cambian de
+capa: los raycasts tambien filtran por capas y alterar el numero de luces
+activas recompilaria los shaders.
+
 Los zombis se dibujan opacos y solo pasan a mezcla durante el fundido de
 muerte (`rendering/FadeMaterials.ts`); `Game.prepare` precompila esa variante.
 Asi una horda solapada en la escalera conserva el descarte por profundidad.

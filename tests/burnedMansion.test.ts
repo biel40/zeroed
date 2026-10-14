@@ -647,6 +647,57 @@ describe('Burned Mansion topology', () => {
     expect(canWalk([MANSION_STAIR_CENTER_X, MANSION_STAIR_TOP_Z + 0.7], [8.4, -5], arena.wallColliders)).toBe(false);
   });
 
+  it('renders only the floors the observer can see, without touching colliders or lights', () => {
+    const arena = makeArena();
+    unlock(arena, 'nuclear-bunker');
+    const camera = new THREE.PerspectiveCamera();
+    const rendered = (object: THREE.Object3D) => object.layers.test(camera.layers);
+    const firstVisualMesh = (root: THREE.Object3D) => root.getObjectsByProperty('isMesh', true)
+      .find((mesh) => !arena.colliders.includes(mesh))!;
+    const wallBuyMesh = (weaponId: string) => firstVisualMesh(arena.group.children.find((child) => {
+      return child.userData.mapRole === 'wall-buy' && child.userData.weaponId === weaponId;
+    })!);
+    // Far from the stairwell on each floor, plus one stair-strip object per floor.
+    const bunkerVisual = firstVisualMesh(arena.group.getObjectByName('bunker-raygun-case')!);
+    const groundVisual = wallBuyMesh('m1911');
+    const bunkerStairStrip = wallBuyMesh('m60');
+    const groundStairStrip = firstVisualMesh(arena.group.getObjectByName('soul-lamp:upper-stairs')!);
+    const lights: THREE.Object3D[] = [];
+    arena.group.traverse((object) => { if ((object as THREE.Light).isLight) lights.push(object); });
+
+    const observe = (x: number, y: number, z: number) => arena.update(1 / 60, new THREE.Vector3(x, y, z));
+    const assertInvariants = () => {
+      expect(arena.colliders.every(rendered)).toBe(true);
+      expect(lights.every(rendered)).toBe(true);
+    };
+
+    observe(MANSION_PLAYER_SPAWN.x, EYE_HEIGHT, MANSION_PLAYER_SPAWN.z);
+    expect([groundVisual, groundStairStrip].every(rendered)).toBe(true);
+    expect([bunkerVisual, bunkerStairStrip].some(rendered)).toBe(false);
+    assertInvariants();
+
+    observe(-4, MANSION_BUNKER_Y + EYE_HEIGHT, -4);
+    expect([bunkerVisual, bunkerStairStrip].every(rendered)).toBe(true);
+    expect([groundVisual, groundStairStrip].some(rendered)).toBe(false);
+    assertInvariants();
+
+    // From the stair room the other floor is visible only through the shaft.
+    for (const [y, z, own, other] of [
+      [EYE_HEIGHT, -2.6, [groundVisual, groundStairStrip], [bunkerStairStrip, bunkerVisual]],
+      [-1, -5.5, [bunkerVisual, bunkerStairStrip], [groundStairStrip, groundVisual]],
+      [MANSION_BUNKER_Y + EYE_HEIGHT, -8.4, [bunkerVisual, bunkerStairStrip], [groundStairStrip, groundVisual]],
+    ] as const) {
+      observe(MANSION_STAIR_CENTER_X, y, z);
+      expect(own.every(rendered)).toBe(true);
+      expect(rendered(other[0])).toBe(true);
+      expect(rendered(other[1])).toBe(false);
+      assertInvariants();
+    }
+    // Meshes spanning both floors, like the steps, never leave the camera layer.
+    observe(MANSION_PLAYER_SPAWN.x, EYE_HEIGHT, MANSION_PLAYER_SPAWN.z);
+    expect(rendered(arena.group.getObjectByName('bunker-stair-steps')!)).toBe(true);
+  });
+
   it('closes the east-wing corners and the ledge behind the stairwell', () => {
     const arena = makeArena();
     const covered = (x: number, y: number, z: number) =>
