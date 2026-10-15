@@ -14,3 +14,11 @@
   continua a traves del contacto (sin chasquido de codo). El impacto ocurre al
   30 % de los 0.72 s (0.216 s, antes 0.39 s); duracion, dano, alcance y
   seleccion de objetivo no cambian.
+- Pulido: la subida se detiene en una breve tension hacia la derecha (el
+  hombro echa la hoja atras, no el codo) antes de soltar el tajo; el corte
+  acelera hasta su velocidad maxima justo en el contacto (antes frenaba al
+  llegar), muerde con una frenada fuerte, se asienta abajo a la izquierda y la
+  retirada cae sin pararse a mitad. Cada clave Hermite lleva un `drive` que
+  escala su tangente; en el contacto el codo, casi recto, usa menos que el
+  hombro para no dar un tiron. Duracion, momento del impacto, alcance y ventana
+  del modelo (3 %-77 %) no cambian.

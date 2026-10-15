@@ -306,37 +306,38 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     equipTime: 0.55,
     audio: { volume: 0.65, duration: 0.11, lowpass: 2200, thump: 110 },
     view: {
-      // No GLB available: dedicated procedural builder (frame 'lmg', see ASSETS.md).
+      // No GLB: dedicated M60 builder traced from a reference photo (see M60ViewModel.ts).
       frame: 'lmg',
       hip: [0.28, -0.26, -0.52],
-      ads: [0, 0, -0.34],
+      ads: [0, 0, -0.31],
       sway: 0.7,
       bob: 0.8,
       visualRecoil: { kickImpulse: 1.5, pitchImpulse: 2.0, rollImpulse: 1.2, stiffness: 90, damping: 11 },
-      scale: 1.05,
-      bodyColor: 0x2e3134,
-      accentColor: 0x44484d,
-      barrelLength: 0.42,
-      barrelRadius: 0.014,
+      scale: 1,
+      // Parkerized steel and black polymer furniture.
+      bodyColor: 0x35383b,
+      accentColor: 0x1e1f21,
+      barrelLength: 0.56,
+      barrelRadius: 0.0148,
       receiverLength: 0.3,
-      stockLength: 0.22,
+      stockLength: 0.2,
       magazine: 'box',
       optic: 'irons',
-      sightHeight: 0.085,
+      // Apex of the tall front sight, seen through the raised rear aperture.
+      sightHeight: 0.1117,
       bulk: 1.35,
-      // The support hand rides under the gas tube, ahead of the ammo box.
       hands: {
         right: {
-          position: [0, -0.105, 0.057], axis: [0, 0.97, 0.24], palm: [-1, -0.1, 0], pose: 'rifleGrip',
-          hold: { size: [0.0315, 0.047], axis: [0, 0.955, 0.296] }, trigger: [0, -0.065, -0.002],
+          position: [0, -0.1155, 0.059], axis: [0, 1, -0.05], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.032, 0.053], axis: [0, 0.996, -0.084] }, trigger: [0, -0.088, 0],
         },
-        // Around the barrel and the gas cylinder slung under it.
+        // Under the ribbed forearm, fingers up its flank below the heat shield.
         left: {
-          position: [0, 0.0084, -0.25], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
-          hold: { size: [0.03, 0.055], axis: [0, 0, -1] },
+          position: [0, -0.022, -0.215], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.06, 0.111], axis: [0, 0, -1] },
         },
-        action: { position: [0.013, 0, 0.011], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
-        magazine: { position: [0, -0.075, 0], axis: [0, 0, -1], palm: [0, 1, 0], pose: 'magazineGrab' },
+        action: { position: [0.014, 0, 0.002], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
+        magazine: { position: [0, -0.084, 0], axis: [0, 0, -1], palm: [0, 1, 0], pose: 'magazineGrab' },
       },
       reloadAnim: {
         style: 'belt',
@@ -348,8 +349,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         coverClose: 0.68,
         charge: 0.76,
         chargeEnd: 0.92,
-        magSize: [0.1, 0.11, 0.13],
-        magColor: 0x3a3e42,
+        // Olive-drab 100-round belt pouch.
+        magSize: [0.068, 0.128, 0.158],
+        magColor: 0x4d5136,
       },
     },
   },

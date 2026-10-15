@@ -241,7 +241,7 @@ export interface ViewModelConfig {
   readonly energyColor?: number;
   /**
    * 'pistol' uses the handgun builder (slide, hammer, grip magazine);
-   * 'lmg' uses the dedicated M60 builder (belt box, feed cover, bipod);
+   * 'lmg' uses the dedicated M60 builder (belt pouch, feed cover, bipod);
    * 'ak47' uses the dedicated Type-3 AK builder (milled receiver, lacquered
    * wood, gas tube, curved magazine); 'l96' uses the dedicated L96A1 builder (thumbhole
    * stock, scope, liftable bolt). Default: generic long gun.

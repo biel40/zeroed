@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { clamp, damp } from '../utils/math';
 import type { MagazineDropPool } from './MagazineDrop';
 import { buildAk47 } from './AK47ViewModel';
 import { buildL96 } from './L96ViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
+import { buildM60 } from './M60ViewModel';
 import { buildRayGun } from './RayGunViewModel';
 import { BOLT_REAR_FRACTION, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
@@ -812,213 +814,6 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
 }
 
 /**
- * M60 view model built from primitives, detailed to buildPistol tier. The
- * GPMG silhouette: long exposed barrel with a slotted flash hider, the gas
- * cylinder slung underneath, a deployed bipod and the right-offset carry
- * handle; the receiver carries the left-hung ammo box with a visible brass
- * belt rising into the feed port, the rear-hinged feed cover (the rear
- * sight aperture rides it, like the real gun), the right-flank charging
- * handle and the skeleton shoulder stock. Reload contract (ReloadAnimator
- * 'belt' style): the ammo box is the magazine (drops left+down), the cover
- * pivots open on its rear hinge and the handle racks +Z. ~40 meshes built
- * once at preload: cheap everywhere.
- */
-function buildM60(config: ViewModelConfig): BuiltProcedural {
-  const group = new THREE.Group();
-  const body = new THREE.MeshStandardMaterial({
-    color: config.bodyColor,
-    roughness: 0.46,
-    metalness: 0.72,
-  });
-  const accent = new THREE.MeshStandardMaterial({
-    color: config.accentColor,
-    roughness: 0.5,
-    metalness: 0.6,
-  });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.55 });
-  const brass = new THREE.MeshStandardMaterial({ color: 0xc8a24a, roughness: 0.35, metalness: 0.85 });
-  const boxMat = new THREE.MeshStandardMaterial({
-    color: config.reloadAnim?.magColor ?? 0x3a3e42,
-    roughness: 0.5,
-    metalness: 0.55,
-  });
-
-  const add = (
-    geometry: THREE.BufferGeometry,
-    material: THREE.Material,
-    x: number,
-    y: number,
-    z: number,
-    rx = 0,
-    rz = 0,
-  ): THREE.Mesh => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    mesh.rotation.x = rx;
-    mesh.rotation.z = rz;
-    group.add(mesh);
-    return mesh;
-  };
-
-  const width = 0.062 * config.bulk;
-  const height = 0.085 * config.bulk;
-  const halfW = width / 2;
-  const halfH = height / 2;
-  const receiverZ = config.receiverLength / 2;
-  const barrelTipZ = -receiverZ - config.barrelLength;
-  const barrelY = 0.02; // the M60 barrel rides the top half of the receiver
-  const sy = config.sightHeight;
-
-  // --- Receiver ---
-  add(new RoundedBoxGeometry(width, height, config.receiverLength, 2, 0.006), body, 0, 0, 0);
-  // Trigger housing under the receiver.
-  add(new THREE.BoxGeometry(width * 0.6, 0.03, 0.1), dark, 0, -halfH - 0.012, 0.02);
-  // Takedown pins on the left flank.
-  add(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 8), dark, -halfW - 0.001, 0.01, 0.1, 0, Math.PI / 2);
-  add(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 8), dark, -halfW - 0.001, 0.01, -0.11, 0, Math.PI / 2);
-  // Ejection port inset on the right flank.
-  add(new THREE.BoxGeometry(0.002, 0.028, 0.06), dark, halfW + 0.0005, -0.008, -0.02);
-
-  // --- Barrel group: exposed barrel, gas cylinder, slotted flash hider ---
-  add(
-    new THREE.CylinderGeometry(config.barrelRadius, config.barrelRadius, config.barrelLength, 12),
-    dark,
-    0,
-    barrelY,
-    -receiverZ - config.barrelLength / 2,
-    Math.PI / 2,
-  );
-  add(
-    new THREE.CylinderGeometry(0.012, 0.012, config.barrelLength * 0.55, 10),
-    dark,
-    0,
-    -0.006,
-    -receiverZ - config.barrelLength * 0.35,
-    Math.PI / 2,
-  );
-  // Gas collar joining barrel and gas tube at the front sight block.
-  add(new THREE.BoxGeometry(0.03, 0.05, 0.04), accent, 0, 0.006, -0.47);
-  // Flash hider protruding past the barrel tip; the muzzle moves to it.
-  add(new THREE.CylinderGeometry(0.011, 0.013, 0.05, 10), dark, 0, barrelY, barrelTipZ - 0.018, Math.PI / 2);
-  add(new THREE.BoxGeometry(0.028, 0.005, 0.006), body, 0, barrelY + 0.008, barrelTipZ - 0.008);
-  add(new THREE.BoxGeometry(0.028, 0.005, 0.006), body, 0, barrelY + 0.008, barrelTipZ - 0.026);
-  const muzzleZ = barrelTipZ - 0.043;
-
-  // --- Front sight: the post tops out exactly on the sight line ---
-  add(new THREE.BoxGeometry(0.014, 0.03, 0.024), dark, 0, 0.049, -0.52); // base ramp
-  add(new THREE.BoxGeometry(0.005, 0.026, 0.006), dark, 0, sy - 0.013, -0.52); // post
-  for (const side of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.004, 0.02, 0.01), dark, side * 0.011, sy - 0.012, -0.52); // ears
-  }
-
-  // --- Bipod (deployed) and right-offset carry handle ---
-  add(new THREE.BoxGeometry(0.04, 0.02, 0.03), dark, 0, barrelY, -0.5);
-  for (const side of [-1, 1]) {
-    add(new THREE.CylinderGeometry(0.004, 0.004, 0.17, 6), dark, side * 0.035, -0.05, -0.5, 0.15, side * 0.4);
-  }
-  // Carry handle on the right edge, kept BELOW the sight line so ADS stays clean.
-  add(new THREE.BoxGeometry(0.006, 0.026, 0.01), dark, 0.034, 0.056, -0.21);
-  add(new THREE.BoxGeometry(0.006, 0.026, 0.01), dark, 0.034, 0.056, -0.15);
-  add(new THREE.BoxGeometry(0.012, 0.012, 0.07), dark, 0.034, 0.072, -0.18);
-
-  // --- Feed cover: rear hinge, plate forward; the animator swings it open ---
-  const coverPivot = new THREE.Group();
-  coverPivot.position.set(0, halfH + 0.004, 0.06);
-  const coverPlate = new THREE.Mesh(new THREE.BoxGeometry(width * 0.86, 0.01, 0.21), accent);
-  coverPlate.position.z = -0.105;
-  coverPivot.add(coverPlate);
-  // Latch at the plate's front edge.
-  const latch = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.014, 0.012), dark);
-  latch.position.set(0, 0.006, -0.1);
-  coverPlate.add(latch);
-  // The rear sight aperture rides the cover (as on the real M60): two blocks
-  // leave a real notch whose gap sits exactly on the sightY line.
-  for (const side of [-1, 1]) {
-    const block = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.019, 0.01), dark);
-    block.position.set(side * 0.009, 0.0143, 0.085);
-    coverPlate.add(block);
-  }
-  group.add(coverPivot);
-
-  // --- Ammo box (the reload "magazine"): hangs left+below, belt rising ---
-  const [magW, magH, magD] = config.reloadAnim?.magSize ?? [0.1, 0.11, 0.13];
-  const magazine = new THREE.Group();
-  magazine.position.set(-(halfW + magW / 2 - 0.015), -(halfH + magH / 2 - 0.03), -0.03);
-  magazine.add(new THREE.Mesh(new RoundedBoxGeometry(magW, magH, magD, 2, 0.006), boxMat));
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(magW + 0.002, 0.012, magD + 0.002), dark);
-  lid.position.y = magH / 2 + 0.004;
-  magazine.add(lid);
-  const boxLatch = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.025, 0.008), dark);
-  boxLatch.position.set(0.03, 0.02, magD / 2 + 0.002);
-  magazine.add(boxLatch);
-  // Belt stub: brass rounds rising from the box into the left feed port.
-  // Children of the magazine so the belt leaves and returns with the box.
-  const roundGeometry = new THREE.CylinderGeometry(0.0045, 0.0045, 0.026, 6);
-  for (let i = 0; i < 4; i++) {
-    const round = new THREE.Mesh(roundGeometry, brass);
-    round.rotation.x = Math.PI / 2;
-    round.position.set(0.029, magH / 2 + 0.012 + i * 0.011, 0);
-    magazine.add(round);
-  }
-  group.add(magazine);
-
-  // --- Charging handle on the RIGHT flank (the animator racks it +Z) ---
-  const handle = new THREE.Group();
-  handle.position.set(halfW + 0.008, -0.02, -0.09);
-  handle.add(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.01, 0.06), dark));
-  const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.02, 8), dark);
-  knob.rotation.z = Math.PI / 2;
-  knob.position.set(0.012, 0, 0.01);
-  handle.add(knob);
-  group.add(handle);
-
-  // --- Grip, trigger guard, shoulder stock ---
-  // Close enough behind the trigger for the index finger to reach it.
-  add(new RoundedBoxGeometry(0.03, 0.09, 0.045, 2, 0.005), dark, 0, -0.098, 0.055, 0.3);
-  add(new THREE.BoxGeometry(0.024, 0.005, 0.07), dark, 0, -0.078, 0);
-  add(new THREE.BoxGeometry(0.024, 0.03, 0.006), dark, 0, -0.064, -0.033, -0.15);
-  add(new THREE.BoxGeometry(0.005, 0.02, 0.006), dark, 0, -0.062, -0.002, 0.15);
-  add(
-    new THREE.BoxGeometry(width * 0.75, height * 0.8, config.stockLength),
-    dark,
-    0,
-    -0.012,
-    receiverZ + config.stockLength / 2 - 0.01,
-    -0.04,
-  );
-  add(
-    new THREE.BoxGeometry(width * 0.7, height * 0.95, 0.015),
-    dark,
-    0,
-    -0.017,
-    receiverZ + config.stockLength - 0.02,
-    -0.04,
-  );
-  add(
-    new THREE.TorusGeometry(0.006, 0.0015, 6, 10),
-    dark,
-    0,
-    -0.055,
-    receiverZ + config.stockLength - 0.04,
-    Math.PI / 2,
-  );
-
-  group.scale.setScalar(config.scale);
-  const sightY = sy * config.scale;
-  return {
-    group,
-    muzzlePosition: new THREE.Vector3(0, barrelY * config.scale, muzzleZ * config.scale),
-    ejectionPosition: new THREE.Vector3(
-      (halfW + 0.004) * config.scale,
-      -0.008 * config.scale,
-      -0.02 * config.scale,
-    ),
-    sightY,
-    reloadParts: { magazine, cover: coverPivot, handle },
-  };
-}
-
-/**
  * Procedural fallback for GLB weapons that failed to load. Kept deliberately
  * simple; the GLB path is the primary one, and the M60/Ray Gun/Tesla/M1911
  * have their own dedicated builders (see buildProceduralViewModel).
@@ -1349,6 +1144,7 @@ export class WeaponView {
 
     this.root.position.copy(this.hipPosition);
     this.root.visible = false;
+    applyViewModelDepth(this.root);
   }
 
   /**
@@ -1395,6 +1191,15 @@ export class WeaponView {
     model: THREE.Group,
     view: ViewModelConfig,
   ): { sightY: number; box: THREE.Box3 } {
+    // The cached GLB also feeds world display models (wall buys, Mystery Box,
+    // remote avatars): own a copy so the view-model depth patch stays here.
+    model = model.clone(true);
+    model.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.material = Array.isArray(object.material)
+        ? object.material.map((material) => material.clone())
+        : object.material.clone();
+    });
     tuneGlbMaterials(model);
 
     const rawBox = new THREE.Box3().setFromObject(model);

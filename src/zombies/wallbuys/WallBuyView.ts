@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AK47_PROFILE, ak47MagazineFloorplate, ak47MagazineOutline } from '../../weapons/AK47ViewModel';
 import { L96_PROFILE } from '../../weapons/L96ViewModel';
+import { M60_PROFILE, m60BipodLeg, m60FrontSight, m60HeatShieldSlots, m60LeafTop } from '../../weapons/M60ViewModel';
 import type { WeaponDefinition } from '../../weapons/WeaponTypes';
 import type { WallBuy } from './WallBuy';
 
@@ -30,6 +31,9 @@ export class WallBuyView {
     } else if (definition.id === 'l96') {
       this.buildL96Silhouette(view.sightHeight);
       this.group.userData.silhouette = 'l96';
+    } else if (definition.id === 'm60') {
+      this.buildM60Silhouette(view.sightHeight);
+      this.group.userData.silhouette = 'm60';
     } else {
       const totalLength = view.stockLength + view.receiverLength + view.barrelLength;
       const scale = 1.35 / totalLength;
@@ -274,6 +278,90 @@ export class WallBuyView {
     const bipod = L96_PROFILE.bipod;
     this.addShape(rect(bipod.mountZ + 0.017, bipod.mountZ - 0.017, -0.044, -0.066), 'l96-wall-bipod');
     this.addShape(rect(bipod.mountZ, bipod.footZ, bipod.legY + 0.006, bipod.legY - 0.006), 'l96-wall-bipod');
+  }
+
+  /**
+   * M60 profile traced from the same M60_PROFILE as the view model: fluted
+   * butt, grip, receiver with its feed cover and raised rear leaf, belt
+   * pouch, ribbed forearm under the slotted heat shield, gas cylinder, tall
+   * front sight, slotted flash hider and the bipod deployed like the
+   * reference photo. +X points toward the muzzle.
+   */
+  private buildM60Silhouette(sightHeight: number): void {
+    const scale = 1.27;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.232) * scale, (y + 0.1) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const hole = (points: ReadonlyArray<readonly [number, number]>): THREE.Path => new THREE.Path(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): [number, number][] =>
+      [[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]];
+    const profile = M60_PROFILE;
+
+    this.addShape(outline(profile.stock), 'm60-wall-stock');
+    this.addShape(outline(profile.grip), 'm60-wall-grip');
+    this.addShape(outline(profile.receiver), 'm60-wall-receiver');
+    this.addShape(outline(profile.cover), 'm60-wall-feed-cover');
+    this.addShape(outline(profile.coverLatch), 'm60-wall-feed-cover');
+    this.addShape(outline(profile.rearSightBase), 'm60-wall-rear-sight');
+    const leaf = profile.rearSightLeaf;
+    this.addShape(outline(rect(leaf.z + 0.008, leaf.z - 0.008, m60LeafTop(sightHeight), leaf.bottomY)), 'm60-wall-rear-sight');
+    const guard = outline(profile.triggerGuard);
+    guard.holes.push(hole(profile.triggerOpening));
+    this.addShape(guard, 'm60-wall-trigger-guard');
+    this.addShape(outline(profile.trigger), 'm60-wall-trigger-guard');
+
+    const bag = profile.pouch;
+    const [rearZ, frontZ] = [bag.z + bag.depth / 2, bag.z - bag.depth / 2];
+    const [topY, bottomY] = [bag.y + bag.height / 2, bag.y - bag.height / 2];
+    this.addShape(outline([
+      [rearZ, topY], [frontZ, topY], [frontZ - 0.003, topY - 0.008], [frontZ - 0.003, bottomY + 0.008],
+      [frontZ + 0.006, bottomY], [rearZ - 0.006, bottomY], [rearZ, bottomY + 0.008],
+    ]), 'm60-wall-pouch');
+
+    this.addShape(outline(profile.forearm), 'm60-wall-forearm');
+    const shield = outline(profile.heatShield);
+    for (const slot of m60HeatShieldSlots()) shield.holes.push(hole(slot));
+    this.addShape(shield, 'm60-wall-heat-shield');
+
+    const barrel = profile.barrel;
+    const shieldFrontZ = Math.min(...profile.heatShield.map(([z]) => z));
+    this.addShape(outline([
+      [shieldFrontZ, barrel.rearRadius], [barrel.frontZ, barrel.frontRadius],
+      [barrel.frontZ, -barrel.frontRadius], [shieldFrontZ, -barrel.rearRadius],
+    ]), 'm60-wall-barrel');
+    const band = profile.barrelBand;
+    this.addShape(outline(rect(band.rearZ, band.frontZ, band.radius, -band.radius)), 'm60-wall-barrel');
+    const gas = profile.gasCylinder;
+    this.addShape(outline(rect(gas.rearZ, gas.nutZ, gas.y + gas.radius, gas.y - gas.radius)), 'm60-wall-gas-cylinder');
+    this.addShape(outline(rect(gas.nutZ, gas.nutFrontZ, gas.y + gas.nutRadius, gas.y - gas.nutRadius)), 'm60-wall-gas-cylinder');
+    this.addShape(outline(rect(gas.nutFrontZ, gas.frontZ, gas.y + gas.frontRadius, gas.y - gas.frontRadius)), 'm60-wall-gas-cylinder');
+    this.addShape(outline(profile.gasBlock), 'm60-wall-gas-cylinder');
+    this.addShape(outline(profile.gasBand), 'm60-wall-gas-cylinder');
+    const stud = profile.gasStud;
+    this.addShape(outline(rect(stud.z + 0.006, stud.z - 0.006, stud.topY, stud.bottomY)), 'm60-wall-gas-cylinder');
+
+    const sight = profile.frontSight;
+    const frontSight = outline(m60FrontSight(sightHeight));
+    frontSight.holes.push(hole(profile.frontSightHole));
+    this.addShape(frontSight, 'm60-wall-front-sight');
+    this.addShape(outline(rect(sight.bandRearZ, sight.bandFrontZ, sight.bandRadius, -sight.bandRadius)), 'm60-wall-front-sight');
+
+    const hider = profile.flashHider;
+    const flashHider = outline([
+      [hider.collarZ, barrel.frontRadius + 0.0016], [hider.rearZ, hider.radius], [hider.frontZ, hider.radius],
+      [hider.frontZ, -hider.radius], [hider.rearZ, -hider.radius], [hider.collarZ, -barrel.frontRadius - 0.0016],
+    ]);
+    flashHider.holes.push(hole(rect(hider.slotRearZ, hider.slotFrontZ, 0.0024, -0.0024)));
+    this.addShape(flashHider, 'm60-wall-flash-hider');
+
+    this.addShape(outline(profile.yoke), 'm60-wall-bipod');
+    for (const angle of [profile.bipod.deployed, -profile.bipod.deployed]) {
+      const leg = m60BipodLeg(angle);
+      const plate = outline(leg.plate);
+      for (const opening of leg.holes) plate.holes.push(hole(opening));
+      this.addShape(plate, 'm60-wall-bipod');
+      this.addShape(outline(leg.foot), 'm60-wall-bipod');
+    }
   }
 
   private addShape(shape: THREE.Shape, name: string): THREE.Mesh {

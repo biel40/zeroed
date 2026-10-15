@@ -19,7 +19,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | M4A1 | Builder procedural dedicado `buildM4A1` en `src/weapons/M4A1ViewModel.ts` | Original del proyecto | 1984 | Sin descarga |
 | L96 | Builder procedural dedicado `buildL96` (frame `'l96'`) en `src/weapons/L96ViewModel.ts` | Original del proyecto | ~4.5k | Sin descarga |
 | AK-47 | Builder procedural dedicado `buildAk47` (frame `'ak47'`) en `src/weapons/AK47ViewModel.ts` | Original del proyecto | ~5.7k | Sin descarga |
-| M60 | — (builder procedural dedicado `buildM60` en `WeaponView.ts`; no se encontró LMG CC0 adecuada) | — | ~40 meshes | — |
+| M60 | Builder procedural dedicado `buildM60` (frame `'lmg'`) en `src/weapons/M60ViewModel.ts` | Original del proyecto | ~7.2k | Sin descarga |
 | M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
 | Ray Gun | Builder procedural dedicado `buildRayGun` en `src/weapons/RayGunViewModel.ts` | Original del proyecto | ~7k | Sin descarga |
 
@@ -41,6 +41,15 @@ el guardamanos de dos piezas, el punto de mira con orejetas, la baqueta y el
 cargador curvo sobre un arco. La madera usa veta procedural y barniz
 (`clearcoat`); el acero, una textura de microdesgaste. Ambas se generan en
 canvas en runtime, sin descargas. Los mismos perfiles trazan su wall buy.
+
+La M60 sigue la misma estrategia: sus perfiles (`M60_PROFILE`) se trazaron
+sobre una foto de referencia a 0,76 mm/px (1105 mm totales). Reproduce la
+culata con estrías, el receptor con la ranura de la palanca de carga, la tapa
+de alimentación con bisagra delantera, el alza levantada con apertura, el
+guardamanos nervado bajo el escudo térmico ranurado, el cilindro de gases, el
+punto de mira triangular, el apagallamas de cuatro patas, el bípode plegado y
+la bolsa de 100 cartuchos con la cinta. Su wall buy usa los mismos perfiles con
+el bípode desplegado, como en la foto.
 
 La Ray Gun procedural combina carcasas de esmalte rojo desconchado, ventanas
 de plasma con un mapa emisivo que fluye, discos aceleradores, tres brazos con

@@ -4,7 +4,7 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 import {
   cylinderZ, extrudeProfile, profilePath, profileShape, shapeWidth, type ProfilePoint,
 } from './ProfileGeometry';
-import { canvasTexture, seededRandom } from './ProceduralTextures';
+import { canvasTexture, seededRandom, steelWearTexture } from './ProceduralTextures';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -150,7 +150,6 @@ export function ak47MagazineFloorplate(): ProfilePoint[] {
 }
 
 let woodGrain: THREE.CanvasTexture | null | undefined;
-let steelWear: THREE.CanvasTexture | null | undefined;
 
 /**
  * Birch grain tinted by the material color: long wavy latewood lines,
@@ -190,27 +189,6 @@ function woodGrainTexture(): THREE.CanvasTexture | null {
     woodGrain.repeat.set(1 / 0.42, 1 / 0.105);
   }
   return woodGrain;
-}
-
-/** Roughness speckle and fine handling scratches for the blued steel. */
-function steelWearTexture(): THREE.CanvasTexture | null {
-  if (steelWear !== undefined) return steelWear;
-  const random = seededRandom(1947);
-  steelWear = canvasTexture(128, 128, (ctx) => {
-    ctx.fillStyle = 'rgb(140, 140, 140)';
-    ctx.fillRect(0, 0, 128, 128);
-    for (let speck = 0; speck < 900; speck++) {
-      const value = 118 + Math.floor(random() * 50);
-      ctx.fillStyle = `rgb(${value}, ${value}, ${value})`;
-      ctx.fillRect(random() * 128, random() * 128, 1 + random() * 2, 1 + random() * 2);
-    }
-    ctx.fillStyle = 'rgba(90, 90, 90, 0.6)';
-    for (let scratch = 0; scratch < 24; scratch++) {
-      ctx.fillRect(random() * 128, random() * 128, 6 + random() * 26, 0.6);
-    }
-  });
-  steelWear?.repeat.set(18, 18);
-  return steelWear;
 }
 
 /** Rounded wooden furniture: generous creased bevels that keep the traced outline. */

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH } from './FirstPersonArm';
 import { RIGHT_SHOULDER } from './ViewArms';
 import type { MeleeArmDriver } from './ViewArms';
@@ -46,6 +47,8 @@ const HAND_IN_FOREARM = (() => {
 const REST: ArmPose = { yaw: -0.879, pitch: -2.067, roll: 0.394, flex: 2.009, twist: -0.851 };
 // Raised on the right, edge already facing the cut.
 const DRAW: ArmPose = { yaw: 0.144, pitch: 0.168, roll: -0.295, flex: 1.27, twist: -0.079 };
+// Wind-up: the shoulder pulls the blade back against the cut before release.
+const COCK: ArmPose = { yaw: 0.092, pitch: 0.214, roll: -0.334, flex: 1.27, twist: -0.112 };
 // Blade spanning the crosshair: the instant the cut is resolved.
 const CROSS: ArmPose = { yaw: 0.375, pitch: 0.271, roll: -0.128, flex: 0.668, twist: -0.034 };
 const CUT_END: ArmPose = { yaw: 0.819, pitch: 0.118, roll: -0.164, flex: 0.443, twist: 0.202 };
@@ -53,12 +56,16 @@ const FOLLOW: ArmPose = { yaw: 0.948, pitch: 0.033, roll: -0.247, flex: 0.414, t
 // Recovery drops the arm below the cut instead of retracing it.
 const RETRACT: ArmPose = { yaw: 0.89, pitch: -1.404, roll: -0.045, flex: 1.765, twist: 0.503 };
 
-// Phases: 15% anticipation, 25% slash, 15% follow-through, 45% recovery.
-const DRAW_END = 0.15;
+// Phases: 13% raise, 4.5% wind-up, 20.5% slash, 12% follow-through, 50% recovery.
+const DRAW_END = 0.13;
+const COCK_END = 0.175;
 const CROSSING = 0.3;
-const SLASH_END = 0.4;
-const FOLLOW_END = 0.55;
-const RETRACT_POINT = 0.78;
+const SLASH_END = 0.38;
+const FOLLOW_END = 0.5;
+const RETRACT_POINT = 0.74;
+// The shoulder sweep peaks at contact; the elbow, nearly straight by then,
+// keeps a gentler extension so it eases through the frame instead of snapping.
+const CROSS_DRIVE: ArmPose = { yaw: 2.2, pitch: 2, roll: 2, flex: 1, twist: 2 };
 
 /** Contact is resolved when the blade crosses the centre of the screen. */
 export const KNIFE_HIT_MOMENT = KNIFE_ATTACK_DURATION * CROSSING;
@@ -70,7 +77,7 @@ const LOWER_OUT_START = 0.5;
 
 // The right hand drops off the dipping weapon grip and returns to it while
 // it and the whole blade are below the screen (measured: the blade enters
-// the frame after 3 % and has left it by 77 %). The knife only exists in
+// the frame after 3 % and has left it by 74 %). The knife only exists in
 // between, so it never pops into view.
 const ARM_TAKE_START = 0;
 export const KNIFE_SHOW_PROGRESS = 0.03;
@@ -90,30 +97,35 @@ interface Key {
 }
 
 /**
- * Hermite keys: the arm stops at the raised draw (anticipation), at the end
- * of the follow-through and at rest, but keeps a continuous velocity through
- * the cut, so it accelerates into the slash and brakes after it with no
- * elbow snap at the contact frame.
+ * Hermite keys: the arm settles at the wind-up, at the end of the
+ * follow-through and at rest. Elsewhere `drive` scales the tangent through the
+ * neighbouring keys (1 = Catmull-Rom): the raise drifts on into the wind-up,
+ * the cut accelerates to its peak speed at contact and bites hard right after
+ * it, and the recovery drops in one continuous motion.
  */
-function buildKeys(keys: readonly { at: number; pose: ArmPose; flowing?: boolean }[]): Key[] {
+function buildKeys(keys: readonly { at: number; pose: ArmPose; drive?: number | ArmPose }[]): Key[] {
   const still: ArmPose = { yaw: 0, pitch: 0, roll: 0, flex: 0, twist: 0 };
-  return keys.map(({ at, pose, flowing }, index) => {
-    if (!flowing) return { at, pose, velocity: still };
+  return keys.map(({ at, pose, drive }, index) => {
+    if (!drive) return { at, pose, velocity: still };
     const before = keys[index - 1];
     const after = keys[index + 1];
     const velocity: Record<(typeof JOINTS)[number], number> = { ...still };
-    for (const joint of JOINTS) velocity[joint] = (after.pose[joint] - before.pose[joint]) / (after.at - before.at);
+    for (const joint of JOINTS) {
+      const scale = typeof drive === 'number' ? drive : drive[joint];
+      velocity[joint] = (scale * (after.pose[joint] - before.pose[joint])) / (after.at - before.at);
+    }
     return { at, pose, velocity };
   });
 }
 
 const KEYS = buildKeys([
   { at: 0, pose: REST },
-  { at: DRAW_END, pose: DRAW },
-  { at: CROSSING, pose: CROSS, flowing: true },
-  { at: SLASH_END, pose: CUT_END, flowing: true },
+  { at: DRAW_END, pose: DRAW, drive: 0.35 },
+  { at: COCK_END, pose: COCK },
+  { at: CROSSING, pose: CROSS, drive: CROSS_DRIVE },
+  { at: SLASH_END, pose: CUT_END, drive: 0.6 },
   { at: FOLLOW_END, pose: FOLLOW },
-  { at: RETRACT_POINT, pose: RETRACT },
+  { at: RETRACT_POINT, pose: RETRACT, drive: 1 },
   { at: 1, pose: REST },
 ]);
 
@@ -148,6 +160,7 @@ export class Knife implements MeleeArmDriver {
     this.buildView();
     this.applyPose(0);
     this.root.visible = false;
+    applyViewModelDepth(this.root);
   }
 
   public get enabled(): boolean {

@@ -13,6 +13,8 @@ const BOLT_TRAVEL = 0.085;
 const BOLT_LIFT = 0.9;
 /** Fraction of an action cycle at which the bolt reaches its rearmost point. */
 export const BOLT_REAR_FRACTION = 0.4;
+/** Belt feed cover swing (radians): front-hinged, it stands just short of upright. */
+const COVER_OPEN = 1.5;
 
 /** View-model parts the animator drives; any of them may be absent. */
 export interface ReloadParts {
@@ -288,7 +290,7 @@ export class ReloadAnimator {
     cover.quaternion.copy(this.coverHome.quaternion);
     const opening = ramp(p, c.coverOpen, c.coverOpen + 0.07);
     const closing = ramp(p, c.coverClose, c.coverClose + 0.07);
-    cover.rotateX(-(opening - closing) * 1.85);
+    cover.rotateX(-(opening - closing) * COVER_OPEN);
   }
 
   /** Whole-weapon motion flavor per style; the parts are the real show. */

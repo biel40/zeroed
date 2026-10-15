@@ -114,6 +114,25 @@ describe('Knife', () => {
     expect(Math.abs(travel.x)).toBeGreaterThan(Math.abs(travel.z) * 3);
   });
 
+  it('winds up against the cut and strikes at its fastest at contact', () => {
+    const { knife, camera } = knifeOnCamera();
+    // Before release the blade drifts back to the right, away from the cut.
+    const raised = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * 0.13);
+    const cocked = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * 0.175);
+    expect(cocked.hiltNdc.x).toBeGreaterThan(raised.hiltNdc.x);
+
+    const step = 1 / 240;
+    const handSpeed = (time: number): number =>
+      sampleBlade(knife, camera, time + step / 2).hand.distanceTo(sampleBlade(knife, camera, time - step / 2).hand) / step;
+    let peak = 0;
+    for (let time = KNIFE_ATTACK_DURATION * 0.2; time < KNIFE_ATTACK_DURATION * 0.5; time += step) {
+      peak = Math.max(peak, handSpeed(time));
+    }
+    expect(handSpeed(KNIFE_HIT_MOMENT)).toBeGreaterThan(peak * 0.95);
+    // The cut brakes hard once the blade is through.
+    expect(handSpeed(KNIFE_ATTACK_DURATION * 0.4)).toBeLessThan(peak * 0.35);
+  });
+
   it('recovers along a lower path and returns exactly to its resting pose', () => {
     const { knife, camera } = knifeOnCamera();
     const rest = sampleBlade(knife, camera, 0);

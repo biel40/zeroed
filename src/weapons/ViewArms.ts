@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { ARM_DETAIL, FirstPersonArm } from './FirstPersonArm';
 import type { ArmDetail } from './FirstPersonArm';
 import { HAND_POSES } from './HandPoses';
@@ -57,6 +58,7 @@ export class ViewArms {
     this.right = new FirstPersonArm('right', detail);
     this.left = new FirstPersonArm('left', detail);
     this.root.add(this.right.root, this.left.root);
+    applyViewModelDepth(this.root);
   }
 
   update(dt: number, view: ArmedView, melee: MeleeArmDriver | null): void {

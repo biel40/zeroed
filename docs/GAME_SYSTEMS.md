@@ -15,7 +15,9 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 `Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga; `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
-`AudioSystem` sincroniza el foley. Las armas de cerrojo (L96) expulsan el
+`AudioSystem` sincroniza el foley. Arma, brazos y cuchillo comprimen su
+profundidad (`applyViewModelDepth`) para no atravesar paredes al pegarse a
+ellas; sus materiales no deben compartirse con objetos del mundo. Las armas de cerrojo (L96) expulsan el
 casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
 levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
 recarga vacia. La AK-47 suma a cada disparo el golpe del portacerrojo y su
