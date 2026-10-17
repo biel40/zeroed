@@ -7,6 +7,7 @@ import { ZombieManager } from '../src/zombies/ZombieManager';
 import { ZombieVisual, ZOMBIE_MODELS } from '../src/zombies/ZombieVisual';
 import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
 import { WindowBarrierView } from '../src/zombies/barriers/WindowBarrierView';
+import { ZOMBIE_DEATH_PROFILES, ZOMBIE_DEATH_STYLES } from '../src/zombies/ZombieDeath';
 import {
   MAX_ALIVE, roundConfig, ZOMBIE_ATTACK_DURATION, ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_CORPSE_LINGER, ZOMBIE_DEATH_FALL, ZOMBIE_SPAWN_DURATION,
@@ -94,21 +95,29 @@ describe('zombie animation synchronization', () => {
       }
     }
   });
-  it.each(['walker', 'brute'] as const)('%s preserves the complete visible pose at death entry and settles its head near the floor', async (id) => {
-    const visual = new ZombieVisual(id, await loadModel(id), 0xffffff, false);
-    visual.setState('walk');
-    for (let i = 0; i < 30; i++) visual.update(DT, 1.35);
-    const head = visual.headAnchor.getWorldPosition(new THREE.Vector3());
-    const hips = visual.root.getObjectByName('Hips')!;
-    const hipPosition = hips.position.clone();
-    visual.setState('death');
-    visual.update(0, 0);
-    expect(visual.headAnchor.getWorldPosition(new THREE.Vector3()).distanceTo(head)).toBeLessThan(0.001);
-    expect(hips.position.distanceTo(hipPosition)).toBeLessThan(0.001);
-    for (let i = 0; i < 75; i++) visual.update(DT, 0);
-    // Brutus is taller and far bulkier, so its head rests proportionally higher.
-    expect(visual.headAnchor.getWorldPosition(new THREE.Vector3()).y)
-      .toBeLessThan(0.55 * ZOMBIE_MODELS[id].height / ZOMBIE_MODELS.walker.height);
+  it.each(['walker', 'brute'] as const)('%s preserves the visible pose at death entry and lays every style on the floor', async (id) => {
+    const source = await loadModel(id);
+    const point = new THREE.Vector3();
+    for (const style of ZOMBIE_DEATH_STYLES) {
+      const visual = new ZombieVisual(id, source, 0xffffff, false);
+      visual.setState('walk');
+      for (let i = 0; i < 30; i++) visual.update(DT, 1.35);
+      const head = visual.headAnchor.getWorldPosition(new THREE.Vector3());
+      const hips = visual.root.getObjectByName('Hips')!;
+      const hipPosition = hips.position.clone();
+      visual.prepareDeath(style, 0, -1);
+      visual.setState('death');
+      visual.update(0, 0);
+      expect(visual.headAnchor.getWorldPosition(point).distanceTo(head), style).toBeLessThan(0.001);
+      expect(hips.position.distanceTo(hipPosition), style).toBeLessThan(0.001);
+      for (let t = 0; t < ZOMBIE_DEATH_PROFILES[style].duration + 0.25; t += DT) visual.update(DT, 0);
+      // Brutus is taller and far bulkier, so its head rests proportionally higher.
+      expect(visual.headAnchor.getWorldPosition(point).y, style)
+        .toBeLessThan(0.55 * ZOMBIE_MODELS[id].height / ZOMBIE_MODELS.walker.height);
+      visual.root.traverse((bone) => {
+        if (bone instanceof THREE.Bone) expect(bone.getWorldPosition(point).y, `${style} ${bone.name}`).toBeGreaterThan(-0.06);
+      });
+    }
   });
 
   it('keeps the original walk cycle active across the full chase-speed range', async () => {

@@ -7,6 +7,7 @@ const DESKTOP_PROFILE: DeviceProfile = {
   isMobile: false,
   isTouch: false,
   isLowMemory: false,
+  quality: 'high',
   pixelRatioLimit: 2,
   shadowQuality: 2,
   useReducedEffects: false,

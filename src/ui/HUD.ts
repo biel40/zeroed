@@ -1,8 +1,10 @@
 import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
+import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
 import { formatNumber, getLanguage, isLanguage, onLanguageChange, setLanguage, t } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
+import { SettingsPanel } from './SettingsPanel';
 import { gameOverEpitaph, lampProgress, roundMarks } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
@@ -91,6 +93,7 @@ export class HUD {
   private mapLoadingShownAt = 0;
   private mapLoadingTimer = 0;
   private startScreenTimer = 0;
+  private readonly settings: SettingsPanel;
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -104,6 +107,9 @@ export class HUD {
       privacyDialog.showModal();
     };
     mustGet('privacy-close').onclick = () => privacyDialog.close();
+
+    this.settings = new SettingsPanel(mustGet('settings-dialog') as HTMLDialogElement,
+      [mustGet('menu-settings'), mustGet('pause-settings')]);
 
     // The language is only chosen from the main menu; in-game texts read it when rendered.
     const languageButtons = mustGet('language-select').querySelectorAll<HTMLButtonElement>('[data-language]');
@@ -235,6 +241,22 @@ export class HUD {
 
   public setCoopSelectHandler(handler: () => void): void {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
+  }
+
+  /** Main-menu quality buttons; the choice applies from the next match. */
+  public setQualitySelect(current: QualityLevel, onSelect: (quality: QualityLevel) => void): void {
+    const buttons = mustGet('quality-select').querySelectorAll<HTMLButtonElement>('[data-quality]');
+    const sync = (selected: QualityLevel): void => {
+      for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.quality === selected));
+    };
+    for (const button of buttons) {
+      button.onclick = () => {
+        if (!isQualityLevel(button.dataset.quality)) return;
+        sync(button.dataset.quality);
+        onSelect(button.dataset.quality);
+      };
+    }
+    sync(current);
   }
 
   public showCoopLobby(defaultServerUrl: string, handlers: {
@@ -490,6 +512,11 @@ export class HUD {
 
   public hidePauseMenu(): void {
     mustGet('pause-menu').classList.add('hidden');
+  }
+
+  /** The settings dialog opens over the main or pause menu and owns ESC while open. */
+  public get settingsOpen(): boolean {
+    return this.settings.isOpen;
   }
 
   /**

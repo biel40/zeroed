@@ -22,6 +22,7 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?compare=1`: compara Shiny con zombies normales.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?shiny=1&night=1`: inspecciona el brillo de Shiny en baja luz.
+- `http://localhost:5173/tools/viewers/zombie-viewer.html?state=death&death=all`: los siete estilos de muerte en fila, en bucle (andar, caer, cadáver). `death=slash` muestra uno solo desde tres ángulos y `time=0.6` congela ese instante de la caída; admite `model=brute`. `electric=1` mantiene los rayos residuales de la ZEUS-77 sobre los cuerpos (la muerte `shock` siempre los lleva).
 - Parámetros adicionales: `state=attack`, `time=0.475` y `close=1`.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.

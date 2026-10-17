@@ -159,11 +159,11 @@ export const ZOMBIE_ATTACK_DURATION = 0.75;
  * procedural attack curves place every variant at contact at exactly 0.475 s.
  */
 export const ZOMBIE_ATTACK_HIT_MOMENT = 0.475;
-/** Brief stagger on non-lethal hits; movement resumes right after. */
-export const ZOMBIE_HIT_DURATION = 0.28;
-/** Headshot stagger lasts longer: precision should feel impactful. */
-export const ZOMBIE_HIT_HEADSHOT_FACTOR = 1.6;
-/** Death fall, corpse linger and fade-out before the body is recycled. */
+/**
+ * Death fall, corpse linger and fade-out before the body is recycled. The
+ * lifetime is the same for every death style; longer falls (ZombieDeath)
+ * simply spend less of it lying still.
+ */
 export const ZOMBIE_DEATH_FALL = 1.0;
 export const ZOMBIE_CORPSE_LINGER = 1.6;
 export const ZOMBIE_DEATH_FADE = 0.8;
@@ -204,6 +204,11 @@ export const RAYGUN_UNLOCK_KILLS = 115;
  * Ray Gun. The visual arc pool in ChainLightning derives from this value.
  */
 export const CHAIN_MAX_TARGETS = 20;
+/**
+ * Seconds residual ZEUS-77 arcs keep crawling over a zapped body. It outlives
+ * the shock death's convulsion so corpses still crackle on the floor.
+ */
+export const ZOMBIE_ELECTRIFIED_DURATION = 2.8;
 /**
  * Maximum hop distance between two zombies in the same chain, meters. 9 m
  * lets the arc walk through a whole horde without cutting early, while the

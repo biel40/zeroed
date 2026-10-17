@@ -1,8 +1,9 @@
 import type { ZombieState } from '../zombies/Zombie';
-import { ZOMBIE_TYPE_CONFIGS, type ZombieTypeId } from '../zombies/ZombieConfig';
+import { CHAIN_MAX_TARGETS, ZOMBIE_TYPE_CONFIGS, type ZombieTypeId } from '../zombies/ZombieConfig';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxSnapshot } from '../zombies/MysteryBox';
+import { isZombieDeathStyle, type ZombieDeathStyle } from '../zombies/ZombieDeath';
 import type { SecretRoomSnapshot } from '../zombies/secret-room/SecretRoomSystem';
 
 /**
@@ -108,7 +109,13 @@ export type HostMessage =
   | { readonly type: 'matchState'; readonly state: MatchState }
   | { readonly type: 'reviveCompleted'; readonly target: CoopPlayerId }
   | { readonly type: 'playerShoot'; readonly weapon: WeaponId; readonly origin: Vec3; readonly direction: Vec3 }
-  | { readonly type: 'teslaChain'; readonly points: readonly Vec3[] }
+  | {
+    readonly type: 'teslaChain';
+    /** Muzzle, then the chest of every electrocuted zombie in arc order. */
+    readonly points: readonly Vec3[];
+    /** Zombies left carrying residual arcs; missing on older hosts. */
+    readonly zombieIds: readonly number[];
+  }
   | { readonly type: 'zombieSpawn'; readonly zombie: ZombieNetState }
   | { readonly type: 'zombieAttack'; readonly zombieId: number; readonly target: CoopPlayerId }
   | {
@@ -119,7 +126,15 @@ export type HostMessage =
     readonly fromX: number;
     readonly fromZ: number;
   }
-  | { readonly type: 'zombieDeath'; readonly zombieId: number; readonly killer: CoopPlayerId }
+  | {
+    readonly type: 'zombieDeath';
+    readonly zombieId: number;
+    readonly killer: CoopPlayerId;
+    readonly style: ZombieDeathStyle;
+    /** Body-local unit direction of the killing impact (x: its left, z: forward). */
+    readonly impactX: number;
+    readonly impactZ: number;
+  }
   | { readonly type: 'roundStart'; readonly round: number }
   | { readonly type: 'roundEnd'; readonly round: number }
   | { readonly type: 'doorOpened'; readonly doorId: string; readonly buyer: CoopPlayerId }
@@ -317,8 +332,13 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
         ? { type: 'playerShoot', weapon: raw.weapon, origin: raw.origin, direction: raw.direction }
         : null;
     case 'teslaChain':
-      return Array.isArray(raw.points) && raw.points.length <= 8 && raw.points.every(isVec3)
-        ? { type: 'teslaChain', points: raw.points } : null;
+      return Array.isArray(raw.points) && raw.points.length <= CHAIN_MAX_TARGETS + 1 && raw.points.every(isVec3)
+        ? {
+          type: 'teslaChain', points: raw.points,
+          zombieIds: Array.isArray(raw.zombieIds) && raw.zombieIds.length <= CHAIN_MAX_TARGETS
+            && raw.zombieIds.every((id) => Number.isInteger(id)) ? raw.zombieIds as number[] : [],
+        }
+        : null;
     case 'zombieSpawn':
       return isZombieNetState(raw.zombie) ? { type: 'zombieSpawn', zombie: raw.zombie } : null;
     case 'zombieAttack':
@@ -334,8 +354,14 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
         }
         : null;
     case 'zombieDeath':
+      // The death performance is cosmetic: an unknown or missing one falls back to the default fall.
       return Number.isInteger(raw.zombieId) && isPlayerId(raw.killer)
-        ? { type: 'zombieDeath', zombieId: raw.zombieId as number, killer: raw.killer }
+        ? {
+          type: 'zombieDeath', zombieId: raw.zombieId as number, killer: raw.killer,
+          style: isZombieDeathStyle(raw.style) ? raw.style : 'knockback',
+          impactX: isFiniteNumber(raw.impactX) ? Math.max(-1, Math.min(1, raw.impactX)) : 0,
+          impactZ: isFiniteNumber(raw.impactZ) ? Math.max(-1, Math.min(1, raw.impactZ)) : -1,
+        }
         : null;
     case 'roundStart':
     case 'roundEnd':

@@ -104,6 +104,8 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   (`zombieSpawn`, `zombieAttack`, `zombieHit`, `zombieDeath`, `roundStart`,
   `roundEnd`, `doorOpened`, `playerDamaged`, `matchRestart`) llevan IDs
   únicos por spawn; los que refieren entidades desaparecidas se ignoran.
+  `zombieDeath` incluye el estilo de muerte y el lado del impacto; si faltan
+  o no son válidos, el invitado usa la caída por defecto.
   En espera, final y créditos se envían solo cambios puntuales; una sala sin
   invitado no envía estados periódicos al relay.
 - Combate: el anfitrión aplica todo el daño. Las balas del invitado vuelan en

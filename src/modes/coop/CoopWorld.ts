@@ -10,6 +10,7 @@ import type { ArenaAmmoRefill, ArenaCompletionInteraction, ArenaRitualInteractio
 import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { BurnedMansionArena } from '../../zombies/maps/BurnedMansionArena';
+import { RITUAL_SCARE_TIMELINE } from '../../zombies/secret-room/SecretRoomSystem';
 import type { ModeContext } from '../GameMode';
 import { cameraSpatialCue, type SpatialCue } from '../../audio/SpatialCue';
 
@@ -39,7 +40,8 @@ export class CoopWorld {
     this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
     this.arena.onSoulLampCompleted = (position) => ctx.audio.playSoulLampComplete(this.spatialCueFor(position));
     this.arena.onSecretRoomUnlocked = (position) => ctx.audio.playSecretRoomUnlock(this.spatialCueFor(position));
-    this.arena.onRitualScare = (position) => ctx.audio.playRitualScare(this.spatialCueFor(position));
+    this.arena.onRitualScare = (position) =>
+      ctx.audio.playRitualScare(this.spatialCueFor(position), RITUAL_SCARE_TIMELINE);
     ctx.scene.add(this.arena.group);
     ctx.hitColliders.length = 0;
     ctx.hitColliders.push(...this.arena.colliders);

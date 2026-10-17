@@ -698,7 +698,7 @@ describe('ZombieManager damage', () => {
     const { manager } = makeManager();
     manager.spawnZombie(roundConfig(1), 0, 4);
     const zombie = [...manager.actives][0];
-    const sources: string[] = [];
+    const sources: (string | undefined)[] = [];
     manager.onZombieKilled = (_z, _headshot, source) => sources.push(source);
 
     manager.damageZombie(zombie, 'torso', 10_000, 'knife');

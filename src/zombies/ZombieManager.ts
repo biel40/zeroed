@@ -33,6 +33,7 @@ import {
   type ZombieTypeId,
 } from './ZombieConfig';
 import { Zombie } from './Zombie';
+import type { ZombieKillSource } from './ZombieDeath';
 import { ZombiePool } from './ZombiePool';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from './ZombieSpawner';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from './ZombieSpawner';
@@ -172,7 +173,6 @@ interface NavPath {
   index: number;
 }
 
-export type ZombieKillSource = 'default' | 'knife';
 export type ZombieTargetId = 'host' | 'guest';
 export interface ZombiePlayerTarget {
   readonly id: ZombieTargetId;
@@ -191,7 +191,8 @@ export interface ZombiePlayerTarget {
 export class ZombieManager {
   readonly group = new THREE.Group();
 
-  onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource) => void) | null = null;
+  /** `source` is undefined for unattributed damage (tests, tools). */
+  onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined) => void) | null = null;
   /** Actual health removed, including direct, melee, splash and chain hits. */
   public onZombieDamaged: ((damage: number) => void) | null = null;
   public onPlayerAttack: ((damage: number, targetId: ZombieTargetId, attacker: Zombie) => void) | null = null;
@@ -569,16 +570,19 @@ export class ZombieManager {
    * Bullet damage routed from the ballistics hit callback. Returns true when
    * the hit was LETHAL — the mode uses this to award the non-lethal hit
    * points only when the zombie survives, keeping hit and kill rewards
-   * mutually exclusive for a single bullet.
+   * mutually exclusive for a single bullet. `source` picks the death
+   * performance; the origin is the shooter (the local player by default).
    */
   damageZombie(
     zombie: Zombie,
     part: ZombieHitPart,
     baseDamage: number,
-    source: ZombieKillSource = 'default',
+    source?: ZombieKillSource,
+    originX = this.lastPlayerX,
+    originZ = this.lastPlayerZ,
   ): boolean {
     const damage = computeDamage(baseDamage, part);
-    if (this.applyTrackedDamage(zombie, damage, part === 'head', this.lastPlayerX, this.lastPlayerZ)) {
+    if (this.applyTrackedDamage(zombie, damage, part === 'head', originX, originZ, source)) {
       this.kill(zombie, part === 'head', source);
       return true;
     }
@@ -622,7 +626,10 @@ export class ZombieManager {
       const appliedDamage = isDirectHit ? computeDamage(damage, directPart) : damage;
       const sourceX = isDirectHit ? this.lastPlayerX : impact.position.x;
       const sourceZ = isDirectHit ? this.lastPlayerZ : impact.position.z;
-      if (this.applyTrackedDamage(zombie, appliedDamage, headshot, sourceX, sourceZ)) this.kill(zombie, headshot);
+      zombie.electrify();
+      if (this.applyTrackedDamage(zombie, appliedDamage, headshot, sourceX, sourceZ, 'tesla')) {
+        this.kill(zombie, headshot, 'tesla');
+      }
     }
     return chain;
   }
@@ -639,13 +646,15 @@ export class ZombieManager {
       const damage = splashDamageAt(splashDamage, Math.hypot(dx, dz), radius);
       if (damage <= 0) continue;
       // applyDamage already triggers the red hit flash.
-      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z)) this.kill(zombie, false);
+      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, 'raygun')) this.kill(zombie, false, 'raygun');
     }
   }
 
-  private applyTrackedDamage(zombie: Zombie, damage: number, headshot: boolean, x: number, z: number): boolean {
+  private applyTrackedDamage(
+    zombie: Zombie, damage: number, headshot: boolean, x: number, z: number, source: ZombieKillSource | undefined,
+  ): boolean {
     const before = Math.max(0, zombie.hp);
-    const lethal = zombie.applyDamage(damage, headshot, x, z);
+    const lethal = zombie.applyDamage(damage, headshot, x, z, source);
     const removed = before - Math.max(0, zombie.hp);
     if (removed > 0) this.onZombieDamaged?.(removed);
     return lethal;
@@ -2183,7 +2192,7 @@ export class ZombieManager {
     return portal ? portal.targetY - EYE_HEIGHT : 0;
   }
 
-  private kill(zombie: Zombie, headshot: boolean, source: ZombieKillSource = 'default'): void {
+  private kill(zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined): void {
     // The falling body must stop blocking bullets immediately.
     this.removeColliders(zombie);
     this.onZombieKilled?.(zombie, headshot, source);

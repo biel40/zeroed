@@ -24,7 +24,7 @@ import { ReviveGesture } from '../../rendering/ReviveGesture';
 import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { Weapon } from '../../weapons/Weapon';
-import type { WeaponId } from '../../weapons/WeaponTypes';
+import type { WeaponDefinition, WeaponId } from '../../weapons/WeaponTypes';
 import { KNIFE_ATTACK_DURATION, KNIFE_RANGE, Knife, knifeDamageForRound } from '../../weapons/Knife';
 import type { MeleeArmDriver } from '../../weapons/ViewArms';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../../zombies/MysteryBox';
@@ -32,6 +32,7 @@ import { MysteryBoxView } from '../../zombies/MysteryBoxView';
 import { EnergyProjectiles } from '../../zombies/EnergyProjectiles';
 import { ChainLightning } from '../../zombies/ChainLightning';
 import type { Zombie } from '../../zombies/Zombie';
+import type { ZombieKillSource } from '../../zombies/ZombieDeath';
 import { CHAIN_ZAP_DAMAGE, PLAYER_MAX_HP, RAYGUN_UNLOCK_KILLS, ZOMBIE_TYPE_CONFIGS } from '../../zombies/ZombieConfig';
 import type { EnergyWeaponConfig } from '../../weapons/WeaponTypes';
 import { ZombieManager, type ZombiePlayerTarget } from '../../zombies/ZombieManager';
@@ -257,7 +258,7 @@ export class CoopHostMode implements GameMode {
     this.ctx.stats.registerHit(distance);
     this.ctx.hud.showHitmarker(headshot);
     const position = this.ctx.player.rig.position;
-    this.applyBulletDamage('host', zombie, headshot, weapon.definition.damage, position.x, position.z);
+    this.applyBulletDamage('host', zombie, headshot, weapon.definition, position.x, position.z);
   }
 
   public onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
@@ -581,7 +582,7 @@ export class CoopHostMode implements GameMode {
     const distance = Math.hypot(zombie.position.x - state.x, zombie.position.z - state.z);
     if (distance > weapon.projectile.maxDistance + 2) return;
     if (!this.shots.get(weaponId)?.tryConsumeHit(defaultNow())) return;
-    this.applyBulletDamage('guest', zombie, headshot, weapon.damage, state.x, state.z);
+    this.applyBulletDamage('guest', zombie, headshot, weapon, state.x, state.z);
   }
 
   private applyLocalKnifeImpact(): void {
@@ -619,21 +620,24 @@ export class CoopHostMode implements GameMode {
   private applyKnifeDamage(shooter: CoopPlayerId, zombie: Zombie): void {
     this.shooter = shooter;
     const damage = knifeDamageForRound(zombie.maxHp, this.rounds.round);
-    const lethal = this.zombies.damageZombie(zombie, 'torso', damage, 'knife');
+    const position = shooter === 'host' ? this.ctx.player.rig.position : this.guestState;
+    const fromX = position?.x ?? 0;
+    const fromZ = position?.z ?? 0;
+    const lethal = this.zombies.damageZombie(zombie, 'torso', damage, 'knife', fromX, fromZ);
     this.shooter = 'host';
     if (!lethal) this.players[shooter].economy.awardHit(false);
     if (!lethal) {
-      const position = shooter === 'host' ? this.ctx.player.rig.position : this.guestState;
       this.send({ type: 'zombieHit', zombieId: this.zombies.networkIdOf(zombie), headshot: false,
-        amount: damage, fromX: position?.x ?? 0, fromZ: position?.z ?? 0 });
+        amount: damage, fromX, fromZ });
     }
   }
 
   /** The single place bullet damage is applied, for both players' shots. */
   private applyBulletDamage(shooter: CoopPlayerId, zombie: Zombie, headshot: boolean,
-    damage: number, fromX: number, fromZ: number): void {
+    weapon: WeaponDefinition, fromX: number, fromZ: number): void {
     this.shooter = shooter;
-    const lethal = this.zombies.damageZombie(zombie, headshot ? 'head' : 'torso', damage);
+    const damage = weapon.damage;
+    const lethal = this.zombies.damageZombie(zombie, headshot ? 'head' : 'torso', damage, weapon.id, fromX, fromZ);
     this.shooter = 'host';
     if (lethal) return;
     this.players[shooter].economy.awardHit(headshot);
@@ -660,15 +664,17 @@ export class CoopHostMode implements GameMode {
         const points = [muzzle, ...chain.map((entry) =>
           new THREE.Vector3(entry.position.x, entry.position.y + 1.1, entry.position.z))];
         this.chain.discharge(points);
-        this.send({ type: 'teslaChain', points: points.map((entry) =>
-          ({ x: entry.x, y: entry.y, z: entry.z })) });
+        this.send({
+          type: 'teslaChain', points: points.map((entry) => ({ x: entry.x, y: entry.y, z: entry.z })),
+          zombieIds: chain.map((entry) => this.zombies.networkIdOf(entry)),
+        });
         this.ctx.audio.playTeslaChain(chain.length);
       }
       this.ctx.audio.playTeslaShot();
     } else {
       this.ctx.audio.playRayImpact();
       if (zombie?.isAlive) {
-        const lethal = this.zombies.damageZombie(zombie, part, WEAPON_DEFINITIONS.raygun.damage);
+        const lethal = this.zombies.damageZombie(zombie, part, WEAPON_DEFINITIONS.raygun.damage, 'raygun');
         if (!lethal) this.players[shooter].economy.awardHit(part === 'head');
       }
       this.zombies.applySplash(point, config.splashRadius, config.splashDamage);
@@ -687,7 +693,7 @@ export class CoopHostMode implements GameMode {
     }
   }
 
-  private onZombieKilled(zombie: Zombie, headshot: boolean, source: 'default' | 'knife'): void {
+  private onZombieKilled(zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined): void {
     const shooter = this.shooter;
     const killer = this.players[shooter];
     killer.kills++;
@@ -699,7 +705,10 @@ export class CoopHostMode implements GameMode {
     if (source === 'knife') killer.economy.awardKnifeKill(rewardMultiplier);
     else killer.economy.awardKill(headshot, rewardMultiplier);
     this.world.arena.captureSoul(zombie.position, zombie.floor);
-    this.send({ type: 'zombieDeath', zombieId: this.zombies.networkIdOf(zombie), killer: shooter });
+    this.send({
+      type: 'zombieDeath', zombieId: this.zombies.networkIdOf(zombie), killer: shooter,
+      style: zombie.deathStyle, impactX: quantize(zombie.impact.x), impactZ: quantize(zombie.impact.y),
+    });
     if (!this.rayGunUnlocked[shooter] && killer.kills >= RAYGUN_UNLOCK_KILLS) {
       this.rayGunUnlocked[shooter] = true;
       if (shooter === 'host') {

@@ -16,6 +16,8 @@
   standalone. Capacitor prepara distribucion Android.
 - Música diferenciada para partida y menú/pausa, con reanudación de la pista de
   partida desde su posición anterior y cue independiente al iniciar ronda.
+- Ajustes accesibles en cualquier momento (menú principal y pausa): volúmenes,
+  sensibilidad, eje Y invertido y campo de visión, guardados en el dispositivo.
 - Cooperativo privado de dos jugadores en Burned Mansion: autoridad del
   anfitrion, servidor de salas WebSocket, replica de jugadores/zombis, arsenal
   completo, Mystery Box y progresion compartida de mapa. El modo

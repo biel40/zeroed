@@ -38,11 +38,13 @@ import {
   MANSION_WALL_BUYS,
 } from '../src/zombies/maps/BurnedMansionConfig';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
+import { RITUAL_SCARE_TIMELINE } from '../src/zombies/secret-room/SecretRoomSystem';
 
 const profile: DeviceProfile = {
   isMobile: false,
   isTouch: false,
   isLowMemory: false,
+  quality: 'high',
   pixelRatioLimit: 2,
   shadowQuality: 2,
   useReducedEffects: false,
@@ -973,12 +975,30 @@ describe('Burned Mansion topology', () => {
     expect(arena.ritualInteraction.activate()).toBe(true);
     expect(arena.ritualInteraction.available).toBe(false);
     expect(arena.ritualInteraction.activate()).toBe(false);
-    expect(arena.group.getObjectByName('ritual-apparition')?.visible).toBe(true);
-    arena.update(0.6);
     const apparition = arena.group.getObjectByName('ritual-apparition') as THREE.Sprite;
+    const viewer = new THREE.Vector3(MANSION_SECRET_ROOM.centerX + 1.6, MANSION_BUNKER_Y + 1.7,
+      MANSION_SECRET_ROOM.centerZ);
+    let impacts = 0;
+    arena.onRitualImpact = () => impacts++;
+    // The candles choke out before anything appears.
+    arena.update(RITUAL_SCARE_TIMELINE.strike - 0.05, viewer);
+    expect(apparition.visible).toBe(false);
+    arena.update(0.15, viewer);
     expect(apparition.visible).toBe(true);
     expect((apparition.material as THREE.SpriteMaterial).opacity).toBeGreaterThan(0);
-    arena.update(0.3);
+    const risenDistance = apparition.position.distanceTo(viewer);
+    for (let elapsed = RITUAL_SCARE_TIMELINE.strike + 0.1; elapsed < RITUAL_SCARE_TIMELINE.impact + 0.05;
+      elapsed += 0.05) {
+      arena.update(0.05, viewer);
+    }
+    expect(impacts).toBe(1);
+    expect(apparition.visible).toBe(true);
+    expect(apparition.position.distanceTo(viewer)).toBeLessThan(0.5);
+    expect(risenDistance).toBeGreaterThan(1.2);
+    arena.update(RITUAL_SCARE_TIMELINE.vanish - RITUAL_SCARE_TIMELINE.impact, viewer);
+    expect(apparition.visible).toBe(false);
+    arena.update(RITUAL_SCARE_TIMELINE.end, viewer);
+    expect(impacts).toBe(1);
     expect(apparition.visible).toBe(false);
     expect(canWalk(
       [-5.8, MANSION_SECRET_ROOM.entranceZ],

@@ -3,8 +3,10 @@ import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { registerFadeMaterial, setFadeOpacity } from '../rendering/FadeMaterials';
 import type { ZombieState } from './Zombie';
 import { ShinyStars } from './ShinyStars';
+import { ZombieElectricArcs } from './ZombieElectricArcs';
 import { ZombieLimb } from './ZombieLimb';
-import { buildZombieRestClips } from './ZombieMotionClips';
+import { buildZombieRestClips, type ZombieRestClips } from './ZombieMotionClips';
+import { ZOMBIE_DEATH_PROFILES, type ZombieDeathStyle } from './ZombieDeath';
 import { sampleMeleeMotion, sampleWindowMotion, boardPullProgress,
   BOARD_PULL_DISTANCE, BOARD_PULL_DROP, BOARD_PULL_DURATION } from './ZombieAttackMotion';
 import {
@@ -27,8 +29,8 @@ export interface ZombieModelConfig {
   readonly url: string;
   /** World height the model is normalized to, meters. */
   readonly height: number;
-  /** Candidate clip names per state; first match wins. */
-  readonly clips: Record<ZombieState, readonly string[]>;
+  /** Candidate clip names per state; first match wins. Deaths are always generated per style. */
+  readonly clips: Record<Exclude<ZombieState, 'death'>, readonly string[]>;
   /** Walk clip ground speed at timeScale 1; syncs feet with movement. */
   readonly walkReferenceSpeed: number;
   /** Standing-still clip candidates; drives real joint motion while stalled at a barrier (optional: not every asset has one). */
@@ -57,7 +59,6 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       barrierAttack: ['ZombieBarrierAttack'],
       barrierBreak: ['ZombieBarrierBreak'],
       hit: ['ZombieHit', 'HitReact', 'Hit'],
-      death: ['ZombieDeath', 'Death'],
     },
     walkReferenceSpeed: 1.35,
     idleClip: ['ZombieIdle', 'Idle'],
@@ -81,7 +82,6 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       barrierAttack: [],
       barrierBreak: [],
       hit: [],
-      death: [],
     },
     walkReferenceSpeed: 1.71,
     tints: [0xb2b9a8],
@@ -96,11 +96,19 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
 };
 
 const CROSSFADE_SECONDS = 0.2;
-const restClipCache = new WeakMap<THREE.Object3D, readonly [THREE.AnimationClip, THREE.AnimationClip] | null>();
+/** Generated clips are pure functions of the rig: bake once per loaded scene, share across the pool. */
+const restClipCache = new WeakMap<THREE.Object3D, ZombieRestClips | null>();
+/** Largest body-yaw the fall turns towards the impact side, radians. */
+const DEATH_MAX_TWIST = 0.8;
 /** Below this ground speed the zombie is treated as stationary (stalled at a barrier). */
 const STATIONARY_SPEED = 0.05;
 /** Hit-flash emissive color shared by every zombie material. */
 const FLASH_COLOR = 0xff2211;
+/** ZEUS-77 residual charge: cold blue skin flicker that fades over its last second. */
+const ELECTRIC_COLOR = 0x5fc8ff;
+const ELECTRIC_FADE = 0.8;
+/** Joints the residual arcs jump between, spread head to toe. */
+const ARC_ANCHORS = ['Hips', 'Spine2', 'Head', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
 /** Sickly undead glow kept very low so the bodies read in the dark. */
 const UNDEAD_GLOW = 0x1a2a12;
 const UNDEAD_GLOW_INTENSITY = 0.12;
@@ -463,6 +471,8 @@ export class ZombieVisual {
 
   private readonly mixer: THREE.AnimationMixer | null = null;
   private readonly actions = new Map<ZombieState, THREE.AnimationAction>();
+  /** One generated fall per death style; empty on the procedural fallback. */
+  private readonly deathActions = new Map<ZombieDeathStyle, THREE.AnimationAction>();
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
@@ -490,6 +500,12 @@ export class ZombieVisual {
   private idleActive = false;
   private attackDuration = 0.9;
   private flash = 0;
+  /** Seconds of ZEUS-77 charge left on the body; arcs persist through death. */
+  private electrified = 0;
+  private readonly electricArcs: ZombieElectricArcs;
+  /** True while flash or charge own the emissive; the glow is restored once both end. */
+  private emissiveOverridden = false;
+  private opacity = 1;
   private bobPhase = Math.random() * Math.PI * 2;
   /** Advances every frame regardless of speed; drives the stationary idle sway. */
   private idlePhase = Math.random() * Math.PI * 2;
@@ -514,6 +530,9 @@ export class ZombieVisual {
   private deathLean = 0;
   private deathSide = 0;
   private deathTime = 0;
+  private deathStyle: ZombieDeathStyle = 'knockback';
+  /** Body yaw the fall turns towards so it travels away from the impact. */
+  private deathTwist = 0;
   private readonly poseBones: THREE.Object3D[] = [];
   private readonly poseFrom: THREE.Quaternion[] = [];
   private readonly positionFrom: THREE.Vector3[] = [];
@@ -610,18 +629,17 @@ export class ZombieVisual {
         restClips = buildZombieRestClips(this.root, this.modelConfig.height);
         restClipCache.set(source.scene, restClips);
       }
-      for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'barrierBreak', 'hit', 'death'] as const) {
-        const clip = (state === 'death' ? restClips?.[1] : undefined)
-          ?? resolveClip(source.clips, this.modelConfig.clips[state]);
-        if (!clip) continue;
-        const action = this.mixer.clipAction(clip);
-        if (state === 'death') {
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-        }
-        this.actions.set(state, action);
+      for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'barrierBreak', 'hit'] as const) {
+        const clip = resolveClip(source.clips, this.modelConfig.clips[state]);
+        if (clip) this.actions.set(state, this.mixer.clipAction(clip));
       }
-      const idleClip = restClips?.[0] ?? (this.modelConfig.idleClip
+      for (const [style, clip] of restClips?.deaths ?? []) {
+        const action = this.mixer.clipAction(clip);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+        this.deathActions.set(style, action);
+      }
+      const idleClip = restClips?.idle ?? (this.modelConfig.idleClip
         ? resolveClip(source.clips, this.modelConfig.idleClip)
         : null);
       if (idleClip) {
@@ -700,6 +718,13 @@ export class ZombieVisual {
     })));
     this.shinyStars = modelId === 'walker' ? new ShinyStars() : null;
     if (this.shinyStars) this.root.add(this.shinyStars.points);
+    const arcAnchors = this.rig
+      ? Object.values(this.rig)
+      : ARC_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
+    this.electricArcs = new ZombieElectricArcs(arcAnchors);
+    this.root.add(this.electricArcs.mesh);
+    // Pitch and roll tip the body in its own frame; the death twist then yaws the result.
+    this.root.rotation.order = 'YXZ';
   }
 
   /** Resets and applies a type treatment compatible with this fixed model. */
@@ -708,12 +733,15 @@ export class ZombieVisual {
     if (config.modelId !== this.modelId) {
       throw new Error(`Zombie type "${typeId}" requires model "${config.modelId}", got "${this.modelId}"`);
     }
-    this.flash = 0;
+    this.flash = this.electrified = 0;
+    this.emissiveOverridden = false;
+    this.electricArcs.hide();
     this.restoreBasePose();
     this.motionSpeed = this.lean = this.turnLean = 0;
     this.reactionX = this.reactionZ = 0;
     this.reactionAge = 1;
-    this.deathTime = this.deathLean = this.deathSide = 0;
+    this.deathTime = this.deathLean = this.deathSide = this.deathTwist = 0;
+    this.deathStyle = 'knockback';
     this.groundOffset = this.attackReach = 0;
     this.locomotionAction = null;
     this.strikeTarget.set(0, 1.3, 1);
@@ -810,6 +838,22 @@ export class ZombieVisual {
   }
 
   /**
+   * Chooses the fall played by the next setState('death'). The push is the
+   * body-local direction of the killing impact; impact-following falls turn
+   * up to DEATH_MAX_TWIST towards it so a side hit never falls sideways-on.
+   */
+  public prepareDeath(style: ZombieDeathStyle, pushX: number, pushZ: number): void {
+    this.deathStyle = style;
+    const profile = ZOMBIE_DEATH_PROFILES[style];
+    if (!profile.followsImpact || (pushX === 0 && pushZ === 0)) {
+      this.deathTwist = 0;
+      return;
+    }
+    const delta = Math.atan2(pushX, pushZ) - (profile.fall === 'back' ? Math.PI : 0);
+    this.deathTwist = THREE.MathUtils.clamp(Math.atan2(Math.sin(delta), Math.cos(delta)), -DEATH_MAX_TWIST, DEATH_MAX_TWIST);
+  }
+
+  /**
    * Crossfades into a state; one-shot states restart from the beginning.
    * Two rules keep bullet impacts from breaking the base animation:
    * looping locomotion NEVER resets (walk resumes the cycle phase frozen
@@ -833,17 +877,16 @@ export class ZombieVisual {
     if (previous !== state) this.idleActive = false;
     if ((state === 'barrierAttack' || state === 'attack') && previous !== state) {
       this.barrierMotionTime = 0;
+      const variant = state === 'attack' ? this.nextAttackVariant : this.nextBarrierVariant;
       if (state === 'attack') {
-        this.attackVariant = this.nextAttackVariant;
-        this.nextAttackVariant = (this.nextAttackVariant + 1) % 3;
-        this.barrierStrikeSide = this.attackVariant === 2 ? 0
-          : Math.sign(this.arms[this.attackVariant]?.rest.x ?? (this.attackVariant === 0 ? -1 : 1));
+        this.attackVariant = variant;
+        this.nextAttackVariant = (variant + 1) % 3;
       } else {
-        this.barrierVariant = this.nextBarrierVariant;
-        this.nextBarrierVariant = (this.nextBarrierVariant + 1) % 3;
-        this.barrierStrikeSide = this.barrierVariant === 2 ? 0
-          : Math.sign(this.arms[this.barrierVariant]?.rest.x ?? (this.barrierVariant === 0 ? -1 : 1));
+        this.barrierVariant = variant;
+        this.nextBarrierVariant = (variant + 1) % 3;
       }
+      // Variants 0/1 lead with one arm each; variant 2 strikes with both.
+      this.barrierStrikeSide = variant === 2 ? 0 : Math.sign(this.arms[variant]?.rest.x ?? (variant === 0 ? -1 : 1));
     }
     if (state === 'barrierBreak' && previous === 'barrierAttack') {
       this.barrierBreakStart = Math.min(1, this.barrierMotionTime / this.attackDuration);
@@ -878,7 +921,7 @@ export class ZombieVisual {
       if (base) { base.time = 0; base.timeScale = 0; }
       return;
     }
-    const next = this.actions.get(state) ?? null;
+    const next = (state === 'death' ? this.deathActions.get(this.deathStyle) : this.actions.get(state)) ?? null;
     if (!next) {
       // Clipless reactions layer over the uninterrupted locomotion clock.
       if (state === 'hit' && previous !== 'hit') this.reactToHit(0, -1, 0.12);
@@ -909,7 +952,8 @@ export class ZombieVisual {
     }
     if (state === 'spawn') next.timeScale = 1.15;
     if (state === 'hit') next.timeScale = 1.4;
-    if (state === 'death') next.timeScale = next.getClip().duration / ZOMBIE_DEATH_FALL;
+    // Each death clip is authored at its real speed (ZombieDeath profiles).
+    if (state === 'death') next.timeScale = 1;
     next.enabled = true;
     // next !== currentAction here (the same-action case returned above).
     if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
@@ -920,6 +964,11 @@ export class ZombieVisual {
   /** Red emissive pulse on bullet impact. */
   hitFlash(): void {
     this.flash = 1;
+  }
+
+  /** Keeps ZEUS-77 arcs crawling over the body (alive or dead) for at least `seconds`. */
+  public electrify(seconds: number): void {
+    this.electrified = Math.max(this.electrified, seconds);
   }
 
   /** Additive recoil in body-local space; never changes the locomotion clock. */
@@ -946,7 +995,7 @@ export class ZombieVisual {
 
   /** 0 → 1 during the death fall; only collapses when no death clip exists. */
   setDeathProgress(t: number): void {
-    if (this.actions.has('death')) return; // the clip handles the fall
+    if (this.deathActions.size > 0) return; // the clip handles the fall
     this.collapse = t;
   }
 
@@ -955,7 +1004,8 @@ export class ZombieVisual {
     if (this.shinyStars) this.shinyStars.points.material.opacity = opacity;
     for (const material of this.eyeMaterials) material.opacity = opacity;
     for (const material of this.fadeMaterials) setFadeOpacity(material, opacity);
-    if (this.flash > 0) return;
+    this.opacity = opacity;
+    if (this.emissiveOverridden) return;
     for (const material of this.materials) material.emissiveIntensity = this.glowIntensity * opacity;
   }
 
@@ -975,22 +1025,31 @@ export class ZombieVisual {
       : 0;
     this.root.position.y = -(1 - this.rise) * SPAWN_DEPTH + heavyBob;
     this.root.position.z = 0;
+    this.root.rotation.set(0, 0, 0);
     if (this.collapse > 0) {
+      // Clipless fallback: tip the rigid body over in the style's direction.
       const ease = 1 - (1 - this.collapse) * (1 - this.collapse);
-      this.root.rotation.x = -ease * (Math.PI / 2 - 0.12);
-      this.root.rotation.z = ease * (0.18 + this.deathSide);
-    } else {
-      this.root.rotation.x = 0;
-      this.root.rotation.z = 0;
+      const tip = ease * (Math.PI / 2 - 0.12);
+      const fall = ZOMBIE_DEATH_PROFILES[this.deathStyle].fall;
+      if (fall === 'side') this.root.rotation.z = tip;
+      else {
+        this.root.rotation.x = fall === 'back' ? -tip : tip;
+        this.root.rotation.z = ease * (0.18 + this.deathSide);
+      }
     }
     if (this.state === 'death') {
       const settle = Math.min(1, this.deathTime / ZOMBIE_DEATH_FALL);
       const remaining = 1 - smoothStep(settle);
+      // Momentum and pose continuity from the living body, layered over the fall.
       this.root.position.z = this.deathStartForward + this.deathTravel * (1 - remaining);
       this.root.rotation.x += this.deathStartPitch * remaining;
       this.root.rotation.z += this.deathStartRoll * remaining;
-      this.root.rotation.x += this.deathLean * Math.sin(settle * Math.PI);
-      if (this.actions.has('death')) this.root.rotation.z += this.deathSide * Math.sin(settle * Math.PI);
+      // Lean and sway humps fade before the body is low: rocking a lying body
+      // about the feet would sink its far end into the floor.
+      const hump = Math.sin(Math.min(1, settle * 2) * Math.PI);
+      this.root.rotation.x += this.deathLean * hump;
+      if (this.deathActions.size > 0) this.root.rotation.z += this.deathSide * hump;
+      this.root.rotation.y = this.deathTwist * smoothStep(Math.min(1, settle * 2));
     }
     if (this.state === 'attack') {
       this.root.position.z = sampleMeleeMotion(this.barrierProgress(), 0, this.attackReach * 0.12,
@@ -1059,7 +1118,7 @@ export class ZombieVisual {
     }
 
     this.captureBasePose();
-    if (this.state === 'death' && !this.actions.has('death')) {
+    if (this.state === 'death' && this.deathActions.size === 0) {
       // The mixer has paused its base clip, but the actual last visible pose
       // also includes solved limbs. Preserve that pose underneath the fall.
       for (let i = 0; i < this.poseBones.length; i++) this.poseBones[i].quaternion.copy(this.poseFrom[i]);
@@ -1097,18 +1156,31 @@ export class ZombieVisual {
       this.shinyStars.update(dt);
     }
 
-    if (this.flash > 0) {
-      this.flash = Math.max(0, this.flash - dt * 5);
-      for (const material of this.materials) {
-        if (this.flash > 0) {
-          material.emissive.setHex(FLASH_COLOR);
-          material.emissiveIntensity = this.flash * 1.5;
-        } else {
-          material.emissive.setHex(this.glowColor);
-          material.emissiveIntensity = this.glowIntensity * (this.materials[0]?.opacity ?? 1);
-        }
+    this.electrified = Math.max(0, this.electrified - dt);
+    const charge = Math.min(1, this.electrified / ELECTRIC_FADE);
+    this.electricArcs.update(dt, charge * this.opacity);
+    if (this.flash > 0 || charge > 0 || this.emissiveOverridden) this.updateEmissive(dt, charge);
+  }
+
+  /** Red hit flash beats the electric flicker; the undead glow returns when both end. */
+  private updateEmissive(dt: number, charge: number): void {
+    this.flash = Math.max(0, this.flash - dt * 5);
+    // Mostly a faint cold sheen with occasional bright jolts, so the arcs stay the focus.
+    const spike = Math.random() ** 3;
+    const flicker = charge * (0.15 + 0.55 * spike) * this.opacity;
+    for (const material of this.materials) {
+      if (this.flash > 0) {
+        material.emissive.setHex(FLASH_COLOR);
+        material.emissiveIntensity = this.flash * 1.5;
+      } else if (charge > 0) {
+        material.emissive.setHex(ELECTRIC_COLOR);
+        material.emissiveIntensity = flicker;
+      } else {
+        material.emissive.setHex(this.glowColor);
+        material.emissiveIntensity = this.glowIntensity * this.opacity;
       }
     }
+    this.emissiveOverridden = this.flash > 0 || charge > 0;
   }
 
   /** Code-driven humanoid animation for the fallback rig. */
@@ -1243,7 +1315,7 @@ export class ZombieVisual {
       this.limbRotation.copy(this.root.quaternion).invert();
       this.limbPoint.applyQuaternion(this.limbRotation);
       arm.solve(this.limbPoint.x, this.limbPoint.y, this.limbPoint.z,
-        side * height * 0.24, height * 0.52, -0.05, weight, false, true);
+        side * height * 0.24, height * 0.52, -0.05, weight, 0, true);
     }
   }
 

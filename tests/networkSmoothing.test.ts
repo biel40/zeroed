@@ -144,6 +144,23 @@ describe('protocol boundary', () => {
     expect(parseHostMessage({ type: 'doorOpened', doorId: 'to-dining', buyer: 'guest' })?.type).toBe('doorOpened');
     expect(parseHostMessage({ type: 'doorOpened', doorId: 'to-dining', buyer: 'someone' })).toBeNull();
   });
+
+  it('carries a full ZEUS-77 chain and its electrified zombies', () => {
+    const points = Array.from({ length: 21 }, (_, i) => ({ x: i, y: 1, z: 0 }));
+    expect(parseHostMessage({ type: 'teslaChain', points, zombieIds: [3, 4] }))
+      .toEqual({ type: 'teslaChain', points, zombieIds: [3, 4] });
+    expect(parseHostMessage({ type: 'teslaChain', points: points.slice(0, 2) }))
+      .toEqual({ type: 'teslaChain', points: points.slice(0, 2), zombieIds: [] });
+    expect(parseHostMessage({ type: 'teslaChain', points: [...points, points[0]] })).toBeNull();
+  });
+
+  it('keeps zombie deaths valid when the cosmetic death style is unknown or missing', () => {
+    expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'guest', style: 'riddled', impactX: 3, impactZ: -0.5 }))
+      .toEqual({ type: 'zombieDeath', zombieId: 4, killer: 'guest', style: 'riddled', impactX: 1, impactZ: -0.5 });
+    expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'ragdoll' }))
+      .toEqual({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'knockback', impactX: 0, impactZ: -1 });
+    expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'nobody', style: 'slash' })).toBeNull();
+  });
 });
 
 describe('barrier replication', () => {

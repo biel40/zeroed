@@ -1,11 +1,14 @@
 import type { SurfaceType } from '../shooting/HitTarget';
 import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
+import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
 import { MusicManager } from './MusicManager';
 import { muffleCutoff, type SpatialCue } from './SpatialCue';
 
 const PING_THROTTLE = 0.045;
 // Reload foley was hard to hear over gunfire/music; boost it above the raw profile values.
 const RELOAD_VOLUME_BOOST = 1.9;
+/** Mix level of every procedural effect before the player's volume settings. */
+const EFFECTS_MIX = 0.55;
 
 interface ReloadProfile {
   start: number;
@@ -95,6 +98,13 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
   },
 };
 
+/** Seconds after activation at which the ritual scare's visual beats land. */
+export interface RitualScareBeats {
+  readonly strike: number;
+  readonly impact: number;
+  readonly vanish: number;
+}
+
 interface AudioContextParts {
   ctx: AudioContext;
   master: GainNode;
@@ -129,8 +139,13 @@ export class AudioSystem {
   private readonly dryFireUrl: string = `${import.meta.env.BASE_URL}assets/audio/encasquillada_arma.mp3`;
   private readonly doorPurchaseUrl: string = `${import.meta.env.BASE_URL}assets/audio/door_purchase.mp3`;
 
+  private readonly stopSettingsListener: () => void;
+
   public constructor(music: MusicManager = new MusicManager()) {
     this.music = music;
+    this.stopSettingsListener = onSettingsChange(() => {
+      if (this.ctx && this.master) this.master.gain.setTargetAtTime(masterGain(), this.ctx.currentTime, 0.02);
+    });
   }
 
   /** Must be called from a user gesture before any sound can play. */
@@ -138,7 +153,7 @@ export class AudioSystem {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.55;
+      this.master.gain.value = masterGain();
       this.master.connect(this.ctx.destination);
 
       const length: number = this.ctx.sampleRate;
@@ -172,6 +187,7 @@ export class AudioSystem {
 
   /** Closes this run's AudioContext; the shared MusicManager keeps the menu theme. */
   public dispose(): void {
+    this.stopSettingsListener();
     this.stopEndingAudio();
     this.stopWind();
     const ctx = this.ctx;
@@ -668,15 +684,130 @@ export class AudioSystem {
     this.toneTo(audio.ctx, output, t + 0.48, 'sine', 960, 0.14, 0.38);
   }
 
-  /** Abrupt layered sting for the secret-room ritual apparition. */
-  public playRitualScare(cue: SpatialCue): void {
+  /**
+   * Secret-room jumpscare scheduled on the visual beats: candles choking out
+   * over a heartbeat and a swelling whisper, a dissonant stab when the circle
+   * erupts, a shriek that climbs while the figure charges, a hit in the face
+   * and a hard cut into a low rumble.
+   */
+  public playRitualScare(cue: SpatialCue, beats: RitualScareBeats): void {
     const audio = this.context();
     if (!audio) return;
-    const output = this.spatialBus(audio, cue, 0.65);
-    const t = audio.ctx.currentTime;
-    this.sweepTo(audio.ctx, output, t, 'sawtooth', 760, 58, 0.2, 0.78);
-    this.toneTo(audio.ctx, output, t + 0.025, 'square', 46, 0.32, 0.62);
-    this.sweepTo(audio.ctx, output, t + 0.13, 'triangle', 120, 510, 0.18, 0.4);
+    const { ctx, noise } = audio;
+    // The player stands on the circle: keep the direction, never soften it.
+    const spatial = this.spatialBus(audio, { ...cue, attenuation: 1, muffle: 0 });
+    // A limiter lets the stacked layers hit hard without clipping the master bus.
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -12;
+    limiter.knee.value = 4;
+    limiter.ratio.value = 14;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.3;
+    limiter.connect(spatial);
+    const bus = ctx.createGain();
+    bus.gain.value = 1.8;
+    bus.connect(limiter);
+
+    const t = ctx.currentTime;
+    const strike = t + beats.strike;
+    const impact = t + beats.impact;
+    const vanish = t + beats.vanish;
+    const envelope = (start: number, peak: number, end: number, volume: number, output: AudioNode = bus): GainNode => {
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(volume, peak);
+      gain.gain.exponentialRampToValueAtTime(0.0001, end);
+      gain.connect(output);
+      return gain;
+    };
+    const oscillator = (type: OscillatorType, from: number, to: number, start: number, end: number,
+      output: AudioNode): OscillatorNode => {
+      const node = ctx.createOscillator();
+      node.type = type;
+      node.frequency.setValueAtTime(from, start);
+      node.frequency.exponentialRampToValueAtTime(Math.max(20, to), end);
+      node.connect(output);
+      node.start(start);
+      node.stop(end + 0.05);
+      return node;
+    };
+    const noiseBand = (type: BiquadFilterType, from: number, to: number, q: number, start: number, end: number,
+      output: AudioNode): void => {
+      const source = ctx.createBufferSource();
+      source.buffer = noise;
+      source.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = type;
+      filter.Q.value = q;
+      filter.frequency.setValueAtTime(from, start);
+      filter.frequency.exponentialRampToValueAtTime(to, end);
+      source.connect(filter);
+      filter.connect(output);
+      source.start(start, Math.random() * 0.5);
+      source.stop(end + 0.05);
+    };
+
+    // Candles choke out; a heartbeat and a whisper swell until the strike.
+    noiseBand('lowpass', 2600, 220, 0.8, t, t + 0.4, envelope(t, t + 0.015, t + 0.4, 0.55));
+    oscillator('sine', 74, 38, t + 0.12, t + 0.3, envelope(t + 0.12, t + 0.13, t + 0.3, 0.9));
+    oscillator('sine', 70, 36, t + 0.34, t + 0.5, envelope(t + 0.34, t + 0.35, t + 0.5, 0.65));
+    oscillator('sine', 44, 33, t, strike, envelope(t, strike - 0.02, strike + 0.08, 0.55));
+    noiseBand('bandpass', 420, 2800, 4, t, strike, envelope(t, strike - 0.01, strike + 0.05, 0.4));
+
+    // Strike: blast, sub drop and a dissonant cluster stab.
+    noiseBand('lowpass', 8000, 240, 0.7, strike, strike + 0.9, envelope(strike, strike + 0.006, strike + 0.9, 1));
+    oscillator('sine', 120, 26, strike, strike + 1.2, envelope(strike, strike + 0.006, strike + 1.2, 1));
+    const stab = ctx.createBiquadFilter();
+    stab.type = 'lowpass';
+    stab.frequency.value = 3200;
+    stab.connect(envelope(strike, strike + 0.01, vanish + 0.5, 0.42));
+    for (const frequency of [196, 207.7, 220, 293.7, 311.1, 415.3, 440]) {
+      oscillator('sawtooth', frequency, frequency * 0.94, strike, vanish + 0.5, stab);
+    }
+
+    // Shriek: detuned voices climbing through a vocal formant with a fast
+    // vibrato, peaking at the face and cut dead on the vanish.
+    const shriekStart = strike + 0.08;
+    const shriek = ctx.createGain();
+    shriek.gain.setValueAtTime(0.0001, shriekStart);
+    shriek.gain.exponentialRampToValueAtTime(0.12, shriekStart + 0.12);
+    shriek.gain.exponentialRampToValueAtTime(0.75, impact);
+    shriek.gain.setValueAtTime(0.75, vanish - 0.03);
+    shriek.gain.linearRampToValueAtTime(0, vanish);
+    shriek.connect(bus);
+    const formant = ctx.createBiquadFilter();
+    formant.type = 'peaking';
+    formant.frequency.value = 1250;
+    formant.Q.value = 1.4;
+    formant.gain.value = 14;
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 380;
+    formant.connect(highpass);
+    highpass.connect(shriek);
+    const vibrato = ctx.createOscillator();
+    vibrato.frequency.value = 15;
+    vibrato.start(shriekStart);
+    vibrato.stop(vanish + 0.05);
+    for (const [frequency, type] of [[560, 'sawtooth'], [843, 'sawtooth'], [1190, 'square']] as const) {
+      const voice = oscillator(type, frequency, frequency * 1.9, shriekStart, impact, formant);
+      const depth = ctx.createGain();
+      depth.gain.value = frequency * 0.06;
+      vibrato.connect(depth);
+      depth.connect(voice.frequency);
+      voice.stop(vanish + 0.05);
+    }
+    noiseBand('bandpass', 1800, 3600, 1.1, shriekStart, vanish, shriek);
+
+    // Impact in the face: wide crack, metallic screech and a second sub hit.
+    noiseBand('bandpass', 3200, 900, 0.7, impact, impact + 0.45, envelope(impact, impact + 0.004, impact + 0.45, 1));
+    oscillator('square', 2300, 420, impact, impact + 0.35, envelope(impact, impact + 0.005, impact + 0.35, 0.3));
+    oscillator('sine', 100, 28, impact, impact + 0.8, envelope(impact, impact + 0.005, impact + 0.8, 1));
+
+    // After the cut: a long low rumble and a fading exhale.
+    noiseBand('lowpass', 420, 70, 0.9, vanish, vanish + 1.8, envelope(vanish, vanish + 0.04, vanish + 1.8, 0.6));
+    noiseBand('bandpass', 1400, 450, 2, vanish + 0.2, vanish + 1.6,
+      envelope(vanish + 0.2, vanish + 0.5, vanish + 1.6, 0.14));
   }
 
   /**
@@ -1123,7 +1254,7 @@ export class AudioSystem {
     this.ctx = ctx;
     if (!this.master) {
       this.master = ctx.createGain();
-      this.master.gain.value = 0.55;
+      this.master.gain.value = masterGain();
       this.master.connect(ctx.destination);
 
       const length: number = ctx.sampleRate;
@@ -1161,6 +1292,10 @@ export class AudioSystem {
     if (this.ctx.state !== 'running') return null;
     return { ctx: this.ctx, master: this.master, noise: this.noiseBuffer };
   }
+}
+
+function masterGain(): number {
+  return EFFECTS_MIX * effectsGain();
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -601,6 +601,10 @@ body {
   margin-top: 18px;
 }
 
+#quality-select {
+  margin-top: 10px;
+}
+
 .language-label {
   margin-right: 6px;
   color: #8e968a;
@@ -2406,6 +2410,46 @@ html.touch-controls-enabled .start-panel {
 }
 @media (prefers-reduced-motion: reduce) {
   #pause-menu .pause-actions button, #pause-menu .pause-actions button::after { transition: none; }
+}
+
+/* Settings: same field-notes card as the pause menu, on top of either menu. */
+#menu-settings { margin-top: 10px; }
+#settings-dialog {
+  margin: auto; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0;
+  overflow-y: auto; color: #e3dccb; border: 0; border-left: 3px solid #7e1713;
+  background: linear-gradient(100deg, #090c0cfa, #0d1110f2); box-shadow: 0 34px 90px #000b;
+}
+#settings-dialog::backdrop { background: rgba(3, 4, 4, 0.72); }
+.settings-form { padding: 24px 28px 22px; }
+.settings-form h2 {
+  margin: 0 0 14px; color: #dedfd8; font: 900 34px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .075em;
+}
+.settings-form fieldset { margin: 0 0 12px; padding: 8px 14px 6px; border: 1px solid #a4ac9d1f; background: #0b0e0d; }
+.settings-form legend {
+  padding: 0 6px; color: #8e968a; font: 600 10px 'Consolas', 'SF Mono', monospace; letter-spacing: .24em;
+}
+.settings-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 4.2em; align-items: center; gap: 12px;
+  min-height: 38px; font: 13px 'Segoe UI', sans-serif;
+}
+.settings-row input[type="range"] { width: 100%; margin: 0; accent-color: #b6483e; cursor: pointer; }
+.settings-row output { color: #d9b469; font: 700 12px 'Consolas', 'SF Mono', monospace; text-align: right; }
+.settings-toggle { grid-template-columns: minmax(0, 1fr) auto; }
+.settings-toggle input { width: 20px; height: 20px; margin: 0; accent-color: #b6483e; cursor: pointer; }
+.settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.settings-actions button {
+  padding: 11px 16px; cursor: pointer; border: 1px solid #98a19340; border-radius: 1px;
+  background: #1a1d1ce6; color: #c9cbc3; font: 700 12px 'Consolas', 'SF Mono', monospace; letter-spacing: .18em;
+}
+.settings-actions #settings-close { border-left: 3px solid #8e201a; background: #36110fe6; color: #f0e6d0; }
+.settings-actions button:hover,
+.settings-actions button:focus-visible { border-color: #b6483ec2; color: #f0e6d0; }
+.settings-form input:focus-visible,
+.settings-actions button:focus-visible { outline: 2px solid #bd5148; outline-offset: 3px; }
+@media (max-height: 500px), (max-width: 420px) {
+  .settings-form { padding: 16px 18px 14px; }
+  .settings-form h2 { margin-bottom: 8px; font-size: 26px; }
+  .settings-row { min-height: 32px; gap: 8px; }
 }
 @media (max-width: 600px) {
   #hud-zombies { right: 10px; bottom: 10px; width: min(248px, calc(100vw - 20px)); }

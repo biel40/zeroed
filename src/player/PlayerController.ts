@@ -4,8 +4,7 @@ import { clamp, damp, lerp } from '../utils/math';
 import type { Input } from './Input';
 import type { PlayerBounds } from '../zombies/maps/ZombieArena';
 import { MANSION_GROUND_BOUNDS } from '../zombies/maps/BurnedMansionConfig';
-
-export const BASE_FOV = 75;
+import { getSettings } from '../core/PlayerSettings';
 
 const SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.02;
@@ -71,7 +70,7 @@ export class PlayerController {
   private readonly wish = new THREE.Vector3();
   private yaw = 0;
   private pitch = 0;
-  private fov = BASE_FOV;
+  private fov = getSettings().fieldOfView;
   private bounds: PlayerBounds = PLAYER_BOUNDS;
   private wallColliders: readonly THREE.Box3[] = [];
   private floorTransitions: readonly FloorTransitionZone[] = [];
@@ -85,7 +84,7 @@ export class PlayerController {
   private cameraImpulse = 0;
 
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.08, 700);
+    this.camera = new THREE.PerspectiveCamera(this.fov, aspect, 0.08, 700);
     this.rig.position.set(0, EYE_HEIGHT, 4);
     this.pitchNode.add(this.camera);
     this.rig.add(this.pitchNode);
@@ -141,9 +140,12 @@ export class PlayerController {
   update(dt: number, input: Input, weapon: Weapon, allowMovement = true, allowLook = allowMovement): void {
     const definition = weapon.definition;
 
-    const sensitivity = SENSITIVITY * lerp(1, definition.ads.sensitivity, weapon.adsAlpha);
+    const settings = getSettings();
+    const sensitivity = SENSITIVITY * settings.lookSensitivity
+      * lerp(1, definition.ads.sensitivity * settings.adsSensitivity, weapon.adsAlpha);
+    const pitchSign = settings.invertY ? -1 : 1;
     this.yaw -= (allowLook ? input.mouseDeltaX : 0) * sensitivity;
-    this.pitch = clamp(this.pitch - (allowLook ? input.mouseDeltaY : 0) * sensitivity, -PITCH_LIMIT, PITCH_LIMIT);
+    this.pitch = clamp(this.pitch - (allowLook ? input.mouseDeltaY : 0) * sensitivity * pitchSign, -PITCH_LIMIT, PITCH_LIMIT);
     this.rig.rotation.y = this.yaw;
     this.pitchNode.rotation.x = this.pitch;
     this.cameraImpulse *= Math.exp(-18 * dt);
@@ -228,7 +230,7 @@ export class PlayerController {
     }
     this.rig.position.y = this.groundY + this.jumpOffset;
 
-    const targetFov = lerp(BASE_FOV, definition.ads.fov, weapon.adsAlpha);
+    const targetFov = lerp(settings.fieldOfView, definition.ads.fov, weapon.adsAlpha);
     if (Math.abs(targetFov - this.fov) > 0.05) {
       this.fov = damp(this.fov, targetFov, 20, dt);
       this.camera.fov = this.fov;

@@ -4,7 +4,7 @@ import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } f
 import { MusicManager } from './audio/MusicManager';
 import { isZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
-import { getDeviceProfile } from './core/DeviceProfile';
+import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
 import { setupPWA } from './pwa';
@@ -17,7 +17,8 @@ import { HUD } from './ui/HUD';
 
 class ZeroedBoot {
   private readonly container: HTMLElement;
-  private readonly profile: ReturnType<typeof getDeviceProfile>;
+  /** Rebuilt when the menu quality changes; each match reads it at start. */
+  private profile: DeviceProfile;
   private readonly hud: HUD;
   private readonly assets: AssetManager;
   private readonly music = new MusicManager();
@@ -30,7 +31,7 @@ class ZeroedBoot {
     if (!container) throw new Error('Missing #app container');
 
     this.container = container;
-    this.profile = getDeviceProfile();
+    this.profile = getDeviceProfile(undefined, getQualityPreference());
     this.hud = new HUD();
     this.assets = new AssetManager(this.profile.anisotropyLimit);
     this.music.setEnabled(true);
@@ -184,6 +185,10 @@ class ZeroedBoot {
       await this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total));
       this.hud.setReady();
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
+      this.hud.setQualitySelect(this.profile.quality, (quality) => {
+        setQualityPreference(quality);
+        this.profile = getDeviceProfile(undefined, quality);
+      });
 
       const requestedMap = new URLSearchParams(window.location.search).get('map');
       if (isZombieMapId(requestedMap)) {

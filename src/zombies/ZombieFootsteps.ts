@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Zombie } from './Zombie';
 import { muffleCutoff, spatialMuffle, voicePoint } from '../audio/SpatialCue';
+import { effectsGain } from '../core/PlayerSettings';
 
 /** Pooled positional sources: only the nearest zombies ever get one. */
 const MAX_AUDIBLE_ZOMBIES = 8;
@@ -107,6 +108,8 @@ export class ZombieFootsteps {
   private readonly root = new THREE.Group();
   private readonly slots: FootstepSlot[] = [];
   private listener: THREE.AudioListener | null = null;
+  /** Effects volume last applied to the listener, which bypasses AudioSystem's bus. */
+  private appliedGain = 1;
   private reassessTimer = 0;
   private readonly tmpListenerPos = new THREE.Vector3();
   private readonly tmpListenerForward = new THREE.Vector3();
@@ -128,6 +131,11 @@ export class ZombieFootsteps {
     if (!this.listener) {
       if (!audioContext) return;
       this.initAudio(audioContext);
+    }
+    const gain = effectsGain();
+    if (gain !== this.appliedGain && this.listener) {
+      this.appliedGain = gain;
+      this.listener.setMasterVolume(gain);
     }
     this.camera.getWorldPosition(this.tmpListenerPos);
     this.camera.getWorldDirection(this.tmpListenerForward);

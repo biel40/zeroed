@@ -1,4 +1,5 @@
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
+import { musicGain, onSettingsChange } from '../core/PlayerSettings';
 
 export type MusicTrackName =
   | 'zombies_round_start'
@@ -76,6 +77,17 @@ export class MusicManager {
   private endingAudioStarted = false;
   private explosionTimer: ReturnType<typeof setTimeout> | null = null;
 
+  public constructor() {
+    // The manager lives for the whole page, so the subscription is never removed.
+    onSettingsChange(() => {
+      for (const [name, player] of this.players) player.volume = this.volumeOf(name);
+    });
+  }
+
+  private volumeOf(name: MusicTrackName): number {
+    return MUSIC_TRACKS[name].volume * musicGain();
+  }
+
   public setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     if (!enabled) this.stop();
@@ -90,7 +102,7 @@ export class MusicManager {
       player = new Audio(def.path);
       player.preload = 'auto';
       player.loop = def.loop;
-      player.volume = def.volume;
+      player.volume = this.volumeOf(name);
       if (typeof player.load === 'function') player.load();
       this.players.set(name, player);
     }
@@ -200,7 +212,7 @@ export class MusicManager {
 
     player.currentTime = 0;
     player.loop = false;
-    player.volume = MUSIC_TRACKS[name].volume;
+    player.volume = this.volumeOf(name);
     void player.play().catch(() => undefined);
   }
 
@@ -213,7 +225,7 @@ export class MusicManager {
 
     player.currentTime = this.pauseOffsets.get(name) ?? 0;
     player.loop = true;
-    player.volume = MUSIC_TRACKS[name].volume;
+    player.volume = this.volumeOf(name);
     void player.play().catch(() => undefined);
   }
 
@@ -226,7 +238,7 @@ export class MusicManager {
     if (!player.paused) return;
 
     player.loop = true;
-    player.volume = MUSIC_TRACKS[name].volume;
+    player.volume = this.volumeOf(name);
     void player.play().catch(() => undefined);
   }
 }

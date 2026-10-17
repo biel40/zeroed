@@ -3,6 +3,7 @@ import type { ZombieNetState } from '../network/Protocol';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../network/Interpolation';
 import { Zombie } from './Zombie';
 import { ZOMBIE_ATTACK_LUNGE, ZOMBIE_TYPE_CONFIGS, MAX_ALIVE } from './ZombieConfig';
+import type { ZombieDeathStyle } from './ZombieDeath';
 import { ZOMBIE_POOL_MODELS, type ZombieModelSources } from './ZombieManager';
 import { ZombiePool } from './ZombiePool';
 import { ZombieVisual, ZOMBIE_MODELS } from './ZombieVisual';
@@ -131,12 +132,18 @@ export class ZombieReplica {
     if (entry && !entry.dying) entry.zombie.playReplicatedHit(amount, headshot, fromX, fromZ);
   }
 
-  public kill(id: number): void {
+  /** Host ZEUS-77 chain: residual arcs on every listed body, dying ones included. */
+  public electrify(ids: readonly number[]): void {
+    for (const id of ids) this.entries.get(id)?.zombie.electrify();
+  }
+
+  /** Snapshot-detected deaths (no event) play the default fall. */
+  public kill(id: number, style?: ZombieDeathStyle, impactX?: number, impactZ?: number): void {
     const entry = this.entries.get(id);
     if (!entry || entry.dying) return;
     entry.dying = true;
     this.removeColliders(entry.zombie);
-    entry.zombie.playReplicatedDeath();
+    entry.zombie.playReplicatedDeath(style, impactX, impactZ);
   }
 
   public update(dt: number): void {

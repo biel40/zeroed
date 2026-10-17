@@ -31,6 +31,14 @@ menú principal y la pausa. Al pausar se conserva la posición de la pista de
 partida; al reanudar continúa desde ese punto. El inicio de ronda se reproduce
 como cue independiente sobre la música de fondo.
 
+Los ajustes del jugador (`PlayerSettings`: volumen general, efectos y música,
+sensibilidad, sensibilidad al apuntar, eje Y invertido y campo de visión) se
+abren desde el menú principal o la pausa y se aplican al instante. El volumen
+de efectos escala el bus de `AudioSystem` y el listener de los pasos; el de
+música, cada pista de `MusicManager`. La sensibilidad al apuntar multiplica la
+propia de cada arma y el campo de visión solo cambia la vista sin apuntar.
+Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
+
 ## Zombies
 
 - Rondas con descanso de 6 s; limite global de 24 activos. `normal` y `shiny`
@@ -68,19 +76,32 @@ como cue independiente sobre la música de fondo.
   espalda o en otra planta pasan por un paso bajo que las apaga, tambien en
   los pasos, para distinguir delante/detras y arriba/abajo. En cooperativo el
   invitado reproduce las mismas señales a partir de los eventos del anfitrion.
-- Animacion: el walker conserva completos los clips originales de idle, marcha
-  y muerte del GLB. El mixer sincroniza la marcha con la velocidad y mezcla los
-  cambios de estado, mientras una capa aditiva limitada aporta inercia de giro,
-  aceleracion e impactos sin reescribir el encorvamiento, braceo o zancada.
+- Animacion: aparicion y marcha son los clips originales del GLB; el idle
+  tecnico y las muertes se hornean por codigo sobre el mismo rig una vez por
+  modelo (`ZombieMotionClips`). El mixer sincroniza la marcha con la velocidad
+  y mezcla los cambios de estado, mientras una capa aditiva limitada aporta
+  inercia de giro, aceleracion e impactos sin reescribir el encorvamiento,
+  braceo o zancada.
 - Melee y ventanas usan tres variantes (un brazo por lado y dos manos), con
   anticipacion, contacto a 0.475 s y recuperacion. Los brazos apuntan al blanco
   comprometido, conservan la muneca local y comparten el movimiento de la tabla
   tras el impacto. La ultima tabla continua el ataque sin reiniciar la mezcla.
   Salir del area del golpe durante la anticipacion permite esquivarlo.
 - Los cambios de estado mezclan posicion y rotacion desde la pose visible.
-  Los impactos leves son aditivos y breves; la muerte conserva impulso y altura
-  de planta, con variacion lateral y sin ragdoll. El steering frena los cambios
-  de direccion, manteniendo las restricciones de paredes y rampas.
+  Los impactos leves son aditivos y breves. El steering frena los cambios de
+  direccion, manteniendo las restricciones de paredes y rampas.
+- Muertes segun el golpe letal (`ZombieDeath`), sin ragdoll: cuchillo (gira,
+  se sujeta el corte y cae de lado), pistola y L96 (retrocede y cae de
+  espaldas), automaticas (sacudidas por cada impacto y se desploma de bruces),
+  headshot con arma de fuego (se derrumba inerte), Ray Gun (sale despedido) y
+  Tesla (convulsiona rigido y cae). Un disparo por la espalda lo tumba hacia
+  delante y los impactos laterales giran la caida hacia el empuje. Todas duran
+  lo mismo en gameplay; el anfitrion replica estilo y lado del impacto.
+- Cada zombie alcanzado por la cadena ZEUS-77 queda cargado 2.8 s
+  (`ZombieElectricArcs`): rayos que saltan entre sus articulaciones y un
+  destello azul en la piel, vivo o ya caido en el suelo. Es solo visual (un
+  draw call por cuerpo cargado, sin luces) y el anfitrion envia los IDs
+  alcanzados en `teslaChain`.
 
 ## Mapas e interacciones
 
@@ -118,7 +139,11 @@ como cue independiente sobre la música de fondo.
   ajustado al tamano y orientacion de la caja, tanto en individual como en
   cooperativo; la tapa animada y el arma flotante no alteran ese volumen.
 - La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
-  una pared una sola vez por run. Las vitrinas del bunker exigen bajas personales:
+  una pared una sola vez por run. Su circulo ritual dispara un susto unico:
+  las velas se apagan, el circulo estalla en rojo y una aparicion emerge y se
+  lanza contra la camara local antes de desaparecer de golpe. El sonido sigue
+  los mismos tiempos (`RITUAL_SCARE_TIMELINE`); en individual el impacto
+  sacude la camara. Las vitrinas del bunker exigen bajas personales:
   Ray Gun, 200 bajas y 6000 Points; ZEUS-77, 300 bajas y 10000 Points.
   Cada vitrina se compra una sola vez por run. El cierre se retrae con un pulso
   de energia al alcanzar el requisito; comprar eleva el cristal y el arma.
@@ -163,13 +188,24 @@ no detiene la partida. `MULTIPLAYER.md` define el alcance y los limites.
 ## Rendimiento
 
 Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 10,
-pasos 8 y drops de cargador 12. No se crean objetos en loops criticos; el
-perfil de dispositivo limita pixel ratio, sombras y efectos.
+pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
+
+`DeviceProfile` fija una calidad Baja/Media/Alta: la elegida en el menu
+principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
+moviles con poca memoria, Media en moviles, equipos modestos o con movimiento
+reducido, Alta en el resto). La calidad decide pixel ratio maximo (1/1,5/2),
+efectos reducidos, anisotropia y luces puntuales; los controles tactiles
+siguen dependiendo solo del dispositivo. Se aplica al empezar la siguiente
+partida. Durante el juego, `DynamicResolution` baja la resolucion por pasos
+del 10 % (minimo 50 %) si la media de un segundo cae de 50 fps, y la sube al
+recuperar 57 fps; un intento de subida fallido duplica la espera del
+siguiente y una bajada que no acelera el frame se deshace, porque el cuello
+no era la GPU. `?debug` muestra la escala actual.
 
 Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene
-un presupuesto local estable de luces puntuales: seis en el perfil completo y
-cuatro con efectos reducidos. El ranking pondera intensidad nominal (sin el
+un presupuesto local estable de luces puntuales segun la calidad: seis en
+Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
 parpadeo) por alcance y distancia, con histeresis, para iluminar el hueco
 desde ambas plantas sin intercambios bruscos.
 

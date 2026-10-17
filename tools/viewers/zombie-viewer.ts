@@ -2,20 +2,32 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { ZombieState } from '../../src/zombies/Zombie';
-import { ZOMBIE_ATTACK_DURATION, ZOMBIE_BARRIER_ATTACK_RECOVERY } from '../../src/zombies/ZombieConfig';
+import { ZOMBIE_ATTACK_DURATION, ZOMBIE_BARRIER_ATTACK_RECOVERY, ZOMBIE_ELECTRIFIED_DURATION } from '../../src/zombies/ZombieConfig';
 import { resolveClip, ZombieVisual, ZOMBIE_MODELS } from '../../src/zombies/ZombieVisual';
+import { isZombieDeathStyle, ZOMBIE_DEATH_STYLES, type ZombieDeathStyle } from '../../src/zombies/ZombieDeath';
 
 // Development-only visual review, independent of the game entry/bundle.
 // /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?state=barrierAttack | ?close=1 | ?night=1
+// ?state=death&death=all (every style in a row) | ?state=death&death=slash&time=0.6 (one frame of one style)
+// ?electric=1 keeps ZEUS-77 residual arcs on the bodies (shock deaths always carry them)
 const params = new URLSearchParams(location.search);
 const close = params.has('close');
 const night = params.has('night');
 const modelId = params.get('model') === 'brute' ? 'brute' : 'walker';
+const height = ZOMBIE_MODELS[modelId].height;
 const speed = params.has('speed') ? Math.max(0, Number(params.get('speed')) || 0) : ZOMBIE_MODELS[modelId].walkReferenceSpeed;
 const requestedState = params.get('state');
 const state: ZombieState =
   requestedState === 'attack' || requestedState === 'barrierAttack' || requestedState === 'death' ? requestedState : 'walk';
 const fixedTime = params.has('time') ? Math.max(0, Number(params.get('time')) || 0) : null;
+const deathParam = params.get('death');
+const allDeaths = state === 'death' && deathParam === 'all';
+const deathStyle: ZombieDeathStyle = isZombieDeathStyle(deathParam) ? deathParam : 'knockback';
+/** Death review loop: walk briefly, fall, hold the corpse, repeat. */
+const DEATH_LEAD = 0.4;
+const DEATH_CYCLE = 3.2;
+const ROW_SPACING = 1.45;
+const electric = params.has('electric');
 let cycleTime = 0;
 let displayedState: ZombieState = state;
 const cycleDuration = ZOMBIE_ATTACK_DURATION + ZOMBIE_BARRIER_ATTACK_RECOVERY;
@@ -33,28 +45,35 @@ scene.add(key);
 const fill = new THREE.DirectionalLight(0xc9dcec, night ? 0.2 : 1);
 fill.position.set(3, 2, -1);
 scene.add(fill);
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0x343432, roughness: 1 }));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 20), new THREE.MeshStandardMaterial({ color: 0x343432, roughness: 1 }));
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -0.003;
 scene.add(floor);
 // Close-ups frame the face of either model; Brutus hunches below its height.
 const faceY = modelId === 'brute' ? 2.02 : 1.55;
-const camera = new THREE.PerspectiveCamera(close ? 32 : 38, innerWidth / innerHeight, 0.01, 30);
-camera.position.set(0, close ? faceY + 0.02 : 1.25, close ? 1.05 : 3.65 * ZOMBIE_MODELS[modelId].height / 1.78);
-camera.lookAt(0, close ? faceY : 0.91, 0);
+const camera = new THREE.PerspectiveCamera(close ? 32 : 38, innerWidth / innerHeight, 0.01, 40);
+const lookY = close ? faceY : allDeaths ? 0.6 : 0.91;
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, close ? faceY : 0.91, 0);
+controls.target.set(0, lookY, 0);
 controls.enablePan = false;
 controls.minDistance = close ? 0.55 : 2.3;
-controls.maxDistance = 7;
+controls.maxDistance = allDeaths ? 16 : 7;
 controls.maxPolarAngle = Math.PI * 0.52;
 const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${ZOMBIE_MODELS[modelId].url}`);
 const visuals: ZombieVisual[] = [];
 const placements: THREE.Group[] = [];
+const labels: HTMLElement[] = [];
 const referenceMixers = new Map<ZombieVisual, THREE.AnimationMixer>();
-for (const [index, yaw] of (close ? [0] : [0, 0.75, Math.PI / 2]).entries()) {
+const deathStyles = new Map<ZombieVisual, ZombieDeathStyle>();
+const deathClocks = new Map<ZombieVisual, number>();
+const layout: readonly { yaw: number; style: ZombieDeathStyle }[] = close
+  ? [{ yaw: 0, style: deathStyle }]
+  : allDeaths
+    ? ZOMBIE_DEATH_STYLES.map((style) => ({ yaw: 0.65, style }))
+    : [0, 0.75, Math.PI / 2].map((yaw) => ({ yaw, style: deathStyle }));
+for (const [index, { yaw, style }] of layout.entries()) {
   const visual = new ZombieVisual(modelId, { scene: gltf.scene, clips: gltf.animations }, ZOMBIE_MODELS[modelId].tints[0], false);
-  visual.setZombieType(modelId === 'brute' ? 'brute' : params.has('shiny') || (params.has('compare') && index === 0) ? 'shiny' : 'normal');
+  visual.setZombieType(zombieType(index));
   visual.setWalkPhase(THREE.MathUtils.euclideanModulo(
     (Number(params.get('variant')) || index) * 0.37,
     1,
@@ -62,27 +81,41 @@ for (const [index, yaw] of (close ? [0] : [0, 0.75, Math.PI / 2]).entries()) {
   visual.setAttackDuration(ZOMBIE_ATTACK_DURATION);
   visual.setAttackReach(0.3);
   visual.setStrikeTarget(0, 1.3, state === 'barrierAttack' ? 0.9 : 1.35);
-  visual.setState(state);
+  visual.setState(state === 'death' ? 'walk' : state);
   if (params.has('source')) {
     const mixer = new THREE.AnimationMixer(visual.root);
     const clip = resolveClip(gltf.animations, speed === 0 ? ['ZombieIdle', 'BruteWalk'] : speed > 2.4 ? ['ZombieRun', 'BruteWalk'] : ['ZombieWalk', 'BruteWalk']);
     if (clip) mixer.clipAction(clip).play();
     referenceMixers.set(visual, mixer);
   }
+  if (state === 'death') {
+    deathStyles.set(visual, style);
+    deathClocks.set(visual, 0);
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = style;
+    document.body.appendChild(label);
+    labels.push(label);
+  }
   const placement = new THREE.Group();
-  placement.position.x = close ? 0 : (index - 1) * ZOMBIE_MODELS[modelId].height * 0.53;
   placement.rotation.y = yaw;
   placement.add(visual.root);
   scene.add(placement);
   placements.push(placement);
   visuals.push(visual);
-  if (fixedTime !== null) advanceVisual(visual, fixedTime);
+  if (fixedTime !== null) advanceVisual(visual, state === 'death' ? DEATH_LEAD + fixedTime : fixedTime);
+}
+function zombieType(index: number): 'brute' | 'shiny' | 'normal' {
+  if (modelId === 'brute') return 'brute';
+  return params.has('shiny') || (params.has('compare') && index === 0) ? 'shiny' : 'normal';
 }
 function advanceVisual(visual: ZombieVisual, elapsed: number): void {
   const reference = referenceMixers.get(visual);
   if (reference) { reference.update(elapsed); return; }
-  if (state === 'walk' || state === 'death') {
-    visual.update(elapsed, state === 'walk' ? speed : 0);
+  if (electric && state !== 'death') visual.electrify(1);
+  if (state === 'death') { advanceDeath(visual, elapsed); return; }
+  if (state === 'walk') {
+    visual.update(elapsed, speed);
     return;
   }
   let remaining = elapsed;
@@ -99,19 +132,52 @@ function advanceVisual(visual: ZombieVisual, elapsed: number): void {
     if (phase >= cycleDuration) phase = 0;
   }
 }
+/** Same entry as the game: a walking body is shot from the front, then falls. */
+function advanceDeath(visual: ZombieVisual, elapsed: number): void {
+  let remaining = elapsed;
+  let clock = deathClocks.get(visual) ?? 0;
+  while (remaining > 0) {
+    const step = Math.min(remaining, 1 / 60);
+    if (clock < DEATH_LEAD && clock + step >= DEATH_LEAD) {
+      const style = deathStyles.get(visual) ?? deathStyle;
+      visual.prepareDeath(style, 0, -1);
+      visual.setState('death');
+      if (electric || style === 'shock') visual.electrify(ZOMBIE_ELECTRIFIED_DURATION);
+    }
+    visual.update(step, clock < DEATH_LEAD ? speed : 0);
+    clock += step;
+    remaining -= step;
+    if (clock >= DEATH_CYCLE) {
+      clock = 0;
+      visual.setZombieType(zombieType(visuals.indexOf(visual)));
+      visual.setState('walk');
+    }
+  }
+  deathClocks.set(visual, clock);
+  displayedState = clock < DEATH_LEAD ? 'walk' : 'death';
+}
 function resize(): void {
-  const compact = innerWidth < 700;
+  const compact = innerWidth < 700 && !allDeaths;
   camera.aspect = innerWidth / innerHeight;
-  camera.position.set(0, close ? faceY + 0.02 : 1.25, close ? Math.max(1.05, 0.25 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)) : 3.65 * ZOMBIE_MODELS[modelId].height / 1.78);
+  if (allDeaths) {
+    // Fit the whole row, whatever the aspect ratio.
+    const halfWidth = (layout.length * ROW_SPACING) / 2 + 0.4;
+    const distance = halfWidth / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+    camera.position.set(0, 0.6 + distance * 0.42, distance);
+  } else {
+    camera.position.set(0, close ? faceY + 0.02 : 1.25, close ? Math.max(1.05, 0.25 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)) : 3.65 * height / 1.78);
+  }
   camera.updateProjectionMatrix();
   for (const [index, placement] of placements.entries()) {
     placement.visible = !compact || index === 0;
-    placement.position.x = close || compact ? 0 : (index - 1) * ZOMBIE_MODELS[modelId].height * 0.53;
+    const spacing = allDeaths ? ROW_SPACING : height * 0.53;
+    placement.position.x = close || compact ? 0 : (index - (layout.length - 1) / 2) * spacing;
   }
   controls.update();
   renderer.setSize(innerWidth, innerHeight);
 }
 resize();
+const labelPoint = new THREE.Vector3();
 let previous = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - previous) / 1000);
@@ -121,6 +187,12 @@ renderer.setAnimationLoop((now) => {
     cycleTime = (cycleTime + dt) % cycleDuration;
   }
   renderer.render(scene, camera);
+  for (const [index, label] of labels.entries()) {
+    labelPoint.set(placements[index].position.x, -0.15, placements[index].position.z).project(camera);
+    label.style.left = `${(labelPoint.x * 0.5 + 0.5) * innerWidth}px`;
+    label.style.top = `${(-labelPoint.y * 0.5 + 0.5) * innerHeight}px`;
+    label.style.display = placements[index].visible ? '' : 'none';
+  }
   document.getElementById('status')!.textContent = `${displayedState} · ${fixedTime === null ? 'animado' : `${fixedTime.toFixed(3)} s`} · ${renderer.info.render.calls} draws · ${renderer.info.render.triangles} triángulos`;
 });
 window.addEventListener('resize', resize);

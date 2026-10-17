@@ -48,6 +48,36 @@ describe('Device profile compatibility', () => {
     expect(profile.isTouch).toBe(true);
   });
 
+  it('detects a quality tier and lets the saved choice override it', () => {
+    const desktop = {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      maxTouchPoints: 0,
+      hardwareConcurrency: 16,
+      deviceMemory: 16,
+      matchMedia: () => ({ matches: false }),
+    };
+    const phone = {
+      userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile',
+      maxTouchPoints: 5,
+      hardwareConcurrency: 4,
+      deviceMemory: 4,
+      matchMedia: (query: string) => ({ matches: query === '(pointer: coarse)' }),
+    };
+
+    expect(getDeviceProfile(desktop).quality).toBe('high');
+    expect(getDeviceProfile(phone).quality).toBe('low');
+
+    const lowDesktop = getDeviceProfile(desktop, 'low');
+    expect(lowDesktop.quality).toBe('low');
+    expect(lowDesktop.pixelRatioLimit).toBe(1);
+    expect(lowDesktop.useReducedEffects).toBe(true);
+    expect(lowDesktop.useTouchControls).toBe(false);
+
+    const highPhone = getDeviceProfile(phone, 'high');
+    expect(highPhone.useReducedEffects).toBe(false);
+    expect(highPhone.useTouchControls).toBe(true);
+  });
+
   it('keeps mouse controls on a fine-pointer desktop with a touch screen', () => {
     const profile = getDeviceProfile({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',

@@ -29,8 +29,10 @@ import {
   ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
-import { ZombieManager, type ZombieKillSource } from '../zombies/ZombieManager';
+import { ZombieManager } from '../zombies/ZombieManager';
+import type { ZombieKillSource } from '../zombies/ZombieDeath';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
+import { RITUAL_SCARE_TIMELINE } from '../zombies/secret-room/SecretRoomSystem';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
@@ -166,7 +168,11 @@ export class ZombiesMode implements GameMode {
       this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
       this.arena.onSoulLampCompleted = (position) => ctx.audio.playSoulLampComplete(this.spatialCueFor(position));
       this.arena.onSecretRoomUnlocked = (position) => ctx.audio.playSecretRoomUnlock(this.spatialCueFor(position));
-      this.arena.onRitualScare = (position) => ctx.audio.playRitualScare(this.spatialCueFor(position));
+      this.arena.onRitualScare = (position) =>
+        ctx.audio.playRitualScare(this.spatialCueFor(position), RITUAL_SCARE_TIMELINE);
+      this.arena.onRitualImpact = () => {
+        this.trauma = 1;
+      };
     }
 
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
@@ -278,6 +284,7 @@ export class ZombiesMode implements GameMode {
       zombie,
       part,
       weapon.definition.damage,
+      weapon.definition.id,
     );
     // A surviving headshot pays 150 here; lethal hits pay through the kill
     // callback instead, so a direct hit is rewarded exactly once.
@@ -873,7 +880,7 @@ export class ZombiesMode implements GameMode {
     headshot: boolean,
     deathPosition?: { readonly x: number; readonly y: number; readonly z: number },
     floor?: number,
-    source: ZombieKillSource = 'default',
+    source?: ZombieKillSource,
     rewardMultiplier = 1,
   ): void {
     if (!this.isGameplayInputEnabled()) return;
@@ -1022,7 +1029,7 @@ export class ZombiesMode implements GameMode {
       this.ctx.stats.registerHit(distance);
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
-      const lethal = this.zombies.damageZombie(zombie, part, raygun.damage);
+      const lethal = this.zombies.damageZombie(zombie, part, raygun.damage, 'raygun');
       if (!lethal) this.economy.awardHit(headshot);
     }
     // Splash includes the directly-hit zombie: the Ray Gun fantasy is that

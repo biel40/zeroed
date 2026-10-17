@@ -33,16 +33,17 @@ export class ZombieLimb {
     tip.getWorldQuaternion(this.restRotation).premultiply(this.parentRotation);
   }
 
-  solve(x: number, y: number, z: number, poleX: number, poleY: number, poleZ: number, weight: number, plant = false, followForearm = false): void {
+  /** `plant` (0..1) levels the tip towards its bind orientation, e.g. a flat foot. */
+  solve(x: number, y: number, z: number, poleX: number, poleY: number, poleZ: number, weight: number, plant = 0, followForearm = false): void {
     if (weight <= 0) return;
     this.upper.getWorldPosition(this.start);
     this.lower.getWorldPosition(this.joint);
     this.tip.getWorldPosition(this.end);
     this.tip.getWorldQuaternion(this.endRotation);
     this.animatedTipLocal.copy(this.tip.quaternion);
-    if (plant) {
+    if (plant > 0) {
       this.root.getWorldQuaternion(this.worldRotation).multiply(this.restRotation);
-      this.endRotation.slerp(this.worldRotation, weight);
+      this.endRotation.slerp(this.worldRotation, weight * plant);
     }
     this.root.localToWorld(this.target.set(x, y, z));
     this.target.lerp(this.end, 1 - weight);

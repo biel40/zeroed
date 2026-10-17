@@ -344,6 +344,7 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'teslaChain':
         this.chain.discharge(message.points.map((point) => new THREE.Vector3(point.x, point.y, point.z)));
+        this.replica.electrify(message.zombieIds);
         this.ctx.audio.playTeslaChain(Math.max(0, message.points.length - 1));
         break;
       case 'zombieSpawn':
@@ -357,7 +358,7 @@ export class CoopGuestMode implements GameMode {
         this.replica.hit(message.zombieId, message.headshot, message.amount, message.fromX, message.fromZ);
         break;
       case 'zombieDeath':
-        this.replica.kill(message.zombieId);
+        this.replica.kill(message.zombieId, message.style, message.impactX, message.impactZ);
         break;
       case 'roundStart':
         this.round = message.round;

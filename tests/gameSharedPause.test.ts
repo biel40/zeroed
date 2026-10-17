@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DynamicResolution } from '../src/core/DynamicResolution';
 import { Game } from '../src/core/Game';
 
 type Stub = Record<string, any>;
@@ -35,6 +36,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     viewportHeight: 100,
     hud: { update: vi.fn(), setInteractionPrompt: vi.fn() },
     debugElement: null,
+    dynamicResolution: new DynamicResolution(),
   });
   return { game, weapon };
 }

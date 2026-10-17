@@ -5,6 +5,7 @@ import { AudioSystem } from '../audio/AudioSystem';
 import { MusicManager } from '../audio/MusicManager';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import { getDeviceProfile, type DeviceProfile } from '../core/DeviceProfile';
+import { DynamicResolution } from '../core/DynamicResolution';
 import { Stats } from '../game/Stats';
 import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
@@ -61,6 +62,8 @@ export class Game {
   /** Map colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
   private readonly hitColliders: THREE.Object3D[] = [];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
+  /** Scales the drawing buffer below the profile's pixel ratio while frames run slow. */
+  private readonly dynamicResolution = new DynamicResolution();
 
   private readonly debugElement: HTMLElement | null = null;
   private debugTimer = 0;
@@ -115,7 +118,7 @@ export class Game {
     this.viewportWidth = container.clientWidth || window.innerWidth || 1;
     this.viewportHeight = container.clientHeight || window.innerHeight || 1;
     this.renderer = new THREE.WebGLRenderer(rendererOptions);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit));
+    this.applyPixelRatio();
     // updateStyle=false everywhere: CSS owns the canvas box (100% of a
     // dvh-sized container), the renderer only owns the drawing buffer. An
     // inline px size here would freeze the arrangement of the first frame
@@ -464,6 +467,8 @@ export class Game {
   }
 
   private readonly handleEscapeKey = (event: KeyboardEvent): void => {
+    // The settings dialog closes itself on ESC; the match stays paused behind it.
+    if (this.hud.settingsOpen) return;
     if (event.code === 'Escape' && this.paused && this.gameplayStarted) this.resume();
   };
 
@@ -491,10 +496,15 @@ export class Game {
     if (width === this.viewportWidth && height === this.viewportHeight) return;
     this.viewportWidth = width;
     this.viewportHeight = height;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit));
+    this.applyPixelRatio();
     this.renderer.setSize(width, height, false);
     this.player.resize(width / height);
   };
+
+  private applyPixelRatio(): void {
+    const devicePixelRatio = Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit);
+    this.renderer.setPixelRatio(devicePixelRatio * this.dynamicResolution.scale);
+  }
 
   private switchWeapon(index: number): void {
     const previousId = this.inventory.currentWeapon;
@@ -646,6 +656,7 @@ export class Game {
     const { render, memory } = this.renderer.info;
     this.debugElement.textContent =
       `FPS ${this.fpsEstimate.toFixed(0)}\n` +
+      `res ${Math.round(this.dynamicResolution.scale * 100)}%\n` +
       `calls ${render.calls}\n` +
       `tris ${render.triangles}\n` +
       `geometries ${memory.geometries}\n` +
@@ -664,6 +675,7 @@ export class Game {
     if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
       this.renderer.render(this.scene, this.player.camera);
       this.input.endFrame();
+      this.dynamicResolution.resetWindow();
       return;
     }
 
@@ -751,6 +763,7 @@ export class Game {
     );
 
     this.renderer.render(this.scene, this.player.camera);
+    if (this.dynamicResolution.sample(dt)) this.applyPixelRatio();
     this.updateDebug(dt);
     this.input.endFrame();
   }

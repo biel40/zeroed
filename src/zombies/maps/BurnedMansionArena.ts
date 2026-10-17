@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { DeviceProfile } from '../../core/DeviceProfile';
+import type { DeviceProfile, QualityLevel } from '../../core/DeviceProfile';
 import { EYE_HEIGHT, type FloorTransitionZone, type StairRamp } from '../../player/PlayerController';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
@@ -68,8 +68,7 @@ const GROUND_CEILING_Y = 3.2;
 const BUNKER_CEILING_Y = -0.3;
 const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
 const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
-const DESKTOP_POINT_LIGHT_BUDGET = 6;
-const REDUCED_EFFECTS_POINT_LIGHT_BUDGET = 4;
+const POINT_LIGHT_BUDGET: Record<QualityLevel, number> = { low: 3, medium: 4, high: 6 };
 
 /** Score bonus that keeps an active light until a rival is clearly better. */
 const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
@@ -272,6 +271,7 @@ export class BurnedMansionArena implements ZombieArena {
   onSoulLampCompleted: ((position: THREE.Vector3) => void) | null = null;
   onSecretRoomUnlocked: ((position: THREE.Vector3) => void) | null = null;
   onRitualScare: ((position: THREE.Vector3) => void) | null = null;
+  onRitualImpact: (() => void) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -342,6 +342,7 @@ export class BurnedMansionArena implements ZombieArena {
     this.secretRoom.onLampCompleted = (position) => this.onSoulLampCompleted?.(position);
     this.secretRoom.onUnlocked = (position) => this.onSecretRoomUnlocked?.(position);
     this.secretRoom.onRitualScare = (position) => this.onRitualScare?.(position);
+    this.secretRoom.onRitualImpact = () => this.onRitualImpact?.();
     this.secretRoom.onDoorOpened = () => {
       this.refreshColliders();
       this.onTopologyChanged?.();
@@ -413,7 +414,7 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   public update(dt: number, observerPosition?: THREE.Vector3): void {
-    this.secretRoom.update(dt);
+    this.secretRoom.update(dt, observerPosition);
     for (const pickup of this.weaponPickups) pickup.update?.(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
     for (const view of this.barrierViews) {
@@ -1448,9 +1449,7 @@ export class BurnedMansionArena implements ZombieArena {
         * (entry.light.visible ? ACTIVE_POINT_LIGHT_HYSTERESIS : 1);
     }
     this.rankedPointLights.sort((left, right) => right.score - left.score);
-    const budget = this.profile.useReducedEffects
-      ? REDUCED_EFFECTS_POINT_LIGHT_BUDGET
-      : DESKTOP_POINT_LIGHT_BUDGET;
+    const budget = POINT_LIGHT_BUDGET[this.profile.quality];
     for (let index = 0; index < this.rankedPointLights.length; index++) {
       this.rankedPointLights[index].light.visible = index < budget;
     }

@@ -94,11 +94,18 @@
         </button>
       </div>
       <button type="button" id="coop-select" class="coop-select" data-i18n="menu.multiplayer"></button>
+      <button type="button" id="menu-settings" class="coop-select" data-i18n="menu.settings"></button>
       <div id="language-select" class="language-select" role="group" data-i18n-aria-label="menu.language">
         <span class="language-label" data-i18n="menu.language" aria-hidden="true"></span>
         <button type="button" data-language="es" lang="es">ES</button>
         <button type="button" data-language="en" lang="en">EN</button>
         <button type="button" data-language="ca" lang="ca">CA</button>
+      </div>
+      <div id="quality-select" class="language-select" role="group" data-i18n-aria-label="menu.quality">
+        <span class="language-label" data-i18n="menu.quality" aria-hidden="true"></span>
+        <button type="button" data-quality="low" data-i18n="menu.qualityLow"></button>
+        <button type="button" data-quality="medium" data-i18n="menu.qualityMedium"></button>
+        <button type="button" data-quality="high" data-i18n="menu.qualityHigh"></button>
       </div>
       <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
       <!-- CC BY 3.0 requires visible attribution; Brutus is a modified walker. -->
@@ -117,6 +124,40 @@
       <button type="button" id="privacy-close" data-i18n-aria-label="privacy.closeLabel" data-i18n="privacy.close"></button>
     </div>
     <iframe id="privacy-frame" data-i18n-title="privacy.frameTitle"></iframe>
+  </dialog>
+
+  <!-- Live player settings: open from the main menu or the pause menu. -->
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form method="dialog" class="settings-form">
+      <h2 id="settings-title" data-i18n="menu.settings"></h2>
+      <fieldset>
+        <legend data-i18n="settings.audio"></legend>
+        <div class="settings-row"><label for="setting-masterVolume" data-i18n="settings.masterVolume"></label>
+          <input id="setting-masterVolume" type="range" data-setting="masterVolume" /><output for="setting-masterVolume"></output></div>
+        <div class="settings-row"><label for="setting-effectsVolume" data-i18n="settings.effectsVolume"></label>
+          <input id="setting-effectsVolume" type="range" data-setting="effectsVolume" /><output for="setting-effectsVolume"></output></div>
+        <div class="settings-row"><label for="setting-musicVolume" data-i18n="settings.musicVolume"></label>
+          <input id="setting-musicVolume" type="range" data-setting="musicVolume" /><output for="setting-musicVolume"></output></div>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="settings.controls"></legend>
+        <div class="settings-row"><label for="setting-lookSensitivity" data-i18n="settings.lookSensitivity"></label>
+          <input id="setting-lookSensitivity" type="range" data-setting="lookSensitivity" /><output for="setting-lookSensitivity"></output></div>
+        <div class="settings-row"><label for="setting-adsSensitivity" data-i18n="settings.adsSensitivity"></label>
+          <input id="setting-adsSensitivity" type="range" data-setting="adsSensitivity" /><output for="setting-adsSensitivity"></output></div>
+        <div class="settings-row settings-toggle"><label for="setting-invertY" data-i18n="settings.invertY"></label>
+          <input id="setting-invertY" type="checkbox" data-setting="invertY" /></div>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="settings.display"></legend>
+        <div class="settings-row"><label for="setting-fieldOfView" data-i18n="settings.fieldOfView"></label>
+          <input id="setting-fieldOfView" type="range" data-setting="fieldOfView" /><output for="setting-fieldOfView"></output></div>
+      </fieldset>
+      <div class="settings-actions">
+        <button type="button" id="settings-reset" data-i18n="settings.reset"></button>
+        <button type="submit" id="settings-close" data-i18n="settings.close"></button>
+      </div>
+    </form>
   </dialog>
 
   <div id="coop-lobby" class="hidden">
@@ -183,6 +224,7 @@
       <div id="pause-lamps" class="lamp-progress"></div>
       <div class="pause-actions">
         <button type="button" id="pause-resume" data-i18n="pause.resume"></button>
+        <button type="button" id="pause-settings" data-i18n="menu.settings"></button>
         <button type="button" id="pause-restart" data-i18n="pause.restart"></button>
         <button type="button" id="pause-menu-btn" data-i18n="pause.mainMenu"></button>
         <button type="button" id="pwa-update-pause" class="hidden" data-i18n="menu.update"></button>

@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import { ZOMBIE_MANIFEST } from '../src/assets/AssetManager';
 import { ZOMBIE_TYPE_CONFIGS, type ZombieModelId } from '../src/zombies/ZombieConfig';
 import { resolveClip, ZombieVisual, ZOMBIE_MODELS } from '../src/zombies/ZombieVisual';
-import type { ZombieState } from '../src/zombies/Zombie';
 
 const GLB_DIR = fileURLToPath(new URL('../public/assets/zombies', import.meta.url));
 const GLB_FILES: Record<ZombieModelId, string> = {
@@ -50,7 +49,7 @@ describe('resolveClip', () => {
 describe('zombie GLB assets', () => {
   // Authored clips every variant needs; attacks, idle and death are solved
   // at runtime for every known rig.
-  const REQUIRED: ZombieState[] = ['spawn', 'walk'];
+  const REQUIRED = ['spawn', 'walk'] as const;
 
   for (const modelId of Object.keys(GLB_FILES) as ZombieModelId[]) {
     it(`${modelId} ships clips for ${REQUIRED.join('/')}`, () => {

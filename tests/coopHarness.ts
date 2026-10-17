@@ -14,6 +14,7 @@ export const TEST_PROFILE: DeviceProfile = {
   isMobile: false,
   isTouch: false,
   isLowMemory: false,
+  quality: 'medium',
   pixelRatioLimit: 2,
   shadowQuality: 2,
   useReducedEffects: true,

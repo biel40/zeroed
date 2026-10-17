@@ -13,7 +13,7 @@ export function boardPullProgress(secondsAfterContact: number): number {
 
 /** Shape-preserving cubic: continuous velocity through a swipe, without
  * overshooting the contact plane or introducing a pause at every pose key. */
-function tangent(before: number, after: number): number {
+export function shapePreservingTangent(before: number, after: number): number {
   if (before * after <= 0) return 0;
   return Math.sign(before) * Math.min(Math.abs((before + after) * 0.5), 2 * Math.abs(before), 2 * Math.abs(after));
 }
@@ -28,16 +28,16 @@ function sample(
   const d = (end - follow) / 0.18;
   let from: number, to: number, velocityFrom: number, velocityTo: number, duration: number, u: number;
   if (t < windupTime) {
-    from = start; to = windup; velocityFrom = 0; velocityTo = tangent(a, b);
+    from = start; to = windup; velocityFrom = 0; velocityTo = shapePreservingTangent(a, b);
     duration = windupTime; u = Math.max(0, t) / duration;
   } else if (t < CONTACT) {
-    from = windup; to = contact; velocityFrom = tangent(a, b); velocityTo = tangent(b, c);
+    from = windup; to = contact; velocityFrom = shapePreservingTangent(a, b); velocityTo = shapePreservingTangent(b, c);
     duration = CONTACT - windupTime; u = (t - windupTime) / duration;
   } else if (t < 0.82) {
-    from = contact; to = follow; velocityFrom = tangent(b, c); velocityTo = tangent(c, d);
+    from = contact; to = follow; velocityFrom = shapePreservingTangent(b, c); velocityTo = shapePreservingTangent(c, d);
     duration = 0.82 - CONTACT; u = (t - CONTACT) / duration;
   } else {
-    from = follow; to = end; velocityFrom = tangent(c, d); velocityTo = 0;
+    from = follow; to = end; velocityFrom = shapePreservingTangent(c, d); velocityTo = 0;
     duration = 0.18; u = Math.min(1, (t - 0.82) / duration);
   }
   const u2 = u * u;

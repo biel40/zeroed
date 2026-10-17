@@ -10,12 +10,14 @@ import {
   ZOMBIE_CORPSE_LINGER,
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
+  ZOMBIE_ELECTRIFIED_DURATION,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_TYPE_CONFIGS,
   type ZombieTypeId,
 } from './ZombieConfig';
 import { ZombieVisual } from './ZombieVisual';
+import { resolveZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from './ZombieDeath';
 
 export type ZombieState =
   | 'spawn'
@@ -82,6 +84,8 @@ export class Zombie implements HitTarget {
   barrierTarget: WindowBarrier | null = null;
   /** Logical map floor; Y is the corresponding physical floor elevation. */
   floor = 0;
+  /** Fall chosen by the killing blow; replicated so co-op guests see the same death. */
+  deathStyle: ZombieDeathStyle = 'knockback';
 
   private stateTimer = 0;
   private attackCooldown = 0;
@@ -91,6 +95,8 @@ export class Zombie implements HitTarget {
   private readonly headBaseScale = new THREE.Vector3();
   private previousYaw = 0;
   private deathGroundY = 0;
+  /** Body-local unit direction of the latest impact (x: its left, y: forward). */
+  readonly impact = new THREE.Vector2();
 
   constructor(visual?: ZombieVisual) {
     this.visual = visual ?? new ZombieVisual('walker', null, 0xa8b89a);
@@ -154,6 +160,7 @@ export class Zombie implements HitTarget {
     this.stateTimer = ZOMBIE_SPAWN_DURATION;
     this.previousYaw = 0;
     this.deathGroundY = y;
+    this.deathStyle = 'knockback';
     this.attackCooldown = 0;
     this.attackApplied = false;
     this.floor = floor;
@@ -189,14 +196,21 @@ export class Zombie implements HitTarget {
    * Applies pre-computed damage. Returns true when the hit is lethal.
    * Non-lethal hits trigger directional visual feedback without interrupting
    * pursuit. Headshots and stronger damage produce a larger brief reaction.
+   * The lethal blow's source and direction pick the death performance.
    */
-  applyDamage(amount: number, headshot = false, sourceX?: number, sourceZ?: number): boolean {
+  applyDamage(
+    amount: number,
+    headshot = false,
+    sourceX?: number,
+    sourceZ?: number,
+    source?: ZombieKillSource,
+  ): boolean {
     if (!this.isAlive) return false;
     this.hp -= amount;
     this.visual.hitFlash();
     this.reactToDamage(amount, headshot, sourceX, sourceZ);
     if (this.hp <= 0) {
-      this.enterDeath();
+      this.enterDeath(resolveZombieDeathStyle(source, headshot, this.impact.y));
       return true;
     }
     return false;
@@ -209,9 +223,16 @@ export class Zombie implements HitTarget {
     this.reactToDamage(amount, headshot, sourceX, sourceZ);
   }
 
-  /** Network replica: the host decided this zombie died. */
-  public playReplicatedDeath(): void {
-    if (this.isAlive) this.enterDeath();
+  /** Network replica: the host decided this zombie died, how, and from which body-local side. */
+  public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1): void {
+    if (!this.isAlive) return;
+    this.impact.set(impactX, impactZ);
+    this.enterDeath(style);
+  }
+
+  /** ZEUS-77 hit: residual arcs crawl over the body, surviving or not. */
+  public electrify(): void {
+    if (this.group.visible) this.visual.electrify(ZOMBIE_ELECTRIFIED_DURATION);
   }
 
   /** Network replica: animation-only swing; it can never emit onAttackLanded. */
@@ -225,22 +246,34 @@ export class Zombie implements HitTarget {
   }
 
   private reactToDamage(amount: number, headshot: boolean, sourceX?: number, sourceZ?: number): void {
-    const dx = sourceX === undefined ? -Math.sin(this.group.rotation.y) : this.position.x - sourceX;
-    const dz = sourceZ === undefined ? -Math.cos(this.group.rotation.y) : this.position.z - sourceZ;
-    const length = Math.hypot(dx, dz) || 1;
-    const yaw = this.group.rotation.y;
+    this.updateImpact(sourceX, sourceZ);
     this.visual.reactToHit(
-      (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / length,
-      (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / length,
+      this.impact.x,
+      this.impact.y,
       Math.min(0.3, 0.07 + amount / Math.max(1, this.maxHp) * 0.3 + (headshot ? 0.06 : 0)),
     );
   }
 
-  private enterDeath(): void {
+  /** Body-local unit direction the impact travels (x: its left, y: forward); unknown sources push from the front. */
+  private updateImpact(sourceX?: number, sourceZ?: number): void {
+    const yaw = this.group.rotation.y;
+    const dx = sourceX === undefined ? -Math.sin(yaw) : this.position.x - sourceX;
+    const dz = sourceZ === undefined ? -Math.cos(yaw) : this.position.z - sourceZ;
+    const length = Math.hypot(dx, dz) || 1;
+    this.impact.set(
+      (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / length,
+      (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / length,
+    );
+  }
+
+  private enterDeath(style: ZombieDeathStyle): void {
     this.deathGroundY = this.position.y;
+    this.deathStyle = style;
     this.state = 'death';
     this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
+    this.visual.prepareDeath(style, this.impact.x, this.impact.y);
     this.visual.setState('death');
+    if (style === 'shock') this.electrify();
   }
 
   /** Starts the attack lunge if the cooldown allows it. */
@@ -333,11 +366,7 @@ export class Zombie implements HitTarget {
         if (this.stateTimer <= 0) this.setWalk();
         break;
       }
-      case 'barrierBreak': {
-        this.stateTimer -= dt;
-        if (this.stateTimer <= 0) this.setWalk();
-        break;
-      }
+      case 'barrierBreak':
       case 'hit': {
         this.stateTimer -= dt;
         if (this.stateTimer <= 0) this.setWalk();

@@ -173,6 +173,7 @@ describe('co-op combat authority', () => {
     const match = startedMatch();
     const zombie = spawnOne(match);
     const id = host(match).zombies.networkIdOf(zombie);
+    const replica = replicaOf(match, zombie);
     const guestPosition = match.guestSide.player.rig.position;
     zombie.group.position.set(guestPosition.x, zombie.group.position.y, guestPosition.z - 1);
     zombie.hp = 1;
@@ -180,7 +181,10 @@ describe('co-op combat authority', () => {
     match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
     expect(host(match).players.guest.kills).toBe(1);
     expect(host(match).players.guest.economy.points).toBe(200);
-    expect(match.relay.sent('host', 'zombieDeath')).toHaveLength(1);
+    expect(match.relay.sent('host', 'zombieDeath')).toEqual([expect.objectContaining({ style: 'slash' })]);
+    match.step();
+    // The guest plays the same knife death the host resolved.
+    expect(replica.deathStyle).toBe('slash');
   });
 
   it('kills a zombie exactly once when both players shoot it', () => {
