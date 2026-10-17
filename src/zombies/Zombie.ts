@@ -11,6 +11,7 @@ import {
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
   ZOMBIE_ELECTRIFIED_DURATION,
+  ZOMBIE_RAYGUN_DEATH_DURATION,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_TYPE_CONFIGS,
@@ -27,6 +28,8 @@ export type ZombieState =
   | 'death'
   | 'barrierAttack'
   | 'barrierBreak';
+
+export type ZombieDeathKind = 'normal' | 'raygun';
 
 // Shared invisible hitbox geometry across every pooled zombie.
 let torsoGeometry: THREE.CapsuleGeometry | null = null;
@@ -74,6 +77,7 @@ export class Zombie implements HitTarget {
   onDeathFinished: (() => void) | null = null;
 
   state: ZombieState = 'spawn';
+  deathKind: ZombieDeathKind = 'normal';
   hp = 0;
   maxHp = 0;
   speed = 0;
@@ -93,6 +97,7 @@ export class Zombie implements HitTarget {
   private attackRecovery = ZOMBIE_ATTACK_RECOVERY;
   private readonly torsoBaseScale = new THREE.Vector3();
   private readonly headBaseScale = new THREE.Vector3();
+  private readonly tmpImpactOrigin = new THREE.Vector3();
   private previousYaw = 0;
   private deathGroundY = 0;
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
@@ -157,6 +162,7 @@ export class Zombie implements HitTarget {
     this.maxHp = hp;
     this.speed = speed;
     this.state = 'spawn';
+    this.deathKind = 'normal';
     this.stateTimer = ZOMBIE_SPAWN_DURATION;
     this.previousYaw = 0;
     this.deathGroundY = y;
@@ -166,6 +172,7 @@ export class Zombie implements HitTarget {
     this.floor = floor;
     this.group.position.set(x, y, z);
     this.group.rotation.set(0, 0, 0);
+    this.visual.setDissolveProgress(0);
     this.visual.setOpacity(1);
     this.visual.setSpawnRise(0);
     this.visual.setState('spawn');
@@ -203,14 +210,16 @@ export class Zombie implements HitTarget {
     headshot = false,
     sourceX?: number,
     sourceZ?: number,
-    source?: ZombieKillSource,
+    source?: ZombieKillSource | 'normal',
   ): boolean {
     if (!this.isAlive) return false;
     this.hp -= amount;
     this.visual.hitFlash();
     this.reactToDamage(amount, headshot, sourceX, sourceZ);
     if (this.hp <= 0) {
-      this.enterDeath(resolveZombieDeathStyle(source, headshot, this.impact.y));
+      const killSource = source === 'normal' ? undefined : source;
+      const deathKind: ZombieDeathKind = killSource === 'raygun' ? 'raygun' : 'normal';
+      this.enterDeath(resolveZombieDeathStyle(killSource, headshot, this.impact.y), deathKind, headshot);
       return true;
     }
     return false;
@@ -227,7 +236,7 @@ export class Zombie implements HitTarget {
   public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1): void {
     if (!this.isAlive) return;
     this.impact.set(impactX, impactZ);
-    this.enterDeath(style);
+    this.enterDeath(style, style === 'blast' ? 'raygun' : 'normal');
   }
 
   /** ZEUS-77 hit: residual arcs crawl over the body, surviving or not. */
@@ -266,14 +275,26 @@ export class Zombie implements HitTarget {
     );
   }
 
-  private enterDeath(style: ZombieDeathStyle): void {
+  private enterDeath(
+    style: ZombieDeathStyle,
+    deathKind: ZombieDeathKind = style === 'blast' ? 'raygun' : 'normal',
+    headshot = false,
+  ): void {
     this.deathGroundY = this.position.y;
     this.deathStyle = style;
+    this.deathKind = deathKind;
     this.state = 'death';
-    this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
     this.visual.prepareDeath(style, this.impact.x, this.impact.y);
     this.visual.setState('death');
     if (style === 'shock') this.electrify();
+    if (deathKind === 'raygun') {
+      this.stateTimer = ZOMBIE_RAYGUN_DEATH_DURATION;
+      this.tmpImpactOrigin.set(0, headshot ? 1.55 : 1.05, 0);
+      this.visual.setDissolveProgress(0.01, this.tmpImpactOrigin);
+    } else {
+      this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
+      this.visual.setDissolveProgress(0);
+    }
   }
 
   /** Starts the attack lunge if the cooldown allows it. */
@@ -374,6 +395,19 @@ export class Zombie implements HitTarget {
       }
       case 'death': {
         this.stateTimer -= dt;
+        if (this.deathKind === 'raygun') {
+          const progress = 1 - Math.max(0, this.stateTimer / ZOMBIE_RAYGUN_DEATH_DURATION);
+          this.visual.setDissolveProgress(progress);
+          if (this.stateTimer <= 0) {
+            this.group.visible = false;
+            this.group.position.y = 0;
+            this.visual.setDissolveProgress(0);
+            this.visual.setOpacity(1);
+            this.onDeathFinished?.();
+            return;
+          }
+          break;
+        }
         const total = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
         const elapsed = total - Math.max(0, this.stateTimer);
         this.visual.setDeathProgress(Math.min(1, elapsed / ZOMBIE_DEATH_FALL));
@@ -397,6 +431,10 @@ export class Zombie implements HitTarget {
     }
 
     if (!visualUpdated) this.visual.update(dt, visualSpeed);
+  }
+
+  public dispose(): void {
+    this.visual.dispose();
   }
 
   private setWalk(): void {

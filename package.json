@@ -27,6 +27,8 @@
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "preandroid:run": "node scripts/ensure-android-sdk.mjs",
     "android:run": "npm run android:sync && cd android && gradlew.bat installDebug",
+    "preandroid:release": "node scripts/ensure-android-sdk.mjs",
+    "android:release": "node scripts/android-release.mjs",
     "android:icons": "capacitor-assets generate --android --iconBackgroundColor '#0b1220' --iconBackgroundColorDark '#0b1220'"
   },
   "dependencies": {

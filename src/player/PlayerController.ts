@@ -136,6 +136,7 @@ export class PlayerController {
   /** Changes only the view height; the standing rig remains the network/collision anchor. */
   public setDownedCamera(enabled: boolean): void { this.downedCamera = enabled; }
   public playReviveImpulse(): void { this.cameraImpulse = 0.035; }
+  public playShotImpulse(strength = 0.012): void { this.cameraImpulse += strength; }
 
   update(dt: number, input: Input, weapon: Weapon, allowMovement = true, allowLook = allowMovement): void {
     const definition = weapon.definition;

@@ -520,6 +520,33 @@ export class AudioSystem {
     this.tick(0.05, 900, 0.16, 3, 0.08);
   }
 
+  /** Ray Gun vaporization: ascending harmonic plasma sizzle as a zombie dissolves into ash. */
+  public playRayVaporize(): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const { ctx, master, noise } = audio;
+    const t: number = ctx.currentTime;
+
+    const sizzle: AudioBufferSourceNode = ctx.createBufferSource();
+    sizzle.buffer = noise;
+    const filter: BiquadFilterNode = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 3.2;
+    filter.frequency.setValueAtTime(950, t);
+    filter.frequency.exponentialRampToValueAtTime(4200, t + 0.68);
+    const gain: GainNode = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.28, t + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+    sizzle.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    sizzle.start(t, Math.random() * 0.4, 0.78);
+
+    this.sweep(0, 'sine', 240, 1180, 0.22, 0.55, t);
+    this.sweep(0.04, 'triangle', 520, 2100, 0.14, 0.48, t);
+  }
+
   /**
    * Tesla shot: a sharp crack (high filtered noise) over a rising mains-hum
    * sweep — a capacitor bank discharging, not a powder report.

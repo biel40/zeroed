@@ -34,6 +34,7 @@ import {
 } from './ZombieConfig';
 import { Zombie } from './Zombie';
 import type { ZombieKillSource } from './ZombieDeath';
+export type { ZombieKillSource } from './ZombieDeath';
 import { ZombiePool } from './ZombiePool';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from './ZombieSpawner';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from './ZombieSpawner';
@@ -645,8 +646,10 @@ export class ZombieManager {
       const dz = zombie.position.z - center.z;
       const damage = splashDamageAt(splashDamage, Math.hypot(dx, dz), radius);
       if (damage <= 0) continue;
-      // applyDamage already triggers the red hit flash.
-      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, 'raygun')) this.kill(zombie, false, 'raygun');
+      // applyDamage already triggers the red hit flash; splash kills vaporize.
+      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, 'raygun')) {
+        this.kill(zombie, false, 'raygun');
+      }
     }
   }
 
@@ -2193,23 +2196,40 @@ export class ZombieManager {
   }
 
   private kill(zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined): void {
-    // The falling body must stop blocking bullets immediately.
+    // Immediately detach hitboxes and all A* navigation/queue state on death.
     this.removeColliders(zombie);
+    this.clearNavigationState(zombie);
     this.onZombieKilled?.(zombie, headshot, source);
   }
 
-  private finishDeath(zombie: Zombie): void {
+  private clearNavigationState(zombie: Zombie): void {
     const queue = this.queueFor(zombie);
     const index = queue?.indexOf(zombie) ?? -1;
     if (queue && index >= 0) queue.splice(index, 1);
     this.entryRoutes.delete(zombie);
     this.stairTraversals.delete(zombie);
     this.roundState.delete(zombie);
+    this.movement.delete(zombie);
     this.headings.delete(zombie);
     this.stuckState.delete(zombie);
     this.navPaths.delete(zombie);
     this.pathCooldowns.delete(zombie);
+    if (this.pathQueued.delete(zombie)) {
+      const qIdx = this.pathQueue.indexOf(zombie);
+      if (qIdx >= 0) this.pathQueue.splice(qIdx, 1);
+    }
+  }
+
+  private finishDeath(zombie: Zombie): void {
+    this.clearNavigationState(zombie);
     this.pool.release(zombie);
+  }
+
+  public dispose(): void {
+    this.reset();
+    for (const zombie of this.zombieIds.keys()) {
+      zombie.dispose();
+    }
   }
 
   private removeColliders(zombie: Zombie): void {

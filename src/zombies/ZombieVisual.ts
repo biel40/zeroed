@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { registerFadeMaterial, setFadeOpacity } from '../rendering/FadeMaterials';
+import {
+  installRayGunDissolve,
+  RayGunAshParticles,
+  RAYGUN_NEON_GREEN,
+  setRayGunDissolveState,
+} from '../rendering/RayGunDissolveShader';
 import type { ZombieState } from './Zombie';
 import { ShinyStars } from './ShinyStars';
 import { ZombieElectricArcs } from './ZombieElectricArcs';
@@ -484,10 +490,13 @@ export class ZombieVisual {
   private readonly rootWorldRotation = new THREE.Quaternion();
   private readonly boneBasis = new THREE.Quaternion();
   private readonly shinyStars: ShinyStars | null;
+  private readonly rayGunAsh: RayGunAshParticles;
   private readonly eyeMaterials: readonly THREE.Material[];
   /** Opaque while alive; blended only during the death fade. */
   private readonly fadeMaterials: readonly THREE.Material[];
   private readonly tmpShinyAnchor = new THREE.Vector3();
+  private readonly dissolveOrigin = new THREE.Vector3();
+  private dissolveProgress = 0;
   private readonly modelConfig: ZombieModelConfig;
   /** End of the head bone chain, when the rig has one (skull midpoint math). */
   private headTop: THREE.Object3D | null = null;
@@ -707,6 +716,9 @@ export class ZombieVisual {
     this.fadeMaterials = [...this.materials, ...this.eyeMaterials]
       .filter((material) => material.blending === THREE.NormalBlending);
     for (const material of this.fadeMaterials) registerFadeMaterial(material);
+    for (const material of this.materials) {
+      installRayGunDissolve(material, this.modelConfig.height);
+    }
     this.root.updateMatrixWorld(true);
     placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
 
@@ -723,6 +735,8 @@ export class ZombieVisual {
       : ARC_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
     this.electricArcs = new ZombieElectricArcs(arcAnchors);
     this.root.add(this.electricArcs.mesh);
+    this.rayGunAsh = new RayGunAshParticles(this.modelConfig.height);
+    this.root.add(this.rayGunAsh.points);
     // Pitch and roll tip the body in its own frame; the death twist then yaws the result.
     this.root.rotation.order = 'YXZ';
   }
@@ -759,6 +773,9 @@ export class ZombieVisual {
     this.glowColor = UNDEAD_GLOW;
     this.glowIntensity = UNDEAD_GLOW_INTENSITY;
     this.shinyStars?.setEnabled(typeId === 'shiny');
+    this.dissolveOrigin.set(0, this.modelConfig.height * 0.55, 0);
+    this.setDissolveProgress(0, this.dissolveOrigin);
+    this.rayGunAsh.reset();
 
     for (let index = 0; index < this.materials.length; index++) {
       const material = this.materials[index];
@@ -1009,6 +1026,32 @@ export class ZombieVisual {
     for (const material of this.materials) material.emissiveIntensity = this.glowIntensity * opacity;
   }
 
+  /**
+   * Drives the Ray Gun energy dissolution shader (`0..1`) and ascending ash
+   * particle burst instead of the standard corpse fall-and-linger sequence.
+   */
+  public setDissolveProgress(progress: number, localOrigin?: THREE.Vector3): void {
+    this.dissolveProgress = THREE.MathUtils.clamp(progress, 0, 1);
+    if (localOrigin) this.dissolveOrigin.copy(localOrigin);
+    for (const material of this.materials) {
+      setRayGunDissolveState(material, this.dissolveProgress, localOrigin);
+      if (this.dissolveProgress > 0) {
+        material.emissive.setHex(RAYGUN_NEON_GREEN);
+        material.emissiveIntensity = Math.sin(this.dissolveProgress * Math.PI) * 1.65;
+      }
+    }
+    if (this.dissolveProgress > 0) {
+      const eyeAlpha = Math.max(0, 1 - this.dissolveProgress * 2.2);
+      for (const material of this.eyeMaterials) material.opacity = eyeAlpha;
+      if (this.currentAction) this.currentAction.paused = true;
+    }
+    this.rayGunAsh.setProgress(this.dissolveProgress);
+  }
+
+  public get currentDissolveProgress(): number {
+    return this.dissolveProgress;
+  }
+
   public update(dt: number, speed: number): void {
     this.restoreBasePose();
     this.transitionTime += dt;
@@ -1026,7 +1069,13 @@ export class ZombieVisual {
     this.root.position.y = -(1 - this.rise) * SPAWN_DEPTH + heavyBob;
     this.root.position.z = 0;
     this.root.rotation.set(0, 0, 0);
-    if (this.collapse > 0) {
+    if (this.dissolveProgress > 0) {
+      // Vaporizing zombies arch back slightly and convulse in place as they disintegrate.
+      const arch = Math.sin(Math.min(1, this.dissolveProgress * 1.4) * Math.PI * 0.5);
+      this.root.rotation.x = -arch * 0.24;
+      this.root.rotation.z = Math.sin(this.dissolveProgress * 28) * 0.04 * (1 - this.dissolveProgress);
+      this.root.position.y += arch * 0.08;
+    } else if (this.collapse > 0) {
       // Clipless fallback: tip the rigid body over in the style's direction.
       const ease = 1 - (1 - this.collapse) * (1 - this.collapse);
       const tip = ease * (Math.PI / 2 - 0.12);
@@ -1037,7 +1086,7 @@ export class ZombieVisual {
         this.root.rotation.z = ease * (0.18 + this.deathSide);
       }
     }
-    if (this.state === 'death') {
+    if (this.state === 'death' && this.dissolveProgress <= 0) {
       const settle = Math.min(1, this.deathTime / ZOMBIE_DEATH_FALL);
       const remaining = 1 - smoothStep(settle);
       // Momentum and pose continuity from the living body, layered over the fall.
@@ -1159,10 +1208,12 @@ export class ZombieVisual {
     this.electrified = Math.max(0, this.electrified - dt);
     const charge = Math.min(1, this.electrified / ELECTRIC_FADE);
     this.electricArcs.update(dt, charge * this.opacity);
-    if (this.flash > 0 || charge > 0 || this.emissiveOverridden) this.updateEmissive(dt, charge);
+    if (this.flash > 0 || charge > 0 || this.dissolveProgress > 0 || this.emissiveOverridden) {
+      this.updateEmissive(dt, charge);
+    }
   }
 
-  /** Red hit flash beats the electric flicker; the undead glow returns when both end. */
+  /** Red hit flash beats the electric flicker and dissolve glow; the undead glow returns when all end. */
   private updateEmissive(dt: number, charge: number): void {
     this.flash = Math.max(0, this.flash - dt * 5);
     // Mostly a faint cold sheen with occasional bright jolts, so the arcs stay the focus.
@@ -1172,6 +1223,9 @@ export class ZombieVisual {
       if (this.flash > 0) {
         material.emissive.setHex(FLASH_COLOR);
         material.emissiveIntensity = this.flash * 1.5;
+      } else if (this.dissolveProgress > 0) {
+        material.emissive.setHex(RAYGUN_NEON_GREEN);
+        material.emissiveIntensity = Math.sin(this.dissolveProgress * Math.PI) * 1.65;
       } else if (charge > 0) {
         material.emissive.setHex(ELECTRIC_COLOR);
         material.emissiveIntensity = flicker;
@@ -1180,7 +1234,7 @@ export class ZombieVisual {
         material.emissiveIntensity = this.glowIntensity * this.opacity;
       }
     }
-    this.emissiveOverridden = this.flash > 0 || charge > 0;
+    this.emissiveOverridden = this.flash > 0 || charge > 0 || this.dissolveProgress > 0;
   }
 
   /** Code-driven humanoid animation for the fallback rig. */
@@ -1352,5 +1406,29 @@ export class ZombieVisual {
     const reach = sample(progress, 0, 0.15, -0.85, -0.6, 0);
     this.rotateBarrierBone(rig.shoulderL, side <= 0 ? reach : -0.1, 0, 0);
     this.rotateBarrierBone(rig.shoulderR, side >= 0 ? reach : -0.1, 0, 0);
+  }
+
+  /**
+   * Releases GPU resources owned exclusively by this visual instance:
+   * cloned materials, eye materials, ash particle geometry/shader, and
+   * procedural fallback geometries.
+   */
+  public dispose(): void {
+    this.mixer?.stopAllAction();
+    this.rayGunAsh.dispose();
+    if (this.shinyStars) {
+      this.shinyStars.points.geometry.dispose();
+      this.shinyStars.points.material.dispose();
+    }
+    for (const material of this.materials) material.dispose();
+    for (const material of this.eyeMaterials) material.dispose();
+    if (this.rig) {
+      this.root.traverse((obj) => {
+        if (obj instanceof THREE.Mesh && obj.geometry !== eyeSocketGeometry
+          && obj.geometry !== eyeGlowGeometry && obj.geometry !== eyeCoreGeometry) {
+          obj.geometry.dispose();
+        }
+      });
+    }
   }
 }

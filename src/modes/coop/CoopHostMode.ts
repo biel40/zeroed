@@ -701,6 +701,7 @@ export class CoopHostMode implements GameMode {
       for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(killer.kills);
     }
     if (headshot) killer.headshots++;
+    if (source === 'raygun') this.ctx.audio.playRayVaporize?.();
     const rewardMultiplier = ZOMBIE_TYPE_CONFIGS[zombie.typeId].killRewardMultiplier;
     if (source === 'knife') killer.economy.awardKnifeKill(rewardMultiplier);
     else killer.economy.awardKill(headshot, rewardMultiplier);

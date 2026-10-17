@@ -4,7 +4,7 @@ import type { WeaponId } from '../src/weapons/WeaponTypes';
 import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
 
 describe('Zombies GOD_MODE developer command', () => {
-  it('activates once after MOTDRULES and grants an infinite-ammo Zeus', () => {
+  it('activates once after MOTDRULES and grants infinite-ammo Ray Gun and Zeus', () => {
     const mode = new ZombiesMode();
     const events: string[] = [];
     (mode as unknown as { ctx: unknown }).ctx = {
@@ -24,6 +24,8 @@ describe('Zombies GOD_MODE developer command', () => {
     for (const key of 'MOTDRULES') mode.onKeyInput?.(key);
 
     expect(events).toEqual([
+      'grant:raygun',
+      'infinite:raygun',
       'grant:tesla',
       'infinite:tesla',
       'banner:GOD MODE ENABLED',

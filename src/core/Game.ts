@@ -31,6 +31,8 @@ interface ArsenalEntry {
 
 const MAX_DELTA = 0.05;
 const FLASH_LIGHT_DECAY = 26;
+/** Fast decay (~1–2 frames at 60 fps) so energy muzzle PointLights never saturate mobile/web GPUs. */
+const ENERGY_FLASH_LIGHT_DECAY = 160;
 const MAX_SPREAD_PIXELS = 130;
 /** A driver that never reports its programs ready must not hold the loading screen. */
 const SHADER_WARMUP_TIMEOUT_MS = 10000;
@@ -62,6 +64,7 @@ export class Game {
   /** Map colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
   private readonly hitColliders: THREE.Object3D[] = [];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
+  private flashLightDecay = FLASH_LIGHT_DECAY;
   /** Scales the drawing buffer below the profile's pixel ratio while frames run slow. */
   private readonly dynamicResolution = new DynamicResolution();
 
@@ -236,6 +239,7 @@ export class Game {
         const entry = this.arsenal.get(id);
         if (!entry) return false;
         entry.weapon.setInfiniteReserve();
+        this.inventory.pin(id);
         return true;
       },
       resetArsenal: () => this.resetArsenal(),
@@ -534,16 +538,21 @@ export class Game {
     if (!entry) return false;
     const previousId = this.inventory.currentWeapon;
     const { equipped } = this.inventory.grant(id);
-    entry.weapon.resetAmmo();
+    const equippedEntry = this.entry(equipped);
+    if (equipped === id) {
+      const keepInfiniteReserve = equippedEntry.weapon.reserveAmmo === null && this.inventory.isPinned(id);
+      equippedEntry.weapon.resetAmmo();
+      if (keepInfiniteReserve) equippedEntry.weapon.setInfiniteReserve();
+    }
     if (previousId !== equipped) {
       const previous = this.entry(previousId);
       previous.weapon.equip();
       previous.view.reset();
       previous.view.root.visible = false;
     }
-    entry.view.reset();
-    entry.view.root.visible = true;
-    entry.weapon.equip();
+    equippedEntry.view.reset();
+    equippedEntry.view.root.visible = true;
+    equippedEntry.weapon.equip();
     return true;
   }
 
@@ -595,9 +604,11 @@ export class Game {
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
     this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
-    this.flashLight.intensity = 9;
+    this.flashLight.intensity = energy ? 10 : 9;
+    this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
 
     if (energy) {
+      this.player.playShotImpulse(0.014);
       this.effects.puff(this.tmpMuzzle, energy.color, 0.2);
     } else {
       this.effects.puff(this.tmpMuzzle, 0xdedede, 0.26);
@@ -748,7 +759,7 @@ export class Game {
 
     this.flashLight.intensity =
       this.flashLight.intensity > 0.02
-        ? this.flashLight.intensity * Math.exp(-FLASH_LIGHT_DECAY * dt)
+        ? this.flashLight.intensity * Math.exp(-this.flashLightDecay * dt)
         : 0;
 
     const fovRadians = (this.player.camera.fov * Math.PI) / 180;

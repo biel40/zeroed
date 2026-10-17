@@ -65,14 +65,17 @@ de la cuenta no esta confirmada. No asumir que tiene acceso a produccion.
 
 ### Publicar cambios o bug fixes
 
-1. Ejecutar `npm test` y comprobar los cambios en el movil, incluido individual.
-2. En `android/app/build.gradle`, incrementar `versionCode` por encima del
-   maximo subido a Play Console y ajustar `versionName` para identificar la release.
-3. Ejecutar `npm run android:sync` y despues `npx cap open android`. Si se
-   modifica el juego otra vez, repetir la sincronizacion antes de generar el AAB.
-4. En Android Studio: Build > Generate Signed Bundle / APK > Android App
-   Bundle. Usar el mismo keystore y alias, variante release y applicationId
-   `es.zeroed.game`. Conservar el keystore y sus credenciales fuera del repositorio.
+1. Comprobar los cambios en el movil, incluido individual.
+2. Una sola vez por PC: copiar `android/key.properties.example` como
+   `android/key.properties` (ignorado por git) con la ruta y credenciales del
+   keystore de subida de siempre. Conservar keystore y credenciales fuera del repositorio.
+3. Ejecutar `npm run android:release` (o `npm run android:release -- 1.1.0`
+   para fijar `versionName`; por defecto sube el patch). El script incrementa
+   `versionCode`, ejecuta tests, sincroniza, firma con `bundleRelease` y deja
+   `releases/zeroed-<versionName>-<versionCode>.aab`. Si falla, restaura
+   `build.gradle`. Si existe, usa `JAVA_HOME`; si no, el JDK de Android Studio.
+4. Hacer commit del cambio de version. `versionCode` debe superar el maximo
+   subido a Play Console.
 5. Crear una version en el canal correspondiente, subir el AAB nuevo,
    completar nombre y notas, revisar errores y completar el envio/lanzamiento.
 6. Cuando este disponible, actualizar desde Google Play con una cuenta que

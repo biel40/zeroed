@@ -16,6 +16,7 @@ import type { Weapon } from './Weapon';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
 const FLASH_DURATION = 0.045;
+const ENERGY_FLASH_DURATION = 0.065;
 /** Bore line as a fraction of the sight line height (rifle geometry heuristic). */
 const BORE_HEIGHT_FRACTION = 0.65;
 /** Pistol slide blowback: travel in meters and full return time in seconds. */
@@ -26,6 +27,7 @@ const SWAY_LIMIT = 0.02;
 const SWAY_SMOOTHING = 9;
 
 let flashTexture: THREE.CanvasTexture | null = null;
+let plasmaFlashTexture: THREE.DataTexture | null = null;
 
 function getFlashTexture(): THREE.CanvasTexture {
   if (flashTexture) return flashTexture;
@@ -42,6 +44,39 @@ function getFlashTexture(): THREE.CanvasTexture {
   ctx.fillRect(0, 0, 64, 64);
   flashTexture = new THREE.CanvasTexture(canvas);
   return flashTexture;
+}
+
+/**
+ * Pure white-to-alpha plasma burst + corona ring texture so energy weapons
+ * (Ray Gun, Tesla) tint cleanly to their neon bolt color without orange bleed.
+ */
+function getPlasmaFlashTexture(): THREE.DataTexture {
+  if (plasmaFlashTexture) return plasmaFlashTexture;
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const nx = (x + 0.5) / size * 2 - 1;
+      const ny = (y + 0.5) / size * 2 - 1;
+      const r = Math.hypot(nx, ny);
+      const angle = Math.atan2(ny, nx);
+      const rays = 0.82 + 0.18 * Math.cos(angle * 6);
+      const core = Math.exp(-r * r * 9.5);
+      const ringDelta = (r - 0.52) / 0.12;
+      const ring = Math.exp(-(ringDelta * ringDelta)) * 0.65;
+      const alpha = Math.max(0, Math.min(1, (core + ring) * rays * (1 - THREE.MathUtils.smoothstep(r, 0.72, 1))));
+      const idx = (y * size + x) * 4;
+      data[idx] = 255;
+      data[idx + 1] = 255;
+      data[idx + 2] = 255;
+      data[idx + 3] = Math.round(alpha * 255);
+    }
+  }
+  plasmaFlashTexture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  plasmaFlashTexture.magFilter = THREE.LinearFilter;
+  plasmaFlashTexture.minFilter = THREE.LinearFilter;
+  plasmaFlashTexture.needsUpdate = true;
+  return plasmaFlashTexture;
 }
 
 /**
@@ -1129,8 +1164,9 @@ export class WeaponView {
       );
     }
 
+    const isEnergyFlash = view.energyColor !== undefined;
     const flashMaterial = new THREE.MeshBasicMaterial({
-      map: getFlashTexture(),
+      map: isEnergyFlash ? getPlasmaFlashTexture() : getFlashTexture(),
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -1138,7 +1174,25 @@ export class WeaponView {
     });
     // Energy weapons tint the muzzle flash to their bolt color.
     if (view.energyColor !== undefined) flashMaterial.color.setHex(view.energyColor);
-    this.flash = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), flashMaterial);
+    this.flash = new THREE.Mesh(
+      new THREE.PlaneGeometry(isEnergyFlash ? 0.25 : 0.22, isEnergyFlash ? 0.25 : 0.22),
+      flashMaterial,
+    );
+    this.flash.name = 'muzzle-flash';
+    if (isEnergyFlash) {
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xeaffd6,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      const plasmaRing = new THREE.Mesh(new THREE.RingGeometry(0.038, 0.068, 16), ringMat);
+      plasmaRing.name = 'muzzle-plasma-ring';
+      plasmaRing.position.z = -0.008;
+      this.flash.add(plasmaRing);
+    }
     this.flash.visible = false;
     this.muzzle.add(this.flash);
 
@@ -1276,8 +1330,9 @@ export class WeaponView {
 
   /** Called by Game on every shot event. */
   onShot(): void {
-    this.flashTime = FLASH_DURATION;
-    this.flash.scale.setScalar(0.8 + Math.random() * 0.5);
+    const isEnergy = this.definition.view.energyColor !== undefined;
+    this.flashTime = isEnergy ? ENERGY_FLASH_DURATION : FLASH_DURATION;
+    this.flash.scale.setScalar(isEnergy ? 0.95 + Math.random() * 0.35 : 0.8 + Math.random() * 0.5);
     this.flash.rotation.z = Math.random() * Math.PI * 2;
     this.flash.visible = true;
     this.spring.kick();

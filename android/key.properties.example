@@ -1,0 +1,6 @@
+# Copiar como android/key.properties (ignorado por git) y rellenar.
+# storeFile: ruta absoluta o relativa a android/. Usa / o \\ en Windows.
+storeFile=C:/ruta/a/zeroed-upload.jks
+storePassword=
+keyAlias=
+keyPassword=

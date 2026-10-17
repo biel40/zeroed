@@ -893,7 +893,9 @@ export class ZombiesMode implements GameMode {
 
     // A lethal headshot already has a strong dedicated impact. Layering the
     // generic death growl at the same instant masks its short crack.
-    if (!headshot) {
+    if (source === 'raygun') {
+      this.ctx.audio.playRayVaporize?.();
+    } else if (!headshot) {
       this.ctx.audio.playZombieDeath();
     }
 
@@ -932,9 +934,12 @@ export class ZombiesMode implements GameMode {
 
   private activateGodMode(): void {
     this.godModeEnabled = true;
+    this.rayGunUnlocked = true;
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
     if (this.arena instanceof BurnedMansionArena) this.arena.unlockSecretRoom();
+    this.ctx.grantWeapon('raygun');
+    this.ctx.setWeaponInfiniteReserve('raygun');
     this.ctx.grantWeapon('tesla');
     this.ctx.setWeaponInfiniteReserve('tesla');
     this.ctx.hud.showRoundBanner(t('banner.godMode'), 'MOTDRULES');

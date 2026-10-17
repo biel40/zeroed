@@ -72,4 +72,21 @@ describe('WeaponInventory (zombies two-weapon rule)', () => {
     expect(inventory.switchTo(4)).toBe('m1911');
     expect(inventory.switchTo(0)).toBe('m4a1');
   });
+
+  it('keeps pinned Ray Gun and Zeus in both slots and ignores replacements until reset', () => {
+    const inventory = new WeaponInventory(['m1911'], 2);
+    inventory.grant('raygun');
+    inventory.pin('raygun');
+    inventory.grant('tesla');
+    inventory.pin('tesla');
+
+    expect([...inventory.weapons].sort()).toEqual(['raygun', 'tesla']);
+    expect(inventory.grant('ak47')).toEqual({ equipped: 'tesla', dropped: null });
+    expect([...inventory.weapons].sort()).toEqual(['raygun', 'tesla']);
+
+    inventory.reset(['m1911']);
+    expect(inventory.isPinned('raygun')).toBe(false);
+    expect(inventory.isPinned('tesla')).toBe(false);
+    expect(inventory.weapons).toEqual(['m1911']);
+  });
 });

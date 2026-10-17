@@ -165,7 +165,7 @@ export class Weapon {
   refillAmmo(): boolean {
     if (this.isAmmoFull) return false;
     this.ammoInMagazine = this.definition.magazineSize;
-    this.reserveAmmo = this.initialReserve;
+    if (this.reserveAmmo !== null) this.reserveAmmo = this.initialReserve;
     return true;
   }
 

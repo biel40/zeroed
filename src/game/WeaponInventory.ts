@@ -20,6 +20,7 @@ export interface GrantResult {
 export class WeaponInventory {
   private slots: WeaponId[];
   private current = 0;
+  private readonly pinned = new Set<WeaponId>();
 
   constructor(starting: readonly WeaponId[], readonly maxSlots: number) {
     if (starting.length < 1 || starting.length > maxSlots) {
@@ -45,6 +46,14 @@ export class WeaponInventory {
     return this.slots.includes(id);
   }
 
+  pin(id: WeaponId): void {
+    if (this.slots.includes(id)) this.pinned.add(id);
+  }
+
+  isPinned(id: WeaponId): boolean {
+    return this.pinned.has(id);
+  }
+
   /**
    * Selects a slot. Returns the newly selected weapon, or null when the
    * slot is empty, out of range, or already selected.
@@ -67,13 +76,22 @@ export class WeaponInventory {
       this.current = this.slots.length - 1;
       return { equipped: id, dropped: null };
     }
-    const dropped = this.slots[this.current];
-    this.slots[this.current] = id;
+    let replaceIndex = this.current;
+    if (this.pinned.has(this.slots[replaceIndex])) {
+      replaceIndex = this.slots.findIndex((slotId) => !this.pinned.has(slotId));
+      if (replaceIndex === -1) {
+        return { equipped: this.slots[this.current], dropped: null };
+      }
+    }
+    const dropped = this.slots[replaceIndex];
+    this.slots[replaceIndex] = id;
+    this.current = replaceIndex;
     return { equipped: id, dropped };
   }
 
   /** Back to the starting loadout (zombies restart). */
   reset(starting: readonly WeaponId[]): void {
+    this.pinned.clear();
     this.slots = [...starting];
     this.current = 0;
   }

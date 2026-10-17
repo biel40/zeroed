@@ -93,10 +93,12 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 - Muertes segun el golpe letal (`ZombieDeath`), sin ragdoll: cuchillo (gira,
   se sujeta el corte y cae de lado), pistola y L96 (retrocede y cae de
   espaldas), automaticas (sacudidas por cada impacto y se desploma de bruces),
-  headshot con arma de fuego (se derrumba inerte), Ray Gun (sale despedido) y
-  Tesla (convulsiona rigido y cae). Un disparo por la espalda lo tumba hacia
-  delante y los impactos laterales giran la caida hacia el empuje. Todas duran
-  lo mismo en gameplay; el anfitrion replica estilo y lado del impacto.
+  headshot con arma de fuego (se derrumba inerte), Ray Gun (vaporizacion de
+  1.0 s con `RayGunDissolveShader`, borde incandescente verde y cenizas
+  ascendentes) y Tesla (convulsiona rigido y cae). Un disparo por la espalda lo
+  tumba hacia delante y los impactos laterales giran la caida hacia el empuje.
+  Al morir se retiran al instante los colliders y el estado A*/colas de barrera;
+  el anfitrion replica estilo y lado del impacto.
 - Cada zombie alcanzado por la cadena ZEUS-77 queda cargado 2.8 s
   (`ZombieElectricArcs`): rayos que saltan entre sus articulaciones y un
   destello azul en la piel, vivo o ya caido en el suelo. Es solo visual (un
@@ -150,8 +152,9 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
   El cooperativo valida las bajas y cobra al comprador en el anfitrion;
   cada cliente muestra su propio progreso y ambos ven la apertura compartida.
   Se conservan la Mystery Box y la recompensa Ray Gun de 115 bajas.
-  El comando individual `MOTDRULES` tambien
-  abre esa pared sin rellenar los faroles; reiniciar restaura el cierre.
+  El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
+  en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
+  restaura el cierre y el inventario inicial.
   El final de 30000 Points pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
   La secuencia nuclear dura 25 s y es CSS puro (transform/opacity, sin bordes
