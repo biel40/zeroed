@@ -58,6 +58,7 @@ Los controles táctiles se adaptan automáticamente en móvil.
 | `npm run multiplayer:cloudflare:test` | Prueba el Worker local con Wrangler en el puerto 8787 |
 | `npm run build` | Genera la versión de producción |
 | `npm run android:run` | Sincroniza e instala una build Android de depuración |
+| `npm run android:release` | Sube la versión y genera el AAB release firmado para Google Play (`:apk` añade el APK) |
 | `npm run multiplayer:cloudflare:deploy` | Despliega el Worker en Cloudflare |
 
 ## 📚 Documentación

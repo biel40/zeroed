@@ -17,9 +17,10 @@ maquina). `npm run android:apk` y `npm run android:run` ejecutan primero
 4. Si nada de eso existe, corta con instrucciones claras (instalar el SDK,
    definir `ANDROID_HOME` con `setx`, o crear `local.properties` a mano).
 
-Tambien se necesita `JAVA_HOME` apuntando a un JDK 21 (Gradle lo toma del
-PATH o de esa variable; si tu maquina no la tiene seteada globalmente,
-export ala antes de correr gradlew).
+Gradle 8.14 necesita un JDK 17-24 (preferible 21); el JBR de Android Studio
+puede ser mas nuevo y no sirve. `npm run android:release` lo busca solo en
+`JAVA_HOME`, `~/.jdks` y el JBR de Android Studio. Para `gradlew` a mano,
+define `JAVA_HOME` antes de ejecutarlo.
 
 ## Build e instalacion
 
@@ -27,7 +28,7 @@ export ala antes de correr gradlew).
 npm run build
 npx cap sync android
 Set-Location android
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+$env:JAVA_HOME = "$HOME\.jdks\jbr-21.0.11"
 .\gradlew.bat installDebug
 ```
 
@@ -69,11 +70,14 @@ de la cuenta no esta confirmada. No asumir que tiene acceso a produccion.
 2. Una sola vez por PC: copiar `android/key.properties.example` como
    `android/key.properties` (ignorado por git) con la ruta y credenciales del
    keystore de subida de siempre. Conservar keystore y credenciales fuera del repositorio.
-3. Ejecutar `npm run android:release` (o `npm run android:release -- 1.1.0`
-   para fijar `versionName`; por defecto sube el patch). El script incrementa
-   `versionCode`, ejecuta tests, sincroniza, firma con `bundleRelease` y deja
-   `releases/zeroed-<versionName>-<versionCode>.aab`. Si falla, restaura
-   `build.gradle`. Si existe, usa `JAVA_HOME`; si no, el JDK de Android Studio.
+3. Ejecutar `npm run android:release` (o `android:release:apk` para obtener
+   tambien un APK firmado instalable a mano). El script comprueba SDK, JDK,
+   firma y relay; ejecuta `npm test`; incrementa `versionCode` y el patch de
+   `versionName` (`-- --version X.Y.Z` lo fija); compila la web con
+   `--mode android` y la beta desactivada; sincroniza; firma con Gradle,
+   verifica la firma y deja `releases/zeroed-<versionName>-<versionCode>.aab`.
+   `-- --dry-run` solo comprueba y `-- --skip-tests` omite los tests. Si falla,
+   restaura `build.gradle`. El relay cooperativo de la app sale de `.env.android`.
 4. Hacer commit del cambio de version. `versionCode` debe superar el maximo
    subido a Play Console.
 5. Crear una version en el canal correspondiente, subir el AAB nuevo,
