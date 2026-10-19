@@ -68,7 +68,7 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
     },
     walkReferenceSpeed: 1.35,
     idleClip: ['ZombieIdle', 'Idle'],
-    tints: [0xb2b9a8],
+    tints: [0xb0aca8],
     eyes: { glow: 0xffb31a, core: 0xffe27a },
     anchors: {
       torso: ['Hips', 'Pelvis'],
@@ -90,7 +90,7 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
       hit: [],
     },
     walkReferenceSpeed: 1.71,
-    tints: [0xb2b9a8],
+    tints: [0xb0aca8],
     // Red instead of amber: the one-hit killer reads at a glance in the dark.
     eyes: { glow: 0xff2a14, core: 0xff9a7a },
     anchors: {
@@ -115,8 +115,8 @@ const ELECTRIC_COLOR = 0x5fc8ff;
 const ELECTRIC_FADE = 0.8;
 /** Joints the residual arcs jump between, spread head to toe. */
 const ARC_ANCHORS = ['Hips', 'Spine2', 'Head', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
-/** Sickly undead glow kept very low so the bodies read in the dark. */
-const UNDEAD_GLOW = 0x1a2a12;
+/** Faint ashen glow kept very low so the pale bodies read in the dark. */
+const UNDEAD_GLOW = 0x221d1a;
 const UNDEAD_GLOW_INTENSITY = 0.12;
 const EYE_SOCKET_COLOR = 0x080604;
 /** How deep below ground the spawn rise starts, meters. */
@@ -330,7 +330,7 @@ function buildProceduralBrute(
   materials: THREE.MeshStandardMaterial[];
 } {
   const skin = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0x727c62).multiply(new THREE.Color(tint)),
+    color: new THREE.Color(0x7a726a).multiply(new THREE.Color(tint)),
     roughness: 0.96,
     metalness: 0,
     emissive: FLASH_COLOR,
@@ -338,7 +338,7 @@ function buildProceduralBrute(
     flatShading: true,
   });
   const cloth = new THREE.MeshStandardMaterial({
-    color: 0x202923,
+    color: 0x26221f,
     roughness: 1,
     metalness: 0,
     emissive: FLASH_COLOR,

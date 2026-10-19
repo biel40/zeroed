@@ -17,7 +17,7 @@ import { HUD } from './ui/HUD';
 
 class ZeroedBoot {
   private readonly container: HTMLElement;
-  /** Rebuilt when the menu quality changes; each match reads it at start. */
+  /** Rebuilt when the settings quality changes; each match reads it at start. */
   private profile: DeviceProfile;
   private readonly hud: HUD;
   private readonly assets: AssetManager;

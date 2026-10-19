@@ -193,8 +193,8 @@ no detiene la partida. `MULTIPLAYER.md` define el alcance y los limites.
 Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 10,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
 
-`DeviceProfile` fija una calidad Baja/Media/Alta: la elegida en el menu
-principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
+`DeviceProfile` fija una calidad Baja/Media/Alta: la elegida en Ajustes
+desde el menu principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
 moviles con poca memoria, Media en moviles, equipos modestos o con movimiento
 reducido, Alta en el resto). La calidad decide pixel ratio maximo (1/1,5/2),
 efectos reducidos, anisotropia y luces puntuales; los controles tactiles

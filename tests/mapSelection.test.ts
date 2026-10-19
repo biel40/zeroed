@@ -71,6 +71,7 @@ describe('Zombies map selection flow', () => {
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
       value: {
+        addEventListener: () => undefined,
         getElementById: (id: string) =>
           id === 'map-select'
             ? mapSelect

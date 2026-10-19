@@ -31,7 +31,11 @@ export class SettingsPanel {
   private readonly controls: NumericControl[] = [];
   private readonly invertY: HTMLInputElement | null;
 
-  public constructor(private readonly dialog: HTMLDialogElement, openButtons: readonly HTMLElement[]) {
+  /**
+   * `menuButton` opens the full panel; `pauseButton` hides `[data-menu-only]`
+   * rows (graphics quality), which only take effect when a match starts.
+   */
+  public constructor(private readonly dialog: HTMLDialogElement, menuButton: HTMLElement, pauseButton: HTMLElement) {
     for (const input of dialog.querySelectorAll<HTMLInputElement>('input[type="range"][data-setting]')) {
       const key = input.dataset.setting;
       if (!isNumericSetting(key)) continue;
@@ -47,7 +51,8 @@ export class SettingsPanel {
     if (invertY) invertY.onchange = () => updateSettings({ invertY: invertY.checked });
     const reset = dialog.querySelector<HTMLButtonElement>('#settings-reset');
     if (reset) reset.onclick = () => resetSettings();
-    for (const button of openButtons) button.onclick = () => this.open();
+    menuButton.onclick = () => this.open('menu');
+    pauseButton.onclick = () => this.open('pause');
     onSettingsChange(() => this.sync());
     this.sync();
   }
@@ -57,7 +62,8 @@ export class SettingsPanel {
     return this.dialog.open;
   }
 
-  public open(): void {
+  public open(context: 'menu' | 'pause'): void {
+    for (const row of this.dialog.querySelectorAll<HTMLElement>('[data-menu-only]')) row.hidden = context !== 'menu';
     if (!this.dialog.open) this.dialog.showModal();
   }
 

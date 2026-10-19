@@ -40,14 +40,16 @@
   renderizar y los datos del mapa guardan claves, no frases. La eleccion se
   recuerda en `localStorage`; sin ella se usa el idioma del navegador.
 - **Calidad grafica por niveles y resolucion dinamica.** El jugador elige
-  Baja/Media/Alta en el menu principal; sin eleccion manda la deteccion del
+  Baja/Media/Alta en Ajustes, solo cuando lo abre desde el menu principal
+  (desde pausa esa fila se oculta); sin eleccion manda la deteccion del
   dispositivo. La resolucion se adapta sola al tiempo de frame dentro del
   limite de la calidad, sin tocar el numero de luces durante la partida para
   no recompilar shaders.
 - **Ajustes del jugador en vivo.** `PlayerSettings` es la unica fuente de
   volumenes, sensibilidad, eje Y y campo de vision; se guarda en
   `localStorage` y se puede cambiar en mitad de la partida. La calidad grafica
-  y el idioma siguen siendo solo del menu principal.
+  y el idioma siguen siendo solo del menu principal: el idioma, en un
+  desplegable con banderas en la esquina del panel.
 
 ## Deudas de contrato
 

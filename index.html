@@ -85,6 +85,22 @@
 
   <div id="map-select" class="hidden">
     <div class="start-panel">
+      <!-- Flags are inline SVG: Windows has no emoji flags. LanguagePicker copies the active one into the toggle. -->
+      <div id="language-select" class="language-picker">
+        <button type="button" id="language-toggle" class="language-toggle" aria-haspopup="true" aria-expanded="false"
+          aria-controls="language-options" data-i18n-aria-label="menu.language"></button>
+        <div id="language-options" class="language-options" role="group" data-i18n-aria-label="menu.language" hidden>
+          <button type="button" data-language="es" lang="es">
+            <svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#aa151b" /><rect y="0.5" width="3" height="1" fill="#f1bf00" /></svg>Español
+          </button>
+          <button type="button" data-language="en" lang="en">
+            <svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" stroke-width="2" /><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10" /><path d="M30,0 v30 M0,15 h60" stroke="#c8102e" stroke-width="6" /></svg>English
+          </button>
+          <button type="button" data-language="ca" lang="ca">
+            <svg class="flag" viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#fcdd09" /><path d="M0,1h9M0,2.333h9M0,3.667h9M0,5h9" stroke="#da121a" stroke-width="0.667" /></svg>Català
+          </button>
+        </div>
+      </div>
       <h1 class="zeroed-title">ZEROED</h1>
       <p class="mode-hint" data-i18n="menu.tagline"></p>
       <div class="mode-grid" role="group" data-i18n-aria-label="menu.zombies">
@@ -95,18 +111,6 @@
       </div>
       <button type="button" id="coop-select" class="coop-select" data-i18n="menu.multiplayer"></button>
       <button type="button" id="menu-settings" class="coop-select" data-i18n="menu.settings"></button>
-      <div id="language-select" class="language-select" role="group" data-i18n-aria-label="menu.language">
-        <span class="language-label" data-i18n="menu.language" aria-hidden="true"></span>
-        <button type="button" data-language="es" lang="es">ES</button>
-        <button type="button" data-language="en" lang="en">EN</button>
-        <button type="button" data-language="ca" lang="ca">CA</button>
-      </div>
-      <div id="quality-select" class="language-select" role="group" data-i18n-aria-label="menu.quality">
-        <span class="language-label" data-i18n="menu.quality" aria-hidden="true"></span>
-        <button type="button" data-quality="low" data-i18n="menu.qualityLow"></button>
-        <button type="button" data-quality="medium" data-i18n="menu.qualityMedium"></button>
-        <button type="button" data-quality="high" data-i18n="menu.qualityHigh"></button>
-      </div>
       <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
       <!-- CC BY 3.0 requires visible attribution; Brutus is a modified walker. -->
       <p class="asset-attribution"><span data-i18n="menu.attribution"></span> <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · Quaternius · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></p>
@@ -152,6 +156,13 @@
         <legend data-i18n="settings.display"></legend>
         <div class="settings-row"><label for="setting-fieldOfView" data-i18n="settings.fieldOfView"></label>
           <input id="setting-fieldOfView" type="range" data-setting="fieldOfView" /><output for="setting-fieldOfView"></output></div>
+        <!-- Quality is read when a match starts, so it is only offered from the main menu. -->
+        <div class="settings-row settings-choice" data-menu-only><span id="setting-quality-label" data-i18n="settings.quality"></span>
+          <div id="quality-select" class="choice-group" role="group" aria-labelledby="setting-quality-label">
+            <button type="button" data-quality="low" data-i18n="settings.qualityLow"></button>
+            <button type="button" data-quality="medium" data-i18n="settings.qualityMedium"></button>
+            <button type="button" data-quality="high" data-i18n="settings.qualityHigh"></button>
+          </div></div>
       </fieldset>
       <div class="settings-actions">
         <button type="button" id="settings-reset" data-i18n="settings.reset"></button>

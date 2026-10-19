@@ -1717,7 +1717,7 @@ describe('Burned Mansion topology', () => {
     expect(bunkerMaterial.name).toBe('worn_concrete_floor');
 
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'soot-detail').length).toBeGreaterThan(5);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'exposed-brick')).toHaveLength(2);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'blood-stain')).toHaveLength(2);
     const frames = arena.group.children.filter((child) => child.userData.mapRole === 'window-frames');
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);

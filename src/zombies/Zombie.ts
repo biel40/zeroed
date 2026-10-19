@@ -17,7 +17,7 @@ import {
   ZOMBIE_TYPE_CONFIGS,
   type ZombieTypeId,
 } from './ZombieConfig';
-import { ZombieVisual } from './ZombieVisual';
+import { ZOMBIE_MODELS, ZombieVisual } from './ZombieVisual';
 import { resolveZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from './ZombieDeath';
 
 export type ZombieState =
@@ -104,7 +104,7 @@ export class Zombie implements HitTarget {
   readonly impact = new THREE.Vector2();
 
   constructor(visual?: ZombieVisual) {
-    this.visual = visual ?? new ZombieVisual('walker', null, 0xa8b89a);
+    this.visual = visual ?? new ZombieVisual('walker', null, ZOMBIE_MODELS.walker.tints[0]);
 
     // Hitboxes are parented onto the animated rig (bones, or the procedural
     // rig groups): the walk sway and the attack lunge move the visible body

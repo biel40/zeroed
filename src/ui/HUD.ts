@@ -1,9 +1,10 @@
 import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
-import { formatNumber, getLanguage, isLanguage, onLanguageChange, setLanguage, t } from '../i18n/i18n';
+import { formatNumber, onLanguageChange, t } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
+import { LanguagePicker } from './LanguagePicker';
 import { SettingsPanel } from './SettingsPanel';
 import { gameOverEpitaph, lampProgress, roundMarks } from './SurvivalPresentation';
 
@@ -109,23 +110,11 @@ export class HUD {
     mustGet('privacy-close').onclick = () => privacyDialog.close();
 
     this.settings = new SettingsPanel(mustGet('settings-dialog') as HTMLDialogElement,
-      [mustGet('menu-settings'), mustGet('pause-settings')]);
+      mustGet('menu-settings'), mustGet('pause-settings'));
 
     // The language is only chosen from the main menu; in-game texts read it when rendered.
-    const languageButtons = mustGet('language-select').querySelectorAll<HTMLButtonElement>('[data-language]');
-    const syncLanguageButtons = (): void => {
-      for (const button of languageButtons) {
-        button.setAttribute('aria-pressed', String(button.dataset.language === getLanguage()));
-      }
-    };
-    for (const button of languageButtons) {
-      button.onclick = () => {
-        if (isLanguage(button.dataset.language)) setLanguage(button.dataset.language);
-      };
-    }
-    syncLanguageButtons();
+    new LanguagePicker(mustGet('language-select'), mustGet('language-toggle'), mustGet('language-options'));
     onLanguageChange(() => {
-      syncLanguageButtons();
       // Cached HUD texts were rendered in the previous language.
       this.lastWeapon = this.lastAmmo = this.lastMode = this.lastZombies = this.lastLamps = '';
       this.lastRound = -1;
@@ -243,7 +232,7 @@ export class HUD {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
   }
 
-  /** Main-menu quality buttons; the choice applies from the next match. */
+  /** Settings quality buttons (main menu only); the choice applies from the next match. */
   public setQualitySelect(current: QualityLevel, onSelect: (quality: QualityLevel) => void): void {
     const buttons = mustGet('quality-select').querySelectorAll<HTMLButtonElement>('[data-quality]');
     const sync = (selected: QualityLevel): void => {

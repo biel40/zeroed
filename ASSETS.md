@@ -77,7 +77,9 @@ y guante comparten esqueleto, asi que cada brazo cuesta cuatro draw calls
 ## Modelos de zombies (`public/assets/zombies/`)
 
 El walker vuelve al asset original de **Quaternius**, via **Poly Pizza**,
-ya incluido en el proyecto. Brutus se genera localmente a partir de ese walker.
+ya incluido en el proyecto, con una unica modificacion: la celda de piel de su
+paleta pasa del verde original a un gris cadaverico (`#b0b0b6`). Brutus se
+genera localmente a partir de ese walker y hereda ese color.
 Los clips concretos por estado se resuelven por nombre en
 `src/zombies/ZombieVisual.ts` (contrato verificado en `tests/zombieAssets.test.ts`).
 

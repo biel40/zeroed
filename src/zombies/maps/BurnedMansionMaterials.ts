@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeBloodDecalTexture } from './BloodDecalTexture';
 
 export type MansionSurfaceMaterials = {
   readonly wallVariants: readonly THREE.MeshStandardMaterial[];
@@ -10,7 +11,8 @@ export type MansionSurfaceMaterials = {
   readonly metal: THREE.MeshStandardMaterial;
   readonly sootSoft: THREE.MeshStandardMaterial;
   readonly sootHeavy: THREE.MeshStandardMaterial;
-  readonly exposedBrick: THREE.MeshStandardMaterial;
+  readonly bloodSplatter: THREE.MeshStandardMaterial;
+  readonly bloodSmear: THREE.MeshStandardMaterial;
   readonly damp: THREE.MeshStandardMaterial;
   readonly crack: THREE.MeshStandardMaterial;
 };
@@ -125,7 +127,7 @@ function makeSurfaceMaterial(
 }
 
 function makeDecalTexture(
-  kind: 'soot' | 'brick' | 'damp' | 'crack',
+  kind: 'soot' | 'damp' | 'crack',
   seed: number,
 ): THREE.DataTexture {
   const size = 128;
@@ -148,13 +150,6 @@ function makeDecalTexture(
         const patch = Math.max(0, 1 - Math.hypot((u - 0.48) / 0.53, (v - 0.55) / 0.48));
         alpha = patch * (0.28 + noise * 0.42);
         color = [38, 47, 39];
-      } else if (kind === 'brick') {
-        const edge = Math.max(0, 1 - Math.hypot((u - 0.5) / 0.49, (v - 0.5) / 0.48));
-        const row = Math.floor(v * 9);
-        const brickU = (u * 5 + (row % 2) * 0.5) % 1;
-        const mortar = brickU < 0.07 || (v * 9) % 1 < 0.08;
-        alpha = edge > noise * 0.28 ? Math.min(1, edge * 3) : 0;
-        color = mortar ? [67, 62, 55] : [112 + Math.round(noise * 25), 66, 49];
       } else {
         const branch = Math.abs(u - 0.5 - Math.sin(v * 20 + seed) * (0.025 + v * 0.035));
         const offshoot = Math.abs(u - 0.43 - v * 0.2);
@@ -173,14 +168,14 @@ function makeDecalTexture(
   return texture;
 }
 
-function makeDecalMaterial(name: string, kind: 'soot' | 'brick' | 'damp' | 'crack', seed: number): THREE.MeshStandardMaterial {
+function makeDecalMaterial(name: string, map: THREE.Texture, alphaTest = 0.03, roughness = 1): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     name,
-    map: makeDecalTexture(kind, seed),
+    map,
     transparent: true,
-    alphaTest: kind === 'crack' ? 0.35 : 0.03,
+    alphaTest,
     depthWrite: false,
-    roughness: 1,
+    roughness,
     metalness: 0,
     polygonOffset: true,
     polygonOffsetFactor: -2,
@@ -204,11 +199,13 @@ export function createMansionSurfaceMaterials(anisotropyLimit: number): MansionS
     floorWood: makeSurfaceMaterial('deteriorated_wood_floor', wood, 0x706355, 0.94, 0.45, 1.25),
     charredWood: makeSurfaceMaterial('charred_wood', wood, 0x443a31, 0.98, 0.55, 0.9),
     metal: new THREE.MeshStandardMaterial({ name: 'oxidized_metal', color: 0x454849, roughness: 0.82, metalness: 0.35 }),
-    sootSoft: makeDecalMaterial('soot_soft', 'soot', 17),
-    sootHeavy: makeDecalMaterial('soot_heavy', 'soot', 83),
-    exposedBrick: makeDecalMaterial('exposed_brick', 'brick', 41),
-    damp: makeDecalMaterial('damp_stain', 'damp', 67),
-    crack: makeDecalMaterial('plaster_crack', 'crack', 29),
+    sootSoft: makeDecalMaterial('soot_soft', makeDecalTexture('soot', 17)),
+    sootHeavy: makeDecalMaterial('soot_heavy', makeDecalTexture('soot', 83)),
+    // Dried blood keeps a faint sheen over the matte plaster.
+    bloodSplatter: makeDecalMaterial('blood_splatter', makeBloodDecalTexture('splatter', 41), 0.03, 0.62),
+    bloodSmear: makeDecalMaterial('blood_smear', makeBloodDecalTexture('smear', 53), 0.03, 0.62),
+    damp: makeDecalMaterial('damp_stain', makeDecalTexture('damp', 67)),
+    crack: makeDecalMaterial('plaster_crack', makeDecalTexture('crack', 29), 0.35),
   };
 }
 

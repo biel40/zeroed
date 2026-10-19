@@ -1116,10 +1116,10 @@ export class BurnedMansionArena implements ZombieArena {
       readonly material: THREE.MeshStandardMaterial;
       readonly role: string;
     }> = [
-      { x: -5.4, y: 1.35, z: 1.835, width: 1.45, height: 1.7, rotationY: 0, material: this.materials.exposedBrick, role: 'exposed-brick' },
+      { x: -5.4, y: 1.35, z: 1.835, width: 1.45, height: 1.7, rotationY: 0, material: this.materials.bloodSplatter, role: 'blood-stain' },
       { x: -1.2, y: 1.25, z: 1.835, width: 0.8, height: 1.5, rotationY: 0, material: this.materials.crack, role: 'wall-crack' },
       { x: -0.165, y: 1.45, z: -5.9, width: 1.1, height: 1.8, rotationY: Math.PI / 2, material: this.materials.damp, role: 'damp-stain' },
-      { x: MANSION_BUNKER_DIVIDER_X - 0.165, y: 1.45, z: -6.15, width: 1.15, height: 1.8, rotationY: Math.PI / 2, material: this.materials.exposedBrick, role: 'exposed-brick' },
+      { x: MANSION_BUNKER_DIVIDER_X - 0.165, y: 1.25, z: -6.15, width: 1.3, height: 1.3, rotationY: Math.PI / 2, material: this.materials.bloodSmear, role: 'blood-stain' },
       { x: -7.0, y: 2.42, z: 5.4, width: 1.7, height: 1.35, rotationY: Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -7.0, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: -3.5, y: 2.42, z: 10.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
