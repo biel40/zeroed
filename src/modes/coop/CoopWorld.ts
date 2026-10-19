@@ -5,11 +5,12 @@ import { defaultNow } from '../../network/Interpolation';
 import type { BarrierNetState, CoopPlayerId, PlayerNetState } from '../../network/Protocol';
 import type { PointDoor } from '../../zombies/doors/PointDoor';
 import type { WallBuy } from '../../zombies/wallbuys/WallBuy';
-import type { ArenaAmmoRefill, ArenaCompletionInteraction, ArenaRitualInteraction,
-  ArenaSoulLampInteraction, ArenaWeaponPickup } from '../../zombies/maps/ZombieArena';
+import { hasSoulRitual, type ArenaAmmoRefill, type ArenaCompletionInteraction, type ArenaRitualInteraction,
+  type ArenaSoulLampInteraction, type ArenaWeaponPickup, type SoulRitualArena,
+  type ZombieArena } from '../../zombies/maps/ZombieArena';
 import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
-import { BurnedMansionArena } from '../../zombies/maps/BurnedMansionArena';
+import { COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS } from '../../config/zombieMaps';
 import { RITUAL_SCARE_TIMELINE } from '../../zombies/secret-room/SecretRoomSystem';
 import type { ModeContext } from '../GameMode';
 import { cameraSpatialCue, type SpatialCue } from '../../audio/SpatialCue';
@@ -21,12 +22,33 @@ const DOOR_LOOK_DOT = 0.6;
 const REMOTE_DOOR_RANGE = 3.5;
 
 /**
- * Map state shared by both co-op roles: the Burned Mansion arena, collider
+ * Everything the co-op roles replicate today: wall collision, the soul
+ * ritual, bunker pickups, ammo refills and a paid ending.
+ */
+export type CoopArena = ZombieArena & SoulRitualArena & Required<Pick<ZombieArena,
+  'wallColliders' | 'floorTransitions' | 'weaponPickups' | 'ammoRefills'
+  | 'soulLampInteractions' | 'ritualInteraction' | 'completionInteraction'>>;
+
+function isCoopArena(arena: ZombieArena): arena is CoopArena {
+  return hasSoulRitual(arena) && !!arena.wallColliders && !!arena.floorTransitions
+    && !!arena.weaponPickups && !!arena.ammoRefills && !!arena.soulLampInteractions
+    && !!arena.ritualInteraction && !!arena.completionInteraction;
+}
+
+function createCoopArena(ctx: ModeContext): CoopArena {
+  const map = ZOMBIE_MAPS[COOP_ZOMBIE_MAP_ID];
+  const arena = map.createArena(ctx.scene, ctx.profile);
+  if (!map.coop || !isCoopArena(arena)) throw new Error(`Zombies map ${map.id} does not support co-op`);
+  return arena;
+}
+
+/**
+ * Map state shared by both co-op roles: the co-op map's arena, collider
  * bookkeeping, doors and barricade boards. It owns no match authority; the
  * host decides who pays and when, and the guest replays those decisions.
  */
 export class CoopWorld {
-  public readonly arena: BurnedMansionArena;
+  public readonly arena: CoopArena;
   /** Host hook: zombie navigation must follow every topology change. */
   public onTopologyChanged: (() => void) | null = null;
 
@@ -34,7 +56,7 @@ export class CoopWorld {
   private readonly tmpDirection = new THREE.Vector3();
 
   public constructor(private readonly ctx: ModeContext) {
-    this.arena = new BurnedMansionArena(ctx.scene, ctx.profile);
+    this.arena = createCoopArena(ctx);
     this.arena.init();
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
@@ -271,11 +293,8 @@ export class CoopWorld {
    */
   public unlockDoor(door: PointDoor, spend: (cost: number) => boolean): boolean {
     if (!door.isLocked || !door.tryUnlock(spend).success) return false;
-    if (this.arena.activateDoor(door.id)) {
-      this.ctx.audio.playDoorUnlock();
-      // The bunker animates open first; the arena reports its topology change later.
-      if (door.id !== 'nuclear-bunker') this.syncTopology();
-    }
+    // The arena reports the new layout through onTopologyChanged.
+    if (this.arena.activateDoor(door.id)) this.ctx.audio.playDoorUnlock();
     return true;
   }
 

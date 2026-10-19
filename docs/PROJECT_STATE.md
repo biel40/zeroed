@@ -4,8 +4,10 @@
 
 ## Funcional
 
-- Entrada WebGL, menu Zombies, mapa `burned-mansion`, carga de
-  assets con fallback y shell FPS compartido desktop/tactil.
+- Entrada WebGL, selector de mapas con tarjetas ilustradas (Burned Mansion
+  incluido; Station 33 premium, solo individual, en acceso anticipado para la
+  beta y aun un stub sin contenido), carga de assets con fallback y shell FPS
+  compartido desktop/tactil. No hay pagos: premium solo es presentacion.
 - Armas declarativas, balistica segmentada, energia, headshots, recargas,
   economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,

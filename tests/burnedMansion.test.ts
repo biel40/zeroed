@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { DeviceProfile } from '../src/core/DeviceProfile';
 import type { Input } from '../src/player/Input';
 import { EYE_HEIGHT, PlayerController, stairGroundY } from '../src/player/PlayerController';
@@ -39,6 +39,7 @@ import {
 } from '../src/zombies/maps/BurnedMansionConfig';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
 import { RITUAL_SCARE_TIMELINE } from '../src/zombies/secret-room/SecretRoomSystem';
+import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
 
 const profile: DeviceProfile = {
   isMobile: false,
@@ -199,6 +200,41 @@ describe('Burned Mansion topology', () => {
     expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(false);
     arena.update(2);
     expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(true);
+  });
+
+  it('reports paid doors at once and the bunker only after its opening animation', () => {
+    const arena = makeArena();
+    const onTopologyChanged = vi.fn();
+    arena.onTopologyChanged = onTopologyChanged;
+    arena.doors.find((door) => door.id === 'to-dining')!.tryUnlock(() => true);
+    expect(arena.activateDoor('to-dining')).toBe(true);
+    expect(onTopologyChanged).toHaveBeenCalledOnce();
+
+    arena.doors.find((door) => door.id === 'nuclear-bunker')!.tryUnlock(() => true);
+    expect(arena.activateDoor('nuclear-bunker')).toBe(true);
+    expect(onTopologyChanged).toHaveBeenCalledOnce();
+    arena.update(3);
+    expect(onTopologyChanged).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps its smoke-filled ambience and the nuclear ending', () => {
+    const scene = new THREE.Scene();
+    const arena = new BurnedMansionArena(scene, profile);
+    arena.init();
+    expect((scene.background as THREE.Color).getHex()).toBe(0x0d0b0a);
+    expect(scene.fog).toBeInstanceOf(THREE.FogExp2);
+    expect((scene.fog as THREE.FogExp2).color.getHex()).toBe(0x17110e);
+    expect((scene.fog as THREE.FogExp2).density).toBe(0.018);
+    const hemisphere = arena.group.children.find((child) => child instanceof THREE.HemisphereLight) as THREE.HemisphereLight;
+    expect(hemisphere.color.getHex()).toBe(0x34465e);
+    expect(hemisphere.groundColor.getHex()).toBe(0x110d0a);
+    expect(hemisphere.intensity).toBe(profile.useReducedEffects ? 0.18 : 0.25);
+    expect(arena.ambience.musicTrack).toBe('background_music_theme');
+    expect(arena.completionInteraction.ending).toEqual({
+      presentation: 'nuclear',
+      audio: 'nuclear',
+      duration: NUCLEAR_ENDING_DURATION,
+    });
   });
 
   it('keeps the Mystery Box behind the first paid divider', () => {

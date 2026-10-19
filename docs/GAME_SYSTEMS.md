@@ -26,8 +26,8 @@ recarga bascula el cargador sobre el teton delantero con foley propio.
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
 
-La música usa una pista en bucle durante la partida y comparte otra entre el
-menú principal y la pausa. Al pausar se conserva la posición de la pista de
+La música usa en bucle durante la partida la pista que declara el mapa y comparte
+otra entre el menú principal y la pausa. Al pausar se conserva la posición de la pista de
 partida; al reanudar continúa desde ese punto. El inicio de ronda se reproduce
 como cue independiente sobre la música de fondo.
 
@@ -108,7 +108,15 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 ## Mapas e interacciones
 
 - `BurnedMansionArena`: dos plantas, colision, nueve ventanas, puertas por
-  Points, wall buys, bunker, pickups, escalera continua y sala secreta.
+  Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
+  unico mapa cooperativo.
+- `Station33Arena`: stub individual y premium, un suelo con dos spawns sin
+  puertas, barreras, compras ni final.
+- El menu principal muestra una tarjeta por mapa con arte SVG animado, nombre,
+  lema, jugadores y acceso (incluido o premium, con brillo dorado y aviso de
+  acceso anticipado); `HUD` rellena jugadores y acceso desde el registro. La
+  pantalla de carga y la pausa nombran el mapa elegido. `?map=<id>` sigue
+  disponible como atajo de pruebas.
 - Las luminarias ambientales de Burned Mansion emiten rojo y sufren parpadeos
   electricos irregulares y desfasados; las luces funcionales de armas,
   recompensas y objetivos conservan su identidad visual.
@@ -155,7 +163,7 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
   El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
   en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
   restaura el cierre y el inventario inicial.
-  El final de 30000 Points pasa por
+  El final de 30000 Points es el que declara la mansion (`MANSION_NUCLEAR_ENDING`) y pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
   La secuencia nuclear dura 25 s y es CSS puro (transform/opacity, sin bordes
   expuestos): alarma con cuenta atras, detonacion a `NUCLEAR_DETONATION_TIME`

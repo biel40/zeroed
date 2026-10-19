@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { AssetManager } from '../assets/AssetManager';
 import type { AudioSystem } from '../audio/AudioSystem';
+import type { MusicTrackName } from '../audio/MusicManager';
 import type { DeviceProfile } from '../core/DeviceProfile';
 import type { Stats } from '../game/Stats';
 import type { Input } from '../player/Input';
@@ -70,6 +71,8 @@ export interface GameMode {
   readonly startingInventory?: readonly WeaponId[];
   /** Inventory slot cap; defaults to weaponIds.length (effectively uncapped). */
   readonly maxWeapons?: number;
+  /** Looping track while playing, taken from the map once `init` built it. */
+  readonly gameplayMusic?: MusicTrackName | null;
   /**
    * Networked match: the world is shared, so the local pause menu only gates
    * this player's input and the Game loop keeps simulating behind it.

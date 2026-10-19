@@ -64,11 +64,30 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
   },
 };
 
-const ENDING_TRACKS: readonly MusicTrackName[] = ['nuclear_alarm', 'nuclear_explosion', 'radioactivity'];
 /** nuclear_explosion.mp3 opens with ~0.5 s of silence before the blast. */
 const NUCLEAR_EXPLOSION_ONSET = 0.5;
 /** Seconds to hold the explosion track so its blast lands on the visual flash. */
 export const NUCLEAR_EXPLOSION_AUDIO_DELAY = NUCLEAR_DETONATION_TIME - NUCLEAR_EXPLOSION_ONSET;
+
+/** Audio sets a map ending can request through `ArenaEnding.audio`. */
+export type EndingAudioId = 'nuclear';
+
+interface EndingAudioDef {
+  /** Every track of the ending; all are created up front so they buffer together. */
+  readonly tracks: readonly MusicTrackName[];
+  /** One-shot held back so its hit lands on a beat of the cinematic. */
+  readonly delayed: MusicTrackName;
+  readonly delaySeconds: number;
+}
+
+const ENDING_AUDIO: Record<EndingAudioId, EndingAudioDef> = {
+  nuclear: {
+    tracks: ['nuclear_alarm', 'nuclear_explosion', 'radioactivity'],
+    delayed: 'nuclear_explosion',
+    delaySeconds: NUCLEAR_EXPLOSION_AUDIO_DELAY,
+  },
+};
+const ENDING_TRACKS: readonly MusicTrackName[] = Object.values(ENDING_AUDIO).flatMap((ending) => ending.tracks);
 
 export class MusicManager {
   public enabled = false;
@@ -163,24 +182,25 @@ export class MusicManager {
   }
 
   /**
-   * Alarm and ambience start together; the one-shot explosion waits so its
-   * blast lands on the cinematic's detonation flash.
+   * The ending's loops start together; its delayed one-shot (the nuclear
+   * blast) waits so it lands on the cinematic's beat.
    */
-  startEndingAudio(): void {
+  startEndingAudio(id: EndingAudioId): void {
     if (!this.enabled || this.endingAudioStarted) return;
     this.stop();
     this.endingAudioStarted = true;
-    for (const name of ENDING_TRACKS) {
-      // The explosion element is still created now so it buffers meanwhile.
+    const ending = ENDING_AUDIO[id];
+    for (const name of ending.tracks) {
+      // The delayed element is still created now so it buffers meanwhile.
       const player = this.getPlayer(name);
-      if (player && name !== 'nuclear_explosion') void player.play().catch(() => undefined);
+      if (player && name !== ending.delayed) void player.play().catch(() => undefined);
     }
     this.explosionTimer = setTimeout(() => {
       this.explosionTimer = null;
       if (!this.endingAudioStarted) return;
-      const player = this.getPlayer('nuclear_explosion');
+      const player = this.getPlayer(ending.delayed);
       if (player) void player.play().catch(() => undefined);
-    }, NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000);
+    }, ending.delaySeconds * 1000);
   }
 
   stopEndingAudio(): void {
@@ -229,10 +249,9 @@ export class MusicManager {
     void player.play().catch(() => undefined);
   }
 
-  /** Gameplay bed: starts once at match start and keeps looping through rounds. */
-  startGameplayLoop(): void {
+  /** Gameplay bed (the map's track): starts once at match start and keeps looping through rounds. */
+  startGameplayLoop(name: MusicTrackName): void {
     if (!this.enabled) return;
-    const name: MusicTrackName = 'background_music_theme';
     const player = this.getPlayer(name);
     if (!player) return;
     if (!player.paused) return;

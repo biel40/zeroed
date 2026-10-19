@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { t } from '../i18n/i18n';
 import { actionKey, doorPrompt, wallBuyPrompt, weaponCaseLocked, weaponCasePrompt } from '../ui/InteractionPrompts';
-import type { ZombieMapId } from '../config/zombieMaps';
+import { ZOMBIE_MAPS, type ZombieMapId } from '../config/zombieMaps';
+import type { MusicTrackName } from '../audio/MusicManager';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
 import { PlayerHealth } from '../game/PlayerHealth';
@@ -14,6 +15,7 @@ import type { MeleeArmDriver } from '../weapons/ViewArms';
 import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zombies/MysteryBox';
+import { mysteryBoxFootprint } from '../zombies/MysteryBoxFootprint';
 import { MysteryBoxView } from '../zombies/MysteryBoxView';
 import { RoundManager } from '../zombies/RoundManager';
 import { Zombie } from '../zombies/Zombie';
@@ -31,19 +33,19 @@ import {
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
 import { ZombieManager } from '../zombies/ZombieManager';
 import type { ZombieKillSource } from '../zombies/ZombieDeath';
-import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { RITUAL_SCARE_TIMELINE } from '../zombies/secret-room/SecretRoomSystem';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
-import type { ZombieArena } from '../zombies/maps/ZombieArena';
+import { hasSoulRitual, type ZombieArena } from '../zombies/maps/ZombieArena';
 import type {
   ArenaAmmoRefill,
+  ArenaCompletionInteraction,
+  ArenaEnding,
   ArenaRitualInteraction,
   ArenaSoulLampInteraction,
   ArenaWeaponPickup,
 } from '../zombies/maps/ZombieArena';
-import type { ArenaCompletionInteraction } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
@@ -59,8 +61,9 @@ const MOAN_SPREAD = 9;
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
  * brief post-hit invulnerability, game over / restart, and the mode-only
- * Ray Gun firing visible energy bolts with splash damage. The mode owns the
- * Burned Mansion atmosphere, progression and interactions.
+ * Ray Gun firing visible energy bolts with splash damage. The map registry
+ * builds the arena (geometry, interactions, ambience and ending); the mode
+ * owns the run and its progression.
  */
 export class ZombiesMode implements GameMode {
   readonly id = 'zombies' as const;
@@ -106,7 +109,8 @@ export class ZombiesMode implements GameMode {
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private gameOver = false;
   private readonly runFlow = new ZombiesRunFlow();
-  private mansionStaticColliders = new Set<THREE.Object3D>();
+  /** Arena colliders currently registered in `ctx.hitColliders`. */
+  private arenaStaticColliders = new Set<THREE.Object3D>();
   private trauma = 0;
   private shakeSeed = 0;
   private moanTimer = MOAN_MIN_DELAY;
@@ -118,14 +122,17 @@ export class ZombiesMode implements GameMode {
   private readonly knife = new Knife();
   private readonly knifeRaycaster = new THREE.Raycaster();
 
-  constructor(mapId: ZombieMapId = 'burned-mansion') {
-    if (mapId !== 'burned-mansion') throw new Error(`Unknown Zombies map: ${mapId}`);
+  constructor(readonly mapId: ZombieMapId = 'burned-mansion') {}
+
+  /** The map's gameplay bed; Game starts it once the match begins. */
+  get gameplayMusic(): MusicTrackName | null {
+    return this.arena?.ambience.musicTrack ?? null;
   }
 
   init(ctx: ModeContext): void {
     this.ctx = ctx;
 
-    this.arena = new BurnedMansionArena(ctx.scene, ctx.profile);
+    this.arena = ZOMBIE_MAPS[this.mapId].createArena(ctx.scene, ctx.profile);
 
     this.arena.init();
     ctx.scene.add(this.arena.group);
@@ -133,7 +140,7 @@ export class ZombiesMode implements GameMode {
     // The arena owns static ballistics geometry; zombies add dynamic hitboxes.
     ctx.hitColliders.length = 0;
     ctx.hitColliders.push(...this.arena.colliders);
-    this.mansionStaticColliders = new Set(this.arena.colliders);
+    this.arenaStaticColliders = new Set(this.arena.colliders);
 
     this.zombies = new ZombieManager(
       Math.random,
@@ -145,6 +152,7 @@ export class ZombiesMode implements GameMode {
       this.arena.floorTransitions,
     );
     this.zombies.setNavigationBounds(this.arena.navigationBounds);
+    this.zombies.setBodyObstacles([mysteryBoxFootprint(this.arena.mysteryBoxPlacement)]);
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(
       headshot,
@@ -163,8 +171,8 @@ export class ZombiesMode implements GameMode {
     );
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     ctx.scene.add(this.zombies.group);
-    if (this.arena instanceof BurnedMansionArena) {
-      this.arena.onTopologyChanged = () => this.syncMansionArena(this.mansionStaticColliders);
+    this.arena.onTopologyChanged = () => this.syncArenaTopology();
+    if (hasSoulRitual(this.arena)) {
       this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
       this.arena.onSoulLampCompleted = (position) => ctx.audio.playSoulLampComplete(this.spatialCueFor(position));
       this.arena.onSecretRoomUnlocked = (position) => ctx.audio.playSecretRoomUnlock(this.spatialCueFor(position));
@@ -194,14 +202,13 @@ export class ZombiesMode implements GameMode {
     this.boxView.group.rotation.y = this.arena.mysteryBoxPlacement.yaw;
     ctx.scene.add(this.boxView.group);
 
-    // Player wall collision / floor transitions for the mansion.
+    // The arena owns where the player stands and how far they can move.
+    ctx.player.setBounds(this.arena.playerBounds);
     if (this.arena.useWallCollision) {
-      if (this.arena.playerBounds) ctx.player.setBounds(this.arena.playerBounds);
       if (this.arena.wallColliders) ctx.player.setWallColliders(this.arena.wallColliders);
       if (this.arena.floorTransitions) ctx.player.setFloorTransitions(this.arena.floorTransitions);
-      const spawn = this.arena.playerSpawn ?? { x: 0, y: 1.7, z: 0, floor: 0 };
-      ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
     }
+    this.placePlayerAtSpawn();
 
     ctx.hud.setZombiesPanelVisible(true);
     ctx.hud.setZombiesRestartHandler(() => this.restart());
@@ -433,9 +440,9 @@ export class ZombiesMode implements GameMode {
         this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: completion.cost }));
         return;
       }
-      if (!this.runFlow.beginEnding()) return;
+      if (!this.runFlow.beginEnding(completion.ending.duration)) return;
       if (!this.economy.spend(completion.cost)) throw new Error('Completion purchase became unaffordable');
-      this.beginEnding();
+      this.beginEnding(completion.ending);
       return;
     }
 
@@ -819,27 +826,22 @@ export class ZombiesMode implements GameMode {
 
   private onDoorUnlocked(door: PointDoor): void {
     this.ctx.audio.playDoorUnlock();
-    if (this.arena instanceof BurnedMansionArena) {
-      const previousStaticColliders = new Set(this.arena.colliders);
-      if (this.arena.activateDoor(door.id) && door.id !== 'nuclear-bunker') {
-        this.syncMansionArena(previousStaticColliders);
-      }
-    }
+    // The arena reports the new layout through onTopologyChanged.
+    this.arena.activateDoor(door.id);
   }
 
-  private syncMansionArena(previousStaticColliders: ReadonlySet<THREE.Object3D>): void {
-    if (!(this.arena instanceof BurnedMansionArena)) return;
+  private syncArenaTopology(): void {
     this.arena.refreshSpawnPoints();
     this.arena.refreshColliders();
     // Remove only old static map objects: live zombie hitboxes share this array.
     for (let index = this.ctx.hitColliders.length - 1; index >= 0; index--) {
-      if (previousStaticColliders.has(this.ctx.hitColliders[index])) {
+      if (this.arenaStaticColliders.has(this.ctx.hitColliders[index])) {
         this.ctx.hitColliders.splice(index, 1);
       }
     }
     this.ctx.hitColliders.push(...this.arena.colliders);
-    this.mansionStaticColliders = new Set(this.arena.colliders);
-    this.ctx.player.setWallColliders(this.arena.wallColliders);
+    this.arenaStaticColliders = new Set(this.arena.colliders);
+    if (this.arena.wallColliders) this.ctx.player.setWallColliders(this.arena.wallColliders);
     this.zombies.setSpawnPoints(this.arena.spawnPoints);
     this.zombies.setBarriers(this.arena.barriers);
     this.zombies.registerColliders(this.ctx.hitColliders);
@@ -903,7 +905,7 @@ export class ZombiesMode implements GameMode {
     // headshot, and neither stacks with the ordinary kill payout.
     if (source === 'knife') this.economy.awardKnifeKill(rewardMultiplier);
     else this.economy.awardKill(headshot, rewardMultiplier);
-    if (deathPosition && floor !== undefined && this.arena instanceof BurnedMansionArena) {
+    if (deathPosition && floor !== undefined && hasSoulRitual(this.arena)) {
       this.arena.captureSoul(deathPosition, floor);
     }
     if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) {
@@ -937,7 +939,7 @@ export class ZombiesMode implements GameMode {
     this.rayGunUnlocked = true;
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
-    if (this.arena instanceof BurnedMansionArena) this.arena.unlockSecretRoom();
+    if (hasSoulRitual(this.arena)) this.arena.unlockSecretRoom();
     this.ctx.grantWeapon('raygun');
     this.ctx.setWeaponInfiniteReserve('raygun');
     this.ctx.grantWeapon('tesla');
@@ -1075,12 +1077,9 @@ export class ZombiesMode implements GameMode {
     this.energy?.reset();
     if (this.zombies) this.zombies.reset();
     this.footsteps?.reset();
-    if (this.arena instanceof BurnedMansionArena) {
-      const previousStaticColliders = new Set(this.arena.colliders);
+    if (this.arena) {
       this.arena.reset();
-      this.syncMansionArena(previousStaticColliders);
-    } else if (this.arena) {
-      this.arena.reset();
+      this.syncArenaTopology();
     }
     this.activeRepairBarrier = null;
     this.knife.reset();
@@ -1089,10 +1088,7 @@ export class ZombiesMode implements GameMode {
     // Fresh run: M1911 with 8 / 32, no box weapons, box back to closed.
     this.box?.reset();
     this.ctx.resetArsenal();
-    if (this.arena?.useWallCollision && this.arena.playerBounds && this.ctx.player?.teleport) {
-      const spawn = this.arena.playerSpawn ?? { x: 0, y: 1.7, z: 0, floor: 0 };
-      this.ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
-    }
+    if (this.arena && this.ctx.player) this.placePlayerAtSpawn();
     this.ctx.hud.hideGameOver();
     this.ctx.hud.hideEnding?.();
     this.ctx.hud.setHudVisible?.(true);
@@ -1100,7 +1096,12 @@ export class ZombiesMode implements GameMode {
     this.ctx.lockPointer();
   }
 
-  private beginEnding(): void {
+  private placePlayerAtSpawn(): void {
+    const spawn = this.arena.playerSpawn;
+    this.ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
+  }
+
+  private beginEnding(ending: ArenaEnding): void {
     this.activeRepairBarrier?.stopRepair();
     this.activeRepairBarrier = null;
     this.knife.reset();
@@ -1109,10 +1110,10 @@ export class ZombiesMode implements GameMode {
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
     this.ctx.audio.stopWind?.();
-    this.ctx.audio.startEndingAudio();
+    this.ctx.audio.startEndingAudio(ending.audio);
     this.ctx.hud.setInteractionPrompt(null);
     this.pushHudState();
-    this.ctx.hud.showEnding(this.rounds.round);
+    this.ctx.hud.showEnding(this.rounds.round, ending.presentation);
     this.ctx.unlockPointer();
   }
 

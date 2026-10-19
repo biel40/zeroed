@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { projectBoxUVs } from '../maps/BurnedMansionMaterials';
+import { projectBoxUVs } from '../maps/shared/BoxUVs';
 import { makeSoftDotTexture } from './BuyableDoorVisual';
 import type { DoorOpeningState } from './PointDoorView';
 

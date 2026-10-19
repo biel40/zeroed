@@ -33,8 +33,8 @@ describe('nuclear ending audio', () => {
     vi.stubGlobal('Audio', FakeAudio);
     const music = new MusicManager();
     music.setEnabled(true);
-    music.startGameplayLoop();
-    music.startEndingAudio();
+    music.startGameplayLoop('background_music_theme');
+    music.startEndingAudio('nuclear');
     vi.advanceTimersByTime(NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000);
     const [gameplay, alarm, explosion, radioactivity] = FakeAudio.players;
     expect(gameplay.paused).toBe(true);
@@ -44,7 +44,7 @@ describe('nuclear ending audio', () => {
     expect(explosion.loop).toBe(false);
     expect(radioactivity.src).toBe(ZOMBIES_MUSIC_PATHS.radioactivity);
     expect(radioactivity.loop).toBe(true);
-    music.startEndingAudio();
+    music.startEndingAudio('nuclear');
     expect(alarm.play).toHaveBeenCalledTimes(1);
     expect(explosion.play).toHaveBeenCalledTimes(1);
     expect(radioactivity.play).toHaveBeenCalledTimes(1);
@@ -68,7 +68,7 @@ describe('nuclear ending audio', () => {
     music.preload();
     const explosion = FakeAudio.players.find(p => p.src === ZOMBIES_MUSIC_PATHS.nuclearExplosion)!;
     const alarm = FakeAudio.players.find(p => p.src === ZOMBIES_MUSIC_PATHS.nuclearAlarm)!;
-    music.startEndingAudio();
+    music.startEndingAudio('nuclear');
     expect(alarm.play).toHaveBeenCalledTimes(1);
     expect(explosion.play).not.toHaveBeenCalled();
     vi.advanceTimersByTime(NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000 - 1);
@@ -84,11 +84,11 @@ describe('nuclear ending audio', () => {
     music.setEnabled(true);
     music.preload();
     const explosion = FakeAudio.players.find(p => p.src === ZOMBIES_MUSIC_PATHS.nuclearExplosion)!;
-    music.startEndingAudio();
+    music.startEndingAudio('nuclear');
     music.stopEndingAudio();
     vi.advanceTimersByTime(NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000 * 2);
     expect(explosion.play).not.toHaveBeenCalled();
-    music.startEndingAudio();
+    music.startEndingAudio('nuclear');
     music.stop();
     vi.advanceTimersByTime(NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000 * 2);
     expect(explosion.play).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('nuclear ending audio', () => {
     music.preload();
     const alarm = FakeAudio.players.find(p => p.src === ZOMBIES_MUSIC_PATHS.nuclearAlarm)!;
     alarm.play.mockRejectedValue(new Error('Asset missing'));
-    music.startEndingAudio();
+    music.startEndingAudio('nuclear');
     vi.advanceTimersByTime(NUCLEAR_EXPLOSION_AUDIO_DELAY * 1000);
     await Promise.resolve();
     for (const player of FakeAudio.players.filter(p =>

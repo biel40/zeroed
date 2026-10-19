@@ -15,23 +15,23 @@ import { t, type TranslationKey } from '../../i18n/i18n';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
 import { CreepyAreaLights } from '../../rendering/CreepyAreaLights';
-import { MYSTERY_BOX_SIZE } from '../MysteryBox';
+import { mysteryBoxFootprint } from '../MysteryBoxFootprint';
 import type {
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
   ArenaRitualInteraction,
   ArenaSoulLampInteraction,
   ArenaWeaponPickup,
+  SoulRitualArena,
   ZombieArena,
 } from './ZombieArena';
-import {
-  createMansionSurfaceMaterials,
-  projectBoxUVs,
-  type MansionSurfaceMaterials,
-} from './BurnedMansionMaterials';
+import { createMansionSurfaceMaterials, type MansionSurfaceMaterials } from './BurnedMansionMaterials';
+import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
+import { projectBoxUVs } from './shared/BoxUVs';
 import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
+  MANSION_AMBIENCE,
   MANSION_AMMO_REFILLS,
   MANSION_BARRIERS,
   MANSION_BUNKER_BOUNDS,
@@ -251,9 +251,10 @@ class MansionAmmoRefill implements ArenaAmmoRefill {
  * player-collision list. Exterior walls are segmented around real window
  * openings; paid doors occupy real apertures rather than overlapping walls.
  */
-export class BurnedMansionArena implements ZombieArena {
+export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   readonly id = 'burned-mansion';
   readonly group = new THREE.Group();
+  readonly ambience = MANSION_AMBIENCE;
   readonly mysteryBoxPlacement = MANSION_BOX_PLACEMENT;
   readonly playerSpawn = MANSION_PLAYER_SPAWN;
   readonly useWallCollision = true;
@@ -386,6 +387,7 @@ export class BurnedMansionArena implements ZombieArena {
     );
     for (const door of this.doors) {
       const view = new PointDoorView(door, this.group, {
+        sealed: door.id === 'nuclear-bunker',
         woodMaterial: this.materials.floorWood,
         reducedEffects: this.profile.useReducedEffects,
       });
@@ -409,8 +411,7 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   public init(): void {
-    this.scene.background = new THREE.Color(0x0d0b0a);
-    this.scene.fog = new THREE.FogExp2(0x17110e, 0.018);
+    applySceneAmbience(this.scene, this.ambience);
   }
 
   public update(dt: number, observerPosition?: THREE.Vector3): void {
@@ -455,10 +456,12 @@ export class BurnedMansionArena implements ZombieArena {
       return false;
     }
     const index = this.doors.findIndex((door) => door.id === doorId);
+    // The sealed bunker animates open first; update() reports its topology later.
     if (doorId === 'nuclear-bunker') return this.doorViews[index].beginOpening();
     this.openDoorIds.add(doorId);
     this.activeSpawnZones.add(doorId);
     this.refreshProgressionState();
+    this.onTopologyChanged?.();
     return true;
   }
 
@@ -551,14 +554,7 @@ export class BurnedMansionArena implements ZombieArena {
 
   private collectPlayerWallColliders(): ReadonlyArray<THREE.Box3> {
     const boxes = this.playerWallMeshes.map((mesh) => new THREE.Box3().setFromObject(mesh));
-    const { position, yaw } = this.mysteryBoxPlacement;
-    // Include the base rails, front hardware and closed lid, not the floating reward.
-    const boxHalfWidth = MYSTERY_BOX_SIZE.width / 2 + 0.09;
-    const boxHalfDepth = MYSTERY_BOX_SIZE.depth / 2 + 0.11;
-    boxes.push(new THREE.Box3(
-      new THREE.Vector3(-boxHalfWidth, 0, -boxHalfDepth),
-      new THREE.Vector3(boxHalfWidth, MYSTERY_BOX_SIZE.bodyHeight + 0.36, boxHalfDepth),
-    ).applyMatrix4(new THREE.Matrix4().makeRotationY(yaw).setPosition(position.x, position.y, position.z)));
+    boxes.push(mysteryBoxFootprint(this.mysteryBoxPlacement));
     if (!this.secretRoom.isDoorOpen) boxes.push(new THREE.Box3().setFromObject(this.secretWallCollider));
     for (let i = 0; i < this.doors.length; i++) {
       if (!this.openDoorIds.has(this.doors[i].id)) boxes.push(new THREE.Box3().setFromObject(this.doorMeshes[i]));
@@ -1180,9 +1176,7 @@ export class BurnedMansionArena implements ZombieArena {
   }
 
   private buildLighting(): void {
-    this.group.add(
-      new THREE.HemisphereLight(0x34465e, 0x110d0a, this.profile.useReducedEffects ? 0.18 : 0.25),
-    );
+    this.group.add(createAmbienceHemisphereLight(this.ambience, this.profile.useReducedEffects));
     this.addPointLight(-3.8, 2.55, 6.5, 2.4, 6.5, GROUND_CEILING_Y);
     this.addPointLight(-4.5, 2.35, -4.8, 1.7, 6.5, GROUND_CEILING_Y);
     this.addPointLight(2.1, 2.35, -4.8, 1.1, 5.2, GROUND_CEILING_Y);

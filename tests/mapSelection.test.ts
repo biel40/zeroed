@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
+import { COOP_ZOMBIE_MAP_ID, isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import { HUD } from '../src/ui/HUD';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -26,6 +26,9 @@ class FakeElement {
   textContent = '';
   focused = false;
 
+  /** Elements returned by querySelector for selectors other than 'span'. */
+  readonly slots: Record<string, FakeElement> = {};
+
   constructor(private readonly children: FakeElement[] = []) {}
 
   addEventListener(): void {}
@@ -35,7 +38,7 @@ class FakeElement {
   }
 
   querySelector(selector: string): FakeElement | null {
-    return selector === 'span' ? this.children[0] ?? null : null;
+    return selector === 'span' ? this.children[0] ?? null : this.slots[selector] ?? null;
   }
 
   querySelectorAll(): FakeElement[] {
@@ -44,13 +47,25 @@ class FakeElement {
 }
 
 describe('Zombies map selection flow', () => {
-  it('exposes Burned Mansion as the only Zombies map', () => {
-    expect(html).toMatch(/<button type="button" data-map="burned-mansion">/);
-    expect(html.match(/data-map=/g)).toHaveLength(1);
+  it('declares one translated menu button per registered map', () => {
+    for (const map of Object.values(ZOMBIE_MAPS)) {
+      expect(html).toContain(`data-map="${map.id}"`);
+      expect(html).toContain(`data-i18n="${map.nameKey}"`);
+    }
+    expect(html.match(/data-map=/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
     expect(html).not.toContain('data-mode=');
     expect(html).toContain('data-i18n="menu.zombies"');
-    expect(html).toContain('BURNED MANSION');
-    expect(ZOMBIE_MAPS['burned-mansion'].visible).toBe(true);
+    // Each card carries its own tagline and the chips HUD fills from the registry.
+    expect(html.match(/data-i18n="map.[a-zA-Z0-9]+.tagline"/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    expect(html.match(/data-map-players/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    expect(html.match(/data-map-access/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+  });
+
+  it('lists Burned Mansion for everyone and Station 33 as a single-player premium map', () => {
+    expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true, premium: false });
+    expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, coop: false, premium: true });
+    expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
+    expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);
   });
 
@@ -60,10 +75,17 @@ describe('Zombies map selection flow', () => {
     );
   });
 
-  it('handles the mansion button again after reopening the picker', () => {
-    const mansion = new FakeElement();
-    mansion.dataset.map = 'burned-mansion';
-    const mapSelect = new FakeElement([mansion]);
+  it('labels the cards from the registry and handles them again after reopening the picker', () => {
+    const card = (mapId: string): FakeElement => {
+      const element = new FakeElement();
+      element.dataset.map = mapId;
+      element.slots['[data-map-access]'] = new FakeElement();
+      element.slots['[data-map-players]'] = new FakeElement();
+      return element;
+    };
+    const mansion = card('burned-mansion');
+    const station = card('station-33');
+    const mapSelect = new FakeElement([mansion, station]);
     const startScreen = new FakeElement();
     const loadingBar = new FakeElement([new FakeElement()]);
     const generic = new FakeElement();
@@ -96,13 +118,20 @@ describe('Zombies map selection flow', () => {
       expect(startScreen.classList.contains('hidden')).toBe(true);
       expect(startScreen.classList.contains('leaving')).toBe(false);
       expect(mansion.classList.contains('hidden')).toBe(false);
+      expect(station.classList.contains('hidden')).toBe(false);
       expect(mansion.focused).toBe(true);
+      expect(mansion.dataset.access).toBe('free');
+      expect(mansion.slots['[data-map-access]'].dataset.i18n).toBe('map.access.free');
+      expect(mansion.slots['[data-map-players]'].textContent).toBe('1–2 PLAYERS');
+      expect(station.dataset.access).toBe('premium');
+      expect(station.slots['[data-map-access]'].textContent).toBe('PREMIUM');
+      expect(station.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion']);
 
       ui.showMapSelect((mapId) => selected.push(`again:${mapId}`));
-      mansion.onclick?.();
-      expect(selected).toEqual(['burned-mansion', 'again:burned-mansion']);
+      station.onclick?.();
+      expect(selected).toEqual(['burned-mansion', 'again:station-33']);
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();
@@ -115,7 +144,9 @@ describe('Zombies map selection flow', () => {
 
   it('forwards the selected id to Zombies game initialization', () => {
     expect(main).toContain('hud.showMapSelect((mapId) =>');
-    expect(main).toContain('startGame(new ZombiesMode(mapId))');
+    expect(main).toContain('startGame(new ZombiesMode(mapId), mapId)');
+    // ?map= keeps working as a testing shortcut, hidden maps included.
+    expect(main).toContain('startGame(new ZombiesMode(requestedMap), requestedMap)');
     expect(main).not.toContain('showModeSelect');
     expect(main).not.toContain('ClassicMode');
   });

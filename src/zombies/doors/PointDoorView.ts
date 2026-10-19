@@ -11,13 +11,15 @@ const BUNKER_OPEN_DURATION = 2.4;
 export type DoorOpeningState = 'CLOSED' | 'OPENING' | 'OPEN';
 
 export interface PointDoorViewOptions {
+  /** A sealed blast door instead of a boarded paid door. */
+  readonly sealed?: boolean;
   readonly woodMaterial?: THREE.MeshStandardMaterial;
   readonly reducedEffects?: boolean;
 }
 
 /**
  * Point door visual. Paid doors keep an invisible slab as their collider and
- * delegate presentation to `BuyableDoorVisual`; the sealed bunker door is the
+ * delegate presentation to `BuyableDoorVisual`; a sealed door is the
  * collider itself, dressed and animated by `BunkerDoorVisual`.
  */
 export class PointDoorView {
@@ -36,7 +38,7 @@ export class PointDoorView {
     options: PointDoorViewOptions = {},
   ) {
     const geometry = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICK);
-    const sealed = door.id === 'nuclear-bunker';
+    const sealed = options.sealed ?? false;
     this.sealed = sealed;
     // Raycasts and Box3 ignore material visibility, so the hidden slab still blocks.
     const material = new THREE.MeshStandardMaterial({ visible: false });

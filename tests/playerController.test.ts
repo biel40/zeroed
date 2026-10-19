@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Input } from '../src/player/Input';
-import { PLAYER_BOUNDS, PlayerController } from '../src/player/PlayerController';
+import { DEFAULT_PLAYER_BOUNDS, PlayerController } from '../src/player/PlayerController';
 import type { Weapon } from '../src/weapons/Weapon';
 
 const DT = 1 / 60;
@@ -33,30 +33,30 @@ describe('PlayerController movement bounds', () => {
   it('stays within the ground-floor bounds when moving forward', () => {
     const player = new PlayerController(1);
     step(player, inputStub(new Set(['KeyW'])), 6);
-    expect(player.rig.position.z).toBeCloseTo(PLAYER_BOUNDS.minZ, 3);
+    expect(player.rig.position.z).toBeCloseTo(DEFAULT_PLAYER_BOUNDS.minZ, 3);
   });
 
   it('clamps a position beyond the map edge back into the walkable area', () => {
     const player = new PlayerController(1);
-    player.rig.position.z = PLAYER_BOUNDS.minZ - 2;
+    player.rig.position.z = DEFAULT_PLAYER_BOUNDS.minZ - 2;
     step(player, inputStub(new Set()), DT * 2);
-    expect(player.rig.position.z).toBeGreaterThanOrEqual(PLAYER_BOUNDS.minZ);
+    expect(player.rig.position.z).toBeGreaterThanOrEqual(DEFAULT_PLAYER_BOUNDS.minZ);
   });
 
   it('keeps the player between the side walls', () => {
     const player = new PlayerController(1);
     step(player, inputStub(new Set(['KeyA'])), 6);
-    expect(player.rig.position.x).toBeCloseTo(PLAYER_BOUNDS.minX, 3);
+    expect(player.rig.position.x).toBeCloseTo(DEFAULT_PLAYER_BOUNDS.minX, 3);
 
     const other = new PlayerController(1);
     step(other, inputStub(new Set(['KeyD'])), 6);
-    expect(other.rig.position.x).toBeCloseTo(PLAYER_BOUNDS.maxX, 3);
+    expect(other.rig.position.x).toBeCloseTo(DEFAULT_PLAYER_BOUNDS.maxX, 3);
   });
 
   it('keeps the player in front of the back wall', () => {
     const player = new PlayerController(1);
     step(player, inputStub(new Set(['KeyS'])), 6);
-    expect(player.rig.position.z).toBeCloseTo(PLAYER_BOUNDS.maxZ, 3);
+    expect(player.rig.position.z).toBeCloseTo(DEFAULT_PLAYER_BOUNDS.maxZ, 3);
   });
 });
 
@@ -68,7 +68,7 @@ describe('PlayerController analog movement (virtual joystick)', () => {
     step(half, inputStub(new Set(), { y: 0.5 }), 0.5);
     // Forward is -z: the slower player stays closer to the spawn z.
     expect(half.rig.position.z).toBeGreaterThan(full.rig.position.z);
-    expect(full.rig.position.z).toBeGreaterThan(PLAYER_BOUNDS.minZ);
+    expect(full.rig.position.z).toBeGreaterThan(DEFAULT_PLAYER_BOUNDS.minZ);
   });
 
   it('clamps keyboard + joystick combined input to full deflection', () => {

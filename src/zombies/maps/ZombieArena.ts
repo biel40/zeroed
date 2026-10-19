@@ -1,7 +1,10 @@
 import type * as THREE from 'three';
+import type { EndingAudioId, MusicTrackName } from '../../audio/MusicManager';
 import type { FloorTransitionZone } from '../../player/PlayerController';
+import type { EndingPresentationId } from '../../ui/HUD';
 import type { WindowBarrier } from '../barriers/WindowBarrier';
 import type { PointDoor } from '../doors/PointDoor';
+import type { SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
 import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import type { WeaponId } from '../../weapons/WeaponTypes';
@@ -53,9 +56,18 @@ export interface ArenaAmmoRefill {
   reset(): void;
 }
 
+/** How a map closes its run: the HUD cinematic, its audio and how long it lasts. */
+export interface ArenaEnding {
+  readonly presentation: EndingPresentationId;
+  readonly audio: EndingAudioId;
+  /** Seconds from the purchase to the credits. */
+  readonly duration: number;
+}
+
 export interface ArenaCompletionInteraction {
   readonly id: string;
   readonly cost: number;
+  readonly ending: ArenaEnding;
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly floor: number;
   readonly useRange: number;
@@ -100,6 +112,21 @@ export interface ZombieNavigationBounds extends PlayerBounds {
   readonly baseY?: number;
 }
 
+/** Scene mood owned by the map and applied when the arena initializes. */
+export interface ArenaAmbience {
+  readonly backgroundColor: number;
+  readonly fog: { readonly color: number; readonly density: number };
+  readonly hemisphereLight: {
+    readonly skyColor: number;
+    readonly groundColor: number;
+    readonly intensity: number;
+    /** Intensity on reduced-effects profiles. */
+    readonly reducedIntensity: number;
+  };
+  /** Looping bed while the match is running. */
+  readonly musicTrack: MusicTrackName;
+}
+
 /**
  * Contract for a Zombies map. The arena owns the physical environment,
  * spawn points, interactive objects and ambience. `ZombiesMode` owns the
@@ -121,24 +148,61 @@ export interface ZombieArena {
   readonly ammoRefills?: ReadonlyArray<ArenaAmmoRefill>;
   readonly soulLampInteractions?: ReadonlyArray<ArenaSoulLampInteraction>;
   readonly ritualInteraction?: ArenaRitualInteraction;
+  /** Paid interaction that ends the run with the map's own ending. */
   readonly completionInteraction?: ArenaCompletionInteraction;
   readonly mysteryBoxPlacement: MysteryBoxPlacement;
   /** Safe initial position owned by the map rather than the game mode. */
-  readonly playerSpawn?: ArenaPlayerSpawn;
+  readonly playerSpawn: ArenaPlayerSpawn;
   /** True when the arena wants swept wall collision for the player. */
   readonly useWallCollision: boolean;
-  /** Optional movement bounds for the current arena. */
-  readonly playerBounds?: PlayerBounds;
+  /** Movement bounds of the floor holding `playerSpawn`. */
+  readonly playerBounds: PlayerBounds;
   /** Per-floor envelope containing valid zombie spawns and pursuit routes. */
   readonly navigationBounds: ReadonlyArray<ZombieNavigationBounds>;
   /** Stair/zone transitions that swap player floor/bounds. */
   readonly floorTransitions?: ReadonlyArray<FloorTransitionZone>;
+  readonly ambience: ArenaAmbience;
   /** Optional visual event fired when a rebuilt board finishes seating. */
   onBarrierBoardRebuilt?: (() => void) | null;
+  /**
+   * Fired when doors or walls changed the layout. Modes then re-read
+   * `colliders`, `wallColliders`, `spawnPoints` and `barriers`.
+   */
+  onTopologyChanged: (() => void) | null;
   /** Called once after the arena is added to the scene. */
   init(): void;
   /** Per-frame update for ambience and animations. */
   update(dt: number, observerPosition?: THREE.Vector3): void;
   /** Called when the run restarts. */
   reset(): void;
+  /**
+   * Opens the layout behind a door whose `PointDoor` just unlocked. Returns
+   * false for unknown or already open doors. `onTopologyChanged` fires once
+   * the new layout is in place: at once, or after an opening animation.
+   */
+  activateDoor(doorId: string): boolean;
+  refreshSpawnPoints(): void;
+  refreshColliders(): void;
+}
+
+/**
+ * Optional capability: kills feed souls into lamps that unlock a secret room
+ * with a ritual. Modes reach it only through `hasSoulRitual`.
+ */
+export interface SoulRitualArena {
+  captureSoul(position: { readonly x: number; readonly y: number; readonly z: number }, floor: number): boolean;
+  /** Developer access to the secret room without filling the lamps. */
+  unlockSecretRoom(): boolean;
+  /** Secret-room progress replicated to the co-op guest. */
+  readonly secretSnapshot: SecretRoomSnapshot;
+  applySecretSnapshot(snapshot: SecretRoomSnapshot): void;
+  onSoulAbsorbed: ((position: THREE.Vector3) => void) | null;
+  onSoulLampCompleted: ((position: THREE.Vector3) => void) | null;
+  onSecretRoomUnlocked: ((position: THREE.Vector3) => void) | null;
+  onRitualScare: ((position: THREE.Vector3) => void) | null;
+  onRitualImpact: (() => void) | null;
+}
+
+export function hasSoulRitual(arena: ZombieArena): arena is ZombieArena & SoulRitualArena {
+  return typeof (arena as Partial<SoulRitualArena>).captureSoul === 'function';
 }

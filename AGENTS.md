@@ -8,7 +8,7 @@
 - Elimina codigo muerto o duplicado derivado de tus cambios.
 - Valida con los comandos disponibles y revisa regresiones antes de finalizar.
 - La documentacion describe el codigo; no debe sustituirlo ni repetir detalles faciles de obtener al leerlo.
-- Burned Mansion es el unico mapa jugable de Zeroed, tanto en individual como en cooperativo. El usuario ha decidido retirar definitivamente el campo de tiro/Classic; no lo reintroduzcas como modo, mapa ni dependencia de gameplay.
+- Los mapas jugables de Zeroed son Burned Mansion (individual y cooperativo) y Station 33 (solo individual, mapa de pago futuro; aun sin contenido y desbloqueado para la beta cerrada). Todo mapa se registra en `src/config/zombieMaps.ts` y cumple `ZombieArena`; los modos no deben depender de un mapa concreto. El usuario ha decidido retirar definitivamente el campo de tiro/Classic; no lo reintroduzcas como modo, mapa ni dependencia de gameplay.
 - El modo individual sigue siendo la prioridad: los cambios cooperativos no deben degradar su funcionamiento.
 
 - Todo script o codigo fuente que se genere en este proyecto debe ser escalable, legible y mantenible, tanto por una persona como por un agente de IA: nombres claros, responsabilidades acotadas, modulos pequenos y cohesionados, contratos explicitos y sin logica oculta ni dependencias implicitas.

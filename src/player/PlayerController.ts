@@ -3,7 +3,6 @@ import type { Weapon } from '../weapons/Weapon';
 import { clamp, damp, lerp } from '../utils/math';
 import type { Input } from './Input';
 import type { PlayerBounds } from '../zombies/maps/ZombieArena';
-import { MANSION_GROUND_BOUNDS } from '../zombies/maps/BurnedMansionConfig';
 import { getSettings } from '../core/PlayerSettings';
 
 const SENSITIVITY = 0.0023;
@@ -54,8 +53,11 @@ export function stairGroundY(ramp: StairRamp, x: number, z: number): number {
   return lerp(ramp.top.y, ramp.bottom.y, progress);
 }
 
-/** Default movement area before the active arena finishes initialization. */
-export const PLAYER_BOUNDS: PlayerBounds = MANSION_GROUND_BOUNDS;
+/**
+ * Neutral movement area until a mode applies its arena's `playerBounds`;
+ * no map uses it as its real limits.
+ */
+export const DEFAULT_PLAYER_BOUNDS: PlayerBounds = { minX: -8, maxX: 8, minZ: -8, maxZ: 8 };
 
 /**
  * First-person rig: rig (yaw + position) → pitch node → camera (recoil
@@ -71,7 +73,7 @@ export class PlayerController {
   private yaw = 0;
   private pitch = 0;
   private fov = getSettings().fieldOfView;
-  private bounds: PlayerBounds = PLAYER_BOUNDS;
+  private bounds: PlayerBounds = DEFAULT_PLAYER_BOUNDS;
   private wallColliders: readonly THREE.Box3[] = [];
   private floorTransitions: readonly FloorTransitionZone[] = [];
   private currentFloor = 0;

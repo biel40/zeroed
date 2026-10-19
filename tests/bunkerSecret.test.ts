@@ -9,7 +9,7 @@ import type {
   ArenaWeaponPickup,
 } from '../src/zombies/maps/ZombieArena';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
-import { MANSION_SOUL_LAMPS } from '../src/zombies/maps/BurnedMansionConfig';
+import { MANSION_NUCLEAR_ENDING, MANSION_SOUL_LAMPS } from '../src/zombies/maps/BurnedMansionConfig';
 
 function bunkerDoor(): PointDoor {
   return new PointDoor(
@@ -30,6 +30,7 @@ describe('Burned Mansion secret bunker interaction', () => {
   const ending: ArenaCompletionInteraction = {
     id: 'radiation-ending',
     cost: 30000,
+    ending: MANSION_NUCLEAR_ENDING,
     position: { x: 0, y: 0, z: 0 },
     floor: -1,
     useRange: 2,

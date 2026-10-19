@@ -7,8 +7,12 @@ export const NUCLEAR_DETONATION_TIME = 3.2;
 export class ZombiesRunFlow {
   private current: ZombiesRunState = 'PLAYING';
   private endingElapsed = 0;
+  private endingDuration: number;
 
-  constructor(readonly endingDuration = NUCLEAR_ENDING_DURATION) {}
+  /** Used when `beginEnding` receives no map-defined duration. */
+  constructor(private readonly defaultEndingDuration = NUCLEAR_ENDING_DURATION) {
+    this.endingDuration = defaultEndingDuration;
+  }
 
   get state(): ZombiesRunState {
     return this.current;
@@ -18,10 +22,11 @@ export class ZombiesRunFlow {
     return this.current === 'PLAYING';
   }
 
-  beginEnding(): boolean {
+  beginEnding(duration = this.defaultEndingDuration): boolean {
     if (this.current !== 'PLAYING') return false;
     this.current = 'ENDING';
     this.endingElapsed = 0;
+    this.endingDuration = duration;
     return true;
   }
 

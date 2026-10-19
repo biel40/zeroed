@@ -11,7 +11,7 @@ Durable Objects por sala en Cloudflare.
 main.ts -> PWA + DeviceProfile + AssetManager + selector de mapa
         -> Game (loop, renderer, pausa, servicios compartidos)
         -> Player/Input + WeaponInventory/Weapon + Ballistics/EnergyProjectiles
-        -> ZombiesMode(GameMode) -> BurnedMansionArena + run Zombies
+        -> ZombiesMode(GameMode) -> arena del registro de mapas + run Zombies
         -> CoopHostMode / CoopGuestMode(GameMode) -> CoopWorld + autoridad del anfitrion
         -> vistas, audio, HUD, efectos y render
 ```
@@ -37,7 +37,8 @@ sufra tirones de compilacion de shaders.
 | `src/modes/coop/` | Cooperativo: `CoopWorld` (mapa compartido), `CoopHostMode` (autoridad), `CoopGuestMode` (replica) |
 | `src/network/` + `server/` + `cloudflare/` | Protocolo validado, interpolacion, validacion de disparos y relays |
 | `src/rendering/RemotePlayer*` | Compañero como entidad de mundo: interpolacion y cuerpo animado |
-| `src/zombies/maps/*` | Geometria, colliders, spawns e interacciones del mapa |
+| `src/config/zombieMaps.ts` | Registro de mapas: visibilidad, nombre, cooperativo y factoria de arena |
+| `src/zombies/maps/*` | Geometria, colliders, spawns e interacciones de cada mapa; `shared/` reune utilidades sin mapa |
 | `src/weapons/` + `src/config/` | Logica pura, definiciones y viewmodels |
 | `src/shooting/` | Trayectoria, pool balistico, raycast y `HitTarget` |
 | `src/zombies/` | IA, pool, combate, barreras, puertas y wonder weapons |
@@ -71,7 +72,11 @@ sufra tirones de compilacion de shaders.
 - Logica determinista y vistas Three.js permanecen separadas para poder probar
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
   municion la decide el modo.
-- `ZombieArena` separa la run de `ZombiesMode` de la geometria de Burned Mansion.
+- `ZombieArena` separa la run de la geometria del mapa. La arena declara spawn y
+  limites del jugador, ambiente (fondo, niebla, luz hemisferica y musica), su
+  final (cinematica, audio y duracion) y avisa con `onTopologyChanged` cuando
+  puertas o muros cambian la topologia. Las capacidades propias de un mapa
+  (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`.
   `HitTarget` desacopla balistica de blancos.
 - Pools y temporales reutilizables limitan allocations por frame. Los tipos
   zombie (`normal`, `shiny`, `brute`) pueden compartir modelo sin duplicar IA.
@@ -81,6 +86,10 @@ sufra tirones de compilacion de shaders.
 ## Extension
 
 Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo modo:
-`GameMode` y selector. Nuevo mapa: `ZombieArena`. Nuevo blanco: `HitTarget` y
+`GameMode` y selector. Nuevo mapa: clase que implemente `ZombieArena` (sus
+datos en un config propio, utilidades comunes de `maps/shared/`), entrada en
+`ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` (arte SVG propio) y claves
+`map.<nombre>` y `map.<nombre>.tagline` en los tres diccionarios; el test de contrato lo recorre solo. Un final nuevo anade su id
+de presentacion en `HUD` y de audio en `MusicManager`. Nuevo blanco: `HitTarget` y
 registro en colliders. Nuevo tipo zombie: registro de estadisticas/modelo,
 orden de spawn y asset si procede.

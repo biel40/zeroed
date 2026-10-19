@@ -208,6 +208,8 @@ export class ZombieManager {
   private colliders: THREE.Object3D[] = [];
   /** Static obstacle AABBs (walls, barriers, crates, posts) blocking movement. */
   private readonly obstacles: THREE.Box3[] = [];
+  /** Solids that bullets ignore but bodies cannot cross (the Mystery Box). */
+  private bodyObstacles: readonly THREE.Box3[] = [];
   // Reused temporaries: no allocations in the per-frame steering loop.
   private readonly tmpToPlayer = new THREE.Vector3();
   private readonly tmpSeparation = new THREE.Vector3();
@@ -287,6 +289,14 @@ export class ZombieManager {
       this.group.add(zombie.group);
       return zombie;
     }, MAX_ALIVE);
+  }
+
+  /**
+   * Movement-only solids outside the ballistic collider array. They join
+   * the obstacles and navigation grid on the next `registerColliders`.
+   */
+  setBodyObstacles(boxes: readonly THREE.Box3[]): void {
+    this.bodyObstacles = boxes;
   }
 
   /** The mutable arena collider array shared with ballistics. */
@@ -381,6 +391,7 @@ export class ZombieManager {
       if (size.x > MAX_OBSTACLE_FOOTPRINT || size.z > MAX_OBSTACLE_FOOTPRINT) continue;
       this.obstacles.push(box.clone());
     }
+    for (const obstacle of this.bodyObstacles) this.obstacles.push(obstacle.clone());
   }
 
   get aliveCount(): number {

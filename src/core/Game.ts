@@ -344,7 +344,7 @@ export class Game {
       this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
-      if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
+      this.startGameplayMusic();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
@@ -377,7 +377,7 @@ export class Game {
       this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
-      if (this.mode?.id === 'zombies') this.audio.music.startGameplayLoop();
+      this.startGameplayMusic();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
       this.hud.setHudVisible(true);
@@ -394,6 +394,12 @@ export class Game {
     // ESC, Alt+Tab, tab changes and focus loss all converge here, based on
     // document.pointerLockElement as reported by DesktopInput.
     if (!this.paused) this.pause();
+  }
+
+  /** The map's gameplay bed, which the mode exposes once its arena exists. */
+  private startGameplayMusic(): void {
+    const track = this.mode?.gameplayMusic;
+    if (track) this.audio.music.startGameplayLoop(track);
   }
 
   /**

@@ -25,6 +25,7 @@ import type { Zombie } from '../../zombies/Zombie';
 import { PLAYER_MAX_HP } from '../../zombies/ZombieConfig';
 import { ZombieReplica } from '../../zombies/ZombieReplica';
 import type { GameMode, ModeContext } from '../GameMode';
+import type { MusicTrackName } from '../../audio/MusicManager';
 import { voicePoint } from '../../audio/SpatialCue';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
@@ -47,6 +48,10 @@ export class CoopGuestMode implements GameMode {
   public readonly maxWeapons = 2;
   public readonly sharedSimulation = true;
   public readonly reserveAmmoFor = coopReserveAmmo;
+
+  public get gameplayMusic(): MusicTrackName | null {
+    return this.world?.arena.ambience.musicTrack ?? null;
+  }
 
   private ctx!: ModeContext;
   private world!: CoopWorld;
@@ -467,10 +472,11 @@ export class CoopGuestMode implements GameMode {
     }
     if (state.phase === 'gameOver') this.showGameOver(state);
     else if (previousPhase !== state.phase && state.phase === 'ending') {
+      const ending = this.world.arena.completionInteraction.ending;
       this.ctx.audio.stopMusic();
       this.ctx.audio.stopWind();
-      this.ctx.audio.startEndingAudio();
-      this.ctx.hud.showEnding(state.round);
+      this.ctx.audio.startEndingAudio(ending.audio);
+      this.ctx.hud.showEnding(state.round, ending.presentation);
       this.ctx.unlockPointer();
     } else if (previousPhase !== state.phase && state.phase === 'credits') {
       this.ctx.audio.stopEndingAudio();

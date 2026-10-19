@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
 import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
@@ -19,10 +19,14 @@ describe('Zombies GOD_MODE developer command', () => {
       hud: { showRoundBanner: (title: string) => events.push(`banner:${title}`) },
       audio: { playTeslaUnlock: () => events.push('audio') },
     };
+    // A soul-ritual arena also opens its secret room.
+    const unlockSecretRoom = vi.fn(() => true);
+    (mode as unknown as { arena: unknown }).arena = { captureSoul: vi.fn(), unlockSecretRoom };
 
     for (const key of 'MOTDRULES') mode.onKeyInput?.(key);
     for (const key of 'MOTDRULES') mode.onKeyInput?.(key);
 
+    expect(unlockSecretRoom).toHaveBeenCalledOnce();
     expect(events).toEqual([
       'grant:raygun',
       'infinite:raygun',
@@ -41,6 +45,8 @@ describe('Zombies GOD_MODE developer command', () => {
       hud: { showRoundBanner: () => undefined },
       audio: { playTeslaUnlock: () => undefined },
     };
+    // Maps without the soul ritual have no secret room to open.
+    (mode as unknown as { arena: unknown }).arena = {};
 
     for (const key of 'MOTDRULES') mode.onKeyInput?.(key);
 

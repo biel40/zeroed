@@ -159,7 +159,7 @@ describe('MusicManager', () => {
 
     music.playRoundStartOnce();
     music.startMenuLoop();
-    music.startGameplayLoop();
+    music.startGameplayLoop('background_music_theme');
     music.resume();
 
     expect(plays).toEqual([]);
@@ -261,7 +261,7 @@ describe('Game pause resume', () => {
     game.pointerLockRequested = true;
     game.gameplayStarted = true;
     game.profile = { useTouchControls: false };
-    game.mode = { id: 'zombies' };
+    game.mode = { id: 'zombies', gameplayMusic: 'background_music_theme' };
     game.audio = { music: { stopMenuLoop: vi.fn(), startGameplayLoop: vi.fn() } };
     game.audio.resumeMusic = vi.fn();
     game.hud = {
@@ -281,7 +281,7 @@ describe('Game pause resume', () => {
     expect(game.pointerLockRequested).toBe(false);
     expect(game.audio.music.stopMenuLoop).toHaveBeenCalledOnce();
     expect(game.audio.resumeMusic).toHaveBeenCalledOnce();
-    expect(game.audio.music.startGameplayLoop).toHaveBeenCalledOnce();
+    expect(game.audio.music.startGameplayLoop).toHaveBeenCalledExactlyOnceWith('background_music_theme');
     expect(game.hud.hidePauseMenu).toHaveBeenCalledOnce();
   });
 

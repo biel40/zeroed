@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { projectBoxUVs } from '../maps/BurnedMansionMaterials';
+import { projectBoxUVs } from '../maps/shared/BoxUVs';
 
 const PLANK_COUNT = 5;
 const PLANK_THICK = 0.09;

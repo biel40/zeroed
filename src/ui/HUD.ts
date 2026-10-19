@@ -1,6 +1,6 @@
 import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
-import { formatNumber, onLanguageChange, t } from '../i18n/i18n';
+import { formatNumber, onLanguageChange, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
@@ -29,6 +29,14 @@ export interface GameOverStats {
 }
 
 /** Keep in sync with the #map-loading opacity transition in style.css. */
+/** Ending cinematics a map can request through `ArenaEnding.presentation`. */
+export type EndingPresentationId = 'nuclear';
+
+/** Seconds into each cinematic when its impact flash lands (CSS `--detonation`). */
+const ENDING_DETONATION_TIME: Record<EndingPresentationId, number> = {
+  nuclear: NUCLEAR_DETONATION_TIME,
+};
+
 const MAP_LOADING_FADE_MS = 450;
 const MAP_LOADING_MIN_MS = 700;
 /** Matches the #start-screen opacity transition in style.css. */
@@ -38,6 +46,13 @@ function mustGet(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing HUD element #${id}`);
   return element;
+}
+
+/** Text chosen at runtime that `applyDocumentTranslations` keeps in the active language. */
+function setTranslatedText(element: HTMLElement | null, key: TranslationKey): void {
+  if (!element) return;
+  element.dataset.i18n = key;
+  element.textContent = t(key);
 }
 
 /**
@@ -145,8 +160,13 @@ export class HUD {
     this.revealStartScreen();
   }
 
-  /** Opaque cover shown from the map pick until the first frame is ready. */
-  public showMapLoading(): void {
+  /**
+   * Opaque cover shown from the map pick until the first frame is ready. It
+   * also names the map in the pause kicker for the rest of the match.
+   */
+  public showMapLoading(mapNameKey: TranslationKey): void {
+    setTranslatedText(mustGet('map-loading-title'), mapNameKey);
+    setTranslatedText(mustGet('pause-map'), mapNameKey);
     clearTimeout(this.mapLoadingTimer);
     this.mapLoadingShownAt = performance.now();
     this.mapLoading.classList.remove('hidden', 'leaving');
@@ -218,6 +238,10 @@ export class HUD {
         continue;
       }
       if (map.visible && !firstVisibleButton) firstVisibleButton = button;
+      // The registry, not the markup, decides each card's players and access labels.
+      button.dataset.access = map.premium ? 'premium' : 'free';
+      setTranslatedText(button.querySelector('[data-map-access]'), map.premium ? 'map.access.premium' : 'map.access.free');
+      setTranslatedText(button.querySelector('[data-map-players]'), map.coop ? 'map.players.coop' : 'map.players.solo');
       // Assignment replaces a previous handler if this menu is shown again.
       button.onclick = () => {
         for (const mapButton of buttons) mapButton.onclick = null;
@@ -470,10 +494,10 @@ export class HUD {
     mustGet('go-restart').onclick = handler;
   }
 
-  public showEnding(round: number): void {
+  public showEnding(round: number, presentation: EndingPresentationId): void {
     this.root.classList.add('hidden');
     this.setInteractionPrompt(null);
-    this.endingScreen.style.setProperty('--detonation', `${NUCLEAR_DETONATION_TIME}s`);
+    this.endingScreen.style.setProperty('--detonation', `${ENDING_DETONATION_TIME[presentation]}s`);
     this.endingRound.textContent = `${round}`;
     this.endingScreen.classList.remove('hidden', 'credits');
     this.endingScreen.classList.add('ending');

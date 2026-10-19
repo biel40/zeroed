@@ -1,7 +1,7 @@
 import type { SurfaceType } from '../shooting/HitTarget';
 import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
-import { MusicManager } from './MusicManager';
+import { MusicManager, type EndingAudioId } from './MusicManager';
 import { muffleCutoff, type SpatialCue } from './SpatialCue';
 
 const PING_THROTTLE = 0.045;
@@ -177,8 +177,8 @@ export class AudioSystem {
     this.music.stop();
   }
 
-  public startEndingAudio(): void {
-    this.music.startEndingAudio();
+  public startEndingAudio(id: EndingAudioId): void {
+    this.music.startEndingAudio(id);
   }
 
   public stopEndingAudio(): void {

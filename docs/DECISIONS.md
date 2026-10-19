@@ -3,9 +3,17 @@
 - **Shell comun y modos aislados.** `Game` posee servicios compartidos; cada
   `GameMode` recibe un `ModeContext`. Individual y cooperativo comparten loop
   sin compartir estado de run.
-- **Burned Mansion como unico mapa.** El campo de tiro/Classic se retira por
-  decision del usuario. `ZombieArena` mantiene geometria, colliders, spawns,
-  barreras, puertas y ambiente fuera de la logica de la run.
+- **Mapas por registro.** Burned Mansion y Station 33 son los mapas jugables;
+  Station 33 es solo individual, sera de pago y por ahora es un stub. `zombieMaps.ts`
+  declara por mapa visibilidad, nombre i18n, soporte cooperativo, si es premium
+  y factoria de arena; los modos la resuelven por `mapId`. Mientras no exista
+  un sistema de pagos, `premium` solo cambia la presentacion: la beta cerrada
+  juega todos los mapas visibles. `ZombieArena` mantiene geometria,
+  colliders, spawns, barreras, puertas, ambiente, musica y final fuera de la
+  logica de la run; lo exclusivo de un mapa (almas, faroles, ritual y sala
+  secreta de la mansion) es una capacidad opcional consultada con type guard.
+  El cooperativo usa un unico mapa (`COOP_ZOMBIE_MAP_ID`) sin negociarlo en el
+  protocolo. El campo de tiro/Classic se retira por decision del usuario.
 - **Logica separada de vistas.** Armas, economia, rondas, salud, Mystery Box,
   barreras, puertas, trayectorias y cadena Tesla son testeables sin Three.js.
 - **Armas declarativas.** `WeaponDefinition` concentra cadencia, dano, recoil,

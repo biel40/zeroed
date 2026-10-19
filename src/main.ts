@@ -2,7 +2,7 @@ import './style.css';
 import type * as BetaAccess from '../public/beta/access.js';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { MusicManager } from './audio/MusicManager';
-import { isZombieMapId } from './config/zombieMaps';
+import { COOP_ZOMBIE_MAP_ID, isZombieMapId, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
@@ -54,11 +54,11 @@ class ZeroedBoot {
     return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
   }
 
-  private async startGame(mode: GameMode): Promise<void> {
+  private async startGame(mode: GameMode, mapId: ZombieMapId): Promise<void> {
     this.hud.hideCoopLobby();
     this.game?.dispose();
     this.game = null;
-    this.hud.showMapLoading();
+    this.hud.showMapLoading(ZOMBIE_MAPS[mapId].nameKey);
     // Building the arena blocks the main thread, so the opaque overlay must
     // be painted first; its CSS animation keeps running on the compositor.
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
@@ -87,11 +87,12 @@ class ZeroedBoot {
     this.coopConnection = null;
     connection.onMessage = null;
     connection.onClose = null;
-    void this.startGame(role === 'host' ? new CoopHostMode(connection) : new CoopGuestMode(connection));
+    void this.startGame(role === 'host' ? new CoopHostMode(connection) : new CoopGuestMode(connection),
+      COOP_ZOMBIE_MAP_ID);
   }
 
   private showMapMenu(): void {
-    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId)));
+    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId));
   }
 
   private showCoopLobby(): void {
@@ -192,9 +193,9 @@ class ZeroedBoot {
 
       const requestedMap = new URLSearchParams(window.location.search).get('map');
       if (isZombieMapId(requestedMap)) {
-        void this.startGame(new ZombiesMode(requestedMap));
+        // Direct link for testing, including maps the menu hides.
+        void this.startGame(new ZombiesMode(requestedMap), requestedMap);
       } else {
-        // Burned Mansion is the only Zombies arena.
         this.showMapMenu();
       }
     } catch (error: unknown) {

@@ -28,6 +28,7 @@ import type { WeaponDefinition, WeaponId } from '../../weapons/WeaponTypes';
 import { KNIFE_ATTACK_DURATION, KNIFE_RANGE, Knife, knifeDamageForRound } from '../../weapons/Knife';
 import type { MeleeArmDriver } from '../../weapons/ViewArms';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../../zombies/MysteryBox';
+import { mysteryBoxFootprint } from '../../zombies/MysteryBoxFootprint';
 import { MysteryBoxView } from '../../zombies/MysteryBoxView';
 import { EnergyProjectiles } from '../../zombies/EnergyProjectiles';
 import { ChainLightning } from '../../zombies/ChainLightning';
@@ -40,6 +41,7 @@ import { RoundManager } from '../../zombies/RoundManager';
 import { ZombiesRunFlow } from '../../zombies/ZombiesRunFlow';
 import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
 import type { GameMode, ModeContext } from '../GameMode';
+import type { MusicTrackName } from '../../audio/MusicManager';
 import { voicePoint } from '../../audio/SpatialCue';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
@@ -107,6 +109,10 @@ export class CoopHostMode implements GameMode {
   public readonly sharedSimulation = true;
   public readonly reserveAmmoFor = coopReserveAmmo;
 
+  public get gameplayMusic(): MusicTrackName | null {
+    return this.world?.arena.ambience.musicTrack ?? null;
+  }
+
   private ctx!: ModeContext;
   private world!: CoopWorld;
   private zombies!: ZombieManager;
@@ -163,6 +169,7 @@ export class CoopHostMode implements GameMode {
     this.zombies = new ZombieManager(Math.random, ctx.assets.getZombieModels(), !ctx.profile.useReducedEffects,
       arena.spawnPoints, arena.barriers, arena.floorTransitions);
     this.zombies.setNavigationBounds(arena.navigationBounds);
+    this.zombies.setBodyObstacles([mysteryBoxFootprint(arena.mysteryBoxPlacement)]);
     this.zombies.registerColliders(ctx.hitColliders);
     this.world.onTopologyChanged = () => {
       this.zombies.setSpawnPoints(arena.spawnPoints);
@@ -543,9 +550,10 @@ export class CoopHostMode implements GameMode {
   private acceptGuestState(state: PlayerNetState): void {
     const bounds = this.world.arena.navigationBounds.find((entry) => entry.floor === state.floor);
     if (!bounds || !this.guestInventory.has(state.weapon)) return;
+    const baseY = bounds.baseY ?? 0;
     if (state.x < bounds.minX - BOUNDS_MARGIN || state.x > bounds.maxX + BOUNDS_MARGIN
       || state.z < bounds.minZ - BOUNDS_MARGIN || state.z > bounds.maxZ + BOUNDS_MARGIN
-      || state.y < bounds.baseY + 0.5 || state.y > bounds.baseY + EYE_HEIGHT + 2.5) return;
+      || state.y < baseY + 0.5 || state.y > baseY + EYE_HEIGHT + 2.5) return;
     const previous = this.guestState;
     if (this.players.guest.life.state !== 'alive' && previous) {
       state = { ...state, x: previous.x, y: previous.y, z: previous.z, floor: previous.floor,
@@ -1034,7 +1042,8 @@ export class CoopHostMode implements GameMode {
   }
 
   private beginEnding(): void {
-    if (!this.runFlow.beginEnding()) return;
+    const ending = this.world.arena.completionInteraction.ending;
+    if (!this.runFlow.beginEnding(ending.duration)) return;
     this.phase = 'ending';
     this.players.host.life.reset();
     this.players.guest.life.reset();
@@ -1044,9 +1053,9 @@ export class CoopHostMode implements GameMode {
     this.energy.reset();
     this.ctx.audio.stopMusic?.();
     this.ctx.audio.stopWind?.();
-    this.ctx.audio.startEndingAudio();
+    this.ctx.audio.startEndingAudio(ending.audio);
     this.ctx.hud.setInteractionPrompt(null);
-    this.ctx.hud.showEnding(this.rounds.round);
+    this.ctx.hud.showEnding(this.rounds.round, ending.presentation);
     this.ctx.unlockPointer();
     this.sendMatchState();
   }

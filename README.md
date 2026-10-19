@@ -1,66 +1,30 @@
-# 🧟 Zeroed
+# Zeroed
 
-FPS Zombies para navegador inspirado en el ritmo arcade de los zombies de CoD clásicos. Sobrevive a las rondas, mejora tu arsenal, y explora los secretos de "Burned Mansion".
+FPS de zombies para navegador. Sobrevive a las rondas en Burned Mansion, individual o en cooperativo.
 
-## 🛠️ Stack
-
-TypeScript estricto, Three.js, Vite, Vitest, Web Audio API y Capacitor.
-
-## 🚀 Inicio rápido
+## Inicio
 
 ```bash
 npm install
 npm run dev
 ```
 
-Para probar el primer cooperativo de dos jugadores en Burned Mansion, inicia también
-`npm run multiplayer:server` y abre dos pestañas. La partida individual no
-necesita ese servidor. Alcance, límites y conexión por Internet:
-[Multijugador](docs/MULTIPLAYER.md).
+Abre `http://localhost:5173`. Para cooperativo local, ejecuta también `npm run multiplayer:server` ([docs](docs/MULTIPLAYER.md)).
 
-Abre `http://localhost:5173`. Para comprobar cambios:
-
-```bash
-npm run typecheck
-npm run test
-```
-
-## 🎮 Juego
-
-- 🏚️ **Burned Mansion**: una mansión en ruinas con rutas, puertas, barreras, compras de pared y secretos.
-- 💰 Rondas de Zombies con economía, salud, inventario de dos armas y un cuchillo.
-- 🧟‍♂️ Enemigos normales, "brutus", y un posible encuentro con un zombie Shiny...
-- 📱 PWA instalable versión de Android mediante Capacitor.
-## 🕹️ Controles
+## Controles
 
 | Entrada | Acción |
 | --- | --- |
 | `WASD` / ratón | Movimiento y cámara |
-| `LMB` / `RMB` | 🔫 Disparar / apuntar |
-| `R` / `X` | 🔄 Recargar / cambiar modo de fuego |
-| `1` `2` / `3` | 🔪 Cambiar arma / Knife |
-| `E` | 🚪 Interactuar, comprar y reparar |
-| `Space` / `ESC` | ⏸️ Saltar / pausa |
+| `LMB` / `RMB` | Disparar / apuntar |
+| `R` / `X` | Recargar / modo de fuego |
+| `1` `2` / `3` | Arma / cuchillo |
+| `E` | Interactuar |
+| `Space` / `ESC` | Saltar / pausa |
 
-Los controles táctiles se adaptan automáticamente en móvil.
+## Comandos
 
-## 📜 Scripts
+- `npm run test` · `npm run typecheck` · `npm run build`
+- `npm run android:run` · `npm run android:release`
 
-| Comando | Descripción |
-| --- | --- |
-| `npm run dev` | Inicia Vite en desarrollo |
-| `npm run test` | Ejecuta la suite Vitest |
-| `npm run typecheck` | Comprueba TypeScript estricto |
-| `npm run multiplayer:server` | Inicia el servidor gratuito de salas privadas |
-| `npm run multiplayer:test-server` | Prueba el protocolo de salas |
-| `npm run multiplayer:cloudflare:dev` | Prueba el Worker de salas localmente |
-| `npm run multiplayer:cloudflare:deploy` | Despliega el Worker en Cloudflare |
-| `npm run multiplayer:cloudflare:test` | Prueba el Worker local con Wrangler en el puerto 8787 |
-| `npm run build` | Genera la versión de producción |
-| `npm run android:run` | Sincroniza e instala una build Android de depuración |
-| `npm run android:release` | Sube la versión y genera el AAB release firmado para Google Play (`:apk` añade el APK) |
-| `npm run multiplayer:cloudflare:deploy` | Despliega el Worker en Cloudflare |
-
-## 📚 Documentación
-
-- [Cambios relevantes](docs/changes/)
+Más: [cambios](docs/changes/)

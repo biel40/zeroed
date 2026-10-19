@@ -2,6 +2,8 @@ import type { TranslationKey } from '../../i18n/i18n';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
+import { NUCLEAR_ENDING_DURATION } from '../ZombiesRunFlow';
+import type { ArenaAmbience, ArenaEnding } from './ZombieArena';
 
 /** Pure tuning constants for the Burned Mansion map. */
 
@@ -11,6 +13,21 @@ export const BARRIER_CONFIG: WindowBarrierConfig = {
   repairInterval: 0.55,
   repairRewardCap: 4,
 };
+
+/** Charred interior: near-black smoke haze under a cold night sky. */
+export const MANSION_AMBIENCE = {
+  backgroundColor: 0x0d0b0a,
+  fog: { color: 0x17110e, density: 0.018 },
+  hemisphereLight: { skyColor: 0x34465e, groundColor: 0x110d0a, intensity: 0.25, reducedIntensity: 0.18 },
+  musicTrack: 'background_music_theme',
+} as const satisfies ArenaAmbience;
+
+/** The bunker's warhead: nuclear cinematic, alarm and fallout audio. */
+export const MANSION_NUCLEAR_ENDING = {
+  presentation: 'nuclear',
+  audio: 'nuclear',
+  duration: NUCLEAR_ENDING_DURATION,
+} as const satisfies ArenaEnding;
 
 /** Door costs in points. */
 export const MANSION_DOOR_COSTS = {
@@ -103,6 +120,7 @@ export const MANSION_SOUL_LAMPS = [
 export const MANSION_BUNKER_ENDING = {
   id: 'radiation-ending',
   cost: 30000,
+  ending: MANSION_NUCLEAR_ENDING,
   position: { x: -11.635, y: MANSION_BUNKER_Y + 1.55, z: MANSION_SECRET_ROOM.centerZ },
   floor: -1,
   useRange: 2.1,

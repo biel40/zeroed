@@ -103,10 +103,139 @@
       </div>
       <h1 class="zeroed-title">ZEROED</h1>
       <p class="mode-hint" data-i18n="menu.tagline"></p>
-      <div class="mode-grid" role="group" data-i18n-aria-label="menu.zombies">
-        <button type="button" data-map="burned-mansion">
-          <span class="mode-name" data-i18n="menu.zombies"></span>
-          <span class="mode-desc">BURNED MANSION</span>
+      <p class="map-select-kicker" data-i18n="menu.chooseMap"></p>
+      <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false and fills the
+           data-map-* chips from the registry (players, access); the art is decorative inline SVG. -->
+      <div class="map-grid" role="group" data-i18n-aria-label="menu.chooseMap">
+        <button type="button" class="map-card" data-map="burned-mansion">
+          <span class="map-card-art" aria-hidden="true">
+            <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" focusable="false">
+              <defs>
+                <linearGradient id="bm-sky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#0d0607" /><stop offset="0.62" stop-color="#2a0c0a" /><stop offset="1" stop-color="#521a10" />
+                </linearGradient>
+                <radialGradient id="bm-moon">
+                  <stop offset="0" stop-color="#f0cfa6" stop-opacity="0.9" /><stop offset="0.3" stop-color="#b8402a" stop-opacity="0.45" /><stop offset="1" stop-color="#b8402a" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="bm-fire" cx="0.5" cy="1" r="0.85">
+                  <stop offset="0" stop-color="#ff7a2e" stop-opacity="0.8" /><stop offset="0.55" stop-color="#c2280f" stop-opacity="0.32" /><stop offset="1" stop-color="#c2280f" stop-opacity="0" />
+                </radialGradient>
+                <linearGradient id="bm-window" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#ffc06a" /><stop offset="1" stop-color="#d23a1a" />
+                </linearGradient>
+                <linearGradient id="bm-fog" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#3b1a14" stop-opacity="0" /><stop offset="1" stop-color="#2a1511" stop-opacity="0.85" />
+                </linearGradient>
+                <filter id="bm-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /></filter>
+              </defs>
+              <rect width="400" height="200" fill="url(#bm-sky)" />
+              <circle cx="322" cy="44" r="62" fill="url(#bm-moon)" />
+              <circle cx="322" cy="44" r="14" fill="#e6bd94" opacity="0.8" />
+              <g class="map-art-smoke" filter="url(#bm-blur)" fill="#2e2220">
+                <ellipse cx="182" cy="58" rx="46" ry="16" /><ellipse cx="214" cy="34" rx="62" ry="18" opacity="0.8" />
+                <ellipse cx="150" cy="20" rx="70" ry="14" opacity="0.6" /><ellipse cx="268" cy="72" rx="34" ry="12" opacity="0.7" />
+              </g>
+              <ellipse class="map-art-flicker" cx="200" cy="168" rx="170" ry="86" fill="url(#bm-fire)" />
+              <g fill="#060404">
+                <path d="M98 174V112l29-24 29 24v-12h22V72l22-22 22 22v28h22v12l17-15 7 8 9-12 11 15 10 4v62z" />
+                <rect x="134" y="76" width="8" height="24" /><path d="M252 100v-16l4-3 3 4v15z" />
+                <path d="M200 50l-3-10h6z" />
+                <path d="M0 174c18-4 30-14 30-14l-4-24 9 18 5-30 2 32c6-6 10-14 10-14l-6 22c12 4 20 10 20 10z" />
+                <path d="M348 176c4-12 10-18 10-18l-8-30 12 24 2-38 4 40 10-20-6 28c10 4 28 14 28 14z" />
+              </g>
+              <g class="map-art-windows" fill="url(#bm-window)">
+                <rect x="115" y="119" width="9" height="13" /><rect x="133" y="119" width="9" height="13" opacity="0.7" />
+                <path d="M193 92a7 7 0 0 1 14 0v14h-14z" />
+                <rect x="186" y="118" width="9" height="15" /><rect x="205" y="118" width="9" height="15" opacity="0.85" />
+                <rect x="258" y="121" width="9" height="13" opacity="0.6" />
+                <rect x="115" y="147" width="9" height="13" opacity="0.55" /><rect x="276" y="147" width="9" height="13" />
+                <rect x="195" y="148" width="10" height="26" opacity="0.9" />
+              </g>
+              <g stroke="#2b1d17" stroke-width="2">
+                <path d="M131 147l13 6M131 152l13-4M131 158l13 1" /><path d="M256 147l12 5M256 153l12-3M256 158l12 2" />
+              </g>
+              <path d="M0 174q200-14 400 0v26H0z" fill="#040303" />
+              <rect y="138" width="400" height="62" fill="url(#bm-fog)" />
+              <g class="map-art-embers" fill="#ff9a4a">
+                <circle cx="150" cy="150" r="1.2" /><circle cx="214" cy="140" r="1" /><circle cx="248" cy="156" r="1.4" />
+                <circle cx="178" cy="162" r="0.9" /><circle cx="286" cy="148" r="1" /><circle cx="122" cy="160" r="1.1" />
+              </g>
+            </svg>
+          </span>
+          <span class="map-card-access" data-map-access></span>
+          <span class="map-card-body">
+            <span class="map-card-mode" data-i18n="menu.zombies"></span>
+            <span class="map-card-name" data-i18n="map.burnedMansion">BURNED MANSION</span>
+            <span class="map-card-tagline" data-i18n="map.burnedMansion.tagline"></span>
+            <span class="map-card-meta">
+              <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-early" data-i18n="map.earlyAccess"></span>
+            </span>
+          </span>
+        </button>
+        <button type="button" class="map-card" data-map="station-33">
+          <span class="map-card-art" aria-hidden="true">
+            <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" focusable="false">
+              <defs>
+                <linearGradient id="s33-bg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#05090b" /><stop offset="1" stop-color="#0b1519" />
+                </linearGradient>
+                <radialGradient id="s33-spill">
+                  <stop offset="0" stop-color="#7fe6da" stop-opacity="0.42" /><stop offset="1" stop-color="#7fe6da" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="s33-beacon">
+                  <stop offset="0" stop-color="#ffd27a" /><stop offset="0.25" stop-color="#ffb02e" stop-opacity="0.7" /><stop offset="1" stop-color="#ff9a1f" stop-opacity="0" />
+                </radialGradient>
+                <linearGradient id="s33-gold" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#fbe7a1" /><stop offset="0.5" stop-color="#d4a13c" /><stop offset="1" stop-color="#7c5317" />
+                </linearGradient>
+                <linearGradient id="s33-fog" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#13282b" stop-opacity="0" /><stop offset="1" stop-color="#0f2124" stop-opacity="0.9" />
+                </linearGradient>
+                <pattern id="s33-hazard" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <rect width="5" height="10" fill="#d9a33b" /><rect x="5" width="5" height="10" fill="#111" />
+                </pattern>
+                <filter id="s33-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" /></filter>
+              </defs>
+              <rect width="400" height="200" fill="url(#s33-bg)" />
+              <path d="M0 0h400L262 66H138z" fill="#081114" />
+              <path d="M0 0l138 66v72L0 200z" fill="#0d171a" />
+              <path d="M400 0L262 66v72l138 62z" fill="#0b1417" />
+              <path d="M0 200l138-62h124l138 62z" fill="#091113" />
+              <g fill="none" stroke="#1d2c30" stroke-width="2">
+                <rect x="35" y="16" width="330" height="168" /><rect x="70" y="33" width="260" height="134" />
+                <rect x="104" y="50" width="192" height="100" />
+              </g>
+              <g stroke="#2c3d41" stroke-width="2">
+                <path d="M118 200l66-62M282 200l-66-62" /><path d="M150 200l42-62M250 200l-42-62" stroke="#1f2d31" />
+              </g>
+              <g class="map-art-tubes" fill="#9ff4ea">
+                <rect x="160" y="3" width="80" height="4" /><rect x="176" y="20" width="48" height="3" />
+                <rect class="map-art-flicker" x="186" y="37" width="28" height="2.5" /><rect x="192" y="53" width="16" height="2" />
+              </g>
+              <g filter="url(#s33-glow)" fill="#7fe6da" opacity="0.6">
+                <rect x="160" y="3" width="80" height="6" /><rect x="176" y="20" width="48" height="5" />
+              </g>
+              <ellipse cx="200" cy="104" rx="120" ry="70" fill="url(#s33-spill)" />
+              <rect x="146" y="68" width="108" height="70" fill="url(#s33-hazard)" />
+              <rect x="154" y="75" width="92" height="63" fill="#141d20" stroke="#26363a" stroke-width="2" />
+              <path d="M200 75v63" stroke="#0b1113" stroke-width="2" />
+              <text x="200" y="124" text-anchor="middle" fill="url(#s33-gold)" font-family="Impact, 'Arial Narrow', sans-serif" font-size="46" letter-spacing="2">33</text>
+              <circle class="map-art-beacon" cx="200" cy="60" r="16" fill="url(#s33-beacon)" />
+              <circle cx="200" cy="60" r="2.4" fill="#ffe2a0" />
+              <rect y="140" width="400" height="60" fill="url(#s33-fog)" />
+            </svg>
+          </span>
+          <span class="map-card-access" data-map-access></span>
+          <span class="map-card-body">
+            <span class="map-card-mode" data-i18n="menu.zombies"></span>
+            <span class="map-card-name" data-i18n="map.station33">STATION 33</span>
+            <span class="map-card-tagline" data-i18n="map.station33.tagline"></span>
+            <span class="map-card-meta">
+              <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-early" data-i18n="map.earlyAccess"></span>
+            </span>
+          </span>
         </button>
       </div>
       <button type="button" id="coop-select" class="coop-select" data-i18n="menu.multiplayer"></button>
@@ -224,7 +353,7 @@
 
   <div id="pause-menu" class="hidden">
     <div class="start-panel">
-      <p class="menu-kicker"><span data-i18n="pause.kicker"></span> <span id="pause-round">1</span></p>
+      <p class="menu-kicker"><span id="pause-map" data-i18n="map.burnedMansion"></span> · <span data-i18n="pause.kicker"></span> <span id="pause-round">1</span></p>
       <h1 data-i18n="pause.title"></h1>
       <dl class="pause-stats" data-i18n-aria-label="pause.stats">
         <div><dt data-i18n="pause.damage"></dt><dd id="pause-damage">0</dd></div>
@@ -331,7 +460,7 @@
   <div id="map-loading" class="hidden" role="status" aria-live="polite">
     <div class="map-loading-content">
       <p class="map-loading-kicker" data-i18n="mapLoading.preparing"></p>
-      <h2 class="map-loading-title">BURNED MANSION</h2>
+      <h2 id="map-loading-title" class="map-loading-title" data-i18n="map.burnedMansion">BURNED MANSION</h2>
       <div class="map-loading-bar" aria-hidden="true"><span></span></div>
       <p class="map-loading-tagline" data-i18n="menu.tagline"></p>
     </div>
