@@ -1,0 +1,308 @@
+import * as THREE from 'three';
+import { seededRandom } from '../shared/ProceduralNoise';
+
+/**
+ * Diegetic Cyrillic signage of the station, painted on canvases at load.
+ * These are part of the art (never translated, never UI). Iconography stays
+ * generic: stars, rays, lettering and tesserae; no portraits or real emblems.
+ */
+export type SignId =
+  | 'exit'
+  | 'ticket-office'
+  | 'no-smoking'
+  | 'no-entry'
+  | 'to-trains'
+  | 'do-not-run'
+  | 'civil-defence'
+  | 'torn-poster-a'
+  | 'torn-poster-b';
+
+const ATLAS_SIZE = 1024;
+
+/** Atlas cells in canvas pixels: x, y, width, height. */
+const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
+  exit: [0, 0, 512, 128],
+  'ticket-office': [512, 0, 512, 128],
+  'no-smoking': [0, 128, 256, 128],
+  'no-entry': [256, 128, 256, 128],
+  'to-trains': [512, 128, 512, 128],
+  'do-not-run': [768, 256, 256, 128],
+  'civil-defence': [0, 256, 256, 384],
+  'torn-poster-a': [256, 256, 256, 384],
+  'torn-poster-b': [512, 256, 256, 384],
+};
+
+const SIGN_FONT = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+
+export interface Station33Signage {
+  /** Enamel plates and paper posters (cut out by alpha). */
+  readonly material: THREE.MeshStandardMaterial;
+  /** Lightbox faces; the lighting circuits drive their colour. */
+  readonly litMaterial: THREE.MeshBasicMaterial;
+  /** Faded smalt mosaic above the escalator portal. */
+  readonly muralMaterial: THREE.MeshStandardMaterial;
+  /** Plane of `width` x `height` metres showing one atlas cell. */
+  signGeometry(id: SignId, width: number, height: number): THREE.PlaneGeometry;
+}
+
+/** Mural composition, shared with the builder that shapes its geometry. */
+export const MURAL_LAYOUT = {
+  /** Mural area: x in [-halfWidth, halfWidth], y from bottomY up to the vault. */
+  halfWidth: 6.5,
+  bottomY: 3.05,
+  /** Height of the lettered band along the bottom. */
+  bandHeight: 0.5,
+  canvasWidth: 1950,
+  canvasHeight: 306,
+  tessera: 6,
+} as const;
+
+/** Texture coordinates of a mural point given in metres (x across, y absolute height). */
+export function muralUv(x: number, y: number): readonly [number, number] {
+  const { halfWidth, bottomY, canvasWidth, canvasHeight } = MURAL_LAYOUT;
+  const heightMetres = (canvasHeight / canvasWidth) * halfWidth * 2;
+  return [(x + halfWidth) / (halfWidth * 2), (y - bottomY) / heightMetres];
+}
+
+function makeCanvas(width: number, height: number): { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D } {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Station 33 signage needs a 2D canvas');
+  return { canvas, context };
+}
+
+function canvasTexture(canvas: HTMLCanvasElement, anisotropy: number): THREE.CanvasTexture {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = anisotropy;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return texture;
+}
+
+/** Scuffs, chips and soot over a painted cell. */
+function weather(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, random: () => number, amount: number): void {
+  for (let index = 0; index < amount; index++) {
+    const size = 2 + random() * 9;
+    context.fillStyle = random() < 0.7 ? 'rgba(20, 18, 14, 0.35)' : 'rgba(120, 104, 80, 0.4)';
+    context.fillRect(x + random() * (width - size), y + random() * (height - size), size, size * (0.4 + random()));
+  }
+}
+
+function lettering(context: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, color: string): void {
+  context.fillStyle = color;
+  context.font = `bold ${size}px ${SIGN_FONT}`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(text, x, y);
+}
+
+/** Enamel plate: coloured field, thin border, centred lettering. */
+function enamelPlate(
+  context: CanvasRenderingContext2D,
+  id: SignId,
+  field: string,
+  border: string,
+  ink: string,
+  lines: ReadonlyArray<string>,
+  fontSize: number,
+  random: () => number,
+): void {
+  const [x, y, width, height] = SIGN_REGIONS[id];
+  context.fillStyle = border;
+  context.fillRect(x, y, width, height);
+  context.fillStyle = field;
+  context.fillRect(x + 6, y + 6, width - 12, height - 12);
+  const step = height / (lines.length + 1);
+  lines.forEach((line, index) => lettering(context, line, x + width / 2, y + step * (index + 1), fontSize, ink));
+  weather(context, x, y, width, height, random, 40);
+}
+
+/** Arrow pointing up the plate, drawn as a polygon so no glyph support is needed. */
+function arrow(context: CanvasRenderingContext2D, x: number, y: number, size: number, color: string): void {
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(x, y - size);
+  context.lineTo(x + size * 0.7, y - size * 0.1);
+  context.lineTo(x + size * 0.25, y - size * 0.1);
+  context.lineTo(x + size * 0.25, y + size);
+  context.lineTo(x - size * 0.25, y + size);
+  context.lineTo(x - size * 0.25, y - size * 0.1);
+  context.lineTo(x - size * 0.7, y - size * 0.1);
+  context.closePath();
+  context.fill();
+}
+
+/** Paper torn along a jagged outline; everything outside stays transparent. */
+function tornPaper(context: CanvasRenderingContext2D, id: SignId, keep: number, random: () => number): void {
+  const [x, y, width, height] = SIGN_REGIONS[id];
+  context.fillStyle = '#b4aa8e';
+  context.beginPath();
+  context.moveTo(x + 4, y + 4);
+  context.lineTo(x + width - 4, y + 4);
+  const tornY = y + height * keep;
+  context.lineTo(x + width - 4, tornY - random() * 40);
+  for (let step = 1; step < 12; step++) {
+    context.lineTo(x + width - 4 - (width - 8) * step / 12, tornY + (random() - 0.5) * 70);
+  }
+  context.lineTo(x + 4, tornY - random() * 60);
+  context.closePath();
+  context.fill();
+}
+
+/** Illegible print: grey bars standing in for paragraphs. */
+function printLines(context: CanvasRenderingContext2D, x: number, y: number, width: number, rows: number, random: () => number): void {
+  context.fillStyle = 'rgba(40, 36, 30, 0.75)';
+  for (let row = 0; row < rows; row++) {
+    context.fillRect(x, y + row * 13, width * (0.55 + random() * 0.45), 6);
+  }
+}
+
+function paintAtlas(context: CanvasRenderingContext2D): void {
+  const random = seededRandom(3333);
+  context.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
+  enamelPlate(context, 'exit', '#d9d3c1', '#3a3a36', '#a3241a', ['ВЫХОД В ГОРОД'], 66, random);
+  enamelPlate(context, 'ticket-office', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['КАССЫ'], 84, random);
+  enamelPlate(context, 'no-smoking', '#e4e0d4', '#a3241a', '#1b1b1b', ['НЕ КУРИТЬ'], 46, random);
+  enamelPlate(context, 'no-entry', '#9a1f16', '#e8e2d2', '#f1ead8', ['ВХОДА НЕТ'], 50, random);
+  enamelPlate(context, 'to-trains', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['К ПОЕЗДАМ'], 66, random);
+  arrow(context, 512 + 448, 128 + 64, 34, '#e2d8b8');
+  enamelPlate(context, 'do-not-run', '#d8b02c', '#1b1b1b', '#1b1b1b', ['НЕ БЕГИТЕ', 'ПО ЭСКАЛАТОРУ'], 30, random);
+
+  // Civil-defence notice: red header, instructions, a shelter arrow, torn off at the bottom.
+  const [cx, cy, cw] = SIGN_REGIONS['civil-defence'];
+  tornPaper(context, 'civil-defence', 0.82, random);
+  context.fillStyle = '#8f2018';
+  context.fillRect(cx + 14, cy + 16, cw - 28, 54);
+  lettering(context, 'ГРАЖДАНСКАЯ', cx + cw / 2, cy + 32, 22, '#efe6cf');
+  lettering(context, 'ОБОРОНА', cx + cw / 2, cy + 55, 22, '#efe6cf');
+  lettering(context, 'ПАМЯТКА НАСЕЛЕНИЮ', cx + cw / 2, cy + 88, 17, '#2a2620');
+  printLines(context, cx + 20, cy + 108, cw - 40, 8, random);
+  arrow(context, cx + cw / 2, cy + 240, 26, '#8f2018');
+  printLines(context, cx + 20, cy + 276, cw - 40, 3, random);
+  weather(context, cx, cy, cw, 300, random, 70);
+
+  // Older bills almost scraped away: only a corner and a stripe of print survive.
+  for (const [id, keep] of [['torn-poster-a', 0.45], ['torn-poster-b', 0.62]] as const) {
+    const [px, py, pw] = SIGN_REGIONS[id];
+    tornPaper(context, id, keep, random);
+    context.fillStyle = 'rgba(30, 60, 90, 0.55)';
+    context.fillRect(px + 16, py + 18, pw - 32, 40);
+    lettering(context, id === 'torn-poster-a' ? 'ГО...' : 'СТАНЦИЯ', px + pw / 2, py + 38, 28, '#d9cfb3');
+    printLines(context, px + 20, py + 74, pw - 40, 6, random);
+    weather(context, px, py, pw, 200, random, 50);
+  }
+}
+
+/** Mosaic colour at a point of the mural, in metres (x across, y above the portal). */
+function muralColor(x: number, y: number, random: () => number): string {
+  const { halfWidth, bandHeight } = MURAL_LAYOUT;
+  // Fading: tesserae lose saturation towards grey, unevenly.
+  const fade = 0.45 + random() * 0.2;
+  const jitter = 0.88 + random() * 0.24;
+  let rgb: [number, number, number];
+  if (y < bandHeight) {
+    rgb = [92, 34, 28];
+  } else {
+    const cy = bandHeight + 0.55;
+    const dx = x;
+    const dy = y - cy;
+    const radius = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const star = insideStar(dx, dy, 0.42, 0.17);
+    const ray = Math.cos(angle * 16) > 0.55 && radius > 0.5;
+    const laurel = Math.abs(Math.hypot(dx * 0.5, dy + 0.3) - 1.65) < 0.11 && Math.sin(Math.atan2(dy + 0.3, dx) * 40) > 0 && Math.abs(dx) > 1.2;
+    if (star) rgb = [176, 44, 30];
+    else if (radius < 0.5) rgb = [196, 158, 70];
+    else if (laurel) rgb = [70, 104, 66];
+    else if (ray && radius < 3.6) rgb = [188, 150, 76];
+    else {
+      const sky = THREE.MathUtils.clamp((y - bandHeight) / 1.3, 0, 1);
+      rgb = [46 + (150 - 46) * (1 - sky), 82 + (128 - 82) * (1 - sky), 104 + (96 - 104) * (1 - sky)];
+    }
+    if (Math.abs(x) > halfWidth - 0.15) rgb = [168, 140, 80];
+  }
+  const grey = (rgb[0] + rgb[1] + rgb[2]) / 3;
+  return `rgb(${[0, 1, 2].map((channel) => Math.round((rgb[channel] + (grey - rgb[channel]) * fade) * jitter)).join(',')})`;
+}
+
+function insideStar(x: number, y: number, outer: number, inner: number): boolean {
+  // Ray-casting test against the ten-vertex star polygon pointing up.
+  let inside = false;
+  for (let index = 0, previous = 9; index < 10; previous = index++) {
+    const vertex = starVertex(index, outer, inner);
+    const other = starVertex(previous, outer, inner);
+    if ((vertex[1] > y) !== (other[1] > y) && x < (other[0] - vertex[0]) * (y - vertex[1]) / (other[1] - vertex[1]) + vertex[0]) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function starVertex(index: number, outer: number, inner: number): readonly [number, number] {
+  const angle = Math.PI / 2 + index * Math.PI / 5;
+  const radius = index % 2 === 0 ? outer : inner;
+  return [Math.cos(angle) * radius, Math.sin(angle) * radius];
+}
+
+function paintMural(context: CanvasRenderingContext2D): void {
+  const { canvasWidth, canvasHeight, tessera, halfWidth, bandHeight } = MURAL_LAYOUT;
+  const random = seededRandom(3361);
+  const muralHeight = canvasHeight / tessera;
+  const metresPerTessera = (halfWidth * 2) / (canvasWidth / tessera);
+  context.fillStyle = '#4a4740';
+  context.fillRect(0, 0, canvasWidth, canvasHeight);
+  // Missing tesserae cluster where water came through the vault.
+  const losses = Array.from({ length: 9 }, () => ({ x: random() * canvasWidth, y: random() * canvasHeight, r: 12 + random() * 46 }));
+  for (let row = 0; row < muralHeight; row++) {
+    for (let column = 0; column < canvasWidth / tessera; column++) {
+      const px = column * tessera;
+      const py = row * tessera;
+      const lost = losses.some((loss) => Math.hypot(px - loss.x, py - loss.y) < loss.r * (0.6 + random() * 0.5));
+      if (lost) continue;
+      const x = (column + 0.5) * metresPerTessera - halfWidth;
+      const y = (muralHeight - row - 0.5) * metresPerTessera;
+      context.fillStyle = muralColor(x, y, random);
+      context.fillRect(px + 1, py + 1, tessera - 1, tessera - 1);
+    }
+  }
+  const bandRows = bandHeight / metresPerTessera;
+  lettering(context, 'СТАНЦИЯ 33', canvasWidth / 2, canvasHeight - bandRows * tessera / 2, 56, '#c4a65c');
+  // Seepage darkens the mosaic from the top down.
+  for (let index = 0; index < 14; index++) {
+    context.fillStyle = 'rgba(30, 26, 18, 0.18)';
+    const width = 12 + random() * 40;
+    context.fillRect(random() * canvasWidth, 0, width, canvasHeight * (0.3 + random() * 0.6));
+  }
+}
+
+export function createStation33Signage(anisotropyLimit: number): Station33Signage {
+  const anisotropy = Math.min(anisotropyLimit, 8);
+  const atlas = makeCanvas(ATLAS_SIZE, ATLAS_SIZE);
+  paintAtlas(atlas.context);
+  const atlasTexture = canvasTexture(atlas.canvas, anisotropy);
+  const mural = makeCanvas(MURAL_LAYOUT.canvasWidth, MURAL_LAYOUT.canvasHeight);
+  paintMural(mural.context);
+
+  return {
+    material: new THREE.MeshStandardMaterial({ name: 'station33_signs', map: atlasTexture, alphaTest: 0.5, roughness: 0.6, metalness: 0.05 }),
+    litMaterial: new THREE.MeshBasicMaterial({ name: 'station33_lit_signs', map: atlasTexture, alphaTest: 0.5 }),
+    muralMaterial: new THREE.MeshStandardMaterial({ name: 'station33_mural', map: canvasTexture(mural.canvas, anisotropy), roughness: 0.5, metalness: 0.05 }),
+    signGeometry(id, width, height) {
+      const [x, y, cellWidth, cellHeight] = SIGN_REGIONS[id];
+      const geometry = new THREE.PlaneGeometry(width, height);
+      const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+      for (let index = 0; index < uv.count; index++) {
+        // Canvas rows grow downwards; texture v grows upwards (flipY).
+        uv.setXY(
+          index,
+          (x + uv.getX(index) * cellWidth) / ATLAS_SIZE,
+          1 - (y + (1 - uv.getY(index)) * cellHeight) / ATLAS_SIZE,
+        );
+      }
+      return geometry;
+    },
+  };
+}

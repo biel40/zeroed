@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import type { AmbientCuePlayback } from '../../audio/AudioSystem';
 import type { EndingAudioId, MusicTrackName } from '../../audio/MusicManager';
 import type { FloorTransitionZone } from '../../player/PlayerController';
 import type { EndingPresentationId } from '../../ui/HUD';
@@ -112,6 +113,11 @@ export interface ZombieNavigationBounds extends PlayerBounds {
   readonly baseY?: number;
 }
 
+/** A positioned ambient sound the map emits (PA horn, distant train...). */
+export interface ArenaAmbientCue extends AmbientCuePlayback {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+}
+
 /** Scene mood owned by the map and applied when the arena initializes. */
 export interface ArenaAmbience {
   readonly backgroundColor: number;
@@ -123,6 +129,12 @@ export interface ArenaAmbience {
     /** Intensity on reduced-effects profiles. */
     readonly reducedIntensity: number;
   };
+  /**
+   * Share of the shell's image-based light (scene.environmentIntensity) the
+   * map lets through; omitted keeps the shell default. Dark interiors lower
+   * it so practical lights, not the sky-like environment, shape the room.
+   */
+  readonly environmentIntensity?: { readonly intensity: number; readonly reducedIntensity: number };
   /** Looping bed while the match is running. */
   readonly musicTrack: MusicTrackName;
 }
@@ -162,6 +174,8 @@ export interface ZombieArena {
   /** Stair/zone transitions that swap player floor/bounds. */
   readonly floorTransitions?: ReadonlyArray<FloorTransitionZone>;
   readonly ambience: ArenaAmbience;
+  /** Optional: ambient sounds the map schedules itself; the mode plays them. */
+  onAmbientCue?: ((cue: ArenaAmbientCue) => void) | null;
   /** Optional visual event fired when a rebuilt board finishes seating. */
   onBarrierBoardRebuilt?: (() => void) | null;
   /**

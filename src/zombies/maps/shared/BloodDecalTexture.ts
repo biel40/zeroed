@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { seededRandom, valueNoise } from './ProceduralNoise';
 
 /** Wall blood shapes: an impact spray with runs, or a dragged handprint. */
 export type BloodDecalKind = 'splatter' | 'smear';
@@ -14,35 +15,6 @@ const THICK_BLOOD: Rgb = [34, 4, 4];
 const MAX_DENSITY = 1.6;
 /** Texels per cell of the low-frequency noise that blotches the film. */
 const MOTTLE_CELL = 14;
-
-function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** Smooth 0..1 value noise over a lattice of random corners. */
-function valueNoise(random: () => number, cell: number): (x: number, y: number) => number {
-  const cells = Math.ceil(SIZE / cell) + 1;
-  const corners = Float32Array.from({ length: cells * cells }, () => random());
-  return (x, y) => {
-    const gx = x / cell;
-    const gy = y / cell;
-    const x0 = Math.floor(gx);
-    const y0 = Math.floor(gy);
-    const fx = THREE.MathUtils.smootherstep(gx - x0, 0, 1);
-    const fy = THREE.MathUtils.smootherstep(gy - y0, 0, 1);
-    const at = (cx: number, cy: number): number => corners[cy * cells + cx];
-    const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx;
-    const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx;
-    return top + (bottom - top) * fy;
-  };
-}
 
 /** Blood thickness per texel; row 0 is the bottom of the wall patch. */
 class BloodField {
@@ -191,7 +163,7 @@ export function makeBloodDecalTexture(kind: BloodDecalKind, seed: number): THREE
   else paintSmear(field, random);
 
   // Blood never dries evenly: blotch the film so thin areas break up.
-  const mottle = valueNoise(random, MOTTLE_CELL);
+  const mottle = valueNoise(random, MOTTLE_CELL, SIZE);
   const data = new Uint8Array(SIZE * SIZE * 4);
   for (let index = 0; index < field.density.length; index++) {
     const density = field.density[index] * (0.65 + 0.55 * mottle(index % SIZE, Math.floor(index / SIZE)));

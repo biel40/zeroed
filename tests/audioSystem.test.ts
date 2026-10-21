@@ -511,6 +511,27 @@ describe('AudioSystem zombie impact sounds', () => {
     expect(sweepSpy.mock.calls[0][2]).toBeLessThan(100);
     expect(tickSpy).toHaveBeenCalledOnce();
   });
+
+  it.each(['pa-crackle', 'distant-train', 'power-dip'] as const)('voices the %s map ambience procedurally from its position', (sound) => {
+    const audio = new AudioSystem() as any;
+    const formant = { type: '', frequency: { value: 0 }, Q: { value: 0 }, connect: vi.fn() };
+    audio.context = vi.fn(() => ({ ctx: { currentTime: 0, createBiquadFilter: () => formant }, master: {}, noise: {} }));
+    const sweepSpy = vi.spyOn(audio, 'sweep').mockImplementation(() => {});
+    const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    const toneSpy = vi.spyOn(audio, 'toneTo').mockImplementation(() => {});
+    const loadSpy = vi.spyOn(audio, 'loadSample');
+    const bus = {};
+    const busSpy = vi.spyOn(audio, 'spatialBus').mockReturnValue(bus);
+
+    audio.playAmbientCue({ sound }, { pan: 0.4, attenuation: 0.05, muffle: 0.5 });
+
+    // Map-wide mood: distance alone never silences it.
+    expect(busSpy.mock.calls[0][2]).toBeGreaterThanOrEqual(0.3);
+    expect(tickSpy.mock.calls.length + sweepSpy.mock.calls.length + toneSpy.mock.calls.length).toBeGreaterThan(2);
+    expect(tickSpy.mock.calls.every((call) => call[5] === bus)).toBe(true);
+    // Without a sample file nothing is fetched.
+    expect(loadSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('AudioSystem sampled effects', () => {

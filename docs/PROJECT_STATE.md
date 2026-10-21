@@ -1,12 +1,12 @@
 # Estado del proyecto
 
-**Corte:** 2026-09-25. La fuente de verdad es el codigo actual.
+**Corte:** 2026-10-21. La fuente de verdad es el codigo actual.
 
 ## Funcional
 
 - Entrada WebGL, selector de mapas con tarjetas ilustradas (Burned Mansion
   incluido; Station 33 premium, solo individual, en acceso anticipado para la
-  beta y aun un stub sin contenido), carga de assets con fallback y shell FPS
+  beta y con su Fase 1 jugable: el vestibulo), carga de assets con fallback y shell FPS
   compartido desktop/tactil. No hay pagos: premium solo es presentacion.
 - Armas declarativas, balistica segmentada, energia, headshots, recargas,
   economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.

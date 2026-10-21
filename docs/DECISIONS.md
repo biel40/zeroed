@@ -4,11 +4,13 @@
   `GameMode` recibe un `ModeContext`. Individual y cooperativo comparten loop
   sin compartir estado de run.
 - **Mapas por registro.** Burned Mansion y Station 33 son los mapas jugables;
-  Station 33 es solo individual, sera de pago y por ahora es un stub. `zombieMaps.ts`
+  Station 33 es solo individual, sera de pago y se construye por fases (la
+  primera, el vestibulo), cada una jugable y sin puertas hacia el vacio. `zombieMaps.ts`
   declara por mapa visibilidad, nombre i18n, soporte cooperativo, si es premium
   y factoria de arena; los modos la resuelven por `mapId`. Mientras no exista
   un sistema de pagos, `premium` solo cambia la presentacion: la beta cerrada
-  juega todos los mapas visibles. `ZombieArena` mantiene geometria,
+  juega todos los mapas visibles. Cada mapa fija su ambiente, incluida la luz
+  de entorno que deja pasar. `ZombieArena` mantiene geometria,
   colliders, spawns, barreras, puertas, ambiente, musica y final fuera de la
   logica de la run; lo exclusivo de un mapa (almas, faroles, ritual y sala
   secreta de la mansion) es una capacidad opcional consultada con type guard.

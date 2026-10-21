@@ -98,6 +98,18 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
   },
 };
 
+/** Map ambience with a procedural voice in this class. */
+export type AmbientCueSound = 'pa-crackle' | 'distant-train' | 'power-dip';
+
+/** What to play for a map ambient event; `sampleFile` (in `assets/audio/`) replaces the procedural sound. */
+export interface AmbientCuePlayback {
+  readonly sound: AmbientCueSound;
+  readonly sampleFile?: string;
+}
+
+/** Ambient cues set the mood of the whole map, so distance never buries them. */
+const AMBIENT_CUE_MIN_ATTENUATION = 0.35;
+
 /** Seconds after activation at which the ritual scare's visual beats land. */
 export interface RitualScareBeats {
   readonly strike: number;
@@ -135,6 +147,7 @@ export class AudioSystem {
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private dryFireBuffer: AudioBuffer | null = null;
   private doorPurchaseBuffer: AudioBuffer | null = null;
+  private readonly ambientSamples = new Map<string, AudioBuffer | null>();
   private readonly mysteryBoxOpenUrl: string = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
   private readonly dryFireUrl: string = `${import.meta.env.BASE_URL}assets/audio/encasquillada_arma.mp3`;
   private readonly doorPurchaseUrl: string = `${import.meta.env.BASE_URL}assets/audio/door_purchase.mp3`;
@@ -952,6 +965,80 @@ export class AudioSystem {
     const base: number = 65 + Math.random() * 40;
     this.sweep(0, 'sawtooth', base, base * 0.6, 0.09, 1.4, t, output);
     this.sweep(0.1, 'triangle', base * 1.5, base, 0.06, 1.1, t + 0.1, output);
+  }
+
+  /**
+   * A map's positioned ambience: its MP3 from `assets/audio/` once loaded,
+   * otherwise the procedural version of that sound.
+   */
+  public playAmbientCue(cue: AmbientCuePlayback, spatial: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, spatial, AMBIENT_CUE_MIN_ATTENUATION);
+    const sample = cue.sampleFile ? this.ambientSample(cue.sampleFile) : null;
+    if (sample) {
+      const source = audio.ctx.createBufferSource();
+      source.buffer = sample;
+      source.connect(output);
+      source.start();
+      return;
+    }
+    const t = audio.ctx.currentTime;
+    if (cue.sound === 'pa-crackle') this.playPaCrackle(audio, output, t);
+    else if (cue.sound === 'distant-train') this.playDistantTrain(output, t);
+    else this.playPowerDip(audio, output, t);
+  }
+
+  /** Optional ambience files load on first use; null until (or unless) they decode. */
+  private ambientSample(file: string): AudioBuffer | null {
+    if (!this.ambientSamples.has(file)) {
+      this.ambientSamples.set(file, null);
+      void this.loadSample(`${import.meta.env.BASE_URL}assets/audio/${file}`)
+        .then((buffer) => this.ambientSamples.set(file, buffer));
+    }
+    return this.ambientSamples.get(file) ?? null;
+  }
+
+  /** Dead public-address horn: static, a warped two-tone chime and a garbled voice. */
+  private playPaCrackle(audio: AudioContextParts, output: AudioNode, t: number): void {
+    for (let index = 0; index < 9; index++) {
+      this.tick(Math.random() * 0.4, 2400 + Math.random() * 1600, 0.05 + Math.random() * 0.06, 3, 0.025, output);
+    }
+    this.toneTo(audio.ctx, output, t + 0.38, 'triangle', 652, 0.07, 0.5);
+    this.toneTo(audio.ctx, output, t + 0.66, 'triangle', 517, 0.07, 0.7);
+    // A narrow formant over a buzz reads as speech through a broken speaker.
+    const formant = audio.ctx.createBiquadFilter();
+    formant.type = 'bandpass';
+    formant.frequency.value = 1050;
+    formant.Q.value = 1.4;
+    formant.connect(output);
+    for (let syllable = 0; syllable < 7; syllable++) {
+      const at = t + 1.2 + syllable * 0.19 + Math.random() * 0.05;
+      const pitch = 120 + Math.random() * 45;
+      this.sweep(0, 'sawtooth', pitch, pitch * 0.85, 0.11, 0.15, at, formant);
+    }
+    for (let index = 0; index < 6; index++) {
+      this.tick(1.2 + Math.random() * 1.4, 3000 + Math.random() * 1500, 0.04, 3, 0.02, output);
+    }
+    this.tick(2.7, 1900, 0.09, 2, 0.06, output);
+  }
+
+  /** A train that never arrives: a swelling sub rumble and a faint wheel squeal far below. */
+  private playDistantTrain(output: AudioNode, t: number): void {
+    const swell = [0.07, 0.13, 0.19, 0.22, 0.17, 0.1, 0.05];
+    for (let index = 0; index < swell.length; index++) {
+      this.tick(index * 0.5, 75 + index * 4, swell[index], 0.8, 1.6, output);
+    }
+    this.sweep(0, 'sine', 36, 52, 0.16, 3.2, t + 0.4, output);
+    this.tick(1.6, 2350, 0.022, 16, 1.4, output);
+  }
+
+  /** Mains relay dropping out, the hum dying and the tube starters clicking back. */
+  private playPowerDip(audio: AudioContextParts, output: AudioNode, t: number): void {
+    this.tick(0, 170, 0.32, 2, 0.08, output);
+    this.sweep(0, 'sawtooth', 100, 48, 0.05, 0.8, t, output);
+    this.toneTo(audio.ctx, output, t + 1.15, 'sawtooth', 100, 0.04, 0.45);
+    for (const offset of [1.12, 1.24, 1.31, 1.47]) this.tick(offset, 3300, 0.12, 9, 0.02, output);
   }
 
   /** Two-note ominous sting when a new round begins. */

@@ -73,7 +73,9 @@ sufra tirones de compilacion de shaders.
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
   municion la decide el modo.
 - `ZombieArena` separa la run de la geometria del mapa. La arena declara spawn y
-  limites del jugador, ambiente (fondo, niebla, luz hemisferica y musica), su
+  limites del jugador, ambiente (fondo, niebla, luz hemisferica, musica y, si
+  quiere, la intensidad de la luz de entorno), sonidos ambientales opcionales
+  (`onAmbientCue`, que el modo reproduce), su
   final (cinematica, audio y duracion) y avisa con `onTopologyChanged` cuando
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`.

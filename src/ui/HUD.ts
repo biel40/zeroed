@@ -446,6 +446,8 @@ export class HUD {
       this.lastLamps = lampKey;
       mustGet('z-lamps').innerHTML = lampProgress(state.lamps, true);
       mustGet('pause-lamps').innerHTML = lampProgress(state.lamps);
+      // Lamps are a map feature: maps without them show no counter.
+      for (const id of ['z-lamps', 'pause-lamps']) mustGet(id).classList.toggle('hidden', state.lamps.length === 0);
     }
   }
 

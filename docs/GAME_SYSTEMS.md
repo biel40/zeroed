@@ -110,8 +110,18 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 - `BurnedMansionArena`: dos plantas, colision, nueve ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
   unico mapa cooperativo.
-- `Station33Arena`: stub individual y premium, un suelo con dos spawns sin
-  puertas, barreras, compras ni final.
+- `Station33Arena`: individual y premium, se construye por fases y crece hacia
+  el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
+  es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
+  puerta de servicio y dos rejillas), M1911 y AK-47 en pared, y la Mystery Box
+  junto a la escalera mecanica sellada, su unica frontera. Aun no tiene puertas
+  de pago ni final. La arena solo orquesta: cada zona tiene su builder en
+  `station33/`, y la luz y la atmosfera son sistemas propios.
+- Los fluorescentes de Station 33 parpadean por circuitos desfasados (colores
+  de materiales compartidos, sin luces nuevas). Megafonia, tren lejano y
+  apagon son eventos de datos del mapa con temporizador
+  (`AmbientEventScheduler`) y voz procedural en `AudioSystem`; un `sampleFile`
+  en el evento la sustituye por un MP3 de `public/assets/audio/`.
 - El menu principal muestra una tarjeta por mapa con arte SVG animado, nombre,
   lema, jugadores y acceso (incluido o premium, con brillo dorado y aviso de
   acceso anticipado); `HUD` rellena jugadores y acceso desde el registro. La
@@ -212,6 +222,11 @@ del 10 % (minimo 50 %) si la media de un segundo cae de 50 fps, y la sube al
 recuperar 57 fps; un intento de subida fallido duplica la espera del
 siguiente y una bajada que no acelera el frame se deshace, porque el cuello
 no era la GPU. `?debug` muestra la escala actual.
+
+Station 33 crea, por prioridad, solo las luces puntuales que caben en ese mismo
+presupuesto (`POINT_LIGHT_BUDGET`) y fusiona su decoracion estatica en una
+malla por material (`StaticMeshBatch`); columnas, torniquetes, taquillas y
+bancos chocan con proxies AABB invisibles.
 
 Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene

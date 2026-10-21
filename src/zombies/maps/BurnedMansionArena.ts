@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { DeviceProfile, QualityLevel } from '../../core/DeviceProfile';
+import type { DeviceProfile } from '../../core/DeviceProfile';
 import { EYE_HEIGHT, type FloorTransitionZone, type StairRamp } from '../../player/PlayerController';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
@@ -27,7 +27,8 @@ import type {
 } from './ZombieArena';
 import { createMansionSurfaceMaterials, type MansionSurfaceMaterials } from './BurnedMansionMaterials';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
-import { projectBoxUVs } from './shared/BoxUVs';
+import { ArenaStructure, projectMaterialUVs } from './shared/ArenaStructure';
+import { POINT_LIGHT_BUDGET } from './shared/PointLightBudget';
 import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
@@ -68,7 +69,6 @@ const GROUND_CEILING_Y = 3.2;
 const BUNKER_CEILING_Y = -0.3;
 const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
 const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
-const POINT_LIGHT_BUDGET: Record<QualityLevel, number> = { low: 3, medium: 4, high: 6 };
 
 /** Score bonus that keeps an active light until a rival is clearly better. */
 const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
@@ -284,8 +284,9 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   readonly soulLampInteractions: ReadonlyArray<ArenaSoulLampInteraction>;
   spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = [];
 
-  private readonly structureMeshes: THREE.Mesh[] = [];
-  private readonly playerWallMeshes: THREE.Mesh[] = [];
+  private readonly structure = new ArenaStructure(this.group);
+  private readonly structureMeshes = this.structure.solids;
+  private readonly playerWallMeshes = this.structure.playerBlockers;
   private readonly allBarriers: ReadonlyArray<WindowBarrier>;
   private readonly barrierViews: WindowBarrierView[] = [];
   private readonly doorViews: PointDoorView[] = [];
@@ -411,7 +412,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   }
 
   public init(): void {
-    applySceneAmbience(this.scene, this.ambience);
+    applySceneAmbience(this.scene, this.ambience, this.profile.useReducedEffects);
   }
 
   public update(dt: number, observerPosition?: THREE.Vector3): void {
@@ -687,7 +688,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       LOWER_WALL_HEIGHT,
       MANSION_SECRET_ROOM.entranceWidth,
     );
-    this.projectSurfaceUVs(
+    projectMaterialUVs(
       geometry,
       WALL_THICKNESS,
       LOWER_WALL_HEIGHT,
@@ -748,7 +749,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       // The top tread stops at the slab edge instead of sharing its y=0 plane.
       const endZ = Math.min(startZ + depth, STAIR_APERTURE_MAX_Z);
       const geometry = new THREE.BoxGeometry(stepWidth, Math.max(0.12, height), endZ - startZ);
-      this.projectSurfaceUVs(geometry, stepWidth, Math.max(0.12, height), endZ - startZ, this.materials.metal, index);
+      projectMaterialUVs(geometry, stepWidth, Math.max(0.12, height), endZ - startZ, this.materials.metal, index);
       geometry.translate(
         MANSION_STAIR_CENTER_X,
         MANSION_BUNKER_Y + height / 2,
@@ -1145,8 +1146,8 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private buildWindowFrames(): void {
     const verticalGeometry = new THREE.BoxGeometry(0.12, 1.9, 0.12);
     const horizontalGeometry = new THREE.BoxGeometry(1.8, 0.12, 0.12);
-    this.projectSurfaceUVs(verticalGeometry, 0.12, 1.9, 0.12, this.materials.charredWood, 3);
-    this.projectSurfaceUVs(horizontalGeometry, 1.8, 0.12, 0.12, this.materials.charredWood, 7);
+    projectMaterialUVs(verticalGeometry, 0.12, 1.9, 0.12, this.materials.charredWood, 3);
+    projectMaterialUVs(horizontalGeometry, 1.8, 0.12, 0.12, this.materials.charredWood, 7);
     const verticals = new THREE.InstancedMesh(verticalGeometry, this.materials.charredWood, MANSION_BARRIERS.length * 2);
     const horizontals = new THREE.InstancedMesh(horizontalGeometry, this.materials.charredWood, MANSION_BARRIERS.length * 2);
     const matrix = new THREE.Matrix4();
@@ -1316,17 +1317,13 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     material?: THREE.MeshStandardMaterial,
   ): void {
     const surfaceMaterial = material ?? this.nextWallMaterial();
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    this.projectSurfaceUVs(geometry, width, height, depth, surfaceMaterial, this.wallMaterialIndex);
-    const mesh = new THREE.Mesh(geometry, surfaceMaterial);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = !this.profile.useReducedEffects;
-    mesh.receiveShadow = true;
-    mesh.userData.surface = surfaceMaterial === this.materials.charredWood ? 'wood' : 'concrete';
-    mesh.userData.mapRole = 'wall';
-    this.structureMeshes.push(mesh);
-    this.playerWallMeshes.push(mesh);
-    this.group.add(mesh);
+    this.structure.addBox(x, y, z, width, height, depth, surfaceMaterial, {
+      surface: surfaceMaterial === this.materials.charredWood ? 'wood' : 'concrete',
+      mapRole: 'wall',
+      castShadow: !this.profile.useReducedEffects,
+      uvSeed: this.wallMaterialIndex,
+      blocksPlayer: true,
+    });
   }
 
   private addSlab(
@@ -1339,16 +1336,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     depth: number,
     material: THREE.Material,
   ): void {
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    this.projectSurfaceUVs(geometry, width, height, depth, material as THREE.MeshStandardMaterial, name.length);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    mesh.name = name;
-    mesh.receiveShadow = true;
-    mesh.userData.surface = 'concrete';
-    mesh.userData.mapRole = 'slab';
-    this.structureMeshes.push(mesh);
-    this.group.add(mesh);
+    this.structure.addBox(x, y, z, width, height, depth, material, {
+      name,
+      surface: 'concrete',
+      mapRole: 'slab',
+      castShadow: false,
+      uvSeed: name.length,
+      blocksPlayer: false,
+    });
   }
 
   private addProp(
@@ -1361,18 +1356,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     depth: number,
     material: THREE.Material,
   ): void {
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    this.projectSurfaceUVs(geometry, width, height, depth, material as THREE.MeshStandardMaterial, name.length);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    mesh.name = name;
-    mesh.castShadow = !this.profile.useReducedEffects;
-    mesh.receiveShadow = true;
-    mesh.userData.surface = material === this.materials.metal ? 'metal' : 'wood';
-    mesh.userData.mapRole = 'solid-prop';
-    this.structureMeshes.push(mesh);
-    this.playerWallMeshes.push(mesh);
-    this.group.add(mesh);
+    this.structure.addBox(x, y, z, width, height, depth, material, {
+      name,
+      surface: material === this.materials.metal ? 'metal' : 'wood',
+      mapRole: 'solid-prop',
+      castShadow: !this.profile.useReducedEffects,
+      uvSeed: name.length,
+      blocksPlayer: true,
+    });
   }
 
   private addPointLight(
@@ -1498,27 +1489,6 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     const material = this.materials.wallVariants[this.wallMaterialIndex % this.materials.wallVariants.length];
     this.wallMaterialIndex++;
     return material;
-  }
-
-  private projectSurfaceUVs(
-    geometry: THREE.BoxGeometry,
-    width: number,
-    height: number,
-    depth: number,
-    material: THREE.MeshStandardMaterial,
-    seed: number,
-  ): void {
-    const metersPerTile = material.userData.metersPerTile as number | undefined;
-    if (!metersPerTile) return;
-    projectBoxUVs(
-      geometry,
-      width,
-      height,
-      depth,
-      metersPerTile,
-      (seed * 0.37) % 1,
-      (seed * 0.61) % 1,
-    );
   }
 
   private addDebugHelpers(): void {

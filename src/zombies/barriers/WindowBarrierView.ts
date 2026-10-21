@@ -72,9 +72,10 @@ export class WindowBarrierView {
     parent: THREE.Object3D,
     private readonly onBoardRebuilt: (() => void) | null = null,
     private readonly rng: () => number = Math.random,
+    /** Map skin for the planks (e.g. steel slats); wooden boards by default. */
+    material: THREE.Material = getMaterial(),
   ) {
     const geometry = getGeometry();
-    const material = getMaterial();
 
     const totalHeight = barrier.boards.length * BOARD_HEIGHT + (barrier.boards.length - 1) * GAP;
     const startY = totalHeight / 2 - BOARD_HEIGHT / 2;

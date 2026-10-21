@@ -170,6 +170,7 @@ export class ZombiesMode implements GameMode {
       this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
     );
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
+    this.arena.onAmbientCue = (cue) => ctx.audio.playAmbientCue(cue, this.spatialCueFor(cue.position));
     ctx.scene.add(this.zombies.group);
     this.arena.onTopologyChanged = () => this.syncArenaTopology();
     if (hasSoulRitual(this.arena)) {
