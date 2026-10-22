@@ -47,6 +47,8 @@ de efectos escala el bus de `AudioSystem` y el listener de los pasos; el de
 música, cada pista de `MusicManager`. La sensibilidad al apuntar multiplica la
 propia de cada arma y el campo de visión solo cambia la vista sin apuntar.
 Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
+«Guardar» confirma los valores actuales y cierra el panel; los cambios siguen
+guardandose automaticamente al ajustarlos.
 
 ## Zombies
 

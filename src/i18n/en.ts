@@ -33,6 +33,7 @@ export const en = {
   'settings.fieldOfView': 'Field of view',
   'settings.reset': 'RESET DEFAULTS',
   'settings.close': 'CLOSE',
+  'settings.save': 'SAVE',
   'menu.privacy': 'Privacy policy',
   'menu.attribution': 'Zombies based on',
   'menu.install': 'INSTALL ZEROED',

@@ -3124,14 +3124,19 @@ html.touch-controls-enabled .start-panel {
 .choice-group button:focus-visible { color: #f0e6d0; }
 .choice-group button:focus-visible { outline: 2px solid #bd5148; outline-offset: 2px; }
 .choice-group button[aria-pressed="true"] { background: #69151199; box-shadow: inset 0 0 0 1px #9a453e; color: #f0e6d0; }
-.settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .settings-actions button {
   padding: 11px 16px; cursor: pointer; border: 1px solid #98a19340; border-radius: 1px;
   background: #1a1d1ce6; color: #c9cbc3; font: 700 12px 'Consolas', 'SF Mono', monospace; letter-spacing: .18em;
 }
-.settings-actions #settings-close { border-left: 3px solid #8e201a; background: #36110fe6; color: #f0e6d0; }
+.settings-actions #settings-reset { margin-right: auto; }
+.settings-actions #settings-save {
+  border-color: #d9b469; background: #d9b469; color: #17140d; box-shadow: 0 0 16px #d9b46926;
+}
 .settings-actions button:hover,
 .settings-actions button:focus-visible { border-color: #b6483ec2; color: #f0e6d0; }
+.settings-actions #settings-save:hover,
+.settings-actions #settings-save:focus-visible { border-color: #f0d39b; background: #f0d39b; color: #17140d; }
 .settings-form input:focus-visible,
 .settings-actions button:focus-visible { outline: 2px solid #bd5148; outline-offset: 3px; }
 @media (max-height: 500px), (max-width: 420px) {

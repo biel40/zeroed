@@ -237,13 +237,13 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
   {
-    // Available from the start, between the service door and the AK-47.
+    // Available from the start on the east wall, clear of the vent and posters.
     id: 'vestibule-vector',
     weaponId: 'vector',
     price: 900,
     ammoPrice: 625,
-    position: { x: WEST_WALL_X + 0.17, y: 1.45, z: 6.8 },
-    yaw: Math.PI / 2,
+    position: { x: EAST_WALL_X - 0.17, y: 1.45, z: 2.0 },
+    yaw: -Math.PI / 2,
     floor: 0,
   },
 ];

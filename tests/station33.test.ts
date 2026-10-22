@@ -251,6 +251,13 @@ describe('Station 33 layout', () => {
     expect(vectors[0].position.x).toBeLessThan(VESTIBULE.maxX);
     expect(vectors[0].position.z).toBeGreaterThan(VESTIBULE.minZ);
     expect(vectors[0].position.z).toBeLessThan(VESTIBULE.maxZ);
+    arena.group.updateMatrixWorld(true);
+    const vectorView = arena.group.getObjectByName(`wall-buy:${vectors[0].id}`)!;
+    const vectorBounds = new THREE.Box3().setFromObject(vectorView);
+    for (const other of arena.wallBuys.filter((wallBuy) => wallBuy.weaponId !== 'vector')) {
+      const otherView = arena.group.getObjectByName(`wall-buy:${other.id}`)!;
+      expect(vectorBounds.intersectsBox(new THREE.Box3().setFromObject(otherView))).toBe(false);
+    }
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
     for (const wallBuy of STATION33_WALL_BUYS) {
       const facing = new THREE.Vector3(Math.sin(wallBuy.yaw), 0, Math.cos(wallBuy.yaw));

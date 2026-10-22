@@ -51,6 +51,8 @@ export class SettingsPanel {
     if (invertY) invertY.onchange = () => updateSettings({ invertY: invertY.checked });
     const reset = dialog.querySelector<HTMLButtonElement>('#settings-reset');
     if (reset) reset.onclick = () => resetSettings();
+    const save = dialog.querySelector<HTMLButtonElement>('#settings-save');
+    if (save) save.onclick = () => updateSettings(getSettings());
     menuButton.onclick = () => this.open('menu');
     pauseButton.onclick = () => this.open('pause');
     onSettingsChange(() => this.sync());
