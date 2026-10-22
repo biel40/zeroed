@@ -45,9 +45,3 @@ export function lampProgress(lamps: readonly boolean[], compact = false): string
     <div class="lamp-icons">${lamps.map((filled, index) => `<span class="lamp ${filled ? 'lit' : 'unlit'}" aria-label="${t('hud.lampLabel', { index: index + 1, state: t(filled ? 'hud.lampLit' : 'hud.lampUnlit') })}">${lampIcon()}${compact ? '' : `<small>${index + 1}</small>`}</span>`).join('')}</div>`;
 }
 
-/** Game-over flavour line, escalating with how long the player survived. */
-export function gameOverEpitaph(round: number): TranslationKey | null {
-  if (round >= 10) return 'gameOver.epitaphLate';
-  return round >= 4 ? 'gameOver.epitaphMid' : null;
-}
-

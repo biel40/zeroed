@@ -760,7 +760,8 @@ export class Game {
     const melee = this.mode.getMeleeArm?.() ?? null;
     // A cinematic camera films the world, not the first-person weapon and arms.
     const cinematicCamera = this.mode.getCinematicCamera?.() ?? null;
-    this.currentView.root.visible = fallbackName === null && cinematicCamera === null;
+    // ...and a collapsing body has dropped its weapon.
+    this.currentView.root.visible = fallbackName === null && cinematicCamera === null && !this.player.isDying;
     this.currentView.update(
       dt,
       weapon,

@@ -25,6 +25,8 @@ export interface MysteryBoxEntry {
  */
 export const MYSTERY_BOX_POOL: readonly MysteryBoxEntry[] = [
   { weaponId: 'm4a1', weight: 25, rarity: 'standard' },
+  { weaponId: 'mp5', weight: 25, rarity: 'standard' },
+  { weaponId: 'vector', weight: 20, rarity: 'standard' },
   { weaponId: 'ak47', weight: 25, rarity: 'standard' },
   { weaponId: 'm60', weight: 20, rarity: 'standard' },
   { weaponId: 'l96', weight: 20, rarity: 'standard' },

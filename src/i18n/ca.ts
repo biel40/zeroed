@@ -209,8 +209,6 @@ export const ca: Record<TranslationKey, string> = {
 
   'gameOver.kicker': 'CONSTANTS VITALS PERDUDES',
   'gameOver.title': 'HAS MORT',
-  'gameOver.epitaphMid': 'Has resistit… però l’horda no es cansa mai.',
-  'gameOver.epitaphLate': 'Una última resistència que la mansió recordarà.',
   'gameOver.round': 'RONDA ASSOLIDA',
   'gameOver.kills': 'BAIXES',
   'gameOver.headshots': 'AL CAP',

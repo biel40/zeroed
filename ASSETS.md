@@ -182,12 +182,24 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | --- | --- |
 | `zombies_round_start.mp3` | Sting de inicio de ronda |
 | `menu_theme.mp3` | Música en bucle del menú principal y de pausa |
-| `background_music_theme.mp3` | Música en bucle durante la partida |
+| `background_music_theme.mp3` | Música en bucle durante la partida en Burned Mansion |
+| `station33_theme.mp3` | Música en bucle durante la partida en Station 33 |
 | `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
 | `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |
+
+### Música de Station 33
+
+**«Creepy Halloween Music» — Tunetank**, publicada en
+[Pixabay](https://pixabay.com/music/ambient-creepy-halloween-music-413493/).
+Archivo: `station33_theme.mp3`, copiado del MP3 descargado por el usuario sin
+modificar el audio. Uso bajo la
+[Pixabay Content License](https://pixabay.com/service/license-summary/).
+La ficha indica **Content ID Registered**. Esta referencia documenta el origen;
+no sustituye un certificado de descarga de Pixabay.
+El crédito aparece en el menú principal y en los créditos finales.
 
 ### Efectos de Kenney (CC0)
 

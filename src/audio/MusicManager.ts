@@ -7,12 +7,14 @@ export type MusicTrackName =
   | 'nuclear_alarm'
   | 'nuclear_explosion'
   | 'radioactivity'
-  | 'background_music_theme';
+  | 'background_music_theme'
+  | 'station33_theme';
 
 export const ZOMBIES_MUSIC_PATHS = {
   roundStart: `${import.meta.env.BASE_URL}assets/audio/zombies_round_start.mp3`,
   menu: `${import.meta.env.BASE_URL}assets/audio/menu_theme.mp3`,
   gameplay: `${import.meta.env.BASE_URL}assets/audio/background_music_theme.mp3`,
+  station33: `${import.meta.env.BASE_URL}assets/audio/station33_theme.mp3`,
   nuclearAlarm: `${import.meta.env.BASE_URL}assets/audio/nuclear_alarm.mp3`,
   nuclearExplosion: `${import.meta.env.BASE_URL}assets/audio/nuclear_explosion.mp3`,
   radioactivity: `${import.meta.env.BASE_URL}assets/audio/radioactivity.mp3`,
@@ -59,6 +61,12 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
   background_music_theme: {
     name: 'background_music_theme',
     path: ZOMBIES_MUSIC_PATHS.gameplay,
+    volume: 0.2,
+    loop: true,
+  },
+  station33_theme: {
+    name: 'station33_theme',
+    path: ZOMBIES_MUSIC_PATHS.station33,
     volume: 0.2,
     loop: true,
   },

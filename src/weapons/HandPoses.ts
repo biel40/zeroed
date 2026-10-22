@@ -101,6 +101,19 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     grip: [-0.03, 0, -0.07],
     wrap: FINGERS,
   },
+  // Support hand on a wide magazine well (Vector): palm flat on the near
+  // flank, fingers round the front onto the far flank, and the thumb laid
+  // forward along the near flank under the charging handle (swung off the
+  // palm so it never enters the part) instead of closing round a magazine.
+  supportMagwell: {
+    index: finger(1.02, 0.92, 0.58, 0.04),
+    middle: finger(1.06, 0.94, 0.6),
+    ring: finger(1.1, 0.96, 0.6, -0.04),
+    pinky: finger(1.14, 0.96, 0.58, -0.08),
+    thumb: { base: [0.6, -0.18, 0], curl: [0.08, 0.16] },
+    grip: [-0.03, 0, -0.07],
+    wrap: FINGERS,
+  },
   // Thumb and index pinch a knob; the other fingers tuck in.
   boltPinch: {
     index: finger(0.78, 0.88, 0.56, 0.08),

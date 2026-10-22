@@ -185,6 +185,197 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
 
+  /**
+   * MP5A3 — 9x19 roller-delayed SMG (30-round curved magazine, ~400 m/s).
+   * The cheap early automatic, one clear tier under the rifles: ~260 DPS
+   * against the AK-47's 400, five torso hits on a round-1 zombie, a
+   * magazine worth two thirds of an M4A1's and a short reserve. Quick to
+   * handle, but its bloom punishes long bursts. The cyclic rate is trimmed
+   * to 700 (MP5SD-like) for balance. Procedural model: MP5ViewModel.ts.
+   */
+  mp5: {
+    id: 'mp5',
+    name: 'MP5',
+    fireModes: ['auto', 'semi'],
+    defaultFireMode: 'auto',
+    rpm: 700,
+    magazineSize: 30,
+    reloadTime: 2.2,
+    tacticalReloadTime: 1.75,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 22,
+    recoil: {
+      verticalKick: 0.0092,
+      horizontalKick: 0.0042,
+      horizontalBias: 0.1,
+      kickVariance: 0.28,
+      recoverySpeed: 10,
+      recoveryDelay: 0.08,
+      cameraShare: 0.55,
+      adsRecoilMultiplier: 0.75,
+    },
+    spread: {
+      hipBase: 0.013,
+      adsBase: 0.0035,
+      bloomPerShot: 0.0024,
+      maxBloom: 0.026,
+      bloomRecovery: 0.03,
+    },
+    ads: { fov: 58, speed: 11, sensitivity: 0.72 },
+    projectile: { muzzleVelocity: 400, gravity: 9.8, maxDistance: 200, drag: 0.08 },
+    moveSpeedMultiplier: 1.03,
+    equipTime: 0.3,
+    // Pistol-calibre report: higher and drier than the rifles, with the
+    // roller-delayed bolt clacking back after each shot.
+    audio: { volume: 0.44, duration: 0.07, lowpass: 3900, thump: 190, mechanism: 0.12 },
+    view: {
+      frame: 'mp5',
+      hip: [0.18, -0.18, -0.38],
+      ads: [0, 0, -0.29],
+      sway: 0.9,
+      bob: 0.95,
+      visualRecoil: { kickImpulse: 0.75, pitchImpulse: 1.3, rollImpulse: 0.45, stiffness: 200, damping: 17 },
+      scale: 1,
+      // Black-finished stamped steel and black polymer furniture.
+      bodyColor: 0x2c2f33,
+      accentColor: 0x17191b,
+      barrelLength: 0.225,
+      barrelRadius: 0.0085,
+      receiverLength: 0.284,
+      stockLength: 0.22,
+      magazine: 'curved',
+      optic: 'irons',
+      // Apex of the hooded front post, seen through the drum aperture.
+      sightHeight: 0.066,
+      bulk: 0.9,
+      // Same grip section and rake as the M4A1; the support hand cups the
+      // slim handguard under the cocking tube.
+      hands: {
+        right: {
+          position: [0, -0.11, 0.028], axis: [0, 1, -0.14], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.033, 0.044], axis: [0, 0.94, -0.34] }, trigger: [0, -0.075, -0.051],
+        },
+        left: {
+          position: [0, 0.008, -0.27], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.044, 0.046], axis: [0, 0, -1] },
+        },
+        // The cocking handle folds out on the left of the tube: the support hand racks it.
+        actionHand: 'left',
+        action: { position: [-0.026, 0, -0.003], axis: [0.33, 0.74, 0.55], palm: [0.37, -0.65, 0.65], pose: 'boltPinch' },
+      },
+      reloadAnim: {
+        style: 'rifle',
+        magOut: 0.1,
+        magDrop: 0.24,
+        magIn: 0.48,
+        magSeat: 0.64,
+        charge: 0.72,
+        chargeEnd: 0.94,
+        magSize: [0.022, 0.15, 0.042],
+        magColor: 0x1c1e20,
+      },
+    },
+  },
+
+  /**
+   * KRISS Vector Gen II — 9x19 SMG whose off-axis "Super V" action drives
+   * the recoil down, firing ~1200 rpm from a 30-round extended magazine.
+   * The hose: the highest cadence in the game with very little damage per
+   * hit (seven torso hits on a round-1 zombie, ~300 DPS) and very little
+   * reach — heavy drag and a 35 m maximum range. Its strength is control:
+   * the softest per-shot kick and the fastest recovery of every firearm.
+   * Dedicated procedural view model (see VectorViewModel.ts).
+   */
+  vector: {
+    id: 'vector',
+    name: 'Vector',
+    fireModes: ['auto', 'semi'],
+    defaultFireMode: 'auto',
+    rpm: 1200,
+    magazineSize: 30,
+    reloadTime: 2.3,
+    tacticalReloadTime: 1.8,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 15,
+    recoil: {
+      verticalKick: 0.0042,
+      horizontalKick: 0.0022,
+      horizontalBias: -0.05,
+      kickVariance: 0.2,
+      recoverySpeed: 14,
+      recoveryDelay: 0.05,
+      cameraShare: 0.5,
+      adsRecoilMultiplier: 0.6,
+    },
+    spread: {
+      hipBase: 0.015,
+      adsBase: 0.0055,
+      bloomPerShot: 0.0011,
+      maxBloom: 0.02,
+      bloomRecovery: 0.04,
+    },
+    ads: { fov: 58, speed: 11, sensitivity: 0.72 },
+    projectile: { muzzleVelocity: 380, gravity: 9.8, maxDistance: 35, drag: 0.25 },
+    moveSpeedMultiplier: 1.02,
+    equipTime: 0.3,
+    // Short, dry pistol-calibre snaps that stay distinct at 20 shots a second.
+    audio: { volume: 0.38, duration: 0.05, lowpass: 4300, thump: 210, mechanism: 0.05 },
+    view: {
+      frame: 'vector',
+      // Pushed out like the M4A1 so the tall stock stays low in the corner.
+      hip: [0.19, -0.2, -0.41],
+      ads: [0, 0, -0.3],
+      sway: 0.9,
+      bob: 0.95,
+      // Light, fast-settling kick: the action soaks most of the impulse.
+      visualRecoil: { kickImpulse: 0.55, pitchImpulse: 0.9, rollImpulse: 0.3, stiffness: 240, damping: 20 },
+      scale: 1,
+      // Black anodised upper and black polymer lower, stock and magazine.
+      bodyColor: 0x26292d,
+      accentColor: 0x17191b,
+      barrelLength: 0.14,
+      barrelRadius: 0.0082,
+      receiverLength: 0.36,
+      stockLength: 0.23,
+      magazine: 'straight',
+      optic: 'irons',
+      // Tip of the folding front post, seen through the rear aperture.
+      sightHeight: 0.085,
+      bulk: 0.95,
+      // Same grip as the M4A1. The support hand takes the classic Vector
+      // magwell hold: palm on the left flank of the well, fingers round its
+      // front, thumb up toward the charging handle.
+      hands: {
+        right: {
+          position: [0, -0.08, 0.028], axis: [0, 1, -0.14], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.033, 0.044], axis: [0, 0.94, -0.34] }, trigger: [0, -0.045, -0.051],
+        },
+        left: {
+          position: [0, -0.074, -0.192], axis: [0, 0.97, -0.24], palm: [1, 0, 0], pose: 'supportMagwell',
+          hold: { size: [0.04, 0.05], axis: [0, 0.97, -0.24] },
+        },
+        // The charging handle rides on the left of the upper: the support hand racks it.
+        actionHand: 'left',
+        action: { position: [-0.008, 0, -0.012], axis: [0.33, 0.74, 0.55], palm: [0.37, -0.65, 0.65], pose: 'boltPinch' },
+      },
+      reloadAnim: {
+        style: 'rifle',
+        magOut: 0.1,
+        magDrop: 0.24,
+        magIn: 0.48,
+        magSeat: 0.64,
+        charge: 0.72,
+        chargeEnd: 0.94,
+        magSize: [0.022, 0.22, 0.034],
+        magColor: 0x1a1c1e,
+      },
+    },
+  },
+
   ak47: {
     id: 'ak47',
     name: 'AK-47',
@@ -621,7 +812,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96', 'm1911'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ak47', 'm60', 'l96', 'm1911'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
@@ -634,6 +825,8 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'ak47', 'm60', 'l96', 
 export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm1911',
   'm4a1',
+  'mp5',
+  'vector',
   'ak47',
   'm60',
   'l96',

@@ -5,6 +5,7 @@ import type { Input } from './Input';
 import type { PlayerBounds } from '../zombies/maps/ZombieArena';
 import { getSettings } from '../core/PlayerSettings';
 import { blocksCircleMovement } from '../utils/collision';
+import { DEATH_FALL_DURATION, deathFallPose } from './DeathFall';
 
 const SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.02;
@@ -93,6 +94,8 @@ export class PlayerController {
   private jumpVelocity = 0;
   private readonly tmpBox = new THREE.Box3();
   private downedCamera = false;
+  /** Seconds into the death collapse; null while alive. */
+  private deathFallElapsed: number | null = null;
   private cameraImpulse = 0;
 
   constructor(aspect: number) {
@@ -140,7 +143,8 @@ export class PlayerController {
     this.jumpVelocity = 0;
     this.currentFloor = floor;
     this.downedCamera = false;
-    this.camera.position.y = 0;
+    this.deathFallElapsed = null;
+    this.camera.position.set(0, 0, 0);
     if (bounds) this.bounds = bounds;
   }
 
@@ -152,8 +156,23 @@ export class PlayerController {
 
   /** Changes only the view height; the standing rig remains the network/collision anchor. */
   public setDownedCamera(enabled: boolean): void { this.downedCamera = enabled; }
+  /** Collapses the view to the floor; teleport() stands the player back up. */
+  public playDeathFall(): void { this.deathFallElapsed = 0; }
+  /** True from the death until the next teleport (the view model stays hidden). */
+  get isDying(): boolean { return this.deathFallElapsed !== null; }
+  get deathFallFinished(): boolean { return (this.deathFallElapsed ?? 0) >= DEATH_FALL_DURATION; }
   public playReviveImpulse(): void { this.cameraImpulse = 0.035; }
   public playShotImpulse(strength = 0.012): void { this.cameraImpulse += strength; }
+
+  /** The gaze levels out so the body drops straight down, then the death pose takes the camera. */
+  private updateDeathFall(dt: number): void {
+    this.deathFallElapsed = Math.min((this.deathFallElapsed ?? 0) + dt, DEATH_FALL_DURATION);
+    this.pitch = damp(this.pitch, 0, 6, dt);
+    this.pitchNode.rotation.x = this.pitch;
+    const pose = deathFallPose(this.deathFallElapsed);
+    this.camera.rotation.set(pose.pitch, 0, pose.roll);
+    this.camera.position.set(pose.sideShift, -pose.drop, 0);
+  }
 
   update(dt: number, input: Input, weapon: Weapon, allowMovement = true, allowLook = allowMovement): void {
     const definition = weapon.definition;
@@ -167,9 +186,12 @@ export class PlayerController {
     this.rig.rotation.y = this.yaw;
     this.pitchNode.rotation.x = this.pitch;
     this.cameraImpulse *= Math.exp(-18 * dt);
-    this.camera.rotation.set(weapon.recoil.pitch + this.cameraImpulse, weapon.recoil.yaw,
-      this.downedCamera ? 0.06 : 0);
-    this.camera.position.y = damp(this.camera.position.y, this.downedCamera ? -1.2 : 0, 8, dt);
+    if (this.deathFallElapsed !== null) this.updateDeathFall(dt);
+    else {
+      this.camera.rotation.set(weapon.recoil.pitch + this.cameraImpulse, weapon.recoil.yaw,
+        this.downedCamera ? 0.06 : 0);
+      this.camera.position.y = damp(this.camera.position.y, this.downedCamera ? -1.2 : 0, 8, dt);
+    }
 
     // Digital keys plus the analog touch axes (virtual joystick); the clamp
     // keeps combined input from exceeding full deflection, and desktop is

@@ -6,7 +6,7 @@ import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { LanguagePicker } from './LanguagePicker';
 import { SettingsPanel } from './SettingsPanel';
-import { gameOverEpitaph, lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
+import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
 export interface ZombieHudState {
@@ -95,6 +95,7 @@ export class HUD {
   private readonly coopLobby: HTMLElement = mustGet('coop-lobby');
   private readonly interactPrompt: HTMLElement = mustGet('interact-prompt');
   private readonly downedFilter: HTMLElement = mustGet('downed-filter');
+  private readonly deathFilter: HTMLElement = mustGet('death-filter');
   private readonly downedStatus: HTMLElement = mustGet('downed-status');
   private readonly downedCountdown: HTMLElement = mustGet('downed-countdown');
   private readonly reviveStatus: HTMLElement = mustGet('revive-status');
@@ -515,23 +516,17 @@ export class HUD {
     this.goRound.textContent = `${stats.round}`;
     this.goKills.textContent = `${stats.kills}`;
     this.goHeadshots.textContent = `${stats.headshots}`;
-    // A data-i18n key keeps the line translated if the language changes meanwhile.
-    const epitaph = mustGet('go-epitaph');
-    const epitaphKey = gameOverEpitaph(stats.round);
-    if (epitaphKey) {
-      epitaph.dataset.i18n = epitaphKey;
-      epitaph.textContent = t(epitaphKey);
-      epitaph.classList.remove('hidden');
-    } else {
-      delete epitaph.dataset.i18n;
-      epitaph.textContent = '';
-      epitaph.classList.add('hidden');
-    }
     this.gameOverPanel.classList.remove('hidden');
+  }
+
+  /** Drains the world to black and white as the player dies; hideGameOver() restores colour. */
+  public showDeathFilter(): void {
+    this.deathFilter.classList.add('active');
   }
 
   public hideGameOver(): void {
     this.gameOverPanel.classList.add('hidden');
+    this.deathFilter.classList.remove('active');
   }
 
   public setGameOverHandlers(handlers: {

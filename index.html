@@ -81,6 +81,7 @@
     <div id="ring-flash"></div>
     <div id="interact-prompt" class="hidden"></div>
     <div id="downed-filter" class="hidden"></div>
+    <div id="death-filter" aria-hidden="true"></div>
     <div id="downed-status" class="hidden" role="status"><strong data-i18n="hud.downed"></strong><span id="downed-countdown"></span></div>
     <div id="revive-status" class="hidden"><span data-i18n="hud.revivingTeammate"></span><div><i id="revive-progress"></i></div></div>
     <div id="host-pause-status" class="hidden" role="status" data-i18n="hud.hostPaused"></div>
@@ -244,6 +245,7 @@
       <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
       <!-- CC BY 3.0 requires visible attribution; Brutus is a modified walker. -->
       <p class="asset-attribution"><span data-i18n="menu.attribution"></span> <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · Quaternius · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></p>
+      <p class="asset-attribution">Station 33 · <a href="https://pixabay.com/music/ambient-creepy-halloween-music-413493/" target="_blank" rel="noopener noreferrer">«Creepy Halloween Music»</a> · Tunetank · Pixabay</p>
       <div class="pwa-actions" aria-live="polite">
         <button type="button" id="pwa-install" class="pwa-action hidden" data-i18n="menu.install"></button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden" data-i18n="menu.update"></button>
@@ -336,13 +338,12 @@
     </div>
   </div>
 
-  <div id="game-over" class="hidden" role="alertdialog" aria-labelledby="go-title" aria-describedby="go-epitaph">
+  <div id="game-over" class="hidden" role="alertdialog" aria-labelledby="go-title">
     <div class="go-flash" aria-hidden="true"></div>
     <div class="start-panel">
       <svg class="go-flatline" viewBox="0 0 440 36" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M0 18h150l6-8 6 8h10l5-15 8 30 6-19 5 4h244"/></svg>
       <p class="menu-kicker" data-i18n="gameOver.kicker"></p>
       <h1 id="go-title" data-i18n="gameOver.title"></h1>
-      <p id="go-epitaph"></p>
       <dl class="go-stats">
         <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-round"/></svg><span data-i18n="gameOver.round"></span></dt><dd id="go-round">1</dd></div>
         <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-kills"/></svg><span data-i18n="gameOver.kills"></span></dt><dd id="go-kills">0</dd></div>
@@ -447,7 +448,7 @@
       <p class="credits-role" data-i18n="ending.betaTesters"></p>
       <p>Biel Frau Fuster<br />Ivan Cabellos Berber</p>
       <p class="credits-role" data-i18n="ending.assets"></p>
-      <p class="credits-assets">Quaternius — <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a><br />Kenney · Poly Haven · delosound (Pixabay)</p>
+      <p class="credits-assets">Quaternius — <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a><br />Kenney · Poly Haven · delosound (Pixabay)<br />Station 33 · <a href="https://pixabay.com/music/ambient-creepy-halloween-music-413493/" target="_blank" rel="noopener noreferrer">«Creepy Halloween Music»</a> · Tunetank · Pixabay</p>
       <p class="credits-thanks" data-i18n="ending.thanks"></p>
       <button type="button" id="credits-main-menu" data-i18n="ending.mainMenu"></button>
     </div>

@@ -114,6 +114,8 @@ export class ZombiesMode implements GameMode {
   private godModeEnabled = false;
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private gameOver = false;
+  /** Dead, but the game-over panel waits for the death fall to finish. */
+  private gameOverPending = false;
   private readonly runFlow = new ZombiesRunFlow();
   /** The map's opening cinematic; played once, on the first gameplay start. */
   private intro: IntroCinematic | null = null;
@@ -278,6 +280,7 @@ export class ZombiesMode implements GameMode {
     }
     this.rings?.update(dt);
     this.updateCameraShake(dt);
+    this.updateGameOverReveal();
     this.pushHudState();
   }
 
@@ -1110,11 +1113,20 @@ export class ZombiesMode implements GameMode {
     this.zombies.applySplash(point, config.splashRadius, config.splashDamage);
   }
 
+  /** Death: the body collapses in first person; the verdict waits for the fall to land. */
   private endGame(): void {
     if (!this.runFlow.gameOver()) return;
     this.gameOver = true;
+    this.gameOverPending = true;
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
+    this.ctx.player.playDeathFall();
+    this.ctx.hud.showDeathFilter();
+  }
+
+  private updateGameOverReveal(): void {
+    if (!this.gameOverPending || !this.ctx.player.deathFallFinished) return;
+    this.gameOverPending = false;
     this.ctx.hud.showGameOver({
       round: this.rounds.round,
       kills: this.kills,
@@ -1131,6 +1143,7 @@ export class ZombiesMode implements GameMode {
   private restart(): void {
     this.endIntro();
     this.gameOver = false;
+    this.gameOverPending = false;
     this.runFlow.reset();
     this.totalDamage = 0;
     this.kills = 0;

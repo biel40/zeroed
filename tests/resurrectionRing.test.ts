@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
 import { RING_DEFINITIONS } from '../src/game/rings/RingCatalog';
+import { DEATH_FALL_DURATION } from '../src/player/DeathFall';
+import type { Input } from '../src/player/Input';
 import { EYE_HEIGHT } from '../src/player/PlayerController';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { protectionVignette } from '../src/modes/ZombiesRings';
@@ -29,6 +31,7 @@ interface ModeInternals {
   onPlayerHit(damage: number): void;
   zombies: ZombieManager;
   rings: { update(dt: number): void };
+  updateGameOverReveal(): void;
 }
 
 function startRun(): { mode: ZombiesMode; internals: ModeInternals; side: TestContext } {
@@ -48,6 +51,17 @@ function faceRingLocker({ internals, side }: { internals: ModeInternals; side: T
   side.player.teleport(machine.position.x - 0.5, EYE_HEIGHT, machine.position.z, 0);
   side.player.face(-Math.PI / 2);
   side.player.rig.updateMatrixWorld(true);
+}
+
+const IDLE_INPUT = {
+  mouseDeltaX: 0, mouseDeltaY: 0, moveAxisX: 0, moveAxisY: 0,
+  isDown: () => false, wasPressed: () => false,
+} as unknown as Input;
+
+/** Lets the first-person death fall land, which is when the game-over panel shows. */
+function finishDeathFall({ internals, side }: { internals: ModeInternals; side: TestContext }): void {
+  side.player.update(DEATH_FALL_DURATION, IDLE_INPUT, side.weapon, false);
+  internals.updateGameOverReveal();
 }
 
 describe('Resurrection ring', () => {
@@ -98,6 +112,7 @@ describe('Resurrection ring', () => {
     // A second lethal hit with the ring spent ends the run as before.
     internals.onPlayerHit(LETHAL);
     expect(internals.gameOver).toBe(true);
+    finishDeathFall(run);
     expect(side.hud.showGameOver).toHaveBeenCalledOnce();
   });
 
@@ -122,12 +137,25 @@ describe('Resurrection ring', () => {
     expect(internals.gameOver).toBe(false);
   });
 
-  it('ends the run on a lethal hit without a ring, exactly as before', () => {
-    const { internals, side } = startRun();
+  it('ends the run on a lethal hit without a ring: the body falls, then the verdict shows', () => {
+    const run = startRun();
+    const { internals, side } = run;
     internals.onPlayerHit(LETHAL);
     expect(internals.gameOver).toBe(true);
+    expect(side.player.isDying).toBe(true);
+    expect(side.hud.showDeathFilter).toHaveBeenCalledOnce();
+    expect(side.hud.showGameOver).not.toHaveBeenCalled();
+    expect(side.ctx.unlockPointer).not.toHaveBeenCalled();
+    finishDeathFall(run);
+    expect(side.player.camera.position.y).toBeLessThan(-1);
     expect(side.hud.showGameOver).toHaveBeenCalledOnce();
+    expect(side.ctx.unlockPointer).toHaveBeenCalledOnce();
     expect(side.ctx.audio.playResurrection).not.toHaveBeenCalled();
+
+    run.mode.onRestartRequested();
+    expect(side.player.isDying).toBe(false);
+    expect(side.player.camera.position.y).toBe(0);
+    expect(side.hud.hideGameOver).toHaveBeenCalled();
   });
 
   it('god mode (MOTDRULES) grants no ring, buys one for free and never spends it; restart clears it', () => {

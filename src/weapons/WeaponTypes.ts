@@ -1,4 +1,4 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911' | 'tesla';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -158,6 +158,7 @@ export type HandPoseId =
   | 'supportHandguard'
   | 'supportPistol'
   | 'magazineGrab'
+  | 'supportMagwell'
   | 'boltPinch'
   | 'relaxed';
 
@@ -244,9 +245,11 @@ export interface ViewModelConfig {
    * 'lmg' uses the dedicated M60 builder (belt pouch, feed cover, bipod);
    * 'ak47' uses the dedicated Type-3 AK builder (milled receiver, lacquered
    * wood, gas tube, curved magazine); 'l96' uses the dedicated L96A1 builder (thumbhole
-   * stock, scope, liftable bolt). Default: generic long gun.
+   * stock, scope, liftable bolt); 'mp5' uses the MP5A3 builder (drum sight,
+   * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
+   * ("Super V" lower, full rail, folding sights). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'mp5' | 'vector';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */

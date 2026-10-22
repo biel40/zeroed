@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setLanguage } from '../src/i18n/i18n';
 import { PlayerEconomy } from '../src/game/PlayerEconomy';
-import { gameOverEpitaph, lampProgress, ringProgress, roundMarks } from '../src/ui/SurvivalPresentation';
+import { lampProgress, ringProgress, roundMarks } from '../src/ui/SurvivalPresentation';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 
@@ -98,14 +98,5 @@ describe('survival presentation', () => {
     expect(roundMarks(5).match(/<i>/g)).toHaveLength(5);
     expect(roundMarks(12345)).toContain('12345');
     expect(roundMarks(12345).match(/<i>/g)).toHaveLength(3);
-  });
-});
-
-describe('game over presentation', () => {
-  it('escalates the epitaph with the round reached', () => {
-    expect(gameOverEpitaph(1)).toBeNull();
-    expect(gameOverEpitaph(4)).toBe('gameOver.epitaphMid');
-    expect(gameOverEpitaph(9)).toBe('gameOver.epitaphMid');
-    expect(gameOverEpitaph(10)).toBe('gameOver.epitaphLate');
   });
 });

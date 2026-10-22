@@ -20,6 +20,7 @@
     "generate:player": "node scripts/generate-soldier-asset.mjs",
     "generate:zombies": "npm run generate:zombie-brute",
     "build:player-asset": "node scripts/build-player-asset.mjs",
+    "codemap": "node scripts/codemap.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "android:sync": "npm run build && npx cap sync android",

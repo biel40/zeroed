@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { AK47_PROFILE, ak47MagazineFloorplate, ak47MagazineOutline } from '../../weapons/AK47ViewModel';
 import { L96_PROFILE } from '../../weapons/L96ViewModel';
 import { M60_PROFILE, m60BipodLeg, m60FrontSight, m60HeatShieldSlots, m60LeafTop } from '../../weapons/M60ViewModel';
+import { MP5_PROFILE } from '../../weapons/MP5ViewModel';
+import { VECTOR_PROFILE } from '../../weapons/VectorViewModel';
 import type { WeaponDefinition } from '../../weapons/WeaponTypes';
 import type { WallBuy } from './WallBuy';
 
@@ -25,6 +27,12 @@ export class WallBuyView {
     } else if (definition.id === 'm4a1') {
       this.buildM4A1Silhouette();
       this.group.userData.silhouette = 'm4a1';
+    } else if (definition.id === 'mp5') {
+      this.buildMP5Silhouette(view.sightHeight);
+      this.group.userData.silhouette = 'mp5';
+    } else if (definition.id === 'vector') {
+      this.buildVectorSilhouette(view.sightHeight);
+      this.group.userData.silhouette = 'vector';
     } else if (definition.id === 'm1911') {
       this.buildM1911Silhouette();
       this.group.userData.silhouette = 'm1911';
@@ -187,6 +195,93 @@ export class WallBuyView {
 
     this.addPart(0.4, 0.024, 0.81, 0.025).name = 'm4a1-wall-barrel';
     this.addPart(0.09, 0.035, 1.055, 0.025).name = 'm4a1-wall-flash-hider';
+  }
+
+  /**
+   * MP5A3 profile traced from the same MP5_PROFILE as the view model:
+   * retractable stock, receiver with cocking tube, drum rear sight, grip,
+   * curved magazine, slim handguard, hooded front sight and the three-lug
+   * barrel. +X points toward the muzzle.
+   */
+  private buildMP5Silhouette(sightHeight: number): void {
+    const scale = 1.9;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.04) * scale, (y + 0.065) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): THREE.Shape =>
+      outline([[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]]);
+    const profile = MP5_PROFILE;
+
+    this.addShape(outline(profile.butt), 'mp5-wall-stock');
+    const strut = profile.strut;
+    this.addShape(rect(strut.rearZ, strut.frontZ, strut.y + strut.radius, strut.y - strut.radius), 'mp5-wall-stock');
+    this.addShape(outline(profile.receiver), 'mp5-wall-receiver');
+    const upper = profile.receiverTube;
+    this.addShape(rect(upper.rearZ, upper.frontZ, upper.y + upper.radius, upper.y - upper.radius), 'mp5-wall-receiver');
+    const tube = profile.cockingTube;
+    this.addShape(rect(tube.rearZ, tube.frontZ, tube.y + tube.radius, tube.y - tube.radius), 'mp5-wall-receiver');
+    this.addShape(outline(profile.housing), 'mp5-wall-lower');
+    this.addShape(outline(profile.grip), 'mp5-wall-grip');
+    this.addShape(outline(profile.triggerGuard), 'mp5-wall-trigger-guard');
+
+    const [, seatY, seatZ] = profile.magazine.seat;
+    this.addShape(outline(profile.magazine.outline.map(([z, y]) => [z + seatZ, y + seatY] as const)), 'mp5-wall-magazine');
+    this.addShape(outline(profile.handguard), 'mp5-wall-handguard');
+
+    const rear = profile.rearSight;
+    this.addShape(rect(rear.z + 0.015, rear.z - 0.015, sightHeight + 0.004, 0.047), 'mp5-wall-rear-sight');
+    this.addShape(outline(profile.frontSightBlock), 'mp5-wall-front-sight');
+    const hood = toWall([profile.frontSightZ, sightHeight - 0.002]);
+    const ring = new THREE.Shape();
+    ring.absarc(hood.x, hood.y, (profile.hoodRadius + 0.003) * scale, 0, Math.PI * 2, false);
+    const opening = new THREE.Path();
+    opening.absarc(hood.x, hood.y, (profile.hoodRadius - 0.002) * scale, 0, Math.PI * 2, true);
+    ring.holes.push(opening);
+    this.addShape(ring, 'mp5-wall-front-sight');
+
+    const { boreY } = profile;
+    const barrel = profile.barrel;
+    this.addShape(rect(barrel.rearZ, barrel.muzzleZ, boreY + barrel.radius, boreY - barrel.radius), 'mp5-wall-barrel');
+    const lug = profile.triLug;
+    this.addShape(rect(lug.rearZ, lug.frontZ, boreY + lug.radius, boreY - lug.radius), 'mp5-wall-barrel');
+  }
+
+  /**
+   * KRISS Vector profile traced from the same VECTOR_PROFILE as the view
+   * model: adjustable stock on its tube, railed upper, the "Super V" lower
+   * with its open guard, grip, long straight magazine, folding sights and
+   * the birdcage flash hider. +X points toward the muzzle.
+   */
+  private buildVectorSilhouette(sightHeight: number): void {
+    const scale = 2;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.025) * scale, (y + 0.09) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): THREE.Shape =>
+      outline([[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]]);
+    const profile = VECTOR_PROFILE;
+
+    this.addShape(outline(profile.stock), 'vector-wall-stock');
+    const tube = profile.stockTube;
+    this.addShape(rect(tube.rearZ, tube.frontZ, tube.y + tube.radius, tube.y - tube.radius), 'vector-wall-stock');
+    this.addShape(outline(profile.upper), 'vector-wall-upper');
+    const rail = profile.rail;
+    this.addShape(rect(rail.rearZ, rail.frontZ, rail.topY, rail.baseY - 0.001), 'vector-wall-rail');
+    const lower = outline(profile.lower);
+    lower.holes.push(new THREE.Path(profile.triggerOpening.map(toWall)));
+    this.addShape(lower, 'vector-wall-lower');
+    this.addShape(outline(profile.grip), 'vector-wall-grip');
+
+    const [, seatY, seatZ] = profile.magazine.seat;
+    const toSeat = ([z, y]: readonly [number, number]) => [z + seatZ, y + seatY] as const;
+    this.addShape(outline(profile.magazine.outline.map(toSeat)), 'vector-wall-magazine');
+    this.addShape(outline(profile.magazine.floorplate.map(toSeat)), 'vector-wall-magazine');
+
+    for (const z of [profile.frontSightZ, profile.rearSightZ]) {
+      this.addShape(rect(z + 0.008, z - 0.008, sightHeight + 0.004, rail.topY - 0.001), 'vector-wall-sight');
+    }
+    const hider = profile.flashHider;
+    this.addShape(rect(hider.rearZ + 0.002, hider.frontZ, profile.boreY + hider.radius, profile.boreY - hider.radius), 'vector-wall-flash-hider');
   }
 
   /** Classic M1911A1 side profile. +X points toward the muzzle. */

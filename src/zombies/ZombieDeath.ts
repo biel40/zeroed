@@ -15,6 +15,8 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   m1911: 'knockback',
   l96: 'knockback',
   m4a1: 'riddled',
+  mp5: 'riddled',
+  vector: 'riddled',
   ak47: 'riddled',
   m60: 'riddled',
   raygun: 'blast',

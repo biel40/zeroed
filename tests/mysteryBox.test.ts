@@ -4,6 +4,7 @@ import {
   MYSTERY_BOX_TUNING,
   MysteryBoxMachine,
   pickWeighted,
+  type MysteryBoxEntry,
   type MysteryBoxEventType,
 } from '../src/zombies/MysteryBox';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
@@ -48,7 +49,7 @@ function roll(machine: MysteryBoxMachine): WeaponId {
 describe('Mystery Box pool', () => {
   it('contains the standard weapons, Ray Gun and ZEUS-77', () => {
     expect(MYSTERY_BOX_POOL.map((entry) => entry.weaponId).sort()).toEqual(
-      ['ak47', 'l96', 'm4a1', 'm60', 'raygun', 'tesla'].sort(),
+      ['ak47', 'l96', 'm4a1', 'm60', 'mp5', 'raygun', 'tesla', 'vector'].sort(),
     );
   });
 
@@ -75,7 +76,15 @@ describe('Mystery Box pool', () => {
   });
 });
 describe('pickWeighted (deterministic, injected rng)', () => {
-  const pool = MYSTERY_BOX_POOL;
+  // A fixed wheel: the selection maths must not change when the live pool gains weapons.
+  const pool: readonly MysteryBoxEntry[] = [
+    { weaponId: 'm4a1', weight: 25, rarity: 'standard' },
+    { weaponId: 'ak47', weight: 25, rarity: 'standard' },
+    { weaponId: 'm60', weight: 20, rarity: 'standard' },
+    { weaponId: 'l96', weight: 20, rarity: 'standard' },
+    { weaponId: 'raygun', weight: 10, rarity: 'rare' },
+    { weaponId: 'tesla', weight: 1, rarity: 'legendary' },
+  ];
 
   it('maps the roll onto cumulative weights', () => {
     // Total 101: 25/25/20/20/10/1, with ZEUS-77 occupying the final 1-weight slice.

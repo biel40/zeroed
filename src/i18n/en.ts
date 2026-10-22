@@ -211,8 +211,6 @@ export const en = {
 
   'gameOver.kicker': 'VITAL SIGNS LOST',
   'gameOver.title': 'YOU DIED',
-  'gameOver.epitaphMid': 'You held the line… but the horde never tires.',
-  'gameOver.epitaphLate': 'A last stand the mansion will remember.',
   'gameOver.round': 'ROUND REACHED',
   'gameOver.kills': 'KILLS',
   'gameOver.headshots': 'HEADSHOTS',

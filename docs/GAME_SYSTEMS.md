@@ -36,6 +36,9 @@ La música usa en bucle durante la partida la pista que declara el mapa y compar
 otra entre el menú principal y la pausa. Al pausar se conserva la posición de la pista de
 partida; al reanudar continúa desde ese punto. El inicio de ronda se reproduce
 como cue independiente sobre la música de fondo.
+Station 33 usa «Creepy Halloween Music», de Tunetank (Pixabay), como pista propia;
+Burned Mansion conserva su música de partida. Los créditos y el origen del asset
+se recogen en `ASSETS.md`.
 
 Los ajustes del jugador (`PlayerSettings`: volumen general, efectos y música,
 sensibilidad, sensibilidad al apuntar, eje Y invertido y campo de visión) se
@@ -121,11 +124,12 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
-  puerta de servicio y dos rejillas), la AK-47 en pared y la escalera mecanica
-  sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
+  puerta de servicio y dos rejillas), la AK-47 y la Vector (900 / 625) en pared
+  y la escalera mecanica sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
   el muro este: dos entradas mas, que solo generan zombis con la puerta
-  abierta, la Mystery Box y la taquilla del anillo de Resurreccion (su arma
-  de pared esta pendiente). Las rejillas este del vestibulo se separaron para
+  abierta, la MP5 (1000 / 500) en
+  pared, la Mystery Box y la taquilla del
+  anillo de Resurreccion. Las rejillas este del vestibulo se separaron para
   dejar un pasillo de 5,8 m. Un unico rectangulo de `playerBounds` y de navegacion cubre
   ambas salas: muros y la puerta cerrada son lo que impide el paso. Reiniciar
   cierra la puerta y duerme la zona. Aun no tiene final. La arena solo

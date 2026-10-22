@@ -214,7 +214,7 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
   consigna: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'consigna').map(spawnBehind),
 };
 
-/** Weapon outlines 2 cm in front of the wall face; prices follow the mansion's balance. */
+/** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
 export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   {
     // A Soviet station keeps the rifle of the era by the turnstiles.
@@ -223,6 +223,26 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     price: 1750,
     ammoPrice: 900,
     position: { x: WEST_WALL_X + 0.17, y: 1.45, z: 8.0 },
+    yaw: Math.PI / 2,
+    floor: 0,
+  },
+  {
+    // The cheap automatic waits down the luggage-office corridor, clear of its blood stain.
+    id: 'consigna-mp5',
+    weaponId: 'mp5',
+    price: 1000,
+    ammoPrice: 500,
+    position: { x: 11.2, y: 1.45, z: CONSIGNA.corridor.minZ + 0.02 },
+    yaw: 0,
+    floor: 0,
+  },
+  {
+    // Available from the start, between the service door and the AK-47.
+    id: 'vestibule-vector',
+    weaponId: 'vector',
+    price: 900,
+    ammoPrice: 625,
+    position: { x: WEST_WALL_X + 0.17, y: 1.45, z: 6.8 },
     yaw: Math.PI / 2,
     floor: 0,
   },
@@ -283,8 +303,7 @@ export const STATION33_AMBIENCE = {
   hemisphereLight: { skyColor: 0x3c4c46, groundColor: 0x120e0a, intensity: 0.5, reducedIntensity: 0.7 },
   // Underground: almost no sky-like fill, the fluorescents and lamps do the lighting.
   environmentIntensity: { intensity: 0.1, reducedIntensity: 0.12 },
-  // Provisional: the only gameplay bed until the station gets its own track.
-  musicTrack: 'background_music_theme',
+  musicTrack: 'station33_theme',
 } as const satisfies ArenaAmbience;
 
 /**

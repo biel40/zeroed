@@ -7,6 +7,8 @@ import type { MagazineDropPool } from './MagazineDrop';
 import { buildAk47 } from './AK47ViewModel';
 import { buildL96 } from './L96ViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
+import { buildMP5 } from './MP5ViewModel';
+import { buildVector } from './VectorViewModel';
 import { buildM60 } from './M60ViewModel';
 import { buildRayGun } from './RayGunViewModel';
 import { BOLT_REAR_FRACTION, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
@@ -1005,7 +1007,7 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
 /**
  * Picks the procedural builder for a view config: dedicated builders for
  * the Wonder Weapons (Ray Gun, Tesla), the M1911 pistol, the AK-47, the
- * M4A1, the L96A1 and the M60 GPMG; the generic long-gun fallback otherwise
+ * M4A1, the MP5A3, the Vector, the L96A1 and the M60 GPMG; the generic long-gun fallback otherwise
  * (a GLB that failed to load). Single dispatch shared by the first-person WeaponView and the
  * world-space display models so both always build the same weapon.
  */
@@ -1016,6 +1018,8 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'lmg') return buildM60(view);
   if (view.frame === 'ak47') return buildAk47(view);
   if (view.frame === 'm4a1') return buildM4A1(view);
+  if (view.frame === 'mp5') return buildMP5(view);
+  if (view.frame === 'vector') return buildVector(view);
   if (view.frame === 'l96') return buildL96(view);
   return buildProcedural(view);
 }

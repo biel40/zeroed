@@ -10,7 +10,7 @@ import type { WeaponId } from '../src/weapons/WeaponTypes';
 import type { Zombie } from '../src/zombies/Zombie';
 import type { ZombieHitPart } from '../src/zombies/ZombieConfig';
 
-const STANDARD_FIREARMS: readonly WeaponId[] = ['m1911', 'm4a1', 'ak47', 'm60', 'l96'];
+const STANDARD_FIREARMS: readonly WeaponId[] = ['m1911', 'm4a1', 'mp5', 'vector', 'ak47', 'm60', 'l96'];
 const TARGET: HitTarget = { acceptsDecals: false, surface: 'flesh', onHit: () => undefined };
 
 function hitZombie(weaponId: WeaponId, part: ZombieHitPart, lethal: boolean) {

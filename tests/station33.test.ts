@@ -241,10 +241,16 @@ describe('Station 33 layout', () => {
     expect(end.z).toBeGreaterThan(VESTIBULE.minZ + 0.3);
   });
 
-  it('hangs every wall buy 2 cm off a wall, within reach, at the mansion prices', () => {
+  it('hangs every wall buy 2 cm off a wall, within reach, at the configured prices', () => {
     const arena = makeArena();
     openDoorTo(arena, 'consigna');
-    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([['ak47', 1750, 900]]);
+    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([['ak47', 1750, 900], ['mp5', 1000, 500], ['vector', 900, 625]]);
+    const vectors = arena.wallBuys.filter((wallBuy) => wallBuy.weaponId === 'vector');
+    expect(vectors).toHaveLength(1);
+    expect(vectors[0].position.x).toBeGreaterThan(VESTIBULE.minX);
+    expect(vectors[0].position.x).toBeLessThan(VESTIBULE.maxX);
+    expect(vectors[0].position.z).toBeGreaterThan(VESTIBULE.minZ);
+    expect(vectors[0].position.z).toBeLessThan(VESTIBULE.maxZ);
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
     for (const wallBuy of STATION33_WALL_BUYS) {
       const facing = new THREE.Vector3(Math.sin(wallBuy.yaw), 0, Math.cos(wallBuy.yaw));
@@ -454,7 +460,7 @@ describe('Station 33 lights and ambience', () => {
     arena.init();
     expect((scene.fog as THREE.FogExp2).density).toBe(arena.ambience.fog.density);
     expect(scene.environmentIntensity).toBe(arena.ambience.environmentIntensity?.intensity);
-    expect(arena.ambience.musicTrack).toBe('background_music_theme');
+    expect(arena.ambience.musicTrack).toBe('station33_theme');
   });
 });
 

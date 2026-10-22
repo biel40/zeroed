@@ -16,8 +16,8 @@ codigo: actualiza la guia.
   completo. Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
-  cuatro entradas con chapas de acero, la AK-47 en pared y la escalera mecanica
-  sellada. La Fase 2 abre la consigna tras la primera puerta de pago. Cada fase
+  cuatro entradas con chapas de acero, la AK-47 y la Vector (900 / 625) en pared
+  y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera puerta de pago. Cada fase
   debe ser jugable por si misma y nunca abrir puertas hacia el vacio. El plan
   de ejes (hacia el norte y hacia abajo) esta documentado al principio de
   `Station33Config.ts`.
@@ -55,7 +55,7 @@ codigo: actualiza la guia.
   muro este; con ella cerrada la sala no existe para el jugador ni para los
   zombis. Al abrirla despiertan sus dos entradas (escalera de mozos sepultada
   y una rejilla), la Mystery Box y la taquilla del anillo. El arma de pared
-  de la consigna esta pendiente.
+  de la consigna es la MP5 (1000 / 500), en el muro norte del pasillo.
 - La taquilla del anillo, bajo la placa "БЮРО НАХОДОК" (objetos perdidos), es
   el foco al final del eje del pasillo: abierta, con un cojin de terciopelo y
   la alianza brillando con su propio esmalte. Tras la compra queda vacia y
@@ -106,8 +106,9 @@ codigo: actualiza la guia.
 - Megafonia que crepita, tren lejano que hace temblar la boveda y caida de
   tension: eventos de datos con temporizador irregular y voz procedural en
   `AudioSystem`. Un `sampleFile` puede sustituir la voz por un MP3.
-- La musica de partida es provisional (la del juego base); el mapa merece una
-  pista propia mas adelante.
+- Musica de partida propia en bucle: «Creepy Halloween Music», de Tunetank
+  (Pixabay). Origen y licencia en `ASSETS.md`; credito visible en el menu y
+  en los creditos finales.
 
 ## Presentacion premium
 
