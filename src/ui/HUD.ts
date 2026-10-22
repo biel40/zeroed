@@ -85,6 +85,8 @@ export class HUD {
   private readonly bannerSub: HTMLElement = mustGet('banner-sub');
   private readonly damageOverlay: HTMLElement = mustGet('damage-overlay');
   private readonly ringFlash: HTMLElement = mustGet('ring-flash');
+  private readonly protectionOverlay: HTMLElement = mustGet('protection-overlay');
+  private lastProtection = 0;
   private readonly gameOverPanel: HTMLElement = mustGet('game-over');
   private readonly goRound: HTMLElement = mustGet('go-round');
   private readonly goKills: HTMLElement = mustGet('go-kills');
@@ -462,6 +464,19 @@ export class HUD {
     mustGet('z-rings').innerHTML = ringProgress(rings, true);
     mustGet('pause-rings').innerHTML = ringProgress(rings);
     for (const id of ['z-rings', 'pause-rings']) mustGet(id).classList.toggle('hidden', rings.length === 0);
+  }
+
+  /**
+   * Blue protection vignette, 0..1: while it shows, zombies can neither hurt
+   * nor see the player. It replaces the red low-health vignette meanwhile.
+   * Polled every frame; the DOM is only touched when the level changes.
+   */
+  public setProtection(level: number): void {
+    const rounded = Math.round(clamp(level, 0, 1) * 100) / 100;
+    if (rounded === this.lastProtection) return;
+    this.lastProtection = rounded;
+    this.protectionOverlay.style.opacity = `${rounded}`;
+    this.damageOverlay.classList.toggle('protected', rounded > 0);
   }
 
   /** Brief cold flash over the whole view: a ring just fired. */

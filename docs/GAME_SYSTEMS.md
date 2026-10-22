@@ -233,13 +233,15 @@ prompt, la muerte y el reinicio.
 - Resurreccion (anular, 1 carga): tres compras por run a precio doble cada vez
   (500, 1000 y 2000; las recargas cuentan), despues la taquilla queda vacia.
   Un golpe letal con carga gasta el anillo en lugar de terminar la run:
-  devuelve el 50 % de la vida con 2,5 s de invulnerabilidad, sacude la camara,
-  destella la pantalla en frio y suena un latido. El jugador cae de rodillas y
-  tarda 1,2 s en levantarse (solo puede mirar: ni moverse, ni disparar, ni
-  interactuar) y los zombis le pierden la pista hasta 2 s despues de ponerse
-  en pie (`ZombieManager.ignoreHost`: se quedan quietos, sus golpes en curso
-  fallan y quien trabaja una barrera sigue con ella). Sin carga, el flujo de
-  muerte no cambia.
+  devuelve el 50 % de la vida, sacude la camara, destella la pantalla en frio
+  y suena un latido. El jugador cae de rodillas y tarda 1,2 s en levantarse
+  (solo puede mirar: ni moverse, ni disparar, ni interactuar). Desde que el
+  anillo se dispara hasta 2,5 s despues de ponerse en pie esta protegido: es
+  invulnerable y los zombis lo ignoran (`ZombieManager.ignoreHost`: se quedan
+  quietos, sus golpes en curso fallan y quien trabaja una barrera sigue con
+  ella). Una vineta azul, espejo de la roja de vida baja (que se oculta
+  mientras tanto), cubre exactamente ese tiempo y parpadea durante el ultimo
+  segundo para avisar del final. Sin carga, el flujo de muerte no cambia.
 - Las maquinas suenan como las de bebidas: `ZombiesRings` sigue cada frame a
   la mas cercana en la planta del jugador y `AudioSystem.setRingJingle`
   mantiene un unico bucle (volumen, paneo y apagado por distancia y

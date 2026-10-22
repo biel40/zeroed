@@ -1,9 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
 import { RING_DEFINITIONS } from '../src/game/rings/RingCatalog';
 import { EYE_HEIGHT } from '../src/player/PlayerController';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
+import { protectionVignette } from '../src/modes/ZombiesRings';
 import type { ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
 import type { ZombieManager } from '../src/zombies/ZombieManager';
@@ -11,7 +12,9 @@ import { installCanvasDocument, makeContext, type TestContext } from './coopHarn
 
 const RESURRECTION = RING_DEFINITIONS.resurrection;
 const [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE] = RESURRECTION.prices;
-const { getUp: GET_UP, untargetable: UNTARGETABLE, invulnerability: INVULNERABILITY } = RESURRECTION.effect;
+const { getUp: GET_UP, protection: PROTECTION } = RESURRECTION.effect;
+/** Protected (invulnerable and ignored) while getting up and for the ring's protection after. */
+const PROTECTED_FOR = GET_UP + PROTECTION;
 const LETHAL = 10_000;
 
 let restoreDocument: () => void;
@@ -88,7 +91,7 @@ describe('Resurrection ring', () => {
     // Still inside the invulnerability window: the next blow does nothing.
     internals.onPlayerHit(LETHAL);
     expect(internals.health.hp).toBe(PLAYER_MAX_HP * RESURRECTION.effect.reviveFraction);
-    internals.health.update(RESURRECTION.effect.invulnerability - 0.1);
+    internals.health.update(PROTECTED_FOR - 0.1);
     expect(internals.health.isInvulnerable).toBe(true);
     internals.health.update(0.2);
 
@@ -106,7 +109,7 @@ describe('Resurrection ring', () => {
     mode.onInteract();
     internals.onPlayerHit(LETHAL);
     internals.rings.update(GET_UP);
-    internals.health.update(RESURRECTION.effect.invulnerability + 0.1);
+    internals.health.update(PROTECTED_FOR + 0.1);
 
     expect(mode.getInteractPrompt()).toContain(`${SECOND_PRICE}`);
     fund(internals.economy, SECOND_PRICE);
@@ -163,26 +166,58 @@ describe('Resurrection ring', () => {
     expect(mode.isDownedLookEnabled()).toBe(false);
   });
 
-  it('keeps the player invulnerable for 2.5 s and off the horde radar until 2 s after standing up', () => {
+  it('protects the player for 2.5 s after standing up: invulnerable, ignored and tinted blue, all ending together', () => {
     const run = startRun();
-    const { mode, internals } = run;
+    const { mode, internals, side } = run;
     faceRingLocker(run);
     fund(internals.economy, FIRST_PRICE);
     mode.onInteract();
     expect(internals.zombies.isHostIgnored).toBe(false);
+    expect(PROTECTION).toBe(2.5);
 
     internals.onPlayerHit(LETHAL);
-    expect(INVULNERABILITY).toBe(2.5);
-    internals.health.update(INVULNERABILITY - 0.1);
-    expect(internals.health.isInvulnerable).toBe(true);
-    internals.health.update(0.2);
-    expect(internals.health.isInvulnerable).toBe(false);
+    expect(internals.zombies.isHostIgnored).toBe(true);
+    expect(side.hud.setProtection).toHaveBeenCalled();
 
+    const advance = (seconds: number): void => {
+      internals.rings.update(seconds);
+      internals.health.update(seconds);
+      internals.zombies.update(seconds, 0, 0);
+    };
+    advance(GET_UP);
+    advance(PROTECTION - 1.5);
+    // Standing, well inside the window: fully tinted, untouchable, unseen.
+    expect(side.hud.setProtection).toHaveBeenLastCalledWith(1);
+    expect(internals.health.isInvulnerable).toBe(true);
     expect(internals.zombies.isHostIgnored).toBe(true);
-    internals.zombies.update(GET_UP + UNTARGETABLE - 0.1, 0, 0);
-    expect(internals.zombies.isHostIgnored).toBe(true);
-    internals.zombies.update(0.2, 0, 0);
+    advance(1.4);
+    const warning = vi.mocked(side.hud.setProtection).mock.lastCall![0];
+    expect(warning).toBeGreaterThan(0);
+    expect(internals.health.isInvulnerable).toBe(true);
+    advance(0.2);
+    expect(side.hud.setProtection).toHaveBeenLastCalledWith(0);
+    expect(internals.health.isInvulnerable).toBe(false);
     expect(internals.zombies.isHostIgnored).toBe(false);
+  });
+
+  it('flickers the blue vignette through the last second so the end is never a surprise', () => {
+    expect(protectionVignette(0, PROTECTED_FOR)).toBe(0);
+    expect(protectionVignette(1, PROTECTED_FOR - 1)).toBe(1);
+    const levels = Array.from({ length: 20 }, (_, index) => protectionVignette(3, 1 - index * 0.05));
+    expect(Math.min(...levels)).toBeLessThan(0.6);
+    expect(Math.max(...levels)).toBeGreaterThan(0.95);
+    expect(protectionVignette(3.7, 0)).toBe(0);
+  });
+
+  it('clears the blue vignette on restart', () => {
+    const run = startRun();
+    const { mode, internals, side } = run;
+    faceRingLocker(run);
+    fund(internals.economy, FIRST_PRICE);
+    mode.onInteract();
+    internals.onPlayerHit(LETHAL);
+    mode.onRestartRequested();
+    expect(side.hud.setProtection).toHaveBeenLastCalledWith(0);
   });
 
   it('sells three purchases a run at doubling prices, then the locker stays empty', () => {
@@ -193,7 +228,7 @@ describe('Resurrection ring', () => {
       internals.onPlayerHit(LETHAL);
       expect(internals.gameOver).toBe(false);
       internals.rings.update(GET_UP);
-      internals.health.update(INVULNERABILITY + 0.1);
+      internals.health.update(PROTECTED_FOR + 0.1);
     };
     for (const price of [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE]) {
       expect(mode.getInteractPrompt()).toContain(`${price}`);

@@ -24,7 +24,7 @@ describe('Ring catalog', () => {
     }
     expect(RESURRECTION.finger).toBe('ring');
     expect(RESURRECTION.prices).toEqual([500, 1000, 2000]);
-    expect(RESURRECTION.effect).toEqual({ kind: 'resurrection', reviveFraction: 0.5, invulnerability: 2.5, getUp: 1.2, untargetable: 2 });
+    expect(RESURRECTION.effect).toEqual({ kind: 'resurrection', reviveFraction: 0.5, getUp: 1.2, protection: 2.5 });
   });
 });
 

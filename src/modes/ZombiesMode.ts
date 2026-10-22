@@ -1014,14 +1014,14 @@ export class ZombiesMode implements GameMode {
     this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);
     if (!this.health.isDead) return;
     // A charged Resurrection ring takes the death instead: the run goes on,
-    // and the horde loses the player while they get up and for a moment after.
-    const revival = this.rings?.tryResurrect(this.health);
-    if (!revival) {
+    // and the horde ignores the player for as long as they are protected.
+    const protectedFor = this.rings?.tryResurrect(this.health) ?? null;
+    if (protectedFor === null) {
       this.endGame();
       return;
     }
     this.trauma = 1;
-    this.zombies.ignoreHost(revival.getUp + revival.untargetable);
+    this.zombies.ignoreHost(protectedFor);
   }
 
   /**

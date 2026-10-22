@@ -3,7 +3,7 @@ import { spatialMuffle, spatialPan } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { PlayerHealth } from '../game/PlayerHealth';
 import { PlayerRings } from '../game/rings/PlayerRings';
-import { RING_DEFINITIONS, type RingEffect } from '../game/rings/RingCatalog';
+import { RING_DEFINITIONS } from '../game/rings/RingCatalog';
 import { t } from '../i18n/i18n';
 import { getUpPose } from '../player/ReviveGetUp';
 import { actionKey } from '../ui/InteractionPrompts';
@@ -16,6 +16,24 @@ const FIRE_PULSE = 1;
 /** The machines' jingle plays at full volume up to here, then fades out by JINGLE_RANGE (metres). */
 const JINGLE_FULL_VOLUME_DISTANCE = 2.5;
 const JINGLE_RANGE = 10;
+/** The blue protection vignette fades in this fast and flickers through its last PROTECTION_WARNING seconds. */
+const PROTECTION_FADE_IN = 0.3;
+const PROTECTION_WARNING = 1;
+const PROTECTION_FLICKER_HZ = 4;
+
+/**
+ * Strength 0..1 of the blue protection vignette `elapsed` seconds into a
+ * protection with `remaining` seconds left: it fades in, holds while the
+ * player is safe, then flickers so the end never comes as a surprise.
+ */
+export function protectionVignette(elapsed: number, remaining: number): number {
+  if (remaining <= 0) return 0;
+  const fadeIn = Math.min(1, elapsed / PROTECTION_FADE_IN);
+  if (remaining > PROTECTION_WARNING) return fadeIn;
+  const warned = PROTECTION_WARNING - remaining;
+  const flicker = 0.4 + 0.6 * (0.5 + 0.5 * Math.cos(warned * Math.PI * 2 * PROTECTION_FLICKER_HZ));
+  return fadeIn * flicker;
+}
 
 /**
  * Rings in a single-player Zombies run. Sells and recharges them at the
@@ -31,6 +49,9 @@ export class ZombiesRings {
   /** Seconds into getting back up after a resurrection, and how long it takes; null when standing. */
   private getUpElapsed: number | null = null;
   private getUpDuration = 0;
+  /** Seconds into the current protection and seconds left of it (0 when unprotected). */
+  private protectionElapsed = 0;
+  private protectionRemaining = 0;
 
   constructor(
     private readonly ctx: ModeContext,
@@ -66,19 +87,24 @@ export class ZombiesRings {
 
   /**
    * A lethal hit landed: a charged Resurrection ring is spent instead of the
-   * run, bringing the player back with its health share and invulnerability,
-   * and starting the get-up. Returns the effect that saved the player (the
-   * mode reads how long the horde loses them), or null when no ring could.
+   * run. The player comes back with its health share, gets up, and stays
+   * protected (invulnerable here; the mode makes the horde ignore them) for
+   * the get-up plus the ring's protection, under the blue vignette. Returns
+   * those protected seconds, or null when no ring could save the player.
    */
-  tryResurrect(health: PlayerHealth): RingEffect | null {
+  tryResurrect(health: PlayerHealth): number | null {
     for (const { ringId } of this.rings.worn) {
       const { effect } = RING_DEFINITIONS[ringId];
       if (effect.kind !== 'resurrection' || !this.rings.consumeCharge(ringId)) continue;
-      health.revive(effect.reviveFraction, effect.invulnerability);
+      const protectedFor = effect.getUp + effect.protection;
+      health.revive(effect.reviveFraction, protectedFor);
       this.getUpElapsed = 0;
       this.getUpDuration = effect.getUp;
+      this.protectionElapsed = 0;
+      this.protectionRemaining = protectedFor;
       this.processEvents();
-      return effect;
+      this.ctx.hud.setProtection(protectionVignette(0, protectedFor));
+      return protectedFor;
     }
     return null;
   }
@@ -94,6 +120,7 @@ export class ZombiesRings {
    * on its own once standing) and the slump adds to the recoil rotation.
    */
   update(dt: number): void {
+    this.updateProtection(dt);
     if (this.getUpElapsed === null) return;
     this.getUpElapsed += Math.max(0, dt);
     const pose = getUpPose(this.getUpElapsed, this.getUpDuration);
@@ -102,6 +129,15 @@ export class ZombiesRings {
     camera.rotation.x += pose.pitch;
     camera.rotation.z += pose.roll;
     if (this.getUpElapsed >= this.getUpDuration) this.getUpElapsed = null;
+  }
+
+  /** Counts the protection down and keeps the blue vignette in step with it. */
+  private updateProtection(dt: number): void {
+    if (this.protectionRemaining <= 0) return;
+    const step = Math.max(0, dt);
+    this.protectionElapsed += step;
+    this.protectionRemaining = Math.max(0, this.protectionRemaining - step);
+    this.ctx.hud.setProtection(protectionVignette(this.protectionElapsed, this.protectionRemaining));
   }
 
   /**
@@ -138,6 +174,9 @@ export class ZombiesRings {
   /** New run: every ring off the hand and back in its machine. */
   reset(): void {
     this.getUpElapsed = null;
+    this.protectionElapsed = 0;
+    this.protectionRemaining = 0;
+    this.ctx.hud.setProtection(0);
     this.rings.reset();
     this.ctx.handRings.clear();
     this.present();

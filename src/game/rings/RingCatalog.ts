@@ -14,12 +14,14 @@ export type RingEffect = {
   readonly kind: 'resurrection';
   /** Share of max HP restored instead of dying. */
   readonly reviveFraction: number;
-  /** Seconds of invulnerability from the moment the ring fires. */
-  readonly invulnerability: number;
   /** Seconds spent getting back up: the player can look around but not move or fight. */
   readonly getUp: number;
-  /** Seconds after standing up during which zombies lose track of the player. */
-  readonly untargetable: number;
+  /**
+   * Seconds after standing back up during which zombies can neither hurt nor
+   * see the player (they are protected while getting up too). The screen
+   * stays tinted blue for the whole protected time.
+   */
+  readonly protection: number;
 };
 
 export interface RingDefinition {
@@ -53,6 +55,6 @@ export const RING_DEFINITIONS: Readonly<Record<RingId, RingDefinition>> = {
     prices: [500, 1000, 2000],
     chargesPerPurchase: 1,
     glowColor: 0x3fd8c8,
-    effect: { kind: 'resurrection', reviveFraction: 0.5, invulnerability: 2.5, getUp: 1.2, untargetable: 2 },
+    effect: { kind: 'resurrection', reviveFraction: 0.5, getUp: 1.2, protection: 2.5 },
   },
 };
