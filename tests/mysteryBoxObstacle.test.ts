@@ -4,6 +4,7 @@ import { ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import { mysteryBoxFootprint } from '../src/zombies/MysteryBoxFootprint';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
+import type { ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { installCanvasDocument, TEST_PROFILE } from './coopHarness';
 
 const DT = 1 / 60;
@@ -43,10 +44,11 @@ describe.each(Object.values(ZOMBIE_MAPS))('Mystery Box blocks the player: $id', 
   beforeAll(() => { restoreDocument = installCanvasDocument(); });
   afterAll(() => restoreDocument());
 
-  it('includes the box footprint in the arena wall colliders', () => {
-    const arena = map.createArena(new THREE.Scene(), TEST_PROFILE);
-    const footprint = mysteryBoxFootprint(arena.mysteryBoxPlacement);
+  it('includes a box collider only when the arena has a Mystery Box', () => {
+    const arena: ZombieArena = map.createArena(new THREE.Scene(), TEST_PROFILE);
     expect(arena.useWallCollision).toBe(true);
+    if (!arena.mysteryBoxPlacement) return;
+    const footprint = mysteryBoxFootprint(arena.mysteryBoxPlacement);
     expect(arena.wallColliders?.some((box) => box.containsBox(footprint))).toBe(true);
   });
 });

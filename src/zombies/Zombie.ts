@@ -140,6 +140,11 @@ export class Zombie implements HitTarget {
     return this.group.position;
   }
 
+  /** Standing movement volume, without the animated attack lunge or death pose. */
+  get bodyHeight(): number {
+    return ZOMBIE_MODELS[this.visual.modelId].height * this.group.scale.y;
+  }
+
   /** Resets the pooled zombie and places it at the spawn point. */
   spawn(
     x: number,

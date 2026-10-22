@@ -12,7 +12,6 @@ export const ca: Record<TranslationKey, string> = {
   'map.players.coop': '1–2 JUGADORS',
   'map.access.free': 'INCLÒS',
   'map.access.premium': 'PREMIUM',
-  'map.earlyAccess': 'ACCÉS ANTICIPAT · BETA TANCADA',
   'menu.multiplayer': 'MODE MULTIJUGADOR',
   'menu.language': 'IDIOMA',
   'settings.quality': 'Qualitat',
@@ -193,14 +192,12 @@ export const ca: Record<TranslationKey, string> = {
 
   'gameOver.kicker': 'CONSTANTS VITALS PERDUDES',
   'gameOver.title': 'HAS MORT',
-  'gameOver.epitaphEarly': 'La mansió gairebé no s’hi ha hagut d’esforçar.',
   'gameOver.epitaphMid': 'Has resistit… però l’horda no es cansa mai.',
   'gameOver.epitaphLate': 'Una última resistència que la mansió recordarà.',
-  'gameOver.round': 'RONDA',
+  'gameOver.round': 'RONDA ASSOLIDA',
   'gameOver.kills': 'BAIXES',
   'gameOver.headshots': 'AL CAP',
-  'gameOver.restart': 'TORNA-HO A PROVAR',
-  'gameOver.leave': 'SORTIR DE LA PARTIDA',
+  'gameOver.restart': 'TORNA A INTENTAR EL MAPA',
 
   'pause.kicker': 'RONDA',
   'pause.title': 'PAUSA',
@@ -220,4 +217,8 @@ export const ca: Record<TranslationKey, string> = {
   'ending.assets': 'Recursos de tercers',
   'ending.thanks': 'Gràcies per jugar!',
   'ending.mainMenu': 'TORNAR AL MENÚ PRINCIPAL',
+  'intro.station33.signal': 'SENYAL RECUPERADA',
+  'intro.station33.tagline': '84 metres sota terra. Segellada des de 1986.',
+  'intro.skip': 'SALTA',
+  'intro.skipHint': 'qualsevol tecla',
 };

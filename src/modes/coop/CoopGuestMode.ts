@@ -91,6 +91,7 @@ export class CoopGuestMode implements GameMode {
     this.world.placeLocalPlayer('guest');
     const castShadows = !ctx.profile.useReducedEffects;
     this.replica = new ZombieReplica(ctx.assets.getZombieModels(), castShadows, ctx.hitColliders);
+    ctx.player.setBodyColliders(this.replica.actives);
     ctx.scene.add(this.replica.group);
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
     this.energy.onImpact = (_point, config) => {
@@ -107,7 +108,6 @@ export class CoopGuestMode implements GameMode {
     this.gesture = new ReviveGesture(ctx.player.camera);
     ctx.hud.setZombiesPanelVisible(true);
     ctx.hud.setCoopPresentation('guest');
-    ctx.hud.setZombiesRestartHandler(() => ctx.returnToMainMenu());
     ctx.hud.setCreditsMainMenuHandler(() => ctx.returnToMainMenu());
     this.connection.onMessage = (message) => this.handleMessage(message);
     this.connection.onClose = () => this.onHostLost(t('banner.connectionLost'));

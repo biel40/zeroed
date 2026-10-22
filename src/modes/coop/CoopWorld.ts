@@ -27,12 +27,12 @@ const REMOTE_DOOR_RANGE = 3.5;
  */
 export type CoopArena = ZombieArena & SoulRitualArena & Required<Pick<ZombieArena,
   'wallColliders' | 'floorTransitions' | 'weaponPickups' | 'ammoRefills'
-  | 'soulLampInteractions' | 'ritualInteraction' | 'completionInteraction'>>;
+  | 'soulLampInteractions' | 'ritualInteraction' | 'completionInteraction' | 'mysteryBoxPlacement'>>;
 
 function isCoopArena(arena: ZombieArena): arena is CoopArena {
   return hasSoulRitual(arena) && !!arena.wallColliders && !!arena.floorTransitions
     && !!arena.weaponPickups && !!arena.ammoRefills && !!arena.soulLampInteractions
-    && !!arena.ritualInteraction && !!arena.completionInteraction;
+    && !!arena.ritualInteraction && !!arena.completionInteraction && !!arena.mysteryBoxPlacement;
 }
 
 function createCoopArena(ctx: ModeContext): CoopArena {

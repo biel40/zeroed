@@ -72,6 +72,11 @@ export class ZombieReplica {
     return count;
   }
 
+  /** Live pool view for local movement collision; dying bodies are filtered by isAlive. */
+  public get actives(): ReadonlySet<Zombie> {
+    return this.pool.actives;
+  }
+
   /** Spawn id of a replica body hit by a local bullet; null when it already left. */
   public networkIdOf(zombie: Zombie): number | null {
     const id = this.ids.get(zombie);

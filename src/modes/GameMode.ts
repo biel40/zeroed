@@ -124,6 +124,11 @@ export interface GameMode {
   isCombatInputEnabled?(): boolean;
   /** Allow aiming the view while movement remains locked (for example DOWNED). */
   isDownedLookEnabled?(): boolean;
+  /**
+   * Camera the shell renders instead of the player's (a map intro). While
+   * set, the first-person weapon and arms are hidden.
+   */
+  getCinematicCamera?(): THREE.Camera | null;
   /** Ordered desktop keyboard input for mode-owned developer commands. */
   onKeyInput?(key: string): void;
   /** Interact key (E) pressed while gameplay input is active. */

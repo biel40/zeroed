@@ -170,6 +170,7 @@ export class CoopHostMode implements GameMode {
       arena.spawnPoints, arena.barriers, arena.floorTransitions);
     this.zombies.setNavigationBounds(arena.navigationBounds);
     this.zombies.setBodyObstacles([mysteryBoxFootprint(arena.mysteryBoxPlacement)]);
+    ctx.player.setBodyColliders(this.zombies.actives);
     this.zombies.registerColliders(ctx.hitColliders);
     this.world.onTopologyChanged = () => {
       this.zombies.setSpawnPoints(arena.spawnPoints);
@@ -204,7 +205,6 @@ export class CoopHostMode implements GameMode {
 
     ctx.hud.setZombiesPanelVisible(true);
     ctx.hud.setCoopPresentation('host');
-    ctx.hud.setZombiesRestartHandler(() => this.onRestartRequested());
     ctx.hud.setCreditsMainMenuHandler(() => ctx.returnToMainMenu());
     this.connection.onMessage = (message) => this.handleMessage(message);
     this.connection.onClose = () => {

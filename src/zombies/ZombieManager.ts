@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import {
   EYE_HEIGHT,
+  PLAYER_BODY_RADIUS,
   stairGroundY,
   type FloorTransitionZone,
   type StairRamp,
 } from '../player/PlayerController';
 import { damp } from '../utils/math';
+import { blocksCircleMovement } from '../utils/collision';
 import type { WindowBarrier } from './barriers/WindowBarrier';
 import type { ZombieNavigationBounds } from './maps/ZombieArena';
 import type { RoundConfig, ZombieHitPart } from './ZombieConfig';
@@ -264,6 +266,7 @@ export class ZombieManager {
   private lastPlayerY = EYE_HEIGHT;
   private lastPlayerZ = 0;
   private lastPlayerFloor = 0;
+  private hostBodyActive = true;
   private otherPlayers: readonly ZombiePlayerTarget[] = [];
 
   constructor(
@@ -686,6 +689,7 @@ export class ZombieManager {
     hostAlive = true,
   ): void {
     this.otherPlayers = otherPlayers;
+    this.hostBodyActive = hostAlive;
     this.lastPlayerX = playerX;
     this.lastPlayerY = playerY;
     this.lastPlayerZ = playerZ;
@@ -1472,17 +1476,36 @@ export class ZombieManager {
     const stepZ = dz / steps;
     for (let step = 0; step < steps; step++) {
       if (stepX !== 0 && (!queued || this.isWithinNavigationBounds(pos.x + stepX, pos.z, zombie.floor))
-        && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y, zombie.bodyRadius)) {
+        && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y, zombie.bodyRadius)
+        && !this.wouldIntersectPlayer(zombie, pos.x + stepX, pos.z)) {
         pos.x += stepX;
         moved = true;
       }
       if (stepZ !== 0 && (!queued || this.isWithinNavigationBounds(pos.x, pos.z + stepZ, zombie.floor))
-        && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y, zombie.bodyRadius)) {
+        && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y, zombie.bodyRadius)
+        && !this.wouldIntersectPlayer(zombie, pos.x, pos.z + stepZ)) {
         pos.z += stepZ;
         moved = true;
       }
     }
     return moved;
+  }
+
+  private wouldIntersectPlayer(zombie: Zombie, x: number, z: number): boolean {
+    if (this.hostBodyActive && this.playerBlocksMovement(zombie, x, z,
+      this.lastPlayerX, this.lastPlayerY, this.lastPlayerZ)) return true;
+    for (const player of this.otherPlayers) {
+      if (this.playerBlocksMovement(zombie, x, z, player.x, player.y, player.z)) return true;
+    }
+    return false;
+  }
+
+  private playerBlocksMovement(zombie: Zombie, x: number, z: number,
+    playerX: number, playerY: number, playerZ: number): boolean {
+    if (zombie.position.y >= playerY + 0.25
+      || zombie.position.y + zombie.bodyHeight <= playerY - EYE_HEIGHT + 0.05) return false;
+    return blocksCircleMovement(zombie.position.x, zombie.position.z, x, z,
+      playerX, playerZ, zombie.bodyRadius + PLAYER_BODY_RADIUS);
   }
 
   private resolveObjective(

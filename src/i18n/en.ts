@@ -14,7 +14,6 @@ export const en = {
   'map.players.coop': '1–2 PLAYERS',
   'map.access.free': 'INCLUDED',
   'map.access.premium': 'PREMIUM',
-  'map.earlyAccess': 'EARLY ACCESS · CLOSED BETA',
   'menu.multiplayer': 'MULTIPLAYER MODE',
   'menu.language': 'LANGUAGE',
   'settings.quality': 'Quality',
@@ -195,14 +194,12 @@ export const en = {
 
   'gameOver.kicker': 'VITAL SIGNS LOST',
   'gameOver.title': 'YOU DIED',
-  'gameOver.epitaphEarly': 'The mansion barely had to try.',
   'gameOver.epitaphMid': 'You held the line… but the horde never tires.',
   'gameOver.epitaphLate': 'A last stand the mansion will remember.',
-  'gameOver.round': 'ROUND',
+  'gameOver.round': 'ROUND REACHED',
   'gameOver.kills': 'KILLS',
   'gameOver.headshots': 'HEADSHOTS',
-  'gameOver.restart': 'TRY AGAIN',
-  'gameOver.leave': 'LEAVE MATCH',
+  'gameOver.restart': 'RETRY MAP',
 
   'pause.kicker': 'ROUND',
   'pause.title': 'PAUSED',
@@ -222,6 +219,10 @@ export const en = {
   'ending.assets': 'Third-party assets',
   'ending.thanks': 'Thank you for playing!',
   'ending.mainMenu': 'RETURN TO MAIN MENU',
+  'intro.station33.signal': 'SIGNAL RESTORED',
+  'intro.station33.tagline': '84 metres underground. Sealed since 1986.',
+  'intro.skip': 'SKIP',
+  'intro.skipHint': 'any key',
 } as const;
 
 export type TranslationKey = keyof typeof en;

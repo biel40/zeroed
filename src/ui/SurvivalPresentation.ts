@@ -18,7 +18,8 @@ export function lampProgress(lamps: readonly boolean[], compact = false): string
 }
 
 /** Game-over flavour line, escalating with how long the player survived. */
-export function gameOverEpitaph(round: number): TranslationKey {
+export function gameOverEpitaph(round: number): TranslationKey | null {
   if (round >= 10) return 'gameOver.epitaphLate';
-  return round >= 4 ? 'gameOver.epitaphMid' : 'gameOver.epitaphEarly';
+  return round >= 4 ? 'gameOver.epitaphMid' : null;
 }
+

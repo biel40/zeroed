@@ -2,7 +2,7 @@ import type * as THREE from 'three';
 import type { AmbientCuePlayback } from '../../audio/AudioSystem';
 import type { EndingAudioId, MusicTrackName } from '../../audio/MusicManager';
 import type { FloorTransitionZone } from '../../player/PlayerController';
-import type { EndingPresentationId } from '../../ui/HUD';
+import type { EndingPresentationId, IntroPresentationId } from '../../ui/HUD';
 import type { WindowBarrier } from '../barriers/WindowBarrier';
 import type { PointDoor } from '../doors/PointDoor';
 import type { SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
@@ -63,6 +63,23 @@ export interface ArenaEnding {
   readonly audio: EndingAudioId;
   /** Seconds from the purchase to the credits. */
   readonly duration: number;
+}
+
+/** A camera keyframe of a map intro, in world space. */
+export interface ArenaIntroShot {
+  /** Seconds on the intro's eased timeline (see `IntroCinematic`). */
+  readonly time: number;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly target: { readonly x: number; readonly y: number; readonly z: number };
+}
+
+/** Opening cinematic a map plays once, when its run first starts. */
+export interface ArenaIntro {
+  readonly presentation: IntroPresentationId;
+  /** Seconds until the player takes control; the camera lands in their eyes. */
+  readonly duration: number;
+  /** Camera path ordered by time, every shot before `duration`. */
+  readonly shots: ReadonlyArray<ArenaIntroShot>;
 }
 
 export interface ArenaCompletionInteraction {
@@ -162,7 +179,10 @@ export interface ZombieArena {
   readonly ritualInteraction?: ArenaRitualInteraction;
   /** Paid interaction that ends the run with the map's own ending. */
   readonly completionInteraction?: ArenaCompletionInteraction;
-  readonly mysteryBoxPlacement: MysteryBoxPlacement;
+  /** Opening cinematic; omitted when the map starts straight into play. */
+  readonly intro?: ArenaIntro;
+  /** Omitted when the currently playable map has no Mystery Box. */
+  readonly mysteryBoxPlacement?: MysteryBoxPlacement;
   /** Safe initial position owned by the map rather than the game mode. */
   readonly playerSpawn: ArenaPlayerSpawn;
   /** True when the arena wants swept wall collision for the player. */
@@ -187,6 +207,10 @@ export interface ZombieArena {
   init(): void;
   /** Per-frame update for ambience and animations. */
   update(dt: number, observerPosition?: THREE.Vector3): void;
+  /** Stages the map side of `intro` (lights, sounds) as its camera starts. */
+  startIntro?(): void;
+  /** Settles whatever `startIntro` staged once the intro ends or is skipped. */
+  finishIntro?(): void;
   /** Called when the run restarts. */
   reset(): void;
   /**

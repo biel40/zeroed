@@ -102,6 +102,13 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
 };
 
 const CROSSFADE_SECONDS = 0.2;
+/**
+ * The living pose (raised arms, mid-stride legs) melts into the fall over this
+ * window instead of snapping to the clip's hanging start pose in CROSSFADE_SECONDS.
+ */
+const DEATH_CROSSFADE_SECONDS = 0.42;
+/** Decay time of the walking momentum the falling body keeps, seconds. */
+const DEATH_MOMENTUM_SECONDS = 0.1;
 /** Generated clips are pure functions of the rig: bake once per loaded scene, share across the pool. */
 const restClipCache = new WeakMap<THREE.Object3D, ZombieRestClips | null>();
 /** Largest body-yaw the fall turns towards the impact side, radians. */
@@ -551,6 +558,7 @@ export class ZombieVisual {
   private readonly basePositions: THREE.Vector3[] = [];
   private readonly baseScales: THREE.Vector3[] = [];
   private transitionTime = CROSSFADE_SECONDS;
+  private transitionDuration = CROSSFADE_SECONDS;
   private readonly feet: THREE.Object3D[] = [];
   private readonly footRestY: number[] = [];
   private readonly footPosition = new THREE.Vector3();
@@ -886,8 +894,9 @@ export class ZombieVisual {
         this.poseFrom[i].copy(this.poseBones[i].quaternion);
         this.positionFrom[i].copy(this.poseBones[i].position);
       }
+      this.transitionDuration = state === 'death' ? DEATH_CROSSFADE_SECONDS : CROSSFADE_SECONDS;
       this.transitionTime = state === 'spawn' || (state === 'barrierBreak' && previous === 'barrierAttack')
-        ? CROSSFADE_SECONDS : 0;
+        ? this.transitionDuration : 0;
     }
     if (state === 'walk' && previous === 'walk' && this.idleActive) return;
     this.state = state;
@@ -915,7 +924,7 @@ export class ZombieVisual {
       this.deathStartPitch = this.root.rotation.x;
       this.deathStartRoll = this.root.rotation.z;
       this.deathStartForward = this.root.position.z;
-      this.deathTravel = Math.min(0.14, this.motionSpeed * 0.06);
+      this.deathTravel = Math.min(0.14, this.motionSpeed * DEATH_MOMENTUM_SECONDS);
       this.deathLean = Math.min(0.16, this.motionSpeed * 0.065) + this.lean;
       this.deathSide = Math.sin(this.bobPhase + this.idlePhase) * 0.16 + this.turnLean;
     }
@@ -970,10 +979,18 @@ export class ZombieVisual {
     if (state === 'spawn') next.timeScale = 1.15;
     if (state === 'hit') next.timeScale = 1.4;
     // Each death clip is authored at its real speed (ZombieDeath profiles).
-    if (state === 'death') next.timeScale = 1;
+    if (state === 'death') {
+      next.timeScale = 1;
+      // The pose-space blend alone carries the living pose into the fall. A
+      // mixer crossfade on top kept the walk cycle stepping and ended with a
+      // velocity jump, read as a hitch before the body went down. Disabling
+      // (not stopping) keeps the mixer from snapping bindings to the bind pose.
+      for (const action of this.actions.values()) action.enabled = false;
+      if (this.idleAction) this.idleAction.enabled = false;
+    }
     next.enabled = true;
     // next !== currentAction here (the same-action case returned above).
-    if (this.currentAction) next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
+    if (this.currentAction && state !== 'death') next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
     next.play();
     this.currentAction = next;
   }
@@ -1089,8 +1106,10 @@ export class ZombieVisual {
     if (this.state === 'death' && this.dissolveProgress <= 0) {
       const settle = Math.min(1, this.deathTime / ZOMBIE_DEATH_FALL);
       const remaining = 1 - smoothStep(settle);
-      // Momentum and pose continuity from the living body, layered over the fall.
-      this.root.position.z = this.deathStartForward + this.deathTravel * (1 - remaining);
+      // Momentum and pose continuity from the living body, layered over the fall:
+      // the body leaves at walking speed and decays, never stopping dead first.
+      const carried = 1 - Math.exp(-this.deathTime / DEATH_MOMENTUM_SECONDS);
+      this.root.position.z = this.deathStartForward + this.deathTravel * carried;
       this.root.rotation.x += this.deathStartPitch * remaining;
       this.root.rotation.z += this.deathStartRoll * remaining;
       // Lean and sway humps fade before the body is low: rocking a lying body
@@ -1177,7 +1196,7 @@ export class ZombieVisual {
     }
     this.applyInertia(dt);
     this.applyLimbMotion();
-    const blend = smoothStep(Math.min(1, this.transitionTime / CROSSFADE_SECONDS));
+    const blend = smoothStep(Math.min(1, this.transitionTime / this.transitionDuration));
     if (blend < 1) {
       for (let i = 0; i < this.poseBones.length; i++) {
         this.poseBones[i].quaternion.slerp(this.poseFrom[i], 1 - blend);

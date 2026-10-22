@@ -264,6 +264,10 @@ export class Game {
       onRestart: () => this.restartRun(),
       onMainMenu: () => this.returnToMainMenu(),
     });
+    this.hud.setGameOverHandlers({
+      onRestart: () => this.restartRun(),
+      onMainMenu: () => this.returnToMainMenu(),
+    });
     // ESC to resume while the menu is open and the pointer is unlocked.
     document.addEventListener('keydown', this.handleEscapeKey);
 
@@ -750,7 +754,9 @@ export class Game {
     this.mode.update(dt);
     const fallbackName = this.mode.getFallbackWeaponName?.() ?? null;
     const melee = this.mode.getMeleeArm?.() ?? null;
-    this.currentView.root.visible = fallbackName === null;
+    // A cinematic camera films the world, not the first-person weapon and arms.
+    const cinematicCamera = this.mode.getCinematicCamera?.() ?? null;
+    this.currentView.root.visible = fallbackName === null && cinematicCamera === null;
     this.currentView.update(
       dt,
       weapon,
@@ -779,7 +785,7 @@ export class Game {
       allowGameplayInput ? (this.mode.getInteractPrompt?.() ?? null) : null,
     );
 
-    this.renderer.render(this.scene, this.player.camera);
+    this.renderer.render(this.scene, cinematicCamera ?? this.player.camera);
     if (this.dynamicResolution.sample(dt)) this.applyPixelRatio();
     this.updateDebug(dt);
     this.input.endFrame();

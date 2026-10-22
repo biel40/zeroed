@@ -111,13 +111,26 @@ export function sampleZombieDeath(profile: ZombieDeathProfile, t: number, pose: 
   profile.layer?.(t, pose);
 }
 
-type Key = readonly [time: number, value: number];
+/** Marks a key where the body hits the floor (see `curve`). */
+const IMPACT = true;
+type Key = readonly [time: number, value: number, impact?: typeof IMPACT];
 
-/** Monotone cubic through normalized keys: continuous velocity, no overshoot. */
+/**
+ * Monotone cubic through normalized keys: continuous velocity, no overshoot.
+ * IMPACT keys break that continuity on purpose: the body arrives at full speed
+ * and leaves on a ballistic rebound (a 2x-slope tangent traces a parabola to a
+ * resting neighbour) instead of easing to a stop just above the floor.
+ */
 function curve(...keys: Key[]): Curve {
   const last = keys.length - 1;
   const slopes = keys.slice(1).map(([time, value], i) => (value - keys[i][1]) / (time - keys[i][0]));
-  const tangents = keys.map((_, i) => (i === 0 || i === last ? 0 : shapePreservingTangent(slopes[i - 1], slopes[i])));
+  const outgoing = keys.map((_, i) => (i === 0 || i === last ? 0 : shapePreservingTangent(slopes[i - 1], slopes[i])));
+  const incoming = [...outgoing];
+  keys.forEach(([, , impact], i) => {
+    if (!impact || i === 0) return;
+    incoming[i] = 2 * slopes[i - 1];
+    outgoing[i] = i === last ? 0 : 2 * slopes[i];
+  });
   return (t) => {
     if (t <= keys[0][0]) return keys[0][1];
     if (t >= keys[last][0]) return keys[last][1];
@@ -129,8 +142,8 @@ function curve(...keys: Key[]): Curve {
     const u = (t - t0) / h;
     const u2 = u * u;
     const u3 = u2 * u;
-    return (2 * u3 - 3 * u2 + 1) * from + (u3 - 2 * u2 + u) * h * tangents[i]
-      + (-2 * u3 + 3 * u2) * to + (u3 - u2) * h * tangents[i + 1];
+    return (2 * u3 - 3 * u2 + 1) * from + (u3 - 2 * u2 + u) * h * outgoing[i]
+      + (-2 * u3 + 3 * u2) * to + (u3 - u2) * h * incoming[i + 1];
   };
 }
 
@@ -170,9 +183,9 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     fall: 'back',
     followsImpact: true,
     channels: {
-      drop: curve([0, 0], [0.18, 0.06], [0.4, 0.2], [0.72, 0.86], [0.8, 0.8], [0.88, 0.86], [1, 0.86]),
+      drop: curve([0, 0], [0.18, 0.06], [0.4, 0.2], [0.72, 0.86, IMPACT], [0.8, 0.83], [0.88, 0.86, IMPACT], [1, 0.86]),
       travel: curve([0, 0], [0.25, -0.06], [0.72, -0.2], [1, -0.21]),
-      pitch: curve([0, 0], [0.22, -0.12], [0.45, -0.45], [0.72, -1.5], [0.8, -1.42], [0.9, -1.52], [1, -1.5]),
+      pitch: curve([0, 0], [0.22, -0.12], [0.45, -0.45], [0.72, -1.5, IMPACT], [0.8, -1.42], [0.9, -1.52, IMPACT], [1, -1.5]),
       roll: curve([0, 0], [0.7, 0.08], [1, 0.1]),
       spine: curve([0, 0], [0.2, -0.22], [0.5, -0.12], [0.75, 0.08], [1, 0.04]),
       nod: curve([0, 0], [0.12, -0.45], [0.4, -0.25], [0.75, 0.15], [0.85, -0.08], [1, 0.04]),
@@ -188,9 +201,9 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     fall: 'forward',
     followsImpact: true,
     channels: {
-      drop: curve([0, 0], [0.25, 0.12], [0.5, 0.4], [0.78, 0.84], [0.86, 0.78], [1, 0.84]),
+      drop: curve([0, 0], [0.25, 0.12], [0.5, 0.4], [0.78, 0.84, IMPACT], [0.86, 0.81], [1, 0.84, IMPACT]),
       travel: curve([0, 0], [0.3, 0.08], [0.78, 0.26], [1, 0.27]),
-      pitch: curve([0, 0], [0.3, 0.25], [0.55, 0.7], [0.8, 1.5], [0.88, 1.42], [1, 1.48]),
+      pitch: curve([0, 0], [0.3, 0.25], [0.55, 0.7], [0.8, 1.5, IMPACT], [0.88, 1.42], [1, 1.48, IMPACT]),
       spine: curve([0, 0], [0.3, 0.25], [0.7, 0.1], [1, -0.05]),
       nod: curve([0, 0], [0.1, -0.3], [0.4, 0.1], [0.8, -0.3], [1, -0.32]),
       turn: curve([0.72, 0], [1, 0.9]),
@@ -206,7 +219,7 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     channels: {
       drop: curve([0, 0], [0.35, 0.1], [0.6, 0.44], [0.85, 0.82], [1, 0.84]),
       travel: curve([0, 0], [0.4, -0.05], [0.6, -0.04], [0.9, 0.12], [1, 0.13]),
-      pitch: curve([0, 0], [0.35, -0.12], [0.55, 0.1], [0.75, 0.7], [0.9, 1.45], [1, 1.42]),
+      pitch: curve([0, 0], [0.35, -0.12], [0.55, 0.1], [0.75, 0.7], [0.9, 1.45, IMPACT], [1, 1.42]),
       roll: curve([0.5, 0], [1, 0.3]),
       spine: curve([0, 0], [0.4, -0.15], [0.6, 0.35], [0.9, 0.2], [1, 0.05]),
       nod: curve([0, 0], [0.4, -0.2], [0.6, 0.4], [0.9, -0.1], [1, -0.2]),
@@ -235,9 +248,9 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     fall: 'back',
     followsImpact: false,
     channels: {
-      drop: curve([0, 0], [0.1, 0.08], [0.45, 0.6], [0.7, 0.86], [0.78, 0.8], [1, 0.86]),
+      drop: curve([0, 0], [0.1, 0.08], [0.45, 0.6], [0.7, 0.86, IMPACT], [0.78, 0.83], [1, 0.86, IMPACT]),
       travel: curve([0, 0], [0.45, -0.04], [1, -0.12]),
-      pitch: curve([0, 0], [0.3, -0.05], [0.55, -0.6], [0.75, -1.45], [0.82, -1.38], [1, -1.45]),
+      pitch: curve([0, 0], [0.3, -0.05], [0.55, -0.6], [0.75, -1.45, IMPACT], [0.82, -1.38], [1, -1.45, IMPACT]),
       roll: curve([0, 0], [0.5, 0.15], [1, 0.25]),
       spine: curve([0, 0], [0.2, -0.12], [0.45, 0.25], [1, 0.1]),
       nod: curve([0, 0], [0.08, -0.6], [0.2, -0.35], [0.5, 0.2], [0.75, -0.1], [1, 0]),
@@ -253,11 +266,11 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     fall: 'side',
     followsImpact: false,
     channels: {
-      drop: curve([0, 0], [0.3, 0.16], [0.55, 0.5], [0.85, 0.82], [0.92, 0.78], [1, 0.82]),
+      drop: curve([0, 0], [0.3, 0.16], [0.55, 0.5], [0.85, 0.82, IMPACT], [0.92, 0.8], [1, 0.82, IMPACT]),
       travel: curve([0, 0], [0.5, 0.03], [1, 0.06]),
       sway: curve([0, 0], [0.3, -0.06], [1, -0.18]),
       pitch: curve([0, 0], [0.5, 0.15], [0.8, 0.3], [1, 0.1]),
-      roll: curve([0, 0], [0.4, 0.08], [0.6, 0.2], [0.85, 1.5], [0.92, 1.42], [1, 1.5]),
+      roll: curve([0, 0], [0.4, 0.08], [0.6, 0.2], [0.85, 1.5, IMPACT], [0.92, 1.42], [1, 1.5, IMPACT]),
       yaw: curve([0, 0], [0.15, -0.35], [0.35, -0.5], [0.7, -0.65], [1, -0.7]),
       spine: curve([0, 0], [0.25, 0.35], [0.6, 0.45], [0.85, 0.2], [1, 0.1]),
       twist: curve([0, 0], [0.1, -0.35], [0.3, -0.2], [1, -0.1]),
@@ -282,9 +295,9 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     fall: 'back',
     followsImpact: true,
     channels: {
-      drop: curve([0, 0], [0.15, -0.08], [0.35, 0], [0.6, 0.76], [0.68, 0.9], [0.76, 0.8], [0.85, 0.86], [1, 0.86]),
+      drop: curve([0, 0], [0.15, -0.08], [0.35, 0], [0.6, 0.76], [0.68, 0.9, IMPACT], [0.76, 0.83], [0.85, 0.86, IMPACT], [1, 0.86]),
       travel: curve([0, 0], [0.2, -0.12], [0.6, -0.4], [0.75, -0.46], [1, -0.48]),
-      pitch: curve([0, 0], [0.15, -0.35], [0.45, -1.1], [0.65, -1.55], [0.75, -1.45], [1, -1.52]),
+      pitch: curve([0, 0], [0.15, -0.35], [0.45, -1.1], [0.65, -1.55, IMPACT], [0.75, -1.45], [1, -1.52]),
       roll: curve([0, 0], [0.5, -0.15], [1, -0.2]),
       spine: curve([0, 0], [0.12, -0.35], [0.4, 0.25], [0.68, -0.05], [1, 0.05]),
       nod: curve([0, 0], [0.12, 0.45], [0.4, -0.3], [0.68, 0.25], [0.78, -0.1], [1, 0.08]),
@@ -299,9 +312,9 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile>
     fall: 'forward',
     followsImpact: false,
     channels: {
-      drop: curve([0, 0], [0.1, -0.05], [0.55, -0.04], [0.7, 0.4], [0.88, 0.84], [0.94, 0.78], [1, 0.84]),
+      drop: curve([0, 0], [0.1, -0.05], [0.55, -0.04], [0.7, 0.4], [0.88, 0.84, IMPACT], [0.94, 0.81], [1, 0.84, IMPACT]),
       travel: curve([0, 0], [0.6, -0.02], [1, 0.1]),
-      pitch: curve([0, 0], [0.1, -0.1], [0.55, -0.12], [0.7, 0.2], [0.9, 1.4], [1, 1.38]),
+      pitch: curve([0, 0], [0.1, -0.1], [0.55, -0.12], [0.7, 0.2], [0.9, 1.4, IMPACT], [1, 1.38]),
       roll: curve([0.55, 0], [1, -0.3]),
       spine: curve([0, 0], [0.1, -0.28], [0.55, -0.25], [0.7, 0.35], [1, 0.05]),
       nod: curve([0, 0], [0.1, -0.4], [0.55, -0.35], [0.72, 0.45], [0.9, -0.2], [1, -0.25]),

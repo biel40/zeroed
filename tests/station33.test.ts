@@ -4,7 +4,7 @@ import type { DeviceProfile, QualityLevel } from '../src/core/DeviceProfile';
 import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
 import type { Input } from '../src/player/Input';
 import type { Weapon } from '../src/weapons/Weapon';
-import { mysteryBoxFootprint } from '../src/zombies/MysteryBoxFootprint';
+import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { ZombieSpawnPoint } from '../src/zombies/ZombieSpawner';
@@ -13,7 +13,6 @@ import { Station33Arena } from '../src/zombies/maps/Station33Arena';
 import {
   ESCALATOR_PORTAL,
   STATION33_BARRIERS,
-  STATION33_BOX_PLACEMENT,
   STATION33_PLAYER_BOUNDS,
   STATION33_PLAYER_SPAWN,
   STATION33_SPAWNS,
@@ -23,7 +22,7 @@ import {
 } from '../src/zombies/maps/Station33Config';
 import { circuitLevel } from '../src/zombies/maps/station33/Station33Lighting';
 import type { ArenaAmbientCue, ZombieArena } from '../src/zombies/maps/ZombieArena';
-import { installCanvasDocument, TEST_PROFILE } from './coopHarness';
+import { installCanvasDocument, makeContext, TEST_PROFILE } from './coopHarness';
 
 const DT = 1 / 60;
 const ZOMBIE_BAND = { bottom: 0.05, top: 1.8 } as const;
@@ -39,7 +38,7 @@ function makeArena(profile: DeviceProfile = TEST_PROFILE): Station33Arena {
 }
 
 /** World AABBs of everything solid a zombie body or the player can bump into. */
-function solidBoxes(arena: Station33Arena): THREE.Box3[] {
+function solidBoxes(arena: ZombieArena): THREE.Box3[] {
   arena.group.updateMatrixWorld(true);
   return [
     ...arena.colliders.map((object) => new THREE.Box3().setFromObject(object)),
@@ -63,7 +62,6 @@ function openBarrier(arena: Station33Arena, id: string): void {
 function chaseUntilHit(arena: Station33Arena, spawn: ZombieSpawnPoint, playerX: number, playerZ: number, seconds: number): { hit: boolean; path: THREE.Vector3[] } {
   const manager = new ZombieManager(() => 0, {}, false, [spawn], arena.barriers, [], () => 1);
   manager.setNavigationBounds(arena.navigationBounds);
-  manager.setBodyObstacles([mysteryBoxFootprint(arena.mysteryBoxPlacement)]);
   manager.registerColliders([...arena.colliders]);
   expect(manager.spawnZombie(roundConfig(6), playerX, playerZ, 6)).toBe(true);
   const zombie = [...manager.actives][0];
@@ -94,6 +92,20 @@ const weaponStub = {
 } as unknown as Weapon;
 
 describe('Station 33 vestibule layout', () => {
+  it('initializes and restarts single-player without creating or offering a Mystery Box', () => {
+    const { ctx } = makeContext();
+    const mode = new ZombiesMode('station-33');
+    mode.init(ctx);
+    const state = mode as unknown as { box: unknown; boxView: unknown; playerInBoxRange(): boolean };
+    expect(state.box).toBeNull();
+    expect(state.boxView).toBeNull();
+    expect(state.playerInBoxRange()).toBe(false);
+    mode.onInteract();
+    mode.onRestartRequested();
+    expect(state.box).toBeNull();
+    expect(state.boxView).toBeNull();
+  });
+
   it('is a single sealed start zone: no doors, endings or map-only interactions', () => {
     const arena: ZombieArena = makeArena();
     expect(arena.doors).toHaveLength(0);
@@ -159,7 +171,8 @@ describe('Station 33 vestibule layout', () => {
   });
 
   it('keeps wall buys on the walls within reach, at the mansion prices', () => {
-    expect(STATION33_WALL_BUYS.map((wallBuy) => [wallBuy.weaponId, wallBuy.price])).toEqual([['m1911', 500], ['ak47', 1750]]);
+    const arena = makeArena();
+    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([['ak47', 1750, 900]]);
     for (const wallBuy of STATION33_WALL_BUYS) {
       const { x, z } = wallBuy.position;
       const toWall = Math.min(x - VESTIBULE.minX, VESTIBULE.maxX - x, z - VESTIBULE.minZ, VESTIBULE.maxZ - z);
@@ -170,13 +183,14 @@ describe('Station 33 vestibule layout', () => {
     }
   });
 
-  it('keeps the Mystery Box clear of walls and furniture with room to use it', () => {
-    const arena = makeArena();
-    const footprint = mysteryBoxFootprint(STATION33_BOX_PLACEMENT);
-    const others = solidBoxes(arena).filter((box) => !box.equals(footprint));
-    for (const box of others) expect(box.intersectsBox(footprint)).toBe(false);
-    const front = bodyBox(STATION33_BOX_PLACEMENT.position.x, STATION33_BOX_PLACEMENT.position.z + 1.3, 0.35);
-    for (const box of solidBoxes(arena)) expect(box.intersectsBox(front)).toBe(false);
+  it('has no Mystery Box or leftover collision at its former location, including after reset', () => {
+    const arena: ZombieArena = makeArena();
+    const formerBox = bodyBox(4.9, 0.95, 0.35);
+    for (const reset of [false, true]) {
+      if (reset) arena.reset();
+      expect(arena.mysteryBoxPlacement).toBeUndefined();
+      for (const box of solidBoxes(arena)) expect(box.intersectsBox(formerBox)).toBe(false);
+    }
   });
 });
 

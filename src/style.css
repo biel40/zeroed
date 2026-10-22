@@ -905,6 +905,7 @@ body {
 }
 
 html.coop-mode [data-coop-hidden],
+html.coop-guest #go-restart,
 html.coop-guest #pause-restart {
   display: none !important;
 }
@@ -1208,16 +1209,6 @@ html.coop-guest #pause-restart {
   letter-spacing: 0.16em;
 }
 
-.map-card-early {
-  color: var(--accent-bright);
-  font: 700 10px 'Consolas', 'SF Mono', monospace;
-  letter-spacing: 0.16em;
-}
-
-.map-card[data-access='free'] .map-card-early {
-  display: none;
-}
-
 /* Living art: fire flicker, drifting smoke, rising embers, beacon and tube lights. */
 .map-art-flicker { animation: map-art-flicker 3.4s steps(1) infinite; }
 .map-art-windows { animation: map-art-flicker 5.3s steps(1) 0.7s infinite; }
@@ -1449,20 +1440,25 @@ html.coop-guest #pause-restart {
 .go-stats > div:nth-child(3) { animation-delay: 2.4s; }
 .go-stats dt {
   display: flex; align-items: center; gap: 6px; color: #8e968a;
-  font: 600 9px 'Consolas', 'SF Mono', monospace; letter-spacing: .2em; text-transform: uppercase;
+  font: 600 10px/1.4 'Consolas', 'SF Mono', monospace; letter-spacing: .08em; text-transform: uppercase;
 }
 .go-stats .survival-icon { width: 15px; height: 15px; flex-basis: 15px; color: #a4ac9d; }
-.go-stats dd { margin-top: auto; padding-top: 7px; font: 400 32px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .04em; overflow-wrap: anywhere; text-shadow: 2px 3px 0 #0009; }
+.go-stats dd { margin: auto 0 0; padding-top: 9px; font: 700 32px/1.1 'Consolas', 'SF Mono', monospace; overflow-wrap: anywhere; }
 #go-round { color: #dedfd8; }
 #go-kills { color: #d9b469; }
 #go-headshots { color: #c96956; }
-#go-restart {
-  position: relative; width: 100%; margin-top: 22px; padding: 14px 44px 14px 18px; cursor: pointer; text-align: left;
+.go-actions { display: grid; gap: 10px; margin-top: 22px; animation: go-reveal 0.6s ease-out 2.8s both; }
+#go-restart,
+#go-main-menu {
+  position: relative; width: 100%; padding: 14px 44px 14px 18px; cursor: pointer; text-align: left;
   border: 1px solid #b6483e8c; border-left: 3px solid #b6483e; border-radius: 1px;
   background: linear-gradient(90deg, #3e1310e6, #141917e6); color: #f0e6d0;
-  font: 700 13px 'Consolas', 'SF Mono', monospace; letter-spacing: .22em;
+  font: 700 13px/1.4 'Consolas', 'SF Mono', monospace; letter-spacing: .1em;
   transition: border-color .15s ease, background .15s ease, transform .15s ease;
-  animation: go-reveal 0.6s ease-out 2.8s both;
+}
+#go-main-menu {
+  min-height: 46px; padding-right: 18px; text-align: center;
+  border: 1px solid #a4ac9d40; background: #14191799; color: #b9bcb2;
 }
 #go-restart::after {
   content: '›'; position: absolute; top: 50%; right: 18px; color: #d05b51;
@@ -1470,9 +1466,12 @@ html.coop-guest #pause-restart {
 }
 #go-restart:hover,
 #go-restart:focus-visible { border-color: #d0574cd9; transform: translateX(3px); background: linear-gradient(90deg, #5a1915f0, #181c1af0); }
+#go-main-menu:hover,
+#go-main-menu:focus-visible { border-color: #a4ac9d99; background: #242b26; color: #f0e6d0; }
 #go-restart:hover::after,
 #go-restart:focus-visible::after { transform: translate(4px, -55%); }
-#go-restart:focus-visible { outline: 2px solid #bd5148; outline-offset: 3px; }
+#go-restart:focus-visible,
+#go-main-menu:focus-visible { outline: 2px solid #bd5148; outline-offset: 3px; }
 
 @keyframes go-fade { from { opacity: 0; } }
 @keyframes go-flash {
@@ -1492,7 +1491,7 @@ html.coop-guest #pause-restart {
 @media (max-width: 480px) {
   #game-over .start-panel { padding: 22px 18px 22px 22px; }
   .go-stats > div { padding: 10px 9px 11px; }
-  .go-stats dt { letter-spacing: .12em; }
+  .go-stats dt { letter-spacing: .03em; }
   .go-stats dd { font-size: 24px; }
 }
 @media (max-height: 600px) {
@@ -1500,7 +1499,8 @@ html.coop-guest #pause-restart {
   .go-flatline { height: 22px; margin-bottom: 6px; }
   #game-over h1 { font-size: 46px; }
   #go-epitaph { margin-bottom: 14px; }
-  #go-restart { margin-top: 14px; padding-top: 11px; padding-bottom: 11px; }
+  .go-actions { margin-top: 14px; gap: 8px; }
+  #go-restart, #go-main-menu { padding-top: 11px; padding-bottom: 11px; }
 }
 @media (prefers-reduced-motion: reduce) {
   #game-over, #game-over *, #game-over .start-panel::before { animation: none !important; transition: none; }
@@ -1519,6 +1519,352 @@ html.coop-guest #pause-restart {
   justify-content: center;
   background: radial-gradient(ellipse at center, rgba(8, 10, 10, 0.55), rgba(3, 4, 4, 0.9) 78%);
   backdrop-filter: blur(4px) saturate(0.6);
+}
+
+/* ---------- Map intro ---------- */
+
+/*
+ * Title card over a map intro, filmed by IntroCinematic in the 3D scene.
+ * Every delay is a share of --intro-duration (HUD sets it from the map's
+ * ArenaIntro), so the card and the camera land together. Only opacity and
+ * transform animate; the overlay takes no pointer input but its skip button.
+ */
+#intro-screen {
+  --intro-duration: 8s;
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#hud.intro-active {
+  visibility: hidden;
+}
+
+.intro-grade,
+.intro-flash,
+.intro-letterbox {
+  position: absolute;
+  inset: 0;
+}
+
+/* Cold metro grade with a heavy vignette, lifted as control returns. */
+.intro-grade {
+  background:
+    radial-gradient(ellipse at 50% 55%, transparent 30%, rgba(0, 0, 0, 0.82) 100%),
+    linear-gradient(180deg, rgba(14, 44, 42, 0.32), rgba(4, 10, 9, 0.18));
+}
+
+.intro-grade::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.22;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0 1px, transparent 1px 3px);
+}
+
+/* The mains kick in: one teal-white bloom across the frame. */
+.intro-flash {
+  opacity: 0;
+  background: radial-gradient(ellipse at 50% 35%, rgba(205, 255, 244, 0.5), rgba(127, 230, 218, 0.12) 60%, transparent 80%);
+}
+
+.intro-letterbox::before,
+.intro-letterbox::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 11vh;
+  background: #000;
+}
+
+.intro-letterbox::before { top: 0; transform-origin: top; }
+.intro-letterbox::after { bottom: 0; transform-origin: bottom; }
+
+/* Security-camera readout while the hall is still dark. */
+.intro-feed {
+  position: absolute;
+  top: calc(11vh + 18px);
+  left: clamp(16px, 4vw, 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #9ff4ea;
+  font: 700 clamp(10px, 1.1vw, 13px)/1.3 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 10px rgba(127, 230, 218, 0.6);
+  opacity: 0;
+}
+
+.intro-rec {
+  color: #ff5a3c;
+  text-shadow: 0 0 10px rgba(255, 60, 30, 0.7);
+}
+
+.intro-rec::before {
+  content: '\25CF\00a0';
+}
+
+.intro-signal {
+  color: #f0cd78;
+  text-shadow: 0 0 10px rgba(214, 160, 52, 0.55);
+}
+
+.intro-title {
+  position: absolute;
+  left: clamp(16px, 7vw, 120px);
+  bottom: calc(11vh + clamp(24px, 6vh, 64px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  opacity: 0;
+}
+
+.intro-badge {
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 226, 150, 0.9);
+  background: linear-gradient(135deg, #fbe7a1, #d4a13c 55%, #a8741f);
+  color: #1d1405;
+  font: 800 11px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.26em;
+  box-shadow: 0 0 22px rgba(214, 160, 52, 0.55);
+}
+
+.intro-badge::before {
+  content: '\25C6\00a0';
+}
+
+.intro-cyrillic {
+  color: #9ff4ea;
+  font: 700 clamp(12px, 1.5vw, 17px) 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.6em;
+  text-shadow: 0 0 14px rgba(127, 230, 218, 0.55);
+}
+
+.intro-name {
+  position: relative;
+  margin: 0;
+  /* Two text-clipped layers: a glint band that sweeps once over the gold. */
+  background:
+    linear-gradient(105deg, transparent 42%, rgba(255, 250, 228, 0.95) 50%, transparent 58%) 160% 0 / 250% 100% no-repeat,
+    linear-gradient(180deg, #fff4cc 0%, #e3b552 58%, #b07c24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font: 400 clamp(52px, 10vw, 132px)/0.92 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.06em;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.7)) drop-shadow(0 0 28px rgba(214, 160, 52, 0.35));
+  white-space: nowrap;
+}
+
+.intro-rule {
+  width: min(520px, 70vw);
+  height: 2px;
+  background: linear-gradient(90deg, #f0cd78, rgba(214, 160, 52, 0));
+  box-shadow: 0 0 12px rgba(214, 160, 52, 0.6);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.intro-tagline {
+  margin: 0;
+  color: #d8ddd3;
+  font: 600 clamp(13px, 1.5vw, 17px)/1.4 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 6px #000;
+  opacity: 0;
+}
+
+#intro-skip {
+  position: absolute;
+  right: clamp(16px, 4vw, 48px);
+  bottom: calc(11vh + 16px);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 1px solid rgba(240, 205, 120, 0.45);
+  background: rgba(6, 9, 9, 0.6);
+  color: #f0cd78;
+  font: 800 12px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.24em;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0;
+}
+
+#intro-skip span::after {
+  content: '\00a0\203A';
+}
+
+#intro-skip small {
+  color: #8e968a;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+html.touch-controls-enabled #intro-skip small {
+  display: none;
+}
+
+#intro-screen.playing .intro-grade,
+#intro-screen.playing .intro-letterbox {
+  animation: intro-out calc(var(--intro-duration) * 0.12) ease-in calc(var(--intro-duration) * 0.88) both;
+}
+
+#intro-screen.playing .intro-letterbox::before,
+#intro-screen.playing .intro-letterbox::after {
+  animation: intro-bars calc(var(--intro-duration) * 0.12) cubic-bezier(0.6, 0, 0.8, 0.4) calc(var(--intro-duration) * 0.88) both;
+}
+
+#intro-screen.playing .intro-flash {
+  animation: intro-flash 0.7s ease-out calc(var(--intro-duration) * 0.3) both;
+}
+
+#intro-screen.playing .intro-feed {
+  animation: intro-feed calc(var(--intro-duration) * 0.46) steps(1) both;
+}
+
+#intro-screen.playing .intro-rec::before {
+  animation: intro-blink 0.9s steps(1) infinite;
+}
+
+#intro-screen.playing .intro-title {
+  animation: intro-title calc(var(--intro-duration) * 0.52) ease-out calc(var(--intro-duration) * 0.32) both;
+}
+
+#intro-screen.playing .intro-badge {
+  animation: intro-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) calc(var(--intro-duration) * 0.33) both;
+}
+
+#intro-screen.playing .intro-cyrillic {
+  animation: intro-track 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--intro-duration) * 0.35) both;
+}
+
+#intro-screen.playing .intro-name {
+  animation:
+    intro-name 1.1s cubic-bezier(0.16, 0.84, 0.3, 1) calc(var(--intro-duration) * 0.37) both,
+    intro-glint 1.2s ease-in-out calc(var(--intro-duration) * 0.52) both;
+}
+
+#intro-screen.playing .intro-rule {
+  animation: intro-rule 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) calc(var(--intro-duration) * 0.45) both;
+}
+
+#intro-screen.playing .intro-tagline {
+  animation: intro-rise 0.8s ease-out calc(var(--intro-duration) * 0.5) both;
+}
+
+#intro-screen.playing #intro-skip {
+  animation: intro-skip calc(var(--intro-duration) * 0.8) ease-out calc(var(--intro-duration) * 0.08) both;
+}
+
+@keyframes intro-out {
+  to { opacity: 0; }
+}
+
+@keyframes intro-bars {
+  to { transform: scaleY(0); }
+}
+
+@keyframes intro-flash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* A dead feed that stutters to life, then drops once the lights hold. */
+@keyframes intro-feed {
+  0% { opacity: 0; }
+  6% { opacity: 1; }
+  9% { opacity: 0.2; }
+  12%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes intro-blink {
+  50% { opacity: 0; }
+}
+
+@keyframes intro-title {
+  0%, 88% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes intro-track {
+  from { opacity: 0; letter-spacing: 1.4em; }
+  to { opacity: 1; letter-spacing: 0.6em; }
+}
+
+@keyframes intro-name {
+  from { opacity: 0; transform: scale(1.16); letter-spacing: 0.3em; }
+  to { opacity: 1; transform: none; letter-spacing: 0.06em; }
+}
+
+@keyframes intro-glint {
+  from { background-position: 160% 0, 0 0; }
+  to { background-position: -60% 0, 0 0; }
+}
+
+@keyframes intro-rule {
+  to { transform: scaleX(1); }
+}
+
+@keyframes intro-skip {
+  0% { opacity: 0; }
+  10%, 90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes intro-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (orientation: portrait), (max-width: 600px) {
+  .intro-title {
+    left: 16px;
+    right: 16px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .intro-name {
+    font-size: clamp(44px, 15vw, 96px);
+  }
+}
+
+/* Same timeline, no movement: the card fades instead of tracking and zooming. */
+@media (prefers-reduced-motion: reduce) {
+  #intro-screen.playing .intro-badge,
+  #intro-screen.playing .intro-cyrillic,
+  #intro-screen.playing .intro-tagline {
+    animation-name: intro-fade;
+  }
+
+  #intro-screen.playing .intro-name {
+    animation: intro-fade 1.1s ease-out calc(var(--intro-duration) * 0.37) both;
+  }
+
+  #intro-screen.playing .intro-rule {
+    transform: none;
+    animation-name: intro-fade;
+  }
+
+  #intro-screen.playing .intro-flash,
+  #intro-screen.playing .intro-rec::before {
+    animation: none;
+  }
 }
 
 /* ---------- Ending and credits ---------- */

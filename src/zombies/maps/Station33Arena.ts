@@ -4,7 +4,6 @@ import type { DeviceProfile } from '../../core/DeviceProfile';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
 import type { PointDoor } from '../doors/PointDoor';
-import { mysteryBoxFootprint } from '../MysteryBoxFootprint';
 import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
@@ -24,7 +23,8 @@ import {
   STATION33_AMBIENT_EVENTS,
   STATION33_BARRIER_CONFIG,
   STATION33_BARRIERS,
-  STATION33_BOX_PLACEMENT,
+  STATION33_INTRO,
+  STATION33_INTRO_CUES,
   STATION33_NAVIGATION_BOUNDS,
   STATION33_PLAYER_BOUNDS,
   STATION33_PLAYER_SPAWN,
@@ -42,16 +42,16 @@ import type { ArenaAmbientCue, ZombieArena } from './ZombieArena';
  * and premium; the closed beta unlocks it from the map menu. The arena only
  * orchestrates: zone builders shape the geometry, `Station33Lighting` and
  * `Station33Atmosphere` keep it alive, and gameplay objects come from the
- * shared barrier, wall-buy and Mystery Box systems.
+ * shared barrier and wall-buy systems.
  *
- * Phase 1 is the entrance vestibule with four entrances, two wall buys and
- * the Mystery Box; the escalator north of it is the sealed frontier.
+ * Phase 1 is the entrance vestibule with four entrances and an AK-47 wall
+ * buy; the escalator north of it is the sealed frontier.
  */
 export class Station33Arena implements ZombieArena {
   readonly id = 'station-33';
   readonly group = new THREE.Group();
   readonly ambience = STATION33_AMBIENCE;
-  readonly mysteryBoxPlacement = STATION33_BOX_PLACEMENT;
+  readonly intro = STATION33_INTRO;
   readonly playerSpawn = STATION33_PLAYER_SPAWN;
   readonly useWallCollision = true;
   readonly playerBounds = STATION33_PLAYER_BOUNDS;
@@ -74,6 +74,9 @@ export class Station33Arena implements ZombieArena {
   private readonly lighting: Station33Lighting;
   private readonly atmosphere: Station33Atmosphere;
   private readonly ambientEvents = new AmbientEventScheduler(STATION33_AMBIENT_EVENTS);
+  /** Seconds into the intro while its cues are pending, else null. */
+  private introTime: number | null = null;
+  private nextIntroCue = 0;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -117,6 +120,7 @@ export class Station33Arena implements ZombieArena {
   }
 
   update(dt: number): void {
+    this.updateIntroCues(dt);
     for (const view of this.barrierViews) {
       if (view.group.visible) view.update(dt);
     }
@@ -128,12 +132,25 @@ export class Station33Arena implements ZombieArena {
   reset(): void {
     for (const barrier of this.allBarriers) barrier.reset();
     for (const view of this.barrierViews) view.reset();
+    this.introTime = null;
     this.ambientEvents.reset();
     this.lighting.reset();
     this.atmosphere.reset();
     this.activeZones.clear();
     this.activeZones.add(STATION33_START_ZONE);
     this.refreshZones();
+  }
+
+  /** The hall wakes from a blackout while the intro camera looks on. */
+  startIntro(): void {
+    this.introTime = 0;
+    this.nextIntroCue = 0;
+    this.lighting.powerUp();
+  }
+
+  finishIntro(): void {
+    this.introTime = null;
+    this.lighting.finishPowerUp();
   }
 
   /** Phase 1 has no paid doors: the escalator frontier is sealed, not for sale. */
@@ -148,7 +165,7 @@ export class Station33Arena implements ZombieArena {
   refreshColliders(): void {
     this.group.updateMatrixWorld(true);
     this.colliders = [...this.structure.solids];
-    this.wallColliders = [...this.structure.playerWallBoxes(), mysteryBoxFootprint(this.mysteryBoxPlacement)];
+    this.wallColliders = this.structure.playerWallBoxes();
   }
 
   /** Real lights the quality budget kept, for diagnostics and tests. */
@@ -163,6 +180,17 @@ export class Station33Arena implements ZombieArena {
       this.barrierViews[index].group.visible = this.activeZones.has(STATION33_BARRIERS[index].zone);
     }
     this.refreshColliders();
+  }
+
+  private updateIntroCues(dt: number): void {
+    if (this.introTime === null) return;
+    this.introTime += Math.max(0, dt);
+    while (this.nextIntroCue < STATION33_INTRO_CUES.length && STATION33_INTRO_CUES[this.nextIntroCue].time <= this.introTime) {
+      const { eventId } = STATION33_INTRO_CUES[this.nextIntroCue++];
+      const event = STATION33_AMBIENT_EVENTS.find((candidate) => candidate.id === eventId);
+      if (event) this.playAmbientEvent(event);
+    }
+    if (this.nextIntroCue >= STATION33_INTRO_CUES.length) this.introTime = null;
   }
 
   /** Bound once: the scheduler calls it from the frame loop. */

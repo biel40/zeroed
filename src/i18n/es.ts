@@ -12,7 +12,6 @@ export const es: Record<TranslationKey, string> = {
   'map.players.coop': '1–2 JUGADORES',
   'map.access.free': 'INCLUIDO',
   'map.access.premium': 'PREMIUM',
-  'map.earlyAccess': 'ACCESO ANTICIPADO · BETA CERRADA',
   'menu.multiplayer': 'MODO MULTIJUGADOR',
   'menu.language': 'IDIOMA',
   'settings.quality': 'Calidad',
@@ -193,14 +192,12 @@ export const es: Record<TranslationKey, string> = {
 
   'gameOver.kicker': 'CONSTANTES VITALES PERDIDAS',
   'gameOver.title': 'HAS MUERTO',
-  'gameOver.epitaphEarly': 'La mansión apenas tuvo que esforzarse.',
   'gameOver.epitaphMid': 'Resististe… pero la horda nunca se cansa.',
   'gameOver.epitaphLate': 'Una última resistencia que la mansión recordará.',
-  'gameOver.round': 'RONDA',
+  'gameOver.round': 'RONDA ALCANZADA',
   'gameOver.kills': 'BAJAS',
   'gameOver.headshots': 'A LA CABEZA',
-  'gameOver.restart': 'VOLVER A INTENTARLO',
-  'gameOver.leave': 'SALIR DE LA PARTIDA',
+  'gameOver.restart': 'REINTENTAR MAPA',
 
   'pause.kicker': 'RONDA',
   'pause.title': 'PAUSA',
@@ -220,4 +217,8 @@ export const es: Record<TranslationKey, string> = {
   'ending.assets': 'Recursos de terceros',
   'ending.thanks': '¡Gracias por jugar!',
   'ending.mainMenu': 'VOLVER AL MENÚ PRINCIPAL',
+  'intro.station33.signal': 'SEÑAL RECUPERADA',
+  'intro.station33.tagline': '84 metros bajo tierra. Sellada desde 1986.',
+  'intro.skip': 'SALTAR',
+  'intro.skipHint': 'cualquier tecla',
 };

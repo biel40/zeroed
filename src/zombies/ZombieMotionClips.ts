@@ -5,6 +5,7 @@ import {
   sampleZombieDeath,
   ZOMBIE_DEATH_PROFILES,
   ZOMBIE_DEATH_STYLES,
+  type ZombieDeathProfile,
   type ZombieDeathStyle,
 } from './ZombieDeath';
 
@@ -18,8 +19,6 @@ const IDLE_FRAMES = 64;
 const DEATH_FPS = 60;
 /** Toe tips stay this high above the floor, visual-root meters (sole thickness). */
 const TOE_FLOOR = 0.03;
-/** A knee lower than this (fraction of height) releases its planted foot. */
-const KNEE_FLOOR = 0.034;
 /** Skinned vertices sampled per mesh for the floor check, and the tolerated sink, meters. */
 const FLOOR_SAMPLES = 320;
 const FLESH_FLOOR = -0.01;
@@ -95,14 +94,18 @@ export function buildZombieRestClips(root: THREE.Object3D, height: number): Zomb
     forward.set(0, 0, 1).applyQuaternion(headRotation);
     offset(head, 0, extraYaw - Math.atan2(forward.x, forward.z), 0);
   };
+  /** Returns every generated node to the bind pose a clip frame starts from. */
+  const resetRig = (): void => {
+    nodes.forEach((node, index) => node.quaternion.copy(rotations[index]));
+    hips.position.copy(hipPosition);
+  };
   const bake = (name: string, duration: number, frames: number, pose: (t: number) => void): THREE.AnimationClip => {
     const values = nodes.map(() => [] as number[]);
     const positions: number[] = [];
     const times: number[] = [];
     for (let frame = 0; frame <= frames; frame++) {
       const t = frame / frames;
-      nodes.forEach((node, index) => node.quaternion.copy(rotations[index]));
-      hips.position.copy(hipPosition);
+      resetRig();
       pose(t);
       times.push(t * duration);
       nodes.forEach((node, index) => node.quaternion.toArray(values[index], values[index].length));
@@ -180,67 +183,101 @@ export function buildZombieRestClips(root: THREE.Object3D, height: number): Zomb
     return lowest;
   };
   const footTarget = new THREE.Vector3();
+  const plantedPole = new THREE.Vector3();
   const pose = createZombieDeathPose();
   const carriedFeet = legs.map(() => new THREE.Vector3());
   const carriedPoles = legs.map(() => new THREE.Vector3());
+  /** Steps 1–4 of a death frame at its authored height; the floor lift is applied separately. */
+  const poseFall = (profile: ZombieDeathProfile, t: number): void => {
+    sampleZombieDeath(profile, t, pose);
+    // 1. Upper body, authored upright so the fall below carries it along.
+    centreGaze(0);
+    const flat = Math.min(1, Math.abs(pose.pitch) / (Math.PI / 2));
+    offset(spine ?? torso, -restLean * flat * flat * (3 - 2 * flat), 0, 0);
+    offset(torso, pose.spine * 0.5, pose.twist * 0.5, 0);
+    offset(chest ?? torso, pose.spine * 0.5, pose.twist * 0.5, 0);
+    offset(head, pose.nod, pose.turn, pose.tilt);
+    arms.forEach((arm) => {
+      const hand = arm.rest.x > 0 ? pose.left : pose.right;
+      solveArm(arm, hand[0], hand[1], hand[2]);
+    });
+    // 2. Where relaxed feet and knees would end if the legs rode the hips.
+    hips.updateWorldMatrix(true, false);
+    legReach.forEach(({ hip, length }, i) => {
+      root.localToWorld(carriedFeet[i].set(hip.x, hip.y - length + pose.knees * height * 0.5, hip.z));
+      root.localToWorld(carriedPoles[i].set(hip.x, height * 0.27, 0.65));
+      hips.worldToLocal(carriedFeet[i]);
+      hips.worldToLocal(carriedPoles[i]);
+    });
+    // 3. The fall itself: the whole body pivots and travels at the hips.
+    placeHips(
+      hipRest.x + pose.sway * height,
+      hipRest.y * (1 - pose.drop),
+      hipRest.z + pose.travel * height,
+    );
+    offset(hips, pose.pitch, pose.yaw, pose.roll);
+    // 4. Planted feet buckle the knees towards the travelling standing pole;
+    //    released ones follow the body and its pole. Feet never aim below
+    //    the floor: a straight leg reaching under it would lever the body up.
+    hips.updateWorldMatrix(true, false);
+    legs.forEach((leg, i) => {
+      root.worldToLocal(hips.localToWorld(carriedFeet[i]));
+      root.worldToLocal(hips.localToWorld(carriedPoles[i]));
+      footTarget.copy(carriedFeet[i]).lerp(leg.rest, pose.plant);
+      footTarget.y = Math.max(footTarget.y, leg.rest.y);
+      plantedPole.set(legReach[i].hip.x + pose.sway * height, height * 0.27, 0.65 + pose.travel * height);
+      carriedPoles[i].lerp(plantedPole, pose.plant);
+      leg.solve(footTarget.x, footTarget.y, footTarget.z,
+        carriedPoles[i].x, carriedPoles[i].y, carriedPoles[i].z, 1, pose.plant);
+      const toe = toes[i];
+      if (toe) liftToes(leg.tip, toe);
+    });
+  };
+  /**
+   * 5. Per-frame lift that rests whatever reaches below the floor on it. Until
+   * the hips first bottom out, the lifted hips never rise again: knees meeting
+   * the floor hold the body up until it topples, instead of the floor check
+   * levering it back up mid-fall. Authored rebounds after landing are kept.
+   */
+  const floorLifts = (profile: ZombieDeathProfile, frames: number): number[] => {
+    const hipHeights: number[] = [];
+    const lifts: number[] = [];
+    for (let frame = 0; frame <= frames; frame++) {
+      resetRig();
+      poseFall(profile, frame / frames);
+      hipHeights.push(rootY(hips));
+      lifts.push(Math.max(0, FLESH_FLOOR - lowestFlesh()));
+    }
+    let landing = frames;
+    for (let frame = 1; frame < frames; frame++) {
+      if (hipHeights[frame] < hipHeights[0] * 0.5 && hipHeights[frame + 1] > hipHeights[frame] + 1e-5) {
+        landing = frame;
+        break;
+      }
+    }
+    let lowestAhead = -Infinity;
+    for (let frame = landing; frame >= 0; frame--) {
+      lowestAhead = Math.max(lowestAhead, hipHeights[frame] + lifts[frame]);
+      lifts[frame] = lowestAhead - hipHeights[frame];
+    }
+    return lifts;
+  };
   const deaths = new Map<ZombieDeathStyle, THREE.AnimationClip>();
   for (const style of ZOMBIE_DEATH_STYLES) {
     const profile = ZOMBIE_DEATH_PROFILES[style];
-    deaths.set(style, bake(`ZeroedZombieDeath_${style}`, profile.duration, Math.ceil(profile.duration * DEATH_FPS), (t) => {
-      sampleZombieDeath(profile, t, pose);
-      // 1. Upper body, authored upright so the fall below carries it along.
-      centreGaze(0);
-      const flat = Math.min(1, Math.abs(pose.pitch) / (Math.PI / 2));
-      offset(spine ?? torso, -restLean * flat * flat * (3 - 2 * flat), 0, 0);
-      offset(torso, pose.spine * 0.5, pose.twist * 0.5, 0);
-      offset(chest ?? torso, pose.spine * 0.5, pose.twist * 0.5, 0);
-      offset(head, pose.nod, pose.turn, pose.tilt);
-      arms.forEach((arm) => {
-        const hand = arm.rest.x > 0 ? pose.left : pose.right;
-        solveArm(arm, hand[0], hand[1], hand[2]);
-      });
-      // 2. Where relaxed feet and knees would end if the legs rode the hips.
-      hips.updateWorldMatrix(true, false);
-      legReach.forEach(({ hip, length }, i) => {
-        root.localToWorld(carriedFeet[i].set(hip.x, hip.y - length + pose.knees * height * 0.5, hip.z));
-        root.localToWorld(carriedPoles[i].set(hip.x, height * 0.27, 0.65));
-        hips.worldToLocal(carriedFeet[i]);
-        hips.worldToLocal(carriedPoles[i]);
-      });
-      // 3. The fall itself: the whole body pivots and travels at the hips.
-      placeHips(
-        hipRest.x + pose.sway * height,
-        hipRest.y * (1 - pose.drop),
-        hipRest.z + pose.travel * height,
-      );
-      offset(hips, pose.pitch, pose.yaw, pose.roll);
-      // 4. Planted feet buckle the knees; released ones follow the body. A
-      //    knee that would sink through the floor lets its foot go early.
-      hips.updateWorldMatrix(true, false);
-      legs.forEach((leg, i) => {
-        root.worldToLocal(hips.localToWorld(carriedFeet[i]));
-        root.worldToLocal(hips.localToWorld(carriedPoles[i]));
-        for (const release of [1, 0.5, 0]) {
-          const plant = pose.plant * release;
-          footTarget.copy(carriedFeet[i]).lerp(leg.rest, plant);
-          leg.solve(footTarget.x, footTarget.y, footTarget.z,
-            carriedPoles[i].x, carriedPoles[i].y, carriedPoles[i].z, 1, plant);
-          if (plant === 0 || rootY(leg.lower) >= KNEE_FLOOR * height) break;
-        }
-        const toe = toes[i];
-        if (toe) liftToes(leg.tip, toe);
-      });
-      // 5. Whatever still reaches below the floor lifts the whole body onto it.
-      const sink = FLESH_FLOOR - lowestFlesh();
-      if (sink > 0) {
+    const frames = Math.ceil(profile.duration * DEATH_FPS);
+    const lifts = floorLifts(profile, frames);
+    deaths.set(style, bake(`ZeroedZombieDeath_${style}`, profile.duration, frames, (t) => {
+      poseFall(profile, t);
+      const lift = lifts[Math.round(t * frames)];
+      if (lift > 0) {
         const lifted = rootPoint(hips);
-        placeHips(lifted.x, lifted.y + sink, lifted.z);
+        placeHips(lifted.x, lifted.y + lift, lifted.z);
       }
     }));
   }
 
-  nodes.forEach((node, index) => node.quaternion.copy(rotations[index]));
-  hips.position.copy(hipPosition);
+  resetRig();
   root.updateMatrixWorld(true);
   return { idle, deaths };
 }

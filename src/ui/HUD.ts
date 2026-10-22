@@ -37,6 +37,9 @@ const ENDING_DETONATION_TIME: Record<EndingPresentationId, number> = {
   nuclear: NUCLEAR_DETONATION_TIME,
 };
 
+/** Opening cinematics a map can request through `ArenaIntro.presentation`. */
+export type IntroPresentationId = 'station33';
+
 const MAP_LOADING_FADE_MS = 450;
 const MAP_LOADING_MIN_MS = 700;
 /** Matches the #start-screen opacity transition in style.css. */
@@ -96,6 +99,7 @@ export class HUD {
   private readonly hostPauseStatus: HTMLElement = mustGet('host-pause-status');
   private readonly endingScreen: HTMLElement = mustGet('ending-screen');
   private readonly endingRound: HTMLElement = mustGet('ending-round');
+  private readonly introScreen: HTMLElement = mustGet('intro-screen');
 
   private lastWeapon: string = '';
   private lastAmmo: string = '';
@@ -387,15 +391,12 @@ export class HUD {
   public setCoopPresentation(role: 'host' | 'guest'): void {
     document.documentElement.classList.add('coop-mode');
     document.documentElement.classList.toggle('coop-guest', role === 'guest');
-    // Only the host restarts; a guest can always leave, and follows a host restart automatically.
-    mustGet('go-restart').textContent = t(role === 'host' ? 'gameOver.restart' : 'gameOver.leave');
   }
 
   public clearCoopPresentation(): void {
     document.documentElement.classList.remove('coop-mode', 'coop-guest');
     this.setDownedState('alive', 0, 0);
     this.setHostPauseVisible(false);
-    mustGet('go-restart').textContent = t('gameOver.restart');
   }
 
   public setHostPauseVisible(visible: boolean): void {
@@ -483,8 +484,15 @@ export class HUD {
     // A data-i18n key keeps the line translated if the language changes meanwhile.
     const epitaph = mustGet('go-epitaph');
     const epitaphKey = gameOverEpitaph(stats.round);
-    epitaph.dataset.i18n = epitaphKey;
-    epitaph.textContent = t(epitaphKey);
+    if (epitaphKey) {
+      epitaph.dataset.i18n = epitaphKey;
+      epitaph.textContent = t(epitaphKey);
+      epitaph.classList.remove('hidden');
+    } else {
+      delete epitaph.dataset.i18n;
+      epitaph.textContent = '';
+      epitaph.classList.add('hidden');
+    }
     this.gameOverPanel.classList.remove('hidden');
   }
 
@@ -492,8 +500,12 @@ export class HUD {
     this.gameOverPanel.classList.add('hidden');
   }
 
-  public setZombiesRestartHandler(handler: () => void): void {
-    mustGet('go-restart').onclick = handler;
+  public setGameOverHandlers(handlers: {
+    onRestart: () => void;
+    onMainMenu: () => void;
+  }): void {
+    mustGet('go-restart').onclick = handlers.onRestart;
+    mustGet('go-main-menu').onclick = handlers.onMainMenu;
   }
 
   public showEnding(round: number, presentation: EndingPresentationId): void {
@@ -514,6 +526,30 @@ export class HUD {
   public hideEnding(): void {
     this.endingScreen.classList.add('hidden');
     this.endingScreen.classList.remove('ending', 'credits');
+  }
+
+  /**
+   * Title card over a map intro. Its CSS timeline is scaled to `duration`
+   * and the gameplay HUD stays hidden until `hideIntro`. `onSkip` serves
+   * touch players; desktop skips through the mode's key handling.
+   */
+  public showIntro(presentation: IntroPresentationId, duration: number, onSkip: () => void): void {
+    this.root.classList.add('intro-active');
+    this.setInteractionPrompt(null);
+    this.introScreen.dataset.presentation = presentation;
+    this.introScreen.style.setProperty('--intro-duration', `${duration}s`);
+    (mustGet('intro-skip') as HTMLButtonElement).onclick = onSkip;
+    // Re-adding the class restarts the CSS timeline on a replay.
+    this.introScreen.classList.remove('playing');
+    void this.introScreen.offsetWidth;
+    this.introScreen.classList.remove('hidden');
+    this.introScreen.classList.add('playing');
+  }
+
+  public hideIntro(): void {
+    this.root.classList.remove('intro-active');
+    this.introScreen.classList.add('hidden');
+    this.introScreen.classList.remove('playing');
   }
 
   public setCreditsMainMenuHandler(handler: () => void): void {

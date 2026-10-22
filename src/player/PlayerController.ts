@@ -4,6 +4,7 @@ import { clamp, damp, lerp } from '../utils/math';
 import type { Input } from './Input';
 import type { PlayerBounds } from '../zombies/maps/ZombieArena';
 import { getSettings } from '../core/PlayerSettings';
+import { blocksCircleMovement } from '../utils/collision';
 
 const SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.02;
@@ -14,9 +15,17 @@ const ADS_MOVE_PENALTY = 0.45;
 const JUMP_SPEED = 5.2;
 const GRAVITY = 15;
 /** Body radius used for swept wall collision in arenas that enable it. */
-const BODY_RADIUS = 0.35;
+export const PLAYER_BODY_RADIUS = 0.35;
 /** Vertical speed of stair transitions. */
 const FLOOR_BLEND_SPEED = 8;
+
+/** Stable movement volume; independent of animated ballistic hitboxes. */
+export interface PlayerBodyCollider {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly bodyRadius: number;
+  readonly bodyHeight: number;
+  readonly isAlive: boolean;
+}
 
 export interface FloorTransitionZone {
   /** Trigger volume for the transition. */
@@ -75,6 +84,7 @@ export class PlayerController {
   private fov = getSettings().fieldOfView;
   private bounds: PlayerBounds = DEFAULT_PLAYER_BOUNDS;
   private wallColliders: readonly THREE.Box3[] = [];
+  private bodyColliders: Iterable<PlayerBodyCollider> = [];
   private floorTransitions: readonly FloorTransitionZone[] = [];
   private currentFloor = 0;
   private groundY = EYE_HEIGHT;
@@ -109,6 +119,11 @@ export class PlayerController {
   /** Replace the wall set used for swept collision. */
   public setWallColliders(colliders: readonly THREE.Box3[]): void {
     this.wallColliders = colliders;
+  }
+
+  /** Live population view: spawns, deaths and pool resets apply without rebuilding an array. */
+  public setBodyColliders(colliders: Iterable<PlayerBodyCollider>): void {
+    this.bodyColliders = colliders;
   }
 
   /** Replace stair transition triggers. */
@@ -191,10 +206,14 @@ export class PlayerController {
       this.bounds.maxZ,
     );
 
-    if (this.wallColliders.length > 0) {
-      // Resolve each axis independently so the player slides along walls.
-      if (this.wouldIntersectWall(nextX, this.rig.position.z)) nextX = this.rig.position.x;
-      if (this.wouldIntersectWall(nextX, nextZ)) nextZ = this.rig.position.z;
+    // Resolve each axis independently so the player can slide around walls and bodies.
+    if (this.wouldIntersectWall(nextX, this.rig.position.z)
+      || this.wouldIntersectBody(this.rig.position.x, this.rig.position.z, nextX, this.rig.position.z)) {
+      nextX = this.rig.position.x;
+    }
+    if (this.wouldIntersectWall(nextX, nextZ)
+      || this.wouldIntersectBody(nextX, this.rig.position.z, nextX, nextZ)) {
+      nextZ = this.rig.position.z;
     }
 
     this.rig.position.x = nextX;
@@ -250,10 +269,21 @@ export class PlayerController {
   private wouldIntersectWall(x: number, z: number): boolean {
     const minY = Math.min(this.rig.position.y, this.groundY) - EYE_HEIGHT + 0.05;
     const maxY = Math.max(this.rig.position.y, this.groundY) + 0.25;
-    this.tmpBox.min.set(x - BODY_RADIUS, minY, z - BODY_RADIUS);
-    this.tmpBox.max.set(x + BODY_RADIUS, maxY, z + BODY_RADIUS);
+    this.tmpBox.min.set(x - PLAYER_BODY_RADIUS, minY, z - PLAYER_BODY_RADIUS);
+    this.tmpBox.max.set(x + PLAYER_BODY_RADIUS, maxY, z + PLAYER_BODY_RADIUS);
     for (const wall of this.wallColliders) {
       if (this.tmpBox.intersectsBox(wall)) return true;
+    }
+    return false;
+  }
+
+  private wouldIntersectBody(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+    const bottom = this.rig.position.y - EYE_HEIGHT + 0.05;
+    const top = this.rig.position.y + 0.25;
+    for (const body of this.bodyColliders) {
+      if (!body.isAlive || body.position.y >= top || body.position.y + body.bodyHeight <= bottom) continue;
+      if (blocksCircleMovement(fromX, fromZ, toX, toZ,
+        body.position.x, body.position.z, PLAYER_BODY_RADIUS + body.bodyRadius)) return true;
     }
     return false;
   }

@@ -120,6 +120,30 @@ describe('zombie animation synchronization', () => {
     }
   });
 
+  it.each(['walker', 'brute'] as const)('%s never bobs back up mid-fall before a death first lands', async (id) => {
+    const source = await loadModel(id);
+    const point = new THREE.Vector3();
+    for (const style of ZOMBIE_DEATH_STYLES) {
+      const visual = new ZombieVisual(id, source, 0xffffff, false);
+      visual.setState('walk');
+      for (let i = 0; i < 30; i++) visual.update(DT, 1.35);
+      visual.prepareDeath(style, 0, -1);
+      visual.setState('death');
+      visual.update(0, 0);
+      const hips = visual.root.getObjectByName('Hips')!;
+      const standing = hips.getWorldPosition(point).y;
+      let previous = standing;
+      for (let t = 0; t < ZOMBIE_DEATH_PROFILES[style].duration; t += DT) {
+        visual.update(DT, 0);
+        const y = hips.getWorldPosition(point).y;
+        // Authored rebounds only follow the first landing.
+        if (y < standing * 0.5 && y > previous) break;
+        expect(y - previous, `${style} at ${t.toFixed(3)}s`).toBeLessThan(0.015);
+        previous = y;
+      }
+    }
+  });
+
   it('keeps the original walk cycle active across the full chase-speed range', async () => {
     const visual = new ZombieVisual('walker', await loadModel('walker'), 0xffffff, false) as any;
     visual.setState('walk');

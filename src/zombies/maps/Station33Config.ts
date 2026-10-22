@@ -2,7 +2,7 @@ import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
-import type { ArenaAmbience, ArenaAmbientCue, MysteryBoxPlacement, PlayerBounds, ZombieNavigationBounds } from './ZombieArena';
+import type { ArenaAmbience, ArenaAmbientCue, ArenaIntro, PlayerBounds, ZombieNavigationBounds } from './ZombieArena';
 
 /**
  * Station 33 layout data. Every coordinate is in metres, feet height 0 on
@@ -166,15 +166,6 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
 /** Weapon outlines 2 cm in front of the wall face; prices follow the mansion's balance. */
 export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   {
-    id: 'vestibule-m1911',
-    weaponId: 'm1911',
-    price: 500,
-    ammoPrice: 250,
-    position: { x: EAST_WALL_X - 0.17, y: 1.45, z: 16.2 },
-    yaw: -Math.PI / 2,
-    floor: 0,
-  },
-  {
     // A Soviet station keeps the rifle of the era by the turnstiles.
     id: 'vestibule-ak47',
     weaponId: 'ak47',
@@ -185,15 +176,6 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
 ];
-
-/** Next to the sealed escalator, facing the hall. */
-export const STATION33_BOX_PLACEMENT: MysteryBoxPlacement = {
-  position: { x: 4.9, y: 0, z: 0.95 },
-  yaw: Math.PI,
-  useRange: 2.2,
-  lookDotMin: 0.5,
-  floor: 0,
-};
 
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
 
@@ -325,4 +307,38 @@ export const STATION33_AMBIENT_EVENTS: ReadonlyArray<Station33AmbientEvent> = [
     minInterval: 90,
     maxInterval: 170,
   },
+];
+
+/**
+ * Opening cinematic: the camera wakes at the sealed escalator in the dark,
+ * a train shakes the vault, the circuits kick on one after another and the
+ * view cranes back over the turnstiles into the player's eyes at the spawn.
+ * Shots stay inside the hall, clear of columns, fixtures and the vault.
+ */
+export const STATION33_INTRO: ArenaIntro = {
+  presentation: 'station33',
+  duration: 8,
+  shots: [
+    { time: 0, position: { x: 1.4, y: 1.15, z: 2.4 }, target: { x: -1.6, y: 1.9, z: 0 } },
+    { time: 2.2, position: { x: 0.3, y: 2.3, z: 5.2 }, target: { x: -0.4, y: 1.5, z: 0.4 } },
+    { time: 4.6, position: { x: -1.1, y: 3.4, z: 10.8 }, target: { x: 0, y: 1.1, z: 4 } },
+    { time: 6.5, position: { x: 0.5, y: 2.3, z: 17.1 }, target: { x: 0, y: 1.6, z: 8 } },
+  ],
+};
+
+/**
+ * Seconds into the intro when each mains circuit kicks on (the battery
+ * emergency lamp never goes out). Ordered so light sweeps the hall.
+ */
+export const STATION33_INTRO_POWER_UP: Readonly<Record<Exclude<Station33LightCircuit, 'emergency'>, number>> = {
+  amber: 1.1,
+  failing: 1.8,
+  steady: 2.4,
+  unstable: 3.1,
+};
+
+/** Ambient events the intro fires on its own clock, by `STATION33_AMBIENT_EVENTS` id. */
+export const STATION33_INTRO_CUES: ReadonlyArray<{ readonly time: number; readonly eventId: string }> = [
+  { time: 0.2, eventId: 'distant-train' },
+  { time: 4.4, eventId: 'pa-announcement' },
 ];

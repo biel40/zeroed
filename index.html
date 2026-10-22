@@ -169,7 +169,6 @@
             <span class="map-card-tagline" data-i18n="map.burnedMansion.tagline"></span>
             <span class="map-card-meta">
               <span class="map-card-chip" data-map-players></span>
-              <span class="map-card-early" data-i18n="map.earlyAccess"></span>
             </span>
           </span>
         </button>
@@ -233,7 +232,6 @@
             <span class="map-card-tagline" data-i18n="map.station33.tagline"></span>
             <span class="map-card-meta">
               <span class="map-card-chip" data-map-players></span>
-              <span class="map-card-early" data-i18n="map.earlyAccess"></span>
             </span>
           </span>
         </button>
@@ -347,7 +345,10 @@
         <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-kills"/></svg><span data-i18n="gameOver.kills"></span></dt><dd id="go-kills">0</dd></div>
         <div><dt><svg class="survival-icon" aria-hidden="true"><use href="#icon-headshots"/></svg><span data-i18n="gameOver.headshots"></span></dt><dd id="go-headshots">0</dd></div>
       </dl>
-      <button type="button" id="go-restart"></button>
+      <div class="go-actions">
+        <button type="button" id="go-restart" data-i18n="gameOver.restart"></button>
+        <button type="button" id="go-main-menu" data-i18n="pause.mainMenu"></button>
+      </div>
     </div>
   </div>
 
@@ -370,6 +371,25 @@
         <button type="button" id="pwa-update-pause" class="hidden" data-i18n="menu.update"></button>
       </div>
     </div>
+  </div>
+
+  <div id="intro-screen" class="hidden" data-presentation="station33">
+    <div class="intro-grade" aria-hidden="true"></div>
+    <div class="intro-flash" aria-hidden="true"></div>
+    <div class="intro-letterbox" aria-hidden="true"></div>
+    <div class="intro-feed" aria-hidden="true">
+      <span class="intro-rec">REC</span>
+      <span>CAM 33-07 · МЕТРОПОЛИТЕН</span>
+      <span class="intro-signal" data-i18n="intro.station33.signal"></span>
+    </div>
+    <div class="intro-title">
+      <span class="intro-badge" data-i18n="map.access.premium"></span>
+      <span class="intro-cyrillic" aria-hidden="true">СТАНЦИЯ 33</span>
+      <h2 class="intro-name" data-i18n="map.station33">STATION 33</h2>
+      <span class="intro-rule" aria-hidden="true"></span>
+      <p class="intro-tagline" data-i18n="intro.station33.tagline"></p>
+    </div>
+    <button type="button" id="intro-skip"><span data-i18n="intro.skip"></span><small data-i18n="intro.skipHint"></small></button>
   </div>
 
   <div id="ending-screen" class="hidden" aria-live="polite">

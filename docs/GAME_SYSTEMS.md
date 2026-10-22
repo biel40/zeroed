@@ -26,6 +26,12 @@ recarga bascula el cargador sobre el teton delantero con foley propio.
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
 
+Jugador y zombis vivos se bloquean con volumenes cilindricos estables, separados
+de las hitboxes animadas. El movimiento comprueba el trayecto y permite rodear
+los cuerpos y salir de solapamientos por aparicion o correcciones de red; la
+altura evita colisiones entre plantas. Los muertos dejan de bloquear al instante.
+Individual y anfitrion usan la poblacion local; el invitado, las replicas visibles.
+
 La música usa en bucle durante la partida la pista que declara el mapa y comparte
 otra entre el menú principal y la pausa. Al pausar se conserva la posición de la pista de
 partida; al reanudar continúa desde ese punto. El inicio de ronda se reproduce
@@ -97,7 +103,9 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
   1.0 s con `RayGunDissolveShader`, borde incandescente verde y cenizas
   ascendentes) y Tesla (convulsiona rigido y cae). Un disparo por la espalda lo
   tumba hacia delante y los impactos laterales giran la caida hacia el empuje.
-  Al morir se retiran al instante los colliders y el estado A*/colas de barrera;
+  La pose viva se funde con la caida conservando la inercia de la marcha; el
+  cuerpo llega al suelo con impacto y, hasta aterrizar, nunca vuelve a subir
+  (si las rodillas tocan el suelo lo sostienen hasta que se desploma). Al morir se retiran al instante los colliders y el estado A*/colas de barrera;
   el anfitrion replica estilo y lado del impacto.
 - Cada zombie alcanzado por la cadena ZEUS-77 queda cargado 2.8 s
   (`ZombieElectricArcs`): rayos que saltan entre sus articulaciones y un
@@ -113,15 +121,26 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
-  puerta de servicio y dos rejillas), M1911 y AK-47 en pared, y la Mystery Box
-  junto a la escalera mecanica sellada, su unica frontera. Aun no tiene puertas
+  puerta de servicio y dos rejillas) y solo la AK-47 en pared. La Mystery Box
+  queda reservada para una fase posterior; la escalera mecanica sellada es
+  su unica frontera. Aun no tiene puertas
   de pago ni final. La arena solo orquesta: cada zona tiene su builder en
-  `station33/`, y la luz y la atmosfera son sistemas propios.
+  `station33/`, y la luz y la atmosfera son sistemas propios. Direccion de
+  arte y directrices del mapa: `STATION_33.md`.
 - Los fluorescentes de Station 33 parpadean por circuitos desfasados (colores
   de materiales compartidos, sin luces nuevas). Megafonia, tren lejano y
   apagon son eventos de datos del mapa con temporizador
   (`AmbientEventScheduler`) y voz procedural en `AudioSystem`; un `sampleFile`
   en el evento la sustituye por un MP3 de `public/assets/audio/`.
+- Un mapa puede declarar una intro (`ArenaIntro`: planos de camara,
+  duracion y presentacion del HUD). `ZombiesMode` la reproduce una sola vez
+  al empezar la partida (no al reanudar ni reiniciar) con `IntroCinematic`,
+  cuya camara renderiza el shell sin arma ni brazos; la ronda no avanza hasta
+  que termina, y el ultimo plano aterriza en los ojos del jugador. Se salta
+  con cualquier tecla (tras 0.6 s), con el boton tactil o al pausar.
+  La de Station 33 (8 s) arranca a oscuras con solo la luz de emergencia, un
+  tren hace temblar la boveda, los circuitos se encienden uno a uno y la grua
+  recorre la nave mientras aparece el titulo premium dorado.
 - El menu principal muestra una tarjeta por mapa con arte SVG animado, nombre,
   lema, jugadores y acceso (incluido o premium, con brillo dorado y aviso de
   acceso anticipado); `HUD` rellena jugadores y acceso desde el registro. La
@@ -265,3 +284,7 @@ combinan aranazos decorativos limitados con el numero exacto para rondas altas.
 En dispositivos tactiles el panel permanece pequeno arriba a la derecha, bajo
 el boton de pausa, con ronda, puntos, vida y bajas; headshots y faroles se consultan
 en la pausa para dejar libre la vista de combate.
+
+La pantalla de derrota muestra la ronda alcanzada y permite reintentar el mapa
+o volver al menu principal. En cooperativo solo el anfitrion puede reintentar;
+el invitado puede volver al menu o esperar al reinicio del anfitrion.

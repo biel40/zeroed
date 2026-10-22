@@ -7,6 +7,7 @@ import {
   EMERGENCY_LAMP,
   FLUORESCENT_COLOR,
   FLUORESCENT_FIXTURES,
+  STATION33_INTRO_POWER_UP,
   STATION33_POINT_LIGHTS,
   type Station33LightCircuit,
 } from '../Station33Config';
@@ -29,6 +30,9 @@ const CIRCUIT_PHASES: Readonly<Record<Station33LightCircuit, number>> = {
   amber: 1.7,
   emergency: 0,
 };
+/** Seconds a circuit stutters on its starters before it holds. */
+const STARTER_FLICKER = 0.5;
+const POWER_UP_END = Math.max(...Object.values(STATION33_INTRO_POWER_UP)) + STARTER_FLICKER;
 const FIXTURE_Y = 4.05;
 const TUBE_LENGTH = 1.55;
 
@@ -79,6 +83,8 @@ export class Station33Lighting {
   private dipRemaining = 0;
   private dipDuration = 1;
   private tremorRemaining = 0;
+  /** Seconds into a cold start, or null when the mains are simply on. */
+  private powerUpElapsed: number | null = null;
 
   constructor(private readonly context: Station33BuildContext) {
     for (const circuit of CIRCUITS) {
@@ -117,6 +123,16 @@ export class Station33Lighting {
     this.dipRemaining = this.dipDuration;
   }
 
+  /** Cold start: mains dark, then each circuit kicks on at its `STATION33_INTRO_POWER_UP` time. */
+  powerUp(): void {
+    this.powerUpElapsed = 0;
+  }
+
+  /** Ends a cold start at once: every circuit back to normal. */
+  finishPowerUp(): void {
+    this.powerUpElapsed = null;
+  }
+
   /** A passing train shakes the supply: fluorescents waver while it lasts. */
   tremor(duration: number): void {
     this.tremorRemaining = Math.max(this.tremorRemaining, duration);
@@ -126,10 +142,14 @@ export class Station33Lighting {
     this.time += Math.max(0, dt);
     this.dipRemaining = Math.max(0, this.dipRemaining - dt);
     this.tremorRemaining = Math.max(0, this.tremorRemaining - dt);
+    if (this.powerUpElapsed !== null) {
+      this.powerUpElapsed += Math.max(0, dt);
+      if (this.powerUpElapsed >= POWER_UP_END) this.powerUpElapsed = null;
+    }
     const mains = this.mainsLevel();
     for (const circuit of CIRCUITS) {
       const level = circuitLevel(circuit, this.time, CIRCUIT_PHASES[circuit]);
-      this.levels.set(circuit, circuit === 'emergency' ? level : level * mains);
+      this.levels.set(circuit, circuit === 'emergency' ? level : level * mains * this.powerUpLevel(circuit));
     }
     for (const entry of this.circuitMaterials) {
       entry.material.color.copy(entry.baseColor).multiplyScalar(Math.max(0.04, this.levels.get(entry.circuit)!));
@@ -143,7 +163,17 @@ export class Station33Lighting {
     this.time = 0;
     this.dipRemaining = 0;
     this.tremorRemaining = 0;
+    this.powerUpElapsed = null;
     this.update(0);
+  }
+
+  private powerUpLevel(circuit: Exclude<Station33LightCircuit, 'emergency'>): number {
+    if (this.powerUpElapsed === null) return 1;
+    const sinceKick = this.powerUpElapsed - STATION33_INTRO_POWER_UP[circuit];
+    if (sinceKick < 0) return 0;
+    if (sinceKick >= STARTER_FLICKER) return 1;
+    // The starter strikes a few times before the tube holds.
+    return hash(Math.floor(this.time * 24) + STATION33_INTRO_POWER_UP[circuit] * 17) > 0.45 ? 1 : 0.06;
   }
 
   private mainsLevel(): number {

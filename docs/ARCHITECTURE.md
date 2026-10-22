@@ -76,6 +76,7 @@ sufra tirones de compilacion de shaders.
   limites del jugador, ambiente (fondo, niebla, luz hemisferica, musica y, si
   quiere, la intensidad de la luz de entorno), sonidos ambientales opcionales
   (`onAmbientCue`, que el modo reproduce), su
+  intro opcional (planos de camara y presentacion), su
   final (cinematica, audio y duracion) y avisa con `onTopologyChanged` cuando
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`.
@@ -92,6 +93,7 @@ Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo modo:
 datos en un config propio, utilidades comunes de `maps/shared/`), entrada en
 `ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` (arte SVG propio) y claves
 `map.<nombre>` y `map.<nombre>.tagline` en los tres diccionarios; el test de contrato lo recorre solo. Un final nuevo anade su id
-de presentacion en `HUD` y de audio en `MusicManager`. Nuevo blanco: `HitTarget` y
+de presentacion en `HUD` y de audio en `MusicManager`. Una intro nueva anade su
+id en `IntroPresentationId` y su overlay en `#intro-screen`. Nuevo blanco: `HitTarget` y
 registro en colliders. Nuevo tipo zombie: registro de estadisticas/modelo,
 orden de spawn y asset si procede.

@@ -49,6 +49,7 @@ import type {
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
+import { IntroCinematic } from '../rendering/IntroCinematic';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
@@ -57,6 +58,8 @@ const SHAKE_MAX_ANGLE = 0.04;
 /** Distant moans drift in every few seconds, never on a fixed rhythm. */
 const MOAN_MIN_DELAY = 6;
 const MOAN_SPREAD = 9;
+/** A key still held from starting the run must not also skip its intro. */
+const INTRO_SKIP_GUARD = 0.6;
 
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
@@ -109,6 +112,9 @@ export class ZombiesMode implements GameMode {
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private gameOver = false;
   private readonly runFlow = new ZombiesRunFlow();
+  /** The map's opening cinematic; played once, on the first gameplay start. */
+  private intro: IntroCinematic | null = null;
+  private introPlayed = false;
   /** Arena colliders currently registered in `ctx.hitColliders`. */
   private arenaStaticColliders = new Set<THREE.Object3D>();
   private trauma = 0;
@@ -136,6 +142,7 @@ export class ZombiesMode implements GameMode {
 
     this.arena.init();
     ctx.scene.add(this.arena.group);
+    this.intro = this.arena.intro ? new IntroCinematic(this.arena.intro) : null;
 
     // The arena owns static ballistics geometry; zombies add dynamic hitboxes.
     ctx.hitColliders.length = 0;
@@ -152,7 +159,9 @@ export class ZombiesMode implements GameMode {
       this.arena.floorTransitions,
     );
     this.zombies.setNavigationBounds(this.arena.navigationBounds);
-    this.zombies.setBodyObstacles([mysteryBoxFootprint(this.arena.mysteryBoxPlacement)]);
+    ctx.player.setBodyColliders(this.zombies.actives);
+    const boxPlacement = this.arena.mysteryBoxPlacement;
+    this.zombies.setBodyObstacles(boxPlacement ? [mysteryBoxFootprint(boxPlacement)] : []);
     this.zombies.registerColliders(ctx.hitColliders);
     this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(
       headshot,
@@ -193,15 +202,12 @@ export class ZombiesMode implements GameMode {
     this.knife.onImpact = () => this.applyKnifeImpact();
     ctx.player.camera.add(this.knife.root);
 
-    // The Mystery Box: main weapon progression, exclusive to this mode.
-    this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
-    this.boxView = new MysteryBoxView(
-      ctx.assets,
-      this.arena.mysteryBoxPlacement.position,
-      MYSTERY_BOX_POOL,
-    );
-    this.boxView.group.rotation.y = this.arena.mysteryBoxPlacement.yaw;
-    ctx.scene.add(this.boxView.group);
+    if (boxPlacement) {
+      this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
+      this.boxView = new MysteryBoxView(ctx.assets, boxPlacement.position, MYSTERY_BOX_POOL);
+      this.boxView.group.rotation.y = boxPlacement.yaw;
+      ctx.scene.add(this.boxView.group);
+    }
 
     // The arena owns where the player stands and how far they can move.
     ctx.player.setBounds(this.arena.playerBounds);
@@ -212,7 +218,6 @@ export class ZombiesMode implements GameMode {
     this.placePlayerAtSpawn();
 
     ctx.hud.setZombiesPanelVisible(true);
-    ctx.hud.setZombiesRestartHandler(() => this.restart());
     ctx.hud.setCreditsMainMenuHandler(() => this.finishRun());
     this.pushHudState();
   }
@@ -230,6 +235,7 @@ export class ZombiesMode implements GameMode {
       return;
     }
     if (this.runFlow.state === 'CREDITS' || this.runFlow.state === 'FINISHED') return;
+    this.updateIntro(dt);
 
     // The horde keeps shambling behind the game-over screen; it just can't
     // hurt anyone anymore.
@@ -354,13 +360,33 @@ export class ZombiesMode implements GameMode {
     }
   }
 
+  /** The intro starts with the first gameplay frame, never on a resume. */
+  onGameplayStarted(): void {
+    if (!this.intro || this.introPlayed) return;
+    this.introPlayed = true;
+    const { presentation, duration } = this.intro.definition;
+    this.intro.start(this.ctx.player.camera);
+    this.arena.startIntro?.();
+    this.ctx.hud.showIntro(presentation, duration, () => this.endIntro());
+  }
+
+  /** Pausing mid-intro skips it: the run resumes in first person. */
+  onLocalPauseChanged(paused: boolean): void {
+    if (paused) this.endIntro();
+  }
+
+  /** While the intro plays, the shell renders its camera instead of the player's. */
+  getCinematicCamera(): THREE.Camera | null {
+    return this.intro?.isPlaying ? this.intro.camera : null;
+  }
+
   /** Skip the pause screen while the game-over panel is up. */
   onPointerUnlock(): boolean {
     return this.gameOver || !this.runFlow.acceptsGameplay;
   }
 
   isGameplayInputEnabled(): boolean {
-    return !this.gameOver && this.runFlow.acceptsGameplay;
+    return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
   }
 
   /** E pressed: door unlock > barrier repair > soul lamp > purchases. */
@@ -521,6 +547,7 @@ export class ZombiesMode implements GameMode {
    */
   private playerInBoxRange(): boolean {
     const placement = this.arena.mysteryBoxPlacement;
+    if (!placement) return false;
     if (placement.floor !== undefined && placement.floor !== this.ctx.player.floor) return false;
     const playerPos = this.ctx.player.rig.position;
     const boxPos = placement.position;
@@ -932,6 +959,10 @@ export class ZombiesMode implements GameMode {
   }
 
   public onKeyInput(key: string): void {
+    if (this.intro?.isPlaying) {
+      if (this.intro.time >= INTRO_SKIP_GUARD) this.endIntro();
+      return;
+    }
     if (!this.godModeEnabled && this.godModeCommand.push(key)) this.activateGodMode();
   }
 
@@ -1064,6 +1095,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private restart(): void {
+    this.endIntro();
     this.gameOver = false;
     this.runFlow.reset();
     this.totalDamage = 0;
@@ -1095,6 +1127,23 @@ export class ZombiesMode implements GameMode {
     this.ctx.hud.setHudVisible?.(true);
     this.pushHudState();
     this.ctx.lockPointer();
+  }
+
+  private updateIntro(dt: number): void {
+    if (!this.intro?.isPlaying) return;
+    if (this.intro.update(dt, this.ctx.player.camera)) this.handOverFromIntro();
+  }
+
+  /** Skip, pause or restart: cuts a playing intro straight to first person. */
+  private endIntro(): void {
+    if (!this.intro?.isPlaying) return;
+    this.intro.stop();
+    this.handOverFromIntro();
+  }
+
+  private handOverFromIntro(): void {
+    this.arena.finishIntro?.();
+    this.ctx.hud.hideIntro();
   }
 
   private placePlayerAtSpawn(): void {

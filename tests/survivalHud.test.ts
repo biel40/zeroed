@@ -88,7 +88,7 @@ describe('survival presentation', () => {
 
 describe('game over presentation', () => {
   it('escalates the epitaph with the round reached', () => {
-    expect(gameOverEpitaph(1)).toBe('gameOver.epitaphEarly');
+    expect(gameOverEpitaph(1)).toBeNull();
     expect(gameOverEpitaph(4)).toBe('gameOver.epitaphMid');
     expect(gameOverEpitaph(9)).toBe('gameOver.epitaphMid');
     expect(gameOverEpitaph(10)).toBe('gameOver.epitaphLate');
