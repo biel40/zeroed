@@ -1,15 +1,18 @@
 # Estado del proyecto
 
-**Corte:** 2026-10-21. La fuente de verdad es el codigo actual.
+**Corte:** 2026-10-22. La fuente de verdad es el codigo actual.
 
 ## Funcional
 
 - Entrada WebGL, selector de mapas con tarjetas ilustradas (Burned Mansion
   incluido; Station 33 premium, solo individual, en acceso anticipado para la
-  beta y con su Fase 1 jugable: el vestibulo), carga de assets con fallback y shell FPS
+  beta y con sus Fases 1 y 2 jugables: el vestibulo y la consigna), carga de
+  assets con fallback y shell FPS
   compartido desktop/tactil. No hay pagos: premium solo es presentacion.
 - Armas declarativas, balistica segmentada, energia, headshots, recargas,
   economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.
+- Anillos (perks) en individual: el de Resurreccion se compra en la consigna
+  de Station 33, se ve en el anular, salva una muerte y se recarga.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
   melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria.
 - Burned Mansion con dos plantas, bunker, escalera continua, progresion pagada,

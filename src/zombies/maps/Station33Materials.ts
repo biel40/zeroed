@@ -16,6 +16,8 @@ export interface Station33Materials {
   readonly vaultPlaster: THREE.MeshStandardMaterial;
   readonly stucco: THREE.MeshStandardMaterial;
   readonly serviceConcrete: THREE.MeshStandardMaterial;
+  /** Glazed service tiles of the luggage office, crazed and stained. */
+  readonly tiledWall: THREE.MeshStandardMaterial;
   readonly paintedSteel: THREE.MeshStandardMaterial;
   readonly greySteel: THREE.MeshStandardMaterial;
   readonly bronze: THREE.MeshStandardMaterial;
@@ -249,6 +251,33 @@ function concretePainter(size: number): () => Painter {
   };
 }
 
+/** Pale green glazed tiles with dark grout, crazed and yellowed by seepage from above. */
+function tilePainter(size: number, tiles: number): () => Painter {
+  return () => {
+    const random = seededRandom(3323);
+    const stain = valueNoise(random, size / 3, size);
+    const fine = valueNoise(random, size / 24, size);
+    const glaze: Rgb = [128, 140, 126];
+    const yellowed: Rgb = [112, 104, 78];
+    const tinted: Rgb = [0, 0, 0];
+    const tileSize = size / tiles;
+    return (x, y, texel) => {
+      const tileX = Math.floor(x / tileSize);
+      const tileY = Math.floor(y / tileSize);
+      const grout = x - tileX * tileSize < 2 || y - tileY * tileSize < 2;
+      const chipped = hash2(tileX, tileY, 29) > 0.94;
+      const seep = THREE.MathUtils.smoothstep(stain(x, y) + (1 - y / size) * 0.25, 0.55, 0.95);
+      mix(glaze, yellowed, seep * 0.8, tinted);
+      const shade = grout ? 0.3 : (0.88 + hash2(tileX, tileY, 31) * 0.14 + fine(x, y) * 0.06) * (chipped ? 0.55 : 1);
+      texel.color[0] = tinted[0] * shade;
+      texel.color[1] = tinted[1] * shade;
+      texel.color[2] = tinted[2] * shade;
+      texel.height = grout ? 0.1 : chipped ? 0.4 : 0.7;
+      texel.roughness = grout || chipped ? 0.95 : 0.22 + seep * 0.5;
+    };
+  };
+}
+
 /** Military green enamel, chipped down to rusty steel at the edges of the chips. */
 function paintedSteelPainter(size: number): () => Painter {
   return () => {
@@ -356,6 +385,7 @@ export function createStation33Materials(anisotropyLimit: number): Station33Mate
     vaultPlaster: surfaceMaterial('station33_vault_plaster', bake('vault-plaster', 256, 2, plasterPainter(256)), anisotropy, 2.5, { side: THREE.DoubleSide }),
     stucco: new THREE.MeshStandardMaterial({ name: 'station33_stucco', color: 0x9f9786, roughness: 0.9 }),
     serviceConcrete: surfaceMaterial('station33_service_concrete', bake('service-concrete', 256, 3, concretePainter(256)), anisotropy, 1.6),
+    tiledWall: surfaceMaterial('station33_tiled_wall', bake('tiled-wall', 256, 2, tilePainter(256, 8)), anisotropy, 1.2),
     paintedSteel: surfaceMaterial('station33_painted_steel', paintedSteel, anisotropy, 0.8, { metalness: 0.45 }),
     greySteel: new THREE.MeshStandardMaterial({ name: 'station33_grey_steel', color: 0x4f5455, roughness: 0.55, metalness: 0.6 }),
     bronze: new THREE.MeshStandardMaterial({ name: 'station33_bronze', color: 0x6a5232, roughness: 0.45, metalness: 0.8 }),

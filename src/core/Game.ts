@@ -218,6 +218,7 @@ export class Game {
       assets: this.assets,
       profile: this.profile,
       hitColliders: this.hitColliders,
+      handRings: this.viewArms.rings,
       lockPointer: () => this.start(),
       unlockPointer: () => document.exitPointerLock(),
       grantWeapon: (id) => this.grantWeapon(id),
@@ -301,7 +302,10 @@ export class Game {
       this.renderer.compileAsync(this.scene, camera).catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, SHADER_WARMUP_TIMEOUT_MS)),
     ]);
+    // Rings start off the hand; show them for the compile so wearing one never stalls.
+    this.viewArms.rings.setWarmup(true);
     await compile();
+    this.viewArms.rings.setWarmup(false);
     if (this.disposed) return;
     const textures = new Set<THREE.Texture>();
     const fadeMaterials = new Set<THREE.Material>();

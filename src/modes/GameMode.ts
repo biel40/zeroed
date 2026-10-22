@@ -11,6 +11,7 @@ import type { HitTarget } from '../shooting/HitTarget';
 import type { HUD } from '../ui/HUD';
 import type { Weapon } from '../weapons/Weapon';
 import type { WeaponId } from '../weapons/WeaponTypes';
+import type { HandRings } from '../weapons/HandRings';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
 
 /** Everything a mode needs from the shared Game shell. */
@@ -31,6 +32,8 @@ export interface ModeContext {
    * raycast. Modes may push/splice dynamic hitboxes (zombies) here.
    */
   readonly hitColliders: THREE.Object3D[];
+  /** Rings worn on the first-person glove; modes without rings never touch them. */
+  readonly handRings: HandRings;
   /** User-gesture-safe pointer lock + audio resume. */
   lockPointer(): void;
   unlockPointer(): void;

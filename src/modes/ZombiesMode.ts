@@ -48,6 +48,7 @@ import type {
 } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
+import { ZombiesRings } from './ZombiesRings';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { IntroCinematic } from '../rendering/IntroCinematic';
 
@@ -95,6 +96,8 @@ export class ZombiesMode implements GameMode {
   private footsteps!: ZombieFootsteps;
   private box: MysteryBoxMachine | null = null;
   private boxView: MysteryBoxView | null = null;
+  /** Ring purchases and effects; maps without ring machines simply never sell one. */
+  private rings: ZombiesRings | null = null;
   private readonly rounds = new RoundManager();
   private readonly health = new PlayerHealth(
     PLAYER_MAX_HP,
@@ -201,6 +204,8 @@ export class ZombiesMode implements GameMode {
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyKnifeImpact();
     ctx.player.camera.add(this.knife.root);
+
+    this.rings = new ZombiesRings(ctx, this.arena.ringMachines ?? [], this.economy);
 
     if (boxPlacement) {
       this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
@@ -389,7 +394,7 @@ export class ZombiesMode implements GameMode {
     return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
   }
 
-  /** E pressed: door unlock > barrier repair > soul lamp > purchases. */
+  /** E pressed: door unlock > barrier repair > soul lamp > purchases (rings among them). */
   onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
 
@@ -460,6 +465,8 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
+    if (this.rings?.interact()) return;
+
     const completion = this.findFacingCompletionInteraction();
     if (completion) {
       if (!this.economy.canAfford(completion.cost)) {
@@ -522,6 +529,9 @@ export class ZombiesMode implements GameMode {
 
     const ammoRefill = this.findFacingAmmoRefill();
     if (ammoRefill) return t('prompt.pickup', { label: ammoRefill.interactionLabel, key });
+
+    const ringPrompt = this.rings?.prompt();
+    if (ringPrompt) return ringPrompt;
 
     const completion = this.findFacingCompletionInteraction();
     if (completion) return t('prompt.activateFinal', { key, cost: completion.cost });
@@ -987,7 +997,10 @@ export class ZombiesMode implements GameMode {
     this.ctx.hud.flashDamage();
     // Trauma-based shake: offsets pile up and decay smoothly.
     this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);
-    if (this.health.isDead) this.endGame();
+    if (!this.health.isDead) return;
+    // A charged Resurrection ring takes the death instead: the run goes on.
+    if (this.rings?.tryResurrect(this.health)) this.trauma = 1;
+    else this.endGame();
   }
 
   /**
@@ -1106,6 +1119,7 @@ export class ZombiesMode implements GameMode {
     this.godModeCommand.reset();
     this.economy.reset();
     this.health.reset();
+    this.rings?.reset();
     this.rounds.reset();
     this.energy?.reset();
     if (this.zombies) this.zombies.reset();

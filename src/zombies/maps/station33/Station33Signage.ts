@@ -15,7 +15,9 @@ export type SignId =
   | 'do-not-run'
   | 'civil-defence'
   | 'torn-poster-a'
-  | 'torn-poster-b';
+  | 'torn-poster-b'
+  | 'luggage-office'
+  | 'lost-property';
 
 const ATLAS_SIZE = 1024;
 
@@ -30,7 +32,14 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   'civil-defence': [0, 256, 256, 384],
   'torn-poster-a': [256, 256, 256, 384],
   'torn-poster-b': [512, 256, 256, 384],
+  'luggage-office': [768, 384, 256, 128],
+  'lost-property': [768, 512, 256, 128],
 };
+
+/** Grid of enamel number tags for the luggage lockers: bank letter and number. */
+const LOCKER_PLATES = { x: 0, y: 640, columns: 8, rows: 8, cellWidth: 64, cellHeight: 32 } as const;
+const LOCKER_PLATE_COUNT = LOCKER_PLATES.columns * LOCKER_PLATES.rows;
+const LOCKER_BANK_LETTERS = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'И'] as const;
 
 const SIGN_FONT = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
 
@@ -43,6 +52,8 @@ export interface Station33Signage {
   readonly muralMaterial: THREE.MeshStandardMaterial;
   /** Plane of `width` x `height` metres showing one atlas cell. */
   signGeometry(id: SignId, width: number, height: number): THREE.PlaneGeometry;
+  /** Plane showing locker number tag `index` (wraps over LOCKER_PLATE_COUNT). */
+  lockerPlateGeometry(index: number, width: number, height: number): THREE.PlaneGeometry;
 }
 
 /** Mural composition, shared with the builder that shapes its geometry. */
@@ -184,6 +195,10 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   printLines(context, cx + 20, cy + 276, cw - 40, 3, random);
   weather(context, cx, cy, cw, 300, random, 70);
 
+  enamelPlate(context, 'luggage-office', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['КАМЕРА', 'ХРАНЕНИЯ'], 40, random);
+  enamelPlate(context, 'lost-property', '#d9d3c1', '#3a3a36', '#1c2a3a', ['БЮРО', 'НАХОДОК'], 40, random);
+  paintLockerPlates(context, random);
+
   // Older bills almost scraped away: only a corner and a stripe of print survive.
   for (const [id, keep] of [['torn-poster-a', 0.45], ['torn-poster-b', 0.62]] as const) {
     const [px, py, pw] = SIGN_REGIONS[id];
@@ -193,6 +208,24 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
     lettering(context, id === 'torn-poster-a' ? 'ГО...' : 'СТАНЦИЯ', px + pw / 2, py + 38, 28, '#d9cfb3');
     printLines(context, px + 20, py + 74, pw - 40, 6, random);
     weather(context, px, py, pw, 200, random, 50);
+  }
+}
+
+/** Small cream tags with the bank letter and locker number, like "Б-17". */
+function paintLockerPlates(context: CanvasRenderingContext2D, random: () => number): void {
+  const { x, y, columns, rows, cellWidth, cellHeight } = LOCKER_PLATES;
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const cellX = x + column * cellWidth;
+      const cellY = y + row * cellHeight;
+      context.fillStyle = '#3a3a36';
+      context.fillRect(cellX + 2, cellY + 2, cellWidth - 4, cellHeight - 4);
+      context.fillStyle = '#cfc7b0';
+      context.fillRect(cellX + 4, cellY + 4, cellWidth - 8, cellHeight - 8);
+      const number = String(row * columns + column + 1).padStart(2, '0');
+      lettering(context, `${LOCKER_BANK_LETTERS[row]}-${number}`, cellX + cellWidth / 2, cellY + cellHeight / 2 + 1, 17, '#2a2620');
+      weather(context, cellX, cellY, cellWidth, cellHeight, random, 3);
+    }
   }
 }
 
@@ -286,23 +319,34 @@ export function createStation33Signage(anisotropyLimit: number): Station33Signag
   const mural = makeCanvas(MURAL_LAYOUT.canvasWidth, MURAL_LAYOUT.canvasHeight);
   paintMural(mural.context);
 
+  const cellGeometry = (x: number, y: number, cellWidth: number, cellHeight: number, width: number, height: number): THREE.PlaneGeometry => {
+    const geometry = new THREE.PlaneGeometry(width, height);
+    const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+    for (let index = 0; index < uv.count; index++) {
+      // Canvas rows grow downwards; texture v grows upwards (flipY).
+      uv.setXY(
+        index,
+        (x + uv.getX(index) * cellWidth) / ATLAS_SIZE,
+        1 - (y + (1 - uv.getY(index)) * cellHeight) / ATLAS_SIZE,
+      );
+    }
+    return geometry;
+  };
+
   return {
     material: new THREE.MeshStandardMaterial({ name: 'station33_signs', map: atlasTexture, alphaTest: 0.5, roughness: 0.6, metalness: 0.05 }),
     litMaterial: new THREE.MeshBasicMaterial({ name: 'station33_lit_signs', map: atlasTexture, alphaTest: 0.5 }),
     muralMaterial: new THREE.MeshStandardMaterial({ name: 'station33_mural', map: canvasTexture(mural.canvas, anisotropy), roughness: 0.5, metalness: 0.05 }),
     signGeometry(id, width, height) {
       const [x, y, cellWidth, cellHeight] = SIGN_REGIONS[id];
-      const geometry = new THREE.PlaneGeometry(width, height);
-      const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
-      for (let index = 0; index < uv.count; index++) {
-        // Canvas rows grow downwards; texture v grows upwards (flipY).
-        uv.setXY(
-          index,
-          (x + uv.getX(index) * cellWidth) / ATLAS_SIZE,
-          1 - (y + (1 - uv.getY(index)) * cellHeight) / ATLAS_SIZE,
-        );
-      }
-      return geometry;
+      return cellGeometry(x, y, cellWidth, cellHeight, width, height);
+    },
+    lockerPlateGeometry(index, width, height) {
+      const { x, y, columns, cellWidth, cellHeight } = LOCKER_PLATES;
+      const cell = ((index % LOCKER_PLATE_COUNT) + LOCKER_PLATE_COUNT) % LOCKER_PLATE_COUNT;
+      const cellX = x + (cell % columns) * cellWidth;
+      const cellY = y + Math.floor(cell / columns) * cellHeight;
+      return cellGeometry(cellX, cellY, cellWidth, cellHeight, width, height);
     },
   };
 }

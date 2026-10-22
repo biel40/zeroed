@@ -121,12 +121,19 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
-  puerta de servicio y dos rejillas) y solo la AK-47 en pared. La Mystery Box
-  queda reservada para una fase posterior; la escalera mecanica sellada es
-  su unica frontera. Aun no tiene puertas
-  de pago ni final. La arena solo orquesta: cada zona tiene su builder en
-  `station33/`, y la luz y la atmosfera son sistemas propios. Direccion de
-  arte y directrices del mapa: `STATION_33.md`.
+  puerta de servicio y dos rejillas), la AK-47 en pared y la escalera mecanica
+  sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
+  el muro este: dos entradas mas, que solo generan zombis con la puerta
+  abierta, el M4A1 (1500 / 750), la Mystery Box y la taquilla del anillo de
+  Resurreccion. Un unico rectangulo de `playerBounds` y de navegacion cubre
+  ambas salas: muros y la puerta cerrada son lo que impide el paso. Reiniciar
+  cierra la puerta y duerme la zona. Aun no tiene final. La arena solo
+  orquesta: cada zona tiene su builder en `station33/`, y la luz y la
+  atmosfera son sistemas propios. Direccion de arte y directrices del mapa:
+  `STATION_33.md`.
+- Puertas de pago de Station 33: la misma `PointDoorView`/`BuyableDoorVisual`
+  que la mansion con chapas de acero en lugar de tablones y superficie de
+  impacto metalica.
 - Los fluorescentes de Station 33 parpadean por circuitos desfasados (colores
   de materiales compartidos, sin luces nuevas). Megafonia, tren lejano y
   apagon son eventos de datos del mapa con temporizador
@@ -210,6 +217,32 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
   sonidos basta con colocar los MP3 en `public/assets/audio/` y reconstruir
   (en Android, `npm run android:sync`).
 
+## Anillos
+
+Los anillos son las perks de Zeroed: un anillo por dedo, cada uno con un dedo
+fijo en su `RingDefinition` (`src/game/rings/RingCatalog.ts`), que guarda
+precio, recarga, cargas y los parametros de su efecto como dato.
+`PlayerRings` es el estado puro de la run (anillos llevados, cargas y
+`pendingEvents`). `ZombiesRings` (en `src/modes/`) vende y recarga en las
+`ringMachines` opcionales del mapa con la cartera comun, dispara los efectos y
+mantiene en sintonia guante, maquinas y HUD; `ZombiesMode` solo le delega la
+interaccion (tras las recargas de municion y antes del final y la caja), el
+prompt, la muerte y el reinicio.
+
+- Resurreccion (anular, 2500; recarga 1500; 1 carga): un golpe letal con carga
+  gasta el anillo en lugar de terminar la run, devuelve el 50 % de la vida con
+  2 s de invulnerabilidad, sacude la camara, destella la pantalla en frio y
+  suena un latido. Sin carga, el flujo de muerte no cambia.
+- El anillo se ve en el dedo del guante derecho en primera persona
+  (`HandRings`, hijo del hueso de la falange, sin tocar la pose ni subir nunca
+  hacia la mira); brilla con su esmalte al ponerselo y al dispararse y se apaga
+  gastado. `Game.prepare` los muestra todos para compilar sus shaders.
+- El HUD muestra iconos compactos por anillo (tambien en movil) y la pausa,
+  nombre, dedo y estado; un anillo gastado se atenua.
+- `MOTDRULES` no concede anillos: con invencibilidad nunca se gastarian. Con
+  sus compras ilimitadas se pueden comprar gratis y reiniciar los retira.
+- Solo individual: el cooperativo no los usa.
+
 ## Cooperativo
 
 `CoopHostMode` es la unica autoridad: rondas, spawns, IA y objetivo de los
@@ -242,10 +275,12 @@ recuperar 57 fps; un intento de subida fallido duplica la espera del
 siguiente y una bajada que no acelera el frame se deshace, porque el cuello
 no era la GPU. `?debug` muestra la escala actual.
 
-Station 33 crea, por prioridad, solo las luces puntuales que caben en ese mismo
-presupuesto (`POINT_LIGHT_BUDGET`) y fusiona su decoracion estatica en una
-malla por material (`StaticMeshBatch`); columnas, torniquetes, taquillas y
-bancos chocan con proxies AABB invisibles.
+Station 33 mantiene visibles solo las luces puntuales que caben en ese mismo
+presupuesto (`POINT_LIGHT_BUDGET`): las de la sala donde esta el jugador, por
+prioridad, y las de la otra para completar; el cambio de sala espera a que el
+jugador cruce claramente la puerta. Fusiona su decoracion estatica en una
+malla por material (`StaticMeshBatch`); columnas, torniquetes, taquillas,
+mostrador, carro y bancos chocan con proxies AABB invisibles.
 
 Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene

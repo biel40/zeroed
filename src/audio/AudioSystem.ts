@@ -686,6 +686,40 @@ export class AudioSystem {
     this.sweep(0.12, 'sine', 160, 48, 0.28, 0.3);
   }
 
+  /** A ring slid onto the glove: a small metal chime over the locker's latch. */
+  public playRingPurchase(): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const t: number = audio.ctx.currentTime;
+    this.tick(0, 1400, 0.22);
+    this.tone(t + 0.04, 'sine', 1568, 0.12, 0.5);
+    this.tone(t + 0.09, 'sine', 2349, 0.08, 0.7);
+    this.tone(t + 0.12, 'triangle', 784, 0.07, 0.6);
+  }
+
+  /** A spent ring taking its charge again: a rising shimmer that settles on one note. */
+  public playRingRecharge(): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const t: number = audio.ctx.currentTime;
+    this.sweep(0, 'sine', 520, 1560, 0.11, 0.45);
+    this.tone(t + 0.42, 'sine', 1568, 0.1, 0.55);
+    this.tick(0.02, 1400, 0.16);
+  }
+
+  /** Resurrection firing: a heartbeat restarting under a cold swelling chord. */
+  public playResurrection(): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const t: number = audio.ctx.currentTime;
+    this.sweep(0, 'sine', 70, 38, 0.42, 0.22);
+    this.sweep(0.34, 'sine', 70, 38, 0.36, 0.22);
+    this.tone(t + 0.15, 'sine', 659, 0.12, 1.3);
+    this.tone(t + 0.25, 'sine', 988, 0.1, 1.2);
+    this.tone(t + 0.38, 'triangle', 1319, 0.07, 1.0);
+    this.sweep(0.1, 'sawtooth', 160, 1200, 0.05, 0.9);
+  }
+
   /** Low guttural drop when a zombie dies. */
   public playZombieDeath(): void {
     this.sweep(0, 'sawtooth', 190, 52, 0.3, 0.34);

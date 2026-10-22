@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
+import { RING_DEFINITIONS, RING_FINGERS } from '../src/game/rings/RingCatalog';
 import { ARM_DETAIL, FirstPersonArm } from '../src/weapons/FirstPersonArm';
 import { FINGER_LAYOUT, FINGERS, HAND_POSES, PHALANX_TAPER } from '../src/weapons/HandPoses';
 import { KNIFE_ATTACK_DURATION, KNIFE_HIDE_PROGRESS, KNIFE_SHOW_PROGRESS, Knife } from '../src/weapons/Knife';
@@ -363,5 +364,73 @@ describe('Reload hands', () => {
       farthest = Math.max(farthest, setup.arms.right.getGripWorldPosition(new THREE.Vector3()).distanceTo(restingGrip));
     }
     expect(farthest).toBeGreaterThan(0.05);
+  });
+});
+
+describe('Hand rings', () => {
+  const GLOW = 0x3fd8c8;
+
+  /** Highest point of a worn ring in the weapon's own space. */
+  function ringTop(view: WeaponView, mesh: THREE.Mesh): number {
+    const position = mesh.geometry.getAttribute('position');
+    const point = new THREE.Vector3();
+    let top = -Infinity;
+    for (let index = 0; index < position.count; index++) {
+      point.fromBufferAttribute(position, index);
+      top = Math.max(top, view.root.worldToLocal(mesh.localToWorld(point)).y);
+    }
+    return top;
+  }
+
+  it('hangs one ring per finger on the right glove, hidden until worn, on every detail tier', () => {
+    for (const detail of Object.values(ARM_DETAIL)) {
+      const arms = new ViewArms(detail);
+      for (const finger of RING_FINGERS) {
+        expect(arms.rings.isWorn(finger)).toBe(false);
+        expect(arms.root.getObjectByName(`hand-ring-right-${finger}`)!.parent).toBe(arms.right.ringSeat(finger).bone);
+      }
+      arms.rings.show(RING_DEFINITIONS.resurrection.finger, 'charged', GLOW);
+      expect(RING_FINGERS.filter((finger) => arms.rings.isWorn(finger))).toEqual(['ring']);
+      arms.rings.show('ring', 'spent', GLOW);
+      expect(arms.rings.isWorn('ring')).toBe(true);
+      arms.rings.clear();
+      expect(RING_FINGERS.some((finger) => arms.rings.isWorn(finger))).toBe(false);
+    }
+  });
+
+  it('shows every ring for the shader warm-up only, compressed into the view-model depth range', () => {
+    const arms = new ViewArms();
+    arms.rings.show('ring', 'charged', GLOW);
+    arms.rings.setWarmup(true);
+    expect(RING_FINGERS.every((finger) => arms.rings.isWorn(finger))).toBe(true);
+    for (const finger of RING_FINGERS) {
+      const mesh = arms.root.getObjectByName(`hand-ring-right-${finger}`) as THREE.Mesh;
+      for (const material of mesh.material as THREE.Material[]) expect(material.onBeforeCompile).toBeTypeOf('function');
+    }
+    arms.rings.setWarmup(false);
+    expect(RING_FINGERS.filter((finger) => arms.rings.isWorn(finger))).toEqual(['ring']);
+  });
+
+  it.each(WEAPONS)('%s: worn rings never move a finger and stay under the sight line when aiming', (id) => {
+    const definition = WEAPON_DEFINITIONS[id];
+    const plain = rig(definition);
+    const ringed = rig(definition);
+    for (const finger of RING_FINGERS) ringed.arms.rings.show(finger, 'charged', GLOW);
+    for (const options of [{}, { ads: true }]) {
+      for (let step = 0; step < 90; step++) {
+        frame(plain, options);
+        frame(ringed, options);
+      }
+      expect(Array.from(ringed.arms.right.poseValues)).toEqual(Array.from(plain.arms.right.poseValues));
+      const bones = (setup: Rig) => setup.arms.right.mesh.skeleton.bones.map((bone) => bone.getWorldPosition(new THREE.Vector3()));
+      const expected = bones(plain);
+      bones(ringed).forEach((position, index) => expect(position.distanceTo(expected[index])).toBeLessThan(1e-9));
+    }
+    if (!ringed.view.root.visible) return;
+    const sightLine = definition.view.sightHeight * definition.view.scale;
+    for (const finger of RING_FINGERS) {
+      const mesh = ringed.arms.root.getObjectByName(`hand-ring-right-${finger}`) as THREE.Mesh;
+      expect(ringTop(ringed.view, mesh), `${id} ${finger} ring`).toBeLessThan(sightLine - 0.015);
+    }
   });
 });

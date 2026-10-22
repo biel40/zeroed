@@ -65,10 +65,14 @@ export class PlayerHealth {
     this.invincible = false;
   }
 
-  /** Cooperative revive restores a fraction without resetting the run. */
-  revive(fraction: number): void {
+  /**
+   * Restores a fraction of max HP without resetting the run (cooperative
+   * revive, Resurrection ring), followed by `invulnerability` seconds of
+   * protection (the post-hit window by default).
+   */
+  revive(fraction: number, invulnerability = this.invulnDuration): void {
     this.hp = Math.max(1, Math.min(this.maxHp, this.maxHp * fraction));
-    this.invulnTimer = this.invulnDuration;
+    this.invulnTimer = invulnerability;
     this.regenTimer = 0;
   }
 }

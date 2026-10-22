@@ -415,6 +415,22 @@ body {
 #hud-zombies .lamp:not(.lit) .lamp-icon { color: #5f625b; }
 #hud-zombies .lamp.lit .lamp-icon { color: #f0c46e; }
 
+/* Rings: the worn band and its enamel, glowing in the ring's colour while charged. */
+.ring-progress { margin-top: 9px; text-align: left; }
+.ring-icons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.ring { display: flex; align-items: center; gap: 8px; color: #6a6e66; }
+.ring .ring-icon { width: 22px; height: 22px; flex-basis: 22px; }
+.ring .ring-bezel { fill: currentColor; }
+.ring.charged .ring-icon { color: #c9c4b6; filter: drop-shadow(0 0 5px var(--ring-glow)); }
+.ring.charged .ring-bezel { fill: var(--ring-glow); stroke: var(--ring-glow); }
+.ring.spent { opacity: .5; }
+.ring-text { display: flex; flex-direction: column; gap: 2px; }
+.ring-text strong { font-size: 12px; letter-spacing: .12em; color: #e3dccb; }
+.ring-text small { font-size: 9px; letter-spacing: .2em; color: #8e968a; }
+#z-rings { margin-top: 7px; }
+#hud-zombies .ring-icons { gap: 5px; margin: 0; }
+#hud-zombies .ring .ring-icon { width: 17px; height: 17px; flex-basis: 17px; }
+
 #round-banner {
   position: absolute;
   left: 50%;
@@ -531,6 +547,25 @@ body {
 
 #damage-overlay.active::after {
   animation: damageflash 0.42s ease-out forwards;
+}
+
+/* A ring firing: a cold wash over the view that clears from the centre out. */
+#ring-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(160, 255, 240, 0.5) 0%, rgba(63, 216, 200, 0.28) 45%, rgba(6, 40, 38, 0.6) 100%);
+}
+
+#ring-flash.active {
+  animation: ringflash 1.1s ease-out forwards;
+}
+
+@keyframes ringflash {
+  0% { opacity: 0.95; }
+  25% { opacity: 0.6; }
+  100% { opacity: 0; }
 }
 
 @keyframes damageflash {
@@ -2977,6 +3012,9 @@ html.touch-controls-enabled .start-panel {
 #pause-lamps { margin-top: 12px; padding: 12px 14px 13px; border: 1px solid #a4ac9d1f; background: #0b0e0d; font-family: 'Consolas', 'SF Mono', monospace; }
 #pause-lamps .lamp-icons { gap: 18px; }
 #pause-lamps .lamp .lamp-icon { width: 30px; height: 30px; flex-basis: 30px; }
+#pause-rings { margin-top: 12px; padding: 12px 14px 13px; border: 1px solid #a4ac9d1f; background: #0b0e0d; font-family: 'Consolas', 'SF Mono', monospace; }
+#pause-rings .ring-icons { gap: 18px; }
+#pause-rings .ring .ring-icon { width: 30px; height: 30px; flex-basis: 30px; }
 #pause-menu .pause-actions { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin-top: 22px; }
 #pause-menu .pause-actions button {
   position: relative; padding: 13px 44px 13px 18px; cursor: pointer; text-align: left;
@@ -3114,6 +3152,8 @@ html.touch-controls-enabled #hud-zombies .survival-counters { padding: 3px 0 0; 
 html.touch-controls-enabled #hud-zombies .survival-counters > div { flex-basis: 100%; }
 html.touch-controls-enabled #hud-zombies .survival-counters span { font-size: 8px; }
 html.touch-controls-enabled #hud-zombies .survival-counters strong { font-size: 11px; }
+html.touch-controls-enabled #z-rings { margin-top: 3px; }
+html.touch-controls-enabled #hud-zombies .ring .ring-icon { width: 12px; height: 12px; flex-basis: 12px; }
 html.touch-controls-enabled #hud-zombies .survival-counters > div + div,
 html.touch-controls-enabled #z-lamps { display: none; }
 

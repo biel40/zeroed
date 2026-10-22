@@ -1,24 +1,32 @@
 import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { VESTIBULE } from '../Station33Config';
+import { CONSIGNA, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
-import { vaultHeightAt } from './VaultProfile';
+import { ceilingHeightAt, vaultHeightAt } from './VaultProfile';
 
 const DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 30, medium: 60, high: 90 };
+/** Extra motes over the luggage-office hall, seeded apart so the vestibule's stay put. */
+const CONSIGNA_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 10, medium: 20, high: 30 };
 const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5 };
-/** Seepage points in the vault; the third one is the hole the plaster fell from. */
+/**
+ * Seepage points in the ceilings; the third one is the hole the vault
+ * plaster fell from, the last two soak the luggage office.
+ */
 const DRIP_SOURCES = [
   { x: -1.2, z: 7.3, interval: 2.3 },
   { x: 2.7, z: 12.2, interval: 3.1 },
   { x: 4.6, z: 15.0, interval: 1.7 },
+  { x: 16.1, z: 11.6, interval: 2.6 },
+  { x: 19.6, z: 16.7, interval: 1.9 },
 ] as const;
-/** Severed cables hanging out of the vault: anchor, length and sway phase. */
+/** Severed cables hanging out of the ceilings: anchor, length and sway phase. */
 const HANGING_CABLES = [
   { x: 4.4, z: 14.8, length: 1.6, phase: 0.4 },
   { x: 4.9, z: 15.3, length: 1.1, phase: 2.2 },
   { x: -5.2, z: 6.2, length: 1.3, phase: 4.1 },
+  { x: 12.3, z: 9.1, length: 0.9, phase: 3.0 },
 ] as const;
 /** The fluorescent fixture that tore loose from its slot and hangs by one chain. */
 const DANGLING_FIXTURE = { x: 2, z: 6.75, chain: 0.9 } as const;
@@ -93,13 +101,22 @@ export class Station33Atmosphere {
     const random = seededRandom(3407);
 
     const dustCount = DUST_COUNT[quality];
-    this.dustBase = new Float32Array(dustCount * 3);
-    this.dustPhase = new Float32Array(dustCount);
+    const totalDust = dustCount + CONSIGNA_DUST_COUNT[quality];
+    this.dustBase = new Float32Array(totalDust * 3);
+    this.dustPhase = new Float32Array(totalDust);
     for (let index = 0; index < dustCount; index++) {
       this.dustBase[index * 3] = THREE.MathUtils.lerp(VESTIBULE.minX + 0.5, VESTIBULE.maxX - 0.5, random());
       this.dustBase[index * 3 + 1] = 0.3 + random() * 3.8;
       this.dustBase[index * 3 + 2] = THREE.MathUtils.lerp(VESTIBULE.minZ + 0.5, VESTIBULE.maxZ - 0.5, random());
       this.dustPhase[index] = random() * Math.PI * 2;
+    }
+    const consignaRandom = seededRandom(3413);
+    const { hall } = CONSIGNA;
+    for (let index = dustCount; index < totalDust; index++) {
+      this.dustBase[index * 3] = THREE.MathUtils.lerp(hall.minX + 0.5, hall.maxX - 0.5, consignaRandom());
+      this.dustBase[index * 3 + 1] = 0.3 + consignaRandom() * (CONSIGNA.ceilingHeight - 0.5);
+      this.dustBase[index * 3 + 2] = THREE.MathUtils.lerp(hall.minZ + 0.5, hall.maxZ - 0.5, consignaRandom());
+      this.dustPhase[index] = consignaRandom() * Math.PI * 2;
     }
     this.dust = this.makePoints('station33-dust', this.dustBase.slice(), new THREE.PointsMaterial({
       name: 'station33_dust', size: 0.035, map: spot, color: 0xb8c2b8, transparent: true, opacity: 0.45, depthWrite: false,
@@ -108,7 +125,7 @@ export class Station33Atmosphere {
     this.drips = DRIP_SOURCES.map((source) => ({
       x: source.x,
       z: source.z,
-      top: vaultHeightAt(source.x) - 0.05,
+      top: ceilingHeightAt(source.x) - 0.05,
       interval: source.interval,
       timer: random() * source.interval,
       falling: false,
@@ -213,7 +230,7 @@ export class Station33Atmosphere {
 
   private addCable(x: number, z: number, length: number, phase: number): void {
     const pivot = new THREE.Group();
-    pivot.position.set(x, vaultHeightAt(x) - 0.02, z);
+    pivot.position.set(x, ceilingHeightAt(x) - 0.02, z);
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0.08, -length * 0.4, 0.05),

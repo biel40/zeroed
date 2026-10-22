@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FINGER_LAYOUT, FINGERS, HAND_POSES, PHALANX_TAPER } from './HandPoses';
 import type { HandPose } from './HandPoses';
+import type { RingFinger } from '../game/rings/RingCatalog';
 
 export type ArmSide = 'left' | 'right';
 
@@ -424,6 +425,12 @@ function armGeometry(side: ArmSide, detail: ArmDetail): THREE.BufferGeometry {
   return geometry;
 }
 
+export interface RingSeat {
+  readonly bone: THREE.Bone;
+  readonly length: number;
+  readonly radius: number;
+}
+
 /**
  * Procedural first-person arm: field-jacket sleeve and a tactical glove with
  * articulated fingers, skinned to one skeleton so the whole arm costs four
@@ -565,6 +572,18 @@ export class FirstPersonArm {
 
   getWristWorldPosition(out: THREE.Vector3): THREE.Vector3 {
     return this.bones[WRIST].getWorldPosition(out);
+  }
+
+  /**
+   * Proximal phalanx a ring is worn on, with its length and radius. In the
+   * bone's frame the finger runs along -Z and its back faces +X on the
+   * right glove (-X on the mirrored left one). Every detail tier keeps this
+   * bone articulated.
+   */
+  ringSeat(finger: RingFinger): RingSeat {
+    if (finger === 'thumb') return { bone: this.bones[THUMB + 1], length: THUMB_LENGTHS[1], radius: THUMB_RADIUS * 0.94 };
+    const { lengths, radius } = FINGER_LAYOUT[finger];
+    return { bone: this.bones[fingerBone(FINGERS.indexOf(finger), 0)], length: lengths[0], radius };
   }
 
   /** Grip point in the wrist frame for the current (eased) pose. */

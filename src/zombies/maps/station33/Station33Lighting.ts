@@ -9,10 +9,13 @@ import {
   FLUORESCENT_FIXTURES,
   STATION33_INTRO_POWER_UP,
   STATION33_POINT_LIGHTS,
+  STATION33_START_ZONE,
+  station33ZoneAt,
   type Station33LightCircuit,
+  type Station33ZoneId,
 } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
-import { vaultHeightAt } from './VaultProfile';
+import { ceilingHeightAt } from './VaultProfile';
 
 /** Fault windows of the fluorescent circuits: how often they stutter and how dark they get. */
 const FLUORESCENT_FAULTS = {
@@ -33,7 +36,11 @@ const CIRCUIT_PHASES: Readonly<Record<Station33LightCircuit, number>> = {
 /** Seconds a circuit stutters on its starters before it holds. */
 const STARTER_FLICKER = 0.5;
 const POWER_UP_END = Math.max(...Object.values(STATION33_INTRO_POWER_UP)) + STARTER_FLICKER;
+/** Hanging height under the vault; lower ceilings mount fixtures just below them. */
 const FIXTURE_Y = 4.05;
+const FIXTURE_DROP = 0.25;
+/** Metres past the door before the real lights follow the player into the other room. */
+const ZONE_SWITCH_MARGIN = 0.6;
 const TUBE_LENGTH = 1.55;
 
 function hash(value: number): number {
@@ -66,17 +73,21 @@ interface CircuitLight {
   readonly light: THREE.PointLight;
   readonly circuit: Station33LightCircuit;
   readonly baseIntensity: number;
+  readonly zone: Station33ZoneId;
 }
 
 /**
  * Practical lights of the station: fluorescent rows, amber sconces and the
- * red emergency lamp. Emissive materials carry most of the light; only the
- * first POINT_LIGHT_BUDGET entries of STATION33_POINT_LIGHTS become real
- * lights, a count fixed at build time so shaders never recompile.
+ * red emergency lamp. Emissive materials carry most of the light; of the
+ * real lights in STATION33_POINT_LIGHTS only POINT_LIGHT_BUDGET stay visible,
+ * the player's room first, a count fixed for the match so shaders never
+ * recompile.
  */
 export class Station33Lighting {
   private readonly circuitMaterials: CircuitMaterial[] = [];
   private readonly lights: CircuitLight[] = [];
+  /** Room whose lights currently come first in the budget. */
+  private lightZone: Station33ZoneId | null = null;
   private readonly levels = new Map<Station33LightCircuit, number>();
   private readonly tubeMaterials = new Map<Station33LightCircuit, THREE.MeshBasicMaterial>();
   private time = 0;
@@ -98,12 +109,13 @@ export class Station33Lighting {
     this.buildSconces();
     this.buildEmergencyLamp();
     this.buildPointLights();
+    this.showLightsFor(STATION33_START_ZONE);
     this.update(0);
   }
 
-  /** Real lights in the scene, in priority order. */
-  get pointLights(): ReadonlyArray<THREE.PointLight> {
-    return this.lights.map((entry) => entry.light);
+  /** Real lights currently visible (always the quality budget). */
+  get visiblePointLights(): ReadonlyArray<THREE.PointLight> {
+    return this.lights.filter((entry) => entry.light.visible).map((entry) => entry.light);
   }
 
   /** Emissive material driven by `circuit` (shared by every lamp on it). */
@@ -138,7 +150,9 @@ export class Station33Lighting {
     this.tremorRemaining = Math.max(this.tremorRemaining, duration);
   }
 
-  update(dt: number): void {
+  /** Animates every circuit; with an observer, the real lights follow them between rooms. */
+  update(dt: number, observer?: THREE.Vector3): void {
+    if (observer) this.followObserver(observer);
     this.time += Math.max(0, dt);
     this.dipRemaining = Math.max(0, this.dipRemaining - dt);
     this.tremorRemaining = Math.max(0, this.tremorRemaining - dt);
@@ -160,11 +174,27 @@ export class Station33Lighting {
   }
 
   reset(): void {
+    this.showLightsFor(STATION33_START_ZONE);
     this.time = 0;
     this.dipRemaining = 0;
     this.tremorRemaining = 0;
     this.powerUpElapsed = null;
     this.update(0);
+  }
+
+  /** Switches rooms only once the observer is clearly past the door, so the doorway never flickers. */
+  private followObserver(observer: THREE.Vector3): void {
+    const margin = this.lightZone === 'vestibule' ? -ZONE_SWITCH_MARGIN : ZONE_SWITCH_MARGIN;
+    this.showLightsFor(station33ZoneAt(observer.x + margin));
+  }
+
+  /** The room's lights in authored priority, then the other room's, up to the quality budget. */
+  private showLightsFor(zone: Station33ZoneId): void {
+    if (zone === this.lightZone) return;
+    this.lightZone = zone;
+    const ordered = [...this.lights.filter((entry) => entry.zone === zone), ...this.lights.filter((entry) => entry.zone !== zone)];
+    const budget = POINT_LIGHT_BUDGET[this.context.profile.quality];
+    ordered.forEach((entry, index) => { entry.light.visible = index < budget; });
   }
 
   private powerUpLevel(circuit: Exclude<Station33LightCircuit, 'emergency'>): number {
@@ -191,19 +221,20 @@ export class Station33Lighting {
     const { batch, materials } = this.context;
     const deadTube = materials.greySteel;
     for (const fixture of FLUORESCENT_FIXTURES) {
-      batch.addBox(materials.greySteel, fixture.x, FIXTURE_Y + 0.05, fixture.z, 0.26, 0.08, 1.75);
-      const ceiling = vaultHeightAt(fixture.x);
+      const ceiling = ceilingHeightAt(fixture.x);
+      const y = Math.min(FIXTURE_Y, ceiling - FIXTURE_DROP);
+      batch.addBox(materials.greySteel, fixture.x, y + 0.05, fixture.z, 0.26, 0.08, 1.75);
       for (const offset of [-0.65, 0.65]) {
-        const rodLength = ceiling - (FIXTURE_Y + 0.09);
+        const rodLength = ceiling - (y + 0.09);
         const rod = new THREE.CylinderGeometry(0.012, 0.012, rodLength, 5);
-        rod.translate(fixture.x, FIXTURE_Y + 0.09 + rodLength / 2, fixture.z + offset);
+        rod.translate(fixture.x, y + 0.09 + rodLength / 2, fixture.z + offset);
         batch.add(rod, materials.greySteel);
       }
       const tubeMaterial = fixture.circuit === 'dead' ? deadTube : this.circuitMaterial(fixture.circuit);
       for (const side of [-0.06, 0.06]) {
         const tube = new THREE.CylinderGeometry(0.024, 0.024, TUBE_LENGTH, 8);
         tube.rotateX(Math.PI / 2);
-        tube.translate(fixture.x + side, FIXTURE_Y - 0.015, fixture.z);
+        tube.translate(fixture.x + side, y - 0.015, fixture.z);
         batch.add(tube, tubeMaterial);
       }
     }
@@ -237,14 +268,13 @@ export class Station33Lighting {
   }
 
   private buildPointLights(): void {
-    const budget = POINT_LIGHT_BUDGET[this.context.profile.quality];
-    for (const config of STATION33_POINT_LIGHTS.slice(0, budget)) {
+    for (const config of STATION33_POINT_LIGHTS) {
       const light = new THREE.PointLight(config.color, config.intensity, config.distance, 1.7);
       light.position.set(config.x, config.y, config.z);
       light.castShadow = false;
       light.userData.mapRole = 'station-light';
       this.context.group.add(light);
-      this.lights.push({ light, circuit: config.circuit, baseIntensity: config.intensity });
+      this.lights.push({ light, circuit: config.circuit, baseIntensity: config.intensity, zone: config.zone });
     }
   }
 }

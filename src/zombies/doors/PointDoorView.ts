@@ -1,11 +1,10 @@
 import * as THREE from 'three';
-import type { PointDoor } from './PointDoor';
+import type { SurfaceType } from '../../shooting/HitTarget';
+import { POINT_DOOR_SIZE, type PointDoor } from './PointDoor';
 import { BuyableDoorVisual } from './BuyableDoorVisual';
 import { BunkerDoorVisual } from './BunkerDoorVisual';
 
-const DOOR_WIDTH = 1.6;
-const DOOR_HEIGHT = 2.1;
-const DOOR_THICK = 0.12;
+const { width: DOOR_WIDTH, height: DOOR_HEIGHT, thickness: DOOR_THICK } = POINT_DOOR_SIZE;
 const BUNKER_OPEN_DURATION = 2.4;
 
 export type DoorOpeningState = 'CLOSED' | 'OPENING' | 'OPEN';
@@ -13,7 +12,9 @@ export type DoorOpeningState = 'CLOSED' | 'OPENING' | 'OPEN';
 export interface PointDoorViewOptions {
   /** A sealed blast door instead of a boarded paid door. */
   readonly sealed?: boolean;
-  readonly woodMaterial?: THREE.MeshStandardMaterial;
+  readonly panelMaterial?: THREE.MeshStandardMaterial;
+  /** Impact surface of a paid door's slab (default wood); sealed doors are metal. */
+  readonly surface?: SurfaceType;
   readonly reducedEffects?: boolean;
 }
 
@@ -40,6 +41,7 @@ export class PointDoorView {
     const geometry = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICK);
     const sealed = options.sealed ?? false;
     this.sealed = sealed;
+    const surface: SurfaceType = sealed ? 'metal' : options.surface ?? 'wood';
     // Raycasts and Box3 ignore material visibility, so the hidden slab still blocks.
     const material = new THREE.MeshStandardMaterial({ visible: false });
     this.mesh = new THREE.Mesh(geometry, material);
@@ -48,7 +50,7 @@ export class PointDoorView {
     this.mesh.position.y = DOOR_HEIGHT / 2;
     this.mesh.castShadow = sealed;
     this.mesh.receiveShadow = sealed;
-    this.mesh.userData.surface = sealed ? 'metal' : 'wood';
+    this.mesh.userData.surface = surface;
     this.mesh.userData.mapRole = sealed ? 'sealed-bunker-door' : 'point-door';
     if (sealed) {
       this.bunker = new BunkerDoorVisual(this.mesh, {
@@ -64,7 +66,7 @@ export class PointDoorView {
         width: DOOR_WIDTH,
         height: DOOR_HEIGHT,
         cost: door.cost,
-        woodMaterial: options.woodMaterial,
+        panelMaterial: options.panelMaterial,
         reducedEffects: options.reducedEffects,
       });
       this.visual.group.userData.mapRole = 'point-door-visual';
@@ -73,7 +75,7 @@ export class PointDoorView {
 
     this.group.add(this.mesh);
     this.group.position.set(door.position.x, door.y, door.position.z);
-    this.group.userData.surface = sealed ? 'metal' : 'wood';
+    this.group.userData.surface = surface;
     const angle = Math.atan2(door.outward.x, door.outward.z);
     this.group.rotation.y = angle;
     parent.add(this.group);

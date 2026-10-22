@@ -126,6 +126,7 @@ export function makeContext(): TestContext {
     },
     profile: TEST_PROFILE,
     hitColliders: [] as THREE.Object3D[],
+    handRings: mockObject(),
     lockPointer: vi.fn(),
     unlockPointer: vi.fn(),
     grantWeapon: vi.fn(() => false),

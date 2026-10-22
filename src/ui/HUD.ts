@@ -6,7 +6,7 @@ import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { LanguagePicker } from './LanguagePicker';
 import { SettingsPanel } from './SettingsPanel';
-import { gameOverEpitaph, lampProgress, roundMarks } from './SurvivalPresentation';
+import { gameOverEpitaph, lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
 export interface ZombieHudState {
@@ -84,6 +84,7 @@ export class HUD {
   private readonly bannerTitle: HTMLElement = mustGet('banner-title');
   private readonly bannerSub: HTMLElement = mustGet('banner-sub');
   private readonly damageOverlay: HTMLElement = mustGet('damage-overlay');
+  private readonly ringFlash: HTMLElement = mustGet('ring-flash');
   private readonly gameOverPanel: HTMLElement = mustGet('game-over');
   private readonly goRound: HTMLElement = mustGet('go-round');
   private readonly goKills: HTMLElement = mustGet('go-kills');
@@ -107,6 +108,7 @@ export class HUD {
   private lastZombies: string = '';
   private lastRound = -1;
   private lastLamps = '';
+  private lastRings = '';
   private lastPrompt: string | null = null;
   private ready: boolean = false;
   private readonly mapLoading: HTMLElement = mustGet('map-loading');
@@ -135,7 +137,7 @@ export class HUD {
     new LanguagePicker(mustGet('language-select'), mustGet('language-toggle'), mustGet('language-options'));
     onLanguageChange(() => {
       // Cached HUD texts were rendered in the previous language.
-      this.lastWeapon = this.lastAmmo = this.lastMode = this.lastZombies = this.lastLamps = '';
+      this.lastWeapon = this.lastAmmo = this.lastMode = this.lastZombies = this.lastLamps = this.lastRings = '';
       this.lastRound = -1;
       this.lastPrompt = null;
     });
@@ -450,6 +452,23 @@ export class HUD {
       // Lamps are a map feature: maps without them show no counter.
       for (const id of ['z-lamps', 'pause-lamps']) mustGet(id).classList.toggle('hidden', state.lamps.length === 0);
     }
+  }
+
+  /** Worn rings on the combat panel and in the pause menu; hidden while none is worn. */
+  public updateRings(rings: readonly RingHudEntry[]): void {
+    const key = rings.map((ring) => `${ring.nameKey}:${ring.charged}`).join(',');
+    if (key === this.lastRings) return;
+    this.lastRings = key;
+    mustGet('z-rings').innerHTML = ringProgress(rings, true);
+    mustGet('pause-rings').innerHTML = ringProgress(rings);
+    for (const id of ['z-rings', 'pause-rings']) mustGet(id).classList.toggle('hidden', rings.length === 0);
+  }
+
+  /** Brief cold flash over the whole view: a ring just fired. */
+  public flashRing(): void {
+    this.ringFlash.classList.remove('active');
+    void this.ringFlash.offsetWidth;
+    this.ringFlash.classList.add('active');
   }
 
   /** Brief red flash on the points counter: a purchase was refused. */

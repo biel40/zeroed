@@ -3,6 +3,7 @@ import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { ARM_DETAIL, FirstPersonArm } from './FirstPersonArm';
 import type { ArmDetail } from './FirstPersonArm';
 import { HAND_POSES } from './HandPoses';
+import { HandRings } from './HandRings';
 import type { HandPose } from './HandPoses';
 import type { WeaponHands } from './WeaponHands';
 
@@ -44,6 +45,11 @@ export class ViewArms {
   readonly root = new THREE.Group();
   readonly right: FirstPersonArm;
   readonly left: FirstPersonArm;
+  /**
+   * Rings ride the right glove: it wraps the grip below the sight line of
+   * every weapon, while the support hand may sit near the sights.
+   */
+  readonly rings: HandRings;
   private lastHands: WeaponHands | null = null;
 
   private readonly grip = new THREE.Vector3();
@@ -58,10 +64,12 @@ export class ViewArms {
     this.right = new FirstPersonArm('right', detail);
     this.left = new FirstPersonArm('left', detail);
     this.root.add(this.right.root, this.left.root);
+    this.rings = new HandRings(this.right);
     applyViewModelDepth(this.root);
   }
 
   update(dt: number, view: ArmedView, melee: MeleeArmDriver | null): void {
+    this.rings.update(dt);
     const hands = view.hands;
     // A new weapon pops in with its own grips: fingers snap with it.
     const blend = hands === this.lastHands ? 1 - Math.exp(-POSE_RATE * dt) : 1;

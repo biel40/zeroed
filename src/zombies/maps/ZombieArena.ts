@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { AmbientCuePlayback } from '../../audio/AudioSystem';
 import type { EndingAudioId, MusicTrackName } from '../../audio/MusicManager';
+import type { RingId } from '../../game/rings/RingCatalog';
 import type { FloorTransitionZone } from '../../player/PlayerController';
 import type { EndingPresentationId, IntroPresentationId } from '../../ui/HUD';
 import type { WindowBarrier } from '../barriers/WindowBarrier';
@@ -55,6 +56,23 @@ export interface ArenaAmmoRefill {
   activate(): void;
   update?(dt: number): void;
   reset(): void;
+}
+
+/**
+ * What a ring machine shows: its ring for sale, nothing while the player
+ * wears the charged ring, or a call to recharge once that ring is spent.
+ */
+export type RingMachineDisplay = 'stocked' | 'empty' | 'recharge';
+
+/** A map's ring machine. The mode sells and recharges; the map only presents it. */
+export interface ArenaRingMachine {
+  readonly id: string;
+  readonly ringId: RingId;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  setDisplay(display: RingMachineDisplay): void;
 }
 
 /** How a map closes its run: the HUD cinematic, its audio and how long it lasts. */
@@ -177,6 +195,8 @@ export interface ZombieArena {
   readonly ammoRefills?: ReadonlyArray<ArenaAmmoRefill>;
   readonly soulLampInteractions?: ReadonlyArray<ArenaSoulLampInteraction>;
   readonly ritualInteraction?: ArenaRitualInteraction;
+  /** Optional: machines selling the rings (perks); maps without them omit it. */
+  readonly ringMachines?: ReadonlyArray<ArenaRingMachine>;
   /** Paid interaction that ends the run with the map's own ending. */
   readonly completionInteraction?: ArenaCompletionInteraction;
   /** Opening cinematic; omitted when the map starts straight into play. */

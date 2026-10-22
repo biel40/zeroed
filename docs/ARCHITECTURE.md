@@ -42,7 +42,7 @@ sufra tirones de compilacion de shaders.
 | `src/weapons/` + `src/config/` | Logica pura, definiciones y viewmodels |
 | `src/shooting/` | Trayectoria, pool balistico, raycast y `HitTarget` |
 | `src/zombies/` | IA, pool, combate, barreras, puertas y wonder weapons |
-| `src/game/` | Inventario, salud, economia y estadisticas puras |
+| `src/game/` | Inventario, salud, economia, anillos y estadisticas puras |
 | `src/pwa.ts` | Service Worker, instalacion y actualizaciones |
 | `src/i18n/` | Diccionarios es/en/ca, `t()` e idioma activo |
 | `public/beta/` | Pantalla y filtro temporal de acceso; conectado al arranque desde `src/main.ts` |
@@ -79,7 +79,11 @@ sufra tirones de compilacion de shaders.
   intro opcional (planos de camara y presentacion), su
   final (cinematica, audio y duracion) y avisa con `onTopologyChanged` cuando
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
-  (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`.
+  (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
+  las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
+  `ammoRefills`, `mysteryBoxPlacement`, `ringMachines`).
+- Los anillos llevados se ven en el guante derecho de `ViewArms`
+  (`HandRings`), que el modo recibe en `ModeContext.handRings`.
   `HitTarget` desacopla balistica de blancos.
 - Pools y temporales reutilizables limitan allocations por frame. Los tipos
   zombie (`normal`, `shiny`, `brute`) pueden compartir modelo sin duplicar IA.
@@ -88,7 +92,10 @@ sufra tirones de compilacion de shaders.
 
 ## Extension
 
-Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo modo:
+Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo anillo:
+`RingId` + `RingDefinition` (dedo libre, efecto como dato), su gancho en
+`ZombiesRings`, claves `ring.*` y una maquina en las `ringMachines` de un
+mapa. Nuevo modo:
 `GameMode` y selector. Nuevo mapa: clase que implemente `ZombieArena` (sus
 datos en un config propio, utilidades comunes de `maps/shared/`), entrada en
 `ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` (arte SVG propio) y claves

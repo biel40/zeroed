@@ -1,4 +1,4 @@
-import { VESTIBULE } from '../Station33Config';
+import { CONSIGNA, station33ZoneAt, VESTIBULE } from '../Station33Config';
 
 /** Shallow segmental barrel vault spanning the hall across X, springing from the side walls. */
 const HALF_SPAN = (VESTIBULE.maxX - VESTIBULE.minX) / 2;
@@ -15,4 +15,9 @@ export const VAULT_HALF_ANGLE = Math.asin(HALF_SPAN / VAULT_RADIUS);
 export function vaultHeightAt(x: number): number {
   if (Math.abs(x) >= HALF_SPAN) return VESTIBULE.wallHeight;
   return VAULT_CENTER_Y + Math.sqrt(VAULT_RADIUS * VAULT_RADIUS - x * x);
+}
+
+/** Underside of whatever ceiling covers a floor point: the vault, or the luggage office's flat slab. */
+export function ceilingHeightAt(x: number): number {
+  return station33ZoneAt(x) === 'consigna' ? CONSIGNA.ceilingHeight : vaultHeightAt(x);
 }

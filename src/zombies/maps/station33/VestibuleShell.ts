@@ -1,15 +1,10 @@
 import * as THREE from 'three';
 import { wallSpans, type WallAxis, type WallOpening } from '../shared/ArenaStructure';
-import {
-  ESCALATOR_PORTAL,
-  STATION33_BARRIERS,
-  STATION33_OPENINGS,
-  STATION33_WALL_THICKNESS,
-  VESTIBULE,
-} from '../Station33Config';
+import { ESCALATOR_PORTAL, STATION33_WALL_THICKNESS, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import { MURAL_LAYOUT, muralUv } from './Station33Signage';
 import { VAULT_CENTER_Y, VAULT_HALF_ANGLE, VAULT_RADIUS, vaultHeightAt } from './VaultProfile';
+import { stationWallOpenings } from './WallOpenings';
 
 const HALF_THICKNESS = STATION33_WALL_THICKNESS / 2;
 const DADO_HEIGHT = 1.1;
@@ -27,12 +22,6 @@ interface WallLine {
   readonly openings: ReadonlyArray<WallOpening>;
 }
 
-function barrierOpenings(axis: WallAxis, fixed: number): WallOpening[] {
-  return STATION33_BARRIERS
-    .filter((barrier) => (axis === 'z' ? barrier.x : barrier.z) === fixed)
-    .map((barrier) => ({ center: axis === 'z' ? barrier.z : barrier.x, ...STATION33_OPENINGS[barrier.kind] }));
-}
-
 /** The four walls of the hall. Side walls run past the corners to close them. */
 export function vestibuleWalls(): ReadonlyArray<WallLine> {
   const west = VESTIBULE.minX - HALF_THICKNESS;
@@ -42,8 +31,8 @@ export function vestibuleWalls(): ReadonlyArray<WallLine> {
   const outerMinZ = VESTIBULE.minZ - STATION33_WALL_THICKNESS;
   const outerMaxZ = VESTIBULE.maxZ + STATION33_WALL_THICKNESS;
   return [
-    { axis: 'z', fixed: west, min: outerMinZ, max: outerMaxZ, inward: 1, openings: barrierOpenings('z', west) },
-    { axis: 'z', fixed: east, min: outerMinZ, max: outerMaxZ, inward: -1, openings: barrierOpenings('z', east) },
+    { axis: 'z', fixed: west, min: outerMinZ, max: outerMaxZ, inward: 1, openings: stationWallOpenings('z', west, outerMinZ, outerMaxZ) },
+    { axis: 'z', fixed: east, min: outerMinZ, max: outerMaxZ, inward: -1, openings: stationWallOpenings('z', east, outerMinZ, outerMaxZ) },
     {
       axis: 'x',
       fixed: north,
@@ -52,7 +41,14 @@ export function vestibuleWalls(): ReadonlyArray<WallLine> {
       inward: 1,
       openings: [{ center: ESCALATOR_PORTAL.centerX, width: ESCALATOR_PORTAL.width, bottom: 0, top: ESCALATOR_PORTAL.height }],
     },
-    { axis: 'x', fixed: south, min: VESTIBULE.minX, max: VESTIBULE.maxX, inward: -1, openings: barrierOpenings('x', south) },
+    {
+      axis: 'x',
+      fixed: south,
+      min: VESTIBULE.minX,
+      max: VESTIBULE.maxX,
+      inward: -1,
+      openings: stationWallOpenings('x', south, VESTIBULE.minX, VESTIBULE.maxX),
+    },
   ];
 }
 

@@ -4,8 +4,8 @@
   `GameMode` recibe un `ModeContext`. Individual y cooperativo comparten loop
   sin compartir estado de run.
 - **Mapas por registro.** Burned Mansion y Station 33 son los mapas jugables;
-  Station 33 es solo individual, sera de pago y se construye por fases (la
-  primera, el vestibulo), cada una jugable y sin puertas hacia el vacio. `zombieMaps.ts`
+  Station 33 es solo individual, sera de pago y se construye por fases (el
+  vestibulo y la consigna), cada una jugable y sin puertas hacia el vacio. `zombieMaps.ts`
   declara por mapa visibilidad, nombre i18n, soporte cooperativo, si es premium
   y factoria de arena; los modos la resuelven por `mapId`. Mientras no exista
   un sistema de pagos, `premium` solo cambia la presentacion: la beta cerrada
@@ -13,11 +13,19 @@
   de entorno que deja pasar. `ZombieArena` mantiene geometria,
   colliders, spawns, barreras, puertas, ambiente, musica y final fuera de la
   logica de la run; lo exclusivo de un mapa (almas, faroles, ritual y sala
-  secreta de la mansion) es una capacidad opcional consultada con type guard.
+  secreta de la mansion) es una capacidad opcional consultada con type guard;
+  lo que cualquier mapa puede ofrecer (caja, maquinas de anillos) es un campo
+  opcional.
   El cooperativo usa un unico mapa (`COOP_ZOMBIE_MAP_ID`) sin negociarlo en el
   protocolo. El campo de tiro/Classic se retira por decision del usuario.
 - **Logica separada de vistas.** Armas, economia, rondas, salud, Mystery Box,
-  barreras, puertas, trayectorias y cadena Tesla son testeables sin Three.js.
+  barreras, puertas, anillos, trayectorias y cadena Tesla son testeables sin
+  Three.js.
+- **Anillos como perks.** Las perks de Zeroed son anillos: uno por dedo, cada
+  anillo con su dedo fijo para que su sitio en la mano sea predecible, y la
+  mano en primera persona como senal principal (el HUD solo apoya). Su efecto
+  es dato en la definicion mas un gancho en el modo; no hay un framework de
+  modificadores. Las maquinas son una capacidad opcional del mapa.
 - **Armas declarativas.** `WeaponDefinition` concentra cadencia, dano, recoil,
   municion, ADS, proyectil y presentacion; no hay subclases por arma.
 - **Economia por autoridad.** `PlayerEconomy` centraliza Points; el modo decide

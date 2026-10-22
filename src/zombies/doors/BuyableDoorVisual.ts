@@ -17,8 +17,8 @@ export interface BuyableDoorVisualOptions {
   readonly width: number;
   readonly height: number;
   readonly cost: number;
-  /** Textured map wood; must carry `userData.metersPerTile` for box UVs. */
-  readonly woodMaterial?: THREE.MeshStandardMaterial;
+  /** Map planks or steel sheets; must carry `userData.metersPerTile` for box UVs. Default: plain wood. */
+  readonly panelMaterial?: THREE.MeshStandardMaterial;
   readonly reducedEffects?: boolean;
 }
 
@@ -67,7 +67,7 @@ export class BuyableDoorVisual {
     const { width, height } = options;
     this.group.add(this.body);
 
-    const wood = options.woodMaterial
+    const wood = options.panelMaterial
       ?? new THREE.MeshStandardMaterial({ color: 0x6b5442, roughness: 0.88, metalness: 0.02 });
     const metersPerTile = (wood.userData.metersPerTile as number | undefined) ?? 1.25;
     const plankWidth = width / PLANK_COUNT;

@@ -1,8 +1,16 @@
+import type { RingId } from '../../game/rings/RingCatalog';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
-import type { ArenaAmbience, ArenaAmbientCue, ArenaIntro, PlayerBounds, ZombieNavigationBounds } from './ZombieArena';
+import type {
+  ArenaAmbience,
+  ArenaAmbientCue,
+  ArenaIntro,
+  MysteryBoxPlacement,
+  PlayerBounds,
+  ZombieNavigationBounds,
+} from './ZombieArena';
 
 /**
  * Station 33 layout data. Every coordinate is in metres, feet height 0 on
@@ -14,9 +22,9 @@ import type { ArenaAmbience, ArenaAmbientCue, ArenaIntro, PlayerBounds, ZombieNa
  *   the surface, which is never shown.
  * - z = 0 is the vestibule's north wall: the escalator portal. Everything
  *   deeper lies at z < 0 and below y = 0, descending northwards.
- * - Phase 2 opens a side zone off the vestibule through a paid door in the
- *   east or west wall (x beyond +-7.15), between the entrance passages, and
- *   keeps z >= 0. Wall decoration may move to make room; passages may not.
+ * - Phase 2 (built) is the luggage office (`consigna`), behind a paid door
+ *   in the vestibule's east wall: a corridor between the two east vent
+ *   passages, then the locker hall past their dead ends, all at z >= 0.
  * - Phase 3 opens the escalator: an incline from z = 0 down to the mezzanine
  *   (floor -1), joined with `floorTransitions` like the mansion stairs.
  * - Phase 4 is the central platform (floor -2) with tracks along Z further
@@ -109,20 +117,60 @@ export interface Station33Barrier {
   readonly zone: Station33ZoneId;
 }
 
-export type Station33ZoneId = 'vestibule';
+export type Station33ZoneId = 'vestibule' | 'consigna';
 
 export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
+
+/**
+ * Phase 2 luggage office, interior faces like VESTIBULE. The corridor runs
+ * east from the vestibule door between the two east vent passages; the hall
+ * starts past their dead ends (x = 13.6) and shares the vestibule's south
+ * line, so the player bounds close its south entrance the same way.
+ */
+export const CONSIGNA = {
+  corridor: { minX: VESTIBULE.maxX + STATION33_WALL_THICKNESS, maxX: 14, minZ: 7.95, maxZ: 12.05 },
+  hall: { minX: 14, maxX: 21, minZ: 6, maxZ: VESTIBULE.maxZ },
+  /** Flat service ceiling, lower than the vestibule vault. */
+  ceilingHeight: 3.2,
+} as const;
 
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
 const EAST_WALL_X = VESTIBULE.maxX + STATION33_WALL_THICKNESS / 2;
 const SOUTH_WALL_Z = VESTIBULE.maxZ + STATION33_WALL_THICKNESS / 2;
+const CONSIGNA_EAST_WALL_X = CONSIGNA.hall.maxX + STATION33_WALL_THICKNESS / 2;
 
-/** Zombie entrances of the vestibule: the surface stairs, a service door and two vents. */
+/**
+ * Zombie entrances: the vestibule's surface stairs, service door and two
+ * vents, then the luggage office's porters' stairs and grille, which only
+ * wake once its door is bought.
+ */
 export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'surface-stairs', x: -3.6, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'vestibule' },
   { id: 'service-door-west', x: WEST_WALL_X, z: 4.0, outwardX: -1, outwardZ: 0, kind: 'gate', zone: 'vestibule' },
   { id: 'vent-east-north', x: EAST_WALL_X, z: 6.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
   { id: 'vent-east-south', x: EAST_WALL_X, z: 13.6, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
+  { id: 'consigna-porters-stairs', x: 17.5, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'consigna' },
+  { id: 'consigna-vent-east', x: CONSIGNA_EAST_WALL_X, z: 15.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'consigna' },
+];
+
+export interface Station33Door {
+  readonly id: string;
+  /** Centre of the door on its wall's centre line. */
+  readonly x: number;
+  readonly z: number;
+  /** Towards the zone it opens: debris bursts that way. */
+  readonly outwardX: number;
+  readonly outwardZ: number;
+  readonly cost: number;
+  readonly zone: Station33ZoneId;
+}
+
+/**
+ * Paid doors. The first one costs what the mansion's first door does (750);
+ * it sits beside the east bench, clear of both vent openings.
+ */
+export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
+  { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna' },
 ];
 
 /** Dead-end service passage behind every entrance, where its zombies appear. */
@@ -161,6 +209,7 @@ function spawnBehind(barrier: Station33Barrier): ZombieSpawnPoint {
 /** Spawn points per unlocked zone, one at the end of each entrance passage. */
 export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<ZombieSpawnPoint>>> = {
   vestibule: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'vestibule').map(spawnBehind),
+  consigna: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'consigna').map(spawnBehind),
 };
 
 /** Weapon outlines 2 cm in front of the wall face; prices follow the mansion's balance. */
@@ -175,21 +224,64 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     yaw: Math.PI / 2,
     floor: 0,
   },
+  {
+    // Halfway down the luggage-office corridor, out of reach from the vestibule.
+    id: 'consigna-m4a1',
+    weaponId: 'm4a1',
+    price: 1500,
+    ammoPrice: 750,
+    position: { x: 10.6, y: 1.45, z: CONSIGNA.corridor.maxZ - 0.02 },
+    yaw: Math.PI,
+    floor: 0,
+  },
+];
+
+/** The luggage office's crate, against the north lockers with its front to the hall. */
+export const STATION33_BOX_PLACEMENT: MysteryBoxPlacement = {
+  position: { x: 17.6, y: 0, z: CONSIGNA.hall.minZ + 0.6 },
+  yaw: Math.PI,
+  useRange: 2.2,
+  lookDotMin: 0.5,
+  floor: 0,
+};
+
+/** Open luggage locker holding a ring, at the end of the corridor's axis. */
+export interface Station33RingLocker {
+  readonly id: string;
+  readonly ringId: RingId;
+  /** Centre of the locker's open front, on the hall face of its bank. */
+  readonly x: number;
+  readonly z: number;
+  /** Direction the open front faces (into the hall). */
+  readonly facingX: number;
+  readonly facingZ: number;
+}
+
+/** Depth and height of the luggage lockers that line the hall walls. */
+export const CONSIGNA_LOCKER = { depth: 0.5, height: 2.0, columnWidth: 0.42, rows: 3, ringLockerWidth: 0.62 } as const;
+
+export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
+  { id: 'consigna-resurrection', ringId: 'resurrection', x: CONSIGNA.hall.maxX - CONSIGNA_LOCKER.depth, z: 10, facingX: -1, facingZ: 0 },
 ];
 
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
 
-/** Player movement inside the vestibule, inset by the body radius. */
+/**
+ * Player movement over the vestibule and the luggage office, inset by the
+ * body radius. One rectangle covers both: walls and the closed door keep
+ * the player out of the office (and out of the gap between the rooms)
+ * until it is bought; the shared south line keeps both south gates shut.
+ */
 export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
   minX: VESTIBULE.minX + 0.4,
-  maxX: VESTIBULE.maxX - 0.4,
+  maxX: CONSIGNA.hall.maxX - 0.4,
   minZ: VESTIBULE.minZ + 0.4,
   maxZ: VESTIBULE.maxZ - 0.4,
 };
 
-/** Hall plus every entrance passage on the vestibule level. */
+/** Both rooms plus every entrance passage on the vestibule level. */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -13.5, maxX: 13.5, minZ: 0, maxZ: 24.5, baseY: 0 },
+  { floor: 0, minX: -13.5, maxX: 27.8, minZ: 0, maxZ: 24.7, baseY: 0 },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -217,31 +309,45 @@ export interface Station33PointLight {
   readonly intensity: number;
   readonly distance: number;
   readonly circuit: Station33LightCircuit;
+  /** Room it lights: the player's room gets its lights first. */
+  readonly zone: Station33ZoneId;
 }
 
 export const FLUORESCENT_COLOR = 0xd2eadf;
 export const AMBER_LAMP_COLOR = 0xffa65a;
 export const EMERGENCY_COLOR = 0xff2a12;
 
+/** Zone holding a floor point at `x`: the vestibule's east wall separates the rooms. */
+export function station33ZoneAt(x: number): Station33ZoneId {
+  return x > EAST_WALL_X ? 'consigna' : 'vestibule';
+}
+
 /** Battery emergency lamp beside the sealed escalator portal. */
 export const EMERGENCY_LAMP = { x: -3.75, y: 2.6, z: VESTIBULE.minZ } as const;
 
 /**
- * Dynamic lights in priority order: a quality level keeps the first
- * POINT_LIGHT_BUDGET entries. Everything else glows through emissive meshes.
+ * Dynamic lights in priority order within each room. A quality level keeps
+ * the first POINT_LIGHT_BUDGET entries, taking the player's room first and
+ * filling up with the other room's; everything else glows through emissive
+ * meshes. The luggage-office lights are short so they never leak through
+ * the wall it shares with the vestibule.
  */
 export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
-  { x: 0, y: 3.85, z: 5.6, color: FLUORESCENT_COLOR, intensity: 9, distance: 12, circuit: 'steady' },
-  { x: 0, y: 3.85, z: 13.2, color: FLUORESCENT_COLOR, intensity: 8, distance: 12, circuit: 'unstable' },
-  { x: EMERGENCY_LAMP.x, y: EMERGENCY_LAMP.y, z: EMERGENCY_LAMP.z + 0.6, color: EMERGENCY_COLOR, intensity: 4, distance: 6.5, circuit: 'emergency' },
-  { x: -6.1, y: 2.75, z: 13.5, color: AMBER_LAMP_COLOR, intensity: 3.2, distance: 6.5, circuit: 'amber' },
-  { x: 6.1, y: 2.75, z: 8.2, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6.5, circuit: 'amber' },
-  { x: -2, y: 3.85, z: 2.5, color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing' },
+  { x: 0, y: 3.85, z: 5.6, color: FLUORESCENT_COLOR, intensity: 9, distance: 12, circuit: 'steady', zone: 'vestibule' },
+  { x: 0, y: 3.85, z: 13.2, color: FLUORESCENT_COLOR, intensity: 8, distance: 12, circuit: 'unstable', zone: 'vestibule' },
+  { x: EMERGENCY_LAMP.x, y: EMERGENCY_LAMP.y, z: EMERGENCY_LAMP.z + 0.6, color: EMERGENCY_COLOR, intensity: 4, distance: 6.5, circuit: 'emergency', zone: 'vestibule' },
+  { x: -6.1, y: 2.75, z: 13.5, color: AMBER_LAMP_COLOR, intensity: 3.2, distance: 6.5, circuit: 'amber', zone: 'vestibule' },
+  { x: 6.1, y: 2.75, z: 8.2, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6.5, circuit: 'amber', zone: 'vestibule' },
+  { x: -2, y: 3.85, z: 2.5, color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing', zone: 'vestibule' },
+  { x: 17.5, y: 2.95, z: 9.2, color: FLUORESCENT_COLOR, intensity: 5, distance: 7, circuit: 'steady', zone: 'consigna' },
+  { x: 17.5, y: 2.95, z: 14.8, color: FLUORESCENT_COLOR, intensity: 4.5, distance: 7, circuit: 'failing', zone: 'consigna' },
+  { x: 10.6, y: 2.95, z: 10, color: FLUORESCENT_COLOR, intensity: 4, distance: 4.5, circuit: 'unstable', zone: 'consigna' },
 ];
 
 /**
- * Linear fluorescent fixtures hung under the vault, along Z. The slot at
- * (2, 6.75) is empty: that fixture tore loose and dangles from one chain.
+ * Linear fluorescent fixtures along Z, hung under the vault or the
+ * luggage-office ceiling. The vestibule slot at (2, 6.75) is empty: that
+ * fixture tore loose and dangles from one chain.
  */
 export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly z: number; readonly circuit: Station33LightCircuit | 'dead' }> = [
   { x: -2, z: 2.5, circuit: 'failing' },
@@ -251,6 +357,10 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: 2, z: 11.25, circuit: 'dead' },
   { x: -2, z: 15.5, circuit: 'steady' },
   { x: 2, z: 15.5, circuit: 'failing' },
+  { x: 10.6, z: 10, circuit: 'unstable' },
+  { x: 17.5, z: 9.2, circuit: 'steady' },
+  { x: 19.4, z: 12, circuit: 'dead' },
+  { x: 17.5, z: 14.8, circuit: 'failing' },
 ];
 
 /** Amber glass sconces on the side walls; `yaw` faces the hall. */

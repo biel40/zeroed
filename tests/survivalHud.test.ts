@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setLanguage } from '../src/i18n/i18n';
 import { PlayerEconomy } from '../src/game/PlayerEconomy';
-import { gameOverEpitaph, lampProgress, roundMarks } from '../src/ui/SurvivalPresentation';
+import { gameOverEpitaph, lampProgress, ringProgress, roundMarks } from '../src/ui/SurvivalPresentation';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 
@@ -77,6 +77,21 @@ describe('survival presentation', () => {
     expect(compact).toContain('Farol 1: lleno');
     expect(compact).toContain('Farol 2: sin llenar');
     expect(lampProgress(lamps)).not.toContain('llenos');
+  });
+
+  it('shows worn rings by finger, dimming a spent one, with names only in the pause detail', () => {
+    const ring = { finger: 'ring', nameKey: 'ring.resurrection', glowColor: 0x3fd8c8 } as const;
+    const compact = ringProgress([{ ...ring, charged: true }], true);
+    expect(compact).toContain('class="ring charged"');
+    expect(compact).toContain('--ring-glow:#3fd8c8');
+    expect(compact).toContain('aria-label="RESURRECCIÓN — ANULAR: cargado"');
+    expect(compact).not.toContain('<strong>');
+    const detail = ringProgress([{ ...ring, charged: false }]);
+    expect(detail).toContain('class="ring spent"');
+    expect(detail).toContain('ANILLOS');
+    expect(detail).toContain('<strong>RESURRECCIÓN</strong>');
+    expect(detail).toContain('ANULAR · gastado');
+    expect(ringProgress([])).not.toContain('class="ring ');
   });
 
   it('bounds scratch marks while keeping the exact high round legible', () => {

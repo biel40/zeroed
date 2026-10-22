@@ -389,7 +389,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     for (const door of this.doors) {
       const view = new PointDoorView(door, this.group, {
         sealed: door.id === 'nuclear-bunker',
-        woodMaterial: this.materials.floorWood,
+        panelMaterial: this.materials.floorWood,
         reducedEffects: this.profile.useReducedEffects,
       });
       if (this.profile.useReducedEffects) {

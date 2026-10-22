@@ -2,6 +2,9 @@ import type { TranslationKey } from '../../i18n/i18n';
 
 export type DoorState = 'locked' | 'unlocked';
 
+/** Slab every point door fills; maps cut wall openings of this size. */
+export const POINT_DOOR_SIZE = { width: 1.6, height: 2.1, thickness: 0.12 } as const;
+
 export interface PointDoorConfig {
   readonly cost: number;
   /** Custom action text shown instead of the generic unlock prompt. */

@@ -15,11 +15,12 @@ codigo: actualiza la guia.
   presentacion (tarjeta dorada, insignia, intro) y la beta cerrada lo juega
   completo. Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
-- Se construye por fases. La Fase 1, el vestibulo, ya es una partida completa:
+- Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
   cuatro entradas con chapas de acero, la AK-47 en pared y la escalera mecanica
-  sellada como unica frontera. Cada fase debe ser jugable por si misma y nunca
-  abrir puertas hacia el vacio. El plan de ejes (hacia el norte y hacia abajo)
-  esta documentado al principio de `Station33Config.ts`.
+  sellada. La Fase 2 abre la consigna tras la primera puerta de pago. Cada fase
+  debe ser jugable por si misma y nunca abrir puertas hacia el vacio. El plan
+  de ejes (hacia el norte y hacia abajo) esta documentado al principio de
+  `Station33Config.ts`.
 
 ## Pilares de ambientacion
 
@@ -40,6 +41,37 @@ codigo: actualiza la guia.
 5. **Una estacion viva aunque muerta.** Movimiento barato y constante: polvo en
    suspension, gotas que caen en charcos, cables cortados y una lampara colgante
    que se balancean, vapor de una tuberia rota. Un tren lejano lo agita todo.
+
+## La consigna (Fase 2)
+
+- La consigna de equipajes de la estacion: lo que los evacuados entregaron y
+  nadie volvio a recoger. Pasillo estrecho entre los pasadizos de las rejillas
+  y una sala de taquillas de acero con numeracion cirilica ("Б-17"), puertas
+  colgando abiertas, un mostrador con la persiana bajada, un carro de mozo y
+  maletas por el suelo. Techo plano y bajo de servicio y azulejo vidriado
+  amarillento por las filtraciones: mas pobre y mas humeda que el vestibulo.
+- Se entra por una puerta de chapa de acero (750 Points) junto al banco del
+  muro este; con ella cerrada la sala no existe para el jugador ni para los
+  zombis. Al abrirla despiertan sus dos entradas (escalera de mozos sepultada
+  y una rejilla), el M4A1 en pared, la Mystery Box y la taquilla del anillo.
+- La taquilla del anillo, bajo la placa "БЮРО НАХОДОК" (objetos perdidos), es
+  el foco al final del eje del pasillo: abierta, con un cojin de terciopelo y
+  la alianza brillando con su propio esmalte. Tras la compra queda vacia y
+  apagada; si el anillo se gasta, el cojin vacio vuelve a latir para pedir la
+  recarga. Ese brillo es de material emisivo, nunca una luz.
+
+## Anillos
+
+- Los anillos son las perks de Zeroed: alianzas que los evacuados dejaron en
+  las taquillas. Uno por dedo de la mano derecha, cada uno en un dedo fijo,
+  visibles en primera persona; el HUD solo apoya.
+- Su brillo es un acento frio (turquesa para Resurreccion); el dorado sigue
+  reservado a lo premium. Un anillo gastado se queda en el dedo, sin brillo.
+- Catalogo previsto (solo existe Resurreccion): anular, Resurreccion (salva una
+  muerte); corazon, Vitalidad (vida maxima); indice, Doble impacto (dano y
+  cadencia); menique, Cadencia (recarga); pulgar, un anillo de utilidad (por
+  ejemplo, tercera arma). Las fases siguientes anadiran el interruptor de la
+  subestacion (maquinas que exigen energia) y el Pack-a-Punch.
 
 ## Paleta y materiales
 
@@ -84,10 +116,10 @@ codigo: actualiza la guia.
 
 ## Restricciones tecnicas que sostienen el ambiente
 
-- Pocas luces reales: solo las primeras entradas de la lista priorizada de
-  luces puntuales caben en el presupuesto de calidad; el resto brilla con
-  materiales emisivos que siguen a su circuito. Un numero fijo de luces evita
-  recompilar shaders.
+- Pocas luces reales: cada sala tiene su lista priorizada de luces puntuales
+  y la sala donde esta el jugador ocupa primero el presupuesto de calidad (las
+  de la otra completan); el resto brilla con materiales emisivos que siguen a
+  su circuito. Un numero fijo de luces visibles evita recompilar shaders.
 - La geometria estatica se agrupa en un unico batch; cada mueble solido tiene
   un proxy AABB simple que para balas, zombies y jugador.
 - La decoracion del suelo queda por debajo de la altura de obstaculo de los
@@ -104,9 +136,9 @@ codigo: actualiza la guia.
   propios: amplialos, no los dupliques.
 - Respeta el plan de ejes: lo existente no se mueve; las zonas nuevas se abren
   con puertas de pago o la escalera, y dejan libres los pasadizos de spawn.
-- La Mystery Box esta reservada para una fase posterior; aun no hay puertas de
-  pago ni final.
+- La Mystery Box vive en la consigna. Aun no hay final.
 - Nada de recursos que rompan el tono: fuego, colores saturados, humor,
   señaletica traducida o UI que explique lo que el escenario puede mostrar.
 - Valida con `npm run typecheck` y `npm test` (`tests/station33.test.ts` y
-  `tests/mapIntro.test.ts` cubren disposicion, luces, ambiente e intro).
+  `tests/mapIntro.test.ts` cubren disposicion, puertas, rutas, luces,
+  ambiente e intro).
