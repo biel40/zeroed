@@ -60,7 +60,8 @@ codigo: actualiza la guia.
   el foco al final del eje del pasillo: abierta, con un cojin de terciopelo y
   la alianza brillando con su propio esmalte. Tras la compra queda vacia y
   apagada; si el anillo se gasta, el cojin vacio vuelve a latir para pedir la
-  recarga. Ese brillo es de material emisivo, nunca una luz.
+  recarga, hasta que la tercera compra de la run la deja vacia para siempre.
+  Ese brillo es de material emisivo, nunca una luz.
 - Alrededor de la taquilla suena en bucle una musica de maquina, como el jingle
   de las bebidas de CoD Zombies: se oye a pleno a su lado y se apaga a unos
   10 m, nunca desde el vestibulo. Hoy es una cajita de musica procedural

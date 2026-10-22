@@ -6,9 +6,12 @@ import { EYE_HEIGHT } from '../src/player/PlayerController';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
+import type { ZombieManager } from '../src/zombies/ZombieManager';
 import { installCanvasDocument, makeContext, type TestContext } from './coopHarness';
 
 const RESURRECTION = RING_DEFINITIONS.resurrection;
+const [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE] = RESURRECTION.prices;
+const { getUp: GET_UP, untargetable: UNTARGETABLE, invulnerability: INVULNERABILITY } = RESURRECTION.effect;
 const LETHAL = 10_000;
 
 let restoreDocument: () => void;
@@ -21,6 +24,8 @@ interface ModeInternals {
   health: PlayerHealth;
   gameOver: boolean;
   onPlayerHit(damage: number): void;
+  zombies: ZombieManager;
+  rings: { update(dt: number): void };
 }
 
 function startRun(): { mode: ZombiesMode; internals: ModeInternals; side: TestContext } {
@@ -47,9 +52,9 @@ describe('Resurrection ring', () => {
     const run = startRun();
     const { mode, internals, side } = run;
     faceRingLocker(run);
-    expect(mode.getInteractPrompt()).toContain(`${RESURRECTION.price}`);
+    expect(mode.getInteractPrompt()).toContain(`${FIRST_PRICE}`);
 
-    fund(internals.economy, RESURRECTION.price - 10);
+    fund(internals.economy, FIRST_PRICE - 10);
     mode.onInteract();
     expect(side.hud.flashNotEnoughPoints).toHaveBeenCalled();
     expect(side.ctx.handRings.show).not.toHaveBeenCalled();
@@ -68,7 +73,7 @@ describe('Resurrection ring', () => {
     const run = startRun();
     const { internals, side } = run;
     faceRingLocker(run);
-    fund(internals.economy, RESURRECTION.price);
+    fund(internals.economy, FIRST_PRICE);
     run.mode.onInteract();
 
     internals.onPlayerHit(LETHAL);
@@ -97,13 +102,14 @@ describe('Resurrection ring', () => {
     const run = startRun();
     const { mode, internals, side } = run;
     faceRingLocker(run);
-    fund(internals.economy, RESURRECTION.price);
+    fund(internals.economy, FIRST_PRICE);
     mode.onInteract();
     internals.onPlayerHit(LETHAL);
+    internals.rings.update(GET_UP);
     internals.health.update(RESURRECTION.effect.invulnerability + 0.1);
 
-    expect(mode.getInteractPrompt()).toContain(`${RESURRECTION.rechargePrice}`);
-    fund(internals.economy, RESURRECTION.rechargePrice);
+    expect(mode.getInteractPrompt()).toContain(`${SECOND_PRICE}`);
+    fund(internals.economy, SECOND_PRICE);
     mode.onInteract();
     expect(internals.economy.points).toBe(0);
     expect(side.ctx.audio.playRingRecharge).toHaveBeenCalledOnce();
@@ -139,11 +145,77 @@ describe('Resurrection ring', () => {
     expect(internals.gameOver).toBe(true);
   });
 
+  it('gets the player back up slowly: looking around only, then full control', () => {
+    const run = startRun();
+    const { mode, internals, side } = run;
+    faceRingLocker(run);
+    fund(internals.economy, FIRST_PRICE);
+    mode.onInteract();
+
+    internals.onPlayerHit(LETHAL);
+    expect(mode.isGameplayInputEnabled()).toBe(false);
+    expect(mode.isDownedLookEnabled()).toBe(true);
+    expect(mode.getInteractPrompt()).toBeNull();
+    internals.rings.update(GET_UP * 0.3);
+    expect(side.player.camera.position.y).toBeLessThan(-0.5);
+    internals.rings.update(GET_UP);
+    expect(mode.isGameplayInputEnabled()).toBe(true);
+    expect(mode.isDownedLookEnabled()).toBe(false);
+  });
+
+  it('keeps the player invulnerable for 2.5 s and off the horde radar until 2 s after standing up', () => {
+    const run = startRun();
+    const { mode, internals } = run;
+    faceRingLocker(run);
+    fund(internals.economy, FIRST_PRICE);
+    mode.onInteract();
+    expect(internals.zombies.isHostIgnored).toBe(false);
+
+    internals.onPlayerHit(LETHAL);
+    expect(INVULNERABILITY).toBe(2.5);
+    internals.health.update(INVULNERABILITY - 0.1);
+    expect(internals.health.isInvulnerable).toBe(true);
+    internals.health.update(0.2);
+    expect(internals.health.isInvulnerable).toBe(false);
+
+    expect(internals.zombies.isHostIgnored).toBe(true);
+    internals.zombies.update(GET_UP + UNTARGETABLE - 0.1, 0, 0);
+    expect(internals.zombies.isHostIgnored).toBe(true);
+    internals.zombies.update(0.2, 0, 0);
+    expect(internals.zombies.isHostIgnored).toBe(false);
+  });
+
+  it('sells three purchases a run at doubling prices, then the locker stays empty', () => {
+    const run = startRun();
+    const { mode, internals, side } = run;
+    faceRingLocker(run);
+    const dieAndStandUp = (): void => {
+      internals.onPlayerHit(LETHAL);
+      expect(internals.gameOver).toBe(false);
+      internals.rings.update(GET_UP);
+      internals.health.update(INVULNERABILITY + 0.1);
+    };
+    for (const price of [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE]) {
+      expect(mode.getInteractPrompt()).toContain(`${price}`);
+      fund(internals.economy, price);
+      mode.onInteract();
+      expect(internals.economy.points).toBe(0);
+      dieAndStandUp();
+    }
+    expect([FIRST_PRICE, SECOND_PRICE, THIRD_PRICE]).toEqual([500, 1000, 2000]);
+    expect(mode.getInteractPrompt()).toBeNull();
+    expect(internals.arena.group.getObjectByName('locker-ring')!.visible).toBe(false);
+    expect(side.hud.updateRings).toHaveBeenLastCalledWith([expect.objectContaining({ charged: false })]);
+
+    internals.onPlayerHit(LETHAL);
+    expect(internals.gameOver).toBe(true);
+  });
+
   it('restart takes the ring off and puts it back in its locker', () => {
     const run = startRun();
     const { mode, internals, side } = run;
     faceRingLocker(run);
-    fund(internals.economy, RESURRECTION.price);
+    fund(internals.economy, FIRST_PRICE);
     mode.onInteract();
 
     mode.onRestartRequested();
@@ -151,7 +223,7 @@ describe('Resurrection ring', () => {
     expect(side.hud.updateRings).toHaveBeenLastCalledWith([]);
     expect(internals.arena.group.getObjectByName('locker-ring')!.visible).toBe(true);
     faceRingLocker(run);
-    expect(mode.getInteractPrompt()).toContain(`${RESURRECTION.price}`);
+    expect(mode.getInteractPrompt()).toContain(`${FIRST_PRICE}`);
 
     internals.onPlayerHit(LETHAL);
     expect(internals.gameOver).toBe(true);

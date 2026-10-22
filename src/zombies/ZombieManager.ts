@@ -267,6 +267,8 @@ export class ZombieManager {
   private lastPlayerZ = 0;
   private lastPlayerFloor = 0;
   private hostBodyActive = true;
+  /** Seconds the host stays off every zombie's radar (see `ignoreHost`). */
+  private hostIgnoredFor = 0;
   private otherPlayers: readonly ZombiePlayerTarget[] = [];
 
   constructor(
@@ -690,6 +692,7 @@ export class ZombieManager {
   ): void {
     this.otherPlayers = otherPlayers;
     this.hostBodyActive = hostAlive;
+    this.hostIgnoredFor = Math.max(0, this.hostIgnoredFor - dt);
     this.lastPlayerX = playerX;
     this.lastPlayerY = playerY;
     this.lastPlayerZ = playerZ;
@@ -713,7 +716,7 @@ export class ZombieManager {
       let targetY = playerY;
       let targetZ = playerZ;
       let targetFloor = playerFloor;
-      let nearest = hostAlive
+      let nearest = hostAlive && !this.isHostIgnored
         ? Math.hypot(playerX - zombie.position.x, playerZ - zombie.position.z) + (playerFloor === zombie.floor ? 0 : 100)
         : Infinity;
       for (const candidate of otherPlayers) {
@@ -727,6 +730,8 @@ export class ZombieManager {
           nearest = distance;
         }
       }
+      // With the host ignored and nobody else to chase, a zombie loses the scent.
+      const hunting = nearest < Infinity || !this.isHostIgnored;
       const previousX = zombie.position.x;
       const previousZ = zombie.position.z;
       const previousYaw = zombie.group.rotation.y;
@@ -749,9 +754,10 @@ export class ZombieManager {
           this.navPaths.delete(zombie);
           this.recoveryCount++;
         }
-        this.steer(zombie, dt, targetX, targetZ, targetFloor, targetY, targetId);
+        this.steer(zombie, dt, targetX, targetZ, targetFloor, targetY, targetId, hunting);
         this.applyFloorTransition(zombie, dt);
-        this.updateStuckRecovery(
+        // Standing still on purpose is not being stuck.
+        if (hunting || zombie.barrierTarget) this.updateStuckRecovery(
           zombie,
           dt,
           targetX,
@@ -793,7 +799,22 @@ export class ZombieManager {
   }
 
   /** Game over / restart: every zombie vanishes back into the pool. */
+  /**
+   * Zombies lose track of the local player for `seconds` (a Resurrection
+   * ring firing): nobody chases them and strikes already swinging miss.
+   * Zombies working a barrier or climbing in carry on; co-op partners stay
+   * targets.
+   */
+  ignoreHost(seconds: number): void {
+    this.hostIgnoredFor = Math.max(this.hostIgnoredFor, seconds);
+  }
+
+  get isHostIgnored(): boolean {
+    return this.hostIgnoredFor > 0;
+  }
+
   reset(): void {
+    this.hostIgnoredFor = 0;
     for (const zombie of this.pool.actives) {
       zombie.group.visible = false;
       zombie.state = 'death'; // not alive; prevents stale attack callbacks
@@ -958,6 +979,8 @@ export class ZombieManager {
     playerFloor: number,
     playerY: number,
     targetId: ZombieTargetId = 'host',
+    /** False while the zombie has lost its target: it waits where it stands. */
+    hunting = true,
   ): void {
     if (zombie.barrierTarget?.isOpen) {
       zombie.barrierTarget = null;
@@ -968,6 +991,7 @@ export class ZombieManager {
     if (this.followEntryRoute(zombie, dt)) return;
     if (this.followStairTraversal(zombie, dt)) return;
     const target = zombie.barrierTarget;
+    if (!target && !hunting) return;
 
     if (target) {
       zombie.faceTowards(target.position.x, target.position.z, TURN_SPEED * dt);
@@ -1041,7 +1065,8 @@ export class ZombieManager {
           const live = targetId === 'host'
             ? { x: this.lastPlayerX, y: this.lastPlayerY, z: this.lastPlayerZ, floor: this.lastPlayerFloor }
             : this.otherPlayers.find((candidate) => candidate.id === targetId);
-          if (live && Math.hypot(live.x - playerX, live.z - playerZ) <= 0.6
+          const lostTarget = targetId === 'host' && this.isHostIgnored;
+          if (live && !lostTarget && Math.hypot(live.x - playerX, live.z - playerZ) <= 0.6
             && this.attackStillConnects(zombie, live.x, live.z, live.floor, live.y)) {
             this.onPlayerAttack?.(zombie.attackDamage, targetId, zombie);
           }

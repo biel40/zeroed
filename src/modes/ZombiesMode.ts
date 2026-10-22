@@ -228,7 +228,7 @@ export class ZombiesMode implements GameMode {
   }
 
   update(dt: number): void {
-    this.rings?.updateJingle(this.isGameplayInputEnabled());
+    this.rings?.updateJingle(this.runAcceptsInput());
     // The view model must never survive a transition that stops gameplay.
     // Some of these states return before the normal end-of-swing cleanup.
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
@@ -245,7 +245,7 @@ export class ZombiesMode implements GameMode {
 
     // The horde keeps shambling behind the game-over screen; it just can't
     // hurt anyone anymore.
-    if (this.isGameplayInputEnabled()) {
+    if (this.runAcceptsInput()) {
       this.health.update(dt);
       this.rounds.update(dt, this.zombies.aliveCount);
       this.processRoundEvents();
@@ -276,6 +276,7 @@ export class ZombiesMode implements GameMode {
       this.boxView.update(dt, this.box);
       this.processBoxEvents();
     }
+    this.rings?.update(dt);
     this.updateCameraShake(dt);
     this.pushHudState();
   }
@@ -288,7 +289,7 @@ export class ZombiesMode implements GameMode {
     object: THREE.Object3D,
     weapon: Weapon,
   ): void {
-    if (!this.isGameplayInputEnabled()) return;
+    if (!this.runAcceptsInput()) return;
     const zombie = object.userData.zombie as Zombie | undefined;
 
     if (!zombie) return;
@@ -313,7 +314,7 @@ export class ZombiesMode implements GameMode {
 
   /** The Ray Gun bypasses hitscan ballistics and fires a visible bolt. */
   onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
-    if (!this.isGameplayInputEnabled()) return true;
+    if (!this.runAcceptsInput()) return true;
     const energy = weapon.definition.energy;
     if (!energy) return false;
     this.energy.fire(origin, direction, energy);
@@ -393,7 +394,18 @@ export class ZombiesMode implements GameMode {
     return this.gameOver || !this.runFlow.acceptsGameplay;
   }
 
+  /** Shell gate for movement, weapons and interactions: closed while getting back up. */
   isGameplayInputEnabled(): boolean {
+    return this.runAcceptsInput() && !(this.rings?.isGettingUp ?? false);
+  }
+
+  /** Getting back up after a Resurrection ring: the player can look around, nothing else. */
+  isDownedLookEnabled(): boolean {
+    return this.rings?.isGettingUp ?? false;
+  }
+
+  /** The run itself is live: rounds, health, kills and hits keep resolving. */
+  private runAcceptsInput(): boolean {
     return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
   }
 
@@ -926,7 +938,7 @@ export class ZombiesMode implements GameMode {
     source?: ZombieKillSource,
     rewardMultiplier = 1,
   ): void {
-    if (!this.isGameplayInputEnabled()) return;
+    if (!this.runAcceptsInput()) return;
     this.kills++;
     for (const pickup of this.arena?.weaponPickups ?? []) pickup.setKillProgress?.(this.kills);
 
@@ -994,16 +1006,22 @@ export class ZombiesMode implements GameMode {
   }
 
   private onPlayerHit(damage: number, from?: { readonly x: number; readonly y: number; readonly z: number }): void {
-    if (!this.isGameplayInputEnabled()) return;
+    if (!this.runAcceptsInput()) return;
     if (!this.health.damage(damage)) return;
     this.ctx.audio.playPlayerHurt(from && this.spatialCueFor(from));
     this.ctx.hud.flashDamage();
     // Trauma-based shake: offsets pile up and decay smoothly.
     this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);
     if (!this.health.isDead) return;
-    // A charged Resurrection ring takes the death instead: the run goes on.
-    if (this.rings?.tryResurrect(this.health)) this.trauma = 1;
-    else this.endGame();
+    // A charged Resurrection ring takes the death instead: the run goes on,
+    // and the horde loses the player while they get up and for a moment after.
+    const revival = this.rings?.tryResurrect(this.health);
+    if (!revival) {
+      this.endGame();
+      return;
+    }
+    this.trauma = 1;
+    this.zombies.ignoreHost(revival.getUp + revival.untargetable);
   }
 
   /**
@@ -1042,7 +1060,7 @@ export class ZombiesMode implements GameMode {
     object: THREE.Object3D | null,
     distance: number,
   ): void {
-    if (!this.isGameplayInputEnabled()) return;
+    if (!this.runAcceptsInput()) return;
     const zombie = object?.userData.zombie as Zombie | undefined;
     const isTesla = config.color === WEAPON_DEFINITIONS.tesla.energy?.color;
 

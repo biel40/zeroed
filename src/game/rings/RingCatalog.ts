@@ -14,8 +14,12 @@ export type RingEffect = {
   readonly kind: 'resurrection';
   /** Share of max HP restored instead of dying. */
   readonly reviveFraction: number;
-  /** Seconds of invulnerability after coming back. */
+  /** Seconds of invulnerability from the moment the ring fires. */
   readonly invulnerability: number;
+  /** Seconds spent getting back up: the player can look around but not move or fight. */
+  readonly getUp: number;
+  /** Seconds after standing up during which zombies lose track of the player. */
+  readonly untargetable: number;
 };
 
 export interface RingDefinition {
@@ -24,9 +28,11 @@ export interface RingDefinition {
   readonly finger: RingFinger;
   readonly nameKey: TranslationKey;
   readonly descriptionKey: TranslationKey;
-  readonly price: number;
-  /** Price to restore the charges of a spent ring at its machine. */
-  readonly rechargePrice: number;
+  /**
+   * Price of each purchase in a run, the first one and every recharge after
+   * it. Once all are used the machine has nothing left to sell that run.
+   */
+  readonly prices: readonly number[];
   readonly chargesPerPurchase: number;
   /** Enamel glow of the ring, a cold accent of the palette (gold stays premium). */
   readonly glowColor: number;
@@ -43,10 +49,10 @@ export const RING_DEFINITIONS: Readonly<Record<RingId, RingDefinition>> = {
     finger: 'ring',
     nameKey: 'ring.resurrection',
     descriptionKey: 'ring.resurrection.description',
-    price: 2500,
-    rechargePrice: 1500,
+    // Doubles each time, three times a run (like a solo revive machine).
+    prices: [500, 1000, 2000],
     chargesPerPurchase: 1,
     glowColor: 0x3fd8c8,
-    effect: { kind: 'resurrection', reviveFraction: 0.5, invulnerability: 2 },
+    effect: { kind: 'resurrection', reviveFraction: 0.5, invulnerability: 2.5, getUp: 1.2, untargetable: 2 },
   },
 };

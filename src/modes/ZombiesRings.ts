@@ -3,8 +3,9 @@ import { spatialMuffle, spatialPan } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { PlayerHealth } from '../game/PlayerHealth';
 import { PlayerRings } from '../game/rings/PlayerRings';
-import { RING_DEFINITIONS } from '../game/rings/RingCatalog';
+import { RING_DEFINITIONS, type RingEffect } from '../game/rings/RingCatalog';
 import { t } from '../i18n/i18n';
+import { getUpPose } from '../player/ReviveGetUp';
 import { actionKey } from '../ui/InteractionPrompts';
 import type { ArenaRingMachine, RingMachineDisplay } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
@@ -27,6 +28,9 @@ export class ZombiesRings {
   private readonly rings = new PlayerRings();
   private readonly forward = new THREE.Vector3();
   private readonly listener = new THREE.Vector3();
+  /** Seconds into getting back up after a resurrection, and how long it takes; null when standing. */
+  private getUpElapsed: number | null = null;
+  private getUpDuration = 0;
 
   constructor(
     private readonly ctx: ModeContext,
@@ -62,18 +66,42 @@ export class ZombiesRings {
 
   /**
    * A lethal hit landed: a charged Resurrection ring is spent instead of the
-   * run, bringing the player back with its health share and a moment of
-   * invulnerability. True when a ring saved the player.
+   * run, bringing the player back with its health share and invulnerability,
+   * and starting the get-up. Returns the effect that saved the player (the
+   * mode reads how long the horde loses them), or null when no ring could.
    */
-  tryResurrect(health: PlayerHealth): boolean {
+  tryResurrect(health: PlayerHealth): RingEffect | null {
     for (const { ringId } of this.rings.worn) {
       const { effect } = RING_DEFINITIONS[ringId];
       if (effect.kind !== 'resurrection' || !this.rings.consumeCharge(ringId)) continue;
       health.revive(effect.reviveFraction, effect.invulnerability);
+      this.getUpElapsed = 0;
+      this.getUpDuration = effect.getUp;
       this.processEvents();
-      return true;
+      return effect;
     }
-    return false;
+    return null;
+  }
+
+  /** True while the player is getting back up after a resurrection. */
+  get isGettingUp(): boolean {
+    return this.getUpElapsed !== null;
+  }
+
+  /**
+   * Plays the get-up on the camera. Runs after the player controller wrote
+   * its pose this frame: the drop replaces the eye height (which eases back
+   * on its own once standing) and the slump adds to the recoil rotation.
+   */
+  update(dt: number): void {
+    if (this.getUpElapsed === null) return;
+    this.getUpElapsed += Math.max(0, dt);
+    const pose = getUpPose(this.getUpElapsed, this.getUpDuration);
+    const camera = this.ctx.player.camera;
+    camera.position.y = -pose.drop;
+    camera.rotation.x += pose.pitch;
+    camera.rotation.z += pose.roll;
+    if (this.getUpElapsed >= this.getUpDuration) this.getUpElapsed = null;
   }
 
   /**
@@ -109,6 +137,7 @@ export class ZombiesRings {
 
   /** New run: every ring off the hand and back in its machine. */
   reset(): void {
+    this.getUpElapsed = null;
     this.rings.reset();
     this.ctx.handRings.clear();
     this.present();
@@ -177,8 +206,9 @@ export class ZombiesRings {
     })));
   }
 
+  /** Stocked until bought, empty while charged or once every purchase is used, else calling for a recharge. */
   private displayFor(machine: ArenaRingMachine): RingMachineDisplay {
     if (!this.rings.has(machine.ringId)) return 'stocked';
-    return this.rings.chargesOf(machine.ringId) > 0 ? 'empty' : 'recharge';
+    return this.rings.priceOf(machine.ringId) === null ? 'empty' : 'recharge';
   }
 }
