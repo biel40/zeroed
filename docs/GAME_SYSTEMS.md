@@ -124,8 +124,9 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
   puerta de servicio y dos rejillas), la AK-47 en pared y la escalera mecanica
   sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
   el muro este: dos entradas mas, que solo generan zombis con la puerta
-  abierta, el M4A1 (1500 / 750), la Mystery Box y la taquilla del anillo de
-  Resurreccion. Un unico rectangulo de `playerBounds` y de navegacion cubre
+  abierta, la Mystery Box y la taquilla del anillo de Resurreccion (su arma
+  de pared esta pendiente). Las rejillas este del vestibulo se separaron para
+  dejar un pasillo de 5,8 m. Un unico rectangulo de `playerBounds` y de navegacion cubre
   ambas salas: muros y la puerta cerrada son lo que impide el paso. Reiniciar
   cierra la puerta y duerme la zona. Aun no tiene final. La arena solo
   orquesta: cada zona tiene su builder en `station33/`, y la luz y la
@@ -233,6 +234,11 @@ prompt, la muerte y el reinicio.
   gasta el anillo en lugar de terminar la run, devuelve el 50 % de la vida con
   2 s de invulnerabilidad, sacude la camara, destella la pantalla en frio y
   suena un latido. Sin carga, el flujo de muerte no cambia.
+- Las maquinas suenan como las de bebidas: `ZombiesRings` sigue cada frame a
+  la mas cercana en la planta del jugador y `AudioSystem.setRingJingle`
+  mantiene un unico bucle (volumen, paneo y apagado por distancia y
+  orientacion, sin allocations), callado en intro, pausa, derrota y final.
+  `ring_machine_jingle.mp3` sustituye al tono procedural si existe.
 - El anillo se ve en el dedo del guante derecho en primera persona
   (`HandRings`, hijo del hueso de la falange, sin tocar la pose ni subir nunca
   hacia la mira); brilla con su esmalte al ponerselo y al dispararse y se apaga

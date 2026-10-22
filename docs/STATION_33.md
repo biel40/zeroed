@@ -45,20 +45,27 @@ codigo: actualiza la guia.
 ## La consigna (Fase 2)
 
 - La consigna de equipajes de la estacion: lo que los evacuados entregaron y
-  nadie volvio a recoger. Pasillo estrecho entre los pasadizos de las rejillas
-  y una sala de taquillas de acero con numeracion cirilica ("Б-17"), puertas
+  nadie volvio a recoger. Un pasillo holgado (5,8 m, para que la horda y el
+  jugador se crucen) entre los pasadizos de las rejillas del vestibulo, que se
+  separaron para hacerle sitio, y una sala de taquillas de acero con numeracion cirilica ("Б-17"), puertas
   colgando abiertas, un mostrador con la persiana bajada, un carro de mozo y
   maletas por el suelo. Techo plano y bajo de servicio y azulejo vidriado
   amarillento por las filtraciones: mas pobre y mas humeda que el vestibulo.
 - Se entra por una puerta de chapa de acero (750 Points) junto al banco del
   muro este; con ella cerrada la sala no existe para el jugador ni para los
   zombis. Al abrirla despiertan sus dos entradas (escalera de mozos sepultada
-  y una rejilla), el M4A1 en pared, la Mystery Box y la taquilla del anillo.
+  y una rejilla), la Mystery Box y la taquilla del anillo. El arma de pared
+  de la consigna esta pendiente.
 - La taquilla del anillo, bajo la placa "БЮРО НАХОДОК" (objetos perdidos), es
   el foco al final del eje del pasillo: abierta, con un cojin de terciopelo y
   la alianza brillando con su propio esmalte. Tras la compra queda vacia y
   apagada; si el anillo se gasta, el cojin vacio vuelve a latir para pedir la
   recarga. Ese brillo es de material emisivo, nunca una luz.
+- Alrededor de la taquilla suena en bucle una musica de maquina, como el jingle
+  de las bebidas de CoD Zombies: se oye a pleno a su lado y se apaga a unos
+  10 m, nunca desde el vestibulo. Hoy es una cajita de musica procedural
+  provisional; `public/assets/audio/ring_machine_jingle.mp3` la sustituye en
+  cuanto exista (pista libre de derechos, en bucle limpio).
 
 ## Anillos
 

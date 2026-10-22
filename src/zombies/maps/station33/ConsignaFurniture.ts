@@ -66,7 +66,7 @@ const LOCKER_BANKS: ReadonlyArray<LockerBank> = [
     ajar: [1, 13],
     ringLockers: STATION33_RING_LOCKERS.filter((locker) => locker.facingX < 0).map((locker) => locker.z),
   },
-  { frame: new WallFrame('z', hall.minX, 1), from: 12.6, to: 15.4, ajar: [5], ringLockers: [] },
+  { frame: new WallFrame('z', hall.minX, 1), from: 13.4, to: 16.2, ajar: [5], ringLockers: [] },
 ];
 
 /** Luggage counter in the south-west corner, its shutter rolled down behind it. */

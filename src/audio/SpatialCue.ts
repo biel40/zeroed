@@ -38,16 +38,9 @@ export function spatialCue(listener: Point3, forward: Point3, source: Point3): S
   const dx = source.x - listener.x;
   const dy = source.y - listener.y;
   const dz = source.z - listener.z;
-  const horizontal = Math.hypot(dx, dz);
-  const distance = Math.hypot(horizontal, dy);
-  const forwardLength = Math.hypot(forward.x, forward.z);
-  let pan = 0;
-  if (horizontal > 0.001 && forwardLength > 0.001) {
-    // Right-hand vector of the horizontal forward is (-fz, fx).
-    pan = THREE.MathUtils.clamp((dx * -forward.z + dz * forward.x) / (horizontal * forwardLength), -1, 1);
-  }
+  const distance = Math.hypot(dx, dy, dz);
   return {
-    pan,
+    pan: spatialPan(listener, forward, source),
     attenuation: THREE.MathUtils.clamp(
       1 / (1 + Math.max(0, distance - NEAR_DISTANCE) * FALLOFF),
       MIN_ATTENUATION,
@@ -57,7 +50,18 @@ export function spatialCue(listener: Point3, forward: Point3, source: Point3): S
   };
 }
 
-/** Muffle alone, without allocating: per-frame callers (footsteps) use this. */
+/** Stereo pan alone (-1 left, 1 right), without allocating. */
+export function spatialPan(listener: Point3, forward: Point3, source: Point3): number {
+  const dx = source.x - listener.x;
+  const dz = source.z - listener.z;
+  const horizontal = Math.hypot(dx, dz);
+  const forwardLength = Math.hypot(forward.x, forward.z);
+  if (horizontal <= 0.001 || forwardLength <= 0.001) return 0;
+  // Right-hand vector of the horizontal forward is (-fz, fx).
+  return THREE.MathUtils.clamp((dx * -forward.z + dz * forward.x) / (horizontal * forwardLength), -1, 1);
+}
+
+/** Muffle alone, without allocating: per-frame callers (footsteps, loops) use this. */
 export function spatialMuffle(listener: Point3, forward: Point3, source: Point3): number {
   const dx = source.x - listener.x;
   const dz = source.z - listener.z;

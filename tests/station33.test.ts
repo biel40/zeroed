@@ -244,7 +244,7 @@ describe('Station 33 layout', () => {
   it('hangs every wall buy 2 cm off a wall, within reach, at the mansion prices', () => {
     const arena = makeArena();
     openDoorTo(arena, 'consigna');
-    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([['ak47', 1750, 900], ['m4a1', 1500, 750]]);
+    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([['ak47', 1750, 900]]);
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
     for (const wallBuy of STATION33_WALL_BUYS) {
       const facing = new THREE.Vector3(Math.sin(wallBuy.yaw), 0, Math.cos(wallBuy.yaw));
@@ -268,6 +268,13 @@ describe('Station 33 layout', () => {
 });
 
 describe('Station 33 luggage office', () => {
+  it('gives the corridor room for the horde and the player to pass each other', () => {
+    expect(CONSIGNA.corridor.maxZ - CONSIGNA.corridor.minZ).toBeGreaterThanOrEqual(5.5);
+    const door = STATION33_DOORS.find((candidate) => candidate.zone === 'consigna')!;
+    expect(door.z - 0.8).toBeGreaterThan(CONSIGNA.corridor.minZ);
+    expect(door.z + 0.8).toBeLessThan(CONSIGNA.corridor.maxZ);
+  });
+
   it('stays unreachable and silent until its door is bought', () => {
     const arena = makeArena();
     expect(walk(arena, 6.2, 8.8, FACE_EAST, 3).x).toBeLessThan(VESTIBULE.maxX);

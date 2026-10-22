@@ -228,6 +228,7 @@ export class ZombiesMode implements GameMode {
   }
 
   update(dt: number): void {
+    this.rings?.updateJingle(this.isGameplayInputEnabled());
     // The view model must never survive a transition that stops gameplay.
     // Some of these states return before the normal end-of-swing cleanup.
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
@@ -375,9 +376,11 @@ export class ZombiesMode implements GameMode {
     this.ctx.hud.showIntro(presentation, duration, () => this.endIntro());
   }
 
-  /** Pausing mid-intro skips it: the run resumes in first person. */
+  /** Pausing mid-intro skips it (the run resumes in first person) and silences the ring jingle. */
   onLocalPauseChanged(paused: boolean): void {
-    if (paused) this.endIntro();
+    if (!paused) return;
+    this.endIntro();
+    this.rings?.updateJingle(false);
   }
 
   /** While the intro plays, the shell renders its camera instead of the player's. */

@@ -46,7 +46,7 @@ function addSignage(context: Station33BuildContext): void {
   addSign(context, 'civil-defence', VESTIBULE.maxX - 0.01, 1.75, 12.4, 0.62, 0.93, '-x');
   addSign(context, 'torn-poster-a', VESTIBULE.minX + 0.01, 1.55, 2.6, 0.6, 0.9, '+x');
   addSign(context, 'torn-poster-b', VESTIBULE.minX + 0.01, 1.45, 6.0, 0.55, 0.82, '+x');
-  addSign(context, 'torn-poster-a', VESTIBULE.maxX - 0.01, 1.5, 4.2, 0.6, 0.9, '-x');
+  addSign(context, 'torn-poster-a', VESTIBULE.maxX - 0.01, 1.5, 6.4, 0.6, 0.9, '-x');
 }
 
 /** Glass doors with bronze frames, cracked and choked by rubble from the collapsed stairway. */

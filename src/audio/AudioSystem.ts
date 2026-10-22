@@ -109,6 +109,32 @@ export interface AmbientCuePlayback {
 
 /** Ambient cues set the mood of the whole map, so distance never buries them. */
 const AMBIENT_CUE_MIN_ATTENUATION = 0.35;
+/** Loudest the ring-machine jingle gets, standing at the machine: background, never over the fight. */
+const RING_JINGLE_GAIN = 0.16;
+/** Smallest change worth a new automation event on the jingle's nodes. */
+const RING_JINGLE_EPSILON = 0.01;
+
+/**
+ * Placeholder ring-machine tune: a music-box waltz in A minor, one note per
+ * beat (MIDI, 0 = rest) over eight 1 s bars, with a soft bass on each bar.
+ */
+const RING_JINGLE_TUNE = {
+  beat: 1 / 3,
+  melody: [69, 72, 76, 74, 72, 71, 69, 64, 69, 68, 71, 76, 77, 76, 74, 72, 71, 69, 71, 68, 64, 69, 0, 0],
+  bass: [45, 50, 45, 40, 50, 45, 40, 45],
+} as const;
+
+interface RingJingle {
+  source: AudioBufferSourceNode;
+  sampled: boolean;
+  readonly input: AudioNode;
+  readonly gain: GainNode;
+  readonly lowpass: BiquadFilterNode;
+  readonly panner: StereoPannerNode | null;
+  volume: number;
+  pan: number;
+  muffle: number;
+}
 
 /** Seconds after activation at which the ritual scare's visual beats land. */
 export interface RitualScareBeats {
@@ -148,6 +174,10 @@ export class AudioSystem {
   private dryFireBuffer: AudioBuffer | null = null;
   private doorPurchaseBuffer: AudioBuffer | null = null;
   private readonly ambientSamples = new Map<string, AudioBuffer | null>();
+  private ringJingle: RingJingle | null = null;
+  private ringJingleSample: AudioBuffer | null = null;
+  private ringJingleRequested = false;
+  private readonly ringJingleUrl: string = `${import.meta.env.BASE_URL}assets/audio/ring_machine_jingle.mp3`;
   private readonly mysteryBoxOpenUrl: string = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
   private readonly dryFireUrl: string = `${import.meta.env.BASE_URL}assets/audio/encasquillada_arma.mp3`;
   private readonly doorPurchaseUrl: string = `${import.meta.env.BASE_URL}assets/audio/door_purchase.mp3`;
@@ -203,6 +233,7 @@ export class AudioSystem {
     this.stopSettingsListener();
     this.stopEndingAudio();
     this.stopWind();
+    this.stopRingJingle();
     const ctx = this.ctx;
     this.ctx = null;
     this.master = null;
@@ -718,6 +749,86 @@ export class AudioSystem {
     this.tone(t + 0.25, 'sine', 988, 0.1, 1.2);
     this.tone(t + 0.38, 'triangle', 1319, 0.07, 1.0);
     this.sweep(0.1, 'sawtooth', 160, 1200, 0.05, 0.9);
+  }
+
+  /**
+   * The music of the ring machines, heard around them like a perk jingle:
+   * an endless loop whose volume, pan and muffle follow the listener.
+   * `ring_machine_jingle.mp3` in `assets/audio/` replaces the procedural
+   * tune once it decodes. Volume 0 keeps the loop running silently; the loop
+   * only starts the first time it is audible. Allocation free per frame.
+   */
+  public setRingJingle(volume: number, pan: number, muffle: number): void {
+    if (volume <= 0 && !this.ringJingle) return;
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    if (!this.ringJingleRequested) {
+      this.ringJingleRequested = true;
+      void this.loadSample(this.ringJingleUrl).then((buffer) => { this.ringJingleSample = buffer; });
+    }
+    const jingle = this.ringJingle ?? this.startRingJingle(audio);
+    if (this.ringJingleSample && !jingle.sampled) this.swapRingJingleSource(audio, jingle, this.ringJingleSample);
+    const t = audio.ctx.currentTime;
+    if (Math.abs(volume - jingle.volume) > RING_JINGLE_EPSILON) {
+      jingle.volume = volume;
+      jingle.gain.gain.setTargetAtTime(clamp(volume, 0, 1) * RING_JINGLE_GAIN, t, 0.15);
+    }
+    if (Math.abs(muffle - jingle.muffle) > RING_JINGLE_EPSILON) {
+      jingle.muffle = muffle;
+      jingle.lowpass.frequency.setTargetAtTime(muffleCutoff(muffle), t, 0.1);
+    }
+    if (jingle.panner && Math.abs(pan - jingle.pan) > RING_JINGLE_EPSILON) {
+      jingle.pan = pan;
+      jingle.panner.pan.setTargetAtTime(clamp(pan, -1, 1), t, 0.1);
+    }
+  }
+
+  private startRingJingle(audio: AudioContextParts): RingJingle {
+    const { ctx, master } = audio;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.connect(master);
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = muffleCutoff(0);
+    lowpass.Q.value = 0.5;
+    lowpass.connect(gain);
+    const panner = typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : null;
+    panner?.connect(lowpass);
+    const input: AudioNode = panner ?? lowpass;
+    const source = this.loopSource(ctx, ringJingleTune(ctx), input);
+    this.ringJingle = { source, sampled: false, input, gain, lowpass, panner, volume: 0, pan: 0, muffle: 0 };
+    return this.ringJingle;
+  }
+
+  private swapRingJingleSource(audio: AudioContextParts, jingle: RingJingle, sample: AudioBuffer): void {
+    const previous = jingle.source;
+    jingle.source = this.loopSource(audio.ctx, sample, jingle.input);
+    jingle.sampled = true;
+    try {
+      previous.stop();
+    } catch {
+      // Already stopped; safe to ignore.
+    }
+  }
+
+  private loopSource(ctx: AudioContext, buffer: AudioBuffer, output: AudioNode): AudioBufferSourceNode {
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(output);
+    source.start();
+    return source;
+  }
+
+  private stopRingJingle(): void {
+    if (!this.ringJingle) return;
+    try {
+      this.ringJingle.source.stop();
+    } catch {
+      // Already stopped; safe to ignore.
+    }
+    this.ringJingle = null;
   }
 
   /** Low guttural drop when a zombie dies. */
@@ -1444,6 +1555,36 @@ export class AudioSystem {
 
 function masterGain(): number {
   return EFFECTS_MIX * effectsGain();
+}
+
+/**
+ * Renders the placeholder ring-machine tune once into a seamless loop:
+ * bell-like music-box notes whose tails wrap around the loop point.
+ */
+function ringJingleTune(ctx: AudioContext): AudioBuffer {
+  const { beat, melody, bass } = RING_JINGLE_TUNE;
+  const rate = ctx.sampleRate;
+  const length = Math.round(melody.length * beat * rate);
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const note = (midi: number, start: number, decay: number, level: number, bell: boolean): void => {
+    const frequency = 440 * 2 ** ((midi - 69) / 12);
+    const tail = Math.round(decay * 4 * rate);
+    for (let index = 0; index < tail; index++) {
+      const time = index / rate;
+      const envelope = Math.min(1, time / 0.004) * Math.exp(-time / decay);
+      const phase = 2 * Math.PI * frequency * time;
+      const tone = bell
+        ? Math.sin(phase) + 0.3 * Math.sin(phase * 2) + 0.12 * Math.sin(phase * 4.2)
+        : Math.sin(phase);
+      data[(start + index) % length] += tone * envelope * level;
+    }
+  };
+  melody.forEach((midi, index) => {
+    if (midi > 0) note(midi, Math.round(index * beat * rate), 0.45, 0.32, true);
+  });
+  bass.forEach((midi, bar) => note(midi, Math.round(bar * 3 * beat * rate), 0.8, 0.22, false));
+  return buffer;
 }
 
 function clamp(value: number, min: number, max: number): number {

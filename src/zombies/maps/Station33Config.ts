@@ -123,12 +123,13 @@ export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
 
 /**
  * Phase 2 luggage office, interior faces like VESTIBULE. The corridor runs
- * east from the vestibule door between the two east vent passages; the hall
+ * east from the vestibule door between the two east vent passages (5.8 m
+ * wide, room for the horde and the player to pass each other); the hall
  * starts past their dead ends (x = 13.6) and shares the vestibule's south
  * line, so the player bounds close its south entrance the same way.
  */
 export const CONSIGNA = {
-  corridor: { minX: VESTIBULE.maxX + STATION33_WALL_THICKNESS, maxX: 14, minZ: 7.95, maxZ: 12.05 },
+  corridor: { minX: VESTIBULE.maxX + STATION33_WALL_THICKNESS, maxX: 14, minZ: 7, maxZ: 12.8 },
   hall: { minX: 14, maxX: 21, minZ: 6, maxZ: VESTIBULE.maxZ },
   /** Flat service ceiling, lower than the vestibule vault. */
   ceilingHeight: 3.2,
@@ -147,8 +148,9 @@ const CONSIGNA_EAST_WALL_X = CONSIGNA.hall.maxX + STATION33_WALL_THICKNESS / 2;
 export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'surface-stairs', x: -3.6, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'vestibule' },
   { id: 'service-door-west', x: WEST_WALL_X, z: 4.0, outwardX: -1, outwardZ: 0, kind: 'gate', zone: 'vestibule' },
-  { id: 'vent-east-north', x: EAST_WALL_X, z: 6.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
-  { id: 'vent-east-south', x: EAST_WALL_X, z: 13.6, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
+  // Spread apart in phase 2 so the luggage-office corridor fits between their passages.
+  { id: 'vent-east-north', x: EAST_WALL_X, z: 4.6, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
+  { id: 'vent-east-south', x: EAST_WALL_X, z: 15.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
   { id: 'consigna-porters-stairs', x: 17.5, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'consigna' },
   { id: 'consigna-vent-east', x: CONSIGNA_EAST_WALL_X, z: 15.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'consigna' },
 ];
@@ -224,16 +226,6 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     yaw: Math.PI / 2,
     floor: 0,
   },
-  {
-    // Halfway down the luggage-office corridor, out of reach from the vestibule.
-    id: 'consigna-m4a1',
-    weaponId: 'm4a1',
-    price: 1500,
-    ammoPrice: 750,
-    position: { x: 10.6, y: 1.45, z: CONSIGNA.corridor.maxZ - 0.02 },
-    yaw: Math.PI,
-    floor: 0,
-  },
 ];
 
 /** The luggage office's crate, against the north lockers with its front to the hall. */
@@ -261,7 +253,7 @@ export interface Station33RingLocker {
 export const CONSIGNA_LOCKER = { depth: 0.5, height: 2.0, columnWidth: 0.42, rows: 3, ringLockerWidth: 0.62 } as const;
 
 export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
-  { id: 'consigna-resurrection', ringId: 'resurrection', x: CONSIGNA.hall.maxX - CONSIGNA_LOCKER.depth, z: 10, facingX: -1, facingZ: 0 },
+  { id: 'consigna-resurrection', ringId: 'resurrection', x: CONSIGNA.hall.maxX - CONSIGNA_LOCKER.depth, z: 9.9, facingX: -1, facingZ: 0 },
 ];
 
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
@@ -341,7 +333,7 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: -2, y: 3.85, z: 2.5, color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing', zone: 'vestibule' },
   { x: 17.5, y: 2.95, z: 9.2, color: FLUORESCENT_COLOR, intensity: 5, distance: 7, circuit: 'steady', zone: 'consigna' },
   { x: 17.5, y: 2.95, z: 14.8, color: FLUORESCENT_COLOR, intensity: 4.5, distance: 7, circuit: 'failing', zone: 'consigna' },
-  { x: 10.6, y: 2.95, z: 10, color: FLUORESCENT_COLOR, intensity: 4, distance: 4.5, circuit: 'unstable', zone: 'consigna' },
+  { x: 10.6, y: 2.95, z: 9.9, color: FLUORESCENT_COLOR, intensity: 4, distance: 4.5, circuit: 'unstable', zone: 'consigna' },
 ];
 
 /**
@@ -357,7 +349,7 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: 2, z: 11.25, circuit: 'dead' },
   { x: -2, z: 15.5, circuit: 'steady' },
   { x: 2, z: 15.5, circuit: 'failing' },
-  { x: 10.6, z: 10, circuit: 'unstable' },
+  { x: 10.6, z: 9.9, circuit: 'unstable' },
   { x: 17.5, z: 9.2, circuit: 'steady' },
   { x: 19.4, z: 12, circuit: 'dead' },
   { x: 17.5, z: 14.8, circuit: 'failing' },

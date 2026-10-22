@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { spatialMuffle, spatialPan } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { PlayerHealth } from '../game/PlayerHealth';
 import { PlayerRings } from '../game/rings/PlayerRings';
@@ -11,6 +12,9 @@ import type { ModeContext } from './GameMode';
 /** How strongly the worn ring flares when put on or recharged, and when it fires. */
 const WEAR_PULSE = 0.8;
 const FIRE_PULSE = 1;
+/** The machines' jingle plays at full volume up to here, then fades out by JINGLE_RANGE (metres). */
+const JINGLE_FULL_VOLUME_DISTANCE = 2.5;
+const JINGLE_RANGE = 10;
 
 /**
  * Rings in a single-player Zombies run. Sells and recharges them at the
@@ -22,6 +26,7 @@ const FIRE_PULSE = 1;
 export class ZombiesRings {
   private readonly rings = new PlayerRings();
   private readonly forward = new THREE.Vector3();
+  private readonly listener = new THREE.Vector3();
 
   constructor(
     private readonly ctx: ModeContext,
@@ -69,6 +74,37 @@ export class ZombiesRings {
       return true;
     }
     return false;
+  }
+
+  /**
+   * The machines' jingle, like a perk machine's: it plays around the nearest
+   * machine on the player's floor and fades out with distance. Silent while
+   * `audible` is false (intro, pause, game over, ending) or no machine is in
+   * range. Called every frame; allocation free.
+   */
+  updateJingle(audible: boolean): void {
+    const player = this.ctx.player;
+    const listener = player.camera.getWorldPosition(this.listener);
+    let nearest: ArenaRingMachine | null = null;
+    let nearestDistance = JINGLE_RANGE;
+    for (const machine of audible ? this.machines : []) {
+      if (machine.floor !== player.floor) continue;
+      const distance = Math.hypot(machine.position.x - listener.x, machine.position.z - listener.z);
+      if (distance < nearestDistance) {
+        nearest = machine;
+        nearestDistance = distance;
+      }
+    }
+    if (!nearest) {
+      this.ctx.audio.setRingJingle(0, 0, 0);
+      return;
+    }
+    const forward = player.camera.getWorldDirection(this.forward);
+    this.ctx.audio.setRingJingle(
+      1 - THREE.MathUtils.smoothstep(nearestDistance, JINGLE_FULL_VOLUME_DISTANCE, JINGLE_RANGE),
+      spatialPan(listener, forward, nearest.position),
+      spatialMuffle(listener, forward, nearest.position),
+    );
   }
 
   /** New run: every ring off the hand and back in its machine. */
