@@ -1,30 +1,50 @@
-# Zeroed
+# 🔫 Zeroed
 
-FPS de zombies para navegador. Sobrevive a las rondas en Burned Mansion, individual o en cooperativo.
+**FPS de supervivencia zombi para navegador**, creado con Three.js y TypeScript.
+Sobrevive a las rondas, consigue armas y descubre los secretos de cada mapa.
 
-## Inicio
+| 🧍 Individual | 🤝 Cooperativo | 🌐 Plataforma |
+| --- | --- | --- |
+| Burned Mansion y Station 33* | Hasta 2 jugadores en Burned Mansion | Navegador, PWA y Android |
+
+\* Station 33 está disponible en acceso beta y solo para un jugador.
+
+## 🚀 Empezar
+
+Necesitas Node.js y npm. Desde la raíz del proyecto:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173`. Para cooperativo local, ejecuta también `npm run multiplayer:server` ([docs](docs/MULTIPLAYER.md)).
+Abre [http://localhost:5173](http://localhost:5173) y pulsa **START**.
+Para jugar en cooperativo local, inicia también `npm run multiplayer:server`
+en otra terminal; más detalles en la [guía multijugador](docs/MULTIPLAYER.md).
 
-## Controles
+## 🎮 Controles de teclado y ratón
 
-| Entrada | Acción |
+| Teclas / ratón | Acción |
 | --- | --- |
-| `WASD` / ratón | Movimiento y cámara |
-| `LMB` / `RMB` | Disparar / apuntar |
-| `R` / `X` | Recargar / modo de fuego |
-| `1` `2` / `3` | Arma / cuchillo |
+| `W A S D` / ratón | Moverse / mirar |
+| Clic izquierdo / derecho | Disparar / apuntar |
+| `1` / `2` / `3` | Cambiar arma / cuchillo |
+| `R` / `X` | Recargar / cambiar modo de fuego |
 | `E` | Interactuar |
-| `Space` / `ESC` | Saltar / pausa |
+| `Espacio` / `Esc` | Saltar / pausa |
 
-## Comandos
+## 🧰 Desarrollo
 
-- `npm run test` · `npm run typecheck` · `npm run build`
-- `npm run android:run` · `npm run android:release`
+```bash
+npm run test       # Tests
+npm run typecheck  # TypeScript
+npm run build      # Comprobación y build de producción
+```
 
-Más: [cambios](docs/changes/)
+## 📚 Más información
+
+- [Cambios recientes](docs/changes/)
+- [Sistemas de juego](docs/GAME_SYSTEMS.md)
+- [Arquitectura](docs/ARCHITECTURE.md)
+- [Cooperativo y servidor](docs/MULTIPLAYER.md)
+- [PWA](docs/PWA.md) · [Android](docs/ANDROID_DOCS.md)
