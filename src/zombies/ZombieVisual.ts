@@ -8,6 +8,7 @@ import {
   setRayGunDissolveState,
 } from '../rendering/RayGunDissolveShader';
 import type { ZombieState } from './Zombie';
+import { windowVaultPose, type WindowVaultPose } from './barriers/WindowVault';
 import { ShinyStars } from './ShinyStars';
 import { ZombieElectricArcs } from './ZombieElectricArcs';
 import { ZombieLimb } from './ZombieLimb';
@@ -577,6 +578,12 @@ export class ZombieVisual {
   private nextAttackVariant = 0;
   private nextBarrierVariant = 0;
   private readonly strikeTarget = new THREE.Vector3(0, 1.3, 1);
+  /** Climb pose the owner asks for, and the eased pose actually shown (it settles when a climb ends or is cut short). */
+  private readonly vaultGoal: WindowVaultPose = { lift: 0, rootPitch: 0, torsoPitch: 0, roll: 0, reach: 0 };
+  private readonly vaultPose: WindowVaultPose = { lift: 0, rootPitch: 0, torsoPitch: 0, roll: 0, reach: 0 };
+  /** Sill height and distance ahead to it, in root units, for the planted hands. */
+  private vaultSill = 0;
+  private vaultDepth = 0;
   private readonly limbPoint = new THREE.Vector3();
   private readonly limbRotation = new THREE.Quaternion();
 
@@ -765,6 +772,8 @@ export class ZombieVisual {
     this.deathTime = this.deathLean = this.deathSide = this.deathTwist = 0;
     this.deathStyle = 'knockback';
     this.groundOffset = this.attackReach = 0;
+    this.clearWindowVault();
+    Object.assign(this.vaultPose, this.vaultGoal);
     this.locomotionAction = null;
     this.strikeTarget.set(0, 1.3, 1);
     this.root.position.set(0, 0, 0);
@@ -856,6 +865,21 @@ export class ZombieVisual {
   /** Contact point relative to the navigation body, in unscaled visual meters. */
   setStrikeTarget(x: number, y: number, z: number): void {
     this.strikeTarget.set(x, y, z);
+  }
+
+  /**
+   * Climb over a window sill at `progress` 0..1; `sill` and `depth` (how
+   * far ahead the sill is) are in root units. Layered over the walk cycle.
+   */
+  setWindowVault(progress: number, sill: number, depth: number): void {
+    windowVaultPose(progress, sill, this.vaultGoal);
+    this.vaultSill = sill;
+    this.vaultDepth = depth;
+  }
+
+  /** No climb: the pose eases back to the plain walk. */
+  clearWindowVault(): void {
+    this.vaultGoal.lift = this.vaultGoal.rootPitch = this.vaultGoal.torsoPitch = this.vaultGoal.roll = this.vaultGoal.reach = 0;
   }
 
   setBarrierBreakDuration(seconds: number): void {
@@ -1129,6 +1153,12 @@ export class ZombieVisual {
       this.root.position.y += sampleWindowMotion(progress, 0, -0.015, -0.025, -0.015, 0);
       this.root.position.z = sampleWindowMotion(progress, 0, 0.025, 0.025, -0.025, 0);
     }
+    this.easeWindowVault(dt);
+    // The leading leg alternates with the stride phase, so bodies do not climb in lockstep.
+    const leadSide = this.walkPhase < 0.5 ? 1 : -1;
+    this.root.position.y += this.vaultPose.lift;
+    this.root.rotation.x += this.vaultPose.rootPitch;
+    this.root.rotation.z += this.vaultPose.roll * leadSide;
 
     if (this.mixer) {
       const walk = this.actions.get('walk');
@@ -1195,6 +1225,7 @@ export class ZombieVisual {
       this.applyAttackBodyPose(this.barrierProgress());
     }
     this.applyInertia(dt);
+    this.applyWindowVaultPose();
     this.applyLimbMotion();
     const blend = smoothStep(Math.min(1, this.transitionTime / this.transitionDuration));
     if (blend < 1) {
@@ -1407,6 +1438,46 @@ export class ZombieVisual {
     const decay = Math.exp(-dt * 6);
     this.reactionX *= decay;
     this.reactionZ *= decay;
+  }
+
+  private easeWindowVault(dt: number): void {
+    const blend = 1 - Math.exp(-Math.max(0, dt) * 12);
+    const pose = this.vaultPose;
+    const goal = this.vaultGoal;
+    pose.lift += (goal.lift - pose.lift) * blend;
+    pose.rootPitch += (goal.rootPitch - pose.rootPitch) * blend;
+    pose.torsoPitch += (goal.torsoPitch - pose.torsoPitch) * blend;
+    pose.roll += (goal.roll - pose.roll) * blend;
+    pose.reach += (goal.reach - pose.reach) * blend;
+  }
+
+  /** Spine hunched over the sill and both hands planted on it while hauling the body up. */
+  private applyWindowVaultPose(): void {
+    const rig = this.barrierRig;
+    const pose = this.vaultPose;
+    if (!rig || this.state === 'death') return;
+    if (pose.torsoPitch > 1e-3) {
+      this.rotateBarrierBone(rig.torso, pose.torsoPitch, 0, 0);
+      // The head keeps looking ahead into the room.
+      this.rotateBarrierBone(rig.head, -pose.torsoPitch * 0.5, 0, 0);
+    }
+    if (pose.reach <= 1e-3 || this.state === 'attack' || this.state === 'barrierAttack' || this.state === 'barrierBreak') return;
+    if (this.arms.length !== 2) {
+      this.rotateBarrierBone(rig.shoulderL, -0.95 * pose.reach, 0, 0);
+      this.rotateBarrierBone(rig.shoulderR, -0.95 * pose.reach, 0, 0);
+      return;
+    }
+    const height = this.modelConfig.height;
+    for (const arm of this.arms) {
+      const side = Math.sign(arm.rest.x) || 1;
+      // Hands on the sill edge a shoulder-width apart; body-relative like the strikes.
+      this.limbPoint.set(side * 0.2, this.vaultSill + 0.03, Math.max(0.14, this.vaultDepth));
+      this.limbPoint.sub(this.root.position);
+      this.limbRotation.copy(this.root.quaternion).invert();
+      this.limbPoint.applyQuaternion(this.limbRotation);
+      arm.solve(this.limbPoint.x, this.limbPoint.y, this.limbPoint.z,
+        side * height * 0.24, height * 0.52, -0.05, pose.reach, 0, true);
+    }
   }
 
   private applyAttackBodyPose(progress: number): void {

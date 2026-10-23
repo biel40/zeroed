@@ -163,7 +163,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         },
         left: {
           position: [0, 0.01, -0.29], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
-          hold: { size: [0.059, 0.051], axis: [0, 0, -1] },
+          hold: { size: [0.06, 0.058], axis: [0, 0, -1] },
         },
         // The charging-handle latch is on the left: the support hand racks it.
         actionHand: 'left',
@@ -177,9 +177,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         magSeat: 0.64,
         charge: 0.72,
         chargeEnd: 0.94,
-        magSize: [0.025, 0.13, 0.055],
-        magColor: 0x555b5e,
-        magAnchor: [0, -0.07, -0.15],
+        magSize: [0.025, 0.18, 0.066],
+        magColor: 0x2c3033,
+        magAnchor: [0, -0.06, -0.1],
         magRotation: [0.12, 0, 0],
       },
     },
@@ -554,8 +554,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'semi',
     rpm: 60,
     magazineSize: 5,
-    reloadTime: 1.1,
-    tacticalReloadTime: 0.8,
+    // Unhurried: the rifle is shown whole while the box magazine is swapped.
+    reloadTime: 2.8,
+    tacticalReloadTime: 2.2,
     boltAction: true,
     boltCycleTime: 0.7,
     scoped: true,
@@ -617,12 +618,12 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       },
       reloadAnim: {
         style: 'bolt',
-        magOut: 0.08,
-        magDrop: 0.22,
-        magIn: 0.42,
-        magSeat: 0.56,
-        charge: 0.64,
-        chargeEnd: 0.96,
+        magOut: 0.1,
+        magDrop: 0.28,
+        magIn: 0.44,
+        magSeat: 0.68,
+        charge: 0.76,
+        chargeEnd: 0.97,
         magSize: [0.028, 0.09, 0.07],
         // Blued steel 5-round detachable box magazine.
         magColor: 0x17191b,
@@ -691,23 +692,28 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       optic: 'irons',
       sightHeight: 0.07,
       bulk: 0.9,
-      // One-handed pistol: the left arm stays hidden.
+      // One-handed pistol: the left arm only shows to swap the canister.
       hands: {
         right: {
           position: [0, -0.1, 0.086], axis: [0, 1, -0.12], palm: [-1, -0.1, 0], pose: 'pistolGrip',
           hold: { size: [0.03, 0.049], axis: [0, 0.946, -0.326] }, trigger: [0, -0.07, 0.003],
         },
+        // Underhand around the plasma chamber, in the canister's frame.
+        magazine: {
+          position: [0, 0, -0.05], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.078, 0.078], axis: [0, 0, -1] },
+        },
       },
       reloadAnim: {
-        style: 'cell',
-        magOut: 0.1,
-        magDrop: 0.26,
-        magIn: 0.48,
-        magSeat: 0.62,
+        style: 'canister',
+        magOut: 0.08,
+        magDrop: 0.3,
+        magIn: 0.52,
+        magSeat: 0.74,
         // No charging handle: the charge window drives the energy spin-up.
-        charge: 0.68,
-        chargeEnd: 0.95,
-        magSize: [0.048, 0.048, 0.048],
+        charge: 0.76,
+        chargeEnd: 0.97,
+        magSize: [0.08, 0.08, 0.28],
         magColor: 0x5cff3a,
       },
     },

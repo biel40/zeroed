@@ -47,7 +47,7 @@ describe('Vector definition', () => {
 
   it('is a standard Mystery Box pull and a Station 33 wall buy', () => {
     expect(MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'vector')).toMatchObject({ rarity: 'standard' });
-    expect(STATION33_WALL_BUYS.find((wallBuy) => wallBuy.weaponId === 'vector')).toMatchObject({ price: 1250, ammoPrice: 625 });
+    expect(STATION33_WALL_BUYS.find((wallBuy) => wallBuy.weaponId === 'vector')).toMatchObject({ price: 900, ammoPrice: 625 });
   });
 });
 
@@ -116,7 +116,8 @@ describe('Vector view model', () => {
 
 describe('Vector wall-buy silhouette', () => {
   it('draws the Vector profile instead of the generic long gun', () => {
-    const wallBuy = new WallBuy(STATION33_WALL_BUYS.find((config) => config.weaponId === 'vector')!);
+    // Face-on (yaw 0) so the outline's width lies along x, whatever wall the map mounts it on.
+    const wallBuy = new WallBuy({ ...STATION33_WALL_BUYS.find((config) => config.weaponId === 'vector')!, yaw: 0 });
     const wall = new WallBuyView(wallBuy, definition, new THREE.Group());
     expect(wall.group.userData.silhouette).toBe('vector');
     for (const part of ['stock', 'upper', 'rail', 'lower', 'grip', 'magazine', 'sight', 'flash-hider']) {

@@ -112,8 +112,17 @@ describe('pickWeighted (deterministic, injected rng)', () => {
   });
 
   it('completely excludes the equipped weapon while preserving the other weights', () => {
-    expect(pickWeighted(pool, () => 0, null, 1, 'm4a1')).toBe('ak47');
-    expect(pickWeighted(pool, () => 0.9999, null, 1, 'tesla')).toBe('raygun');
+    expect(pickWeighted(pool, () => 0, null, 1, ['m4a1'])).toBe('ak47');
+    expect(pickWeighted(pool, () => 0.9999, null, 1, ['tesla'])).toBe('raygun');
+  });
+
+  it('excludes both slots and keeps relative weights and the exact-total fallback', () => {
+    const carried: WeaponId[] = ['m4a1', 'tesla'];
+    // Remaining weights: AK 25, M60 20, L96 20, Ray Gun 10 (total 75).
+    expect(pickWeighted(pool, () => 0, null, 1, carried)).toBe('ak47');
+    expect(pickWeighted(pool, () => 0.34, null, 1, carried)).toBe('m60');
+    expect(pickWeighted(pool, () => 0.61, null, 1, carried)).toBe('l96');
+    expect(pickWeighted(pool, () => 1, null, 1, carried)).toBe('raygun');
   });
 
   it('falls back to the last entry when the roll lands on the exact total', () => {
@@ -157,11 +166,41 @@ describe('MysteryBoxMachine state flow', () => {
     for (const equipped of MYSTERY_BOX_POOL.map((entry) => entry.weaponId)) {
       for (const random of [0, 0.25, 0.5, 0.75, 0.9999]) {
         const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => random);
-        expect(machine.tryActivate(equipped)).toBe(true);
+        expect(machine.tryActivate([equipped])).toBe(true);
         step(machine, MYSTERY_BOX_TUNING.revealTime + 0.1);
         expect(machine.result).not.toBe(equipped);
       }
     }
+  });
+
+  it('excludes every pair of carried weapons', () => {
+    for (const first of MYSTERY_BOX_POOL) {
+      for (const second of MYSTERY_BOX_POOL) {
+        for (const random of [0, 0.25, 0.5, 0.75, 1]) {
+          const carried = [first.weaponId, second.weaponId];
+          const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => random);
+          expect(machine.tryActivate(carried)).toBe(true);
+          step(machine, MYSTERY_BOX_TUNING.revealTime + 0.1);
+          expect(machine.result).not.toBeNull();
+          expect(carried).not.toContain(machine.result);
+        }
+      }
+    }
+  });
+
+  it('captures the inventory at activation and refreshes exclusions for the next roll', () => {
+    const carried: WeaponId[] = ['m4a1', 'mp5'];
+    const machine = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, () => 0);
+    machine.tryActivate(carried);
+    carried.length = 0;
+    expect(machine.tryActivate(['vector'])).toBe(false);
+    step(machine, MYSTERY_BOX_TUNING.revealTime + 0.1);
+    expect(machine.result).toBe('vector');
+    machine.tryPickup();
+    step(machine, MYSTERY_BOX_TUNING.closeTime + 0.1);
+    machine.tryActivate(['vector']);
+    step(machine, MYSTERY_BOX_TUNING.revealTime + 0.1);
+    expect(machine.result).toBe('m4a1');
   });
 
   it('ignores activation spam while busy', () => {

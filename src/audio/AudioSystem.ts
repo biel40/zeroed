@@ -96,6 +96,19 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     coverClose: 1380,
     complete: 2600,
   },
+  // A heavy screw-on canister: deeper twists than the light cell.
+  canister: {
+    start: 1500,
+    magOut: 1150,
+    magDrop: 560,
+    magIn: 820,
+    magSeat: 1350,
+    chargeStart: 1600,
+    chargeEnd: 2200,
+    coverOpen: 1100,
+    coverClose: 1380,
+    complete: 2400,
+  },
 };
 
 /** Map ambience with a procedural voice in this class. */
@@ -717,7 +730,7 @@ export class AudioSystem {
     this.sweep(0.12, 'sine', 160, 48, 0.28, 0.3);
   }
 
-  /** A ring slid onto the glove: a small metal chime over the locker's latch. */
+  /** A ring slid onto the finger: a small metal chime over the locker's latch. */
   public playRingPurchase(): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;

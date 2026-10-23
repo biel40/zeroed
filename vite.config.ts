@@ -111,5 +111,10 @@ export default defineConfig(({ mode }) => ({
     // which a saturated machine stretches past the 5 s default. A synchronous test cannot be
     // interrupted anyway, so the default only produced load-dependent failures.
     testTimeout: 30_000,
+    // One worker per logical processor oversubscribes hybrid CPUs: the map-building tests land on
+    // efficiency cores and the first one per file (which bakes every procedural texture) stretched
+    // from ~0.6 s to 8-10 s, occasionally past the timeout. Half the processors keeps the same
+    // total suite time with the slowest test around 3-4 s.
+    maxWorkers: '50%',
   },
 }));

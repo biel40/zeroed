@@ -25,6 +25,24 @@
   <div id="app"></div>
 
   <div id="hud" class="hidden">
+    <!-- Gas mask visor: first in the HUD so every panel stays readable over it. -->
+    <svg id="gas-mask-overlay" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <path id="gas-mask-visor" d="M120 400C120 160 420 70 800 70S1480 160 1480 400C1480 640 1300 790 1040 800C930 805 870 740 800 740S670 805 560 800C300 790 120 640 120 400Z"/>
+        <radialGradient id="gas-mask-lens" cx="50%" cy="46%" r="62%">
+          <stop offset="55%" stop-color="#0c1612" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#0c1612" stop-opacity="0.6"/>
+        </radialGradient>
+        <radialGradient id="gas-mask-breath" cx="50%" cy="100%" r="60%">
+          <stop offset="0%" stop-color="#dfe8e4" stop-opacity="0.45"/>
+          <stop offset="100%" stop-color="#dfe8e4" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <use href="#gas-mask-visor" fill="url(#gas-mask-lens)"/>
+      <ellipse class="gas-mask-breath" cx="800" cy="840" rx="560" ry="230" fill="url(#gas-mask-breath)"/>
+      <path class="gas-mask-rubber" fill-rule="evenodd" d="M-400-400H2000V1300H-400ZM120 400C120 160 420 70 800 70S1480 160 1480 400C1480 640 1300 790 1040 800C930 805 870 740 800 740S670 805 560 800C300 790 120 640 120 400Z"/>
+      <use class="gas-mask-rim" href="#gas-mask-visor"/>
+    </svg>
     <div id="crosshair">
       <span class="arm arm-top"></span>
       <span class="arm arm-right"></span>
@@ -240,8 +258,21 @@
           </span>
         </button>
       </div>
-      <button type="button" id="coop-select" class="coop-select" data-i18n="menu.multiplayer"></button>
-      <button type="button" id="menu-settings" class="coop-select" data-i18n="menu.settings"></button>
+      <div class="menu-actions">
+        <button type="button" id="coop-select" class="menu-action">
+          <svg class="menu-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="9" cy="8" r="3.2" /><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+            <circle cx="16.5" cy="9" r="2.6" /><path d="M16 13.6c2.9 0 5 1.9 5 4.9" />
+          </svg>
+          <span data-i18n="menu.multiplayer"></span>
+        </button>
+        <button type="button" id="menu-settings" class="menu-action">
+          <svg class="menu-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2.2" /><circle cx="8" cy="17" r="2.2" />
+          </svg>
+          <span data-i18n="menu.settings"></span>
+        </button>
+      </div>
       <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
       <!-- CC BY 3.0 requires visible attribution; Brutus is a modified walker. -->
       <p class="asset-attribution"><span data-i18n="menu.attribution"></span> <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · Quaternius · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></p>
@@ -307,7 +338,10 @@
   <div id="coop-lobby" class="hidden">
     <div class="coop-lobby-content">
       <button type="button" id="coop-back" data-i18n-title="coop.back">
-        <span aria-hidden="true">←</span> <span data-i18n="coop.back"></span>
+        <svg class="coop-back-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M10 3 5 8l5 5" />
+        </svg>
+        <span data-i18n="coop.back"></span>
       </button>
       <div class="start-panel">
         <h1 data-i18n="coop.title"></h1>

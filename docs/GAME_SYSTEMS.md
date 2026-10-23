@@ -122,7 +122,16 @@ guardandose automaticamente al ajustarlos.
 
 - `BurnedMansionArena`: dos plantas, colision, nueve ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
-  unico mapa cooperativo.
+  unico mapa cooperativo. Su ambientacion es una casa victoriana quemada sobre
+  un bunker de defensa civil: papel damasco, zocalo de nogal y parquet
+  carbonizados, vigas a la vista, madera que aun humea (brillo emisivo que
+  respira), lamparas de laton arriba y apliques enjaulados abajo, ceniza,
+  brasas y humo bajo el techo, y un jardin muerto con arboles, tumbas y verja
+  tras las ventanas. Las texturas se hornean en codigo
+  (`shared/ProceduralSurface`, compartido con Station 33) con UV ancladas al
+  mundo para que el patron continue entre trozos de muro. La arena orquesta;
+  la decoracion vive en `maps/burnedMansion/`, nunca es solida y no cambia la
+  geometria jugable.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
@@ -168,6 +177,12 @@ guardandose automaticamente al ajustarlos.
 - Barreras: HP autoritativo, rotura visual independiente y reparacion limitada
   por ronda. Puertas y wall buys cobran de forma atomica. La sala de inicio
   ofrece la M1911 (500) y la L96 (1250) en su pared norte.
+- Cada barrera conoce la altura de su alfeizar (`WindowBarrierConfig.sill`;
+  0 en las puertas de Station 33). Un zombi que empieza a cruzar desde fuera
+  una ventana abierta con alfeizar la trepa (`WindowVault`): se encorva, apoya
+  las manos, sube la cadera por encima del borde y amortigua la caida. Es solo
+  visual, depende de su posicion y no frena el avance; la replica cooperativa
+  lo reproduce igual con las barreras de su arena.
 - Puertas de pago: el collider es una losa invisible y `BuyableDoorVisual`
   dibuja tablones, cinchas, candado y una placa de precio con brillo pulsante
   en ambas caras. Al comprarla tiembla y estalla en escombros hacia la sala
@@ -185,8 +200,9 @@ guardandose automaticamente al ajustarlos.
   primero ni activar anti-stuck por la espera. La muerte libera el turno;
   las ventanas abiertas conservan el orden de entrada y las reparaciones
   vuelven a detener a quienes aun no han cruzado.
-- Mystery Box: 950 Points, revelado a los 5 s; nunca entrega el arma equipada
-  al activarla. Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
+- Mystery Box: 950 Points, revelado a los 5 s; nunca entrega ninguna de las
+  dos armas que lleva el comprador al activarla, en individual y cooperativo.
+  Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
   ajustado al tamano y orientacion de la caja, tanto en individual como en
@@ -203,6 +219,11 @@ guardandose automaticamente al ajustarlos.
   El cooperativo valida las bajas y cobra al comprador en el anfitrion;
   cada cliente muestra su propio progreso y ambos ven la apertura compartida.
   Se conservan la Mystery Box y la recompensa Ray Gun de 115 bajas.
+  Easter egg del bunker: la ultima mascara de gas de la pared norte
+  (`ArenaGasMaskRack`) se pone y se vuelve a colgar con USE. Es cosmetica y
+  solo individual (`ZombiesGasMask`): la mano derecha la lleva a la cara como
+  un `MeleeArmDriver`, el arma baja y no dispara durante la animacion, y el
+  visor SVG del HUD cierra la vista con vaho al respirar.
   El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
   en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
   restaura el cierre y el inventario inicial.
@@ -232,7 +253,7 @@ precio, recarga, cargas y los parametros de su efecto como dato.
 `PlayerRings` es el estado puro de la run (anillos llevados, cargas y
 `pendingEvents`). `ZombiesRings` (en `src/modes/`) vende y recarga en las
 `ringMachines` opcionales del mapa con la cartera comun, dispara los efectos y
-mantiene en sintonia guante, maquinas y HUD; `ZombiesMode` solo le delega la
+mantiene en sintonia mano, maquinas y HUD; `ZombiesMode` solo le delega la
 interaccion (tras las recargas de municion y antes del final y la caja), el
 prompt, la muerte y el reinicio.
 
@@ -253,7 +274,7 @@ prompt, la muerte y el reinicio.
   mantiene un unico bucle (volumen, paneo y apagado por distancia y
   orientacion, sin allocations), callado en intro, pausa, derrota y final.
   `ring_machine_jingle.mp3` sustituye al tono procedural si existe.
-- El anillo se ve en el dedo del guante derecho en primera persona
+- El anillo se ve en el dedo de la mano derecha en primera persona
   (`HandRings`, hijo del hueso de la falange, sin tocar la pose ni subir nunca
   hacia la mira); brilla con su esmalte al ponerselo y al dispararse y se apaga
   gastado. `Game.prepare` los muestra todos para compilar sus shaders.
@@ -307,7 +328,9 @@ malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene
 un presupuesto local estable de luces puntuales segun la calidad: seis en
 Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
 parpadeo) por alcance y distancia, con histeresis, para iluminar el hueco
-desde ambas plantas sin intercambios bruscos.
+desde ambas plantas sin intercambios bruscos. Su decoracion estatica se
+fusiona por material y por planta (`MansionDecorBatch`); cada malla guarda su
+particion para que la ocultacion por plantas siga funcionando.
 
 El renderer solo descarta por frustum, asi que el mapa saca de la capa de
 camara las mallas visuales que pertenecen a una sola planta cuando el jugador

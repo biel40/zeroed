@@ -82,7 +82,7 @@ sufra tirones de compilacion de shaders.
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
   `ammoRefills`, `mysteryBoxPlacement`, `ringMachines`).
-- Los anillos llevados se ven en el guante derecho de `ViewArms`
+- Los anillos llevados se ven en la mano derecha de `ViewArms`
   (`HandRings`), que el modo recibe en `ModeContext.handRings`.
   `HitTarget` desacopla balistica de blancos.
 - Pools y temporales reutilizables limitan allocations por frame. Los tipos

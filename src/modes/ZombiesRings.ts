@@ -39,7 +39,7 @@ export function protectionVignette(elapsed: number, remaining: number): number {
  * Rings in a single-player Zombies run. Sells and recharges them at the
  * map's ring machines through the shared wallet, fires their effects (a
  * charged Resurrection ring takes the place of a death) and keeps the
- * glove, the machines and the HUD in step with the run's `PlayerRings`.
+ * first-person hand, the machines and the HUD in step with the run's `PlayerRings`.
  * `ZombiesMode` delegates every ring concern here.
  */
 export class ZombiesRings {
@@ -230,7 +230,7 @@ export class ZombiesRings {
     this.rings.clearEvents();
   }
 
-  /** Glove, machines and HUD read the current rings. */
+  /** Hand, machines and HUD read the current rings. */
   private present(): void {
     const worn = this.rings.worn;
     for (const { ringId, finger, charges } of worn) {

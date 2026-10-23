@@ -14,7 +14,7 @@ const LOWER_WIDTH = 0.04;
  * KRISS Vector Gen II SMG side profiles, traced from a reference photo at
  * ~1.28 mm/px (645 mm with the stock extended, 140 mm barrel) and shared by
  * the first-person model and the wall-buy silhouette. The bore runs at
- * y = 0.01 and the grip and trigger match the M4A1's, so the gloves share
+ * y = 0.01 and the grip and trigger match the M4A1's, so the hands share
  * its grip geometry.
  */
 export const VECTOR_PROFILE = {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SurfaceType } from '../../../shooting/HitTarget';
-import { projectBoxUVs } from './BoxUVs';
+import { projectBoxUVs, projectWorldBoxUVs } from './BoxUVs';
 
 export type WallAxis = 'x' | 'z';
 
@@ -11,6 +11,11 @@ export interface ArenaBoxOptions {
   readonly castShadow: boolean;
   /** Offsets the world-scale UV projection so neighbouring boxes do not repeat. */
   readonly uvSeed: number;
+  /**
+   * Anchors the texture to world coordinates instead (uvSeed ignored), so
+   * patterned surfaces like wallpaper run on across wall pieces.
+   */
+  readonly worldUVs?: boolean;
   /** Also stops the player through the arena's AABB wall collision. */
   readonly blocksPlayer: boolean;
 }
@@ -77,7 +82,9 @@ export class ArenaStructure {
     options: ArenaBoxOptions,
   ): THREE.Mesh {
     const geometry = new THREE.BoxGeometry(width, height, depth);
-    projectMaterialUVs(geometry, width, height, depth, material, options.uvSeed);
+    const metersPerTile = material.userData.metersPerTile as number | undefined;
+    if (options.worldUVs && metersPerTile) projectWorldBoxUVs(geometry, x, y, z, metersPerTile);
+    else projectMaterialUVs(geometry, width, height, depth, material, options.uvSeed);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);
     if (options.name) mesh.name = options.name;

@@ -101,8 +101,10 @@ export type OpticStyle = 'irons' | 'scope' | 'reddot';
  * Phases: the magazine detaches (magOut), is released to gravity (magDrop),
  * a fresh one rises (magIn) and seats (magSeat), then the action is worked
  * (charge→chargeEnd). Belt-fed guns add cover open/close around the swap.
+ * A 'canister' is never dropped: the support hand unscrews it, carries it off
+ * screen to refill it and screws it back on between magDrop and magIn.
  */
-export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'pistol';
+export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'canister' | 'pistol';
 
 export interface ReloadAnimConfig {
   readonly style: ReloadStyle;
@@ -149,7 +151,7 @@ export interface VisualRecoilConfig {
   readonly damping: number;
 }
 
-/** Finger pose presets of the first-person gloves (see HandPoses.ts). */
+/** Finger pose presets of the first-person hands (see HandPoses.ts). */
 export type HandPoseId =
   | 'fist'
   | 'pistolGrip'
@@ -165,7 +167,7 @@ export type HandPoseId =
 type Vec3 = readonly [number, number, number];
 
 /**
- * Where a glove holds a part. `position` is the center of the held part;
+ * Where a hand holds a part. `position` is the center of the held part;
  * `axis` is the hand's thumb side (along the part, give or take the tilt of
  * a natural wrist) and `palm` is the direction the palm faces. Together they
  * fix the hand rotation (palm is orthogonalized).
@@ -254,7 +256,7 @@ export interface ViewModelConfig {
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
   readonly reloadAnim?: ReloadAnimConfig;
-  /** First-person glove anchors. */
+  /** First-person hand anchors. */
   readonly hands: WeaponHandsConfig;
 }
 

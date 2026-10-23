@@ -11,6 +11,8 @@ export interface ZombieMapDefinition {
   readonly id: string;
   /** Listed in the map menu; hidden maps still start through `?map=`. */
   readonly visible: boolean;
+  /** Listed in the menu only for developers; every map still starts through `?map=`. */
+  readonly developerOnly: boolean;
   readonly nameKey: TranslationKey;
   /** Playable in the co-op modes. */
   readonly coop: boolean;
@@ -24,6 +26,7 @@ export const ZOMBIE_MAPS = {
   'burned-mansion': {
     id: 'burned-mansion',
     visible: true,
+    developerOnly: false,
     nameKey: 'map.burnedMansion',
     coop: true,
     premium: false,
@@ -32,6 +35,7 @@ export const ZOMBIE_MAPS = {
   'station-33': {
     id: 'station-33',
     visible: true,
+    developerOnly: true,
     nameKey: 'map.station33',
     coop: false,
     premium: true,

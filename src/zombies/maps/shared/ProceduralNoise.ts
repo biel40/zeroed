@@ -32,3 +32,26 @@ export function valueNoise(random: () => number, cell: number, size: number): (x
     return top + (bottom - top) * fy;
   };
 }
+
+/**
+ * Value noise whose lattice wraps every `size` texels (`size` a multiple of
+ * `cell`), so textures on RepeatWrapping tile without seams. Coordinates
+ * are in texels and may run past `size`.
+ */
+export function tileableNoise(random: () => number, cell: number, size: number): (x: number, y: number) => number {
+  const cells = Math.max(1, Math.round(size / cell));
+  const corners = Float32Array.from({ length: cells * cells }, () => random());
+  const wrap = (value: number): number => ((value % cells) + cells) % cells;
+  return (x, y) => {
+    const gx = x / cell;
+    const gy = y / cell;
+    const x0 = Math.floor(gx);
+    const y0 = Math.floor(gy);
+    const fx = THREE.MathUtils.smootherstep(gx - x0, 0, 1);
+    const fy = THREE.MathUtils.smootherstep(gy - y0, 0, 1);
+    const at = (cx: number, cy: number): number => corners[wrap(cy) * cells + wrap(cx)];
+    const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx;
+    const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx;
+    return top + (bottom - top) * fy;
+  };
+}

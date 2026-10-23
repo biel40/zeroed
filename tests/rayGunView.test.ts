@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
+import type { MagazineDropPool } from '../src/weapons/MagazineDrop';
 import { RAYGUN_LAYOUT } from '../src/weapons/RayGunViewModel';
 import { ReloadAnimator } from '../src/weapons/ReloadAnimator';
 import type { Weapon } from '../src/weapons/Weapon';
@@ -9,7 +10,7 @@ import { buildProceduralViewModel, buildWeaponDisplayModel, WeaponView } from '.
 
 /**
  * Contract tests for the procedural Ray Gun: its named assemblies, a clean
- * picture through the scope tube, the plasma cell reload, the energy flare
+ * picture through the scope tube, the screw-on canister reload, the energy flare
  * and flow, and a shot voice of its own.
  */
 
@@ -46,13 +47,18 @@ function worldBox(object: THREE.Object3D): THREE.Box3 {
 }
 
 describe('Ray Gun view model', () => {
-  it('builds the dedicated model with its assemblies and live cell', () => {
+  it('builds the dedicated model with its assemblies and screw-on canister', () => {
     const built = buildProceduralViewModel(view);
     expect(built.group.name).toBe('raygun-root');
-    for (const name of ['body', 'barrel', 'arms', 'scope', 'grip', 'cell']) {
+    for (const name of ['body', 'canister', 'scope', 'grip']) {
       expect(built.group.getObjectByName(`raygun-${name}`), name).toBeDefined();
     }
-    expect(built.reloadParts?.magazine).toBe(built.group.getObjectByName('raygun-cell'));
+    const canister = built.group.getObjectByName('raygun-canister')!;
+    expect(built.reloadParts?.magazine).toBe(canister);
+    // The canister carries the whole front, emitter included, and pivots on the bore.
+    expect(worldBox(canister).min.z).toBeLessThan(RAYGUN_LAYOUT.emitter.z);
+    expect(canister.position.x).toBe(0);
+    expect(canister.position.y).toBe(0);
     expect(built.energyMaterials?.length).toBeGreaterThan(0);
     expect(built.energyFlow).toBeInstanceOf(THREE.Texture);
     expect(built.energyMaterials!.every((material) => material.emissiveMap === built.energyFlow)).toBe(true);
@@ -83,18 +89,38 @@ describe('Ray Gun view model', () => {
     expect(highest).toBeLessThan(ceiling);
   });
 
-  it('lifts the plasma cell clear of the chamber and reseats it', () => {
+  it('unscrews the canister, carries it off and screws it back on without dropping it', () => {
     const built = buildProceduralViewModel(view);
-    const cell = built.reloadParts!.magazine!;
-    const home = cell.position.clone();
-    const animator = new ReloadAnimator(view.reloadAnim!, { magazine: cell, handle: null, cover: null }, null);
+    const canister = built.reloadParts!.magazine!;
+    const home = canister.position.clone();
+    const homeRotation = canister.quaternion.clone();
+    const drop = { drop: vi.fn() };
+    const animator = new ReloadAnimator(
+      view.reloadAnim!, { magazine: canister, handle: null, cover: null }, drop as unknown as MagazineDropPool,
+    );
     const anim = view.reloadAnim!;
+    const twistTo = (p: number) => {
+      animator.update(fakeWeapon('reloading', p));
+      return canister.quaternion.angleTo(homeRotation);
+    };
 
-    animator.update(fakeWeapon('reloading', anim.magDrop - 0.01));
-    expect(worldBox(cell).min.y).toBeGreaterThan(RAYGUN_LAYOUT.chamber.radius);
+    // Bayonet twist first, then pulled straight off the coupling.
+    expect(twistTo(anim.magOut + (anim.magDrop - anim.magOut) * 0.3)).toBeGreaterThan(0.5);
+    expect(canister.position.z).toBeCloseTo(home.z, 3);
+    animator.update(fakeWeapon('reloading', anim.magDrop - 0.005));
+    expect(canister.position.z).toBeLessThan(home.z - 0.06);
 
+    // Carried off screen to refill, never released into the world.
+    animator.update(fakeWeapon('reloading', (anim.magDrop + anim.magIn) / 2));
+    expect(drop.drop).not.toHaveBeenCalled();
+    expect(canister.visible).toBe(true);
+    expect(canister.position.y).toBeLessThan(home.y - 0.25);
+
+    // Pushed home, then twisted locked.
+    expect(twistTo(anim.magSeat - 0.01)).toBeLessThan(0.1);
     animator.update(fakeWeapon('reloading', anim.magSeat + 0.01));
-    expect(cell.position.toArray()).toEqual(home.toArray());
+    expect(canister.position.toArray()).toEqual(home.toArray());
+    expect(canister.quaternion.angleTo(homeRotation)).toBeLessThan(1e-6);
   });
 
   it('keeps the procedural detail within a mobile-friendly budget', () => {

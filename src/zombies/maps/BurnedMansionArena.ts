@@ -19,6 +19,7 @@ import { mysteryBoxFootprint } from '../MysteryBoxFootprint';
 import type {
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
+  ArenaGasMaskRack,
   ArenaRitualInteraction,
   ArenaSoulLampInteraction,
   ArenaWeaponPickup,
@@ -26,23 +27,37 @@ import type {
   ZombieArena,
 } from './ZombieArena';
 import { createMansionSurfaceMaterials, type MansionSurfaceMaterials } from './BurnedMansionMaterials';
+import { MansionAtmosphere } from './burnedMansion/MansionAtmosphere';
+import type { MansionBuildContext } from './burnedMansion/MansionBuildContext';
+import { MansionDecorBatch } from './burnedMansion/MansionDecorBatch';
+import { buildMansionDressing } from './burnedMansion/MansionDressing';
+import { buildMansionExterior } from './burnedMansion/MansionExterior';
+import { floorPartitionOf, isInStairRoom, type MansionFloor, type MansionFloorPartition } from './burnedMansion/MansionFloors';
+import { buildInteriorTrim, buildWindowCasings } from './burnedMansion/MansionInteriorTrim';
+import { buildLightFixture } from './burnedMansion/MansionLightFixtures';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
-import { ArenaStructure, projectMaterialUVs } from './shared/ArenaStructure';
+import { ArenaStructure } from './shared/ArenaStructure';
+import { projectWorldBoxUVs } from './shared/BoxUVs';
 import { POINT_LIGHT_BUDGET } from './shared/PointLightBudget';
 import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
   MANSION_AMBIENCE,
   MANSION_AMMO_REFILLS,
+  MANSION_AREA_LIGHTS,
   MANSION_BARRIERS,
+  MANSION_BLAST_DOOR_ID,
   MANSION_BUNKER_BOUNDS,
   MANSION_BUNKER_DIVIDER_X,
   MANSION_BUNKER_ENDING,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
+  MANSION_DOOR_OPENING,
   MANSION_DOORS,
   MANSION_EAST_WALL_X,
+  MANSION_GAS_MASK_RACK,
   MANSION_GROUND_BOUNDS,
+  MANSION_GROUND_CEILING_Y,
   MANSION_PLAYER_SPAWN,
   MANSION_RITUAL_CIRCLE,
   MANSION_SPAWNS,
@@ -54,35 +69,16 @@ import {
   MANSION_SOUL_LAMPS,
   MANSION_SPECIAL_WEAPON_CASES,
   MANSION_WALL_BUYS,
+  MANSION_WALL_HEIGHT,
+  MANSION_WALL_THICKNESS,
+  MANSION_WINDOW_OPENING,
 } from './BurnedMansionConfig';
 
-const WALL_THICKNESS = 0.3;
-const LOWER_WALL_HEIGHT = 3.2;
-const DOOR_WIDTH = 1.6;
-const WINDOW_WIDTH = 1.5;
-// Low enough for a zombie body to step through after the boards break.
-const WINDOW_SILL = 0.3;
-const WINDOW_TOP = 1.9;
-// Underside of the ground-floor roof slab (center 3.28, thickness 0.16).
-const GROUND_CEILING_Y = 3.2;
-// Underside of the bunker ceiling slab (center -0.22, thickness 0.16).
-const BUNKER_CEILING_Y = -0.3;
 const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
 const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
 
 /** Score bonus that keeps an active light until a rival is clearly better. */
 const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
-
-/** Bounds that make a visual mesh belong to a single floor (bunker ceiling tops out at -0.14). */
-const BUNKER_ONLY_MAX_Y = -0.1;
-const GROUND_ONLY_MIN_Y = -0.2;
-/**
- * The stair room is the only place where one floor can see the other, and
- * only that strip of it: a ray through both shaft openings stays at x >= 4.2
- * on either floor. The margin keeps the divider-wall doorway on the safe side.
- */
-const STAIR_ROOM_MIN_X = MANSION_BUNKER_DIVIDER_X - 0.5;
-const STAIR_ROOM_MAX_Z = 2;
 
 interface RankedPointLight {
   readonly light: THREE.PointLight;
@@ -96,7 +92,7 @@ type WallAxis = 'x' | 'z';
 
 /** Visual meshes wholly on one floor, split by whether the stairwell exposes them. */
 interface FloorMeshSet {
-  readonly floor: 'ground' | 'bunker';
+  readonly floor: MansionFloor;
   readonly nearStairs: boolean;
   readonly meshes: THREE.Mesh[];
   rendered: boolean;
@@ -266,6 +262,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
   readonly completionInteraction: ArenaCompletionInteraction = MANSION_BUNKER_ENDING;
   readonly ritualInteraction: ArenaRitualInteraction;
+  readonly gasMaskRack: ArenaGasMaskRack;
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
   onSoulAbsorbed: ((position: THREE.Vector3) => void) | null = null;
@@ -297,8 +294,8 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private readonly secretRoom: SecretRoomSystem;
   private secretWall!: THREE.Mesh;
   private secretWallCollider!: THREE.Mesh;
-  private wallMaterialIndex = 0;
   private readonly areaLights = new CreepyAreaLights();
+  private readonly atmosphere: MansionAtmosphere;
   private readonly rankedPointLights: RankedPointLight[] = [];
   private readonly floorMeshSets: FloorMeshSet[] = (['ground', 'bunker'] as const).flatMap((floor) =>
     [false, true].map((nearStairs) => ({ floor, nearStairs, meshes: [], rendered: true })),
@@ -309,6 +306,12 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     private readonly profile: DeviceProfile,
   ) {
     this.materials = createMansionSurfaceMaterials(profile.anisotropyLimit);
+    const dressing: MansionBuildContext = {
+      group: this.group,
+      batch: new MansionDecorBatch(),
+      materials: this.materials,
+      profile,
+    };
     this.buildShell();
     this.buildInterior();
     this.buildStairs();
@@ -317,8 +320,19 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.weaponPickups = this.buildSecretPickups();
     this.ammoRefills = this.buildAmmoRefills();
     this.buildDamageDetails();
-    this.buildWindowFrames();
-    this.buildLighting();
+    buildInteriorTrim(dressing);
+    buildWindowCasings(dressing);
+    const gasMask = buildMansionDressing(dressing);
+    this.gasMaskRack = {
+      ...MANSION_GAS_MASK_RACK,
+      position: gasMask.position,
+      setMaskOnHook: (onHook) => { gasMask.object.visible = onHook; },
+    };
+    buildMansionExterior(dressing);
+    this.buildLighting(dressing);
+    this.atmosphere = new MansionAtmosphere(dressing);
+    // No mansion light casts shadows; the batch only receives them.
+    dressing.batch.build(this.group, 'burned-mansion-static', { castShadow: false, receiveShadow: true });
     this.secretRoom = new SecretRoomSystem(this.group, this.secretWall, profile);
     const secretRoom = this.secretRoom;
     this.ritualInteraction = {
@@ -388,8 +402,8 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     );
     for (const door of this.doors) {
       const view = new PointDoorView(door, this.group, {
-        sealed: door.id === 'nuclear-bunker',
-        panelMaterial: this.materials.floorWood,
+        sealed: door.id === MANSION_BLAST_DOOR_ID,
+        panelMaterial: this.materials.doorPlanks,
         reducedEffects: this.profile.useReducedEffects,
       });
       if (this.profile.useReducedEffects) {
@@ -431,6 +445,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       this.onTopologyChanged?.();
     }
     this.areaLights.update(dt);
+    this.atmosphere.update(dt);
     if (observerPosition) {
       this.updatePointLightBudget(observerPosition);
       this.updateFloorRendering(observerPosition);
@@ -445,6 +460,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     for (const pickup of this.weaponPickups) pickup.reset();
     for (const refill of this.ammoRefills) refill.reset();
     this.secretRoom.reset();
+    this.atmosphere.reset();
     this.activeSpawnZones.clear();
     this.activeSpawnZones.add('start');
     this.openDoorIds.clear();
@@ -564,24 +580,24 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   }
 
   private buildShell(): void {
-    this.addSlab('ground-floor', -0.8, -0.08, 1, 12.4, 0.16, 18, this.materials.floorConcrete);
-    this.addSlab('ground-floor-east', 8.45, -0.08, 1, 1.1, 0.16, 18, this.materials.floorConcrete);
+    this.addSlab('ground-floor', -0.8, -0.08, 1, 12.4, 0.16, 18, this.materials.parquet);
+    this.addSlab('ground-floor-east', 8.45, -0.08, 1, 1.1, 0.16, 18, this.materials.parquet);
     this.addSlab(
       'ground-floor-stair-north', MANSION_STAIR_CENTER_X, -0.08,
       (-8 + STAIR_APERTURE_MIN_Z) / 2, 2.5, 0.16,
-      STAIR_APERTURE_MIN_Z + 8, this.materials.floorConcrete,
+      STAIR_APERTURE_MIN_Z + 8, this.materials.parquet,
     );
     this.addSlab(
       'ground-floor-stair-south', MANSION_STAIR_CENTER_X, -0.08,
       (STAIR_APERTURE_MAX_Z + 10) / 2, 2.5, 0.16,
-      10 - STAIR_APERTURE_MAX_Z, this.materials.floorConcrete,
+      10 - STAIR_APERTURE_MAX_Z, this.materials.parquet,
     );
 
     this.addWindowedWall('z', -7.15, -8, 10, [-3.2, 3.2, 5.4]);
     this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10, [-2.5]);
     // North and south walls reach the outer face of the widened east wall so
     // the east-wing corners stay closed.
-    const eastOuterX = MANSION_EAST_WALL_X + WALL_THICKNESS / 2;
+    const eastOuterX = MANSION_EAST_WALL_X + MANSION_WALL_THICKNESS / 2;
     this.addWindowedWall('x', -8.15, -7, eastOuterX, [-5.5, -3.5, 1.6]);
     this.addWindowedWall('x', 10.15, -7, eastOuterX, [-5.5, -3.5]);
 
@@ -589,53 +605,53 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
 
     // The bunker mirrors the whole mansion footprint, and its ceiling repeats
     // the exact stair aperture of the ground slab so the stairwell stays open.
-    this.addSlab('bunker-floor', 1, MANSION_BUNKER_Y - 0.08, -3.75, 16, 0.16, 11.5, this.materials.floorConcrete);
-    this.addSlab('bunker-ceiling', -0.8, -0.22, -3.75, 12.4, 0.16, 11.5, this.materials.ceilingBurned);
-    this.addSlab('bunker-ceiling-east', 8.45, -0.22, -3.75, 1.1, 0.16, 11.5, this.materials.ceilingBurned);
+    this.addSlab('bunker-floor', 1, MANSION_BUNKER_Y - 0.08, -3.75, 16, 0.16, 11.5, this.materials.bunkerFloor);
+    this.addSlab('bunker-ceiling', -0.8, -0.22, -3.75, 12.4, 0.16, 11.5, this.materials.bunkerCeiling);
+    this.addSlab('bunker-ceiling-east', 8.45, -0.22, -3.75, 1.1, 0.16, 11.5, this.materials.bunkerCeiling);
     this.addSlab(
       'bunker-ceiling-stair-north', MANSION_STAIR_CENTER_X, -0.22,
       (-9.5 + STAIR_APERTURE_MIN_Z) / 2, 2.5, 0.16,
-      STAIR_APERTURE_MIN_Z + 9.5, this.materials.ceilingBurned,
+      STAIR_APERTURE_MIN_Z + 9.5, this.materials.bunkerCeiling,
     );
     this.addSlab(
       'bunker-ceiling-stair-south', MANSION_STAIR_CENTER_X, -0.22,
       (STAIR_APERTURE_MAX_Z + 2) / 2, 2.5, 0.16,
-      2 - STAIR_APERTURE_MAX_Z, this.materials.ceilingBurned,
+      2 - STAIR_APERTURE_MAX_Z, this.materials.bunkerCeiling,
     );
-    const bunkerWallY = MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2;
+    const bunkerWallY = MANSION_BUNKER_Y + MANSION_WALL_HEIGHT / 2;
     const entranceStart = MANSION_SECRET_ROOM.entranceZ - MANSION_SECRET_ROOM.entranceWidth / 2;
     const entranceEnd = MANSION_SECRET_ROOM.entranceZ + MANSION_SECRET_ROOM.entranceWidth / 2;
     this.addWall(
       MANSION_SECRET_ROOM.entranceX,
       bunkerWallY,
       (-9.5 + entranceStart) / 2,
-      WALL_THICKNESS,
-      LOWER_WALL_HEIGHT,
+      MANSION_WALL_THICKNESS,
+      MANSION_WALL_HEIGHT,
       entranceStart + 9.5,
-      this.materials.concreteDirty,
+      this.materials.bunkerConcrete,
     );
     this.addWall(
       MANSION_SECRET_ROOM.entranceX,
       bunkerWallY,
       (entranceEnd + 2) / 2,
-      WALL_THICKNESS,
-      LOWER_WALL_HEIGHT,
+      MANSION_WALL_THICKNESS,
+      MANSION_WALL_HEIGHT,
       2 - entranceEnd,
-      this.materials.concreteDirty,
+      this.materials.bunkerConcrete,
     );
     this.addWall(
       MANSION_SECRET_ROOM.entranceX,
       MANSION_BUNKER_Y + 2.7,
       MANSION_SECRET_ROOM.entranceZ,
-      WALL_THICKNESS,
+      MANSION_WALL_THICKNESS,
       1,
       MANSION_SECRET_ROOM.entranceWidth,
-      this.materials.concreteDirty,
+      this.materials.bunkerConcrete,
     );
     this.secretWall = this.buildSecretWall();
-    this.addWall(MANSION_EAST_WALL_X - 0.15, bunkerWallY, -3.75, WALL_THICKNESS, LOWER_WALL_HEIGHT, 11.5, this.materials.concreteDirty);
-    this.addWall(1, bunkerWallY, -9.5, 16, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
-    this.addWall(1, bunkerWallY, 2, 16, LOWER_WALL_HEIGHT, WALL_THICKNESS, this.materials.concreteDirty);
+    this.addWall(MANSION_EAST_WALL_X - 0.15, bunkerWallY, -3.75, MANSION_WALL_THICKNESS, MANSION_WALL_HEIGHT, 11.5, this.materials.bunkerConcrete);
+    this.addWall(1, bunkerWallY, -9.5, 16, MANSION_WALL_HEIGHT, MANSION_WALL_THICKNESS, this.materials.bunkerConcrete);
+    this.addWall(1, bunkerWallY, 2, 16, MANSION_WALL_HEIGHT, MANSION_WALL_THICKNESS, this.materials.bunkerConcrete);
 
     this.addSlab(
       'secret-room-floor',
@@ -645,7 +661,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       MANSION_SECRET_ROOM.width,
       0.16,
       MANSION_SECRET_ROOM.depth,
-      this.materials.floorConcrete,
+      this.materials.bunkerFloor,
     );
     this.addSlab(
       'secret-room-ceiling',
@@ -655,16 +671,16 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       MANSION_SECRET_ROOM.width,
       0.16,
       MANSION_SECRET_ROOM.depth,
-      this.materials.ceilingBurned,
+      this.materials.bunkerCeiling,
     );
     this.addWall(
       MANSION_SECRET_ROOM.centerX - MANSION_SECRET_ROOM.width / 2,
       bunkerWallY,
       MANSION_SECRET_ROOM.centerZ,
-      WALL_THICKNESS,
-      LOWER_WALL_HEIGHT,
+      MANSION_WALL_THICKNESS,
+      MANSION_WALL_HEIGHT,
       MANSION_SECRET_ROOM.depth,
-      this.materials.concreteDirty,
+      this.materials.bunkerConcrete,
     );
     for (const z of [
       MANSION_SECRET_ROOM.centerZ - MANSION_SECRET_ROOM.depth / 2,
@@ -675,31 +691,30 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
         bunkerWallY,
         z,
         MANSION_SECRET_ROOM.width,
-        LOWER_WALL_HEIGHT,
-        WALL_THICKNESS,
-        this.materials.concreteDirty,
+        MANSION_WALL_HEIGHT,
+        MANSION_WALL_THICKNESS,
+        this.materials.bunkerConcrete,
       );
     }
   }
 
   private buildSecretWall(): THREE.Mesh {
     const geometry = new THREE.BoxGeometry(
-      WALL_THICKNESS,
-      LOWER_WALL_HEIGHT,
+      MANSION_WALL_THICKNESS,
+      MANSION_WALL_HEIGHT,
       MANSION_SECRET_ROOM.entranceWidth,
     );
-    projectMaterialUVs(
+    projectWorldBoxUVs(
       geometry,
-      WALL_THICKNESS,
-      LOWER_WALL_HEIGHT,
-      MANSION_SECRET_ROOM.entranceWidth,
-      this.materials.concreteDirty,
-      23,
+      MANSION_SECRET_ROOM.entranceX,
+      MANSION_BUNKER_Y + MANSION_WALL_HEIGHT / 2,
+      MANSION_SECRET_ROOM.entranceZ,
+      this.materials.bunkerConcrete.userData.metersPerTile as number,
     );
-    const wall = new THREE.Mesh(geometry, this.materials.concreteDirty);
+    const wall = new THREE.Mesh(geometry, this.materials.bunkerConcrete);
     wall.position.set(
       MANSION_SECRET_ROOM.entranceX,
-      MANSION_BUNKER_Y + LOWER_WALL_HEIGHT / 2,
+      MANSION_BUNKER_Y + MANSION_WALL_HEIGHT / 2,
       MANSION_SECRET_ROOM.entranceZ,
     );
     wall.name = 'secret-room-wall';
@@ -724,7 +739,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private buildInterior(): void {
     // Starting room -> box room. The opening is exactly occupied by to-dining.
     this.addDoorWall('x', 2, -7, 0, -3.5, 0);
-    this.addWall(4.5, LOWER_WALL_HEIGHT / 2, 2, 9, LOWER_WALL_HEIGHT, WALL_THICKNESS);
+    this.addWall(4.5, MANSION_WALL_HEIGHT / 2, 2, 9, MANSION_WALL_HEIGHT, MANSION_WALL_THICKNESS);
 
     // The east hall is the third room between its paid entrance and the sealed bunker.
     this.addDoorWall('z', 0, -8, 2, -2.5, 0);
@@ -749,17 +764,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       // The top tread stops at the slab edge instead of sharing its y=0 plane.
       const endZ = Math.min(startZ + depth, STAIR_APERTURE_MAX_Z);
       const geometry = new THREE.BoxGeometry(stepWidth, Math.max(0.12, height), endZ - startZ);
-      projectMaterialUVs(geometry, stepWidth, Math.max(0.12, height), endZ - startZ, this.materials.metal, index);
-      geometry.translate(
-        MANSION_STAIR_CENTER_X,
-        MANSION_BUNKER_Y + height / 2,
-        (startZ + endZ) / 2,
-      );
+      const center = [MANSION_STAIR_CENTER_X, MANSION_BUNKER_Y + height / 2, (startZ + endZ) / 2] as const;
+      projectWorldBoxUVs(geometry, ...center, this.materials.treadPlate.userData.metersPerTile as number);
+      geometry.translate(...center);
       stepGeometries.push(geometry);
     }
     const mergedStepsGeometry = mergeGeometries(stepGeometries);
     if (!mergedStepsGeometry) throw new Error('Unable to merge bunker stair geometry');
-    const mergedSteps = new THREE.Mesh(mergedStepsGeometry, this.materials.metal);
+    const mergedSteps = new THREE.Mesh(mergedStepsGeometry, this.materials.treadPlate);
     mergedSteps.castShadow = !this.profile.useReducedEffects;
     mergedSteps.receiveShadow = true;
     mergedSteps.name = 'bunker-stair-steps';
@@ -767,7 +779,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     mergedSteps.userData.stepCount = steps;
     this.group.add(mergedSteps);
 
-    const sideHeight = GROUND_CEILING_Y - MANSION_BUNKER_Y;
+    const sideHeight = MANSION_GROUND_CEILING_Y - MANSION_BUNKER_Y;
     const sideY = MANSION_BUNKER_Y + sideHeight / 2;
     const sideDepth = topZ - bottomZ;
     // Full-height stairwell walls leave one longitudinal route: enter at the
@@ -786,15 +798,15 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     }
     // Ground-floor end of the shaft: closes that ledge up to the north wall and
     // overhangs the lower landing as a lintel, above any body on the stairs.
-    const northWallInnerZ = -8.15 + WALL_THICKNESS / 2;
+    const northWallInnerZ = -8.15 + MANSION_WALL_THICKNESS / 2;
     const endWallMinX = sideWalls[0][0];
     const endWallMaxX = sideWalls[1][1];
     this.addWall(
       (endWallMinX + endWallMaxX) / 2,
-      GROUND_CEILING_Y / 2,
+      MANSION_GROUND_CEILING_Y / 2,
       (northWallInnerZ + bottomZ) / 2,
       endWallMaxX - endWallMinX,
-      GROUND_CEILING_Y,
+      MANSION_GROUND_CEILING_Y,
       bottomZ - northWallInnerZ,
       this.materials.charredWood,
     );
@@ -1001,11 +1013,12 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       group.userData.mapRole = 'ammo-refill';
       group.userData.activeFeedback = false;
 
-      const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.58, 0.68), this.materials.metal);
+      // Olive civil-defence ammo chest, the same paint as the bunker walls.
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.58, 0.68), this.materials.bunkerPaint);
       base.position.y = 0.29;
       base.userData.surface = 'metal';
       base.userData.mapRole = 'ammo-box-body';
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.12, 0.72), this.materials.metal);
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.12, 0.72), this.materials.bunkerPaint);
       lid.position.set(0, 0.64, 0);
       lid.userData.mapRole = 'ammo-box-lid';
       const iconPlate = new THREE.Mesh(
@@ -1143,78 +1156,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.group.add(ceilingScorch);
   }
 
-  private buildWindowFrames(): void {
-    const verticalGeometry = new THREE.BoxGeometry(0.12, 1.9, 0.12);
-    const horizontalGeometry = new THREE.BoxGeometry(1.8, 0.12, 0.12);
-    projectMaterialUVs(verticalGeometry, 0.12, 1.9, 0.12, this.materials.charredWood, 3);
-    projectMaterialUVs(horizontalGeometry, 1.8, 0.12, 0.12, this.materials.charredWood, 7);
-    const verticals = new THREE.InstancedMesh(verticalGeometry, this.materials.charredWood, MANSION_BARRIERS.length * 2);
-    const horizontals = new THREE.InstancedMesh(horizontalGeometry, this.materials.charredWood, MANSION_BARRIERS.length * 2);
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-    const scale = new THREE.Vector3(1, 1, 1);
-    for (let index = 0; index < MANSION_BARRIERS.length; index++) {
-      const barrier = MANSION_BARRIERS[index];
-      const angle = Math.atan2(barrier.outwardX, barrier.outwardZ);
-      quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-      const rightX = Math.cos(angle);
-      const rightZ = -Math.sin(angle);
-      for (const side of [-1, 1]) {
-        position.set(barrier.x + rightX * 0.84 * side, 1.1, barrier.z + rightZ * 0.84 * side);
-        verticals.setMatrixAt(index * 2 + (side > 0 ? 1 : 0), matrix.compose(position, quaternion, scale));
-      }
-      for (const edge of [0.22, 2.0]) {
-        position.set(barrier.x, edge, barrier.z);
-        horizontals.setMatrixAt(index * 2 + (edge > 1 ? 1 : 0), matrix.compose(position, quaternion, scale));
-      }
-    }
-    verticals.castShadow = !this.profile.useReducedEffects;
-    horizontals.castShadow = !this.profile.useReducedEffects;
-    verticals.userData.mapRole = 'window-frames';
-    horizontals.userData.mapRole = 'window-frames';
-    this.group.add(verticals, horizontals);
-  }
-
-  private buildLighting(): void {
+  private buildLighting(dressing: MansionBuildContext): void {
     this.group.add(createAmbienceHemisphereLight(this.ambience, this.profile.useReducedEffects));
-    this.addPointLight(-3.8, 2.55, 6.5, 2.4, 6.5, GROUND_CEILING_Y);
-    this.addPointLight(-4.5, 2.35, -4.8, 1.7, 6.5, GROUND_CEILING_Y);
-    this.addPointLight(2.1, 2.35, -4.8, 1.1, 5.2, GROUND_CEILING_Y);
-    // Hung under a real ceiling segment: the stair aperture has no slab to
-    // anchor the cord to, so a bulb placed there floated unattached.
-    this.addPointLight(
-      3.4,
-      MANSION_BUNKER_Y + 2.45,
-      -5.6,
-      1.05,
-      5.5,
-      BUNKER_CEILING_Y,
-    );
-    this.addPointLight(
-      -1.4,
-      MANSION_BUNKER_Y + 2.35,
-      -4.6,
-      1.35,
-      7,
-      BUNKER_CEILING_Y,
-    );
-    this.addPointLight(
-      -5.2,
-      MANSION_BUNKER_Y + 2.4,
-      -1.6,
-      1.15,
-      6.5,
-      BUNKER_CEILING_Y,
-    );
-    this.addPointLight(
-      -4.8,
-      MANSION_BUNKER_Y + 2.4,
-      -6.6,
-      0.95,
-      6,
-      BUNKER_CEILING_Y,
-    );
+    for (const config of MANSION_AREA_LIGHTS) {
+      const light = new THREE.PointLight(0xffffff, config.intensity, config.distance, 1.8);
+      light.position.set(config.x, config.y, config.z);
+      this.group.add(light);
+      this.areaLights.add(light, buildLightFixture(dressing, config));
+    }
 
     const exteriorLight = new THREE.DirectionalLight(0x9ebbd2, this.profile.useReducedEffects ? 0.18 : 0.3);
     exteriorLight.position.set(-8, 5, 7);
@@ -1269,42 +1218,42 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   ): void {
     const span = max - min;
     const center = (min + max) / 2;
-    const middleHeight = WINDOW_TOP - WINDOW_SILL;
-    this.addAxisWall(axis, fixed, center, WINDOW_SILL / 2, span, WINDOW_SILL);
+    const middleHeight = MANSION_WINDOW_OPENING.top - MANSION_WINDOW_OPENING.sill;
+    this.addAxisWall(axis, fixed, center, MANSION_WINDOW_OPENING.sill / 2, span, MANSION_WINDOW_OPENING.sill);
     this.addAxisWall(
       axis,
       fixed,
       center,
-      WINDOW_TOP + (LOWER_WALL_HEIGHT - WINDOW_TOP) / 2,
+      MANSION_WINDOW_OPENING.top + (MANSION_WALL_HEIGHT - MANSION_WINDOW_OPENING.top) / 2,
       span,
-      LOWER_WALL_HEIGHT - WINDOW_TOP,
+      MANSION_WALL_HEIGHT - MANSION_WINDOW_OPENING.top,
     );
 
     let cursor = min;
     for (const opening of [...openingCenters].sort((a, b) => a - b)) {
-      const start = opening - WINDOW_WIDTH / 2;
+      const start = opening - MANSION_WINDOW_OPENING.width / 2;
       if (start > cursor) {
-        this.addAxisWall(axis, fixed, (cursor + start) / 2, WINDOW_SILL + middleHeight / 2, start - cursor, middleHeight);
+        this.addAxisWall(axis, fixed, (cursor + start) / 2, MANSION_WINDOW_OPENING.sill + middleHeight / 2, start - cursor, middleHeight);
       }
-      cursor = opening + WINDOW_WIDTH / 2;
+      cursor = opening + MANSION_WINDOW_OPENING.width / 2;
     }
     if (cursor < max) {
-      this.addAxisWall(axis, fixed, (cursor + max) / 2, WINDOW_SILL + middleHeight / 2, max - cursor, middleHeight);
+      this.addAxisWall(axis, fixed, (cursor + max) / 2, MANSION_WINDOW_OPENING.sill + middleHeight / 2, max - cursor, middleHeight);
     }
   }
 
   private addDoorWall(axis: WallAxis, fixed: number, min: number, max: number, opening: number, baseY: number): void {
-    const openingStart = opening - DOOR_WIDTH / 2;
-    const openingEnd = opening + DOOR_WIDTH / 2;
-    this.addAxisWall(axis, fixed, (min + openingStart) / 2, baseY + LOWER_WALL_HEIGHT / 2, openingStart - min, LOWER_WALL_HEIGHT);
-    this.addAxisWall(axis, fixed, (openingEnd + max) / 2, baseY + LOWER_WALL_HEIGHT / 2, max - openingEnd, LOWER_WALL_HEIGHT);
-    this.addAxisWall(axis, fixed, opening, baseY + 2.65, DOOR_WIDTH, 1.1);
+    const openingStart = opening - MANSION_DOOR_OPENING.width / 2;
+    const openingEnd = opening + MANSION_DOOR_OPENING.width / 2;
+    this.addAxisWall(axis, fixed, (min + openingStart) / 2, baseY + MANSION_WALL_HEIGHT / 2, openingStart - min, MANSION_WALL_HEIGHT);
+    this.addAxisWall(axis, fixed, (openingEnd + max) / 2, baseY + MANSION_WALL_HEIGHT / 2, max - openingEnd, MANSION_WALL_HEIGHT);
+    this.addAxisWall(axis, fixed, opening, baseY + 2.65, MANSION_DOOR_OPENING.width, 1.1);
   }
 
   private addAxisWall(axis: WallAxis, fixed: number, along: number, y: number, length: number, height: number): void {
     if (length <= 0.01 || height <= 0.01) return;
-    if (axis === 'x') this.addWall(along, y, fixed, length, height, WALL_THICKNESS);
-    else this.addWall(fixed, y, along, WALL_THICKNESS, height, length);
+    if (axis === 'x') this.addWall(along, y, fixed, length, height, MANSION_WALL_THICKNESS);
+    else this.addWall(fixed, y, along, MANSION_WALL_THICKNESS, height, length);
   }
 
   private addWall(
@@ -1316,12 +1265,13 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     depth: number,
     material?: THREE.MeshStandardMaterial,
   ): void {
-    const surfaceMaterial = material ?? this.nextWallMaterial();
+    const surfaceMaterial = material ?? this.materials.wallpaper;
     this.structure.addBox(x, y, z, width, height, depth, surfaceMaterial, {
       surface: surfaceMaterial === this.materials.charredWood ? 'wood' : 'concrete',
       mapRole: 'wall',
       castShadow: !this.profile.useReducedEffects,
-      uvSeed: this.wallMaterialIndex,
+      uvSeed: 0,
+      worldUVs: true,
       blocksPlayer: true,
     });
   }
@@ -1342,6 +1292,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       mapRole: 'slab',
       castShadow: false,
       uvSeed: name.length,
+      worldUVs: true,
       blocksPlayer: false,
     });
   }
@@ -1364,39 +1315,6 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       uvSeed: name.length,
       blocksPlayer: true,
     });
-  }
-
-  private addPointLight(
-    x: number,
-    y: number,
-    z: number,
-    intensity: number,
-    distance: number,
-    ceilingY: number = GROUND_CEILING_Y,
-  ): THREE.PointLight {
-    const light = new THREE.PointLight(0xffffff, intensity, distance, 1.8);
-    light.position.set(x, y, z);
-    const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.055, 8, 6),
-      bulbMaterial,
-    );
-    bulb.position.copy(light.position);
-    bulb.userData.mapRole = 'damaged-bulb';
-
-    // Bare bulb hanging from a wire off a ceiling mount — no bulb should float unattached.
-    const cordHeight = Math.max(0.05, ceilingY - y);
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, cordHeight, 6), this.materials.metal);
-    cord.position.set(x, y + cordHeight / 2, z);
-    cord.userData.mapRole = 'light-cord';
-
-    const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.05, 8), this.materials.metal);
-    mount.position.set(x, ceilingY - 0.025, z);
-    mount.userData.mapRole = 'light-mount';
-
-    this.group.add(light, cord, mount, bulb);
-    this.areaLights.add(light, bulbMaterial);
-    return light;
   }
 
   /**
@@ -1460,11 +1378,15 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.group.traverse((object) => {
       // Effects without frustum culling move freely and stay always rendered.
       if (!(object instanceof THREE.Mesh) || !object.frustumCulled || colliders.has(object)) return;
-      bounds.setFromObject(object);
-      if (bounds.isEmpty()) return;
-      const floor = bounds.max.y < BUNKER_ONLY_MAX_Y ? 'bunker' : bounds.min.y > GROUND_ONLY_MIN_Y ? 'ground' : null;
+      // Merged decoration knows its partition; its union bounds would overstate it.
+      let partition = object.userData.floorPartition as MansionFloorPartition | undefined;
+      if (!partition) {
+        bounds.setFromObject(object);
+        if (bounds.isEmpty()) return;
+        partition = floorPartitionOf(bounds);
+      }
+      const { floor, nearStairs } = partition;
       if (!floor) return;
-      const nearStairs = bounds.max.x > STAIR_ROOM_MIN_X && bounds.min.z < STAIR_ROOM_MAX_Z;
       this.floorMeshSets
         .find((set) => set.floor === floor && set.nearStairs === nearStairs)!
         .meshes.push(object);
@@ -1472,7 +1394,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   }
 
   private updateFloorRendering(observerPosition: THREE.Vector3): void {
-    const inStairRoom = observerPosition.x > STAIR_ROOM_MIN_X && observerPosition.z < STAIR_ROOM_MAX_Z;
+    const inStairRoom = isInStairRoom(observerPosition.x, observerPosition.z);
     const observerFloor = observerPosition.y >= 0 ? 'ground' : 'bunker';
     for (const set of this.floorMeshSets) {
       const rendered = set.floor === observerFloor || (inStairRoom && set.nearStairs);
@@ -1483,12 +1405,6 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
         else mesh.layers.disable(0);
       }
     }
-  }
-
-  private nextWallMaterial(): THREE.MeshStandardMaterial {
-    const material = this.materials.wallVariants[this.wallMaterialIndex % this.materials.wallVariants.length];
-    this.wallMaterialIndex++;
-    return material;
   }
 
   private addDebugHelpers(): void {

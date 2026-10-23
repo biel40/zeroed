@@ -177,10 +177,10 @@ describe('Fire modes', () => {
 });
 
 describe('Bolt action', () => {
-  it('uses a one-shot sniper profile with fast reload cadence', () => {
+  it('uses a one-shot sniper profile with a deliberate, readable reload', () => {
     expect(WEAPON_DEFINITIONS.l96.damage).toBeGreaterThanOrEqual(1000);
-    expect(WEAPON_DEFINITIONS.l96.reloadTime).toBeLessThan(1.5);
-    expect(WEAPON_DEFINITIONS.l96.tacticalReloadTime).toBeLessThan(1.25);
+    expect(WEAPON_DEFINITIONS.l96.reloadTime).toBeLessThanOrEqual(3);
+    expect(WEAPON_DEFINITIONS.l96.tacticalReloadTime).toBeLessThan(WEAPON_DEFINITIONS.l96.reloadTime);
   });
 
   it('auto-reloads an empty magazine after completing the bolt cycle', () => {

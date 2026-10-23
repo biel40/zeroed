@@ -16,6 +16,7 @@ describe('Mystery Box purchase with Points', () => {
     activated: number;
     deniedFlashes: number;
     granted: string[];
+    excludedWeapons: readonly string[];
   }
 
   function makeMode(startingPoints: number): { mode: ZombiesMode; mock: Mock } {
@@ -25,6 +26,7 @@ describe('Mystery Box purchase with Points', () => {
       activated: 0,
       deniedFlashes: 0,
       granted: [],
+      excludedWeapons: [],
     };
     // Preload the wallet to an exact amount in normal-hit increments.
     let target = startingPoints;
@@ -38,8 +40,9 @@ describe('Mystery Box purchase with Points', () => {
     const box = {
       state: 'closed' as string,
       result: null as string | null,
-      tryActivate: (_excludedWeaponId?: string) => {
+      tryActivate: (carriedWeapons: readonly string[] = []) => {
         if (box.state !== 'closed') return false;
+        mock.excludedWeapons = carriedWeapons;
         box.state = 'opening';
         mock.activated++;
         return true;
@@ -53,6 +56,7 @@ describe('Mystery Box purchase with Points', () => {
     (mode as unknown as Record<string, unknown>).ctx = {
       grantWeapon: (id: string) => mock.granted.push(id),
       getEquippedWeaponId: () => 'm1911',
+      hasWeapon: (id: string) => id === 'm4a1' || id === 'ak47',
       hud: {
         flashNotEnoughPoints: () => {
           mock.deniedFlashes++;
@@ -70,6 +74,8 @@ describe('Mystery Box purchase with Points', () => {
     mode.onInteract();
     expect(mock.activated).toBe(1);
     expect(mock.economy.points).toBe(1000 - MYSTERY_BOX_TUNING.cost);
+    expect(mock.excludedWeapons).toEqual(expect.arrayContaining(['m4a1', 'ak47']));
+    expect(mock.excludedWeapons).toHaveLength(2);
   });
 
   it('refuses the purchase and flashes feedback when short on points', () => {

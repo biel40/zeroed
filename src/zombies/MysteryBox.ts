@@ -85,8 +85,8 @@ export interface MysteryBoxEvent {
 /**
  * Generic weighted random selection. `lastId`/`repeatFactor` optionally
  * shrink the previous winner's slice of the wheel for one roll, so streaks
- * cool down without ever becoming impossible. `excludedId` removes one
- * weapon entirely, used to prevent the equipped weapon from being rolled.
+ * cool down without ever becoming impossible. `excludedIds` removes carried
+ * weapons entirely so neither inventory slot can be rolled.
  * Deterministic under an injected rng.
  */
 export function pickWeighted(
@@ -94,11 +94,11 @@ export function pickWeighted(
   rng: () => number,
   lastId: WeaponId | null = null,
   repeatFactor = 1,
-  excludedId: WeaponId | null = null,
+  excludedIds: readonly WeaponId[] = [],
 ): WeaponId {
   let total = 0;
   for (const entry of entries) {
-    if (entry.weaponId === excludedId) continue;
+    if (excludedIds.includes(entry.weaponId)) continue;
     total += entry.weight * (entry.weaponId === lastId ? repeatFactor : 1);
   }
   if (total <= 0) throw new Error('pickWeighted needs at least one selectable entry');
@@ -106,7 +106,7 @@ export function pickWeighted(
   let roll = rng() * total;
   let fallback: WeaponId | null = null;
   for (const entry of entries) {
-    if (entry.weaponId === excludedId) continue;
+    if (excludedIds.includes(entry.weaponId)) continue;
     const weight = entry.weight * (entry.weaponId === lastId ? repeatFactor : 1);
     if (weight <= 0) continue;
     fallback = entry.weaponId;
@@ -133,7 +133,7 @@ export class MysteryBoxMachine {
   private resultId: WeaponId | null = null;
   private displayId: WeaponId;
   private lastResult: WeaponId | null = null;
-  private excludedResult: WeaponId | null = null;
+  private excludedResults: readonly WeaponId[] = [];
 
   constructor(
     private readonly pool: readonly MysteryBoxEntry[],
@@ -174,9 +174,9 @@ export class MysteryBoxMachine {
     this.pendingEvents.length = 0;
   }
 
-  tryActivate(excludedWeaponId: WeaponId | null = null): boolean {
+  tryActivate(carriedWeapons: readonly WeaponId[] = []): boolean {
     if (this.phase !== 'closed') return false;
-    this.excludedResult = excludedWeaponId;
+    this.excludedResults = [...carriedWeapons];
     this.phase = 'opening';
     this.timer = this.tuning.openTime;
     this.pendingEvents.push({ type: 'opened' });
@@ -223,7 +223,7 @@ export class MysteryBoxMachine {
             this.rng,
             this.lastResult,
             this.tuning.repeatFactor,
-            this.excludedResult,
+            this.excludedResults,
           );
           this.displayId = this.resultId;
           this.phase = 'awaitingPickup';
@@ -262,7 +262,7 @@ export class MysteryBoxMachine {
     this.tickTimer = 0;
     this.resultId = null;
     this.lastResult = null;
-    this.excludedResult = null;
+    this.excludedResults = [];
     this.displayId = this.pool[0].weaponId;
     this.pendingEvents.length = 0;
   }

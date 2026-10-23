@@ -111,7 +111,7 @@ describe('Zombies map selection flow', () => {
     try {
       const selected: string[] = [];
       const ui = new HUD();
-      ui.showMapSelect((mapId) => selected.push(mapId));
+      ui.showMapSelect((mapId) => selected.push(mapId), true);
       // The loading screen cross-fades out over the menu before hiding.
       expect(startScreen.classList.contains('leaving')).toBe(true);
       vi.runAllTimers();
@@ -129,7 +129,15 @@ describe('Zombies map selection flow', () => {
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion']);
 
-      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`));
+      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
+      expect(station.classList.contains('hidden')).toBe(false);
+
+      // Testers do not see developer-only maps; `?map=` still reaches them.
+      ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), false);
+      expect(station.classList.contains('hidden')).toBe(true);
+      expect(station.onclick).toBeNull();
+      expect(mansion.classList.contains('hidden')).toBe(false);
+      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
     } finally {

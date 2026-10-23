@@ -964,7 +964,9 @@ export class CoopHostMode implements GameMode {
         }
         return;
       }
-      this.box.tryActivate(equippedWeapon);
+      const carriedWeapons = remote ? this.guestInventory.weapons
+        : this.weaponIds.filter((id) => this.ctx.hasWeapon(id));
+      this.box.tryActivate(carriedWeapons);
       this.boxOwner = buyer;
       this.sendMatchState();
       return;

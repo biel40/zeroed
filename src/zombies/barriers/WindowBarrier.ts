@@ -17,6 +17,8 @@ export interface WindowBarrierConfig {
   readonly repairInterval: number;
   /** Max boards that award points per round (per window). */
   readonly repairRewardCap: number;
+  /** Height of the opening's sill above its floor; zombies climb over it once the boards are gone. */
+  readonly sill?: number;
 }
 
 export interface RepairResult {
@@ -36,6 +38,8 @@ export class WindowBarrier {
   readonly outward: { readonly x: number; readonly z: number };
   readonly y: number;
   readonly floor: number;
+  /** Sill height zombies climb over (0: they walk straight through). */
+  readonly sill: number;
   readonly boards: ReadonlyArray<BarrierBoard>;
 
   private _state: BarrierState = 'intact';
@@ -58,6 +62,7 @@ export class WindowBarrier {
     this.outward = { x: outwardX, z: outwardZ };
     this.y = y;
     this.floor = floor;
+    this.sill = config.sill ?? 0;
     this.mutableBoards = Array.from({ length: config.boardCount }, () => ({
       hp: config.boardHp,
       maxHp: config.boardHp,

@@ -46,7 +46,7 @@ export class ViewArms {
   readonly right: FirstPersonArm;
   readonly left: FirstPersonArm;
   /**
-   * Rings ride the right glove: it wraps the grip below the sight line of
+   * Rings ride the right hand: it wraps the grip below the sight line of
    * every weapon, while the support hand may sit near the sights.
    */
   readonly rings: HandRings;

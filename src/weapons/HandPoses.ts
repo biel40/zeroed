@@ -4,19 +4,23 @@ import type { HandPoseId } from './WeaponTypes';
 export const FINGERS = ['index', 'middle', 'ring', 'pinky'] as const;
 export type FingerName = (typeof FINGERS)[number];
 
-/** Knuckle position relative to the wrist and phalanx lengths/radius per finger (right glove). */
+/**
+ * Knuckle position relative to the wrist, phalanx lengths and radius per
+ * finger (right hand). The radius is the proximal phalanx's reach from its
+ * bone line to the pad: what a held part touches.
+ */
 export const FINGER_LAYOUT: Readonly<Record<FingerName, {
   readonly base: readonly [number, number, number];
   readonly lengths: readonly [number, number, number];
   readonly radius: number;
 }>> = {
-  index: { base: [0.001, 0.03, -0.092], lengths: [0.044, 0.027, 0.022], radius: 0.0112 },
-  middle: { base: [0.001, 0.0098, -0.096], lengths: [0.048, 0.03, 0.023], radius: 0.0116 },
-  ring: { base: [0.001, -0.0102, -0.093], lengths: [0.045, 0.028, 0.022], radius: 0.011 },
-  pinky: { base: [0.0, -0.029, -0.085], lengths: [0.036, 0.022, 0.019], radius: 0.0098 },
+  index: { base: [0.001, 0.03, -0.092], lengths: [0.044, 0.027, 0.022], radius: 0.0094 },
+  middle: { base: [0.001, 0.0098, -0.096], lengths: [0.048, 0.03, 0.023], radius: 0.0097 },
+  ring: { base: [0.001, -0.0102, -0.093], lengths: [0.045, 0.028, 0.022], radius: 0.0091 },
+  pinky: { base: [0.0, -0.029, -0.085], lengths: [0.036, 0.022, 0.019], radius: 0.0081 },
 };
 /** Each phalanx is this much thinner than the one before it. */
-export const PHALANX_TAPER = 0.93;
+export const PHALANX_TAPER = 0.87;
 
 /** Curl of the three phalanges (radians, toward the palm) and side spread. */
 export interface FingerPose {
@@ -25,9 +29,9 @@ export interface FingerPose {
 }
 
 /**
- * Finger pose of a right glove. Hand frame: the wrist is the origin, the
+ * Finger pose of a right hand. Hand frame: the wrist is the origin, the
  * fingers point -Z, the thumb side is +Y and the palm faces -X. The left
- * glove mirrors X.
+ * hand mirrors X.
  */
 export interface HandPose {
   readonly index: FingerPose;
@@ -136,7 +140,7 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
 // --- Fitting the fingers to a held part -------------------------------------
 
 /**
- * A held part seen from the hand frame (right-glove convention): a prism
+ * A held part seen from the hand frame (right-hand convention): a prism
  * through `center` whose section is a rounded rectangle spanning
  * `halfWidth` along `across` and `halfDepth` along `through` (unit vectors
  * normal to the part's length).
@@ -154,7 +158,7 @@ export interface HeldPart {
 /** Palm surface (-X) and the line a wrapped part's front face sits behind (-Z). */
 const PALM_SURFACE = 0.017;
 const KNUCKLE_FACE = 0.086;
-/** Glove padding a closed finger may sink into the part. */
+/** Soft pad a closed finger may press into the part. */
 const SQUEEZE = 0.003;
 /** Corner radius of a section, as a share of its smaller half extent. */
 const ROUNDING = 0.7;

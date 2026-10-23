@@ -18,7 +18,7 @@ function gripRotation(config: HandGripConfig, side: HandSide): THREE.Quaternion 
   const y = new THREE.Vector3(...config.axis).normalize();
   const palm = new THREE.Vector3(...config.palm);
   palm.addScaledVector(y, -palm.dot(y)).normalize();
-  // Right gloves face their palm along -X, left gloves along +X.
+  // Right hands face their palm along -X, left hands along +X.
   const x = side === 'right' ? palm.negate() : palm;
   const z = new THREE.Vector3().crossVectors(x, y);
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
@@ -39,7 +39,7 @@ function gripPose(config: HandGripConfig, quaternion: THREE.Quaternion, side: Ha
   if (!config.hold && !config.trigger) return pose;
   const cached = fittedPoses.get(config);
   if (cached) return cached;
-  // Part-space directions as the hand sees them, in the right-glove convention.
+  // Part-space directions as the hand sees them, in the right-hand convention.
   const toHand = quaternion.clone().invert();
   const inHand = (vector: THREE.Vector3): THREE.Vector3 => {
     vector.applyQuaternion(toHand);
@@ -108,7 +108,7 @@ const POUCH_POSITION = new THREE.Vector3(-0.2, -0.62, -0.3);
 const REACH_LEAD = 0.07;
 
 /**
- * Glove targets of one weapon view: the configured grips, plus the reload
+ * Hand targets of one weapon view: the configured grips, plus the reload
  * choreography (support hand rides the magazine to a pouch and back) and
  * the action hand on the charging handle or bolt. Targets are read in world
  * space from the animated parts, so hands follow sway, recoil, ADS, equip
@@ -152,7 +152,8 @@ export class WeaponHands {
         this.handleRear = new THREE.Matrix4().makeTranslation(0, 0, HANDLE_TRAVEL).multiply(parts.handle.matrix);
       }
     }
-    if (parts.magazine && reload && this.anchors.left) {
+    // A one-handed weapon needs an explicit magazine grip to show a reload hand.
+    if (parts.magazine && reload && (this.anchors.left || config.magazine)) {
       this.magazineGrip = toGrip(config.magazine ?? defaultMagazineGrip(reload), 'left');
     }
   }
@@ -177,7 +178,7 @@ export class WeaponHands {
    */
   read(side: HandSide, position: THREE.Vector3, rotation: THREE.Quaternion): HandPose | null {
     const anchor = this.anchors[side];
-    if (!anchor) return null;
+    if (!anchor) return side === 'left' ? this.readReloadOnlyHand(position, rotation) : null;
     this.root.updateWorldMatrix(true, false);
     this.world(anchor, this.root, position, rotation);
     let pose = anchor.pose;
@@ -196,10 +197,12 @@ export class WeaponHands {
     const p = this.progress;
     // A pistol magazine falls free: the hand goes straight for the pouch.
     const extract = reload.style !== 'pistol';
+    // A canister is never let go: the hand carries it off screen and back.
+    const fetch = reload.style !== 'canister';
     const away = extract ? reload.magDrop : reload.magOut;
     const grab = extract ? ramp(p, reload.magOut - REACH_LEAD, reload.magOut) : 0;
-    const toPouch = ramp(p, away, away + (reload.magIn - away) * 0.45);
-    const back = ramp(p, away + (reload.magIn - away) * 0.6, reload.magIn);
+    const toPouch = fetch ? ramp(p, away, away + (reload.magIn - away) * 0.45) : 0;
+    const back = fetch ? ramp(p, away + (reload.magIn - away) * 0.6, reload.magIn) : 0;
     const release = ramp(p, reload.magSeat, Math.min(1, reload.magSeat + 0.1));
 
     magazine.updateWorldMatrix(true, false);
@@ -209,6 +212,28 @@ export class WeaponHands {
     if (release > 0) this.blend(position, rotation, this.anchors.left as Grip, this.root, release);
     const busy = (extract ? grab : toPouch) > 0.5 && release < 0.5;
     return busy ? grip.pose : pose;
+  }
+
+  /**
+   * One-handed weapons: the support hand only shows during a reload, rising
+   * from the pouch onto the magazine and dropping back there once it seats.
+   */
+  private readReloadOnlyHand(position: THREE.Vector3, rotation: THREE.Quaternion): HandPose | null {
+    const reload = this.reload;
+    const magazine = this.parts.magazine;
+    const grip = this.magazineGrip;
+    if (this.state !== 'reloading' || !reload || !magazine || !grip) return null;
+    const p = this.progress;
+    const weight = ramp(p, reload.magOut - REACH_LEAD, reload.magOut)
+      * (1 - ramp(p, reload.magSeat, Math.min(1, reload.magSeat + 0.1)));
+    if (weight <= 0) return null;
+    magazine.updateWorldMatrix(true, false);
+    this.world(grip, magazine, position, rotation);
+    this.blendPosition.copy(position);
+    position.copy(POUCH_POSITION);
+    this.root.parent?.localToWorld(position);
+    position.lerp(this.blendPosition, weight);
+    return grip.pose;
   }
 
   /** Action hand on the charging handle / bolt / slide while it moves. */

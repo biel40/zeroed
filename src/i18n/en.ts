@@ -122,6 +122,8 @@ export const en = {
   'prompt.repairBarricade': 'REPAIR BARRICADE\n{key}',
   'prompt.lightLamp': 'LIGHT LANTERN\n{key}',
   'prompt.ritual': 'TOUCH THE RITUAL CIRCLE\n{key}',
+  'prompt.wearGasMask': 'PUT ON GAS MASK\n{key}',
+  'prompt.removeGasMask': 'HANG UP GAS MASK\n{key}',
   'prompt.activateFinal': 'ACTIVATE FINAL\n{key} — {cost} PTS',
   'prompt.mysteryBox': 'MYSTERY BOX\n{key}',
   'prompt.mysteryBoxCost': 'MYSTERY BOX\n{key} — {cost} PTS',

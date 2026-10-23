@@ -778,6 +778,7 @@ export class ZombieManager {
         const heading = this.smoothHeading(zombie, zombie.position.x - previousX, zombie.position.z - previousZ, dt);
         zombie.faceTowards(zombie.position.x + heading.x, zombie.position.z + heading.z, TURN_SPEED * dt);
       }
+      zombie.trackWindowVault(this.barriers);
       zombie.update(dt, visualSpeed / Math.max(0.01, zombie.group.scale.x));
     }
   }

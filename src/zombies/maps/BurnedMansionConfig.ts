@@ -7,18 +7,17 @@ import type { ArenaAmbience, ArenaEnding } from './ZombieArena';
 
 /** Pure tuning constants for the Burned Mansion map. */
 
-export const BARRIER_CONFIG: WindowBarrierConfig = {
-  boardCount: 5,
-  boardHp: 100,
-  repairInterval: 0.55,
-  repairRewardCap: 4,
-};
-
-/** Charred interior: near-black smoke haze under a cold night sky. */
+/**
+ * Charred interior: warm smoke haze thick enough to swallow the grounds past
+ * the fence, under a cold night sky. The shell's environment light is cut
+ * back so the red bulbs and smouldering char, not a neutral sky, shape the
+ * rooms (and so a previous map's setting never carries over).
+ */
 export const MANSION_AMBIENCE = {
   backgroundColor: 0x0d0b0a,
-  fog: { color: 0x17110e, density: 0.018 },
+  fog: { color: 0x1a130e, density: 0.03 },
   hemisphereLight: { skyColor: 0x34465e, groundColor: 0x110d0a, intensity: 0.25, reducedIntensity: 0.18 },
+  environmentIntensity: { intensity: 0.34, reducedIntensity: 0.3 },
   musicTrack: 'background_music_theme',
 } as const satisfies ArenaAmbience;
 
@@ -38,6 +37,25 @@ export const MANSION_DOOR_COSTS = {
 
 /** Safe player spawn in the expanded south starting room. */
 export const MANSION_PLAYER_SPAWN = { x: -3.5, y: 1.72, z: 7.2, floor: 0 } as const;
+
+/** Wall and opening dimensions shared by the shell and its dressing. */
+export const MANSION_WALL_THICKNESS = 0.3;
+export const MANSION_WALL_HEIGHT = 3.2;
+export const MANSION_DOOR_OPENING = { width: 1.6, top: 2.1 } as const;
+/** Sill low enough for a zombie body to step through after the boards break. */
+export const MANSION_WINDOW_OPENING = { width: 1.5, sill: 0.3, top: 1.9 } as const;
+export const BARRIER_CONFIG: WindowBarrierConfig = {
+  boardCount: 5,
+  boardHp: 100,
+  repairInterval: 0.55,
+  repairRewardCap: 4,
+  sill: MANSION_WINDOW_OPENING.sill,
+};
+
+/** Underside of the ground-floor roof slab (center 3.28, thickness 0.16). */
+export const MANSION_GROUND_CEILING_Y = 3.2;
+/** Underside of the bunker ceiling slab (center -0.22, thickness 0.16). */
+export const MANSION_BUNKER_CEILING_Y = -0.3;
 
 /** Shared east-wing topology coordinates. */
 export const MANSION_EAST_WALL_X = 9.15;
@@ -75,6 +93,30 @@ export const MANSION_BUNKER_BOUNDS = {
 
 export const MANSION_BUNKER_Y = -3.4;
 
+export interface MansionAreaLight {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly intensity: number;
+  readonly distance: number;
+  readonly floor: 0 | -1;
+}
+
+/**
+ * Red, failing practical lights: brass chandeliers upstairs, caged
+ * bulkheads in the bunker. Each hangs under a real ceiling slab; the stair
+ * aperture has none to anchor a cord to.
+ */
+export const MANSION_AREA_LIGHTS: ReadonlyArray<MansionAreaLight> = [
+  { x: -3.8, y: 2.55, z: 6.5, intensity: 2.4, distance: 6.5, floor: 0 },
+  { x: -4.5, y: 2.35, z: -4.8, intensity: 1.7, distance: 6.5, floor: 0 },
+  { x: 2.1, y: 2.35, z: -4.8, intensity: 1.1, distance: 5.2, floor: 0 },
+  { x: 3.4, y: MANSION_BUNKER_Y + 2.45, z: -5.6, intensity: 1.05, distance: 5.5, floor: -1 },
+  { x: -1.4, y: MANSION_BUNKER_Y + 2.35, z: -4.6, intensity: 1.35, distance: 7, floor: -1 },
+  { x: -5.2, y: MANSION_BUNKER_Y + 2.4, z: -1.6, intensity: 1.15, distance: 6.5, floor: -1 },
+  { x: -4.8, y: MANSION_BUNKER_Y + 2.4, z: -6.6, intensity: 0.95, distance: 6, floor: -1 },
+];
+
 export const MANSION_RITUAL_CIRCLE = {
   id: 'secret-room-ritual-circle',
   position: {
@@ -85,6 +127,14 @@ export const MANSION_RITUAL_CIRCLE = {
   floor: -1,
   useRange: 1.85,
   lookDotMin: 0.2,
+} as const;
+
+/** Reach of the wearable gas mask; the dressing hangs it on the bunker's north wall. */
+export const MANSION_GAS_MASK_RACK = {
+  id: 'bunker-gas-mask',
+  floor: -1,
+  useRange: 1.6,
+  lookDotMin: 0.8,
 } as const;
 
 export const SOUL_LAMP_REQUIRED_SOULS = 8;
@@ -194,6 +244,9 @@ export const MANSION_BARRIERS: ReadonlyArray<{
   { id: 'bunker-east', x: MANSION_EAST_WALL_X, z: -2.5, outwardX: 1, outwardZ: 0, zone: 'nuclear-bunker' },
 ];
 
+/** The sealed nuclear bunker door: a steel blast door with its own hazard-striped frame. */
+export const MANSION_BLAST_DOOR_ID = 'nuclear-bunker';
+
 /** Point doors: position, outward normal (opens toward), cost key. */
 export const MANSION_DOORS: ReadonlyArray<{
   id: string;
@@ -210,7 +263,7 @@ export const MANSION_DOORS: ReadonlyArray<{
   { id: 'to-dining', x: -3.5, z: 2, outwardX: 0, outwardZ: -1, cost: MANSION_DOOR_COSTS.diningHall, y: 0, floor: 0 },
   { id: 'to-east-hall', x: 0, z: -2.5, outwardX: 1, outwardZ: 0, cost: MANSION_DOOR_COSTS.eastHall, y: 0, floor: 0 },
   {
-    id: 'nuclear-bunker',
+    id: MANSION_BLAST_DOOR_ID,
     x: MANSION_BUNKER_DIVIDER_X,
     z: -2.5,
     outwardX: 1,

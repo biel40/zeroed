@@ -6,10 +6,8 @@ import type { FirstPersonArm } from './FirstPersonArm';
 /** A worn ring glows while it holds a charge and goes dull once spent. */
 export type HandRingState = 'charged' | 'spent';
 
-/** Share of the phalanx from the knuckle: past the glove's knuckle pad, short of the joint. */
-const SEAT_ALONG = 0.8;
-/** The band sits over the glove, slightly wider than the finger. */
-const BAND_CLEARANCE = 1.12;
+/** The band's inner edge rests on the skin: the unit torus spans 0.84..1.16. */
+const BAND_CLEARANCE = 1.17;
 const CHARGED_GLOW = 1.1;
 /** Seconds for a pulse (putting the ring on, the ring firing) to fade. */
 const PULSE_DECAY = 2.2;
@@ -55,7 +53,7 @@ interface RingSlot {
 }
 
 /**
- * Rings worn on one first-person glove, one per finger. Each ring is a
+ * Rings worn on one first-person hand, one per finger. Each ring is a
  * child of its finger's proximal bone, so it follows every pose without
  * touching it. Rings are hidden until worn and carry no light: a charged
  * ring glows through its own enamel. The owner (`ViewArms`) applies the
@@ -69,14 +67,15 @@ export class HandRings {
     const geometry = ringGeometry();
     const side = arm.side === 'right' ? 1 : -1;
     for (const finger of RING_FINGERS) {
-      const { bone, length, radius } = arm.ringSeat(finger);
+      const { bone, along, halfWidth, back, front } = arm.ringSeat(finger);
       const lit = new THREE.MeshStandardMaterial({ name: `hand-ring-enamel-${finger}`, roughness: 0.25, metalness: 0.1 });
       const mesh = new THREE.Mesh(geometry, [bandMaterial(), lit]);
       mesh.name = `hand-ring-${arm.side}-${finger}`;
-      mesh.position.set(0, 0, -length * SEAT_ALONG);
-      const scale = radius * BAND_CLEARANCE;
-      // Mirrored on the left glove so the bezel stays on the back of the finger.
-      mesh.scale.set(scale * side, scale, scale);
+      // Centred on the finger section (deeper toward the pad than the back) and
+      // fitted to it; mirrored on the left hand so the bezel stays on the back.
+      const depth = (back + front) / 2;
+      mesh.position.set(((back - front) / 2) * side, 0, -along);
+      mesh.scale.set(depth * BAND_CLEARANCE * side, halfWidth * BAND_CLEARANCE, depth * BAND_CLEARANCE);
       mesh.visible = false;
       mesh.frustumCulled = false;
       bone.add(mesh);

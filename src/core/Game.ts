@@ -59,7 +59,7 @@ export class Game {
   private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
   private inventory!: WeaponInventory;
   private readonly magazineDrops: MagazineDropPool;
-  /** First-person gloves shared by every weapon view and the knife. */
+  /** First-person arms and hands shared by every weapon view and the knife. */
   private readonly viewArms: ViewArms;
   /** Map colliders + dynamic mode hitboxes (zombies). Mutated by the mode. */
   private readonly hitColliders: THREE.Object3D[] = [];

@@ -137,7 +137,7 @@ export class CoopGuestMode implements GameMode {
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.world.update(dt);
     this.boxView.update(dt, this.box);
-    this.replica.update(dt);
+    this.replica.update(dt, this.world.arena.barriers);
     this.energy.update(dt);
     this.chain.update(dt);
     this.hostAvatar.update(dt);

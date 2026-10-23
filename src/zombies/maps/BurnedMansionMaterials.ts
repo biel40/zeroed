@@ -1,135 +1,82 @@
 import * as THREE from 'three';
+import { addHeightGrime } from './burnedMansion/HeightGrime';
+import {
+  barkPainter,
+  bunkerPaintPainter,
+  ceilingPainter,
+  charredWoodPainter,
+  deadLawnPainter,
+  formedConcretePainter,
+  gravestonePainter,
+  parquetPainter,
+  portraitPainter,
+  rustySteelPainter,
+  slabConcretePainter,
+  treadPlatePainter,
+  trimPainter,
+  wainscotPainter,
+  wallpaperPainter,
+  weatheredPlankPainter,
+} from './burnedMansion/MansionPainters';
 import { makeBloodDecalTexture } from './shared/BloodDecalTexture';
+import { seededRandom, valueNoise } from './shared/ProceduralNoise';
+import { bake, decalMaterial, decalTexture, surfaceMaterial, type Painter } from './shared/ProceduralSurface';
 
-export type MansionSurfaceMaterials = {
-  readonly wallVariants: readonly THREE.MeshStandardMaterial[];
-  readonly concreteDirty: THREE.MeshStandardMaterial;
+/**
+ * Surfaces of Burned Mansion: a Victorian house gutted by fire (oxblood
+ * damask, walnut wainscot, oak parquet, checked char that still smoulders)
+ * above a civil-defence bunker of board-formed concrete. Every texture is
+ * baked in code and cached per process; materials are created per arena.
+ */
+export interface MansionSurfaceMaterials {
+  /** Ground-floor walls; smoke darkens them towards the ceiling. */
+  readonly wallpaper: THREE.MeshStandardMaterial;
+  /** Bunker and secret-room walls; damp darkens them towards the floor. */
+  readonly bunkerConcrete: THREE.MeshStandardMaterial;
   readonly ceilingBurned: THREE.MeshStandardMaterial;
-  readonly floorConcrete: THREE.MeshStandardMaterial;
-  readonly floorWood: THREE.MeshStandardMaterial;
+  readonly bunkerCeiling: THREE.MeshStandardMaterial;
+  readonly parquet: THREE.MeshStandardMaterial;
+  readonly bunkerFloor: THREE.MeshStandardMaterial;
+  /** Stairwell walls, joists and the cabinet; its emissive map holds the embers. */
   readonly charredWood: THREE.MeshStandardMaterial;
+  readonly wainscot: THREE.MeshStandardMaterial;
+  readonly trimWood: THREE.MeshStandardMaterial;
+  /** Boards nailed over the paid doorways (PointDoorView skin). */
+  readonly doorPlanks: THREE.MeshStandardMaterial;
   readonly metal: THREE.MeshStandardMaterial;
+  readonly treadPlate: THREE.MeshStandardMaterial;
+  readonly bunkerPaint: THREE.MeshStandardMaterial;
+  readonly brass: THREE.MeshStandardMaterial;
+  readonly gilt: THREE.MeshStandardMaterial;
+  readonly shadeGlass: THREE.MeshStandardMaterial;
+  /** Enamel lamp shades of the bunker, open underneath. */
+  readonly enamelShade: THREE.MeshStandardMaterial;
+  readonly windowGlass: THREE.MeshStandardMaterial;
+  readonly mirrorGlass: THREE.MeshStandardMaterial;
+  readonly rubber: THREE.MeshStandardMaterial;
+  readonly rubble: THREE.MeshStandardMaterial;
+  readonly ash: THREE.MeshStandardMaterial;
+  readonly paper: THREE.MeshStandardMaterial;
+  readonly wroughtIron: THREE.MeshStandardMaterial;
+  readonly portraits: readonly THREE.MeshStandardMaterial[];
+  readonly lawn: THREE.MeshStandardMaterial;
+  readonly bark: THREE.MeshStandardMaterial;
+  readonly gravestone: THREE.MeshStandardMaterial;
   readonly sootSoft: THREE.MeshStandardMaterial;
   readonly sootHeavy: THREE.MeshStandardMaterial;
   readonly bloodSplatter: THREE.MeshStandardMaterial;
   readonly bloodSmear: THREE.MeshStandardMaterial;
   readonly damp: THREE.MeshStandardMaterial;
   readonly crack: THREE.MeshStandardMaterial;
-};
-
-type TextureSet = {
-  readonly map: THREE.Texture;
-  readonly normalMap: THREE.Texture;
-  readonly roughnessMap: THREE.Texture;
-};
-
-const PROCEDURAL_SIZE = 128;
-
-function makeFallbackTexture(
-  base: readonly [number, number, number],
-  variation: number,
-  mode: 'color' | 'normal' | 'roughness',
-): THREE.DataTexture {
-  const data = new Uint8Array(PROCEDURAL_SIZE * PROCEDURAL_SIZE * 4);
-  for (let y = 0; y < PROCEDURAL_SIZE; y++) {
-    for (let x = 0; x < PROCEDURAL_SIZE; x++) {
-      const hash = ((x * 73856093) ^ (y * 19349663) ^ ((x + y) * 83492791)) >>> 0;
-      const broad = Math.sin(x * 0.11) * Math.cos(y * 0.09) * 0.32;
-      const fine = ((hash % 1021) / 1020 - 0.5) * 0.68;
-      const noise = broad + fine;
-      const index = (y * PROCEDURAL_SIZE + x) * 4;
-      if (mode === 'normal') {
-        data[index] = 128 + Math.round(noise * variation);
-        data[index + 1] = 128 + Math.round((((hash >>> 8) % 255) / 255 - 0.5) * variation);
-        data[index + 2] = 248;
-      } else if (mode === 'roughness') {
-        const value = Math.max(0, Math.min(255, base[0] + noise * variation));
-        data[index] = value;
-        data[index + 1] = value;
-        data[index + 2] = value;
-      } else {
-        data[index] = Math.max(0, Math.min(255, base[0] + noise * variation));
-        data[index + 1] = Math.max(0, Math.min(255, base[1] + noise * variation));
-        data[index + 2] = Math.max(0, Math.min(255, base[2] + noise * variation));
-      }
-      data[index + 3] = 255;
-    }
-  }
-  const texture = new THREE.DataTexture(data, PROCEDURAL_SIZE, PROCEDURAL_SIZE, THREE.RGBAFormat);
-  texture.colorSpace = mode === 'color' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.needsUpdate = true;
-  return texture;
+  readonly floorScorch: THREE.MeshStandardMaterial;
+  readonly ashDrift: THREE.MeshStandardMaterial;
 }
 
-function loadTexture(
-  name: string,
-  fallback: THREE.Texture,
-  colorSpace: THREE.ColorSpace,
-  anisotropy: number,
-): THREE.Texture {
-  if (typeof Image === 'undefined') return fallback;
-  const texture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/textures/${name}`);
-  texture.colorSpace = colorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.anisotropy = anisotropy;
-  return texture;
-}
+/** Ember glow of the charred wood at full smoulder; the atmosphere breathes it. */
+export const CHAR_EMBER_COLOR = 0xff5a1e;
+export const CHAR_EMBER_INTENSITY = 1.6;
 
-function loadSet(prefix: 'concrete' | 'brown_planks_03', anisotropy: number): TextureSet {
-  const fallbackColor = prefix === 'concrete' ? [112, 108, 98] as const : [75, 67, 57] as const;
-  return {
-    map: loadTexture(
-      `${prefix}_diff.jpg`,
-      makeFallbackTexture(fallbackColor, 34, 'color'),
-      THREE.SRGBColorSpace,
-      anisotropy,
-    ),
-    normalMap: loadTexture(
-      `${prefix}_nor.jpg`,
-      makeFallbackTexture([128, 128, 248], 18, 'normal'),
-      THREE.NoColorSpace,
-      anisotropy,
-    ),
-    roughnessMap: loadTexture(
-      `${prefix}_rough.jpg`,
-      makeFallbackTexture([225, 225, 225], 22, 'roughness'),
-      THREE.NoColorSpace,
-      anisotropy,
-    ),
-  };
-}
-
-function makeSurfaceMaterial(
-  name: string,
-  textures: TextureSet,
-  color: number,
-  roughness: number,
-  normalStrength: number,
-  metersPerTile: number,
-): THREE.MeshStandardMaterial {
-  const material = new THREE.MeshStandardMaterial({
-    name,
-    color,
-    map: textures.map,
-    normalMap: textures.normalMap,
-    normalScale: new THREE.Vector2(normalStrength, normalStrength),
-    roughnessMap: textures.roughnessMap,
-    aoMap: textures.roughnessMap,
-    aoMapIntensity: 0.25,
-    roughness,
-    metalness: 0,
-  });
-  material.userData.metersPerTile = metersPerTile;
-  return material;
-}
-
-function makeDecalTexture(
-  kind: 'soot' | 'damp' | 'crack',
-  seed: number,
-): THREE.DataTexture {
+function makeWallDecalTexture(kind: 'soot' | 'damp' | 'crack', seed: number): THREE.DataTexture {
   const size = 128;
   const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
@@ -162,49 +109,122 @@ function makeDecalTexture(
       data[index + 3] = Math.round(Math.max(0, Math.min(1, alpha)) * 255);
     }
   }
-  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  return texture;
+  return decalTexture(data, size);
 }
 
-function makeDecalMaterial(name: string, map: THREE.Texture, alphaTest = 0.03, roughness = 1): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    name,
-    map,
-    transparent: true,
-    alphaTest,
-    depthWrite: false,
-    roughness,
-    metalness: 0,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    side: THREE.DoubleSide,
-  });
+/** Irregular floor blot: a black burn mark (`scorch`) or a soft drift of grey ash. */
+function makeFloorBlotTexture(kind: 'scorch' | 'ash', seed: number): THREE.DataTexture {
+  const size = 128;
+  const random = seededRandom(seed);
+  const edge = valueNoise(random, 16, size);
+  const fine = valueNoise(random, 4, size);
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const distance = Math.hypot(x - size / 2, y - size / 2) / (size / 2);
+      const body = THREE.MathUtils.smoothstep(1 - distance + (edge(x, y) - 0.5) * 0.6, 0.15, kind === 'scorch' ? 0.55 : 0.8);
+      const offset = (y * size + x) * 4;
+      const grain = 0.75 + fine(x, y) * 0.5;
+      data[offset] = kind === 'scorch' ? 12 : Math.round(96 * grain);
+      data[offset + 1] = kind === 'scorch' ? 10 : Math.round(92 * grain);
+      data[offset + 2] = kind === 'scorch' ? 9 : Math.round(86 * grain);
+      data[offset + 3] = Math.round(THREE.MathUtils.clamp(body * (kind === 'scorch' ? 235 : 170) * grain, 0, 255));
+    }
+  }
+  return decalTexture(data, size);
+}
+
+/** Wall decals hang on planes rotated in place, so both faces must render. */
+function wallDecal(name: string, map: THREE.Texture, alphaTest = 0.03, roughness = 1): THREE.MeshStandardMaterial {
+  return decalMaterial(name, map, roughness, { alphaTest, side: THREE.DoubleSide });
 }
 
 export function createMansionSurfaceMaterials(anisotropyLimit: number): MansionSurfaceMaterials {
   const anisotropy = Math.min(anisotropyLimit, 8);
-  const concrete = loadSet('concrete', anisotropy);
-  const wood = loadSet('brown_planks_03', anisotropy);
-  const plasterDamaged = makeSurfaceMaterial('plaster_damaged', concrete, 0xc0ad8d, 0.96, 0.34, 1.35);
-  const concreteDirty = makeSurfaceMaterial('concrete_dirty', concrete, 0x89877e, 0.98, 0.42, 1.15);
-  const burnedWall = makeSurfaceMaterial('burned_wall', concrete, 0x514a43, 1, 0.48, 1.05);
+  const surface = (
+    name: string,
+    key: string,
+    size: number,
+    normalStrength: number,
+    painter: (size: number) => () => Painter,
+    metersPerTile: number,
+    parameters: THREE.MeshStandardMaterialParameters = {},
+  ): THREE.MeshStandardMaterial => surfaceMaterial(name, bake(key, size, normalStrength, painter(size)), anisotropy, metersPerTile, parameters);
+
+  const wallpaper = surface('burned_wallpaper', 'mansion-wallpaper', 512, 2.5, wallpaperPainter, 1.8);
+  addHeightGrime(wallpaper, { fromY: 1.2, toY: 3.2, darkness: 0.62 });
+  const bunkerConcrete = surface('bunker_concrete', 'mansion-formed-concrete', 256, 3, formedConcretePainter, 1.6);
+  addHeightGrime(bunkerConcrete, { fromY: -2.5, toY: -3.4, darkness: 0.42 });
+  const slab = bake('mansion-slab-concrete', 256, 2.5, slabConcretePainter(256));
 
   return {
-    wallVariants: [plasterDamaged, concreteDirty, burnedWall],
-    concreteDirty,
-    ceilingBurned: makeSurfaceMaterial('blackened_plaster_ceiling', concrete, 0x56534e, 1, 0.38, 1.1),
-    floorConcrete: makeSurfaceMaterial('worn_concrete_floor', concrete, 0x77746b, 0.97, 0.5, 0.95),
-    floorWood: makeSurfaceMaterial('deteriorated_wood_floor', wood, 0x706355, 0.94, 0.45, 1.25),
-    charredWood: makeSurfaceMaterial('charred_wood', wood, 0x443a31, 0.98, 0.55, 0.9),
-    metal: new THREE.MeshStandardMaterial({ name: 'oxidized_metal', color: 0x454849, roughness: 0.82, metalness: 0.35 }),
-    sootSoft: makeDecalMaterial('soot_soft', makeDecalTexture('soot', 17)),
-    sootHeavy: makeDecalMaterial('soot_heavy', makeDecalTexture('soot', 83)),
+    wallpaper,
+    bunkerConcrete,
+    ceilingBurned: surface('blackened_plaster_ceiling', 'mansion-ceiling', 256, 3, ceilingPainter, 1.6),
+    bunkerCeiling: surfaceMaterial('bunker_ceiling_concrete', slab, anisotropy, 2.4, { color: 0xa6a69e }),
+    parquet: surface('charred_parquet', 'mansion-parquet', 512, 3, parquetPainter, 2.4),
+    bunkerFloor: surfaceMaterial('bunker_floor_concrete', slab, anisotropy, 2.4),
+    charredWood: surface('charred_wood', 'mansion-char', 256, 4, charredWoodPainter, 0.6, {
+      emissive: CHAR_EMBER_COLOR,
+      emissiveIntensity: CHAR_EMBER_INTENSITY,
+    }),
+    wainscot: surface('burned_wainscot', 'mansion-wainscot', 256, 4, wainscotPainter, 0.9),
+    trimWood: surface('scorched_trim', 'mansion-trim', 128, 2, trimPainter, 0.6),
+    doorPlanks: surface('weathered_planks', 'mansion-planks', 256, 3, weatheredPlankPainter, 1.25),
+    metal: surface('oxidized_metal', 'mansion-rusty-steel', 128, 2, rustySteelPainter, 0.6, { metalness: 0.55 }),
+    treadPlate: surface('stair_tread_plate', 'mansion-tread-plate', 128, 4, treadPlatePainter, 0.3, { metalness: 0.7 }),
+    bunkerPaint: surface('bunker_paint', 'mansion-bunker-paint', 128, 2, bunkerPaintPainter, 0.8, { metalness: 0.1 }),
+    brass: new THREE.MeshStandardMaterial({ name: 'tarnished_brass', color: 0x6b5330, roughness: 0.45, metalness: 0.85 }),
+    gilt: new THREE.MeshStandardMaterial({ name: 'sooty_gilt', color: 0x5c4524, roughness: 0.5, metalness: 0.75 }),
+    shadeGlass: new THREE.MeshStandardMaterial({
+      name: 'frosted_shade',
+      color: 0x8c6a5a,
+      emissive: 0x3c0904,
+      roughness: 0.35,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+    enamelShade: new THREE.MeshStandardMaterial({
+      name: 'enamel_shade',
+      color: 0x3e4a36,
+      roughness: 0.5,
+      metalness: 0.3,
+      side: THREE.DoubleSide,
+    }),
+    mirrorGlass: new THREE.MeshStandardMaterial({ name: 'tarnished_mirror', color: 0x30363a, roughness: 0.12, metalness: 0.92 }),
+    rubber: new THREE.MeshStandardMaterial({ name: 'gas_mask_rubber', color: 0x161616, roughness: 0.72 }),
+    windowGlass: new THREE.MeshStandardMaterial({
+      name: 'broken_window_glass',
+      color: 0x1b2326,
+      roughness: 0.08,
+      metalness: 0.4,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
+    }),
+    rubble: new THREE.MeshStandardMaterial({ name: 'fallen_plaster', color: 0x5a534c, roughness: 0.96 }),
+    ash: new THREE.MeshStandardMaterial({ name: 'ash_heap', color: 0x2e2b28, roughness: 1 }),
+    paper: new THREE.MeshStandardMaterial({ name: 'burnt_paper', color: 0x6a5c4c, roughness: 0.95, side: THREE.DoubleSide }),
+    wroughtIron: new THREE.MeshStandardMaterial({ name: 'wrought_iron', color: 0x18181b, roughness: 0.6, metalness: 0.6 }),
+    portraits: [5231, 5237].map((seed, index) => surfaceMaterial(
+      `ruined_portrait_${index}`,
+      bake(`mansion-portrait-${seed}`, 128, 2, portraitPainter(128, seed)),
+      anisotropy,
+      1,
+    )),
+    lawn: surface('dead_lawn', 'mansion-lawn', 256, 2, deadLawnPainter, 3),
+    bark: surface('dead_bark', 'mansion-bark', 128, 4, barkPainter, 0.8),
+    gravestone: surface('weathered_stone', 'mansion-gravestone', 128, 2, gravestonePainter, 0.8),
+    sootSoft: wallDecal('soot_soft', makeWallDecalTexture('soot', 17)),
+    sootHeavy: wallDecal('soot_heavy', makeWallDecalTexture('soot', 83)),
     // Dried blood keeps a faint sheen over the matte plaster.
-    bloodSplatter: makeDecalMaterial('blood_splatter', makeBloodDecalTexture('splatter', 41), 0.03, 0.62),
-    bloodSmear: makeDecalMaterial('blood_smear', makeBloodDecalTexture('smear', 53), 0.03, 0.62),
-    damp: makeDecalMaterial('damp_stain', makeDecalTexture('damp', 67)),
-    crack: makeDecalMaterial('plaster_crack', makeDecalTexture('crack', 29), 0.35),
+    bloodSplatter: wallDecal('blood_splatter', makeBloodDecalTexture('splatter', 41), 0.03, 0.62),
+    bloodSmear: wallDecal('blood_smear', makeBloodDecalTexture('smear', 53), 0.03, 0.62),
+    damp: wallDecal('damp_stain', makeWallDecalTexture('damp', 67)),
+    crack: wallDecal('plaster_crack', makeWallDecalTexture('crack', 29), 0.35),
+    floorScorch: decalMaterial('floor_scorch', makeFloorBlotTexture('scorch', 5243), 0.95),
+    ashDrift: decalMaterial('ash_drift', makeFloorBlotTexture('ash', 5249), 1),
   };
 }

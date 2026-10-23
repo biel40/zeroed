@@ -57,3 +57,7 @@ Para eliminarla definitivamente:
    `loadEnv` de `vite.config.ts`, y las variables de entorno de beta.
 4. Quitar la referencia a esta funcion en `docs/PROJECT_STATE.md` y actualizar
    los apartados de beta de `public/privacy.html`.
+
+## Mapas solo para desarrolladores
+
+`DEVELOPER_EMAILS` en `emails.js` (deben estar tambien en `BETA_EMAILS`) decide quien ve en el menu los mapas con `developerOnly` en `src/config/zombieMaps.ts` (hoy Station 33). El resto de testers solo ve Burned Mansion, pero `?map=station-33` sigue abriendolo. No es seguridad: es un filtro del menu.

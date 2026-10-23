@@ -86,20 +86,52 @@ describe('L96A1 view model', () => {
     expect(bolt.quaternion.angleTo(new THREE.Quaternion())).toBeCloseTo(0, 6);
   });
 
-  it('drops and reseats one detachable magazine during a reload', () => {
+  it('drops the emptied magazine and shows the rounds of the fresh one before seating it', () => {
     const built = buildProceduralViewModel(view);
-    const magazine = built.reloadParts!.magazine!;
-    const home = magazine.position.clone();
-    const animator = new ReloadAnimator(view.reloadAnim!, { magazine, handle: built.reloadParts!.handle!, cover: null }, null);
+    const { magazine, handle, rounds } = built.reloadParts!;
+    expect(rounds).toBe(built.group.getObjectByName('l96-magazine-rounds'));
+    expect(rounds!.parent).toBe(magazine);
+    const home = magazine!.position.clone();
+    const homeRotation = magazine!.quaternion.clone();
+    const anim = view.reloadAnim!;
+    const animator = new ReloadAnimator(anim, { magazine: magazine!, handle: handle!, cover: null, rounds: rounds! }, null);
     const update = (progress: number): void => animator.update(fakeWeapon('reloading', progress));
-    update(0.15);
-    expect(magazine.position.y).toBeLessThan(home.y);
-    update(0.3);
-    expect(magazine.visible).toBe(false);
-    update(0.5);
-    expect(magazine.visible).toBe(true);
-    update(0.6);
-    expect(magazine.position.toArray()).toEqual(home.toArray());
+
+    update((anim.magOut + anim.magDrop) / 2);
+    expect(magazine!.position.y).toBeLessThan(home.y - 0.05);
+    expect(rounds!.visible).toBe(false);
+    update((anim.magDrop + anim.magIn) / 2);
+    expect(magazine!.visible).toBe(false);
+
+    // Held up with its top turned to the eye, rounds showing.
+    update(anim.magIn + 0.02);
+    expect(magazine!.visible).toBe(true);
+    expect(rounds!.visible).toBe(true);
+    expect(magazine!.quaternion.angleTo(homeRotation)).toBeGreaterThan(0.4);
+
+    update(anim.magSeat + 0.01);
+    expect(magazine!.position.toArray()).toEqual(home.toArray());
+  });
+
+  it('keeps the rounds hidden in the stock while the magazine is seated', () => {
+    const built = buildProceduralViewModel(view);
+    built.group.updateMatrixWorld(true);
+    const roundsBox = new THREE.Box3().setFromObject(built.reloadParts!.rounds!);
+    expect(roundsBox.max.y).toBeLessThan(-0.008);
+    expect(roundsBox.min.z).toBeGreaterThan(L96_PROFILE.magazine.z - L96_PROFILE.magazine.depth / 2 - 0.001);
+    expect(roundsBox.max.z).toBeLessThan(L96_PROFILE.magazine.z + L96_PROFILE.magazine.depth / 2);
+  });
+
+  it('swings the whole rifle into view for the magazine swap and back for the bolt', () => {
+    const anim = view.reloadAnim!;
+    const animator = new ReloadAnimator(anim, { magazine: null, handle: null, cover: null }, null);
+    animator.update(fakeWeapon('reloading', (anim.magDrop + anim.magIn) / 2));
+    expect(animator.bodyYaw).toBeGreaterThan(0.4);
+    expect(animator.bodyShift.z).toBeLessThan(-0.2);
+    animator.update(fakeWeapon('reloading', (anim.charge + anim.chargeEnd) / 2));
+    expect(animator.bodyYaw).toBe(0);
+    animator.update(fakeWeapon('ready', 0));
+    expect(animator.bodyShift.length()).toBe(0);
   });
 
   it('ejects the spent case once, when the bolt reaches the rear', () => {

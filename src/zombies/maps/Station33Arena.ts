@@ -32,6 +32,7 @@ import {
   STATION33_INTRO,
   STATION33_INTRO_CUES,
   STATION33_NAVIGATION_BOUNDS,
+  STATION33_OPENINGS,
   STATION33_PLAYER_BOUNDS,
   STATION33_PLAYER_SPAWN,
   STATION33_RING_LOCKERS,
@@ -118,7 +119,10 @@ export class Station33Arena implements ZombieArena {
     this.group.add(createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects));
 
     this.allBarriers = STATION33_BARRIERS.map((barrier) =>
-      new WindowBarrier(barrier.id, barrier.x, barrier.z, barrier.outwardX, barrier.outwardZ, STATION33_BARRIER_CONFIG));
+      new WindowBarrier(barrier.id, barrier.x, barrier.z, barrier.outwardX, barrier.outwardZ, {
+        ...STATION33_BARRIER_CONFIG,
+        sill: STATION33_OPENINGS[barrier.kind].bottom,
+      }));
     this.barrierViews = this.allBarriers.map((barrier) => {
       const view = new WindowBarrierView(barrier, this.group, () => this.onBarrierBoardRebuilt?.(), Math.random, materials.barrierSlat);
       if (profile.useReducedEffects) view.group.traverse((object) => { object.castShadow = false; });

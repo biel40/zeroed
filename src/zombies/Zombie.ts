@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { HitTarget, SurfaceType } from '../shooting/HitTarget';
 import type { WindowBarrier } from './barriers/WindowBarrier';
+import { findVaultStart, openingDepth, vaultProgress, WINDOW_VAULT, type VaultOpening } from './barriers/WindowVault';
 import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
@@ -100,6 +101,8 @@ export class Zombie implements HitTarget {
   private readonly tmpImpactOrigin = new THREE.Vector3();
   private previousYaw = 0;
   private deathGroundY = 0;
+  /** Window this body is climbing through, from outside its sill until it is clear inside. */
+  private vaultOpening: VaultOpening | null = null;
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
   readonly impact = new THREE.Vector2();
 
@@ -174,6 +177,8 @@ export class Zombie implements HitTarget {
     this.deathStyle = 'knockback';
     this.attackCooldown = 0;
     this.attackApplied = false;
+    this.vaultOpening = null;
+    this.visual.clearWindowVault();
     this.floor = floor;
     this.group.position.set(x, y, z);
     this.group.rotation.set(0, 0, 0);
@@ -358,6 +363,24 @@ export class Zombie implements HitTarget {
       Math.cos(target - this.group.rotation.y),
     );
     this.group.rotation.y += Math.max(-maxTurn, Math.min(maxTurn, delta));
+  }
+
+  /**
+   * Starts, follows or ends the climb through an open window from where the
+   * body stands; called by the owner (simulation or co-op replica) before
+   * update(). Purely visual: movement never waits for the climb.
+   */
+  trackWindowVault(openings: ReadonlyArray<VaultOpening>): void {
+    if (this.isAlive && !this.vaultOpening) this.vaultOpening = findVaultStart(openings, this.position.x, this.position.z, this.floor);
+    const opening = this.vaultOpening;
+    const depth = opening && this.isAlive && opening.floor === this.floor ? openingDepth(opening, this.position.x, this.position.z) : null;
+    if (!opening || depth === null || depth < WINDOW_VAULT.endDepth || depth > WINDOW_VAULT.startDepth) {
+      this.vaultOpening = null;
+      this.visual.clearWindowVault();
+      return;
+    }
+    const scale = Math.max(0.01, this.group.scale.y);
+    this.visual.setWindowVault(vaultProgress(depth), opening.sill / scale, depth / scale);
   }
 
   update(dt: number, visualSpeed = this.speed): void {

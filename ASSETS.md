@@ -59,18 +59,22 @@ impacto son sintesis Web Audio propia, distinta del zap de la ZEUS-77.
 
 ## Brazos en primera persona (procedurales)
 
-Los brazos del viewmodel son geometria propia (`src/weapons/FirstPersonArm.ts`),
-sin descargas. Cada brazo es un `SkinnedMesh` con 18 huesos: hombro, codo,
-muneca y tres falanges por dedo (dos mas el metacarpiano en el pulgar). Manga
-y guante comparten esqueleto, asi que cada brazo cuesta cuatro draw calls
-(manga, sombra de tela, guante y protecciones de nudillos).
+Los brazos del viewmodel son geometria propia, sin descargas: manga y montaje
+en `src/weapons/FirstPersonArm.ts`, esqueleto en `ArmRig.ts`, mano en
+`HandModel.ts` y piel en `HandSkinTexture.ts`. Cada brazo es un `SkinnedMesh`
+con 18 huesos: hombro, codo, muneca y tres falanges por dedo (dos mas el
+metacarpiano en el pulgar). Manga y mano comparten esqueleto, asi que cada
+brazo cuesta tres draw calls (manga, sombra de tela y piel con uñas).
 
-- **Aspecto**: manga de la chaqueta de campo de `soldier.glb` y guante
-  tactico color coyote, elegido para leerse sobre armas oscuras. La muneca
-  se reparte entre antebrazo y mano para doblarse sin bisagras visibles.
-- **Densidad**: escritorio ~3,3k triangulos por brazo; movil ~1,5k; con
-  `isLowMemory` la falange distal queda fundida en la media con una flexion
-  fija. El esqueleto es el mismo en los tres niveles.
+- **Aspecto**: manga de la chaqueta de campo de `soldier.glb` sobre una mano
+  desnuda de proporciones adultas. Antebrazo, muneca y palma son una sola
+  superficie (nudillos, eminencias tenar e hipotenar) y cada dedo un tubo
+  continuo que se dobla en sus articulaciones, con almohadillas y uña. La piel
+  es un atlas horneado en codigo (color, relieve y rugosidad): pliegues de
+  nudillos y muneca, lineas de la palma, venas suaves, yemas y uñas.
+- **Densidad**: escritorio ~3,3k triangulos por brazo y piel de 512 px; movil
+  ~1,6k y bajo memoria ~1,4k, con piel de 256 px. El esqueleto es el mismo en
+  los tres niveles.
 - **Poses**: los agarres son datos (`src/weapons/HandPoses.ts`); los puntos de
   agarre de cada arma viven en `view.hands` de `src/config/weapons.ts`.
 

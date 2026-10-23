@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { applyViewModelDepth } from '../rendering/ViewModelDepth';
-import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH } from './FirstPersonArm';
+import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH } from './ArmRig';
 import { RIGHT_SHOULDER } from './ViewArms';
 import type { MeleeArmDriver } from './ViewArms';
 
@@ -16,7 +16,7 @@ export function knifeDamageForRound(maxHp: number, round: number): number {
  * forearm twist) -> hand, with the shared right arm's shoulder and lengths.
  * The hand never rotates relative to the forearm, so the slash comes from
  * the whole arm instead of an isolated wrist flick. The chain carries no arm
- * geometry: the shared glove follows it through readHandTarget().
+ * geometry: the shared right hand follows it through readHandTarget().
  */
 interface ArmPose {
   readonly yaw: number;
@@ -31,7 +31,7 @@ const GRIP_ROTATION = new THREE.Euler(-0.987, 0.221, -0.962);
 const HANDLE_CENTER = 0.075;
 
 /**
- * Glove rotation in the forearm frame: the handle runs along the hand's
+ * Hand rotation in the forearm frame: the handle runs along the hand's
  * thumb axis (blade out of the thumb side) and the knuckles follow the
  * forearm, so the wrist stays straight while the knife is cocked.
  */
@@ -287,7 +287,7 @@ export class Knife implements MeleeArmDriver {
     this.elbow.name = 'knife-forearm';
     this.elbow.position.z = -ARM_UPPER_LENGTH;
     this.shoulder.add(this.elbow);
-    // Handle center: the point the shared glove closes on.
+    // Handle center: the point the shared hand closes on.
     this.hand.name = 'knife-hand';
     this.hand.position.z = -ARM_FOREARM_LENGTH;
     this.elbow.add(this.hand);

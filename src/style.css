@@ -580,6 +580,44 @@ body {
   opacity: 0;
 }
 
+/* Gas mask visor: the mode drives --gas-mask (0 bare face, 1 worn) and the
+   rubber closes in from beyond the screen edges as the mask meets the face.
+   Worn, the breath fogs the bottom of the lens. */
+#gas-mask-overlay {
+  --gas-mask: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: min(1, calc(var(--gas-mask) * 2));
+  transform: scale(calc(1.8 - 0.8 * var(--gas-mask)));
+}
+
+#gas-mask-overlay .gas-mask-rubber {
+  fill: #070807;
+}
+
+#gas-mask-overlay .gas-mask-rim {
+  fill: none;
+  stroke: #262924;
+  stroke-width: 22;
+}
+
+#gas-mask-overlay .gas-mask-breath {
+  opacity: 0;
+}
+
+#gas-mask-overlay.worn .gas-mask-breath {
+  animation: gasmaskbreath 3.6s ease-in-out infinite;
+}
+
+@keyframes gasmaskbreath {
+  0%, 100% { opacity: 0; }
+  40% { opacity: 0.85; }
+  70% { opacity: 0.25; }
+}
+
 /* A ring firing: a cold wash over the view that clears from the centre out. */
 #ring-flash {
   position: absolute;
@@ -648,15 +686,85 @@ body {
     linear-gradient(120deg, #070a0b, #101513 55%, #070909);
 }
 
-.coop-select {
+/* Secondary main-menu actions under the map cards: same accent language as the pause menu. */
+.menu-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
   margin-top: 24px;
-  padding: 12px 20px;
+}
+
+.menu-action {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 56px;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 44px 10px 14px;
   cursor: pointer;
-  border: 1px solid rgba(152, 161, 147, 0.35);
-  background: rgba(18, 31, 31, 0.85);
-  color: #d9e4df;
-  font: 700 13px 'Consolas', monospace;
-  letter-spacing: 0.14em;
+  text-align: left;
+  border: 1px solid rgba(152, 161, 147, 0.25);
+  border-left: 3px solid #4c1814;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(26, 29, 28, 0.92), rgba(14, 17, 16, 0.92));
+  color: #c9cbc3;
+  font: 700 12px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.2em;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.menu-action::after {
+  content: '›';
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  color: #9f3a33;
+  font: 300 26px/1 Arial, sans-serif;
+  transform: translateY(-55%);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.menu-action-icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border: 1px solid rgba(152, 161, 147, 0.28);
+  border-radius: 2px;
+  background: rgba(6, 8, 8, 0.7);
+  fill: none;
+  stroke: #b8beb4;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  transition: border-color 0.15s ease, background 0.15s ease, stroke 0.15s ease;
+}
+
+.menu-action:hover,
+.menu-action:focus-visible {
+  border-color: rgba(182, 72, 62, 0.76);
+  border-left-color: #b6483e;
+  background: linear-gradient(90deg, rgba(62, 19, 16, 0.9), rgba(21, 25, 23, 0.94));
+  color: #f0e6d0;
+  transform: translateY(-2px);
+}
+
+.menu-action:focus-visible {
+  outline: 2px solid #bd5148;
+  outline-offset: 3px;
+}
+
+.menu-action:hover::after,
+.menu-action:focus-visible::after {
+  color: #d05b51;
+  transform: translate(4px, -55%);
+}
+
+.menu-action:hover .menu-action-icon,
+.menu-action:focus-visible .menu-action-icon {
+  border-color: #cf6b5d;
+  background: #56231e;
+  stroke: #f1eeea;
 }
 
 /* Main-menu language dropdown, pinned to the panel's top-right corner. */
@@ -776,31 +884,50 @@ body {
 
 #coop-back {
   display: inline-flex;
-  min-width: 116px;
-  min-height: 48px;
+  min-height: 40px;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  margin-bottom: 14px;
-  padding: 0 14px;
+  margin: 0 0 14px -4px;
+  padding: 0 14px 0 4px;
   cursor: pointer;
-  border: 1px solid rgba(155, 166, 156, 0.36);
+  border: 1px solid transparent;
   border-radius: 2px;
-  background: #1d2624;
-  color: #d1d9d1;
-  font: 700 12px/1 'Consolas', monospace;
-  letter-spacing: 0.1em;
+  background: transparent;
+  color: #9fa9a3;
+  font: 700 11px/1 'Consolas', monospace;
+  letter-spacing: 0.2em;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-#coop-back span {
-  font: 28px/1 Arial, sans-serif;
+.coop-back-icon {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: 1px solid rgba(155, 166, 156, 0.3);
+  border-radius: 2px;
+  background: rgba(12, 17, 17, 0.7);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: square;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 #coop-back:hover,
 #coop-back:focus-visible {
-  border-color: #aeb9ac;
-  background: #2b3733;
+  color: #f1eeea;
   outline: none;
+}
+
+#coop-back:focus-visible {
+  border-color: rgba(201, 102, 91, 0.6);
+}
+
+#coop-back:hover .coop-back-icon,
+#coop-back:focus-visible .coop-back-icon {
+  border-color: #cf6b5d;
+  background: #56231e;
+  transform: translateX(-3px);
 }
 
 #coop-lobby h1 {
@@ -3005,7 +3132,9 @@ html.touch-controls-enabled .start-panel {
   #map-select::before { animation: none; }
   .map-card,
   .map-card-art svg,
-  .map-card-body::after { transition: none; }
+  .map-card-body::after,
+  .menu-action,
+  .menu-action::after { transition: none; }
   .map-card::after,
   .map-card-art svg * { animation: none !important; }
 }
@@ -3089,7 +3218,6 @@ html.touch-controls-enabled .start-panel {
 }
 
 /* Settings: same field-notes card as the pause menu, on top of either menu. */
-#menu-settings { margin-top: 10px; }
 #settings-dialog {
   margin: auto; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0;
   overflow-y: auto; color: #e3dccb; border: 0; border-left: 3px solid #7e1713;

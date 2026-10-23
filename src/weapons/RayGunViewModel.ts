@@ -18,8 +18,6 @@ export const RAYGUN_LAYOUT = {
   /** Stacked accelerator discs, rear to front. */
   discs: { rearZ: -0.15, count: 6, pitch: 0.0205, length: 0.019, rearRadius: 0.034, step: 0.0028 },
   emitter: { z: -0.305, radius: 0.024 },
-  /** Seated cell top: low enough to stay hidden behind the scope rim in ADS. */
-  cellTopY: 0.0405,
   muzzleZ: -0.33,
   /** Arm angles around the bore (0 = straight down, PI = straight up). */
   armAngles: [Math.PI - 1.05, Math.PI + 1.05, 0],
@@ -40,8 +38,9 @@ const TRIGGER_FIN_PROFILE: readonly ProfilePoint[] = [
 /**
  * Ray Gun view model: chipped red housings with glowing plasma windows, a
  * stack of tapered accelerator discs ending in the emitter ball, three spiked
- * field arms and an open scope tube. The plasma cell on the chamber is the
- * live reload part ('cell' style); `energyFlow` scrolls through the windows.
+ * field arms and an open scope tube. Everything ahead of the collar rings is
+ * the screw-on plasma canister, the live reload part ('canister' style);
+ * `energyFlow` scrolls through the windows.
  */
 export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
   const group = new THREE.Group();
@@ -131,54 +130,66 @@ export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
     add('collar-ring', cylinderZ(radius, radius, length, 18), steel, body, 0, 0, z);
   }
 
-  // Plasma chamber: glowing core behind red top and bottom shells, so the
-  // windows on both flanks show the energy flowing through.
+  // The whole front is the screw-on plasma canister: chamber, accelerator
+  // and field arms in one part whose origin is the bayonet coupling on the
+  // bore, so the reload twists it about the bore and pulls it straight off.
+  const canister = assembly('canister', 0, 0, C.rearZ);
+  /** Canister-local z of a weapon-space z. */
+  const front = (z: number): number => z - C.rearZ;
+
+  // Bayonet coupling: a glowing plasma port between two lugs on the rear face,
+  // hidden inside the last collar ring until the canister comes off.
+  add('canister-port', cylinderZ(0.017, 0.017, 0.004, 16), energy, canister, 0, 0, 0.0015);
+  for (const side of [-1, 1]) {
+    add('bayonet-lug', new RoundedBoxGeometry(0.008, 0.006, 0.005, 1, 0.0015), steel, canister, side * 0.021, 0, 0.002);
+  }
+
+  // Plasma chamber: glowing liquid core behind red top and bottom shells, so
+  // the windows on both flanks show the energy flowing through.
   const chamberLength = C.rearZ - C.frontZ;
-  const chamberZ = (C.rearZ + C.frontZ) / 2;
-  add('plasma-core', cylinderZ(C.coreRadius, C.coreRadius, chamberLength - 0.004, 18), energy, body, 0, 0, chamberZ);
+  const chamberZ = front((C.rearZ + C.frontZ) / 2);
+  add('plasma-core', cylinderZ(C.coreRadius, C.coreRadius, chamberLength - 0.004, 18), energy, canister, 0, 0, chamberZ);
   const shellHalf = 0.96;
   for (const center of [0, Math.PI]) {
     const shell = new THREE.CylinderGeometry(C.radius, C.radius, chamberLength, 14, 1, false, center - shellHalf, shellHalf * 2);
     shell.rotateX(Math.PI / 2);
-    add(center === 0 ? 'chamber-belly' : 'chamber-spine', shell, paint, body, 0, 0, chamberZ);
+    add(center === 0 ? 'chamber-belly' : 'chamber-spine', shell, paint, canister, 0, 0, chamberZ);
   }
   for (const z of [C.rearZ - 0.007, C.frontZ + 0.007]) {
-    add('chamber-band', cylinderZ(C.radius + 0.0018, C.radius + 0.0018, 0.014, 20), paint, body, 0, 0, z);
+    add('chamber-band', cylinderZ(C.radius + 0.0018, C.radius + 0.0018, 0.014, 20), paint, canister, 0, 0, front(z));
   }
   for (const z of [-0.08, -0.094, -0.108]) {
     const angle = Math.PI + 0.72;
     const [x, y] = around(angle, C.radius + 0.003);
-    const pad = add('grip-pad', new RoundedBoxGeometry(0.005, 0.012, 0.009, 1, 0.0018), fittings, body, x, y, z);
+    const pad = add('grip-pad', new RoundedBoxGeometry(0.005, 0.012, 0.009, 1, 0.0018), fittings, canister, x, y, front(z));
     pad.rotation.z = angle - Math.PI;
   }
-  const bolt = add('hex-bolt', cylinderZ(0.0065, 0.0065, 0.006, 6), fittings, body, -0.0395, 0.012, C.rearZ - 0.007);
+  const bolt = add('hex-bolt', cylinderZ(0.0065, 0.0065, 0.006, 6), fittings, canister, -0.0395, 0.012, front(C.rearZ - 0.007));
   bolt.rotation.y = Math.PI / 2;
 
   // Accelerator: tapered discs on a central rod, then the emitter ball.
-  const barrel = assembly('barrel');
   const D = L.discs;
   const barrelFront = D.rearZ - D.count * D.pitch;
-  add('barrel-rod', cylinderZ(0.011, 0.011, D.rearZ - L.emitter.z, 10), steel, barrel, 0, 0, (D.rearZ + L.emitter.z) / 2);
+  add('barrel-rod', cylinderZ(0.011, 0.011, D.rearZ - L.emitter.z, 10), steel, canister, 0, 0, front((D.rearZ + L.emitter.z) / 2));
   for (let index = 0; index < D.count; index++) {
     const rear = D.rearRadius - index * D.step;
-    add('accelerator-disc', cylinderZ(rear, rear * 0.52, D.length, 18), steel, barrel, 0, 0, D.rearZ - D.length / 2 - index * D.pitch);
+    add('accelerator-disc', cylinderZ(rear, rear * 0.52, D.length, 18), steel, canister, 0, 0, front(D.rearZ - D.length / 2 - index * D.pitch));
   }
-  add('emitter-glow', new THREE.TorusGeometry(0.0125, 0.003, 6, 18), energy, barrel, 0, 0, barrelFront - 0.008);
-  add('emitter-ball', new THREE.SphereGeometry(L.emitter.radius, 18, 14), steel, barrel, 0, 0, L.emitter.z);
+  add('emitter-glow', new THREE.TorusGeometry(0.0125, 0.003, 6, 18), energy, canister, 0, 0, front(barrelFront - 0.008));
+  add('emitter-ball', new THREE.SphereGeometry(L.emitter.radius, 18, 14), steel, canister, 0, 0, front(L.emitter.z));
 
   // Field arms: bent rods out of the chamber front, ending in spiked discs.
-  const arms = assembly('arms');
   for (const angle of L.armAngles) {
     const point = (radius: number, z: number): THREE.Vector3 => {
       const [x, y] = around(angle, radius);
-      return new THREE.Vector3(x, y, z);
+      return new THREE.Vector3(x, y, front(z));
     };
     const tip = point(0.064, -0.215);
     add('arm-rod', new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
       point(C.radius - 0.004, -0.135), point(0.056, -0.15), point(0.066, -0.18), tip,
-    ]), 14, 0.0045, 6, false), fittings, arms);
-    add('arm-disc', cylinderZ(0.011, 0.011, 0.006, 12), fittings, arms, tip.x, tip.y, tip.z);
-    add('arm-spike', cylinderZ(0.0055, 0.0003, 0.026, 8), steel, arms, tip.x, tip.y, tip.z - 0.016);
+    ]), 14, 0.0045, 6, false), fittings, canister);
+    add('arm-disc', cylinderZ(0.011, 0.011, 0.006, 12), fittings, canister, tip.x, tip.y, tip.z);
+    add('arm-spike', cylinderZ(0.0055, 0.0003, 0.026, 8), steel, canister, tip.x, tip.y, tip.z - 0.016);
   }
 
   // Scope: open red tube on a mount; its lining and crosshair frame ADS.
@@ -203,13 +214,6 @@ export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
   add('grip-body', extrudeProfile(profileShape(GRIP_PROFILE), 0.03, 0.006, { segments: 3, keepOutline: true }), gripMetal, grip);
   add('trigger-fin', extrudeProfile(profileShape(TRIGGER_FIN_PROFILE), 0.014, 0.003, { segments: 2, keepOutline: true }), gripMetal, grip);
 
-  // Plasma cell sunk into the chamber spine: only its glowing cap shows,
-  // below the scope's field of view; the reload lifts the whole cell out.
-  const cell = assembly('cell', 0, L.cellTopY - 0.0225, -0.1);
-  add('cell-core', new THREE.CylinderGeometry(0.0095, 0.0095, 0.018, 14), energy, cell, 0, 0.009, 0);
-  add('cell-collar', new THREE.CylinderGeometry(0.012, 0.012, 0.004, 14), steel, cell, 0, 0.0205, 0);
-  add('cell-window', new THREE.CylinderGeometry(0.0075, 0.0075, 0.0045, 14), energy, cell, 0, 0.0205, 0);
-
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
   return {
@@ -219,7 +223,7 @@ export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
     sightY: L.sightY * config.scale,
     energyMaterials: [energy],
     energyFlow: flow ?? undefined,
-    reloadParts: { magazine: cell },
+    reloadParts: { magazine: canister },
   };
 }
 

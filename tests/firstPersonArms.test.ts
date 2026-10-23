@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { RING_DEFINITIONS, RING_FINGERS } from '../src/game/rings/RingCatalog';
 import { ARM_DETAIL, FirstPersonArm } from '../src/weapons/FirstPersonArm';
+import { WRIST } from '../src/weapons/ArmRig';
+import { handGeometries } from '../src/weapons/HandModel';
 import { FINGER_LAYOUT, FINGERS, HAND_POSES, PHALANX_TAPER } from '../src/weapons/HandPoses';
 import { KNIFE_ATTACK_DURATION, KNIFE_HIDE_PROGRESS, KNIFE_SHOW_PROGRESS, Knife } from '../src/weapons/Knife';
 import { ViewArms } from '../src/weapons/ViewArms';
@@ -57,7 +59,7 @@ function frame({ weapon, view, arms }: Rig, options: { ads?: boolean; lowering?:
   arms.update(DT, view, options.melee ?? null);
 }
 
-/** Distance between the glove's grip point and the weapon's target for that hand. */
+/** Distance between the hand's grip point and the weapon's target for that hand. */
 function gripError({ view, arms }: Rig, side: 'left' | 'right'): number {
   const target = new THREE.Vector3();
   view.hands.read(side, target, new THREE.Quaternion());
@@ -78,7 +80,7 @@ function elbowShape(arm: FirstPersonArm): { angle: number; natural: boolean } {
   return { angle, natural: elbow.y < wrist.y && outward > 0 };
 }
 
-/** Wrist bend between the forearm and the knuckles, and the glove's roll against the forearm. */
+/** Wrist bend between the forearm and the knuckles, and the hand's roll against the forearm. */
 function wristShape(arm: FirstPersonArm): { bend: number; twist: number } {
   const forearm = arm.getWristWorldPosition(new THREE.Vector3()).sub(arm.getElbowWorldPosition(new THREE.Vector3()));
   const wrist = arm.mesh.skeleton.bones[2];
@@ -111,13 +113,13 @@ describe('Weapon hand anchors', () => {
     }
   });
 
-  it.each(WEAPONS)('%s: both gloves reach their grips at the hip, in ADS and fully lowered', (id) => {
+  it.each(WEAPONS)('%s: both hands reach their grips at the hip, in ADS and fully lowered', (id) => {
     const definition = WEAPON_DEFINITIONS[id];
     for (const options of [{}, { ads: true }, { lowering: 1 }]) {
       const setup = rig(definition);
       for (let step = 0; step < 90; step++) frame(setup, options);
       if (!setup.view.root.visible) {
-        // A full scope hides the rifle, and the gloves with it.
+        // A full scope hides the rifle, and the hands with it.
         expect(definition.scoped && options.ads).toBe(true);
         expect(setup.arms.right.root.visible || setup.arms.left.root.visible).toBe(false);
         continue;
@@ -173,7 +175,7 @@ describe('Weapon hand anchors', () => {
         const finger = FINGERS.indexOf(name);
         const { lengths, radius } = FINGER_LAYOUT[name];
         const depths = lengths.map((length, segment) => holdDistance(grip, local(3 + finger * 3 + segment, length)) - radius * PHALANX_TAPER ** segment);
-        // Glove padding may sink a few millimetres; the finger must touch somewhere.
+        // Finger pads may press in a few millimetres; the finger must touch somewhere.
         expect(Math.min(...depths), `${id} ${side} ${name} sinks`).toBeGreaterThan(-0.006);
         expect(Math.min(...depths), `${id} ${side} ${name} floats`).toBeLessThan(0.004);
       }
@@ -185,7 +187,7 @@ describe('Weapon hand anchors', () => {
     }
   });
 
-  it.each(WEAPONS)('%s: the gloves stay under the sight line when aiming', (id) => {
+  it.each(WEAPONS)('%s: the hands stay under the sight line when aiming', (id) => {
     const definition = WEAPON_DEFINITIONS[id];
     const setup = rig(definition);
     for (let step = 0; step < 90; step++) frame(setup, { ads: true });
@@ -200,7 +202,7 @@ describe('Weapon hand anchors', () => {
   });
 });
 
-describe('Glove fingers', () => {
+describe('Hand fingers', () => {
   it('eases between poses without jumping', () => {
     const arm = new FirstPersonArm('right');
     arm.setHandPose(HAND_POSES.rifleGrip, 1);
@@ -222,15 +224,49 @@ describe('Glove fingers', () => {
     expect(Math.max(...previous.map((value, slot) => Math.abs(value - end[slot])))).toBeLessThan(0.01);
   });
 
-  it('stays within the mobile and desktop budgets: four draw calls per arm', () => {
+  it('stays within the mobile and desktop budgets: three draw calls per arm', () => {
     const triangles = (detail: (typeof ARM_DETAIL)[keyof typeof ARM_DETAIL]) => {
       const geometry = new FirstPersonArm('right', detail).mesh.geometry;
-      expect(geometry.groups).toHaveLength(4);
+      expect(geometry.groups).toHaveLength(3);
       return (geometry.index as THREE.BufferAttribute).count / 3;
     };
     expect(triangles(ARM_DETAIL.desktop)).toBeLessThanOrEqual(3500);
     expect(triangles(ARM_DETAIL.mobile)).toBeLessThanOrEqual(2000);
     expect(triangles(ARM_DETAIL.lowMemory)).toBeLessThanOrEqual(2000);
+  });
+
+  it('shares one skin between both hands, baked smaller on mobile tiers', () => {
+    const skin = (arm: FirstPersonArm) => (arm.mesh.material as THREE.MeshStandardMaterial[])[2];
+    const right = new FirstPersonArm('right');
+    expect(skin(right)).toBe(skin(new FirstPersonArm('left')));
+    expect(skin(right).map!.image.width).toBe(ARM_DETAIL.desktop.skinTexture);
+    for (const detail of [ARM_DETAIL.mobile, ARM_DETAIL.lowMemory]) {
+      expect(skin(new FirstPersonArm('right', detail)).map!.image.width).toBe(detail.skinTexture);
+    }
+    expect(ARM_DETAIL.mobile.skinTexture).toBeLessThan(ARM_DETAIL.desktop.skinTexture);
+  });
+
+  it.each(Object.keys(ARM_DETAIL) as (keyof typeof ARM_DETAIL)[])('%s: buries the open root of every digit inside the palm', (tier) => {
+    const detail = ARM_DETAIL[tier];
+    const [palm, ...parts] = handGeometries(detail);
+    const position = palm.attributes.position;
+    const index = palm.index as THREE.BufferAttribute;
+    const corners = (face: number) => [0, 1, 2].map((corner) => new THREE.Vector3().fromBufferAttribute(position, index.getX(face + corner)));
+    const faces = Array.from({ length: index.count / 3 }, (_, face) => corners(face * 3));
+    const rays = [new THREE.Vector3(1, 0.013, 0.007), new THREE.Vector3(-0.2, 1, 0.05), new THREE.Vector3(0.1, -0.3, -1)];
+    // Inside a closed-ended surface a ray crosses it an odd number of times.
+    const inside = (point: THREE.Vector3) => rays.filter((direction) => {
+      const ray = new THREE.Ray(point, direction.clone().normalize());
+      return faces.filter(([a, b, c]) => ray.intersectTriangle(a, b, c, false, new THREE.Vector3())).length % 2 === 1;
+    }).length >= 2;
+    // Each digit tube starts with an open ring that rides the wrist alone.
+    parts.slice(0, 5).forEach((part, digit) => {
+      for (let vertex = 0; vertex <= detail.digitRadial; vertex++) {
+        expect(part.attributes.skinIndex.getX(vertex)).toBe(WRIST);
+        expect(part.attributes.skinWeight.getX(vertex)).toBe(1);
+        expect(inside(new THREE.Vector3().fromBufferAttribute(part.attributes.position, vertex)), `${tier} digit ${digit} vertex ${vertex}`).toBe(true);
+      }
+    });
   });
 });
 
@@ -337,6 +373,26 @@ describe('Reload hands', () => {
     expect(leftGrip(seating).distanceTo(magazineOf(seating))).toBeLessThan(0.06);
   });
 
+  it('shows the Ray Gun support hand only to carry its canister', () => {
+    const reload = WEAPON_DEFINITIONS.raygun.view.reloadAnim!;
+    const canisterOf = (setup: Rig) => setup.view.root.getObjectByName('raygun-canister')!;
+
+    const idle = rig(WEAPON_DEFINITIONS.raygun);
+    for (let step = 0; step < 10; step++) frame(idle);
+    expect(idle.arms.left.root.visible).toBe(false);
+
+    for (const progress of [(reload.magOut + reload.magDrop) / 2, (reload.magDrop + reload.magIn) / 2, (reload.magIn + reload.magSeat) / 2]) {
+      const setup = reloading('raygun', progress);
+      expect(setup.arms.left.root.visible, `${progress}`).toBe(true);
+      expect(gripError(setup, 'left'), `${progress}`).toBeLessThan(TOLERANCE);
+      const grip = setup.arms.left.getGripWorldPosition(new THREE.Vector3());
+      expect(canisterOf(setup).worldToLocal(grip).distanceTo(new THREE.Vector3(0, 0, -0.05)), `${progress}`).toBeLessThan(0.06);
+    }
+
+    const done = reloading('raygun', Math.min(1, reload.magSeat + 0.15));
+    expect(done.arms.left.root.visible).toBe(false);
+  });
+
   it('puts the hands straight back on their grips when a reload is interrupted', () => {
     const setup = reloading('m4a1', 0.5);
     setup.view.reset();
@@ -382,7 +438,7 @@ describe('Hand rings', () => {
     return top;
   }
 
-  it('hangs one ring per finger on the right glove, hidden until worn, on every detail tier', () => {
+  it('hangs one ring per finger on the right hand, hidden until worn, on every detail tier', () => {
     for (const detail of Object.values(ARM_DETAIL)) {
       const arms = new ViewArms(detail);
       for (const finger of RING_FINGERS) {

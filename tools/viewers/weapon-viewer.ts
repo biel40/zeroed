@@ -19,9 +19,9 @@ import type { WeaponId } from '../../src/weapons/WeaponTypes';
  *   /tools/viewers/weapon-viewer.html?weapon=m60&view=external  3/4 silhouette, hip | ADS slots
  *   /tools/viewers/weapon-viewer.html?weapon=ak47&view=closeup  tight frame on receiver + barrel
  *   /tools/viewers/weapon-viewer.html?weapon=m1911&view=knife   knife slash phases (&t=0.3 one frame, &play=1&slow=4 loops)
- *   /tools/viewers/weapon-viewer.html?weapon=ak47&view=reload   empty-reload phases with both gloves (&t=0.5 one frame)
+ *   /tools/viewers/weapon-viewer.html?weapon=ak47&view=reload   empty-reload phases with both hands (&t=0.5 one frame)
  *   /tools/viewers/weapon-viewer.html?weapon=m4a1&view=rig      first-person rig from outside (&pose=ads, &cam=, &look=, &fov=)
- *   First-person views draw the gloves; &arms=0 hides them, &detail=mobile|lowMemory picks the tier.
+ *   First-person views draw the arms; &arms=0 hides them, &detail=mobile|lowMemory picks the tier.
  */
 
 const params = new URLSearchParams(location.search);
@@ -64,7 +64,7 @@ interface Slot {
   camera: THREE.PerspectiveCamera;
   view: WeaponView;
   weapon: Weapon;
-  /** First-person gloves, absent in the external/closeup views and with arms=0. */
+  /** First-person arms, absent in the external/closeup views and with arms=0. */
   arms: ViewArms | null;
   /** Knife review: fixed attack progress, or -1 for a looping attack. */
   knife?: { knife: Knife; progress: number };

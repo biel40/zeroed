@@ -1,5 +1,6 @@
 export const BETA_EMAILS = [
   'anavilmoy@gmail.com',
+  'biel40aws@gmail.com',
   'bielet40@gmail.com',
   'delta.centauri.k@gmail.com',
   'dlemosf@hotmail.com',
@@ -12,4 +13,10 @@ export const BETA_EMAILS = [
   'skaw1984@gmail.com',
   'suarez.912.a@gmail.com',
   'toni.bgae@gmail.com',
+];
+
+/** Developers: besides the beta, they see maps still hidden from testers in the menu. */
+export const DEVELOPER_EMAILS = [
+  'bielet40@gmail.com',
+  'biel40aws@gmail.com',
 ];

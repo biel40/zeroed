@@ -48,8 +48,7 @@
   arma tactil debe cancelar reparacion.
 - RESTART necesita reset verificable de toda la run. Distancias de impacto y
   fade vertical de cadaveres tienen casos pendientes.
-- La cache de texturas de Burned Mansion y el registro de colliders dinamicos
-  necesitan consolidacion.
+- El registro de colliders dinamicos necesita consolidacion.
 - Energia aun se distingue por color. Existen flags de debug que deben
   blindarse o retirarse.
 - La suite de tests puede contener expectativas antiguas de headshots o casos

@@ -60,7 +60,7 @@ tocar.
   - un bloque alto y corto en la boca no se sujeta bien con `supportHandguard`.
 - Los tests de manos miden contra el prisma `hold`, no contra la malla: un
   pulgar puede atravesar el arma y pasar igual. Comprueba las puntas de los
-  huesos del guante contra la malla con raycast en un test temporal y
+  huesos de la mano contra la malla con raycast en un test temporal y
   borralo al terminar.
 - Colores: `bodyColor` (metal) y `accentColor` (polimero/madera) en la definicion.
 

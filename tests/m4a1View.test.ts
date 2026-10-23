@@ -56,7 +56,7 @@ describe('M4A1 reload model', () => {
       if (part.name.startsWith('m4a1-magazine')) visibleMagazineParts.push(part);
     });
     expect(visibleMagazineParts).toHaveLength(0);
-    const seatedMagazineCenter = new THREE.Vector3(0, -0.095, -0.15);
+    const seatedMagazineCenter = new THREE.Vector3(0, -0.12, -0.093);
     built.group.traverseVisible((part) => {
       if (!(part instanceof THREE.Mesh)) return;
       expect(new THREE.Box3().setFromObject(part).containsPoint(seatedMagazineCenter), part.name).toBe(false);
@@ -82,8 +82,8 @@ describe('M4A1 reload model', () => {
   it('anchors the detachable magazine at the real magazine well instead of deriving it from barrel length', () => {
     const pose = resolveGlbMagazinePose(view, measuredM4Bounds, measuredM4Bounds.max.y);
 
-    expect(view.reloadAnim?.magAnchor).toEqual([0, -0.07, -0.15]);
-    expect(pose.position.toArray()).toEqual([0, -0.07, -0.15]);
+    expect(view.reloadAnim?.magAnchor).toEqual([0, -0.06, -0.1]);
+    expect(pose.position.toArray()).toEqual([0, -0.06, -0.1]);
     expect(pose.position.y).toBeLessThan(0);
     expect(pose.position.z).toBeGreaterThan(measuredM4Bounds.min.z * 0.45);
   });
@@ -103,7 +103,7 @@ describe('M4A1 reload model', () => {
     };
     const pose = resolveGlbMagazinePose(legacyView, measuredM4Bounds, measuredM4Bounds.max.y);
 
-    expect(pose.position.y).toBeCloseTo(0.1742 * 0.35 - 0.13 * 0.35, 5);
+    expect(pose.position.y).toBeCloseTo(0.1742 * 0.35 - view.reloadAnim!.magSize[1] * 0.35, 5);
     expect(pose.position.z).toBeCloseTo(-0.5865 * 0.45, 5);
     expect(pose.rotation.x).toBe(0);
   });

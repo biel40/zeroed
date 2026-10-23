@@ -10,7 +10,7 @@ import type { ViewModelConfig } from './WeaponTypes';
  * HK MP5A3 side profiles, traced from a reference photo (700 mm with the
  * stock extended, 225 mm barrel) and shared by the first-person model and
  * the wall-buy silhouette. The bore runs at y = 0.01 and the trigger sits
- * near z = -0.05, like the M4A1, so the gloves share its grip geometry.
+ * near z = -0.05, like the M4A1, so the hands share its grip geometry.
  */
 export const MP5_PROFILE = {
   boreY: 0.01,

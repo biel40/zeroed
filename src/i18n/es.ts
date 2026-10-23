@@ -120,6 +120,8 @@ export const es: Record<TranslationKey, string> = {
   'prompt.repairBarricade': 'REPARAR BARRICADA\n{key}',
   'prompt.lightLamp': 'ENCENDER FAROL\n{key}',
   'prompt.ritual': 'TOCAR EL CÍRCULO RITUAL\n{key}',
+  'prompt.wearGasMask': 'PONERSE LA MÁSCARA DE GAS\n{key}',
+  'prompt.removeGasMask': 'COLGAR LA MÁSCARA DE GAS\n{key}',
   'prompt.activateFinal': 'ACTIVAR FINAL\n{key} — {cost} PTS',
   'prompt.mysteryBox': 'CAJA MISTERIOSA\n{key}',
   'prompt.mysteryBoxCost': 'CAJA MISTERIOSA\n{key} — {cost} PTS',

@@ -13,8 +13,25 @@ const BOLT_TRAVEL = 0.085;
 const BOLT_LIFT = 0.9;
 /** Fraction of an action cycle at which the bolt reaches its rearmost point. */
 export const BOLT_REAR_FRACTION = 0.4;
+/**
+ * Bolt-action magazine swap: the rifle turns its left flank to the eye and
+ * moves into the middle of the screen so its whole length shows.
+ */
+const RIFLE_SHOW_YAW = 0.5;
+const RIFLE_SHOW_SHIFT = new THREE.Vector3(-0.07, 0.05, -0.24);
+/** Box magazine turned towards the eye (roll, then pitch) to show its top. */
+const BOX_SHOW_ROLL = 0.6;
+const BOX_SHOW_PITCH = 0.35;
 /** Belt feed cover swing (radians): front-hinged, it stands just short of upright. */
 const COVER_OPEN = 1.5;
+/** Screw-on canister: bayonet twist (radians) and pull-off stroke (meters). */
+const CANISTER_TWIST = 0.85;
+const CANISTER_PULL = 0.07;
+/** Where the hand carries the canister to refill it, off the bottom of the screen. */
+const CANISTER_AWAY = new THREE.Vector3(-0.07, -0.3, 0.1);
+const CANISTER_AWAY_TILT = -0.7;
+/** Share of the unscrew and screw-on windows spent turning the bayonet. */
+const CANISTER_TWIST_SHARE = 0.35;
 
 /** View-model parts the animator drives; any of them may be absent. */
 export interface ReloadParts {
@@ -24,6 +41,8 @@ export interface ReloadParts {
   handle: THREE.Object3D | null;
   /** Belt feed cover pivot (rotates open). */
   cover: THREE.Object3D | null;
+  /** Cartridges riding on the magazine: hidden while an emptied one is out. */
+  rounds?: THREE.Object3D | null;
 }
 
 interface HomePose {
@@ -68,6 +87,9 @@ export class ReloadAnimator {
   bodyDip = 0;
   bodyTilt = 0;
   bodyRoll = 0;
+  /** Yaw and camera-space offset that swing a long rifle out to show it whole. */
+  bodyYaw = 0;
+  readonly bodyShift = new THREE.Vector3();
   /** 0..1 energy spin-up (cell style); WeaponView boosts its glow pulse. */
   chargeGlow = 0;
 
@@ -101,6 +123,9 @@ export class ReloadAnimator {
 
     const p = weapon.stateProgress;
     const c = this.config;
+    // An emptied magazine comes out (and drops) without its rounds; the
+    // fresh one shows them from the moment the hand brings it in.
+    if (this.parts.rounds) this.parts.rounds.visible = weapon.reloadType !== 'empty' || p >= c.magIn;
     this.cross(p, c.magOut, 'magOut');
     this.cross(p, c.magDrop, 'magDrop');
     this.cross(p, c.magIn, 'magIn');
@@ -135,7 +160,7 @@ export class ReloadAnimator {
   private cross(p: number, threshold: number, phase: ReloadPhase): void {
     if (p < threshold || this.fired.has(phase)) return;
     this.fired.add(phase);
-    if (phase === 'magDrop' && this.parts.magazine) {
+    if (phase === 'magDrop' && this.parts.magazine && this.config.style !== 'canister') {
       // The part leaves the weapon: world-space drop, view-model mag hidden
       // until a fresh one is inserted at magIn.
       this.dropPool?.drop(this.parts.magazine);
@@ -149,6 +174,10 @@ export class ReloadAnimator {
     if (!mag || !this.magHome) return;
     const c = this.config;
     const height = c.magSize[1];
+    if (c.style === 'canister') {
+      this.applyCanister(mag, p);
+      return;
+    }
 
     if (p >= c.magDrop && p < c.magIn) return; // on the floor, hidden
     if (p < c.magOut || p >= c.magSeat) {
@@ -167,6 +196,41 @@ export class ReloadAnimator {
     mag.visible = true;
     const t = ramp(p, c.magIn, c.magSeat);
     this.applyMagIn(mag, t, height);
+  }
+
+  /**
+   * Screw-on canister, never dropped: twist the bayonet open and pull it off
+   * the coupling, carry it off screen to refill, bring it back, push it home
+   * and twist it locked with a small snap.
+   */
+  private applyCanister(canister: THREE.Object3D, p: number): void {
+    const home = this.magHome as HomePose;
+    const c = this.config;
+    canister.position.copy(home.position);
+    canister.quaternion.copy(home.quaternion);
+    if (p < c.magOut || p >= c.magSeat) return;
+
+    let twist = 1;
+    let pull = 1;
+    let away = 0;
+    let snap = 0;
+    if (p < c.magDrop) {
+      const turned = c.magOut + (c.magDrop - c.magOut) * CANISTER_TWIST_SHARE;
+      twist = ramp(p, c.magOut, turned);
+      pull = ramp(p, turned, c.magDrop);
+    } else if (p < c.magIn) {
+      const lead = (c.magIn - c.magDrop) * 0.4;
+      away = ramp(p, c.magDrop, c.magDrop + lead) * (1 - ramp(p, c.magIn - lead, c.magIn));
+    } else {
+      const pushed = c.magIn + (c.magSeat - c.magIn) * (1 - CANISTER_TWIST_SHARE);
+      pull = 1 - ramp(p, c.magIn, pushed);
+      twist = 1 - ramp(p, pushed, c.magSeat);
+      snap = pulse(p, pushed, c.magSeat);
+    }
+    canister.position.z -= pull * CANISTER_PULL - snap * 0.002;
+    canister.position.addScaledVector(CANISTER_AWAY, away);
+    canister.rotateX(away * CANISTER_AWAY_TILT);
+    canister.rotateZ(twist * CANISTER_TWIST);
   }
 
   /** Magazine leaving the weapon, per style. t: 0 (seated) → 1 (free). */
@@ -200,6 +264,12 @@ export class ReloadAnimator {
         mag.position.y -= t * height * 1.25;
         mag.position.z += t * height * 0.12;
         mag.rotateX(t * 0.12);
+        break;
+      case 'bolt':
+        // Box magazine drawn straight down out of the well, then its open top
+        // turned to the eye: an emptied one shows its follower.
+        mag.position.y -= ramp(t, 0, 0.7) * height * 1.5;
+        mag.rotateZ(ramp(t, 0.6, 1) * BOX_SHOW_ROLL);
         break;
       default:
         mag.position.y -= t * height * 1.15;
@@ -238,6 +308,18 @@ export class ReloadAnimator {
         mag.position.z += inv * height * 0.12;
         mag.rotateX(inv * 0.08);
         break;
+      case 'bolt': {
+        // The fresh magazine is held up with its rounds to the eye, then
+        // aligned under the well and pushed straight up into it.
+        const show = 1 - ramp(t, 0.4, 0.7);
+        const lift = 1 - ramp(t, 0.6, 1);
+        mag.position.y -= lift * height * 1.4 + show * 0.03;
+        mag.position.x -= show * 0.035;
+        mag.position.z += show * 0.025;
+        mag.rotateZ(show * BOX_SHOW_ROLL);
+        mag.rotateX(show * BOX_SHOW_PITCH);
+        break;
+      }
       default:
         mag.position.y -= inv * height * 1.4;
         break;
@@ -298,6 +380,8 @@ export class ReloadAnimator {
     const c = this.config;
     const base = Math.sin(p * Math.PI);
     this.bodyDip = -base * 0.05;
+    this.bodyYaw = 0;
+    this.bodyShift.set(0, 0, 0);
     switch (c.style) {
       case 'rock':
         this.bodyTilt = -base * 0.3;
@@ -310,16 +394,33 @@ export class ReloadAnimator {
           -(ramp(p, c.coverOpen ?? 0.2, (c.coverOpen ?? 0.2) + 0.1) -
             ramp(p, c.coverClose ?? 0.7, (c.coverClose ?? 0.7) + 0.1)) * 0.3;
         break;
-      case 'bolt':
-        this.bodyTilt = -base * 0.26 - pulse(p, c.charge, c.chargeEnd) * 0.1;
-        this.bodyRoll = base * 0.14;
+      case 'bolt': {
+        // The long rifle swings out across the screen, left flank to the eye,
+        // for the magazine swap, then goes back on the shoulder for the bolt.
+        const present = ramp(p, 0, c.magOut) * (1 - ramp(p, c.magSeat, c.charge));
+        const seat = pulse(p, c.magSeat - 0.03, c.magSeat + 0.03);
+        this.bodyDip = -seat * 0.006;
+        this.bodyTilt = -present * 0.08 - pulse(p, c.charge, c.chargeEnd) * 0.1;
+        this.bodyRoll = -present * 0.24;
+        this.bodyYaw = present * RIFLE_SHOW_YAW;
+        this.bodyShift.copy(RIFLE_SHOW_SHIFT).multiplyScalar(present);
         break;
+      }
       case 'cell':
         // Tilt up towards the player while the cell is out.
         this.bodyTilt = -base * 0.34;
         this.bodyRoll = base * 0.1;
         this.chargeGlow = pulse(p, c.charge, c.chargeEnd);
         break;
+      case 'canister': {
+        // Tilted up and canted inboard towards the support hand; the plasma
+        // dims while the canister is off and surges once it is locked on.
+        const off = ramp(p, c.magOut, c.magDrop) * (1 - ramp(p, c.magIn, c.magSeat));
+        this.bodyTilt = -base * 0.22;
+        this.bodyRoll = off * 0.3 + base * 0.06;
+        this.chargeGlow = pulse(p, c.charge, c.chargeEnd) - off * 0.45;
+        break;
+      }
       case 'pistol':
         // The muzzle dips and the gun cants inboard during the magazine swap,
         // then snaps level for the slide release.
@@ -348,11 +449,14 @@ export class ReloadAnimator {
       this.parts.magazine.visible = true;
       restoreHome(this.parts.magazine, this.magHome);
     }
+    if (this.parts.rounds) this.parts.rounds.visible = true;
     if (this.parts.handle && this.handleHome) restoreHome(this.parts.handle, this.handleHome);
     if (this.parts.cover && this.coverHome) restoreHome(this.parts.cover, this.coverHome);
     this.bodyDip = 0;
     this.bodyTilt = 0;
     this.bodyRoll = 0;
+    this.bodyYaw = 0;
+    this.bodyShift.set(0, 0, 0);
     this.chargeGlow = 0;
   }
 }

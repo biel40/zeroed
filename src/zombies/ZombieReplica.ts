@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ZombieNetState } from '../network/Protocol';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../network/Interpolation';
+import type { VaultOpening } from './barriers/WindowVault';
 import { Zombie } from './Zombie';
 import { ZOMBIE_ATTACK_LUNGE, ZOMBIE_TYPE_CONFIGS, MAX_ALIVE } from './ZombieConfig';
 import type { ZombieDeathStyle } from './ZombieDeath';
@@ -151,7 +152,8 @@ export class ZombieReplica {
     entry.zombie.playReplicatedDeath(style, impactX, impactZ);
   }
 
-  public update(dt: number): void {
+  /** `openings`: the map's active barriers, so bodies climb through windows as on the host. */
+  public update(dt: number, openings: ReadonlyArray<VaultOpening> = []): void {
     const renderTime = this.clock.renderTime;
     for (const entry of this.entries.values()) {
       const zombie = entry.zombie;
@@ -170,6 +172,7 @@ export class ZombieReplica {
       entry.lastX = zombie.position.x;
       entry.lastZ = zombie.position.z;
       const speed = dt > 0 ? Math.min(MAX_VISUAL_SPEED, travelled / dt) : 0;
+      zombie.trackWindowVault(openings);
       zombie.update(dt, speed / Math.max(0.01, zombie.group.scale.x));
     }
   }

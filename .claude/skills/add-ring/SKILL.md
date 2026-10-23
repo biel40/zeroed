@@ -1,13 +1,13 @@
 ---
 name: add-ring
-description: Anadir un anillo nuevo a Zeroed, el equivalente de las perks o bebidas de CoD Zombies (catalogo, efecto como dato y su hook, maquina en un mapa, glove, HUD, i18n, tests y docs). Usar cuando el usuario pida una perk, bebida o anillo nuevo, p. ej. "quiero una perk de recarga rapida" o "anade Vitalidad".
+description: Anadir un anillo nuevo a Zeroed, el equivalente de las perks o bebidas de CoD Zombies (catalogo, efecto como dato y su hook, maquina en un mapa, mano en primera persona, HUD, i18n, tests y docs). Usar cuando el usuario pida una perk, bebida o anillo nuevo, p. ej. "quiero una perk de recarga rapida" o "anade Vitalidad".
 ---
 
 # Anadir un anillo (perk) a Zeroed
 
 En Zeroed las perks son anillos: alianzas que los evacuados dejaron en las
 taquillas. Cada anillo ocupa un dedo fijo de la mano derecha. Se compra en una
-maquina del mapa, se ve en el guante en primera persona y el HUD solo apoya.
+maquina del mapa, se ve en la mano en primera persona y el HUD solo apoya.
 
 Referencia completa: Resurreccion. Archivos:
 - `src/game/rings/RingCatalog.ts` y `PlayerRings.ts`;
@@ -51,7 +51,7 @@ Lee "Anillos" en `docs/GAME_SYSTEMS.md` y `docs/STATION_33.md`.
 
 Sin cambios, porque se derivan del catalogo:
 - `PlayerRings`: compra, cargas, precios crecientes y dedos;
-- `HandRings`: glove y brillo del esmalte;
+- `HandRings`: anillo en el dedo y brillo del esmalte;
 - el HUD de iconos y la pausa, con nombre, dedo y estado;
 - el prompt de compra o recarga, y el jingle de la maquina.
 

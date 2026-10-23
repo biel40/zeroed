@@ -26,7 +26,8 @@ class ZeroedBoot {
   private coopConnection: CoopConnection | null = null;
   private game: Game | null = null;
 
-  public constructor() {
+  /** @param developerAccess Lists the developer-only maps in the menu. */
+  public constructor(private readonly developerAccess: boolean) {
     const container = document.getElementById('app');
     if (!container) throw new Error('Missing #app container');
 
@@ -92,7 +93,7 @@ class ZeroedBoot {
   }
 
   private showMapMenu(): void {
-    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId));
+    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId), this.developerAccess);
   }
 
   private showCoopLobby(): void {
@@ -213,15 +214,18 @@ applyDocumentTranslations();
 const BETA_ACCESS_URL = new URL('/beta/access.js', window.location.origin).href;
 
 async function boot(): Promise<void> {
+  // Builds without the beta gate are developer builds.
+  let developerAccess = true;
   if (import.meta.env.VITE_BETA_ENABLED === 'true') {
-    const { hasBetaAccess } = (await import(/* @vite-ignore */ BETA_ACCESS_URL)) as typeof BetaAccess;
+    const { hasBetaAccess, hasDeveloperAccess } = (await import(/* @vite-ignore */ BETA_ACCESS_URL)) as typeof BetaAccess;
     if (!hasBetaAccess()) {
       window.location.replace(`/beta/index.html${window.location.search}`);
       return;
     }
+    developerAccess = hasDeveloperAccess();
   } else {
     setupPWA();
   }
-  await new ZeroedBoot().run();
+  await new ZeroedBoot(developerAccess).run();
 }
 void boot();

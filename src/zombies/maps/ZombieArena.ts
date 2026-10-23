@@ -133,6 +133,20 @@ export interface ArenaRitualInteraction {
   activate(): boolean;
 }
 
+/**
+ * A gas mask hanging on a hook that the player can put on (and hang back).
+ * The mode plays the donning and the masked view; the map only shows or
+ * hides the mask on its hook.
+ */
+export interface ArenaGasMaskRack {
+  readonly id: string;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  setMaskOnHook(onHook: boolean): void;
+}
+
 export interface PlayerBounds {
   readonly minX: number;
   readonly maxX: number;
@@ -197,6 +211,8 @@ export interface ZombieArena {
   readonly ritualInteraction?: ArenaRitualInteraction;
   /** Optional: machines selling the rings (perks); maps without them omit it. */
   readonly ringMachines?: ReadonlyArray<ArenaRingMachine>;
+  /** Optional easter egg: a gas mask the player can wear. */
+  readonly gasMaskRack?: ArenaGasMaskRack;
   /** Paid interaction that ends the run with the map's own ending. */
   readonly completionInteraction?: ArenaCompletionInteraction;
   /** Opening cinematic; omitted when the map starts straight into play. */

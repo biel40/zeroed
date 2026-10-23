@@ -5,6 +5,7 @@ import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import type { WeaponInventory } from '../src/game/WeaponInventory';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Weapon } from '../src/weapons/Weapon';
+import type { WeaponId } from '../src/weapons/WeaponTypes';
 import type { MysteryBoxMachine } from '../src/zombies/MysteryBox';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
 import type { CoopWorld } from '../src/modes/coop/CoopWorld';
@@ -39,6 +40,7 @@ interface HostInternals {
   readonly guestInventory: WeaponInventory;
   readonly box: MysteryBoxMachine;
   readonly boxOwner: 'host' | 'guest' | null;
+  useBox(buyer: 'host' | 'guest', action: 'activate' | 'pickup', equippedWeapon: WeaponId): void;
   onEnergyImpact(point: THREE.Vector3, config: NonNullable<typeof WEAPON_DEFINITIONS.raygun.energy>,
     object: THREE.Object3D | null, distance: number, shooter: 'host' | 'guest'): void;
 }
@@ -287,6 +289,36 @@ describe('co-op combat authority', () => {
 });
 
 describe('co-op Mystery Box', () => {
+  it('excludes both weapons in the guest inventory without excluding the host weapons', () => {
+    const match = startedMatch();
+    Object.assign(host(match).box, { rng: () => 0 });
+    vi.mocked(match.hostSide.ctx.hasWeapon).mockImplementation((id) => id === 'vector');
+    earn(host(match).players.guest.economy, 950);
+    placePlayer(match.guestSide.player, -5.2, -4.2);
+    match.guestSide.player.face(0);
+    match.step(0.1, 2);
+    host(match).guestInventory.reset(['m4a1', 'mp5']);
+    match.relay.host.onMessage?.({ type: 'boxUse', action: 'activate', equippedWeapon: 'mp5' });
+    match.step(0.1, 51);
+    expect(host(match).box.result).toBe('vector');
+    expect(guest(match).match?.box.result).toBe('vector');
+  });
+
+  it('excludes both weapons carried by the host', () => {
+    const match = startedMatch();
+    Object.assign(host(match).box, { rng: () => 0 });
+    vi.mocked(match.hostSide.ctx.hasWeapon).mockImplementation((id) => id === 'm4a1' || id === 'mp5');
+    earn(host(match).players.host.economy, 950);
+    match.step();
+    const boxPosition = host(match).world.arena.mysteryBoxPlacement.position;
+    placePlayer(match.hostSide.player, boxPosition.x, boxPosition.z);
+    match.hostSide.player.face(0);
+    host(match).useBox('host', 'activate', 'mp5');
+    expect(host(match).boxOwner).toBe('host');
+    match.step(0.1, 51);
+    expect(host(match).box.result).toBe('vector');
+  });
+
   it('charges once, reserves the result for the buyer and grants the host-selected weapon', () => {
     const match = startedMatch();
     earn(host(match).players.guest.economy, 950);

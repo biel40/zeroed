@@ -223,8 +223,10 @@ describe('Burned Mansion topology', () => {
     arena.init();
     expect((scene.background as THREE.Color).getHex()).toBe(0x0d0b0a);
     expect(scene.fog).toBeInstanceOf(THREE.FogExp2);
-    expect((scene.fog as THREE.FogExp2).color.getHex()).toBe(0x17110e);
-    expect((scene.fog as THREE.FogExp2).density).toBe(0.018);
+    expect((scene.fog as THREE.FogExp2).color.getHex()).toBe(0x1a130e);
+    expect((scene.fog as THREE.FogExp2).density).toBe(0.03);
+    // Set explicitly, so a previous map's darker setting never carries over.
+    expect(scene.environmentIntensity).toBe(0.34);
     const hemisphere = arena.group.children.find((child) => child instanceof THREE.HemisphereLight) as THREE.HemisphereLight;
     expect(hemisphere.color.getHex()).toBe(0x34465e);
     expect(hemisphere.groundColor.getHex()).toBe(0x110d0a);
@@ -1735,10 +1737,13 @@ describe('Burned Mansion topology', () => {
     expect(wallMaterial.map).toBeInstanceOf(THREE.DataTexture);
     expect(wallMaterial.normalMap).toBeInstanceOf(THREE.DataTexture);
     expect(wallMaterial.roughnessMap).toBeInstanceOf(THREE.DataTexture);
-    expect(wallMaterial.aoMap).toBeInstanceOf(THREE.DataTexture);
+    // One surface per storey instead of a patchwork cycling per wall piece.
     expect(new Set(walls.map((mesh) => (mesh.material as THREE.Material).name))).toEqual(
-      new Set(['plaster_damaged', 'concrete_dirty', 'burned_wall', 'charred_wood']),
+      new Set(['burned_wallpaper', 'bunker_concrete', 'charred_wood']),
     );
+    expect(walls.filter((mesh) => mesh.position.y > 0).every((mesh) => {
+      return (mesh.material as THREE.Material).name !== 'bunker_concrete';
+    })).toBe(true);
     expect(new Set(walls.map((mesh) => mesh.userData.surface))).toEqual(
       new Set(['concrete', 'wood']),
     );
@@ -1749,8 +1754,8 @@ describe('Burned Mansion topology', () => {
     const groundMaterial = (arena.group.getObjectByName('ground-floor') as THREE.Mesh).material as THREE.Material;
     const bunkerMaterial = (arena.group.getObjectByName('bunker-floor') as THREE.Mesh).material as THREE.Material;
     expect(roofMaterial.name).toBe('blackened_plaster_ceiling');
-    expect(groundMaterial.name).toBe('worn_concrete_floor');
-    expect(bunkerMaterial.name).toBe('worn_concrete_floor');
+    expect(groundMaterial.name).toBe('charred_parquet');
+    expect(bunkerMaterial.name).toBe('bunker_floor_concrete');
 
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'soot-detail').length).toBeGreaterThan(5);
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'blood-stain')).toHaveLength(2);

@@ -87,6 +87,8 @@ export class HUD {
   private readonly ringFlash: HTMLElement = mustGet('ring-flash');
   private readonly protectionOverlay: HTMLElement = mustGet('protection-overlay');
   private lastProtection = 0;
+  private readonly gasMaskOverlay: HTMLElement = mustGet('gas-mask-overlay');
+  private lastGasMask = 0;
   private readonly gameOverPanel: HTMLElement = mustGet('game-over');
   private readonly goRound: HTMLElement = mustGet('go-round');
   private readonly goKills: HTMLElement = mustGet('go-kills');
@@ -233,7 +235,7 @@ export class HUD {
   }
 
   /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
-  public showMapSelect(onSelect: (mapId: ZombieMapId) => void): void {
+  public showMapSelect(onSelect: (mapId: ZombieMapId) => void, showDeveloperMaps: boolean): void {
     this.fadeOutStartScreen();
     this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
@@ -241,12 +243,13 @@ export class HUD {
     let firstVisibleButton: HTMLButtonElement | null = null;
     for (const button of buttons) {
       const map = getZombieMapDefinition(button.dataset.map);
-      button.classList.toggle('hidden', !map?.visible);
-      if (!map) {
+      const listed = !!map?.visible && (showDeveloperMaps || !map.developerOnly);
+      button.classList.toggle('hidden', !listed);
+      if (!map || !listed) {
         button.onclick = null;
         continue;
       }
-      if (map.visible && !firstVisibleButton) firstVisibleButton = button;
+      if (!firstVisibleButton) firstVisibleButton = button;
       // The registry, not the markup, decides each card's players and access labels.
       button.dataset.access = map.premium ? 'premium' : 'free';
       setTranslatedText(button.querySelector('[data-map-access]'), map.premium ? 'map.access.premium' : 'map.access.free');
@@ -478,6 +481,19 @@ export class HUD {
     this.lastProtection = rounded;
     this.protectionOverlay.style.opacity = `${rounded}`;
     this.damageOverlay.classList.toggle('protected', rounded > 0);
+  }
+
+  /**
+   * Gas mask visor over the view, 0..1 (0 bare face, 1 worn): it closes in
+   * from beyond the screen edges as the mask meets the face. Polled every
+   * frame; the DOM is only touched when the level changes.
+   */
+  public setGasMask(level: number): void {
+    const rounded = Math.round(clamp(level, 0, 1) * 100) / 100;
+    if (rounded === this.lastGasMask) return;
+    this.lastGasMask = rounded;
+    this.gasMaskOverlay.style.setProperty('--gas-mask', `${rounded}`);
+    this.gasMaskOverlay.classList.toggle('worn', rounded >= 1);
   }
 
   /** Brief cold flash over the whole view: a ring just fired. */

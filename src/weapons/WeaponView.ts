@@ -1093,7 +1093,7 @@ export class WeaponView {
   private readonly hipPosition: THREE.Vector3;
   private readonly adsPosition: THREE.Vector3;
   private readonly animator: ReloadAnimator | null = null;
-  /** Glove targets: grips, reload choreography and the action hand. */
+  /** Hand targets: grips, reload choreography and the action hand. */
   readonly hands: WeaponHands;
   private flashTime = 0;
   private bobPhase = 0;
@@ -1163,6 +1163,7 @@ export class WeaponView {
           magazine: reloadParts.magazine ?? null,
           handle: reloadParts.handle ?? null,
           cover: reloadParts.cover ?? null,
+          rounds: reloadParts.rounds ?? null,
         },
         dropPool,
       );
@@ -1422,6 +1423,8 @@ export class WeaponView {
           this.root.position.y += this.animator.bodyDip;
           this.root.rotation.x += this.animator.bodyTilt;
           this.root.rotation.z += this.animator.bodyRoll;
+          this.root.rotation.y += this.animator.bodyYaw;
+          this.root.position.add(this.animator.bodyShift);
         } else {
           const curve = Math.sin(weapon.stateProgress * Math.PI);
           this.root.position.y -= curve * 0.13;

@@ -48,6 +48,7 @@ import type {
 } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
+import { ZombiesGasMask } from './ZombiesGasMask';
 import { ZombiesRings } from './ZombiesRings';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { IntroCinematic } from '../rendering/IntroCinematic';
@@ -98,6 +99,8 @@ export class ZombiesMode implements GameMode {
   private boxView: MysteryBoxView | null = null;
   /** Ring purchases and effects; maps without ring machines simply never sell one. */
   private rings: ZombiesRings | null = null;
+  /** The map's wearable gas mask; null on maps without one. */
+  private gasMask: ZombiesGasMask | null = null;
   private readonly rounds = new RoundManager();
   private readonly health = new PlayerHealth(
     PLAYER_MAX_HP,
@@ -208,6 +211,7 @@ export class ZombiesMode implements GameMode {
     ctx.player.camera.add(this.knife.root);
 
     this.rings = new ZombiesRings(ctx, this.arena.ringMachines ?? [], this.economy);
+    this.gasMask = this.arena.gasMaskRack ? new ZombiesGasMask(ctx, this.arena.gasMaskRack) : null;
 
     if (boxPlacement) {
       this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
@@ -279,6 +283,7 @@ export class ZombiesMode implements GameMode {
       this.processBoxEvents();
     }
     this.rings?.update(dt);
+    this.gasMask?.update(dt);
     this.updateCameraShake(dt);
     this.updateGameOverReveal();
     this.pushHudState();
@@ -324,21 +329,22 @@ export class ZombiesMode implements GameMode {
     return true;
   }
 
+  /** The knife, or the hand putting the gas mask on, withholds fire and ADS. */
   usesFallbackAttack(): boolean {
     return this.isGameplayInputEnabled() && !!this.ctx
-      && this.knife.isAttacking;
+      && (this.knife.isAttacking || (this.gasMask?.isAnimating ?? false));
   }
 
   getFallbackWeaponName(): string | null {
-    return this.usesFallbackAttack() ? t('hud.knife') : null;
+    return this.isGameplayInputEnabled() && !!this.ctx && this.knife.isAttacking ? t('hud.knife') : null;
   }
 
   getMeleeArm(): MeleeArmDriver | null {
-    return this.knife.enabled ? this.knife : null;
+    return this.knife.enabled ? this.knife : (this.gasMask?.armDriver ?? null);
   }
 
   public onMeleeAttack(): void {
-    if (!this.isGameplayInputEnabled()) return;
+    if (!this.isGameplayInputEnabled() || this.gasMask?.isAnimating) return;
     this.knife.setEnabled(true);
     this.knife.trigger();
   }
@@ -412,7 +418,7 @@ export class ZombiesMode implements GameMode {
     return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
   }
 
-  /** E pressed: door unlock > barrier repair > soul lamp > purchases (rings among them). */
+  /** E pressed: door unlock > barrier repair > soul lamp > ritual > gas mask > purchases (rings among them). */
   onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
 
@@ -445,6 +451,9 @@ export class ZombiesMode implements GameMode {
       ritual.activate();
       return;
     }
+
+    // Both need the right hand: the mask waits for the knife to come back.
+    if (!this.knife.isAttacking && this.gasMask?.interact()) return;
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -508,7 +517,7 @@ export class ZombiesMode implements GameMode {
         this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
         return;
       }
-      this.box.tryActivate(this.ctx.getEquippedWeaponId());
+      this.box.tryActivate(this.weaponIds.filter((id) => this.ctx.hasWeapon(id)));
       return;
     }
     if (this.box.state === 'awaitingPickup') {
@@ -536,6 +545,9 @@ export class ZombiesMode implements GameMode {
 
     const ritual = this.findFacingRitualCircle();
     if (ritual) return t('prompt.ritual', { key });
+
+    const gasMaskPrompt = this.gasMask?.prompt();
+    if (gasMaskPrompt) return gasMaskPrompt;
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -1154,6 +1166,7 @@ export class ZombiesMode implements GameMode {
     this.economy.reset();
     this.health.reset();
     this.rings?.reset();
+    this.gasMask?.reset();
     this.rounds.reset();
     this.energy?.reset();
     if (this.zombies) this.zombies.reset();
