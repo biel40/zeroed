@@ -26,6 +26,8 @@ recarga vacia. La AK-47 suma a cada disparo el golpe del portacerrojo y su
 recarga bascula el cargador sobre el teton delantero con foley propio. La
 M1911 queda con la corredera abierta tras la ultima bala y su recarga vacia la
 suelta de ese bloqueo; el cargador vaciado cae sin su bala superior.
+La PPSh-41 intercambia su tambor de 71 balas con la misma coreografia; al
+recargar vacia tira del cerrojo hasta engancharlo atras, sin un cierre hacia delante.
 Toda recarga sigue la misma vitrina (`ReloadAnimator`), ajustada por arma en
 `reloadAnim`: `swapPose` sube el arma y gira el cambio hacia el ojo,
 `rackPose` muestra la palanca o el cerrojo en la recarga vacia y `wellDepth`
@@ -68,6 +70,16 @@ guardandose automaticamente al ajustarlos.
   mas salud, menor velocidad y muerte con impacto confirmado. Shiny anade diez
   estrellas reutilizadas; Brutus anade ojos rojos, rugido, ataque letal y paga
   el doble por cada baja (cuerpo, headshot o cuchillo).
+- Skins del walker (`src/zombies/skins/`): cada mapa declara en
+  `ZombieArena.zombieSkins` los aspectos de su horda, que se reparten por turnos
+  entre los cuerpos del pool. Una skin recolorea regiones del atlas (camisa,
+  mangas, guantes, muslos, espinillas, pies) con un multiplicador por vertice y
+  funde accesorios rigidos (gorras, cascos, capuchas, cinturones, correas, equipo) en
+  la misma malla, pesados a un solo hueso: sigue siendo un draw call, no hay
+  texturas nuevas y la altura de contrato no cambia. Se construyen una vez por
+  walker cargado. Solo apariencia: tipo, hitboxes y animacion son los del walker.
+  `ZombieArena.zombieEyes` cambia el color de ojos de todos los modelos del mapa
+  (`ZombieModelSource.eyes`); sin el, cada modelo usa el suyo.
 - Las rondas 1–5 aplican una rampa de velocidad progresiva (65 %, 72 %, 80 %,
   88 % y 95 %) antes de alcanzar el ritmo normal en la ronda 6. Cada aparición
   recibe velocidad, escala y una fase de marcha independientes para evitar que
@@ -148,7 +160,7 @@ guardandose automaticamente al ajustarlos.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
-  puerta de servicio y dos rejillas), la AK-47 y la Vector (900 / 625) en pared
+  puerta de servicio y dos rejillas), la AK-47 y la PPSh-41 (1250 / 625) en pared
   y la escalera mecanica sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
   el muro este: dos entradas mas, que solo generan zombis con la puerta
   abierta, la MP5 (1000 / 500) en
@@ -237,6 +249,7 @@ guardandose automaticamente al ajustarlos.
   vuelven a detener a quienes aun no han cruzado.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega ninguna de las
   dos armas que lleva el comprador al activarla, en individual y cooperativo.
+  La PPSh-41 forma parte del arsenal estandar de la caja; la Vector sigue disponible.
   Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo

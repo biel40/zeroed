@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { AssetManager } from '../../src/assets/AssetManager';
 import { WEAPON_DEFINITIONS } from '../../src/config/weapons';
+import { isZombieMapId, ZOMBIE_MAPS } from '../../src/config/zombieMaps';
+import { getDeviceProfile } from '../../src/core/DeviceProfile';
+import type { ZombieArena } from '../../src/zombies/maps/ZombieArena';
 import { KNIFE_ATTACK_DURATION, KNIFE_HIT_MOMENT, Knife } from '../../src/weapons/Knife';
 import { ARM_DETAIL } from '../../src/weapons/FirstPersonArm';
 import { ViewArms } from '../../src/weapons/ViewArms';
@@ -22,12 +25,16 @@ import type { WeaponId } from '../../src/weapons/WeaponTypes';
  *   /tools/viewers/weapon-viewer.html?weapon=ak47&view=reload   empty-reload phases with both hands (&t=0.5 one frame)
  *   /tools/viewers/weapon-viewer.html?weapon=m4a1&view=rig      first-person rig from outside (&pose=ads, &cam=, &look=, &fov=)
  *   First-person views draw the arms; &arms=0 hides them, &detail=mobile|lowMemory picks the tier.
+ *   &pose=hip|ads shows one POV; &map=station-33&worldCam=x,y,z&worldLook=x,y,z uses real map lighting.
  */
 
 const params = new URLSearchParams(location.search);
 const weaponId = (params.get('weapon') ?? 'ak47') as WeaponId;
 const mode = params.get('view') ?? 'pov';
 const definition = WEAPON_DEFINITIONS[weaponId];
+const requestedMap = params.get('map');
+const mapId = isZombieMapId(requestedMap) && ['pov', 'reload', 'knife'].includes(mode) ? requestedMap : null;
+const arenas = new Map<THREE.Scene, ZombieArena>();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,6 +42,8 @@ renderer.setPixelRatio(1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = mapId !== null;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -46,6 +55,14 @@ function makeScene(): THREE.Scene {
   scene.background = new THREE.Color(0x14181e);
   scene.environment = envTexture;
   scene.environmentIntensity = 0.45;
+  if (mapId) {
+    const arena: ZombieArena = ZOMBIE_MAPS[mapId].createArena(scene, getDeviceProfile(undefined, 'high'));
+    scene.add(arena.group);
+    arena.init();
+    if (params.get('power') === '1') arena.powerSwitch?.activate();
+    arenas.set(scene, arena);
+    return scene;
+  }
   const key = new THREE.DirectionalLight(0xffffff, 1.2);
   key.position.set(2, 3, 1.5);
   scene.add(key);
@@ -116,7 +133,17 @@ const withArms = params.get('arms') !== '0';
 function makePovSlot(weapon: Weapon, fov = 75, label?: string): Slot {
   const scene = makeScene();
   const view = makeView();
-  const camera = new THREE.PerspectiveCamera(fov, 16 / 9, 0.08, 50);
+  const camera = new THREE.PerspectiveCamera(Number(params.get('fov') ?? fov), 16 / 9, 0.08, 50);
+  const arena = arenas.get(scene);
+  if (arena) {
+    const spawn = arena.playerSpawn;
+    const [x, y, z] = vectorParam('worldCam') ?? [spawn.x, spawn.y, spawn.z];
+    const [tx, ty, tz] = vectorParam('worldLook') ?? [x, y, z - 1];
+    camera.position.set(x, y, z);
+    camera.lookAt(tx, ty, tz);
+    // Settle the map's lights before reviewing the static weapon pose.
+    for (let step = 0; step < 150; step++) arena.update(1 / 30, camera.position);
+  }
   const crosshair = new THREE.Mesh(
     new THREE.RingGeometry(0.002, 0.0035, 16),
     new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false }),
@@ -139,9 +166,11 @@ const single = Number(params.get('t') ?? NaN);
 
 if (mode === 'pov') {
   // Exactly what the player sees: the view model rides the camera.
-  for (const ads of [false, true]) slots.push(makePovSlot(makeWeapon(ads), ads ? definition.ads.fov : 75));
+  const poses = params.get('pose') === 'ads' ? [true] : params.get('pose') === 'hip' || mapId ? [false] : [false, true];
+  for (const ads of poses) slots.push(makePovSlot(makeWeapon(ads), ads ? definition.ads.fov : 75));
 } else if (mode === 'knife') {
-  const progresses = params.has('play') ? [-1] : Number.isFinite(single) ? [single] : KNIFE_SAMPLES;
+  const progresses = params.has('play') ? [-1] : Number.isFinite(single) ? [single]
+    : mapId ? [KNIFE_HIT_MOMENT / KNIFE_ATTACK_DURATION] : KNIFE_SAMPLES;
   for (const progress of progresses) {
     const slot = makePovSlot(makeWeapon(false), 75, `${(progress * 100).toFixed(1)}%`);
     const knife = new Knife();
@@ -162,7 +191,9 @@ if (mode === 'pov') {
   slots.push(slot);
 } else if (mode === 'reload') {
   // Empty-reload phases with both hands; &t= shows one frame.
-  for (const progress of Number.isFinite(single) ? [single] : RELOAD_SAMPLES) {
+  // Map QA uses one sample so a grid never instantiates twelve full arenas.
+  const progresses = Number.isFinite(single) ? [single] : mapId ? [0.1] : RELOAD_SAMPLES;
+  for (const progress of progresses) {
     slots.push(makePovSlot(makeReloading(Math.min(progress, 0.999)), 75, `${(progress * 100).toFixed(0)}%`));
   }
 } else {
@@ -231,6 +262,7 @@ function frame(): void {
   const width = window.innerWidth;
   const height = window.innerHeight;
   for (const slot of slots) {
+    arenas.get(slot.scene)?.update(1 / 60, slot.camera.position);
     if (slot.knife) poseKnife(slot.knife);
     const melee = slot.knife?.knife ?? null;
     slot.view.update(1 / 60, slot.weapon, 0, 0, 0, melee?.firearmLowering ?? 0);
@@ -261,11 +293,10 @@ function frame(): void {
     }
     renderer.setScissorTest(false);
   } else {
-    if (slots[0].arms) {
-      slots[0].camera.aspect = width / height;
-      slots[0].camera.updateProjectionMatrix();
-    }
-    renderer.render(slots[0].scene, slots[0].external ?? slots[0].camera);
+    const camera = slots[0].external ?? slots[0].camera;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.render(slots[0].scene, camera);
   }
   const { calls, triangles } = renderer.info.render;
   stats.textContent = `${slots.length} slot(s): ${calls} draw calls, ${triangles} tris`;

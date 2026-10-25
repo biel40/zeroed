@@ -7,7 +7,6 @@ import type { Weapon } from '../src/weapons/Weapon';
 import { buildProceduralViewModel } from '../src/weapons/WeaponView';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
 import { MYSTERY_BOX_POOL } from '../src/zombies/MysteryBox';
-import { STATION33_WALL_BUYS } from '../src/zombies/maps/Station33Config';
 import { WallBuy } from '../src/zombies/wallbuys/WallBuy';
 import { WallBuyView } from '../src/zombies/wallbuys/WallBuyView';
 import { ZOMBIE_BASE_HP } from '../src/zombies/ZombieConfig';
@@ -45,9 +44,8 @@ describe('Vector definition', () => {
     }
   });
 
-  it('is a standard Mystery Box pull and a Station 33 wall buy', () => {
+  it('remains a standard Mystery Box pull', () => {
     expect(MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'vector')).toMatchObject({ rarity: 'standard' });
-    expect(STATION33_WALL_BUYS.find((wallBuy) => wallBuy.weaponId === 'vector')).toMatchObject({ price: 900, ammoPrice: 625 });
   });
 });
 
@@ -117,7 +115,10 @@ describe('Vector view model', () => {
 describe('Vector wall-buy silhouette', () => {
   it('draws the Vector profile instead of the generic long gun', () => {
     // Face-on (yaw 0) so the outline's width lies along x, whatever wall the map mounts it on.
-    const wallBuy = new WallBuy({ ...STATION33_WALL_BUYS.find((config) => config.weaponId === 'vector')!, yaw: 0 });
+    const wallBuy = new WallBuy({
+      id: 'test-vector', weaponId: 'vector', price: 900, ammoPrice: 625,
+      position: { x: 0, y: 0, z: 0 }, yaw: 0, floor: 0,
+    });
     const wall = new WallBuyView(wallBuy, definition, new THREE.Group());
     expect(wall.group.userData.silhouette).toBe('vector');
     for (const part of ['stock', 'upper', 'rail', 'lower', 'grip', 'magazine', 'sight', 'flash-hider']) {

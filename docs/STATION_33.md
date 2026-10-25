@@ -16,7 +16,7 @@ codigo: actualiza la guia.
   completo. Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
-  cuatro entradas con chapas de acero, la AK-47 y la Vector (900 / 625) en pared
+  cuatro entradas con chapas de acero, la AK-47 y la PPSh-41 (1250 / 625) en pared
   y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera
   puerta de pago, la Fase 3 las cocheras tras la segunda y la Fase 4 la sala
   de maquinas (la subestacion) tras la tercera. La escalera mecanica sigue
@@ -160,6 +160,25 @@ codigo: actualiza la guia.
 - Cada taquilla toca la melodia de su anillo. Las de ahora son provisionales
   y procedurales (`RingJingleTunes.ts`); un MP3 libre de derechos con el
   nombre de su `sampleFile` en `public/assets/audio/` sustituye a cada una.
+
+## La horda
+
+- Los zombis son la guarnicion que defendia la estacion y los civiles que no
+  salieron: fusileros de la guerra (pilotka y capote enrollado), infanteria con
+  casco de acero, oficiales de campo con gorra de plato y correaje, centinelas
+  de invierno con capote gris y ushanka, veteranos con chaqueta acolchada,
+  capucha bajo la pilotka, bufanda, cartucheras, cantimplora y morral,
+  oficiales de desfile con guantes
+  blancos y medallas, y evacuados de paisano. La lista vive en
+  `STATION33_ZOMBIE_SKINS`; el catalogo, en `ZombieSkinCatalog.ts`.
+- Toda la horda tiene los ojos rojos (`STATION33_ZOMBIE_EYES`, el rojo de
+  Brutus): el unico color vivo del zombi, que corta la niebla verde.
+- Gorras y cascos ceñidos al craneo y en tonos apagados: deben leerse como
+  parte del uniforme, no destacar sobre la silueta.
+- Uniformes desvaidos y sucios, nunca colores vivos: el rojo de bandas y
+  estrellas y el dorado de desfile son acentos pequenos. Insignias genericas
+  (estrellas, franjas); nada de emblemas reales ni simbolos politicos.
+- Para revisarlas sin jugar: `zombie-viewer.html?skin=all&redEyes=1`.
 
 ## Paleta y materiales
 

@@ -13,6 +13,8 @@
   compartido desktop/tactil. No hay pagos: premium solo es presentacion.
 - Armas declarativas, balistica segmentada, energia, headshots, recargas,
   economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.
+- PPSh-41 con tambor de 71 balas, disponible en la Mystery Box y en la pared
+  del vestibulo de Station 33 en el lugar de la Vector; la Vector sigue en la caja.
 - Anillos (perks) en individual: el de Resurreccion se compra en la consigna
   de Station 33, se ve en el anular, salva una muerte y se recarga. El de
   Prestidigitacion (menique, recargas al doble de velocidad) esta en las
@@ -20,7 +22,9 @@
   maquinas la enciende, y un rayo de la ZEUS-77 contra la taquilla la
   alimenta 60 s.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
-  melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria.
+  melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria. En
+  Station 33 los walkers visten uniformes sovieticos (guerra y guerra fria) o
+  ropa de evacuado mediante skins por mapa.
 - Burned Mansion con dos plantas, bunker, escalera continua, progresion pagada,
   nueve ventanas y sala secreta de lamparas/almas. Final de 30000 Points.
 - PWA instalable, cache runtime y actualizacion diferenciada entre navegador y

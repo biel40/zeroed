@@ -416,6 +416,94 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
 
+  /** Drum-fed Soviet SMG: sustained close-range fire traded for a heavy, slower reload. */
+  ppsh41: {
+    id: 'ppsh41',
+    name: 'PPSh-41',
+    fireModes: ['auto', 'semi'],
+    defaultFireMode: 'auto',
+    rpm: 900,
+    magazineSize: 71,
+    reloadTime: 3.8,
+    tacticalReloadTime: 3.1,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 22,
+    recoil: {
+      verticalKick: 0.0085,
+      horizontalKick: 0.0045,
+      horizontalBias: 0.12,
+      kickVariance: 0.3,
+      recoverySpeed: 10,
+      recoveryDelay: 0.075,
+      cameraShare: 0.55,
+      adsRecoilMultiplier: 0.72,
+    },
+    spread: {
+      hipBase: 0.016,
+      adsBase: 0.004,
+      bloomPerShot: 0.0017,
+      maxBloom: 0.027,
+      bloomRecovery: 0.035,
+    },
+    ads: { fov: 58, speed: 10, sensitivity: 0.72 },
+    projectile: { muzzleVelocity: 488, gravity: 9.8, maxDistance: 150, drag: 0.1 },
+    moveSpeedMultiplier: 0.98,
+    equipTime: 0.38,
+    // Sharp pistol-calibre report over a distinctly heavier open-bolt clatter.
+    audio: { volume: 0.43, duration: 0.06, lowpass: 4600, thump: 195, mechanism: 0.16, tail: 0.07 },
+    view: {
+      frame: 'ppsh41',
+      hip: [0.19, -0.19, -0.52],
+      ads: [0, 0, -0.3],
+      sway: 0.95,
+      bob: 0.95,
+      visualRecoil: { kickImpulse: 0.8, pitchImpulse: 1.4, rollImpulse: 0.5, stiffness: 210, damping: 18 },
+      scale: 1,
+      bodyColor: 0x292d30,
+      accentColor: 0x995025,
+      barrelLength: 0.269,
+      barrelRadius: 0.008,
+      receiverLength: 0.25,
+      stockLength: 0.35,
+      magazine: 'drum',
+      optic: 'irons',
+      sightHeight: 0.042,
+      bulk: 1,
+      hands: {
+        right: {
+          position: [0, -0.058, 0.125], axis: [0, 0.98, -0.2], palm: [-1, -0.1, 0.2], pose: 'stockGrip',
+          hold: { size: [0.032, 0.05], axis: [0, 1, 0] }, trigger: [0, -0.071, 0.015],
+        },
+        left: {
+          position: [0, -0.044, -0.035], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.033, 0.034], axis: [0, 0, -1] },
+        },
+        actionHand: 'right',
+        action: { position: [0.012, 0, 0], axis: [0.25, 0.9, 0.35], palm: [-0.9, 0.3, -0.15], pose: 'boltPinch' },
+        magazine: {
+          position: [0, -0.125, 0.005], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
+          hold: { size: [0.095, 0.048], axis: [0, 0, 1] },
+        },
+      },
+      reloadAnim: {
+        style: 'drum',
+        magOut: 0.1,
+        magDrop: 0.24,
+        magIn: 0.4,
+        magSeat: 0.67,
+        charge: 0.74,
+        chargeEnd: 0.92,
+        swapPose: { shift: [-0.1, 0.15, 0.02], yaw: 0.5, roll: -0.25, tilt: 0.12 },
+        rackPose: { shift: [-0.06, 0.1, 0.01], yaw: -0.4, roll: 0.2, tilt: 0.08 },
+        wellDepth: 0.18,
+        magSize: [0.146, 0.15, 0.048],
+        magColor: 0x25292c,
+      },
+    },
+  },
+
   ak47: {
     id: 'ak47',
     name: 'AK-47',
@@ -883,7 +971,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ak47', 'm60', 'l96', 'm1911'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm60', 'l96', 'm1911'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
@@ -898,6 +986,7 @@ export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm4a1',
   'mp5',
   'vector',
+  'ppsh41',
   'ak47',
   'm60',
   'l96',

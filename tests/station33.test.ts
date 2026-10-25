@@ -278,20 +278,21 @@ describe('Station 33 layout', () => {
     openDoorTo(arena, 'consigna');
     openDoorTo(arena, 'cocheras');
     expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([
-      ['ak47', 1750, 900], ['mp5', 1000, 500], ['vector', 900, 625], ['m60', 2500, 1250],
+      ['ak47', 1750, 900], ['mp5', 1000, 500], ['ppsh41', 1250, 625], ['m60', 2500, 1250],
     ]);
-    const vectors = arena.wallBuys.filter((wallBuy) => wallBuy.weaponId === 'vector');
-    expect(vectors).toHaveLength(1);
-    expect(vectors[0].position.x).toBeGreaterThan(VESTIBULE.minX);
-    expect(vectors[0].position.x).toBeLessThan(VESTIBULE.maxX);
-    expect(vectors[0].position.z).toBeGreaterThan(VESTIBULE.minZ);
-    expect(vectors[0].position.z).toBeLessThan(VESTIBULE.maxZ);
+    const ppshBuys = arena.wallBuys.filter((wallBuy) => wallBuy.weaponId === 'ppsh41');
+    expect(ppshBuys).toHaveLength(1);
+    expect(arena.wallBuys.some((wallBuy) => wallBuy.weaponId === 'vector')).toBe(false);
+    expect(ppshBuys[0].position.x).toBeGreaterThan(VESTIBULE.minX);
+    expect(ppshBuys[0].position.x).toBeLessThan(VESTIBULE.maxX);
+    expect(ppshBuys[0].position.z).toBeGreaterThan(VESTIBULE.minZ);
+    expect(ppshBuys[0].position.z).toBeLessThan(VESTIBULE.maxZ);
     arena.group.updateMatrixWorld(true);
-    const vectorView = arena.group.getObjectByName(`wall-buy:${vectors[0].id}`)!;
-    const vectorBounds = new THREE.Box3().setFromObject(vectorView);
-    for (const other of arena.wallBuys.filter((wallBuy) => wallBuy.weaponId !== 'vector')) {
+    const ppshView = arena.group.getObjectByName(`wall-buy:${ppshBuys[0].id}`)!;
+    const ppshBounds = new THREE.Box3().setFromObject(ppshView);
+    for (const other of arena.wallBuys.filter((wallBuy) => wallBuy.weaponId !== 'ppsh41')) {
       const otherView = arena.group.getObjectByName(`wall-buy:${other.id}`)!;
-      expect(vectorBounds.intersectsBox(new THREE.Box3().setFromObject(otherView))).toBe(false);
+      expect(ppshBounds.intersectsBox(new THREE.Box3().setFromObject(otherView))).toBe(false);
     }
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
     for (const wallBuy of STATION33_WALL_BUYS) {

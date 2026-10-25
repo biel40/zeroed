@@ -106,7 +106,7 @@ export class WeaponHands {
   private progress = 0;
   private emptyReload = false;
 
-  /** Spring-loaded handle at the end of its stroke, in its parent's frame: where the hand lets go. */
+  /** Handle at the end of its stroke, in its parent's frame: where the hand lets go. */
   private readonly handleRear: THREE.Matrix4 | null = null;
 
   private readonly blendPosition = new THREE.Vector3();
@@ -132,7 +132,9 @@ export class WeaponHands {
       this.actionGrip = toGrip(config.action, this.actionHand);
       if (reload && reload.style !== 'bolt') {
         parts.handle.updateMatrix();
-        this.handleRear = new THREE.Matrix4().makeTranslation(0, 0, HANDLE_TRAVEL).multiply(parts.handle.matrix);
+        // Open-bolt models are authored cocked: their home is already the rear sear.
+        this.handleRear = new THREE.Matrix4().makeTranslation(0, 0, reload.style === 'drum' ? 0 : HANDLE_TRAVEL)
+          .multiply(parts.handle.matrix);
       }
     }
     // The support hand rides the magazine only where the weapon declares how it holds it.
@@ -230,8 +232,8 @@ export class WeaponHands {
     if (this.state === 'reloading' && this.emptyReload && this.reload && this.reload.charge >= 0) {
       const { charge, chargeEnd } = this.reload;
       weight = ramp(p, charge - REACH_LEAD, charge) * (1 - ramp(p, chargeEnd, 1));
-      // A spring-loaded handle is let go at the end of its stroke: the hand
-      // opens there and eases back to its grip while the handle slams home.
+      // Release at the rear of the stroke: an open bolt stays on its sear,
+      // while a spring-loaded handle slams home as the hand eases back.
       const letGo = charge + (chargeEnd - charge) * HANDLE_RELEASE_FRACTION;
       if (this.handleRear && p >= letGo) {
         released = true;

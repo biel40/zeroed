@@ -46,6 +46,8 @@ import {
   STATION33_START_ZONE,
   STATION33_WALL_BUYS,
   STATION33_WALL_THICKNESS,
+  STATION33_ZOMBIE_EYES,
+  STATION33_ZOMBIE_SKINS,
   type Station33AmbientEvent,
   type Station33ZoneId,
 } from './Station33Config';
@@ -94,6 +96,8 @@ export class Station33Arena implements ZombieArena {
   readonly id = 'station-33';
   readonly group = new THREE.Group();
   readonly ambience = STATION33_AMBIENCE;
+  readonly zombieSkins = STATION33_ZOMBIE_SKINS;
+  readonly zombieEyes = STATION33_ZOMBIE_EYES;
   readonly intro = STATION33_INTRO;
   readonly playerSpawn = STATION33_PLAYER_SPAWN;
   readonly useWallCollision = true;

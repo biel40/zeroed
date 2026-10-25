@@ -1,5 +1,7 @@
 import type { RingId } from '../../game/rings/RingCatalog';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
+import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
+import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
@@ -354,9 +356,9 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   },
   {
     // Available from the start on the east wall, clear of the vent and posters.
-    id: 'vestibule-vector',
-    weaponId: 'vector',
-    price: 900,
+    id: 'vestibule-ppsh41',
+    weaponId: 'ppsh41',
+    price: 1250,
     ammoPrice: 625,
     position: { x: EAST_WALL_X - 0.17, y: 1.45, z: 2.0 },
     yaw: -Math.PI / 2,
@@ -460,6 +462,23 @@ export const STATION33_AMBIENCE = {
   environmentIntensity: { intensity: 0.1, reducedIntensity: 0.12 },
   musicTrack: 'station33_theme',
 } as const satisfies ArenaAmbience;
+
+/**
+ * The horde: the garrison that held the station, from the war-time riflemen
+ * to the officers of the evacuation, plus the civilians nobody got out.
+ */
+export const STATION33_ZOMBIE_SKINS: readonly ZombieSkinId[] = [
+  'rifleman',
+  'helmetTrooper',
+  'fieldOfficer',
+  'evacuee',
+  'winterSentry',
+  'winterVeteran',
+  'paradeOfficer',
+];
+
+/** Red eyes for the whole horde, the same red as Brutus, cutting through the green haze. */
+export const STATION33_ZOMBIE_EYES: ZombieEyeColors = { glow: 0xff2a14, core: 0xff9a7a };
 
 /**
  * Flicker personality of a light circuit. Mains circuits die during a power

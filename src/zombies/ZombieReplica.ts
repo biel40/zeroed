@@ -5,7 +5,7 @@ import type { VaultOpening } from './barriers/WindowVault';
 import { Zombie } from './Zombie';
 import { ZOMBIE_ATTACK_LUNGE, ZOMBIE_TYPE_CONFIGS, MAX_ALIVE } from './ZombieConfig';
 import type { ZombieDeathStyle } from './ZombieDeath';
-import { ZOMBIE_POOL_MODELS, type ZombieModelSources } from './ZombieManager';
+import { ZOMBIE_POOL_MODELS, zombiePoolSource, type ZombieModelSources } from './ZombieManager';
 import { ZombiePool } from './ZombiePool';
 import { ZombieVisual, ZOMBIE_MODELS } from './ZombieVisual';
 
@@ -59,7 +59,7 @@ export class ZombieReplica {
     this.pool = new ZombiePool(ZOMBIE_POOL_MODELS.length, (index) => {
       const modelId = ZOMBIE_POOL_MODELS[index];
       const model = ZOMBIE_MODELS[modelId];
-      const zombie = new Zombie(new ZombieVisual(modelId, sources[modelId] ?? null,
+      const zombie = new Zombie(new ZombieVisual(modelId, zombiePoolSource(sources, index),
         model.tints[index % model.tints.length], castShadows));
       zombie.onDeathFinished = () => this.release(zombie);
       this.group.add(zombie.group);

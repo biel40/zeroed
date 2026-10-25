@@ -3,6 +3,7 @@ import { AK47_PROFILE, ak47MagazineFloorplate, ak47MagazineOutline } from '../..
 import { L96_PROFILE } from '../../weapons/L96ViewModel';
 import { M60_PROFILE, m60BipodLeg, m60FrontSight, m60HeatShieldSlots, m60LeafTop } from '../../weapons/M60ViewModel';
 import { MP5_PROFILE } from '../../weapons/MP5ViewModel';
+import { PPSH41_PROFILE, ppsh41ShroudSlots } from '../../weapons/PPSH41ViewModel';
 import { VECTOR_PROFILE } from '../../weapons/VectorViewModel';
 import type { WeaponDefinition } from '../../weapons/WeaponTypes';
 import type { WallBuy } from './WallBuy';
@@ -33,6 +34,9 @@ export class WallBuyView {
     } else if (definition.id === 'vector') {
       this.buildVectorSilhouette(view.sightHeight);
       this.group.userData.silhouette = 'vector';
+    } else if (definition.id === 'ppsh41') {
+      this.buildPPSH41Silhouette(view.sightHeight);
+      this.group.userData.silhouette = 'ppsh41';
     } else if (definition.id === 'm1911') {
       this.buildM1911Silhouette();
       this.group.userData.silhouette = 'm1911';
@@ -282,6 +286,47 @@ export class WallBuyView {
     }
     const hider = profile.flashHider;
     this.addShape(rect(hider.rearZ + 0.002, hider.frontZ, profile.boreY + hider.radius, profile.boreY - hider.radius), 'vector-wall-flash-hider');
+  }
+
+  /** Wooden stock, perforated jacket and drum from the first-person PPSh-41 profile. */
+  private buildPPSH41Silhouette(sightHeight: number): void {
+    const scale = 1.6;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.0455) * scale, (y + 0.065) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): THREE.Shape =>
+      outline([[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]]);
+    const profile = PPSH41_PROFILE;
+
+    this.addShape(outline(profile.stock), 'ppsh41-wall-stock');
+    this.addShape(outline(profile.receiver), 'ppsh41-wall-receiver');
+    const guard = outline(profile.triggerGuard);
+    guard.holes.push(new THREE.Path(profile.triggerOpening.map(toWall)));
+    this.addShape(guard, 'ppsh41-wall-trigger-guard');
+    this.addShape(outline(profile.trigger), 'ppsh41-wall-trigger');
+
+    const shroud = profile.shroud;
+    const jacket = rect(shroud.rearZ, shroud.frontZ, shroud.topY, shroud.bottomY);
+    for (const slot of ppsh41ShroudSlots()) jacket.holes.push(new THREE.Path(slot.map(toWall)));
+    this.addShape(jacket, 'ppsh41-wall-shroud');
+
+    const magazine = profile.magazine;
+    const drumCenterY = magazine.seat[1] + magazine.centerY;
+    // The drum's circular faces point along the bore. From the flank its
+    // narrow edge hangs below the receiver, rather than a circular disc.
+    const rearZ = magazine.seat[2] + magazine.depth / 2;
+    const frontZ = magazine.seat[2] - magazine.depth / 2;
+    const topY = drumCenterY + magazine.radius;
+    const bottomY = drumCenterY - magazine.radius;
+    const bevel = 0.004;
+    this.addShape(outline([
+      [rearZ - bevel, topY], [frontZ + bevel, topY], [frontZ, topY - bevel], [frontZ, bottomY + bevel],
+      [frontZ + bevel, bottomY], [rearZ - bevel, bottomY], [rearZ, bottomY + bevel], [rearZ, topY - bevel],
+    ]), 'ppsh41-wall-drum');
+    this.addShape(rect(magazine.seat[2] + 0.019, magazine.seat[2] - 0.019, -0.02, drumCenterY), 'ppsh41-wall-magazine-neck');
+
+    this.addShape(rect(profile.rearSightZ + 0.014, profile.rearSightZ - 0.014, sightHeight + 0.003, 0.02), 'ppsh41-wall-rear-sight');
+    this.addShape(rect(profile.frontSightZ + 0.008, profile.frontSightZ - 0.008, sightHeight + profile.hoodRadius, shroud.topY), 'ppsh41-wall-front-sight');
   }
 
   /** Classic M1911A1 side profile. +X points toward the muzzle. */

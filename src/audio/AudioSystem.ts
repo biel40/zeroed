@@ -1,5 +1,6 @@
 import type { SurfaceType } from '../shooting/HitTarget';
 import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
+import { HANDLE_RELEASE_FRACTION } from '../weapons/ReloadAnimator';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
 import { MusicManager, type EndingAudioId } from './MusicManager';
 import { RING_JINGLE_TUNES, renderRingJingle, type RingJingleId } from './RingJingleTunes';
@@ -29,7 +30,7 @@ interface ReloadProfile {
  * heavier actions sit lower. The AK has its own rock-and-lock foley and
  * energy weapons their synth voices, so they take none.
  */
-const RELOAD_IMPACT_BODY: Partial<Record<ReloadStyle, number>> = { pistol: 160, rifle: 150, bolt: 140, belt: 120 };
+const RELOAD_IMPACT_BODY: Partial<Record<ReloadStyle, number>> = { pistol: 160, rifle: 150, bolt: 140, belt: 120, drum: 105 };
 
 const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
   pistol: {
@@ -55,6 +56,18 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     coverOpen: 980,
     coverClose: 1240,
     complete: 2300,
+  },
+  drum: {
+    start: 1180,
+    magOut: 850,
+    magDrop: 360,
+    magIn: 600,
+    magSeat: 960,
+    chargeStart: 1050,
+    chargeEnd: 1420,
+    coverOpen: 760,
+    coverClose: 980,
+    complete: 1550,
   },
   rock: {
     start: 1250,
@@ -396,6 +409,11 @@ export class AudioSystem {
         this.tick(0.015, profile.magIn * 1.2, boost(0.22));
         break;
       case 'chargeStart':
+        if (style === 'drum') {
+          this.scrape(0, profile.chargeStart, profile.chargeStart * 0.65, boost(0.24),
+            actionDuration > 0 ? actionDuration * HANDLE_RELEASE_FRACTION : 0.2);
+          break;
+        }
         if (style === 'bolt' && actionDuration > 0) {
           this.playBolt(actionDuration);
           break;
@@ -404,6 +422,11 @@ export class AudioSystem {
         this.tick(0.05, profile.magIn, boost(0.18));
         break;
       case 'chargeEnd':
+        // The open bolt catches on the rear sear; it does not slam forward.
+        if (style === 'drum') {
+          this.tick(0, profile.chargeEnd, boost(0.3), 7, 0.045);
+          break;
+        }
         // The bolt cycle already ends with its own lock-down.
         if (style === 'bolt' && actionDuration > 0) break;
         this.metalClang(0, profile.chargeEnd, boost(0.36), 0.1);
@@ -431,7 +454,7 @@ export class AudioSystem {
     const boost = AudioSystem.boostReloadVolume;
     if (phase === 'magSeat' || phase === 'coverClose') {
       this.sweep(0, 'triangle', body, body * 0.375, boost(0.42), 0.09);
-    } else if (phase === 'chargeEnd' && !(style === 'bolt' && actionDuration > 0)) {
+    } else if (phase === 'chargeEnd' && style !== 'drum' && !(style === 'bolt' && actionDuration > 0)) {
       this.sweep(0, 'triangle', body * 1.19, body * 0.34, boost(0.5), 0.12);
       this.metalClang(0.012, 2600, boost(0.22), 0.07);
     }
@@ -499,6 +522,11 @@ export class AudioSystem {
     if (energy) {
       this.sweep(0, 'sine', profile.complete * 0.28, profile.complete * 0.72, boost(0.16), 0.1);
       this.tick(0.045, profile.complete, boost(0.24));
+      return;
+    }
+    if (style === 'drum') {
+      // A brief handling confirmation, with no fictitious closing-bolt impact.
+      this.tick(0, profile.complete, boost(0.3), 7, 0.045);
       return;
     }
     // Original two-stage lock: low receiver clack followed by a crisp latch,

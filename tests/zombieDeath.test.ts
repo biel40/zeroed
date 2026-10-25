@@ -26,6 +26,7 @@ describe('zombie death style resolution', () => {
     ['m1911', false, 'knockback'],
     ['l96', false, 'knockback'],
     ['m4a1', false, 'riddled'],
+    ['ppsh41', false, 'riddled'],
     ['ak47', false, 'riddled'],
     ['m60', false, 'riddled'],
     ['raygun', false, 'blast'],
@@ -33,6 +34,7 @@ describe('zombie death style resolution', () => {
     [undefined, false, 'knockback'],
     ['m1911', true, 'headshot'],
     ['m60', true, 'headshot'],
+    ['ppsh41', true, 'headshot'],
     ['raygun', true, 'headshot'],
     // Electrocution and the blade read better than a generic head snap.
     ['tesla', true, 'shock'],

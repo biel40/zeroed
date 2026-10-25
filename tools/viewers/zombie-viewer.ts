@@ -5,11 +5,15 @@ import type { ZombieState } from '../../src/zombies/Zombie';
 import { ZOMBIE_ATTACK_DURATION, ZOMBIE_BARRIER_ATTACK_RECOVERY, ZOMBIE_ELECTRIFIED_DURATION } from '../../src/zombies/ZombieConfig';
 import { resolveClip, ZombieVisual, ZOMBIE_MODELS } from '../../src/zombies/ZombieVisual';
 import { isZombieDeathStyle, ZOMBIE_DEATH_STYLES, type ZombieDeathStyle } from '../../src/zombies/ZombieDeath';
+import { createSkinnedWalkerSource } from '../../src/zombies/skins/ZombieSkinBuilder';
+import { ZOMBIE_SKINS, type ZombieSkinId } from '../../src/zombies/skins/ZombieSkinCatalog';
+import { STATION33_ZOMBIE_EYES } from '../../src/zombies/maps/Station33Config';
 
 // Development-only visual review, independent of the game entry/bundle.
 // /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?state=barrierAttack | ?close=1 | ?night=1
 // ?state=death&death=all (every style in a row) | ?state=death&death=slash&time=0.6 (one frame of one style)
 // ?electric=1 keeps ZEUS-77 residual arcs on the bodies (shock deaths always carry them)
+// ?skin=fieldOfficer dresses the walkers in one skin | ?skin=all lines every skin up in a row | ?redEyes=1 uses Station 33's eyes
 const params = new URLSearchParams(location.search);
 const close = params.has('close');
 const night = params.has('night');
@@ -28,6 +32,14 @@ const DEATH_LEAD = 0.4;
 const DEATH_CYCLE = 3.2;
 const ROW_SPACING = 1.45;
 const electric = params.has('electric');
+const skinParam = params.get('skin');
+const allSkins = modelId === 'walker' && skinParam === 'all';
+const eyes = params.has('redEyes') ? STATION33_ZOMBIE_EYES : undefined;
+const singleSkin = modelId === 'walker' && skinParam !== null && Object.hasOwn(ZOMBIE_SKINS, skinParam)
+  ? skinParam as ZombieSkinId
+  : null;
+/** Lineups (every death style or every skin) share the row camera. */
+const lineup = allDeaths || allSkins;
 let cycleTime = 0;
 let displayedState: ZombieState = state;
 const cycleDuration = ZOMBIE_ATTACK_DURATION + ZOMBIE_BARRIER_ATTACK_RECOVERY;
@@ -57,7 +69,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, lookY, 0);
 controls.enablePan = false;
 controls.minDistance = close ? 0.55 : 2.3;
-controls.maxDistance = allDeaths ? 16 : 7;
+controls.maxDistance = lineup ? 16 : 7;
 controls.maxPolarAngle = Math.PI * 0.52;
 const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${ZOMBIE_MODELS[modelId].url}`);
 const visuals: ZombieVisual[] = [];
@@ -66,13 +78,17 @@ const labels: HTMLElement[] = [];
 const referenceMixers = new Map<ZombieVisual, THREE.AnimationMixer>();
 const deathStyles = new Map<ZombieVisual, ZombieDeathStyle>();
 const deathClocks = new Map<ZombieVisual, number>();
-const layout: readonly { yaw: number; style: ZombieDeathStyle }[] = close
-  ? [{ yaw: 0, style: deathStyle }]
+const source = { scene: gltf.scene, clips: gltf.animations };
+const layout: readonly { yaw: number; style: ZombieDeathStyle; skin: ZombieSkinId | null }[] = close
+  ? [{ yaw: 0, style: deathStyle, skin: singleSkin }]
   : allDeaths
-    ? ZOMBIE_DEATH_STYLES.map((style) => ({ yaw: 0.65, style }))
-    : [0, 0.75, Math.PI / 2].map((yaw) => ({ yaw, style: deathStyle }));
-for (const [index, { yaw, style }] of layout.entries()) {
-  const visual = new ZombieVisual(modelId, { scene: gltf.scene, clips: gltf.animations }, ZOMBIE_MODELS[modelId].tints[0], false);
+    ? ZOMBIE_DEATH_STYLES.map((style) => ({ yaw: 0.65, style, skin: singleSkin }))
+    : allSkins
+      ? (Object.keys(ZOMBIE_SKINS) as ZombieSkinId[]).map((skin) => ({ yaw: 0.45, style: deathStyle, skin }))
+      : [0, 0.75, Math.PI / 2].map((yaw) => ({ yaw, style: deathStyle, skin: singleSkin }));
+for (const [index, { yaw, style, skin }] of layout.entries()) {
+  const look = { ...(skin ? createSkinnedWalkerSource(source, skin) : source), eyes };
+  const visual = new ZombieVisual(modelId, look, ZOMBIE_MODELS[modelId].tints[0], false);
   visual.setZombieType(zombieType(index));
   visual.setWalkPhase(THREE.MathUtils.euclideanModulo(
     (Number(params.get('variant')) || index) * 0.37,
@@ -91,9 +107,11 @@ for (const [index, { yaw, style }] of layout.entries()) {
   if (state === 'death') {
     deathStyles.set(visual, style);
     deathClocks.set(visual, 0);
+  }
+  if (state === 'death' || allSkins) {
     const label = document.createElement('div');
     label.className = 'label';
-    label.textContent = style;
+    label.textContent = allSkins ? skin ?? '' : style;
     document.body.appendChild(label);
     labels.push(label);
   }
@@ -157,9 +175,9 @@ function advanceDeath(visual: ZombieVisual, elapsed: number): void {
   displayedState = clock < DEATH_LEAD ? 'walk' : 'death';
 }
 function resize(): void {
-  const compact = innerWidth < 700 && !allDeaths;
+  const compact = innerWidth < 700 && !lineup;
   camera.aspect = innerWidth / innerHeight;
-  if (allDeaths) {
+  if (lineup) {
     // Fit the whole row, whatever the aspect ratio.
     const halfWidth = (layout.length * ROW_SPACING) / 2 + 0.4;
     const distance = halfWidth / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
@@ -170,7 +188,7 @@ function resize(): void {
   camera.updateProjectionMatrix();
   for (const [index, placement] of placements.entries()) {
     placement.visible = !compact || index === 0;
-    const spacing = allDeaths ? ROW_SPACING : height * 0.53;
+    const spacing = lineup ? ROW_SPACING : height * 0.53;
     placement.position.x = close || compact ? 0 : (index - (layout.length - 1) / 2) * spacing;
   }
   controls.update();

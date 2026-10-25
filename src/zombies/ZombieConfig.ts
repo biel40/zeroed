@@ -189,6 +189,7 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   m4a1: 300,
   mp5: 180,
   vector: 240,
+  ppsh41: 284,
   ak47: 300,
   m60: 500,
   l96: 60,

@@ -1,4 +1,4 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -87,7 +87,7 @@ export interface EnergyWeaponConfig {
   readonly color: number;
 }
 
-export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal';
+export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal' | 'drum';
 /**
  * irons: classic post+notch. scope: telescopic sight (L96). reddot: a
  * compact reflex sight whose emissive dot sits exactly on the sight line,
@@ -103,8 +103,9 @@ export type OpticStyle = 'irons' | 'scope' | 'reddot';
  * (charge→chargeEnd). Belt-fed guns add cover open/close around the swap.
  * A 'canister' is never dropped: the support hand unscrews it, carries it off
  * screen to refill it and screws it back on between magDrop and magIn.
+ * 'drum' swaps the PPSh magazine and cocks its open bolt onto the rear sear.
  */
-export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'canister' | 'pistol';
+export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'canister' | 'pistol' | 'drum';
 
 /**
  * Whole-weapon pose layered on the view model during a reload stage:
@@ -141,7 +142,7 @@ export interface ReloadAnimConfig {
   /** Pose while the action is worked on an empty reload, showing the handle or bolt. */
   readonly rackPose?: ReloadPoseConfig;
   /**
-   * Box magazines (pistol, rifle, rock): share of the magazine length
+   * Detachable magazines (pistol, rifle, rock, drum): share of the magazine length
    * inside the well when seated. It sets how far the old one travels to
    * hang clear and where the fresh one is lined up before going in.
    */
@@ -184,6 +185,7 @@ export type HandPoseId =
   | 'fist'
   | 'pistolGrip'
   | 'rifleGrip'
+  | 'stockGrip'
   | 'handleGrip'
   | 'supportHandguard'
   | 'supportPistol'
@@ -281,9 +283,10 @@ export interface ViewModelConfig {
    * wood, gas tube, curved magazine); 'l96' uses the dedicated L96A1 builder (thumbhole
    * stock, scope, liftable bolt); 'mp5' uses the MP5A3 builder (drum sight,
    * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
-   * ("Super V" lower, full rail, folding sights). Default: generic long gun.
+   * ("Super V" lower, full rail, folding sights); 'ppsh41' uses the wooden
+   * stock, perforated jacket and drum-fed PPSh-41. Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'mp5' | 'vector';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'mp5' | 'vector' | 'ppsh41';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */

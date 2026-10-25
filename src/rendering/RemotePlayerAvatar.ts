@@ -76,7 +76,7 @@ class RemoteWeaponMount {
       try {
         const source = this.getWeaponModel(id);
         const length = id === 'm1911' ? 0.3 : id === 'raygun' ? 0.43 : id === 'mp5' ? 0.7 : id === 'vector' ? 0.645
-          : id === 'l96' ? 1.03 : id === 'm60' || id === 'tesla' ? 0.95 : 0.84;
+          : id === 'ppsh41' ? 0.843 : id === 'l96' ? 1.03 : id === 'm60' || id === 'tesla' ? 0.95 : 0.84;
         const group = buildWeaponDisplayModel(WEAPON_DEFINITIONS[id], source, length);
         group.position.z = -length * (id === 'm1911' ? 0.23 : 0.17);
         group.traverse((object) => { if ((object as THREE.Mesh).isMesh) object.castShadow = this.castShadow; });

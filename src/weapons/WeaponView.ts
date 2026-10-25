@@ -9,6 +9,7 @@ import { buildL96 } from './L96ViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
 import { buildMP5 } from './MP5ViewModel';
 import { buildVector } from './VectorViewModel';
+import { buildPPSH41 } from './PPSH41ViewModel';
 import { buildM60 } from './M60ViewModel';
 import { buildRayGun } from './RayGunViewModel';
 import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
@@ -161,6 +162,8 @@ export interface BuiltProcedural {
   reloadParts?: Partial<ReloadParts>;
   /** Pistol slide: kicks back per shot and is racked by the reload charge. */
   slide?: THREE.Object3D;
+  /** Open-bolt action: home is cocked at the rear, empty rests forward. */
+  openBolt?: THREE.Object3D;
 }
 
 /**
@@ -1097,7 +1100,7 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
 /**
  * Picks the procedural builder for a view config: dedicated builders for
  * the Wonder Weapons (Ray Gun, Tesla), the M1911 pistol, the AK-47, the
- * M4A1, the MP5A3, the Vector, the L96A1 and the M60 GPMG; the generic long-gun fallback otherwise
+ * M4A1, the MP5A3, the Vector, the PPSh-41, the L96A1 and the M60 GPMG; the generic long-gun fallback otherwise
  * (a GLB that failed to load). Single dispatch shared by the first-person WeaponView and the
  * world-space display models so both always build the same weapon.
  */
@@ -1110,6 +1113,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'm4a1') return buildM4A1(view);
   if (view.frame === 'mp5') return buildMP5(view);
   if (view.frame === 'vector') return buildVector(view);
+  if (view.frame === 'ppsh41') return buildPPSH41(view);
   if (view.frame === 'l96') return buildL96(view);
   return buildProcedural(view);
 }
@@ -1197,6 +1201,9 @@ export class WeaponView {
   private slide: THREE.Object3D | null = null;
   private slideHomeZ = 0;
   private slideBlowback = 0;
+  private openBolt: THREE.Object3D | null = null;
+  private openBoltHomeZ = 0;
+  private openBoltCycle = 0;
   private boltEjected = false;
   /** Wired by Game: bolt-action weapons eject their case mid-cycle, not on the shot. */
   onBoltEject: (() => void) | null = null;
@@ -1232,6 +1239,10 @@ export class WeaponView {
       if (built.slide) {
         this.slide = built.slide;
         this.slideHomeZ = built.slide.position.z;
+      }
+      if (built.openBolt) {
+        this.openBolt = built.openBolt;
+        this.openBoltHomeZ = built.openBolt.position.z;
       }
       reloadParts = built.reloadParts ?? {};
     }
@@ -1433,6 +1444,7 @@ export class WeaponView {
     this.spring.kick();
     // Pistol slide cycles with every shot.
     if (this.slide) this.slideBlowback = 1;
+    if (this.openBolt) this.openBoltCycle = 1;
     this.energySurge = 1;
   }
 
@@ -1446,9 +1458,11 @@ export class WeaponView {
     this.swayX = 0;
     this.swayY = 0;
     this.slideBlowback = 0;
+    this.openBoltCycle = 0;
     this.energySurge = 0;
     this.boltEjected = false;
     if (this.slide) this.slide.position.z = this.slideHomeZ;
+    if (this.openBolt) this.openBolt.position.z = this.openBoltHomeZ;
     this.root.position.copy(this.hipPosition);
     this.root.rotation.set(0, 0, 0);
   }
@@ -1573,6 +1587,18 @@ export class WeaponView {
         // The last round locks the slide open, where the empty reload picks it up.
         const locked = weapon.ammoInMagazine === 0 ? HANDLE_TRAVEL : 0;
         this.slide.position.z = this.slideHomeZ + Math.max(this.slideBlowback * SLIDE_TRAVEL, locked);
+      }
+    }
+
+    // An open-bolt SMG returns to its rear sear between shots; the last shot
+    // leaves it forward until the empty reload cocks it again.
+    if (this.openBolt) {
+      if (weapon.state === 'reloading') {
+        this.openBoltCycle = 0;
+      } else {
+        this.openBoltCycle = Math.max(0, this.openBoltCycle - dt * this.definition.rpm / 60);
+        const forward = weapon.ammoInMagazine === 0 ? 1 : this.openBoltCycle;
+        this.openBolt.position.z = this.openBoltHomeZ - forward * HANDLE_TRAVEL;
       }
     }
 

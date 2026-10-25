@@ -15,6 +15,8 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=ak47&view=reload`: fases de una recarga vacia con las dos manos. Acepta `t=0.5`.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m4a1&view=rig`: el rig de primera persona visto desde fuera (alcance de los brazos, codos, plano cercano). Acepta `pose=ads`, `t=` (fotograma de una recarga vacia), `cam=`, `look=` y `fov=`; con `cam=0,0,0` y un `fov` cerrado sirve de lupa sobre una mano.
 - Las vistas en primera persona dibujan los brazos: `arms=0` los oculta y `detail=mobile|lowMemory` elige el nivel de detalle. La esquina inferior derecha muestra draw calls y triangulos del fotograma.
+- `view=pov&pose=hip` o `pose=ads` muestra un solo encuadre. En las vistas `pov`, `reload` y `knife`, `map=station-33&worldCam=3,1.7,8&worldLook=7,1.65,4` permite revisar el arma con la geometria y las luces reales del mapa; `power=1` enciende su electricidad.
+- Con mapa se muestra una sola pose para no duplicar arenas: hip por defecto, recarga al 10 % o cuchillada en el instante del golpe. `pose=ads` y `t=0..1` seleccionan el encuadre y la fase que se quiere revisar.
 
 ## Visor de zombies
 
@@ -23,6 +25,7 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?compare=1`: compara Shiny con zombies normales.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?shiny=1&night=1`: inspecciona el brillo de Shiny en baja luz.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?state=death&death=all`: los siete estilos de muerte en fila, en bucle (andar, caer, cadáver). `death=slash` muestra uno solo desde tres ángulos y `time=0.6` congela ese instante de la caída; admite `model=brute`. `electric=1` mantiene los rayos residuales de la ZEUS-77 sobre los cuerpos (la muerte `shock` siempre los lleva).
+- `http://localhost:5173/tools/viewers/zombie-viewer.html?skin=all`: todas las skins del walker en fila. `skin=fieldOfficer` viste a los tres zombies con una sola; se combina con `close=1`, `state=`, `speed=0` (pose quieta) y `redEyes=1` (ojos rojos de Station 33).
 - Parámetros adicionales: `state=attack`, `time=0.475` y `close=1`.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.

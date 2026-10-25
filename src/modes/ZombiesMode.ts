@@ -34,6 +34,7 @@ import {
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
 import { ZombieManager } from '../zombies/ZombieManager';
+import { dressZombieSources } from '../zombies/skins/ZombieSkinBuilder';
 import type { ZombieKillSource } from '../zombies/ZombieDeath';
 import { RITUAL_SCARE_TIMELINE } from '../zombies/secret-room/SecretRoomSystem';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
@@ -163,7 +164,7 @@ export class ZombiesMode implements GameMode {
 
     this.zombies = new ZombieManager(
       Math.random,
-      ctx.assets.getZombieModels(),
+      dressZombieSources(ctx.assets.getZombieModels(), { skins: this.arena.zombieSkins, eyes: this.arena.zombieEyes }),
       // Static shadow maps (mobile) must not have moving casters.
       !ctx.profile.useReducedEffects,
       this.arena.spawnPoints,

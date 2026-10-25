@@ -85,6 +85,17 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
   },
   pistolGrip: triggerGrip(finger(0.3, 0.62, 0.32, 0.06), PISTOL_THUMB),
   rifleGrip: triggerGrip(finger(0.26, 0.58, 0.29, 0.07), WRAPPED_THUMB),
+  // Semi-pistol wrist of a wooden stock: three fingers close on its neck,
+  // the index reaches the trigger and the thumb stays behind the receiver.
+  stockGrip: {
+    index: finger(0.26, 0.58, 0.29, 0.07),
+    middle: finger(1.25, 1.35, 0.95),
+    ring: finger(1.3, 1.3, 0.95, -0.04),
+    pinky: finger(1.35, 1.2, 0.9, -0.08),
+    thumb: { base: [-0.007, 1.476, 1.878], curl: [0.998, 1.023] },
+    grip: [-0.032, -0.004, -0.064],
+    wrap: ['middle', 'ring', 'pinky'],
+  },
   // A grip with no trigger in reach: the index closes on it with the rest.
   handleGrip: { ...triggerGrip(finger(1.15, 1.2, 0.9, 0.06), WRAPPED_THUMB), wrap: FINGERS },
   // Cupped under a handguard from below, wrist low: the fingers climb its

@@ -25,10 +25,18 @@ import {
   type ZombieTypeId,
 } from './ZombieConfig';
 
+/** Glow and core colors of the shared eye overlay. */
+export interface ZombieEyeColors {
+  readonly glow: number;
+  readonly core: number;
+}
+
 /** Loaded GLB payload for one model source (scene template + clips). */
 export interface ZombieModelSource {
   readonly scene: THREE.Group;
   readonly clips: THREE.AnimationClip[];
+  /** Map override of the model's eye colors; omitted keeps `ZombieModelConfig.eyes`. */
+  readonly eyes?: ZombieEyeColors;
 }
 
 
@@ -44,8 +52,7 @@ export interface ZombieModelConfig {
   readonly idleClip?: readonly string[];
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
   readonly tints: readonly number[];
-  /** Glow and core colors of the shared eye overlay. */
-  readonly eyes: { readonly glow: number; readonly core: number };
+  readonly eyes: ZombieEyeColors;
   readonly anchors: {
     readonly torso: readonly string[];
     readonly head: readonly string[];
@@ -110,8 +117,12 @@ const CROSSFADE_SECONDS = 0.2;
 const DEATH_CROSSFADE_SECONDS = 0.42;
 /** Decay time of the walking momentum the falling body keeps, seconds. */
 const DEATH_MOMENTUM_SECONDS = 0.1;
-/** Generated clips are pure functions of the rig: bake once per loaded scene, share across the pool. */
-const restClipCache = new WeakMap<THREE.Object3D, ZombieRestClips | null>();
+/**
+ * Generated clips are pure functions of the rig: bake once per loaded asset
+ * (keyed by its clip list, which skinned looks of the same rig share) and
+ * share them across the pool.
+ */
+const restClipCache = new WeakMap<readonly THREE.AnimationClip[], ZombieRestClips | null>();
 /** Largest body-yaw the fall turns towards the impact side, radians. */
 const DEATH_MAX_TWIST = 0.8;
 /** Below this ground speed the zombie is treated as stationary (stalled at a barrier). */
@@ -138,7 +149,7 @@ const eyeCoreGeometry = new THREE.CircleGeometry(0.006, 10);
  * Flat dark sockets with a warm inner glow. Keeping both layers planar makes
  * the light read from inside the face rather than as spheres glued on top.
  */
-function buildEyes(colors: ZombieModelConfig['eyes']): { group: THREE.Group; materials: THREE.Material[] } {
+function buildEyes(colors: ZombieEyeColors): { group: THREE.Group; materials: THREE.Material[] } {
   const group = new THREE.Group();
   group.name = 'zombie-eyes';
   const socketMaterial = new THREE.MeshStandardMaterial({
@@ -648,10 +659,10 @@ export class ZombieVisual {
 
 
       this.mixer = new THREE.AnimationMixer(model);
-      let restClips = restClipCache.get(source.scene);
+      let restClips = restClipCache.get(source.clips);
       if (restClips === undefined) {
         restClips = buildZombieRestClips(this.root, this.modelConfig.height);
-        restClipCache.set(source.scene, restClips);
+        restClipCache.set(source.clips, restClips);
       }
       for (const state of ['spawn', 'walk', 'attack', 'barrierAttack', 'barrierBreak', 'hit'] as const) {
         const clip = resolveClip(source.clips, this.modelConfig.clips[state]);
@@ -722,7 +733,7 @@ export class ZombieVisual {
       }
     }
 
-    const eyes = buildEyes(this.modelConfig.eyes);
+    const eyes = buildEyes(source?.eyes ?? this.modelConfig.eyes);
     this.positionFrom.push(...this.poseBones.map(bone => bone.position.clone()));
     this.baseRotations.push(...this.poseBones.map(bone => bone.quaternion.clone()));
     this.basePositions.push(...this.poseBones.map(bone => bone.position.clone()));

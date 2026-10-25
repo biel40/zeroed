@@ -118,10 +118,28 @@ const BLOCKING_SURFACES: ReadonlySet<string> = new Set(['concrete', 'wood', 'met
 const MIN_OBSTACLE_HEIGHT = 0.5;
 /** Ground/berm-scale boxes are walkable scenery, never obstacles. */
 const MAX_OBSTACLE_FOOTPRINT = 20;
-/** GLB payloads per visual model. Missing keys use that model's distinct fallback. */
-export type ZombieModelSources = Partial<Record<ZombieModelId, ZombieModelSource | null>>;
+/**
+ * GLB payloads per visual model. A list holds several looks of one model (map
+ * skins), dealt in turn to its pooled bodies. Missing keys use that model's
+ * distinct fallback.
+ */
+export type ZombieModelSources = Partial<Record<ZombieModelId, ZombieModelSource | readonly ZombieModelSource[] | null>>;
 export const ZOMBIE_POOL_MODELS = (Object.keys(ZOMBIE_MODEL_POOL_CAPACITIES) as ZombieModelId[])
   .flatMap((modelId) => Array<ZombieModelId>(ZOMBIE_MODEL_POOL_CAPACITIES[modelId]).fill(modelId));
+
+/** Source of the pooled body at `poolIndex` (in ZOMBIE_POOL_MODELS order). */
+export function zombiePoolSource(sources: ZombieModelSources, poolIndex: number): ZombieModelSource | null {
+  const modelId = ZOMBIE_POOL_MODELS[poolIndex];
+  const entry = sources[modelId] ?? null;
+  if (!isLookList(entry)) return entry;
+  // A model's reserve is contiguous in the pool, so this is its own ordinal.
+  const ordinal = poolIndex - ZOMBIE_POOL_MODELS.indexOf(modelId);
+  return entry.length > 0 ? entry[ordinal % entry.length] : null;
+}
+
+function isLookList(entry: ZombieModelSource | readonly ZombieModelSource[] | null): entry is readonly ZombieModelSource[] {
+  return Array.isArray(entry);
+}
 
 interface EntryRoute {
   readonly barrierId: string;
@@ -287,7 +305,7 @@ export class ZombieManager {
       const model = ZOMBIE_MODELS[modelId];
       const tint = model.tints[(this.nextZombieId - 1) % model.tints.length];
       const zombie = new Zombie(
-        new ZombieVisual(modelId, sources[modelId] ?? null, tint, castShadows),
+        new ZombieVisual(modelId, zombiePoolSource(sources, index), tint, castShadows),
       );
       this.zombieIds.set(zombie, this.nextZombieId++);
       zombie.onDeathFinished = () => this.finishDeath(zombie);

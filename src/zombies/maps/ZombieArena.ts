@@ -7,6 +7,8 @@ import type { EndingPresentationId, IntroPresentationId } from '../../ui/HUD';
 import type { WindowBarrier } from '../barriers/WindowBarrier';
 import type { PointDoor } from '../doors/PointDoor';
 import type { SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
+import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
+import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import type { WeaponId } from '../../weapons/WeaponTypes';
@@ -262,6 +264,10 @@ export interface ZombieArena {
   /** Stair/zone transitions that swap player floor/bounds. */
   readonly floorTransitions?: ReadonlyArray<FloorTransitionZone>;
   readonly ambience: ArenaAmbience;
+  /** Optional: walker looks the horde wears, dealt in turn; omitted keeps the plain walker. */
+  readonly zombieSkins?: readonly ZombieSkinId[];
+  /** Optional: eye colors of every zombie on the map; omitted keeps each model's own. */
+  readonly zombieEyes?: ZombieEyeColors;
   /** Optional: ambient sounds the map schedules itself; the mode plays them. */
   onAmbientCue?: ((cue: ArenaAmbientCue) => void) | null;
   /** Optional visual event fired when a rebuilt board finishes seating. */

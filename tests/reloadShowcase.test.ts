@@ -29,7 +29,7 @@ const DT = 1 / 120;
 const WEAPONS = Object.keys(WEAPON_DEFINITIONS) as WeaponId[];
 const styleOf = (id: WeaponId): ReloadStyle => WEAPON_DEFINITIONS[id].view.reloadAnim!.style;
 /** Detachable magazines the hand swaps in front of the eye. */
-const SWAPPED = WEAPONS.filter((id) => ['pistol', 'rifle', 'rock', 'bolt'].includes(styleOf(id)));
+const SWAPPED = WEAPONS.filter((id) => ['pistol', 'rifle', 'rock', 'bolt', 'drum'].includes(styleOf(id)));
 /** Actions let go at the rear that slam home on their own spring. */
 const SPRING_LOADED = WEAPONS.filter((id) => ['pistol', 'rifle', 'rock', 'belt'].includes(styleOf(id)));
 

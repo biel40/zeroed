@@ -5,7 +5,7 @@ import type { ReloadAnimConfig, ReloadPhase, ReloadPoseConfig, ReloadStyle } fro
 
 /** Charging-handle rack travel in meters. */
 export const HANDLE_TRAVEL = 0.042;
-/** Share of a rack at which the hand lets the spring-loaded handle go; it slams home over the next few. */
+/** Share of a rack at which the hand releases the handle, or an open bolt catches on its sear. */
 export const HANDLE_RELEASE_FRACTION = 0.55;
 const HANDLE_SLAM = 0.08;
 /** Actions worked by a spring-loaded handle or slide: let go at the rear, they slam home on their own. */
@@ -197,12 +197,14 @@ export class ReloadAnimator {
   }
 
   /**
-   * Progress at which the action is back in battery. A released spring-
+   * Progress at which the action is ready: latched rear for an open bolt,
+   * back in battery otherwise. A released spring-
    * loaded handle or slide slams home well before the hand has eased off,
    * so its foley and kick land on the impact, not at the end of the window.
    */
   private actionHomeAt(): number {
     const c = this.config;
+    if (c.style === 'drum') return c.charge + (c.chargeEnd - c.charge) * HANDLE_RELEASE_FRACTION;
     if (!SPRING_LOADED.has(c.style)) return c.chargeEnd;
     return c.charge + (c.chargeEnd - c.charge) * (HANDLE_RELEASE_FRACTION + HANDLE_SLAM);
   }
@@ -311,6 +313,7 @@ export class ReloadAnimator {
         mag.position.y += t * height * 1.5;
         mag.rotateY(t * 2.2);
         break;
+      case 'drum':
       case 'rifle':
         // The hand strips it down out of the well until it hangs clear,
         // tipping it away as it lets go.
@@ -343,6 +346,7 @@ export class ReloadAnimator {
     const inv = 1 - t;
     switch (this.config.style) {
       case 'pistol':
+      case 'drum':
       case 'rifle':
       case 'rock':
         this.applyBoxMagIn(mag, t, height);
@@ -409,6 +413,13 @@ export class ReloadAnimator {
     const handle = this.parts.handle;
     if (!handle || !this.handleHome) return;
     const c = this.config;
+    if (c.style === 'drum' && workAction && c.charge >= 0) {
+      // Open-bolt SMGs finish an empty magazine with the bolt forward. The
+      // charging stroke catches it on the rear sear; there is no forward slam.
+      restoreHome(handle, this.handleHome);
+      handle.position.z -= HANDLE_TRAVEL * (1 - ramp(p, c.charge, this.actionHomeAt()));
+      return;
+    }
     // An emptied pistol stays open on its slide stop until the slide is released.
     const lockedOpen = workAction && c.style === 'pistol';
     if (lockedOpen && p < c.charge) {
@@ -491,8 +502,8 @@ export class ReloadAnimator {
     const lean = pulse(p, c.magDrop, c.magIn + 0.1);
     const seat = impact(p, c.magSeat - 0.006, c.magSeat + 0.06)
       + (c.coverClose !== undefined ? impact(p, c.coverClose - 0.006, c.coverClose + 0.06) : 0);
-    const pull = springs ? pulse(p, c.charge, letGo) : 0;
-    const slam = racks ? impact(p, home - 0.002, home + 0.07) : 0;
+    const pull = springs || (racks && c.style === 'drum') ? pulse(p, c.charge, letGo) : 0;
+    const slam = racks && c.style !== 'drum' ? impact(p, home - 0.002, home + 0.07) : 0;
     const settleFrom = racks ? c.chargeEnd : swapEnd + 0.04;
     const settle = p > settleFrom ? dampedWobble((p - settleFrom) / (1 - settleFrom)) : 0;
     const swapPose = c.swapPose;

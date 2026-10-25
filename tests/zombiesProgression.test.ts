@@ -34,6 +34,12 @@ describe('Zombies progression contract', () => {
     expect(WEAPON_DEFINITIONS.tesla.reserveAmmo).toBe(25);
   });
 
+  it('supplies the PPSh-41 with four spare drums in Zombies', () => {
+    const mode = new ZombiesMode();
+    expect(WEAPON_DEFINITIONS.ppsh41.magazineSize).toBe(71);
+    expect(mode.reserveAmmoFor?.('ppsh41')).toBe(284);
+  });
+
   it('preloads every Mystery Box reward (rolls never hit the network)', () => {
     const mode = new ZombiesMode();
     for (const entry of MYSTERY_BOX_POOL) {

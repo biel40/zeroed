@@ -6,7 +6,7 @@ import type { WeaponInventory } from '../src/game/WeaponInventory';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Weapon } from '../src/weapons/Weapon';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
-import type { MysteryBoxMachine } from '../src/zombies/MysteryBox';
+import { MYSTERY_BOX_POOL, type MysteryBoxMachine } from '../src/zombies/MysteryBox';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
 import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
@@ -319,8 +319,14 @@ describe('co-op Mystery Box', () => {
     expect(host(match).box.result).toBe('vector');
   });
 
-  it('charges once, reserves the result for the buyer and grants the host-selected weapon', () => {
+  it.each(['vector', 'ppsh41'] as const)('charges once and grants the host-selected %s to the buyer', (weaponId) => {
     const match = startedMatch();
+    // Pick the middle of this weapon's live-pool weight, independent of pool growth.
+    const index = MYSTERY_BOX_POOL.findIndex((entry) => entry.weaponId === weaponId);
+    const totalWeight = MYSTERY_BOX_POOL.reduce((sum, entry) => sum + entry.weight, 0);
+    const precedingWeight = MYSTERY_BOX_POOL.slice(0, index).reduce((sum, entry) => sum + entry.weight, 0);
+    const random = (precedingWeight + MYSTERY_BOX_POOL[index].weight / 2) / totalWeight;
+    Object.assign(host(match).box, { rng: () => random });
     earn(host(match).players.guest.economy, 950);
     placePlayer(match.guestSide.player, -5.2, -4.2);
     match.guestSide.player.face(0);
@@ -332,8 +338,7 @@ describe('co-op Mystery Box', () => {
     expect(host(match).players.guest.economy.points).toBe(0);
     match.step(0.1, 51);
     const result = host(match).box.result;
-    expect(result).not.toBeNull();
-    expect(result).not.toBe('m1911');
+    expect(result).toBe(weaponId);
     expect(guest(match).match?.box.result).toBe(result);
     match.relay.host.onMessage?.({ type: 'boxUse', action: 'pickup', equippedWeapon: 'm1911' });
     match.relay.flush();

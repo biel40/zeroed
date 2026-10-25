@@ -4,7 +4,7 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 import {
   cylinderZ, extrudeProfile, profilePath, profileShape, shapeWidth, type ProfilePoint,
 } from './ProfileGeometry';
-import { canvasTexture, seededRandom, steelWearTexture } from './ProceduralTextures';
+import { steelWearTexture, woodGrainTexture } from './ProceduralTextures';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -147,48 +147,6 @@ export function ak47MagazineFloorplate(): ProfilePoint[] {
     magazinePoint(length - 0.002, half + 0.003), magazinePoint(length + 0.006, half + 0.003),
     magazinePoint(length + 0.006, -half - 0.004), magazinePoint(length - 0.002, -half - 0.004),
   ];
-}
-
-let woodGrain: THREE.CanvasTexture | null | undefined;
-
-/**
- * Birch grain tinted by the material color: long wavy latewood lines,
- * broad growth bands and sparse pores. Extrusion UVs are in meters, so the
- * repeat maps one tile to 42 x 10.5 cm with the grain along the furniture.
- */
-function woodGrainTexture(): THREE.CanvasTexture | null {
-  if (woodGrain !== undefined) return woodGrain;
-  const random = seededRandom(47);
-  woodGrain = canvasTexture(512, 128, (ctx) => {
-    ctx.fillStyle = '#efe6dc';
-    ctx.fillRect(0, 0, 512, 128);
-    for (let band = 0; band < 9; band++) {
-      ctx.fillStyle = `rgba(150, 92, 55, ${0.04 + random() * 0.06})`;
-      ctx.fillRect(0, random() * 128, 512, 4 + random() * 14);
-    }
-    for (let line = 0; line < 70; line++) {
-      const y0 = random() * 128;
-      const amplitude = 0.6 + random() * 2.6;
-      const frequency = (Math.PI * 2 * (1 + Math.floor(random() * 3))) / 512;
-      const phase = random() * Math.PI * 2;
-      const thickness = 0.6 + random() * 1.8;
-      ctx.fillStyle = `rgba(96, 52, 28, ${0.05 + random() * 0.16})`;
-      // Short rects instead of paths: cheap, and smoothed by texture filtering.
-      for (let x = 0; x < 512; x += 2) {
-        const y = y0 + Math.sin(x * frequency + phase) * amplitude + Math.sin(x * frequency * 3.1 + phase) * amplitude * 0.3;
-        ctx.fillRect(x, y - thickness / 2, 2, thickness);
-      }
-    }
-    for (let pore = 0; pore < 260; pore++) {
-      ctx.fillStyle = `rgba(70, 36, 18, ${0.08 + random() * 0.14})`;
-      ctx.fillRect(random() * 512, random() * 128, 2 + random() * 5, 0.8);
-    }
-  });
-  if (woodGrain) {
-    woodGrain.colorSpace = THREE.SRGBColorSpace;
-    woodGrain.repeat.set(1 / 0.42, 1 / 0.105);
-  }
-  return woodGrain;
 }
 
 /** Rounded wooden furniture: generous creased bevels that keep the traced outline. */
