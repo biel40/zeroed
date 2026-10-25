@@ -9,7 +9,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   /**
    * M1911 — the Zombies starting pistol. Deliberately a sidearm: modest
    * torso damage, light recoil, fast ADS
-   * and a quick reload. Precise players stretch it through early rounds;
+   * and a showy but unhurried reload. Precise players stretch it through early rounds;
    * raw damage per magazine keeps it from competing with the box weapons.
    * Detailed procedural view model (no CC0 GLB exists), finite 8 / 64 ammunition.
    */
@@ -21,8 +21,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     rpm: 360,
     magazineSize: 8,
     reserveAmmo: 64,
-    reloadTime: 1.6,
-    tacticalReloadTime: 1.25,
+    reloadTime: 3.1,
+    tacticalReloadTime: 2.3,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
@@ -77,8 +77,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         // Thumbs forward: the support palm fills the grip's left flank and its
         // fingers wrap the shooting hand's from the front.
         left: {
-          position: [0.009, -0.096, 0.062], axis: [-0.05, 0.99, -0.05], palm: [0.94, 0.1, 0.33], pose: 'supportPistol',
-          hold: { size: [0.088, 0.089], axis: [0, 0.956, -0.292] },
+          position: [0.016, -0.086, 0.084], axis: [-0.05, 0.99, -0.05], palm: [0.94, 0.1, 0.33], pose: 'supportPistol',
+          hold: { size: [0.074, 0.08], axis: [0, 0.956, -0.292] },
         },
         actionHand: 'left',
         // Overhand on the rear serrations: the palm on the slide's upper left
@@ -88,16 +88,29 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
           position: [0, 0, 0.072], axis: [0, -0.25, 1], palm: [0.88, -0.47, 0], pose: 'magazineGrab',
           hold: { size: [0.035, 0.034], axis: [0, 0, -1] },
         },
+        // Cupped under the baseplate, wrist low on the near side: the fingers
+        // climb the far flank, so the whole tube and its top round show
+        // above the hand, and the palm drives it home.
+        magazine: {
+          position: [0, -0.0025, 0], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
+          hold: { size: [0.019, 0.11], axis: [0, 0, 1] },
+        },
       },
       reloadAnim: {
         style: 'pistol',
-        magOut: 0.08,
-        magDrop: 0.2,
-        magIn: 0.44,
-        magSeat: 0.6,
-        charge: 0.68,
-        chargeEnd: 0.94,
-        magSize: [0.022, 0.075, 0.032],
+        magOut: 0.1,
+        magDrop: 0.22,
+        magIn: 0.36,
+        magSeat: 0.68,
+        charge: 0.74,
+        chargeEnd: 0.9,
+        // Up to the screen center, left flank to the eye; a softer turn for the slide release.
+        swapPose: { shift: [-0.09, 0.18, 0.03], yaw: 0.65, roll: -0.3, tilt: 0.12 },
+        rackPose: { shift: [-0.06, 0.08, 0.02], yaw: 0.35, roll: -0.12, tilt: 0.15 },
+        wellDepth: 1,
+        // Real 1911 single-stack proportions: it fills the grip from the
+        // baseplate up under the slide, about three times deeper than wide.
+        magSize: [0.015, 0.105, 0.034],
         magColor: 0x23262b,
       },
     },
@@ -110,8 +123,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'auto',
     rpm: 800,
     magazineSize: 30,
-    reloadTime: 2.1,
-    tacticalReloadTime: 1.7,
+    reloadTime: 2.8,
+    tacticalReloadTime: 2.2,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
@@ -168,15 +181,24 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         // The charging-handle latch is on the left: the support hand racks it.
         actionHand: 'left',
         action: { position: [-0.026, 0.004, 0.008], axis: [0.33, 0.74, 0.55], palm: [0.37, -0.65, 0.65], pose: 'boltPinch' },
+        // Cupped under the baseplate, tilted with the magazine's slight curve.
+        magazine: {
+          position: [0, -0.068, 0.014], axis: [0, -0.16, -0.987], palm: [-0.45, 0.879, -0.142], pose: 'supportHandguard',
+          hold: { size: [0.031, 0.11], axis: [0, 0.16, 0.987] },
+        },
       },
       reloadAnim: {
         style: 'rifle',
         magOut: 0.1,
-        magDrop: 0.24,
-        magIn: 0.48,
-        magSeat: 0.64,
+        magDrop: 0.22,
+        magIn: 0.4,
+        magSeat: 0.66,
         charge: 0.72,
-        chargeEnd: 0.94,
+        chargeEnd: 0.9,
+        // Magwell turned to the eye; then the rear of the upper raised to the charging handle.
+        swapPose: { shift: [-0.1, 0.13, 0.03], yaw: 0.4, roll: -0.25, tilt: 0.1 },
+        rackPose: { shift: [-0.06, 0.09, 0.02], yaw: 0.15, roll: -0.1, tilt: -0.06 },
+        wellDepth: 0.33,
         magSize: [0.025, 0.18, 0.066],
         magColor: 0x2c3033,
         magAnchor: [0, -0.06, -0.1],
@@ -200,8 +222,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'auto',
     rpm: 700,
     magazineSize: 30,
-    reloadTime: 2.2,
-    tacticalReloadTime: 1.75,
+    reloadTime: 2.8,
+    tacticalReloadTime: 2.2,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
@@ -264,15 +286,24 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         // The cocking handle folds out on the left of the tube: the support hand racks it.
         actionHand: 'left',
         action: { position: [-0.026, 0, -0.003], axis: [0.33, 0.74, 0.55], palm: [0.37, -0.65, 0.65], pose: 'boltPinch' },
+        // Cupped under the baseplate, tilted with the curve of the magazine.
+        magazine: {
+          position: [0, -0.098, -0.014], axis: [0, 0.296, -0.955], palm: [-0.45, 0.85, 0.263], pose: 'supportHandguard',
+          hold: { size: [0.027, 0.11], axis: [0, -0.296, 0.955] },
+        },
       },
       reloadAnim: {
         style: 'rifle',
         magOut: 0.1,
-        magDrop: 0.24,
-        magIn: 0.48,
-        magSeat: 0.64,
+        magDrop: 0.22,
+        magIn: 0.4,
+        magSeat: 0.66,
         charge: 0.72,
-        chargeEnd: 0.94,
+        chargeEnd: 0.9,
+        // Magwell turned to the eye; then the cocking tube's handle on the left.
+        swapPose: { shift: [-0.1, 0.13, 0.03], yaw: 0.4, roll: -0.25, tilt: 0.1 },
+        rackPose: { shift: [-0.07, 0.08, 0.02], yaw: 0.3, roll: -0.15, tilt: 0.06 },
+        wellDepth: 0.35,
         magSize: [0.022, 0.15, 0.042],
         magColor: 0x1c1e20,
       },
@@ -295,8 +326,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'auto',
     rpm: 1200,
     magazineSize: 30,
-    reloadTime: 2.3,
-    tacticalReloadTime: 1.8,
+    reloadTime: 2.9,
+    tacticalReloadTime: 2.3,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
@@ -361,15 +392,24 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         // The charging handle rides on the left of the upper: the support hand racks it.
         actionHand: 'left',
         action: { position: [-0.008, 0, -0.012], axis: [0.33, 0.74, 0.55], palm: [0.37, -0.65, 0.65], pose: 'boltPinch' },
+        // Cupped under the baseplate of the long straight magazine.
+        magazine: {
+          position: [0, -0.121, 0.011], axis: [0, -0.06, -0.998], palm: [-0.45, 0.888, -0.053], pose: 'supportHandguard',
+          hold: { size: [0.028, 0.11], axis: [0, 0.06, 0.998] },
+        },
       },
       reloadAnim: {
         style: 'rifle',
         magOut: 0.1,
-        magDrop: 0.24,
-        magIn: 0.48,
-        magSeat: 0.64,
+        magDrop: 0.22,
+        magIn: 0.4,
+        magSeat: 0.66,
         charge: 0.72,
-        chargeEnd: 0.94,
+        chargeEnd: 0.9,
+        // Higher than the others for the long magazine; then the handle on the left of the upper.
+        swapPose: { shift: [-0.1, 0.15, 0.03], yaw: 0.4, roll: -0.25, tilt: 0.1 },
+        rackPose: { shift: [-0.07, 0.08, 0.02], yaw: 0.3, roll: -0.15, tilt: 0.08 },
+        wellDepth: 0.22,
         magSize: [0.022, 0.22, 0.034],
         magColor: 0x1a1c1e,
       },
@@ -383,8 +423,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'auto',
     rpm: 600,
     magazineSize: 30,
-    reloadTime: 2.4,
-    tacticalReloadTime: 1.95,
+    reloadTime: 3,
+    tacticalReloadTime: 2.4,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
@@ -445,15 +485,24 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
           hold: { size: [0.044, 0.072], axis: [0, 0, -1] },
         },
         action: { position: [0.03, 0.007, -0.004], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
+        // Cupped under the baseplate, tilted with the strong curve of the magazine.
+        magazine: {
+          position: [0, -0.137, -0.042], axis: [0, 0.523, -0.853], palm: [-0.45, 0.759, 0.465], pose: 'supportHandguard',
+          hold: { size: [0.035, 0.11], axis: [0, -0.523, 0.853] },
+        },
       },
       reloadAnim: {
         style: 'rock',
-        magOut: 0.07,
-        magDrop: 0.2,
-        magIn: 0.44,
-        magSeat: 0.6,
-        charge: 0.68,
-        chargeEnd: 0.92,
+        magOut: 0.08,
+        magDrop: 0.22,
+        magIn: 0.4,
+        magSeat: 0.64,
+        charge: 0.71,
+        chargeEnd: 0.89,
+        // Magwell turned to the eye; then the right flank up to the right-side charging handle.
+        swapPose: { shift: [-0.1, 0.13, 0.03], yaw: 0.4, roll: -0.25, tilt: 0.1 },
+        rackPose: { shift: [-0.07, 0.09, 0.02], yaw: -0.3, roll: 0.45, tilt: 0.06 },
+        wellDepth: 0.06,
         magSize: [0.03, 0.19, 0.059],
         // Blued stamped-steel 30-round magazine, a shade lighter than the receiver.
         magColor: 0x404347,
@@ -540,6 +589,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         coverClose: 0.68,
         charge: 0.76,
         chargeEnd: 0.92,
+        // Feed tray and belt box brought up to the eye; then the right-side charging handle.
+        swapPose: { shift: [-0.12, 0.14, 0.04], yaw: 0.25, roll: -0.15, tilt: 0.05 },
+        rackPose: { shift: [-0.08, 0.1, 0.02], yaw: -0.3, roll: 0.5, tilt: 0.05 },
         // Olive-drab 100-round belt pouch.
         magSize: [0.068, 0.128, 0.158],
         magColor: 0x4d5136,
@@ -555,8 +607,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     rpm: 60,
     magazineSize: 5,
     // Unhurried: the rifle is shown whole while the box magazine is swapped.
-    reloadTime: 2.8,
-    tacticalReloadTime: 2.2,
+    reloadTime: 3,
+    tacticalReloadTime: 2.4,
     boltAction: true,
     boltCycleTime: 0.7,
     scoped: true,
@@ -615,6 +667,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
           hold: { size: [0.055, 0.043], axis: [0, 0, -1] },
         },
         action: { position: [0.05, -0.014, 0.055], axis: [0, 1, 0], palm: [-1, 0.3, 0], pose: 'boltPinch' },
+        // Cupped under the short box magazine.
+        magazine: {
+          position: [0, -0.0065, 0.002], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
+          hold: { size: [0.033, 0.097], axis: [0, 0, 1] },
+        },
       },
       reloadAnim: {
         style: 'bolt',
@@ -624,6 +681,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         magSeat: 0.68,
         charge: 0.76,
         chargeEnd: 0.97,
+        // The long rifle swings out across the screen, left flank to the eye,
+        // for the magazine swap, then goes back on the shoulder for the bolt.
+        swapPose: { shift: [-0.07, 0.05, -0.24], yaw: 0.5, roll: -0.24, tilt: -0.08 },
+        rackPose: { shift: [-0.02, 0.03, 0], yaw: -0.1, roll: 0.22, tilt: -0.1 },
         magSize: [0.028, 0.09, 0.07],
         // Blued steel 5-round detachable box magazine.
         magColor: 0x17191b,
@@ -643,8 +704,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'semi',
     rpm: 140,
     magazineSize: 20,
-    reloadTime: 2.8,
-    tacticalReloadTime: 2.3,
+    reloadTime: 3,
+    tacticalReloadTime: 2.4,
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
@@ -713,6 +774,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         // No charging handle: the charge window drives the energy spin-up.
         charge: 0.76,
         chargeEnd: 0.97,
+        // Raised and canted inboard, muzzle low, towards the support hand on the canister.
+        swapPose: { shift: [-0.07, 0.09, 0.02], yaw: 0.15, roll: 0.25, tilt: -0.18 },
         magSize: [0.08, 0.08, 0.28],
         magColor: 0x5cff3a,
       },
@@ -811,6 +874,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         // No charging handle: the charge window drives the coil spin-up.
         charge: 0.68,
         chargeEnd: 0.95,
+        // Raised, muzzle low and top tipped to the eye so the caged cell faces the camera.
+        swapPose: { shift: [-0.06, 0.08, 0.02], yaw: 0, roll: 0.12, tilt: -0.25 },
         magSize: [0.05, 0.06, 0.05],
         magColor: 0x7fd4ff,
       },

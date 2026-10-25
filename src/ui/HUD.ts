@@ -5,6 +5,7 @@ import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { LanguagePicker } from './LanguagePicker';
+import { bindInteractionPromptVisibility, renderInteractionPrompt } from './InteractionPromptView';
 import { SettingsPanel } from './SettingsPanel';
 import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
 
@@ -137,6 +138,7 @@ export class HUD {
 
     this.settings = new SettingsPanel(mustGet('settings-dialog') as HTMLDialogElement,
       mustGet('menu-settings'), mustGet('pause-settings'));
+    bindInteractionPromptVisibility(this.interactPrompt);
 
     // The language is only chosen from the main menu; in-game texts read it when rendered.
     new LanguagePicker(mustGet('language-select'), mustGet('language-toggle'), mustGet('language-options'));
@@ -430,8 +432,9 @@ export class HUD {
     if (key === this.lastZombies) return;
     this.lastZombies = key;
     if (this.lastRound !== state.round) {
+      const advancing = this.lastRound >= 0 && state.round > this.lastRound;
       this.lastRound = state.round;
-      this.zRound.innerHTML = roundMarks(state.round);
+      this.zRound.innerHTML = roundMarks(state.round, advancing);
       this.zRound.setAttribute('aria-label', t('hud.roundLabel', { round: state.round }));
       mustGet('pause-round').textContent = `${state.round}`;
     }
@@ -642,7 +645,7 @@ export class HUD {
     if (text === this.lastPrompt) return;
     this.lastPrompt = text;
     this.interactPrompt.classList.toggle('hidden', text === null);
-    if (text !== null) this.interactPrompt.textContent = text;
+    if (text !== null) renderInteractionPrompt(this.interactPrompt, text);
   }
 
   public update(weapon: Weapon, spreadPixels: number, fallbackWeapon: string | null = null): void {

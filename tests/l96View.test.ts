@@ -128,8 +128,10 @@ describe('L96A1 view model', () => {
     animator.update(fakeWeapon('reloading', (anim.magDrop + anim.magIn) / 2));
     expect(animator.bodyYaw).toBeGreaterThan(0.4);
     expect(animator.bodyShift.z).toBeLessThan(-0.2);
+    // Back on the shoulder for the bolt, only canted to show it.
     animator.update(fakeWeapon('reloading', (anim.charge + anim.chargeEnd) / 2));
-    expect(animator.bodyYaw).toBe(0);
+    expect(Math.abs(animator.bodyYaw)).toBeLessThan(0.15);
+    expect(animator.bodyShift.z).toBeGreaterThan(-0.03);
     animator.update(fakeWeapon('ready', 0));
     expect(animator.bodyShift.length()).toBe(0);
   });

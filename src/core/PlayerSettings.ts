@@ -13,6 +13,8 @@ export interface PlayerSettings {
   /** Extra multiplier over each weapon's own aiming sensitivity. */
   readonly adsSensitivity: number;
   readonly invertY: boolean;
+  /** Contextual action hints only; hiding them never disables interactions. */
+  readonly showInteractionPrompts: boolean;
   /** Hip-fire vertical field of view in degrees; aiming keeps each weapon's zoom. */
   readonly fieldOfView: number;
 }
@@ -20,6 +22,12 @@ export interface PlayerSettings {
 export type NumericSetting = {
   [K in keyof PlayerSettings]: PlayerSettings[K] extends number ? K : never;
 }[keyof PlayerSettings];
+
+export type BooleanSetting = {
+  [K in keyof PlayerSettings]: PlayerSettings[K] extends boolean ? K : never;
+}[keyof PlayerSettings];
+
+export const BOOLEAN_SETTINGS: readonly BooleanSetting[] = ['invertY', 'showInteractionPrompts'];
 
 export interface SettingRange {
   readonly min: number;
@@ -43,6 +51,7 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   lookSensitivity: 1,
   adsSensitivity: 1,
   invertY: false,
+  showInteractionPrompts: true,
   fieldOfView: 75,
 };
 
@@ -58,7 +67,9 @@ export function sanitizeSettings(raw: unknown): PlayerSettings {
     const { min, max } = SETTING_RANGES[key];
     settings[key] = Math.min(max, Math.max(min, value));
   }
-  if (typeof source.invertY === 'boolean') settings.invertY = source.invertY;
+  for (const key of BOOLEAN_SETTINGS) {
+    if (typeof source[key] === 'boolean') settings[key] = source[key];
+  }
   return settings as unknown as PlayerSettings;
 }
 

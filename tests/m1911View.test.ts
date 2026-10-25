@@ -57,7 +57,7 @@ describe('M1911 first-person model', () => {
     expect(namedMeshes(built.group, 'm1911-walnut-grip-panel')).toHaveLength(2);
     expect(namedMeshes(built.group, 'm1911-trigger-guard')).toHaveLength(1);
     expect(frame?.getObjectByName('m1911-barrel')).toBeTruthy();
-    expect(frame?.getObjectByName('m1911-recoil-spring-plug')).toBeTruthy();
+    expect(slide?.getObjectByName('m1911-recoil-spring-plug')).toBeTruthy();
     expect(frame?.getObjectByName('m1911-trigger')).toBeTruthy();
     expect(frame?.getObjectByName('m1911-hammer')).toBeTruthy();
     expect(frame?.getObjectByName('m1911-mainspring-housing')).toBeTruthy();
@@ -120,7 +120,8 @@ describe('M1911 first-person model', () => {
 
   it('uses full-size Government proportions and rakes the grip base rearward', () => {
     const built = buildProceduralViewModel(definition.view);
-    const size = new THREE.Box3().setFromObject(built.group).getSize(new THREE.Vector3());
+    // Measure the raked magazine's actual vertices rather than its rotated AABB.
+    const size = new THREE.Box3().setFromObject(built.group, true).getSize(new THREE.Vector3());
     const magazine = built.group.getObjectByName('m1911-magazine')!;
     const screws = namedMeshes(built.group, 'm1911-grip-screw');
 
@@ -176,7 +177,8 @@ describe('M1911 first-person model', () => {
     expect(weapon.state).toBe('reloading');
 
     let reloadFrames = 0;
-    while (weapon.state === 'reloading' && reloadFrames < 220) {
+    const maxFrames = Math.ceil(definition.reloadTime / dt) + 10;
+    while (weapon.state === 'reloading' && reloadFrames < maxFrames) {
       weapon.update(dt, { trigger: false, ads: false });
       view.update(dt, weapon, 0, 0, 0);
       reloadFrames++;
@@ -184,6 +186,79 @@ describe('M1911 first-person model', () => {
 
     expect(weapon.state).toBe('ready');
     expect(slide.position.z).toBeCloseTo(homeZ, 6);
+  });
+
+  it('locks the slide open when empty and slingshots it home during the empty reload', () => {
+    const weapon = new Weapon(definition, () => 0.5);
+    const view = new WeaponView(definition, null);
+    const slide = view.root.getObjectByName('m1911-slide')!;
+    const round = view.root.getObjectByName('m1911-magazine-round')!;
+    const homeZ = slide.position.z;
+    const dt = 1 / 120;
+
+    // No reserve: the empty pistol cannot reload and rests open on its slide stop.
+    weapon.ammoInMagazine = 0;
+    weapon.reserveAmmo = 0;
+    expect(weapon.reload()).toBe(false);
+    view.update(dt, weapon, 0, 0, 0);
+    expect(slide.position.z).toBeGreaterThan(homeZ + 0.03);
+
+    weapon.reserveAmmo = definition.reserveAmmo!;
+    expect(weapon.reload()).toBe(true);
+    const anim = definition.view.reloadAnim!;
+    const advanceTo = (progress: number) => {
+      while (weapon.state === 'reloading' && weapon.stateProgress < progress) {
+        weapon.update(dt, { trigger: false, ads: false });
+        view.update(dt, weapon, 0, 0, 0);
+      }
+    };
+    // The emptied magazine leaves without its top round; the fresh one shows it.
+    advanceTo((anim.magOut + anim.magDrop) / 2);
+    expect(round.visible).toBe(false);
+    expect(slide.position.z).toBeGreaterThan(homeZ + 0.03);
+    advanceTo((anim.magIn + anim.magSeat) / 2);
+    expect(round.visible).toBe(true);
+    expect(slide.position.z).toBeGreaterThan(homeZ + 0.03);
+    advanceTo(anim.chargeEnd + 0.01);
+    expect(slide.position.z).toBeCloseTo(homeZ, 6);
+    advanceTo(1);
+    expect(weapon.state).toBe('ready');
+    expect(view.root.rotation.z).toBeCloseTo(0, 6);
+  });
+
+  it('seats a full-length magazine inside the raked grip with its baseplate flush underneath', () => {
+    const built = buildProceduralViewModel(definition.view);
+    built.group.updateMatrixWorld(true);
+    const grip = built.group.getObjectByName('m1911-grip-core')!;
+    const receiver = built.group.getObjectByName('m1911-receiver')!;
+    const tube = built.group.getObjectByName('m1911-magazine-tube') as THREE.Mesh;
+    const plate = built.group.getObjectByName('m1911-magazine-baseplate')!;
+    const gripBox = new THREE.Box3().setFromObject(grip);
+    // Grip and receiver are side profiles extruded across X: a point lies
+    // within their silhouette when a ray along X through it hits them.
+    const raycaster = new THREE.Raycaster();
+    const insideFrame = (point: THREE.Vector3): boolean => {
+      raycaster.set(new THREE.Vector3(-1, point.y, point.z), new THREE.Vector3(1, 0, 0));
+      return raycaster.intersectObjects([grip, receiver], false).length > 0;
+    };
+
+    const [width, height, depth] = definition.view.reloadAnim!.magSize;
+    expect(height / depth).toBeGreaterThan(3);
+    const positions = tube.geometry.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) {
+      const corner = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(tube.matrixWorld);
+      expect(insideFrame(corner), `tube corner ${corner.toArray()}`).toBe(true);
+      expect(Math.abs(corner.x)).toBeLessThanOrEqual(width / 2 + 1e-6);
+    }
+    expect(width).toBeLessThan(gripBox.max.x - gripBox.min.x);
+
+    // The level plate sits just proud of the grip bottom, entirely under it.
+    const plateBox = new THREE.Box3().setFromObject(plate);
+    expect(plateBox.min.y).toBeLessThan(gripBox.min.y);
+    expect(plateBox.min.y).toBeGreaterThan(gripBox.min.y - 0.005);
+    for (const z of [plateBox.min.z + 0.001, plateBox.max.z - 0.001]) {
+      expect(insideFrame(new THREE.Vector3(0, gripBox.min.y + 0.001, z))).toBe(true);
+    }
   });
 
   it('restores the magazine and slide immediately when the view is reset', () => {

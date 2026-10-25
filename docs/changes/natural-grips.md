@@ -23,6 +23,11 @@
   unos 12 grados menos que su empunadura. Describir la pieza sujetada (seccion
   y eje) basta para cerrar los dedos de cualquier arma; el acoplamiento
   tendinoso (la falange distal sigue a la media) evita poses imposibles.
+- Apoyo de pistola: el volumen que rodea la izquierda representa la mano
+  derecha ya cerrada, no una caja sobredimensionada. Su palma queda mas
+  retrasada y los dedos se cierran sobre los de la derecha; el contacto se
+  valida contra la piel deformada de esa mano, ademas de contra el volumen
+  de agarre. Los pulgares mas cortos conservan la base cosida a la palma.
 - Linea de mira: los dedos de los agarres de reposo nunca suben a menos de
   1 cm de la linea de mira (antes la mano de apoyo de la AK tapaba el punto
   de mira). La M1911 se monta con la palma sobre el canto superior izquierdo

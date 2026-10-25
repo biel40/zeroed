@@ -62,6 +62,10 @@ tocar.
   pulgar puede atravesar el arma y pasar igual. Comprueba las puntas de los
   huesos de la mano contra la malla con raycast en un test temporal y
   borralo al terminar.
+- Un pulgar nuevo va girado sobre su eje (Z de `thumb.base`): la yema sobre la
+  pieza y la uña hacia fuera, visible desde la camara (lo comprueba el test
+  "both thumbs lie on their side"). Una pose lejos del `THUMB_REST` de su mano
+  deforma la base del pulgar.
 - Colores: `bodyColor` (metal) y `accentColor` (polimero/madera) en la definicion.
 
 ## 4. Wall buy

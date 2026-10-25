@@ -412,6 +412,28 @@ describe('AudioSystem reload sound profiles', () => {
     expect(rock).toBeLessThan(pistol);
   });
 
+  it('puts a low body under the magazine slap, the cover slam and the action slam only', () => {
+    const audio = new AudioSystem() as any;
+    vi.spyOn(audio, 'tick').mockImplementation(() => {});
+    const sweepSpy = vi.spyOn(audio, 'sweep').mockImplementation(() => {});
+    const thump = (phase: string, style: string, actionDuration = 0): number[] => {
+      sweepSpy.mockClear();
+      audio.playReloadPhase(phase, false, style, actionDuration);
+      return sweepSpy.mock.calls.filter((call) => call[1] === 'triangle').map((call) => call[2] as number);
+    };
+
+    for (const style of ['pistol', 'rifle', 'belt', 'bolt']) {
+      expect(thump('magSeat', style), style).toHaveLength(1);
+      expect(thump('magOut', style), style).toHaveLength(0);
+    }
+    for (const style of ['pistol', 'rifle', 'belt']) expect(thump('chargeEnd', style), style).toHaveLength(1);
+    expect(thump('coverClose', 'belt')).toHaveLength(1);
+    // A worked bolt already ends with its own lock-down.
+    expect(thump('chargeEnd', 'bolt', 0.6)).toHaveLength(0);
+    // Heavier actions thump lower.
+    expect(thump('magSeat', 'belt')[0]).toBeLessThan(thump('magSeat', 'pistol')[0]);
+  });
+
   it('layers a low receiver clack and crisp latch when a reload completes', () => {
     const audio = new AudioSystem() as any;
     const tickSpy = vi.spyOn(audio, 'tick').mockImplementation(() => {});

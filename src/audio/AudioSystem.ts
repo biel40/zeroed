@@ -23,6 +23,13 @@ interface ReloadProfile {
   complete: number;
 }
 
+/**
+ * Start frequency of the low thump under each style's reload impacts;
+ * heavier actions sit lower. The AK has its own rock-and-lock foley and
+ * energy weapons their synth voices, so they take none.
+ */
+const RELOAD_IMPACT_BODY: Partial<Record<ReloadStyle, number>> = { pistol: 160, rifle: 150, bolt: 140, belt: 120 };
+
 const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
   pistol: {
     start: 1750,
@@ -416,6 +423,24 @@ export class AudioSystem {
         break;
       default:
         break;
+    }
+    this.layerImpactBody(phase, style, actionDuration);
+  }
+
+  /**
+   * The big reload moments get a low body under the generic clack: the
+   * magazine slapped home, the feed cover slammed shut and the action
+   * slamming into battery (a worked bolt already ends with its own lock).
+   */
+  private layerImpactBody(phase: ReloadPhase, style: ReloadStyle, actionDuration: number): void {
+    const body = RELOAD_IMPACT_BODY[style];
+    if (body === undefined) return;
+    const boost = AudioSystem.boostReloadVolume;
+    if (phase === 'magSeat' || phase === 'coverClose') {
+      this.sweep(0, 'triangle', body, body * 0.375, boost(0.42), 0.09);
+    } else if (phase === 'chargeEnd' && !(style === 'bolt' && actionDuration > 0)) {
+      this.sweep(0, 'triangle', body * 1.19, body * 0.34, boost(0.5), 0.12);
+      this.metalClang(0.012, 2600, boost(0.22), 0.07);
     }
   }
 

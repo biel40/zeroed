@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_SETTINGS,
   effectsGain,
@@ -41,7 +41,10 @@ function look(dx: number, dy: number, adsAlpha = 0): { yaw: number; pitch: numbe
 }
 
 describe('player settings', () => {
-  afterEach(() => resetSettings());
+  afterEach(() => {
+    resetSettings();
+    vi.unstubAllGlobals();
+  });
 
   it('fills missing or invalid values with defaults and clamps ranges', () => {
     expect(sanitizeSettings(null)).toEqual(DEFAULT_SETTINGS);
@@ -65,6 +68,29 @@ describe('player settings', () => {
     stop();
     updateSettings({ invertY: true });
     expect(changes).toBe(2);
+  });
+
+  it('keeps interaction hints enabled for old saves and rejects non-boolean values', () => {
+    expect(sanitizeSettings({ masterVolume: 0.5 }).showInteractionPrompts).toBe(true);
+    for (const value of [0, 1, 'false', null]) {
+      expect(sanitizeSettings({ showInteractionPrompts: value }).showInteractionPrompts).toBe(true);
+    }
+    expect(sanitizeSettings({ showInteractionPrompts: false }).showInteractionPrompts).toBe(false);
+  });
+
+  it('saves hidden interaction hints, preserves them through other changes and restores defaults', () => {
+    const setItem = vi.fn();
+    vi.stubGlobal('localStorage', { setItem });
+    updateSettings({ showInteractionPrompts: false });
+    expect(getSettings().showInteractionPrompts).toBe(false);
+    expect(setItem).toHaveBeenLastCalledWith('zeroed.settings', JSON.stringify(getSettings()));
+    const saved = JSON.parse(setItem.mock.lastCall![1] as string) as unknown;
+    expect(sanitizeSettings(saved).showInteractionPrompts).toBe(false);
+    updateSettings({ musicVolume: 0.5, invertY: true });
+    expect(getSettings().showInteractionPrompts).toBe(false);
+    expect(getSettings().invertY).toBe(true);
+    resetSettings();
+    expect(getSettings().showInteractionPrompts).toBe(true);
   });
 
   it('scales hip and aiming look speed and can invert the vertical axis', () => {

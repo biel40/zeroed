@@ -11,7 +11,7 @@ import { buildMP5 } from './MP5ViewModel';
 import { buildVector } from './VectorViewModel';
 import { buildM60 } from './M60ViewModel';
 import { buildRayGun } from './RayGunViewModel';
-import { BOLT_REAR_FRACTION, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
+import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import { WeaponHands } from './WeaponHands';
 import type { Weapon } from './Weapon';
@@ -558,15 +558,20 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   const length = config.receiverLength;
   const slideLength = length * 1.05;
   const slideY = 0.024;
+  const slideFrontZ = -slideLength / 2;
+  const boreY = slideY + 0.001;
+  const muzzleZ = slideFrontZ - 0.0016;
+  const boreRadius = config.barrelRadius * 0.66;
+  const crownDepth = 0.003;
 
   // --- Frame (static): one continuous forged profile instead of stacked boxes. ---
   const receiver = extrudeProfile(
     [
       [-0.096, 0.017],
-      [0.096, 0.017],
-      [0.096, -0.01],
-      [0.08, -0.018],
-      [0.02, -0.021],
+      [0.065, 0.017],
+      [0.065, -0.005],
+      [0.027, -0.005],
+      [0.016, -0.017],
       [0.004, -0.015],
       [-0.084, -0.015],
       [-0.096, -0.003],
@@ -575,16 +580,16 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     frameMat,
   );
   receiver.name = 'm1911-receiver';
-  const dustCover = add(roundedBox(0.029, 0.014, 0.082, 2, 0.004), frameMat, 0, -0.015, -0.054);
+  const dustCover = add(roundedBox(0.029, 0.013, 0.052, 3, 0.005), frameMat, 0, 0.0005, -0.039);
   dustCover.name = 'm1911-dust-cover';
 
   // A real negative space gives the guard its oval side silhouette.
   const guardShape = new THREE.Shape();
-  guardShape.absellipse(0.014, -0.037, 0.035, 0.027, 0, Math.PI * 2, false);
+  guardShape.absellipse(0.014, -0.037, 0.03, 0.024, 0, Math.PI * 2, false);
   const guardOpening = new THREE.Path();
-  guardOpening.absellipse(0.014, -0.038, 0.027, 0.019, 0, Math.PI * 2, true);
+  guardOpening.absellipse(0.014, -0.037, 0.0255, 0.0195, 0, Math.PI * 2, true);
   guardShape.holes.push(guardOpening);
-  const triggerGuard = extrudeShape(guardShape, 0.027, frameMat);
+  const triggerGuard = extrudeShape(guardShape, 0.018, frameMat);
   triggerGuard.name = 'm1911-trigger-guard';
   const trigger = add(roundedBox(0.005, 0.021, 0.006, 2, 0.002), dark, 0, -0.036, 0.002, -0.18);
   trigger.name = 'm1911-trigger';
@@ -664,54 +669,64 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   const mainspringHousing = add(roundedBox(0.021, 0.07, 0.005, 2, 0.002), dark, 0, -0.053, 0.101, -0.29);
   mainspringHousing.name = 'm1911-mainspring-housing';
 
-  // The two circles at the front are characteristic: barrel/bushing above,
-  // recoil spring plug below. Both meet the slide face instead of floating.
+  // Hollow barrel, almost flush with the bushing. Its hidden length keeps it
+  // connected to the action when the slide locks open during an empty reload.
+  const barrelMat = new THREE.MeshStandardMaterial({ color: 0x45494d, roughness: 0.38, metalness: 0.85 });
+  const barrelSection = new THREE.Shape();
+  barrelSection.absarc(0, 0, config.barrelRadius, 0, Math.PI * 2, false);
+  const barrelBore = new THREE.Path();
+  barrelBore.absarc(0, 0, boreRadius, 0, Math.PI * 2, true);
+  barrelSection.holes.push(barrelBore);
   const barrel = add(
-    new THREE.CylinderGeometry(config.barrelRadius, config.barrelRadius, 0.014, 16),
+    new THREE.ExtrudeGeometry(barrelSection, { depth: config.barrelLength - crownDepth, bevelEnabled: false, curveSegments: 12 }),
     dark,
     0,
-    slideY + 0.001,
-    -slideLength / 2 - 0.006,
-    Math.PI / 2,
+    boreY,
+    muzzleZ + crownDepth,
   );
   barrel.name = 'm1911-barrel';
   const muzzleCrown = add(
-    new THREE.CircleGeometry(config.barrelRadius * 0.62, 12),
-    new THREE.MeshBasicMaterial({ color: 0x050607 }),
+    new THREE.LatheGeometry([
+      new THREE.Vector2(boreRadius, crownDepth),
+      new THREE.Vector2(boreRadius, 0.0007),
+      new THREE.Vector2(boreRadius + 0.0007, 0),
+      new THREE.Vector2(config.barrelRadius - 0.0005, 0),
+      new THREE.Vector2(config.barrelRadius, 0.0005),
+      new THREE.Vector2(config.barrelRadius, crownDepth),
+    ], 24),
+    barrelMat,
     0,
-    slideY + 0.001,
-    -slideLength / 2 - 0.0132,
-  );
-  muzzleCrown.name = 'm1911-muzzle-crown';
-  muzzleCrown.rotation.y = Math.PI;
-  const recoilPlug = add(
-    new THREE.CylinderGeometry(0.0065, 0.0065, 0.009, 14),
-    dark,
-    0,
-    0.006,
-    -slideLength / 2 - 0.008,
+    boreY,
+    muzzleZ,
     Math.PI / 2,
   );
-  recoilPlug.name = 'm1911-recoil-spring-plug';
+  muzzleCrown.name = 'm1911-muzzle-crown';
+  const boreShadow = add(
+    new THREE.CircleGeometry(boreRadius, 24),
+    new THREE.MeshBasicMaterial({ color: 0x050607 }),
+    0,
+    boreY,
+    muzzleZ + 0.02,
+  );
+  boreShadow.name = 'm1911-bore-shadow';
+  boreShadow.rotation.y = Math.PI;
 
   // --- SLIDE GROUP — everything in here moves with the blowback / racking ---
   const slide = new THREE.Group();
   slide.name = 'm1911-slide';
   slide.position.set(0, slideY, 0);
-  // Flat machined flanks and a faceted crown: broad planar highlights instead
-  // of the inflated, rippling reflection of a rounded box along the whole slide.
+  // Flat machined flanks with the rounded crown of a Government slide.
   const slideSection = new THREE.Shape();
   slideSection.moveTo(-0.0175, -0.017);
   slideSection.lineTo(0.0175, -0.017);
-  slideSection.lineTo(0.0175, 0.009);
-  slideSection.lineTo(0.012, 0.015);
-  slideSection.lineTo(0.007, 0.017);
-  slideSection.lineTo(-0.007, 0.017);
-  slideSection.lineTo(-0.012, 0.015);
-  slideSection.lineTo(-0.0175, 0.009);
+  slideSection.lineTo(0.0175, 0.001);
+  slideSection.absellipse(0, 0.001, 0.0175, 0.016, 0, Math.PI, false);
   slideSection.closePath();
-  const slideGeometry = new THREE.ExtrudeGeometry(slideSection, { depth: slideLength, bevelEnabled: false, steps: 1 });
-  slideGeometry.translate(0, 0, -slideLength / 2);
+  const barrelOpening = new THREE.Path();
+  barrelOpening.absarc(0, 0.001, config.barrelRadius + 0.0004, 0, Math.PI * 2, true);
+  slideSection.holes.push(barrelOpening);
+  const slideGeometry = new THREE.ExtrudeGeometry(slideSection, { depth: slideLength, bevelEnabled: false, steps: 1, curveSegments: 12 });
+  slideGeometry.translate(0, 0, slideFrontZ);
   const slideBody = new THREE.Mesh(slideGeometry, slideMat);
   slideBody.name = 'm1911-slide-body';
   slide.add(slideBody);
@@ -729,14 +744,27 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     return mesh;
   };
 
-  const slideTopRib = slideAdd(
-    roundedBox(0.018, 0.0015, slideLength * 0.78, 2, 0.0007),
+  // Rounded spring tunnel under the nose, ending ahead of the trigger guard.
+  // The plug and bushing travel with the slide; the barrel stays on the frame.
+  const springTunnelSection = new THREE.Shape();
+  springTunnelSection.moveTo(-0.0175, -0.017);
+  springTunnelSection.lineTo(0.0175, -0.017);
+  springTunnelSection.quadraticCurveTo(0.015, -0.027, 0, -0.027);
+  springTunnelSection.quadraticCurveTo(-0.015, -0.027, -0.0175, -0.017);
+  springTunnelSection.closePath();
+  const springTunnel = slideAdd(
+    new THREE.ExtrudeGeometry(springTunnelSection, { depth: 0.066, bevelEnabled: false, curveSegments: 8 }),
     slideMat,
     0,
-    0.0168,
-    -0.004,
+    0,
+    slideFrontZ,
   );
-  slideTopRib.name = 'm1911-slide-top-rib';
+  springTunnel.name = 'm1911-spring-tunnel';
+  const recoilPlug = slideAdd(new THREE.CylinderGeometry(0.0065, 0.0065, 0.006, 24), dark, 0, 0.006 - slideY, slideFrontZ + 0.002);
+  recoilPlug.rotation.x = Math.PI / 2;
+  recoilPlug.name = 'm1911-recoil-spring-plug';
+  const rearPlate = slideAdd(roundedBox(0.022, 0.026, 0.002, 2, 0.001), slideMat, 0, 0, slideLength / 2 - 0.0009);
+  rearPlate.name = 'm1911-firing-pin-stop';
 
   // Shallow side grooves preserve the 1911 slide silhouette from the rear;
   // full-width ribs read as a ladder when seen down the sights.
@@ -763,11 +791,23 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     -0.026,
   );
   chamber.name = 'm1911-chamber';
-  // Barrel bushing ringing the muzzle at the slide face.
-  const bushing = new THREE.Mesh(new THREE.TorusGeometry(0.0094, 0.0018, 8, 20), dark);
-  bushing.position.set(0, 0.001, -slideLength / 2 - 0.003);
+  // Thin machined bushing with a lower retaining skirt, rather than a torus.
+  const bushingSection = new THREE.Shape();
+  bushingSection.absarc(0, 0, 0.0112, -Math.PI / 4, Math.PI * 1.25, false);
+  bushingSection.lineTo(-0.008, -0.014);
+  bushingSection.quadraticCurveTo(0, -0.017, 0.008, -0.014);
+  bushingSection.closePath();
+  const bushingOpening = new THREE.Path();
+  bushingOpening.absarc(0, 0, config.barrelRadius + 0.0002, 0, Math.PI * 2, true);
+  bushingSection.holes.push(bushingOpening);
+  const bushing = slideAdd(
+    new THREE.ExtrudeGeometry(bushingSection, { depth: 0.0014, bevelEnabled: false, curveSegments: 12 }),
+    dark,
+    0,
+    0.001,
+    slideFrontZ - 0.0012,
+  );
   bushing.name = 'm1911-barrel-bushing';
-  slide.add(bushing);
 
   // Restrained GI sights: two small rear ears leave the aiming notch.
   const sightTop = config.sightHeight;
@@ -808,26 +848,76 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   frontBlade.name = 'm1911-front-sight';
   group.add(slide);
 
-  // Magazine inside the grip; the baseplate is a CHILD so it rides along
-  // when the animator drops it (magDrop) and seats a fresh one (magIn).
-  const [magW, magH, magD] = config.reloadAnim?.magSize ?? [0.024, 0.095, 0.036];
-  const magazine = new THREE.Mesh(
-    roundedBox(magW, magH, magD, 2, 0.003),
-    new THREE.MeshStandardMaterial({
-      color: config.reloadAnim?.magColor ?? 0x23262b,
-      roughness: 0.4,
-      metalness: 0.7,
-    }),
-  );
-  magazine.position.set(0, -0.052, 0.069);
-  magazine.rotation.x = -0.3;
+  // Full-length single-stack magazine, a group so its parts ride along when
+  // the animator drops it (magDrop) and seats a fresh one (magIn). It is
+  // raked with the grip, 3.5 mm behind the front strap, its top up under
+  // the slide; the tube bottom runs level with the grip bottom so the
+  // baseplate sits flush under the front of the grip, ahead of the
+  // mainspring housing.
+  const [magW, magH, magD] = config.reloadAnim?.magSize ?? [0.015, 0.105, 0.034];
+  const gripRake = 0.3;
+  const levelDrop = Math.tan(gripRake) * (magD / 2);
+  const magazine = new THREE.Group();
   magazine.name = 'm1911-magazine';
+  magazine.position.set(0, -0.0399, 0.0555);
+  magazine.rotation.x = -gripRake;
+  const magazineMat = new THREE.MeshStandardMaterial({
+    color: config.reloadAnim?.magColor ?? 0x23262b,
+    roughness: 0.4,
+    metalness: 0.7,
+  });
+  // Side profile in the magazine frame as [front-back, height]; the profile
+  // helper lays its first coordinate along -Z. The feed lips dip at the front.
+  const tube = extrudeProfile(
+    [
+      [-magD / 2, magH / 2],
+      [magD / 2, magH / 2 - 0.004],
+      [magD / 2, -magH / 2 + levelDrop],
+      [-magD / 2, -magH / 2 - levelDrop],
+    ],
+    magW,
+    magazineMat,
+  );
+  tube.name = 'm1911-magazine-tube';
+  magazine.add(tube);
+  // Witness holes down the rear of both flanks, as on a GI magazine.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 7; i++) {
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.0014, 10), dark);
+      hole.name = 'm1911-magazine-witness-hole';
+      hole.position.set(side * (magW / 2 + 0.0002), 0.03 - i * 0.0095, 0.008);
+      hole.rotation.y = side * Math.PI / 2;
+      magazine.add(hole);
+    }
+  }
+  // Level baseplate, a hair wider than the tube, just proud of the grip.
+  const plateThickness = 0.005;
   const baseplate = new THREE.Mesh(
-    roundedBox(magW + 0.006, 0.008, magD + 0.006, 2, 0.003),
+    roundedBox(magW + 0.004, plateThickness, magD / Math.cos(gripRake) + 0.004, 2, 0.0015),
     dark,
   );
-  baseplate.position.y = -magH / 2 + 0.001;
+  baseplate.name = 'm1911-magazine-baseplate';
+  baseplate.rotation.x = gripRake;
+  baseplate.position.set(
+    0,
+    -magH / 2 - (plateThickness / 2) * Math.cos(gripRake),
+    -(plateThickness / 2) * Math.sin(gripRake),
+  );
   magazine.add(baseplate);
+  // Top round on the feed lips, hidden inside the frame once seated: an
+  // emptied magazine drops without it, the fresh one shows it on the way in.
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb8893c, roughness: 0.3, metalness: 0.9 });
+  const round = new THREE.Group();
+  round.name = 'm1911-magazine-round';
+  round.position.set(0, magH / 2 + 0.0035, 0.002);
+  const roundCase = new THREE.Mesh(new THREE.CylinderGeometry(0.0057, 0.0057, 0.022, 12), brass);
+  roundCase.rotation.x = Math.PI / 2;
+  roundCase.position.z = 0.004;
+  const roundBullet = new THREE.Mesh(new THREE.SphereGeometry(0.0057, 12, 8), brass);
+  roundBullet.scale.z = 1.4;
+  roundBullet.position.z = -0.007;
+  round.add(roundCase, roundBullet);
+  magazine.add(round);
   group.add(magazine);
 
   group.scale.setScalar(config.scale);
@@ -836,8 +926,8 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     group,
     muzzlePosition: new THREE.Vector3(
       0,
-      (slideY + 0.001) * config.scale,
-      (-slideLength / 2 - 0.014) * config.scale,
+      boreY * config.scale,
+      (muzzleZ - 0.0003) * config.scale,
     ),
     ejectionPosition: new THREE.Vector3(
       0.019 * config.scale,
@@ -846,7 +936,7 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     ),
     sightY,
     slide,
-    reloadParts: { magazine, handle: slide },
+    reloadParts: { magazine, handle: slide, rounds: round },
   };
 }
 
@@ -1480,7 +1570,9 @@ export class WeaponView {
         this.slideBlowback = 0;
       } else {
         this.slideBlowback = Math.max(0, this.slideBlowback - dt / SLIDE_RETURN_TIME);
-        this.slide.position.z = this.slideHomeZ + this.slideBlowback * SLIDE_TRAVEL;
+        // The last round locks the slide open, where the empty reload picks it up.
+        const locked = weapon.ammoInMagazine === 0 ? HANDLE_TRAVEL : 0;
+        this.slide.position.z = this.slideHomeZ + Math.max(this.slideBlowback * SLIDE_TRAVEL, locked);
       }
     }
 

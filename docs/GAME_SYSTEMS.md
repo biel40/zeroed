@@ -15,13 +15,24 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 `Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga; `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
-`AudioSystem` sincroniza el foley. Arma, brazos y cuchillo comprimen su
+`AudioSystem` sincroniza el foley. La palma y el pulgar de primera persona
+comparten una superficie cosida, continua al cambiar de agarre y nivel de detalle.
+Arma, brazos y cuchillo comprimen su
 profundidad (`applyViewModelDepth`) para no atravesar paredes al pegarse a
 ellas; sus materiales no deben compartirse con objetos del mundo. Las armas de cerrojo (L96) expulsan el
 casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
 levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
 recarga vacia. La AK-47 suma a cada disparo el golpe del portacerrojo y su
-recarga bascula el cargador sobre el teton delantero con foley propio.
+recarga bascula el cargador sobre el teton delantero con foley propio. La
+M1911 queda con la corredera abierta tras la ultima bala y su recarga vacia la
+suelta de ese bloqueo; el cargador vaciado cae sin su bala superior.
+Toda recarga sigue la misma vitrina (`ReloadAnimator`), ajustada por arma en
+`reloadAnim`: `swapPose` sube el arma y gira el cambio hacia el ojo,
+`rackPose` muestra la palanca o el cerrojo en la recarga vacia y `wellDepth`
+fija cuanto recorre un cargador de caja para salir y donde se alinea el nuevo,
+que se ensena entero antes de entrar. La mano lo sujeta desde la base
+(`hands.magazine`) y los golpes (encaje, tapa, cierre de la accion) suenan en
+el mismo fotograma del impacto.
 `BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
@@ -345,6 +356,13 @@ Asi una horda solapada en la escalera conserva el descarte por profundidad.
 
 ## HUD y estadisticas de partida
 
+Los avisos de interaccion comparten una tarjeta oscura de alto contraste, con
+accion, tecla o boton tactil y coste separados. La entrada despliega el marco
+y un reflejo breve, seguido de dos pulsos en la tecla; se omiten con movimiento
+reducido. Los requisitos bloqueados conservan su texto sin ofrecer una tecla.
+En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
+guarda y se aplica al instante, sin desactivar las interacciones del juego.
+
 El HUD y la pausa consumen la misma instantanea por jugador. La cartera separa
 Points disponibles de todos los obtenidos durante la run, incluidas reparaciones;
 las compras no reducen el acumulado. ZombieManager notifica la vida realmente
@@ -358,6 +376,10 @@ y pausa. El HUD de combate usa una presentacion compacta sin leyenda de puntos
 ni resumen textual de faroles; la pausa conserva el detalle. Las primeras diez
 rondas se representan solo con aranazos. La interfaz no anuncia la sala oculta ni el desbloqueo. Las rondas
 combinan aranazos decorativos limitados con el numero exacto para rondas altas.
+Las garras tienen un borde iluminado y al avanzar la ronda se traza la nueva
+marca con un brillo que se apaga; en rondas altas se animan las tres garras y
+el numero exacto. El efecto solo responde a aumentos de ronda y respeta el
+movimiento reducido, sin cambiar la distribucion del panel.
 
 En dispositivos tactiles el panel permanece pequeno arriba a la derecha, bajo
 el boton de pausa, con ronda, puntos, vida y bajas; headshots y faroles se consultan

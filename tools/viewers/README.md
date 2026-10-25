@@ -26,3 +26,11 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - Parámetros adicionales: `state=attack`, `time=0.475` y `close=1`.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.
+
+## Visor de interacciones
+
+`http://localhost:5173/tools/viewers/interaction-viewer.html` usa el render y CSS reales del HUD para revisar avisos, precios y requisitos sobre fondos claros, oscuros y con detalle. Permite cambiar entre los tres idiomas, teclado y controles tactiles, y repetir la entrada. Respeta la visibilidad guardada en Ajustes > Accesibilidad y el movimiento reducido del sistema.
+
+## Visor de rondas del HUD
+
+`http://localhost:5173/tools/viewers/hud-viewer.html` carga el HTML y controlador reales del HUD. Permite avanzar rondas, saltar a rondas altas, reiniciar en cero y cambiar vida/puntos sin volver a animar las garras. El perfil tactil conserva sus dimensiones y el movimiento reducido sigue la preferencia del sistema.

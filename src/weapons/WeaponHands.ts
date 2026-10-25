@@ -80,23 +80,6 @@ function toGrip(config: HandGripConfig, side: HandSide, sightLine: number | null
   return { position: new THREE.Vector3(...config.position), quaternion, pose: gripPose(config, quaternion, side, sightLine) };
 }
 
-/** Default support-hand grip on each weapon's magazine, built once per reload config. */
-const magazineGrips = new WeakMap<ReloadAnimConfig, HandGripConfig>();
-
-function defaultMagazineGrip(reload: ReloadAnimConfig): HandGripConfig {
-  let grip = magazineGrips.get(reload);
-  if (!grip) {
-    const [width, height, depth] = reload.magSize;
-    // The support hand closes on the magazine's left flank, fingers around its front.
-    grip = {
-      position: [0, -height * 0.18, 0], axis: [0, 1, 0], palm: [1, 0, 0], pose: 'magazineGrab',
-      hold: { size: [width, depth], axis: [0, 1, 0] },
-    };
-    magazineGrips.set(reload, grip);
-  }
-  return grip;
-}
-
 /** 0→1 eased ramp over [start, end]. */
 function ramp(p: number, start: number, end: number): number {
   return THREE.MathUtils.smoothstep(p, start, end);
@@ -152,9 +135,9 @@ export class WeaponHands {
         this.handleRear = new THREE.Matrix4().makeTranslation(0, 0, HANDLE_TRAVEL).multiply(parts.handle.matrix);
       }
     }
-    // A one-handed weapon needs an explicit magazine grip to show a reload hand.
-    if (parts.magazine && reload && (this.anchors.left || config.magazine)) {
-      this.magazineGrip = toGrip(config.magazine ?? defaultMagazineGrip(reload), 'left');
+    // The support hand rides the magazine only where the weapon declares how it holds it.
+    if (parts.magazine && reload && config.magazine) {
+      this.magazineGrip = toGrip(config.magazine, 'left');
     }
   }
 

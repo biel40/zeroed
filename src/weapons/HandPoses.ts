@@ -38,7 +38,12 @@ export interface HandPose {
   readonly middle: FingerPose;
   readonly ring: FingerPose;
   readonly pinky: FingerPose;
-  /** Thumb base rotation (XYZ Euler) and the curl of its two phalanges. */
+  /**
+   * Thumb base rotation (XYZ Euler; Z rolls the thumb about its own length,
+   * its nail facing +X like a finger's back at 0) and the curl of its two
+   * phalanges toward the pad. A real thumb is rolled onto its side, so its
+   * pad meets what it holds and its nail faces outward.
+   */
   readonly thumb: { readonly base: readonly [number, number, number]; readonly curl: readonly [number, number] };
   /** Center of the held part relative to the wrist. */
   readonly grip: readonly [number, number, number];
@@ -48,32 +53,40 @@ export interface HandPose {
 
 const finger = (c1: number, c2: number, c3: number, spread = 0): FingerPose => ({ curl: [c1, c2, c3], spread });
 
+/** Rifle grip thumb: around the backstrap, then forward along the far flank, pad on it and nail out. */
+const WRAPPED_THUMB: HandPose['thumb'] = { base: [0.305, 1.065, 3], curl: [0.57, 0.51] };
+/**
+ * Pistol thumbs-forward grip: the web high under the beavertail, the knuckle
+ * on the frame's rear corner and the thumb straight down the far flank at the
+ * thumb safety, toward the muzzle, pad on the frame and nail facing out.
+ */
+const PISTOL_THUMB: HandPose['thumb'] = { base: [1.463, 1.001, 1.785], curl: [1.07, 0.379] };
+
 /** Wrapped around a pistol or rifle grip with the index on the trigger. */
-const triggerGrip = (index: FingerPose): HandPose => ({
+const triggerGrip = (index: FingerPose, thumb: HandPose['thumb']): HandPose => ({
   index,
   middle: finger(1.22, 1.28, 1.05, 0),
   ring: finger(1.26, 1.12, 1.05, -0.04),
   pinky: finger(1.18, 0.8, 0.45, -0.08),
-  // Around the backstrap, then forward along the far flank of the frame.
-  thumb: { base: [0.305, 1.065, -0.145], curl: [-0.57, -0.51] },
+  thumb,
   grip: [-0.032, -0.004, -0.064],
   wrap: ['middle', 'ring', 'pinky'],
 });
 
 export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
-  // Thick knife handle: the thumb locks over the index.
+  // Thick knife handle: the thumb's pad locks over the index.
   fist: {
     index: finger(1.32, 1.3, 0.9, 0.03),
     middle: finger(1.38, 1.3, 0.88),
     ring: finger(1.42, 1.32, 0.86, -0.03),
     pinky: finger(1.48, 1.32, 0.82, -0.07),
-    thumb: { base: [-0.4, 1.02, 0.55], curl: [0.62, 0.42] },
+    thumb: { base: [-0.4, 1.02, 3.78], curl: [0.62, 0.42] },
     grip: [-0.047, -0.004, -0.066],
   },
-  pistolGrip: triggerGrip(finger(0.3, 0.62, 0.32, 0.06)),
-  rifleGrip: triggerGrip(finger(0.26, 0.58, 0.29, 0.07)),
+  pistolGrip: triggerGrip(finger(0.3, 0.62, 0.32, 0.06), PISTOL_THUMB),
+  rifleGrip: triggerGrip(finger(0.26, 0.58, 0.29, 0.07), WRAPPED_THUMB),
   // A grip with no trigger in reach: the index closes on it with the rest.
-  handleGrip: { ...triggerGrip(finger(1.15, 1.2, 0.9, 0.06)), wrap: FINGERS },
+  handleGrip: { ...triggerGrip(finger(1.15, 1.2, 0.9, 0.06), WRAPPED_THUMB), wrap: FINGERS },
   // Cupped under a handguard from below, wrist low: the fingers climb its
   // far side and the thumb lies along its near side toward the muzzle.
   supportHandguard: {
@@ -81,7 +94,7 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     middle: finger(1.2, 0.74, 0.68, 0),
     ring: finger(1.38, 0.5, 0.75, -0.03),
     pinky: finger(1.46, 0.3, 0.4, -0.07),
-    thumb: { base: [0.99, 0.513, 0], curl: [0.05, 0.05] },
+    thumb: { base: [0.99, 0.513, 2.4], curl: [0.05, 0.05] },
     grip: [-0.047, 0.004, -0.062],
     wrap: FINGERS,
   },
@@ -92,7 +105,7 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     middle: finger(1.18, 1.04, 0.64),
     ring: finger(1.22, 1.06, 0.64, -0.04),
     pinky: finger(1.26, 1.06, 0.62, -0.08),
-    thumb: { base: [0.247, -0.082, 0], curl: [-0.12, -0.06] },
+    thumb: { base: [0.802, -0.086, 1.655], curl: [0.548, 0.178] },
     grip: [-0.042, -0.006, -0.07],
     wrap: FINGERS,
   },
@@ -101,7 +114,7 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     middle: finger(1.06, 0.94, 0.6),
     ring: finger(1.1, 0.96, 0.6, -0.04),
     pinky: finger(1.14, 0.96, 0.58, -0.08),
-    thumb: { base: [-0.2, 0.92, 0.22], curl: [0.34, 0.24] },
+    thumb: { base: [-0.2, 0.92, 3.53], curl: [0.34, 0.24] },
     grip: [-0.03, 0, -0.07],
     wrap: FINGERS,
   },
@@ -114,17 +127,17 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     middle: finger(1.06, 0.94, 0.6),
     ring: finger(1.1, 0.96, 0.6, -0.04),
     pinky: finger(1.14, 0.96, 0.58, -0.08),
-    thumb: { base: [0.6, -0.18, 0], curl: [0.08, 0.16] },
+    thumb: { base: [0.8, -0.18, 1], curl: [0.08, 0.16] },
     grip: [-0.03, 0, -0.07],
     wrap: FINGERS,
   },
-  // Thumb and index pinch a knob; the other fingers tuck in.
+  // Thumb and index pinch a knob pad to pad; the other fingers tuck in.
   boltPinch: {
     index: finger(0.78, 0.88, 0.56, 0.08),
     middle: finger(1.22, 1.2, 0.8),
     ring: finger(1.36, 1.28, 0.84, -0.04),
     pinky: finger(1.46, 1.34, 0.84, -0.08),
-    thumb: { base: [-0.26, 0.86, 0.16], curl: [0.46, 0.32] },
+    thumb: { base: [-0.26, 0.86, 3.53], curl: [0.46, 0.32] },
     grip: [-0.022, 0.034, -0.112],
   },
   relaxed: {
@@ -132,7 +145,8 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     middle: finger(0.32, 0.36, 0.22, 0.01),
     ring: finger(0.36, 0.4, 0.24, -0.05),
     pinky: finger(0.42, 0.42, 0.28, -0.11),
-    thumb: { base: [0.15, 0.36, 0.2], curl: [0.12, 0.16] },
+    // The thumb rests beside the index, nail turned to the side.
+    thumb: { base: [0.45, 0.5, 1.8], curl: [0.12, 0.16] },
     grip: [-0.03, -0.006, -0.07],
   },
 };

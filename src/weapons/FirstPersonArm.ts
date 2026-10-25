@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH, ELBOW, SHOULDER, THUMB, WRIST, bindPositions, boneBinds, fingerBone } from './ArmRig';
+import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH, ELBOW, SHOULDER, THUMB, WRIST, bindFrames, boneBinds, fingerBone } from './ArmRig';
+import type { ArmSide } from './ArmRig';
 import { digitRingSeat, handGeometries } from './HandModel';
 import type { DigitSection, HandDetail } from './HandModel';
 import { FINGERS, HAND_POSES } from './HandPoses';
@@ -8,8 +9,6 @@ import type { HandPose } from './HandPoses';
 import { skinMaterial } from './HandSkinTexture';
 import { skinnedLoft } from './SkinnedLoft';
 import type { RingFinger } from '../game/rings/RingCatalog';
-
-export type ArmSide = 'left' | 'right';
 
 /** Geometry density of one arm; the skeleton is identical in every tier. */
 export interface ArmDetail extends HandDetail {
@@ -161,9 +160,12 @@ function sleeveTube(detail: ArmDetail): THREE.BufferGeometry {
   });
 }
 
-/** One merged, skinned arm with three material groups (three draw calls). */
-function buildArmGeometry(detail: ArmDetail): THREE.BufferGeometry {
-  const at = bindPositions();
+/**
+ * One merged, skinned arm with three material groups (three draw calls), in
+ * the right-hand convention with `side`'s thumb rest.
+ */
+function buildArmGeometry(detail: ArmDetail, side: ArmSide): THREE.BufferGeometry {
+  const at = bindFrames(boneBinds(side)).map(({ position }) => position);
   const sleeve: THREE.BufferGeometry[] = [sleeveTube(detail)];
   const shade: THREE.BufferGeometry[] = [];
   const ring = (radius: number, tube: number) => new THREE.TorusGeometry(radius, tube, 4, detail.radial);
@@ -177,7 +179,7 @@ function buildArmGeometry(detail: ArmDetail): THREE.BufferGeometry {
     place(at[ELBOW], 0, 0, -(ARM_FOREARM_LENGTH - 0.07), new THREE.Euler(-Math.PI / 2, 0, 0), [1, 1, 0.93])));
   shade.push(rigid(ring(0.044, 0.005), ELBOW, place(at[ELBOW], 0, 0, -(ARM_FOREARM_LENGTH - 0.046), undefined, [1, 0.93, 1])));
 
-  const groups = [sleeve, shade, handGeometries(detail)].map((parts) => {
+  const groups = [sleeve, shade, handGeometries(detail, side)].map((parts) => {
     const merged = mergeGeometries(parts);
     for (const part of parts) part.dispose();
     if (!merged) throw new Error('Arm geometry parts are incompatible');
@@ -208,7 +210,7 @@ function armGeometry(side: ArmSide, detail: ArmDetail): THREE.BufferGeometry {
   const key = `${side}:${JSON.stringify(detail)}`;
   let geometry = geometryCache.get(key);
   if (!geometry) {
-    geometry = side === 'right' ? buildArmGeometry(detail) : mirrorGeometry(armGeometry('right', detail));
+    geometry = side === 'right' ? buildArmGeometry(detail, side) : mirrorGeometry(buildArmGeometry(detail, side));
     geometry.computeBoundingSphere();
     geometryCache.set(key, geometry);
   }
@@ -252,13 +254,16 @@ export class FirstPersonArm {
   constructor(readonly side: ArmSide, detail: ArmDetail = ARM_DETAIL.desktop) {
     this.sign = side === 'right' ? 1 : -1;
     this.root.name = `view-arm-${side}`;
-    this.bones = boneBinds().map(({ offset }, index) => {
+    const binds = boneBinds(side);
+    this.bones = binds.map(({ offset, rest }, index) => {
       const bone = new THREE.Bone();
       bone.name = `view-arm-${side}-bone-${index}`;
       bone.position.set(offset.x * this.sign, offset.y, offset.z);
+      // Mirroring X flips the Y and Z rotations, as in applyFingers().
+      bone.rotation.set(rest[0], rest[1] * this.sign, rest[2] * this.sign);
       return bone;
     });
-    boneBinds().forEach(({ parent }, index) => {
+    binds.forEach(({ parent }, index) => {
       (parent < 0 ? this.root : this.bones[parent]).add(this.bones[index]);
     });
     this.mesh = new THREE.SkinnedMesh(armGeometry(side, detail), armMaterials(detail));
@@ -370,7 +375,7 @@ export class FirstPersonArm {
 
   /** Where a ring sits on `finger`; every detail tier keeps that bone articulated. */
   ringSeat(finger: RingFinger): RingSeat {
-    const { bone, ...seat } = digitRingSeat(finger);
+    const { bone, ...seat } = digitRingSeat(finger, this.side);
     return { ...seat, bone: this.bones[bone] };
   }
 

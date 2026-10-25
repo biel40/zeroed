@@ -64,7 +64,7 @@ describe('M4A1 reload model', () => {
     update(0.52);
     expect(magazine.visible).toBe(true);
     expect(magazine.position.y).toBeLessThan(home.y);
-    update(0.65);
+    update(view.reloadAnim!.magSeat + 0.01);
     expect(magazine.position.toArray()).toEqual(home.toArray());
     expect(magazine.quaternion.toArray()).toEqual(rotation.toArray());
     animator.reset();

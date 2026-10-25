@@ -33,9 +33,15 @@ export function ringProgress(rings: readonly RingHudEntry[], compact = false): s
   return `${compact ? '' : `<div class="lamp-heading"><span>${t('hud.rings')}</span></div>`}<div class="ring-icons">${items}</div>`;
 }
 
-export function roundMarks(round: number): string {
+/** Draw the newest tally on an advance; high rounds retain an exact numeral. */
+export function roundMarks(round: number, advancing = false): string {
   const count = round > 10 ? 3 : Math.max(0, Math.floor(round));
-  return `<span class="round-scratches" aria-hidden="true">${'<i></i>'.repeat(count)}</span>${round > 10 ? `<span class="round-number">${round}</span>` : ''}`;
+  const scratches = Array.from({ length: count }, (_, index) => {
+    const reveal = advancing && (round > 10 || index === count - 1);
+    return reveal ? '<i class="round-scratch-new"></i>' : '<i></i>';
+  }).join('');
+  const changeClass = advancing ? ' round-advancing' : '';
+  return `<span class="round-scratches${changeClass}" aria-hidden="true">${scratches}</span>${round > 10 ? `<span class="round-number${changeClass}">${round}</span>` : ''}`;
 }
 
 /** `lamps[i]` is true once that lamp is completely filled. */

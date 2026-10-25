@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zeroed — Interaction viewer</title>
+  <style>
+    body { background: #030403; }
+    body[data-scene="bright"] { background: #f4eee0; }
+    body[data-scene="busy"] {
+      background: repeating-linear-gradient(8deg, #514233 0 45px, #a6906a 46px 49px, #161b14 50px 67px, #837052 68px 114px);
+    }
+    .viewer-controls {
+      position: fixed; z-index: 20; top: 18px; left: 18px; right: 18px;
+      display: flex; flex-wrap: wrap; gap: 12px; padding: 14px;
+      width: fit-content; max-width: calc(100% - 36px);
+      background: #10130ff5; border: 1px solid #706b57; color: #fff3dd;
+      font: 13px 'Consolas', monospace;
+    }
+    .viewer-controls label { display: flex; align-items: center; gap: 8px; }
+    .viewer-controls select { padding: 5px; background: #22261e; color: #fff3dd; border: 1px solid #706b57; }
+  </style>
+</head>
+<body data-scene="busy">
+  <div class="viewer-controls">
+    <label>Aviso <select id="sample"><option value="repair">Barricada</option><option value="buy">Comprar arma</option><option value="ammo">Munición</option><option value="door">Búnker</option><option value="locked">Vitrina bloqueada</option><option value="pickup">Recoger arma</option><option value="mask">Máscara de gas</option></select></label>
+    <label>Fondo <select id="scene"><option value="busy">Detalle</option><option value="bright">Claro</option><option value="dark">Oscuro</option></select></label>
+    <label>Idioma <select id="language"><option value="es">ES</option><option value="en">EN</option><option value="ca">CA</option></select></label>
+    <label><input id="touch" type="checkbox" /> Táctil</label>
+    <button id="replay" type="button">Repetir entrada</button>
+  </div>
+  <div id="hud"><div id="crosshair"><span class="arm arm-top"></span><span class="arm arm-right"></span><span class="arm arm-bottom"></span><span class="arm arm-left"></span></div><div id="interact-prompt"></div></div>
+  <script type="module" src="./interaction-viewer.ts"></script>
+</body>
+</html>

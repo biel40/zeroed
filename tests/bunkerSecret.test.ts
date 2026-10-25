@@ -98,7 +98,7 @@ describe('Burned Mansion secret bunker interaction', () => {
     };
     (mode as unknown as { findFacingDoor(): PointDoor }).findFacingDoor = () => door;
 
-    expect(mode.getInteractPrompt()).toBe('USE — Open sealed bunker — 9999 PTS');
+    expect(mode.getInteractPrompt()).toBe('Open sealed bunker\nPress E — 9999 PTS');
     mode.onInteract();
     expect(door.isLocked).toBe(true);
     expect(banners).toEqual(['9999 PTS REQUIRED']);

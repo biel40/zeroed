@@ -116,8 +116,9 @@ describe('Ray Gun view model', () => {
     expect(canister.visible).toBe(true);
     expect(canister.position.y).toBeLessThan(home.y - 0.25);
 
-    // Pushed home, then twisted locked.
-    expect(twistTo(anim.magSeat - 0.01)).toBeLessThan(0.1);
+    // Pushed home, then twisted locked: the bayonet snaps shut right on magSeat.
+    expect(twistTo(anim.magSeat - 0.03)).toBeGreaterThan(0.1);
+    expect(twistTo(anim.magSeat - 0.002)).toBeLessThan(0.1);
     animator.update(fakeWeapon('reloading', anim.magSeat + 0.01));
     expect(canister.position.toArray()).toEqual(home.toArray());
     expect(canister.quaternion.angleTo(homeRotation)).toBeLessThan(1e-6);

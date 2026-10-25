@@ -106,6 +106,19 @@ export type OpticStyle = 'irons' | 'scope' | 'reddot';
  */
 export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'canister' | 'pistol';
 
+/**
+ * Whole-weapon pose layered on the view model during a reload stage:
+ * a camera-space offset in meters and yaw/roll/tilt in radians (positive
+ * yaw turns the muzzle left and the left flank to the eye, negative roll
+ * tips the top outboard, positive tilt raises the muzzle).
+ */
+export interface ReloadPoseConfig {
+  readonly shift: readonly [number, number, number];
+  readonly yaw: number;
+  readonly roll: number;
+  readonly tilt: number;
+}
+
 export interface ReloadAnimConfig {
   readonly style: ReloadStyle;
   readonly magOut: number;
@@ -115,9 +128,24 @@ export interface ReloadAnimConfig {
   /** Action/charging-handle window; set charge < 0 to skip (cell style). */
   readonly charge: number;
   readonly chargeEnd: number;
-  /** Belt-fed only: feed-cover open/close fractions. */
+  /** Belt-fed only: feed-cover open/close fractions (the cover slams shut at coverClose). */
   readonly coverOpen?: number;
   readonly coverClose?: number;
+  /**
+   * Showcase pose held while the magazine (and belt) is swapped: the
+   * weapon comes up towards the screen center with the swap turned to
+   * the eye. It arrives with a touch of overshoot and leaves at magSeat
+   * (coverClose for belt-fed weapons).
+   */
+  readonly swapPose: ReloadPoseConfig;
+  /** Pose while the action is worked on an empty reload, showing the handle or bolt. */
+  readonly rackPose?: ReloadPoseConfig;
+  /**
+   * Box magazines (pistol, rifle, rock): share of the magazine length
+   * inside the well when seated. It sets how far the old one travels to
+   * hang clear and where the fresh one is lined up before going in.
+   */
+  readonly wellDepth?: number;
   /** Procedural magazine dimensions [w, h, d] in meters and color. */
   readonly magSize: readonly [number, number, number];
   readonly magColor: number;
@@ -199,7 +227,11 @@ export interface WeaponHandsConfig {
   readonly actionHand?: 'left' | 'right';
   /** Grip on the reload handle part, in that part's local space. */
   readonly action?: HandGripConfig;
-  /** Left-hand grip on the magazine part, in its local space. */
+  /**
+   * Left-hand grip on the magazine part, in its local space; without it the
+   * support hand does not ride the magazine during a reload. Box magazines
+   * are cupped under the baseplate so the whole tube shows above the hand.
+   */
   readonly magazine?: HandGripConfig;
 }
 

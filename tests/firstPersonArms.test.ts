@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { RING_DEFINITIONS, RING_FINGERS } from '../src/game/rings/RingCatalog';
 import { ARM_DETAIL, FirstPersonArm } from '../src/weapons/FirstPersonArm';
-import { WRIST } from '../src/weapons/ArmRig';
+import { THUMB, WRIST } from '../src/weapons/ArmRig';
 import { handGeometries } from '../src/weapons/HandModel';
 import { FINGER_LAYOUT, FINGERS, HAND_POSES, PHALANX_TAPER } from '../src/weapons/HandPoses';
 import { KNIFE_ATTACK_DURATION, KNIFE_HIDE_PROGRESS, KNIFE_SHOW_PROGRESS, Knife } from '../src/weapons/Knife';
@@ -187,6 +187,48 @@ describe('Weapon hand anchors', () => {
     }
   });
 
+  it.each([false, true])('M1911: support fingers touch the shooting hand without buried fingertips (ADS %s)', (ads) => {
+    const setup = rig(WEAPON_DEFINITIONS.m1911);
+    for (let step = 0; step < 90; step++) frame(setup, { ads });
+    const right = setup.arms.right.mesh;
+    const geometry = right.geometry;
+    const skin = geometry.groups[2];
+    const indices = geometry.getIndex()!;
+    const triangles: THREE.Triangle[] = [];
+    for (let face = skin.start; face < skin.start + skin.count; face += 3) {
+      const vertices = [0, 1, 2].map((corner) => right.localToWorld(
+        right.getVertexPosition(indices.getX(face + corner), new THREE.Vector3()),
+      ));
+      triangles.push(new THREE.Triangle(vertices[0], vertices[1], vertices[2]));
+    }
+    const closest = new THREE.Vector3();
+    const surfaceNormal = new THREE.Vector3();
+    const fromSurface = new THREE.Vector3();
+    // Measure actual skin contact, independently of the configured held prism:
+    // an oversized prism can fit its fingers while leaving both hands apart.
+    FINGERS.forEach((name, finger) => {
+      const { lengths, radius } = FINGER_LAYOUT[name];
+      let nearest = Infinity;
+      let distalDistance = Infinity;
+      let distalDepth = Infinity;
+      lengths.forEach((length, segment) => {
+        const bone = setup.arms.left.mesh.skeleton.bones[3 + finger * 3 + segment];
+        const pad = bone.localToWorld(new THREE.Vector3(radius * PHALANX_TAPER ** segment, 0, -length * 0.5));
+        for (const triangle of triangles) {
+          const distance = triangle.closestPointToPoint(pad, closest).distanceTo(pad);
+          nearest = Math.min(nearest, distance);
+          if (segment === 2 && distance < distalDistance) {
+            distalDistance = distance;
+            const facing = fromSurface.subVectors(pad, closest).dot(triangle.getNormal(surfaceNormal));
+            distalDepth = distance * Math.sign(facing);
+          }
+        }
+      });
+      expect(nearest, `${name}: support finger floats away from shooting hand`).toBeLessThan(0.008);
+      expect(distalDepth, `${name}: support fingertip is buried in the shooting hand`).toBeGreaterThanOrEqual(-0.002);
+    });
+  });
+
   it.each(WEAPONS)('%s: the hands stay under the sight line when aiming', (id) => {
     const definition = WEAPON_DEFINITIONS[id];
     const setup = rig(definition);
@@ -197,6 +239,23 @@ describe('Weapon hand anchors', () => {
       for (const bone of setup.arms[side].mesh.skeleton.bones.slice(3)) {
         const tip = setup.view.root.worldToLocal(bone.localToWorld(new THREE.Vector3(0, 0, -0.02)));
         expect(tip.y, `${id} ${side} ${bone.name}`).toBeLessThan(sightLine - 0.015);
+      }
+    }
+  });
+
+  it.each(WEAPONS)('%s: both thumbs lie on their side, nail toward the eye', (id) => {
+    const definition = WEAPON_DEFINITIONS[id];
+    const setup = rig(definition);
+    for (let step = 0; step < 90; step++) frame(setup);
+    const eye = setup.camera.getWorldPosition(new THREE.Vector3());
+    for (const side of ['right', 'left'] as const) {
+      if (!definition.view.hands[side]) continue;
+      const bones = setup.arms[side].mesh.skeleton.bones;
+      // A thumb wrapped round a grip shows its nail, never its pad, from behind the weapon.
+      for (const segment of [THUMB + 1, THUMB + 2]) {
+        const back = new THREE.Vector3(side === 'right' ? 1 : -1, 0, 0).applyQuaternion(bones[segment].getWorldQuaternion(new THREE.Quaternion()));
+        const toEye = eye.clone().sub(bones[segment].localToWorld(new THREE.Vector3(0, 0, -0.012))).normalize();
+        expect(back.dot(toEye), `${id} ${side} ${bones[segment].name}`).toBeGreaterThan(0.1);
       }
     }
   });
@@ -246,9 +305,11 @@ describe('Hand fingers', () => {
     expect(ARM_DETAIL.mobile.skinTexture).toBeLessThan(ARM_DETAIL.desktop.skinTexture);
   });
 
-  it.each(Object.keys(ARM_DETAIL) as (keyof typeof ARM_DETAIL)[])('%s: buries the open root of every digit inside the palm', (tier) => {
+  const tiersAndSides = (Object.keys(ARM_DETAIL) as (keyof typeof ARM_DETAIL)[])
+    .flatMap((tier) => (['right', 'left'] as const).map((side) => [tier, side] as const));
+  it.each(tiersAndSides)('%s %s: buries the four finger roots inside the palm', (tier, side) => {
     const detail = ARM_DETAIL[tier];
-    const [palm, ...parts] = handGeometries(detail);
+    const [palm, ...parts] = handGeometries(detail, side);
     const position = palm.attributes.position;
     const index = palm.index as THREE.BufferAttribute;
     const corners = (face: number) => [0, 1, 2].map((corner) => new THREE.Vector3().fromBufferAttribute(position, index.getX(face + corner)));
@@ -260,13 +321,76 @@ describe('Hand fingers', () => {
       return faces.filter(([a, b, c]) => ray.intersectTriangle(a, b, c, false, new THREE.Vector3())).length % 2 === 1;
     }).length >= 2;
     // Each digit tube starts with an open ring that rides the wrist alone.
-    parts.slice(0, 5).forEach((part, digit) => {
+    parts.slice(0, 4).forEach((part, digit) => {
       for (let vertex = 0; vertex <= detail.digitRadial; vertex++) {
         expect(part.attributes.skinIndex.getX(vertex)).toBe(WRIST);
         expect(part.attributes.skinWeight.getX(vertex)).toBe(1);
-        expect(inside(new THREE.Vector3().fromBufferAttribute(part.attributes.position, vertex)), `${tier} digit ${digit} vertex ${vertex}`).toBe(true);
+        expect(inside(new THREE.Vector3().fromBufferAttribute(part.attributes.position, vertex)), `${tier} ${side} digit ${digit} vertex ${vertex}`).toBe(true);
       }
     });
+    for (const part of [palm, ...parts]) part.dispose();
+  });
+
+  it.each(tiersAndSides)('%s %s: joins the thumb to the palm without open edges or skinning cracks', (tier, side) => {
+    const parts = handGeometries(ARM_DETAIL[tier], side);
+    const body = parts[0];
+    const positions = body.getAttribute('position');
+    const indices = body.getIndex()!;
+    const key = (vertex: number): string => [positions.getX(vertex), positions.getY(vertex), positions.getZ(vertex)]
+      .map((value) => Math.round(value * 1e6)).join(',');
+    const duplicates = new Map<string, number[]>();
+    for (let vertex = 0; vertex < positions.count; vertex++) {
+      const id = key(vertex);
+      const group = duplicates.get(id) ?? [];
+      group.push(vertex);
+      duplicates.set(id, group);
+    }
+    const edges = new Map<string, { count: number; a: number; b: number }>();
+    for (let face = 0; face < indices.count; face += 3) {
+      for (let edge = 0; edge < 3; edge++) {
+        const a = indices.getX(face + edge);
+        const b = indices.getX(face + (edge + 1) % 3);
+        const endpoints = [key(a), key(b)].sort();
+        if (endpoints[0] === endpoints[1]) continue;
+        const id = endpoints.join('/');
+        const previous = edges.get(id);
+        edges.set(id, { count: (previous?.count ?? 0) + 1, a, b });
+      }
+    }
+    const arm = new FirstPersonArm(side, ARM_DETAIL[tier]);
+    const wristZ = arm.getWristWorldPosition(new THREE.Vector3()).z;
+    // The forearm ends under the sleeve and the palm closes in a thin edge
+    // under the finger roots. The thumb attachment and tip have no open edge.
+    for (const { count, a, b } of edges.values()) {
+      if (count === 1) {
+        const cuff = Math.min(positions.getZ(a), positions.getZ(b)) > wristZ + 0.08;
+        const palmEnd = [a, b].every((vertex) => positions.getZ(vertex) < wristZ - 0.085
+          && body.getAttribute('skinIndex').getX(vertex) === WRIST
+          && body.getAttribute('skinWeight').getX(vertex) === 1);
+        expect(cuff || palmEnd, `${side}: open hand edge ${key(a)} / ${key(b)}`).toBe(true);
+      }
+    }
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.SkinnedMesh(body, material);
+    mesh.bind(arm.mesh.skeleton, arm.mesh.bindMatrix);
+    const point = (vertex: number): THREE.Vector3 => {
+      const value = new THREE.Vector3().fromBufferAttribute(positions, vertex);
+      if (side === 'left') value.x = -value.x;
+      return mesh.applyBoneTransform(vertex, value);
+    };
+    // UV seams may duplicate vertices, but their skin must stay joined in every
+    // pose used by weapons, reloads, the knife and the gas mask.
+    for (const [name, pose] of Object.entries(HAND_POSES)) {
+      arm.setHandPose(pose, 1);
+      arm.root.updateMatrixWorld(true);
+      for (const group of duplicates.values()) {
+        if (group.length < 2) continue;
+        const first = point(group[0]);
+        for (const vertex of group.slice(1)) expect(point(vertex).distanceTo(first), `${side} ${name}: skin seam`).toBeLessThan(1e-5);
+      }
+    }
+    for (const part of parts) part.dispose();
+    material.dispose();
   });
 });
 
@@ -354,8 +478,11 @@ describe('Reload hands', () => {
 
   it('carries the support hand with the magazine and back to the handguard', () => {
     const reload = WEAPON_DEFINITIONS.m4a1.view.reloadAnim!;
-    const magazineOf = (setup: Rig) => setup.view.root.getObjectByName('m4a1-magazine')!.getWorldPosition(new THREE.Vector3());
     const leftGrip = (setup: Rig) => setup.arms.left.getGripWorldPosition(new THREE.Vector3());
+    // The hand cups the magazine's base: its grip point stays on the declared spot in the magazine's frame.
+    const magazineGrip = new THREE.Vector3(...WEAPON_DEFINITIONS.m4a1.view.hands.magazine!.position);
+    const offMagazineGrip = (setup: Rig) =>
+      setup.view.root.getObjectByName('m4a1-magazine')!.worldToLocal(leftGrip(setup)).distanceTo(magazineGrip);
     const anchor = (() => {
       const setup = rig(WEAPON_DEFINITIONS.m4a1);
       for (let step = 0; step < 10; step++) frame(setup);
@@ -363,14 +490,14 @@ describe('Reload hands', () => {
     })();
 
     const pulling = reloading('m4a1', (reload.magOut + reload.magDrop) / 2);
-    expect(leftGrip(pulling).distanceTo(magazineOf(pulling))).toBeLessThan(0.06);
+    expect(offMagazineGrip(pulling)).toBeLessThan(0.01);
     expect(gripError(pulling, 'left')).toBeLessThan(TOLERANCE);
 
     const fetching = reloading('m4a1', (reload.magDrop + reload.magIn) / 2);
     expect(leftGrip(fetching).distanceTo(anchor)).toBeGreaterThan(0.2);
 
     const seating = reloading('m4a1', (reload.magIn + reload.magSeat) / 2);
-    expect(leftGrip(seating).distanceTo(magazineOf(seating))).toBeLessThan(0.06);
+    expect(offMagazineGrip(seating)).toBeLessThan(0.01);
   });
 
   it('shows the Ray Gun support hand only to carry its canister', () => {

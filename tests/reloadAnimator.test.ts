@@ -93,31 +93,31 @@ describe('ReloadAnimator phases', () => {
     expect(dropPool.activeCount).toBe(1);
   });
 
-  it('pulls rifle magazines down and rearward before inserting along the same path', () => {
-    const outgoing = makeRig();
-    const outgoingMag = outgoing.parts.magazine!;
-    const outgoingHome = outgoingMag.position.clone();
-    outgoing.weapon.reload();
-    step(
-      outgoing.weapon,
-      outgoing.animator,
-      outgoing.weapon.definition.tacticalReloadTime * 0.17,
-    );
-    expect(outgoingMag.position.y).toBeLessThan(outgoingHome.y);
-    expect(outgoingMag.position.z).toBeGreaterThan(outgoingHome.z);
+  it('strips rifle magazines down out of the well and shows the fresh one beside it before lining it up', () => {
+    const anim = WEAPON_DEFINITIONS.m4a1.view.reloadAnim!;
+    const rigAt = (progress: number) => {
+      const rig = makeRig();
+      const home = rig.parts.magazine!.position.clone();
+      rig.weapon.reload();
+      step(rig.weapon, rig.animator, rig.weapon.definition.tacticalReloadTime * progress);
+      return { mag: rig.parts.magazine!, home };
+    };
 
-    const incoming = makeRig();
-    const incomingMag = incoming.parts.magazine!;
-    const incomingHome = incomingMag.position.clone();
-    incoming.weapon.reload();
-    step(
-      incoming.weapon,
-      incoming.animator,
-      incoming.weapon.definition.tacticalReloadTime * 0.55,
-    );
-    expect(incomingMag.visible).toBe(true);
-    expect(incomingMag.position.y).toBeLessThan(incomingHome.y);
-    expect(incomingMag.position.z).toBeGreaterThan(incomingHome.z);
+    // Drawn straight down its own axis (this test magazine stands upright).
+    const outgoing = rigAt((anim.magOut + anim.magDrop) / 2);
+    expect(outgoing.mag.position.y).toBeLessThan(outgoing.home.y - 0.01);
+    expect(outgoing.mag.position.x).toBeCloseTo(outgoing.home.x, 5);
+
+    // Held up beside the well, off the near flank...
+    const shown = rigAt(anim.magIn + 0.4 * (anim.magSeat - anim.magIn));
+    expect(shown.mag.visible).toBe(true);
+    expect(shown.mag.position.x).toBeLessThan(shown.home.x - 0.03);
+    expect(shown.mag.position.y).toBeLessThan(shown.home.y);
+
+    // ...then lined up right under it before it goes in.
+    const linedUp = rigAt(anim.magIn + 0.68 * (anim.magSeat - anim.magIn));
+    expect(Math.abs(linedUp.mag.position.x - linedUp.home.x)).toBeLessThan(0.01);
+    expect(linedUp.mag.position.y).toBeLessThan(linedUp.home.y - 0.03);
   });
 
   it('never grants ammunition before the state completes', () => {

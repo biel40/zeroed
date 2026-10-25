@@ -104,7 +104,7 @@ describe('Vector view model', () => {
     expect(magazine.position.y).toBeLessThan(magazineHome.y);
     update(0.3);
     expect(magazine.visible).toBe(false);
-    update(0.65);
+    update(view.reloadAnim!.magSeat + 0.01);
     expect(magazine.visible).toBe(true);
     expect(magazine.position.toArray()).toEqual(magazineHome.toArray());
     update(0.78);

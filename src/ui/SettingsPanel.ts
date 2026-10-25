@@ -1,14 +1,20 @@
 import {
+  BOOLEAN_SETTINGS,
   getSettings,
   onSettingsChange,
   resetSettings,
   SETTING_RANGES,
   updateSettings,
   type NumericSetting,
+  type BooleanSetting,
 } from '../core/PlayerSettings';
 
 function isNumericSetting(value: string | undefined): value is NumericSetting {
   return value !== undefined && Object.hasOwn(SETTING_RANGES, value);
+}
+
+function isBooleanSetting(value: string | undefined): value is BooleanSetting {
+  return BOOLEAN_SETTINGS.some(key => key === value);
 }
 
 function formatSetting(key: NumericSetting, value: number): string {
@@ -23,13 +29,18 @@ interface NumericControl {
   readonly output: HTMLOutputElement | null;
 }
 
+interface BooleanControl {
+  readonly key: BooleanSetting;
+  readonly input: HTMLInputElement;
+}
+
 /**
  * Settings dialog: a view over PlayerSettings. Every change is applied and
  * saved at once, so it behaves the same from the main menu and mid-match.
  */
 export class SettingsPanel {
   private readonly controls: NumericControl[] = [];
-  private readonly invertY: HTMLInputElement | null;
+  private readonly toggles: BooleanControl[] = [];
 
   /**
    * `menuButton` opens the full panel; `pauseButton` hides `[data-menu-only]`
@@ -46,9 +57,12 @@ export class SettingsPanel {
       input.oninput = () => updateSettings({ [key]: Number(input.value) });
       this.controls.push({ key, input, output: input.parentElement?.querySelector('output') ?? null });
     }
-    this.invertY = dialog.querySelector<HTMLInputElement>('input[data-setting="invertY"]');
-    const invertY = this.invertY;
-    if (invertY) invertY.onchange = () => updateSettings({ invertY: invertY.checked });
+    for (const input of dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-setting]')) {
+      const key = input.dataset.setting;
+      if (!isBooleanSetting(key)) continue;
+      input.onchange = () => updateSettings({ [key]: input.checked });
+      this.toggles.push({ key, input });
+    }
     const reset = dialog.querySelector<HTMLButtonElement>('#settings-reset');
     if (reset) reset.onclick = () => resetSettings();
     const save = dialog.querySelector<HTMLButtonElement>('#settings-save');
@@ -75,6 +89,6 @@ export class SettingsPanel {
       input.value = String(settings[key]);
       if (output) output.textContent = formatSetting(key, settings[key]);
     }
-    if (this.invertY) this.invertY.checked = settings.invertY;
+    for (const { key, input } of this.toggles) input.checked = settings[key];
   }
 }

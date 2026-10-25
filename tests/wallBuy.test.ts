@@ -93,9 +93,9 @@ describe('Wall Buy', () => {
     (mode as unknown as { findRepairableBarrier(): null }).findRepairableBarrier = () => null;
     (mode as unknown as { findFacingWallBuy(): WallBuy }).findFacingWallBuy = () => wallBuy;
 
-    expect(mode.getInteractPrompt()).toBe('Press E — Buy M4A1 — 1500 PTS');
+    expect(mode.getInteractPrompt()).toBe('BUY M4A1\nPress E — 1500 PTS');
     context.profile.useTouchControls = true;
-    expect(mode.getInteractPrompt()).toBe('Tap USE — Buy M4A1 — 1500 PTS');
+    expect(mode.getInteractPrompt()).toBe('BUY M4A1\nTap USE — 1500 PTS');
   });
 
   it('does not buy through a damaged barrier that owns the current USE prompt', () => {

@@ -19,7 +19,7 @@ export function actionKey(touch: boolean, hold = false): string {
 }
 
 export function doorPrompt(door: PointDoor, touch: boolean): string {
-  if (door.prompt) return t('prompt.doorAction', { action: t(door.prompt), cost: door.cost });
+  if (door.prompt) return t('prompt.doorAction', { action: t(door.prompt), key: actionKey(touch), cost: door.cost });
   const nameKey = `door.${door.id}`;
   const name = isTranslationKey(nameKey) ? t(nameKey) : door.id.toUpperCase().replace(/-/g, ' ');
   return t('prompt.unlockDoor', { door: name, key: actionKey(touch), cost: door.cost });

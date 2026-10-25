@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import { ELBOW, THUMB, THUMB_LENGTHS, WRIST, bindPositions, fingerBone } from './ArmRig';
+import { ELBOW, THUMB, THUMB_LENGTHS, WRIST, bindFrames, boneBinds, fingerBone } from './ArmRig';
+import type { ArmSide, BindFrame } from './ArmRig';
 import { FINGER_LAYOUT, FINGERS, PHALANX_TAPER } from './HandPoses';
 import { digitUv, handUv, HAND_HZ_RANGE, nailUv } from './HandSkinTexture';
 import { skinnedLoft } from './SkinnedLoft';
+import { joinThumbRoot } from './ThumbRoot';
 import type { RingFinger } from '../game/rings/RingCatalog';
 
 /**
@@ -71,12 +73,20 @@ export interface DigitSection {
 
 /** One finger or the thumb, in its own bind frame: bone line along -Z from the base joint. */
 interface DigitSpec {
-  /** Bind position of the base joint. */
+  /** Bind position and rotation of the base joint (its back is local +X). */
   readonly origin: THREE.Vector3;
+  readonly frame: THREE.Quaternion;
   readonly lengths: readonly [number, number, number];
   /** Shaft section of each segment: [half width, back, front]. */
   readonly shafts: readonly (readonly [number, number, number])[];
-  /** Where the tube starts behind the base joint (negative), its section scale and centre offset [x, y] there. */
+  /** How far before and after each of the two joints the shaft section changes. */
+  readonly shaftBlends: readonly (readonly [number, number])[];
+  /**
+   * Geometry begins at `root` along the bone line. Fingers start behind the
+   * joint and taper from `rootFull` to `rootScale`, sinking by `rootShift`
+   * (hand-frame [x, y]) inside the palm. The thumb starts at its sewn web.
+   */
+  readonly rootFull: number;
   readonly root: number;
   readonly rootScale: number;
   readonly rootShift: readonly [number, number];
@@ -98,10 +108,8 @@ const FINGER_BACK = [0.88, 0.8, 0.7] as const;
 /** Front pads swell mid-segment; flexion creases pinch the joints. */
 const PAD_SWELL = 0.06;
 const CREASE_PINCH = 0.0007;
-/** Shaft sections blend across a joint over this half length. */
+/** Finger shaft sections blend across a joint over this half length. */
 const SHAFT_BLEND = 0.005;
-/** A digit keeps its full section this far behind its base joint, then tapers away inside the palm. */
-const ROOT_FULL = -0.003;
 /** Knuckle bulges scale with the finger from this reference radius. */
 const KNUCKLE_REFERENCE_RADIUS = 0.0095;
 /** Fingertip: the cap starts this many front reaches before the bone end and ends this many past it. */
@@ -123,8 +131,12 @@ function fingerSpec(name: (typeof FINGERS)[number], wrist: THREE.Vector3): Digit
   const knuckle = radius / KNUCKLE_REFERENCE_RADIUS;
   return {
     origin: wrist.clone().add(new THREE.Vector3(...base)),
+    frame: new THREE.Quaternion(),
     lengths,
     shafts,
+    shaftBlends: [[SHAFT_BLEND, SHAFT_BLEND], [SHAFT_BLEND, SHAFT_BLEND]],
+    // Full down to just behind the knuckle, then tapering away inside the palm.
+    rootFull: -0.003,
     root: -0.022,
     rootScale: 0.4,
     rootShift: [0, 0],
@@ -135,20 +147,26 @@ function fingerSpec(name: (typeof FINGERS)[number], wrist: THREE.Vector3): Digit
   };
 }
 
-/** The thumb grows out of the thenar mound: thick metacarpal, broad flat tip. */
-function thumbSpec(thumbBase: THREE.Vector3): DigitSpec {
+/**
+ * The exposed thumb begins partway along the metacarpal, where the palm's
+ * sewn web joins it. Its rest orientation keeps that web near its grips.
+ */
+function thumbSpec(base: BindFrame): DigitSpec {
   return {
-    origin: thumbBase.clone(),
+    origin: base.position.clone(),
+    frame: base.rotation.clone(),
     lengths: THUMB_LENGTHS,
-    shafts: [[0.0128, 0.0102, 0.0136], [0.0106, 0.0086, 0.0097], [0.0104, 0.0068, 0.0092]],
-    root: -0.022,
-    rootScale: 0.45,
-    // Sinks toward the middle of the palm so the root never surfaces by the wrist.
-    rootShift: [0.006, -0.012],
+    // Broad where it leaves the hand, a slimmer waist, then a wide flat tip.
+    shafts: [[0.013, 0.01, 0.013], [0.0095, 0.0078, 0.009], [0.01, 0.0065, 0.009]],
+    shaftBlends: [[0.026, 0.004], [SHAFT_BLEND, SHAFT_BLEND]],
+    rootFull: 0,
+    root: 0.018,
+    rootScale: 1,
+    rootShift: [0, 0],
     bones: [WRIST, THUMB, THUMB + 1, THUMB + 2],
-    baseBlend: [0.002, 0.016],
-    jointBlend: [0.007, 0.005],
-    knuckles: [0.0009, 0.0007],
+    baseBlend: [0, 0.01],
+    jointBlend: [0.009, 0.006],
+    knuckles: [0.0008, 0.0005],
   };
 }
 
@@ -164,27 +182,33 @@ function tipSpan(spec: DigitSpec): [number, number] {
   return [end - CAP_BACK * front, end + TIP_REACH * front];
 }
 
-/** Where a digit's root sinks into the palm: 0 down to `ROOT_FULL`, 1 at the tube's start. */
+/** Bind-space centre and orientation of a digit's bone line at `s` from its base joint. */
+function spineAt(spec: DigitSpec, s: number, center: THREE.Vector3, frame: THREE.Quaternion): void {
+  frame.copy(spec.frame);
+  center.set(0, 0, -s).applyQuaternion(frame).add(spec.origin);
+}
+
+/** How far a digit's root has sunk into the palm: 0 down to `rootFull`, 1 at the tube's start. */
 function rootDepth(spec: DigitSpec, s: number): number {
-  return s < 0 ? THREE.MathUtils.smoothstep(-s, -ROOT_FULL, -spec.root) : 0;
+  return s < spec.rootFull ? THREE.MathUtils.smoothstep(spec.rootFull - s, 0, spec.rootFull - spec.root) : 0;
 }
 
 /** Section of a digit at `s` along its bone line from the base joint. */
 function digitSection(spec: DigitSpec, s: number, out: DigitSection): DigitSection {
   const [j1, j2, j3] = joints(spec);
-  const k1 = THREE.MathUtils.smoothstep(s, j1 - SHAFT_BLEND, j1 + SHAFT_BLEND);
-  const k2 = THREE.MathUtils.smoothstep(s, j2 - SHAFT_BLEND, j2 + SHAFT_BLEND);
+  const [[before1, after1], [before2, after2]] = spec.shaftBlends;
+  const k1 = THREE.MathUtils.smoothstep(s, j1 - before1, j1 + after1);
+  const k2 = THREE.MathUtils.smoothstep(s, j2 - before2, j2 + after2);
   const [a, b, c] = spec.shafts;
   const blend = (index: number) => a[index] + (b[index] - a[index]) * k1 + (c[index] - b[index]) * k2;
   let halfWidth = blend(0);
   let back = blend(1);
   let front = blend(2);
-  if (s < 0) {
-    const scale = THREE.MathUtils.lerp(1, spec.rootScale, rootDepth(spec, s));
-    halfWidth *= scale;
-    back *= scale;
-    front *= scale;
-  } else {
+  const scale = THREE.MathUtils.lerp(1, spec.rootScale, rootDepth(spec, s));
+  halfWidth *= scale;
+  back *= scale;
+  front *= scale;
+  if (s >= 0) {
     const start = s < j1 ? 0 : s < j2 ? j1 : j2;
     const end = s < j1 ? j1 : s < j2 ? j2 : j3;
     const share = THREE.MathUtils.clamp((s - start) / (end - start), 0, 1);
@@ -234,7 +258,7 @@ function digitStations(spec: DigitSpec, detail: HandDetail): number[] {
   const joint2 = spread(j2, half2, detail.jointRings);
   const cap = Array.from({ length: detail.tipRings + 1 }, (_, ring) =>
     capStart + (tip - capStart) * Math.sin((Math.PI / 2) * (ring / (detail.tipRings + 1))));
-  return [
+  const stations = [
     spec.root,
     ...between(spec.root, base[0], 1),
     ...base,
@@ -245,7 +269,8 @@ function digitStations(spec: DigitSpec, detail: HandDetail): number[] {
     ...between(joint2[joint2.length - 1], capStart, rich ? 1 : 0),
     ...cap,
     tip,
-  ];
+  ].filter((station) => station >= spec.root);
+  return stations.filter((station, index) => index === 0 || station - stations[index - 1] > 1e-6);
 }
 
 function digitGeometry(spec: DigitSpec, detail: HandDetail): THREE.BufferGeometry {
@@ -254,6 +279,8 @@ function digitGeometry(spec: DigitSpec, detail: HandDetail): THREE.BufferGeometr
   const [half1, half2] = spec.jointBlend;
   const section: DigitSection = { halfWidth: 0, back: 0, front: 0 };
   const flat = new THREE.Vector2();
+  const center = new THREE.Vector3();
+  const frame = new THREE.Quaternion();
   return skinnedLoft({
     stations: digitStations(spec, detail),
     radial: detail.digitRadial,
@@ -262,7 +289,10 @@ function digitGeometry(spec: DigitSpec, detail: HandDetail): THREE.BufferGeometr
       const { halfWidth, back, front } = digitSection(spec, s, section);
       sectionPoint(around, back, front, halfWidth, halfWidth, DIGIT_BACK_POWER, DIGIT_FRONT_POWER, flat);
       const sink = rootDepth(spec, s);
-      out.set(spec.origin.x + flat.x + spec.rootShift[0] * sink, spec.origin.y + flat.y + spec.rootShift[1] * sink, spec.origin.z - s);
+      spineAt(spec, s, center, frame);
+      out.set(flat.x, flat.y, 0).applyQuaternion(frame).add(center);
+      out.x += spec.rootShift[0] * sink;
+      out.y += spec.rootShift[1] * sink;
     },
     skin: (s, _around, _point, out) => {
       const r0 = THREE.MathUtils.smoothstep(s, baseCentre - baseHalf, baseCentre + baseHalf);
@@ -282,6 +312,8 @@ function nailGeometry(spec: DigitSpec, detail: HandDetail): THREE.BufferGeometry
   const start = j2 + NAIL_START * spec.lengths[2];
   const end = j3 + NAIL_REACH * spec.shafts[2][2];
   const section: DigitSection = { halfWidth: 0, back: 0, front: 0 };
+  const center = new THREE.Vector3();
+  const frame = new THREE.Quaternion();
   const positions: number[] = [];
   const uvs: number[] = [];
   const skinIndex: number[] = [];
@@ -297,7 +329,9 @@ function nailGeometry(spec: DigitSpec, detail: HandDetail): THREE.BufferGeometry
       const surface = back * (1 - Math.abs(y / halfWidth) ** DIGIT_BACK_POWER) ** (1 / DIGIT_BACK_POWER);
       // The plate rises out of the cuticle fold and settles onto the skin at its sides.
       const lift = NAIL_LIFT * (1 - across * across) * THREE.MathUtils.lerp(0.4, 1, THREE.MathUtils.smoothstep(along, 0, 0.35));
-      positions.push(spec.origin.x + surface + lift, spec.origin.y + y, spec.origin.z - s);
+      spineAt(spec, s, center, frame);
+      const point = new THREE.Vector3(surface + lift, y, 0).applyQuaternion(frame).add(center);
+      positions.push(point.x, point.y, point.z);
       uvs.push(...nailUv(across, along));
       skinIndex.push(spec.bones[3], 0, 0, 0);
       skinWeight.push(1, 0, 0, 0);
@@ -353,8 +387,11 @@ const SPARSE_ROWS = [0, 2, 4, 5, 6, 7, 8, 10, 11];
  */
 const PALM_END = -0.104;
 const PALM_END_NARROWING = 0.12;
-/** Share of the thenar mound that follows the thumb metacarpal. */
-const THENAR_FOLLOW = 0.4;
+/**
+ * Thenar mound under the thumb's base: centre (y, z), extents and how far it
+ * swells toward the palm and the thumb side.
+ */
+const THENAR = { y: 0.03, z: -0.026, width: 0.013, length: 0.024, rise: 0.01, flare: 0.011 } as const;
 
 interface HandProfile {
   thumbSide: number;
@@ -403,7 +440,7 @@ function knuckleLine(): (y: number) => number {
 
 const bump = (dy: number, width: number, dz: number, length: number): number => Math.exp(-((dy / width) ** 2) - ((dz / length) ** 2));
 
-function handBodyGeometry(wrist: THREE.Vector3, detail: HandDetail): THREE.BufferGeometry {
+function handBodyGeometry(wrist: THREE.Vector3, thumb: DigitSpec, detail: HandDetail): THREE.BufferGeometry {
   const knuckleZ = knuckleLine();
   const leading = Math.min(...FINGERS.map((name) => FINGER_LAYOUT[name].base[2]));
   const rows = detail.sparsePalm ? SPARSE_ROWS.map((index) => HAND_PROFILE[index]) : HAND_PROFILE;
@@ -429,9 +466,10 @@ function handBodyGeometry(wrist: THREE.Vector3, detail: HandDetail): THREE.Buffe
       dx += KNUCKLE_RISE[finger] * bump(y - by, 0.0052, z - (bz + 0.002), 0.008) * backness ** 1.5 * thickness;
     });
     // Thenar mound under the thumb, hypothenar mound under the little finger, hollow between.
-    const thenar = bump(y - 0.024, 0.011, z + 0.036, 0.019);
-    dx -= 0.0055 * thenar * frontness;
-    const dy = 0.002 * thenar * Math.max(0, -Math.cos(around * Math.PI * 2));
+    const thenar = bump(y - THENAR.y, THENAR.width, z - THENAR.z, THENAR.length);
+    const thumbSideness = Math.max(0, -Math.cos(around * Math.PI * 2));
+    dx -= THENAR.rise * thenar * frontness;
+    const dy = THENAR.flare * thenar * thumbSideness;
     dx -= 0.0035 * bump(y + 0.027, 0.011, z + 0.05, 0.024) * frontness;
     dx += 0.0012 * bump(y - 0.004, 0.012, z + 0.058, 0.016) * frontness;
     // Ulnar head on the little-finger side of the back of the wrist.
@@ -439,36 +477,43 @@ function handBodyGeometry(wrist: THREE.Vector3, detail: HandDetail): THREE.Buffe
     return out.set(x + dx, y + dy, z);
   };
 
-  return skinnedLoft({
-    stations: [...rows.map(([hz]) => hz), ...cap, PALM_END],
+  const stations = [...rows.map(([hz]) => hz), ...cap, PALM_END];
+  const palm = skinnedLoft({
+    stations,
     radial: detail.handRadial,
     point: (hz, around, out) => local(hz, around, out).add(wrist),
-    skin: (hz, around, point, out) => {
-      const y = point.y - wrist.y;
-      const z = point.z - wrist.z;
+    skin: (hz, _around, _point, out) => {
       const hand = THREE.MathUtils.smoothstep(0.018 - hz, 0, 0.04);
-      const front = 0.3 + 0.7 * Math.max(0, -Math.sin(around * Math.PI * 2));
-      const thumb = THENAR_FOLLOW * hand * bump(y - 0.026, 0.013, z + 0.034, 0.018) * front;
-      out.add(ELBOW, 1 - hand).add(WRIST, hand - thumb).add(THUMB, thumb);
+      out.add(ELBOW, 1 - hand).add(WRIST, hand);
     },
     uv: (hz, around) => handUv(around, THREE.MathUtils.clamp(hz, HAND_HZ_RANGE[1], HAND_HZ_RANGE[0])),
   });
+  return joinThumbRoot(palm, digitGeometry(thumb, detail), {
+    rows: [stations.indexOf(0.006), stations.indexOf(-0.064)],
+    columns: [Math.floor(detail.handRadial * 0.4), Math.ceil(detail.handRadial * 0.8)],
+    radial: detail.handRadial,
+  }, detail.digitRadial, new THREE.Vector3(0, 0, -1).applyQuaternion(thumb.frame));
 }
 
 // --- Assembly ----------------------------------------------------------------
 
-function digitSpecs(): DigitSpec[] {
-  const at = bindPositions();
-  return [...FINGERS.map((name) => fingerSpec(name, at[WRIST])), thumbSpec(at[THUMB])];
+/** The digits of one hand, built in the right-hand convention with that hand's thumb rest. */
+function digitSpecs(side: ArmSide): DigitSpec[] {
+  const at = bindFrames(boneBinds(side));
+  return [...FINGERS.map((name) => fingerSpec(name, at[WRIST].position)), thumbSpec(at[THUMB])];
 }
 
-/** Every skin part of one right hand in bind space: hand body, five digits and their nails. */
-export function handGeometries(detail: HandDetail): THREE.BufferGeometry[] {
-  const wrist = bindPositions()[WRIST];
-  const digits = digitSpecs();
+/**
+ * Every skin part of one hand in bind space, in the right-hand convention
+ * (the left hand mirrors it): palm with its sewn thumb, four fingers and
+ * the five nails.
+ */
+export function handGeometries(detail: HandDetail, side: ArmSide): THREE.BufferGeometry[] {
+  const digits = digitSpecs(side);
+  const frames = bindFrames(boneBinds(side));
   return [
-    handBodyGeometry(wrist, detail),
-    ...digits.map((spec) => digitGeometry(spec, detail)),
+    handBodyGeometry(frames[WRIST].position, digits[FINGERS.length], detail),
+    ...digits.slice(0, FINGERS.length).map((spec) => digitGeometry(spec, detail)),
     ...digits.map((spec) => nailGeometry(spec, detail)),
   ];
 }
@@ -482,8 +527,8 @@ export interface DigitRingSeat extends DigitSection {
 /** Rings sit halfway along the proximal phalanx, clear of the knuckle web. */
 const RING_SEAT_ALONG = 0.5;
 
-export function digitRingSeat(finger: RingFinger): DigitRingSeat {
-  const digits = digitSpecs();
+export function digitRingSeat(finger: RingFinger, side: ArmSide): DigitRingSeat {
+  const digits = digitSpecs(side);
   const spec = finger === 'thumb' ? digits[FINGERS.length] : digits[FINGERS.indexOf(finger)];
   // The thumb wears its ring on the proximal phalanx, past the metacarpal.
   const segment = finger === 'thumb' ? 1 : 0;

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zeroed — Round HUD viewer</title>
+  <style>
+    body.round-viewer { background: radial-gradient(ellipse at 85% 85%, #371915, #080b0a 65%); }
+    .viewer-controls {
+      position: fixed; z-index: 20; top: 18px; left: 18px; right: 18px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px;
+      width: fit-content; max-width: calc(100% - 36px);
+      background: #10130ff5; border: 1px solid #706b57; color: #fff3dd;
+      font: 13px 'Consolas', monospace;
+    }
+    .viewer-controls label { display: flex; align-items: center; gap: 8px; }
+    .viewer-controls input[type="number"] { width: 76px; padding: 5px; background: #22261e; color: #fff3dd; border: 1px solid #706b57; }
+    .viewer-controls button { padding: 6px 9px; cursor: pointer; }
+  </style>
+</head>
+<body class="round-viewer">
+  <div class="viewer-controls">
+    <label>Ronda <input id="viewer-round" type="number" min="0" max="99999" value="2" /></label>
+    <button id="viewer-apply" type="button">Aplicar</button>
+    <button id="viewer-next" type="button">Siguiente ronda</button>
+    <button id="viewer-stats" type="button">Cambiar vida / puntos</button>
+    <label><input id="viewer-touch" type="checkbox" /> Táctil</label>
+  </div>
+  <script type="module" src="./hud-viewer.ts"></script>
+</body>
+</html>
