@@ -16,7 +16,7 @@ hud.hideStartScreen();
 hud.setHudVisible(true);
 hud.setZombiesPanelVisible(true);
 for (const child of document.getElementById('hud')!.children) {
-  if (child instanceof HTMLElement && child.id !== 'hud-zombies') child.hidden = true;
+  if (child.id !== 'hud-zombies') child.classList.add('hidden');
 }
 
 let state: ZombieHudState = {
