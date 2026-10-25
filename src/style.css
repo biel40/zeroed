@@ -380,18 +380,18 @@ body {
 }
 #z-points.denied { animation: pointsdenied .5s ease; }
 @keyframes pointsdenied { 25%, 75% { color: #ef7767; transform: translateX(-2px); } 50% { transform: translateX(2px); } }
-#z-round { display: flex; align-items: center; gap: 9px; min-height: 30px; margin-top: 3px; color: #e96956; }
+#z-round { display: flex; align-items: center; gap: 9px; min-height: 40px; margin-top: 3px; color: #e96956; }
 .round-number {
   font: 400 28px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .04em;
   text-shadow: 1px 2px 0 #260a09, 0 0 8px #c239304d;
 }
 .round-scratches {
-  display: flex; align-items: center; gap: 3px;
+  display: flex; align-items: center; gap: 1px;
   filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 3px #b1373466);
 }
 .round-scratches i {
   --claw-angle: 11deg;
-  position: relative; display: block; flex: 0 0 auto; width: 6px; height: 30px;
+  position: relative; display: block; flex: 0 0 auto; width: 9px; height: 40px;
   background:
     linear-gradient(100deg, #751e21 10%, #ffb19c 30%, #ee6551 43%, #b82f2e 76%, #60191c),
     #d4483b;
@@ -400,10 +400,10 @@ body {
   clip-path: polygon(91% 0, 100% 12%, 75% 36%, 89% 35%, 43% 73%, 0 100%, 22% 62%, 13% 61%, 52% 25%);
 }
 .round-scratches i:nth-child(3n) {
-  --claw-angle: 15deg; height: 27px;
+  --claw-angle: 15deg; height: 36px;
   clip-path: polygon(90% 0, 100% 10%, 68% 40%, 80% 40%, 0 100%, 22% 56%, 12% 55%, 54% 23%);
 }
-.round-scratches i:nth-child(5n) { margin-right: 5px; }
+.round-scratches i:nth-child(5n) { margin-right: 4px; }
 .round-scratches i::after {
   content: ''; position: absolute; inset: 0; opacity: 0;
   background: linear-gradient(180deg, #fff0cd, #ffb48e 50%, #ef644600);
@@ -3549,10 +3549,11 @@ html.touch-controls-enabled #hud-zombies {
 
 html.touch-controls-enabled #hud-zombies .survival-top { gap: 4px 8px; }
 html.touch-controls-enabled #hud-zombies .survival-label { font-size: 8px; }
-html.touch-controls-enabled #z-round { min-height: 18px; gap: 4px; }
+html.touch-controls-enabled #z-round { min-height: 24px; gap: 4px; }
 html.touch-controls-enabled #hud-zombies .round-scratches { gap: 2px; }
-html.touch-controls-enabled #hud-zombies .round-scratches i { width: 3px; height: 15px; }
-html.touch-controls-enabled #hud-zombies .round-scratches i:nth-child(3n) { height: 13px; }
+html.touch-controls-enabled #hud-zombies .round-scratches i { width: 4.5px; height: 22px; }
+html.touch-controls-enabled #hud-zombies .round-scratches i:nth-child(3n) { height: 20px; }
+html.touch-controls-enabled #hud-zombies .round-scratches i:nth-child(5n) { margin-right: 3px; }
 html.touch-controls-enabled #hud-zombies .round-number { font-size: 13px; }
 html.touch-controls-enabled #z-points { font-size: 15px; }
 html.touch-controls-enabled #z-health { margin: 5px 0; }
