@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { buildPPSH41 } from '../src/weapons/PPSH41ViewModel';
-import { HAND_POSES, FINGER_LAYOUT, PHALANX_TAPER, type HandPose, type FingerName } from '../src/weapons/HandPoses';
+import { FINGER_LAYOUT, PHALANX_TAPER, type HandPose, type FingerName } from '../src/weapons/HandPoses';
 import { FirstPersonArm } from '../src/weapons/FirstPersonArm';
 import { WeaponHands } from '../src/weapons/WeaponHands';
 import { THUMB, THUMB_LENGTHS } from '../src/weapons/ArmRig';
@@ -89,19 +89,20 @@ it('authors PPSh stock grip against wood geometry',()=>{
     cost+=contact*2+point(THUMB+2,THUMB_LENGTHS[2]*.6).distanceTo(new THREE.Vector3(-.024,-.043,.15));
     return cost;
   };
+  const thumbFrom=(v:readonly number[]):HandPose['thumb']=>({base:[v[0],v[1],v[2]],curl:[v[3],v[4]]});
   let thumbBest=Infinity,thumbValues:number[]=[];
   for(let trial=0;trial<700;trial++){
     const vals=[-.5+rand()*2, .2+rand()*1.5,1.6+rand()*2.3,rand()*1.1,rand()*1.1];
-    pose={...pose,thumb:{base:vals.slice(0,3),curl:vals.slice(3)}} as HandPose;
+    pose={...pose,thumb:thumbFrom(vals)};
     const cost=thumbCost();if(cost<thumbBest){thumbBest=cost;thumbValues=vals;}
   }
   for(const step of [.12,.04,.012])for(let pass=0;pass<7;pass++)for(let i=0;i<5;i++)for(const direction of [-1,1]){
     const vals=[...thumbValues];vals[i]+=direction*step;
     if(i>2&&(vals[i]<0||vals[i]>1.5))continue;
-    pose={...pose,thumb:{base:vals.slice(0,3),curl:vals.slice(3)}} as HandPose;
+    pose={...pose,thumb:thumbFrom(vals)};
     const cost=thumbCost();if(cost<thumbBest){thumbBest=cost;thumbValues=vals;}
   }
-  pose={...pose,thumb:{base:thumbValues.slice(0,3),curl:thumbValues.slice(3)}} as HandPose;
+  pose={...pose,thumb:thumbFrom(thumbValues)};
   console.log('thumb',thumbBest,pose.thumb);console.log('pose',JSON.stringify(pose));
   refresh();
   const geometry=arm.mesh.geometry;
