@@ -9,7 +9,7 @@ import {
   VESTIBULE_COLUMNS,
 } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
-import { vaultHeightAt } from './VaultProfile';
+import { VESTIBULE_VAULT } from './VaultProfile';
 
 const PLINTH_HEIGHT = 0.32;
 const SHAFT_TOP = 3.35;
@@ -50,7 +50,7 @@ function addColumn(context: Station33BuildContext, x: number, z: number): void {
   batch.addBox(materials.columnMarble, x, (PLINTH_HEIGHT + SHAFT_TOP) / 2, z, size, SHAFT_TOP - PLINTH_HEIGHT, size, 0, 0, 0, x * 3 + z);
   batch.addBox(materials.bronze, x, SHAFT_TOP + 0.04, z, size + 0.06, 0.08, size + 0.06);
   // Four-sided frustum, flat shaded, widening into the vault.
-  const capitalTop = vaultHeightAt(x) - 0.02;
+  const capitalTop = VESTIBULE_VAULT.heightAt(x) - 0.02;
   const capitalHeight = capitalTop - (SHAFT_TOP + 0.08);
   const capital = new THREE.CylinderGeometry((size + 0.5) * Math.SQRT1_2, (size + 0.08) * Math.SQRT1_2, capitalHeight, 4, 1)
     .rotateY(Math.PI / 4)
@@ -147,7 +147,7 @@ function addHangingSign(context: Station33BuildContext): void {
   const z = TURNSTILE_LINE.z;
   batch.addBox(materials.greySteel, 0, y, z, 2.5, 0.64, 0.06);
   for (const x of [-1.05, 1.05]) {
-    const top = vaultHeightAt(x);
+    const top = VESTIBULE_VAULT.heightAt(x);
     batch.addBox(materials.greySteel, x, (y + 0.32 + top) / 2, z, 0.025, top - y - 0.32, 0.025);
   }
   const south = new THREE.Mesh(signage.signGeometry('to-trains', 2.4, 0.56), signage.material);

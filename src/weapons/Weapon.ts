@@ -22,6 +22,11 @@ export class Weapon {
   fireMode: FireMode;
   /** 0 = hip fire, 1 = fully aimed. */
   adsAlpha = 0;
+  /**
+   * Multiplier on reload durations, set by the mode (a reload ring halves
+   * it). Applies from the next reload; animation and sounds follow progress.
+   */
+  reloadTimeScale = 1;
   /** Events produced during the last update; drain with clearEvents(). */
   readonly pendingEvents: WeaponEvent[] = [];
 
@@ -112,7 +117,7 @@ export class Weapon {
       this.activeReloadType === 'empty'
         ? this.definition.reloadTime
         : this.definition.tacticalReloadTime;
-    this.enterState('reloading', duration, 'reloadStart');
+    this.enterState('reloading', duration * this.reloadTimeScale, 'reloadStart');
     return true;
   }
 

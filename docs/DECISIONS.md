@@ -5,7 +5,8 @@
   sin compartir estado de run.
 - **Mapas por registro.** Burned Mansion y Station 33 son los mapas jugables;
   Station 33 es solo individual, sera de pago y se construye por fases (el
-  vestibulo y la consigna), cada una jugable y sin puertas hacia el vacio. `zombieMaps.ts`
+  vestibulo, la consigna, las cocheras y la sala de maquinas), cada una
+  jugable y sin puertas hacia el vacio. `zombieMaps.ts`
   declara por mapa visibilidad, nombre i18n, soporte cooperativo, si es premium
   y factoria de arena; los modos la resuelven por `mapId`. Mientras no exista
   un sistema de pagos, `premium` solo cambia la presentacion: la beta cerrada

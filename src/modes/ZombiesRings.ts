@@ -37,9 +37,10 @@ export function protectionVignette(elapsed: number, remaining: number): number {
 
 /**
  * Rings in a single-player Zombies run. Sells and recharges them at the
- * map's ring machines through the shared wallet, fires their effects (a
- * charged Resurrection ring takes the place of a death) and keeps the
- * first-person hand, the machines and the HUD in step with the run's `PlayerRings`.
+ * map's powered ring machines through the shared wallet, fires their
+ * effects (a charged Resurrection ring takes the place of a death, a
+ * Sleight of Hand ring speeds every reload) and keeps the first-person
+ * hand, the machines, the weapons and the HUD in step with the run's `PlayerRings`.
  * `ZombiesMode` delegates every ring concern here.
  */
 export class ZombiesRings {
@@ -61,20 +62,26 @@ export class ZombiesRings {
     this.present();
   }
 
-  /** Prompt of the faced machine while it has something to sell, else null. */
+  /** Prompt of the faced machine while it has something to sell (or waits for power), else null. */
   prompt(): string | null {
     const machine = this.facingMachine();
     if (!machine) return null;
     const ring = t(RING_DEFINITIONS[machine.ringId].nameKey);
+    if (!machine.powered) return t('prompt.ringNeedsPower', { ring });
     const key = actionKey(this.ctx.profile.useTouchControls);
     const cost = this.rings.priceOf(machine.ringId)!;
     return t(this.rings.has(machine.ringId) ? 'prompt.rechargeRing' : 'prompt.buyRing', { ring, key, cost });
   }
 
-  /** USE pressed: buys or recharges at the faced machine. False when no machine has anything to sell. */
+  /**
+   * USE pressed: buys or recharges at the faced machine. A machine waiting
+   * for power takes the press and sells nothing. False when no machine has
+   * anything to sell.
+   */
   interact(): boolean {
     const machine = this.facingMachine();
     if (!machine) return false;
+    if (!machine.powered) return true;
     const cost = this.rings.priceOf(machine.ringId)!;
     if (this.rings.buy(machine.ringId, (price) => this.economy.spend(price)) === 'notEnoughPoints') {
       this.ctx.hud.flashNotEnoughPoints();
@@ -109,6 +116,28 @@ export class ZombiesRings {
     return null;
   }
 
+  /**
+   * A ZEUS-77 bolt grounded at `point`: the nearest machine on the player's
+   * floor within `reach` that waits for power takes `seconds` of it (sells
+   * and plays meanwhile). Returns that machine, or null when none took it.
+   */
+  energizeMachineAt(point: THREE.Vector3Like, seconds: number, reach: number): ArenaRingMachine | null {
+    let nearest: ArenaRingMachine | null = null;
+    let nearestDistance = reach;
+    for (const machine of this.machines) {
+      if (machine.floor !== this.ctx.player.floor || !machine.energize) continue;
+      const { x, y, z } = machine.position;
+      const distance = Math.hypot(point.x - x, point.y - y, point.z - z);
+      if (distance <= nearestDistance) {
+        nearest = machine;
+        nearestDistance = distance;
+      }
+    }
+    if (!nearest?.energize?.(seconds)) return null;
+    this.ctx.hud.showRoundBanner(t(RING_DEFINITIONS[nearest.ringId].nameKey), t('banner.machineCharged', { seconds }));
+    return nearest;
+  }
+
   /** True while the player is getting back up after a resurrection. */
   get isGettingUp(): boolean {
     return this.getUpElapsed !== null;
@@ -141,10 +170,11 @@ export class ZombiesRings {
   }
 
   /**
-   * The machines' jingle, like a perk machine's: it plays around the nearest
-   * machine on the player's floor and fades out with distance. Silent while
-   * `audible` is false (intro, pause, game over, ending) or no machine is in
-   * range. Called every frame; allocation free.
+   * The machines' jingle, like a perk machine's: the nearest powered
+   * machine on the player's floor plays its ring's tune, fading out with
+   * distance. Silent while `audible` is false (intro, pause, game over,
+   * ending) or no powered machine is in range. Called every frame;
+   * allocation free.
    */
   updateJingle(audible: boolean): void {
     const player = this.ctx.player;
@@ -152,7 +182,7 @@ export class ZombiesRings {
     let nearest: ArenaRingMachine | null = null;
     let nearestDistance = JINGLE_RANGE;
     for (const machine of audible ? this.machines : []) {
-      if (machine.floor !== player.floor) continue;
+      if (machine.floor !== player.floor || !machine.powered) continue;
       const distance = Math.hypot(machine.position.x - listener.x, machine.position.z - listener.z);
       if (distance < nearestDistance) {
         nearest = machine;
@@ -168,6 +198,7 @@ export class ZombiesRings {
       1 - THREE.MathUtils.smoothstep(nearestDistance, JINGLE_FULL_VOLUME_DISTANCE, JINGLE_RANGE),
       spatialPan(listener, forward, nearest.position),
       spatialMuffle(listener, forward, nearest.position),
+      RING_DEFINITIONS[nearest.ringId].jingle,
     );
   }
 
@@ -230,8 +261,23 @@ export class ZombiesRings {
     this.rings.clearEvents();
   }
 
-  /** Hand, machines and HUD read the current rings. */
+  /**
+   * Reload-duration multiplier of the worn rings: the strongest charged
+   * reload ring, or 1 without one. Passive rings keep their charge, so
+   * wearing one is enough.
+   */
+  private reloadTimeScale(): number {
+    let scale = 1;
+    for (const { ringId, charges } of this.rings.worn) {
+      const { effect } = RING_DEFINITIONS[ringId];
+      if (effect.kind === 'reloadSpeed' && charges > 0) scale = Math.min(scale, effect.reloadTimeScale);
+    }
+    return scale;
+  }
+
+  /** Hand, machines, HUD and the weapons' reload speed read the current rings. */
   private present(): void {
+    this.ctx.setReloadTimeScale(this.reloadTimeScale());
     const worn = this.rings.worn;
     for (const { ringId, finger, charges } of worn) {
       this.ctx.handRings.show(finger, charges > 0 ? 'charged' : 'spent', RING_DEFINITIONS[ringId].glowColor);

@@ -17,7 +17,15 @@ export type SignId =
   | 'torn-poster-a'
   | 'torn-poster-b'
   | 'luggage-office'
-  | 'lost-property';
+  | 'lost-property'
+  | 'service-passage'
+  | 'no-boarding'
+  | 'third-rail'
+  | 'blast-gate'
+  | 'route-33'
+  | 'depot'
+  | 'substation'
+  | 'main-switch';
 
 const ATLAS_SIZE = 1024;
 
@@ -34,6 +42,14 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   'torn-poster-b': [512, 256, 256, 384],
   'luggage-office': [768, 384, 256, 128],
   'lost-property': [768, 512, 256, 128],
+  'no-boarding': [512, 640, 512, 128],
+  'service-passage': [512, 768, 256, 128],
+  'third-rail': [768, 768, 256, 128],
+  'blast-gate': [512, 896, 256, 128],
+  'route-33': [768, 896, 128, 128],
+  depot: [896, 896, 128, 128],
+  substation: [0, 896, 256, 128],
+  'main-switch': [256, 896, 256, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -209,6 +225,38 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
     printLines(context, px + 20, py + 74, pw - 40, 6, random);
     weather(context, px, py, pw, 200, random, 50);
   }
+  // Painted last so the older cells keep their weathering.
+  paintTrainShedSigns(context, random);
+  paintSubstationSigns(context, random);
+}
+
+/** Machine room: the gallery door's plate and the danger plate over the main switch. */
+function paintSubstationSigns(context: CanvasRenderingContext2D, random: () => number): void {
+  enamelPlate(context, 'substation', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['ТЯГОВАЯ', 'ПОДСТАНЦИЯ'], 36, random);
+  enamelPlate(context, 'main-switch', '#e4e0d4', '#a3241a', '#a3241a', ['ГЛАВНЫЙ', 'РУБИЛЬНИК'], 36, random);
+}
+
+/**
+ * Train sheds: the service-door plate, the cab's "no boarding" lightbox,
+ * the contact-rail warning, the blast-gate plate, the route number and the
+ * depot plate over the crew's ring locker.
+ */
+function paintTrainShedSigns(context: CanvasRenderingContext2D, random: () => number): void {
+  enamelPlate(context, 'service-passage', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['СЛУЖЕБНЫЙ', 'ПРОХОД'], 40, random);
+  // Lightbox face: dark glass, letters lit from behind (the circuit dims them).
+  const [bx, by, bw, bh] = SIGN_REGIONS['no-boarding'];
+  context.fillStyle = '#0d0f0e';
+  context.fillRect(bx, by, bw, bh);
+  lettering(context, 'ПОСАДКИ НЕТ', bx + bw / 2, by + bh / 2 + 2, 74, '#ffd9a0');
+  weather(context, bx, by, bw, bh, random, 25);
+  enamelPlate(context, 'third-rail', '#d8b02c', '#1b1b1b', '#1b1b1b', ['ОСТОРОЖНО!', 'КОНТАКТНЫЙ РЕЛЬС'], 28, random);
+  enamelPlate(context, 'blast-gate', '#9a1f16', '#e8e2d2', '#f1ead8', ['ГЕРМОЗАТВОР', 'НЕ ОТКРЫВАТЬ'], 30, random);
+  const [rx, ry, rw, rh] = SIGN_REGIONS['route-33'];
+  context.fillStyle = '#d9d3c1';
+  context.fillRect(rx, ry, rw, rh);
+  lettering(context, '33', rx + rw / 2, ry + rh / 2 + 4, 92, '#1b1b1b');
+  weather(context, rx, ry, rw, rh, random, 12);
+  enamelPlate(context, 'depot', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['ДЕПО'], 36, random);
 }
 
 /** Small cream tags with the bank letter and locker number, like "Б-17". */

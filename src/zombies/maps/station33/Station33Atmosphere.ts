@@ -1,18 +1,33 @@
 import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { CONSIGNA, VESTIBULE } from '../Station33Config';
+import { COCHERAS, CONSIGNA, SUBESTACION, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
-import { ceilingHeightAt, vaultHeightAt } from './VaultProfile';
+import { ceilingHeightAt, VESTIBULE_VAULT } from './VaultProfile';
 
-const DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 30, medium: 60, high: 90 };
-/** Extra motes over the luggage-office hall, seeded apart so the vestibule's stay put. */
-const CONSIGNA_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 10, medium: 20, high: 30 };
+interface DustVolume {
+  readonly room: { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number };
+  readonly count: Readonly<Record<QualityLevel, number>>;
+  /** Top of the band the motes start in. */
+  readonly ceiling: number;
+  /** Each room has its own seed, so adding a room never moves another's motes. */
+  readonly seed: number;
+}
+
+/** Motes over the vestibule, the luggage-office hall, the train sheds and the machine room. */
+const DUST_VOLUMES: ReadonlyArray<DustVolume> = [
+  { room: VESTIBULE, count: { low: 30, medium: 60, high: 90 }, ceiling: 4.1, seed: 3407 },
+  { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
+  { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60 }, ceiling: 4.1, seed: 3419 },
+  { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: 4.1, seed: 3421 },
+];
 const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5 };
 /**
  * Seepage points in the ceilings; the third one is the hole the vault
- * plaster fell from, the last two soak the luggage office.
+ * plaster fell from, the next two soak the luggage office, three drip from
+ * the joints of the train sheds' iron rings and the last two leak onto the
+ * machine-room floor.
  */
 const DRIP_SOURCES = [
   { x: -1.2, z: 7.3, interval: 2.3 },
@@ -20,6 +35,11 @@ const DRIP_SOURCES = [
   { x: 4.6, z: 15.0, interval: 1.7 },
   { x: 16.1, z: 11.6, interval: 2.6 },
   { x: 19.6, z: 16.7, interval: 1.9 },
+  { x: 9.6, z: -5.4, interval: 2.1 },
+  { x: 12.4, z: -17.3, interval: 1.5 },
+  { x: 19.4, z: -24.1, interval: 2.8 },
+  { x: 9.2, z: -36.5, interval: 2.4 },
+  { x: 16.9, z: -38.6, interval: 1.8 },
 ] as const;
 /** Severed cables hanging out of the ceilings: anchor, length and sway phase. */
 const HANGING_CABLES = [
@@ -27,6 +47,9 @@ const HANGING_CABLES = [
   { x: 4.9, z: 15.3, length: 1.1, phase: 2.2 },
   { x: -5.2, z: 6.2, length: 1.3, phase: 4.1 },
   { x: 12.3, z: 9.1, length: 0.9, phase: 3.0 },
+  { x: 12.9, z: -13.2, length: 2.1, phase: 1.1 },
+  { x: 18.6, z: -18.4, length: 1.5, phase: 3.6 },
+  { x: 12.0, z: -44.2, length: 1.3, phase: 0.9 },
 ] as const;
 /** The fluorescent fixture that tore loose from its slot and hangs by one chain. */
 const DANGLING_FIXTURE = { x: 2, z: 6.75, chain: 0.9 } as const;
@@ -98,25 +121,20 @@ export class Station33Atmosphere {
   constructor(private readonly context: Station33BuildContext, lighting: Station33Lighting) {
     const spot = makeSoftSpot(16);
     const quality = context.profile.quality;
-    const random = seededRandom(3407);
+    const random = seededRandom(3401);
 
-    const dustCount = DUST_COUNT[quality];
-    const totalDust = dustCount + CONSIGNA_DUST_COUNT[quality];
+    const totalDust = DUST_VOLUMES.reduce((sum, volume) => sum + volume.count[quality], 0);
     this.dustBase = new Float32Array(totalDust * 3);
     this.dustPhase = new Float32Array(totalDust);
-    for (let index = 0; index < dustCount; index++) {
-      this.dustBase[index * 3] = THREE.MathUtils.lerp(VESTIBULE.minX + 0.5, VESTIBULE.maxX - 0.5, random());
-      this.dustBase[index * 3 + 1] = 0.3 + random() * 3.8;
-      this.dustBase[index * 3 + 2] = THREE.MathUtils.lerp(VESTIBULE.minZ + 0.5, VESTIBULE.maxZ - 0.5, random());
-      this.dustPhase[index] = random() * Math.PI * 2;
-    }
-    const consignaRandom = seededRandom(3413);
-    const { hall } = CONSIGNA;
-    for (let index = dustCount; index < totalDust; index++) {
-      this.dustBase[index * 3] = THREE.MathUtils.lerp(hall.minX + 0.5, hall.maxX - 0.5, consignaRandom());
-      this.dustBase[index * 3 + 1] = 0.3 + consignaRandom() * (CONSIGNA.ceilingHeight - 0.5);
-      this.dustBase[index * 3 + 2] = THREE.MathUtils.lerp(hall.minZ + 0.5, hall.maxZ - 0.5, consignaRandom());
-      this.dustPhase[index] = consignaRandom() * Math.PI * 2;
+    let mote = 0;
+    for (const { room, count, ceiling, seed } of DUST_VOLUMES) {
+      const roomRandom = seededRandom(seed);
+      for (let index = 0; index < count[quality]; index++, mote++) {
+        this.dustBase[mote * 3] = THREE.MathUtils.lerp(room.minX + 0.5, room.maxX - 0.5, roomRandom());
+        this.dustBase[mote * 3 + 1] = 0.3 + roomRandom() * (ceiling - 0.3);
+        this.dustBase[mote * 3 + 2] = THREE.MathUtils.lerp(room.minZ + 0.5, room.maxZ - 0.5, roomRandom());
+        this.dustPhase[mote] = roomRandom() * Math.PI * 2;
+      }
     }
     this.dust = this.makePoints('station33-dust', this.dustBase.slice(), new THREE.PointsMaterial({
       name: 'station33_dust', size: 0.035, map: spot, color: 0xb8c2b8, transparent: true, opacity: 0.45, depthWrite: false,
@@ -125,7 +143,7 @@ export class Station33Atmosphere {
     this.drips = DRIP_SOURCES.map((source) => ({
       x: source.x,
       z: source.z,
-      top: ceilingHeightAt(source.x) - 0.05,
+      top: ceilingHeightAt(source.x, source.z) - 0.05,
       interval: source.interval,
       timer: random() * source.interval,
       falling: false,
@@ -230,7 +248,7 @@ export class Station33Atmosphere {
 
   private addCable(x: number, z: number, length: number, phase: number): void {
     const pivot = new THREE.Group();
-    pivot.position.set(x, ceilingHeightAt(x) - 0.02, z);
+    pivot.position.set(x, ceilingHeightAt(x, z) - 0.02, z);
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0.08, -length * 0.4, 0.05),
@@ -248,7 +266,7 @@ export class Station33Atmosphere {
   private addDanglingFixture(lighting: Station33Lighting): void {
     const { materials } = this.context;
     const pivot = new THREE.Group();
-    pivot.position.set(DANGLING_FIXTURE.x + 0.5, vaultHeightAt(DANGLING_FIXTURE.x) - 0.02, DANGLING_FIXTURE.z - 0.7);
+    pivot.position.set(DANGLING_FIXTURE.x + 0.5, VESTIBULE_VAULT.heightAt(DANGLING_FIXTURE.x) - 0.02, DANGLING_FIXTURE.z - 0.7);
     const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, DANGLING_FIXTURE.chain, 4), materials.greySteel);
     chain.position.y = -DANGLING_FIXTURE.chain / 2;
     const fixture = new THREE.Group();

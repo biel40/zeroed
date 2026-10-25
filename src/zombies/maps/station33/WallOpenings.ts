@@ -17,3 +17,26 @@ export function stationWallOpenings(axis: WallAxis, fixed: number, min: number, 
     ...STATION33_DOORS.filter(onWall).map((door) => ({ center: along(door), width: POINT_DOOR_SIZE.width, bottom: 0, top: POINT_DOOR_SIZE.height })),
   ];
 }
+
+/** A straight room wall on its centre line, with every hole cut in it. */
+export interface StationWallLine {
+  readonly axis: WallAxis;
+  readonly fixed: number;
+  readonly min: number;
+  readonly max: number;
+  /** +1/-1: the room side of the wall along its normal axis. */
+  readonly inward: number;
+  readonly openings: ReadonlyArray<WallOpening>;
+}
+
+/** Wall line cut by the station's entrances and doors, plus any `extra` openings of its own. */
+export function stationWallLine(
+  axis: WallAxis,
+  fixed: number,
+  min: number,
+  max: number,
+  inward: number,
+  extra: ReadonlyArray<WallOpening> = [],
+): StationWallLine {
+  return { axis, fixed, min, max, inward, openings: [...stationWallOpenings(axis, fixed, min, max), ...extra] };
+}

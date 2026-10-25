@@ -3,6 +3,7 @@ import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
+import type { SignId } from './station33/Station33Signage';
 import type {
   ArenaAmbience,
   ArenaAmbientCue,
@@ -25,10 +26,19 @@ import type {
  * - Phase 2 (built) is the luggage office (`consigna`), behind a paid door
  *   in the vestibule's east wall: a corridor between the two east vent
  *   passages, then the locker hall past their dead ends, all at z >= 0.
- * - Phase 3 opens the escalator: an incline from z = 0 down to the mezzanine
+ * - Phase 3 (built) is the train sheds (`cocheras`), behind a paid door in
+ *   the vestibule's north wall east of the escalator portal: a stabling
+ *   siding on the vestibule level, x >= 4.2 and z < 0, with its tracks
+ *   along Z. The column x in [-4, 4] north of z = 0 stays free for the
+ *   escalator shaft.
+ * - Phase 4 (built) is the machine room (`subestacion`), behind a paid door
+ *   in the sheds' north wall: a gallery between the west track's dead
+ *   tunnel and the blast-gate passage, then the traction substation past
+ *   their dead ends, z down to -46.4, with the station's main switch.
+ * - Phase 5 opens the escalator: an incline from z = 0 down to the mezzanine
  *   (floor -1), joined with `floorTransitions` like the mansion stairs.
- * - Phase 4 is the central platform (floor -2) with tracks along Z further
- *   north; tunnels, substation, service level and bunker follow beyond it.
+ * - Phase 6 is the central platform (floor -2) with tracks along Z further
+ *   north; tunnels, service level and bunker follow beyond it.
  * Zombie spawn passages run 6 m outward from each entrance at y = 0 (see
  * SERVICE_PASSAGE); later zones must leave those footprints free.
  */
@@ -117,7 +127,7 @@ export interface Station33Barrier {
   readonly zone: Station33ZoneId;
 }
 
-export type Station33ZoneId = 'vestibule' | 'consigna';
+export type Station33ZoneId = 'vestibule' | 'consigna' | 'cocheras' | 'subestacion';
 
 export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
 
@@ -135,15 +145,104 @@ export const CONSIGNA = {
   ceilingHeight: 3.2,
 } as const;
 
+/**
+ * Phase 3 train sheds, interior faces like VESTIBULE: one wide hall north
+ * of the vestibule (its north wall is the sheds' south wall where they
+ * meet), lined with cast-iron tunnel rings under a shallow vault. Its east
+ * face lines up with the luggage office's, so one player rectangle keeps
+ * the east entrances of both rooms shut.
+ */
+export const COCHERAS = {
+  hall: { minX: 4.2, maxX: CONSIGNA.hall.maxX, minZ: -26.6, maxZ: VESTIBULE.minZ - STATION33_WALL_THICKNESS },
+  wallHeight: 4.4,
+  vaultApexY: 6.3,
+} as const;
+
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
 const EAST_WALL_X = VESTIBULE.maxX + STATION33_WALL_THICKNESS / 2;
+const NORTH_WALL_Z = VESTIBULE.minZ - STATION33_WALL_THICKNESS / 2;
 const SOUTH_WALL_Z = VESTIBULE.maxZ + STATION33_WALL_THICKNESS / 2;
 const CONSIGNA_EAST_WALL_X = CONSIGNA.hall.maxX + STATION33_WALL_THICKNESS / 2;
+const COCHERAS_NORTH_WALL_Z = COCHERAS.hall.minZ - STATION33_WALL_THICKNESS / 2;
+const COCHERAS_EAST_WALL_X = COCHERAS.hall.maxX + STATION33_WALL_THICKNESS / 2;
+
+/**
+ * Phase 4 machine room, interior faces like VESTIBULE: a service gallery
+ * running north from the sheds' north wall, between the west track's dead
+ * tunnel and the blast-gate passage, then the traction substation hall
+ * past both dead ends. Same width and east face as the sheds, so the one
+ * player rectangle keeps working. Flat concrete ceilings: the gallery's
+ * under the top of the sheds' north wall, the hall's high above its
+ * machines, under steel beams.
+ */
+export const SUBESTACION = {
+  gallery: { minX: 8.6, maxX: 13.4, minZ: -34.1, maxZ: COCHERAS.hall.minZ - STATION33_WALL_THICKNESS },
+  hall: { minX: COCHERAS.hall.minX, maxX: COCHERAS.hall.maxX, minZ: -46.4, maxZ: -34.4 },
+  galleryHeight: 3.6,
+  hallHeight: 4.8,
+} as const;
+
+const SUBESTACION_NORTH_WALL_Z = SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS / 2;
+const SUBESTACION_EAST_WALL_X = SUBESTACION.hall.maxX + STATION33_WALL_THICKNESS / 2;
+
+/**
+ * Two tracks along Z. The west one hugs the wall and runs on into a
+ * buried tunnel through `portal`; the east one ends at the blast gate.
+ * Both stop at buffer stops on the apron behind the vestibule.
+ */
+export const COCHERAS_TRACKS = {
+  gauge: 1.52,
+  railTop: 0.15,
+  west: { x: 5.85, bufferZ: -7.7 },
+  east: { x: 15.65, bufferZ: -3.4 },
+  /** Opening of the west track's tunnel in the north wall, filled by its train. */
+  portal: { width: 3.3, height: 4.0 },
+} as const;
+
+/** Body of a metro car above the rails: floor, roof, doors per side. */
+export const TRAIN_CAR = {
+  width: 2.7,
+  floorY: 1.05,
+  roofY: 3.45,
+  doorsPerSide: 3,
+  doorWidth: 1.3,
+} as const;
+
+/** A metro car left on a siding, as a solid block the horde walks around. */
+export interface Station33TrainCar {
+  readonly id: string;
+  /** Track centre line. */
+  readonly x: number;
+  /** Ends of the body along the track (couplers stick out past them). */
+  readonly minZ: number;
+  readonly maxZ: number;
+  /** End with the driver's cab, if any. */
+  readonly cab: 'north' | 'south' | null;
+  /** Side whose doors face the hall (+1 east, -1 west) and which of them hang open, south first. */
+  readonly openSide: 1 | -1;
+  readonly openDoors: ReadonlyArray<number>;
+  /** Derailment: turn about Y and lean about the track axis, in radians. */
+  readonly yaw: number;
+  readonly roll: number;
+}
+
+/**
+ * The evacuation trains. The west one waits at its buffer stop with a door
+ * open and its trailer half inside the buried tunnel; the east car jumped
+ * the rails and leans across its track, leaving a lane on either side.
+ */
+export const COCHERAS_TRAIN_CARS: ReadonlyArray<Station33TrainCar> = [
+  { id: 'west-lead', x: COCHERAS_TRACKS.west.x, minZ: -20.0, maxZ: -8.8, cab: 'south', openSide: 1, openDoors: [1], yaw: 0, roll: 0 },
+  { id: 'west-trailer', x: COCHERAS_TRACKS.west.x, minZ: -31.4, maxZ: -20.6, cab: null, openSide: 1, openDoors: [0], yaw: 0, roll: 0 },
+  { id: 'east-derailed', x: COCHERAS_TRACKS.east.x, minZ: -22.4, maxZ: -11.6, cab: 'north', openSide: -1, openDoors: [], yaw: 0.045, roll: -0.06 },
+];
 
 /**
  * Zombie entrances: the vestibule's surface stairs, service door and two
- * vents, then the luggage office's porters' stairs and grille, which only
- * wake once its door is bought.
+ * vents, the luggage office's porters' stairs and grille, then the train
+ * sheds' blast-gate wicket, grille and substation door, then the machine
+ * room's grille and cable-tunnel door. Each zone's entrances only wake once
+ * its door is bought.
  */
 export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'surface-stairs', x: -3.6, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'vestibule' },
@@ -153,6 +252,11 @@ export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'vent-east-south', x: EAST_WALL_X, z: 15.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'vestibule' },
   { id: 'consigna-porters-stairs', x: 17.5, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'consigna' },
   { id: 'consigna-vent-east', x: CONSIGNA_EAST_WALL_X, z: 15.4, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'consigna' },
+  { id: 'cocheras-blast-gate', x: COCHERAS_TRACKS.east.x, z: COCHERAS_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'cocheras' },
+  { id: 'cocheras-vent-east', x: COCHERAS_EAST_WALL_X, z: -5.6, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'cocheras' },
+  { id: 'cocheras-substation-door', x: COCHERAS_EAST_WALL_X, z: -17.5, outwardX: 1, outwardZ: 0, kind: 'gate', zone: 'cocheras' },
+  { id: 'subestacion-vent-east', x: SUBESTACION_EAST_WALL_X, z: -38.0, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'subestacion' },
+  { id: 'subestacion-cable-tunnel', x: 18.4, z: SUBESTACION_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'subestacion' },
 ];
 
 export interface Station33Door {
@@ -165,14 +269,24 @@ export interface Station33Door {
   readonly outwardZ: number;
   readonly cost: number;
   readonly zone: Station33ZoneId;
+  /** Enamel plate over the door on the side it is bought from. */
+  readonly plate: SignId;
 }
 
 /**
- * Paid doors. The first one costs what the mansion's first door does (750);
- * it sits beside the east bench, clear of both vent openings.
+ * Paid doors, rising like the mansion's (750, 1250, then 1500). The first
+ * sits beside the east bench, clear of both vent openings; the second is a
+ * service door in the north wall east of the escalator, facing the cab of
+ * the west train; the third opens the machine room's gallery between the
+ * sheds' dead tunnel and blast gate.
  */
 export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
-  { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna' },
+  { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna', plate: 'luggage-office' },
+  { id: 'to-cocheras', x: 5.6, z: NORTH_WALL_Z, outwardX: 0, outwardZ: -1, cost: 1250, zone: 'cocheras', plate: 'service-passage' },
+  {
+    id: 'to-subestacion', x: (SUBESTACION.gallery.minX + SUBESTACION.gallery.maxX) / 2, z: COCHERAS_NORTH_WALL_Z,
+    outwardX: 0, outwardZ: -1, cost: 1500, zone: 'subestacion', plate: 'substation',
+  },
 ];
 
 /** Dead-end service passage behind every entrance, where its zombies appear. */
@@ -212,6 +326,8 @@ function spawnBehind(barrier: Station33Barrier): ZombieSpawnPoint {
 export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<ZombieSpawnPoint>>> = {
   vestibule: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'vestibule').map(spawnBehind),
   consigna: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'consigna').map(spawnBehind),
+  cocheras: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'cocheras').map(spawnBehind),
+  subestacion: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'subestacion').map(spawnBehind),
 };
 
 /** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
@@ -246,6 +362,16 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     yaw: -Math.PI / 2,
     floor: 0,
   },
+  {
+    // The civil-defence machine gun, on the sheds' apron wall between both buffer stops.
+    id: 'cocheras-m60',
+    weaponId: 'm60',
+    price: 2500,
+    ammoPrice: 1250,
+    position: { x: 11.2, y: 1.45, z: COCHERAS.hall.maxZ - 0.02 },
+    yaw: Math.PI,
+    floor: 0,
+  },
 ];
 
 /** The luggage office's crate, against the north lockers with its front to the hall. */
@@ -257,43 +383,72 @@ export const STATION33_BOX_PLACEMENT: MysteryBoxPlacement = {
   floor: 0,
 };
 
-/** Open luggage locker holding a ring, at the end of the corridor's axis. */
+/** Open locker holding a ring, built into a bank of lockers of its room. */
 export interface Station33RingLocker {
   readonly id: string;
   readonly ringId: RingId;
+  /** Room whose locker bank holds it. */
+  readonly zone: Station33ZoneId;
   /** Centre of the locker's open front, on the hall face of its bank. */
   readonly x: number;
   readonly z: number;
   /** Direction the open front faces (into the hall). */
   readonly facingX: number;
   readonly facingZ: number;
+  /** Sells only once the station's power is on (dark and silent until then). */
+  readonly requiresPower: boolean;
 }
 
-/** Depth and height of the luggage lockers that line the hall walls. */
+/** Depth and height of the lockers that line the walls (luggage office, train crew). */
 export const CONSIGNA_LOCKER = { depth: 0.5, height: 2.0, columnWidth: 0.42, rows: 3, ringLockerWidth: 0.62 } as const;
 
+/**
+ * Staff lockers of the train crews on the sheds' apron wall, east of the
+ * buffer stops, clear of the east grille and the walking lane behind them.
+ */
+export const COCHERAS_CREW_LOCKERS = { minX: 17.3, maxX: 20.6 } as const;
+
+/**
+ * The Resurrection locker at the end of the luggage-office corridor's axis,
+ * and the Sleight of Hand locker in the middle of the train crews' bank,
+ * which waits for the power.
+ */
 export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
-  { id: 'consigna-resurrection', ringId: 'resurrection', x: CONSIGNA.hall.maxX - CONSIGNA_LOCKER.depth, z: 9.9, facingX: -1, facingZ: 0 },
+  {
+    id: 'consigna-resurrection', ringId: 'resurrection', zone: 'consigna',
+    x: CONSIGNA.hall.maxX - CONSIGNA_LOCKER.depth, z: 9.9, facingX: -1, facingZ: 0, requiresPower: false,
+  },
+  {
+    id: 'cocheras-sleight-of-hand', ringId: 'sleightOfHand', zone: 'cocheras',
+    x: (COCHERAS_CREW_LOCKERS.minX + COCHERAS_CREW_LOCKERS.maxX) / 2, z: COCHERAS.hall.maxZ - CONSIGNA_LOCKER.depth,
+    facingX: 0, facingZ: -1, requiresPower: true,
+  },
 ];
 
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
 
 /**
- * Player movement over the vestibule and the luggage office, inset by the
- * body radius. One rectangle covers both: walls and the closed door keep
- * the player out of the office (and out of the gap between the rooms)
- * until it is bought; the shared south line keeps both south gates shut.
+ * Player movement over every room, inset by the body radius. One rectangle
+ * covers them all: walls and the closed doors keep the player out of the
+ * locked rooms (and out of the gaps between rooms) until they are bought,
+ * and the arena stops the player at every walk-through gate (the sheds'
+ * blast gate now lies inside the rectangle) so no spawn passage is ever
+ * walkable.
  */
 export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
   minX: VESTIBULE.minX + 0.4,
   maxX: CONSIGNA.hall.maxX - 0.4,
-  minZ: VESTIBULE.minZ + 0.4,
+  minZ: SUBESTACION.hall.minZ + 0.4,
   maxZ: VESTIBULE.maxZ - 0.4,
 };
 
-/** Both rooms plus every entrance passage on the vestibule level. */
+/**
+ * Every room plus every entrance passage on the vestibule level. Walls
+ * longer than the zombie obstacle limit (20 m) are built in pieces, so the
+ * empty ground west of the train sheds stays walled off.
+ */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -13.5, maxX: 27.8, minZ: 0, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: -13.5, maxX: 27.8, minZ: -53.5, maxZ: 24.7, baseY: 0 },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -308,9 +463,11 @@ export const STATION33_AMBIENCE = {
 
 /**
  * Flicker personality of a light circuit. Mains circuits die during a power
- * dip; the emergency circuit runs on batteries.
+ * dip; the emergency circuit runs on batteries. The `mains` circuit is fed
+ * by the substation alone: dark until the main switch is thrown, then a
+ * steady hum.
  */
-export type Station33LightCircuit = 'steady' | 'unstable' | 'failing' | 'amber' | 'emergency';
+export type Station33LightCircuit = 'steady' | 'unstable' | 'failing' | 'amber' | 'emergency' | 'mains';
 
 export interface Station33PointLight {
   readonly x: number;
@@ -328,8 +485,35 @@ export const FLUORESCENT_COLOR = 0xd2eadf;
 export const AMBER_LAMP_COLOR = 0xffa65a;
 export const EMERGENCY_COLOR = 0xff2a12;
 
-/** Zone holding a floor point at `x`: the vestibule's east wall separates the rooms. */
-export function station33ZoneAt(x: number): Station33ZoneId {
+/**
+ * The station's main switch: a knife-switch lever on the machine room's
+ * north wall, at the end of the gallery's axis, between two switchboards.
+ */
+export const POWER_LEVER = { x: (SUBESTACION.gallery.minX + SUBESTACION.gallery.maxX) / 2, z: SUBESTACION.hall.minZ } as const;
+
+/**
+ * What throwing the main switch changes for the rest of the run, as
+ * multipliers: real lights and lamps burn brighter and steadier, the fill
+ * and environment light rise, the haze thins, and the machines (the ring
+ * lockers, and the weapon upgrade machine to come) glow far brighter. The
+ * `mains` fixtures come alive on their own circuit.
+ */
+export const STATION33_MAINS = {
+  lightBoost: 1.8,
+  hemisphereBoost: 2.4,
+  environmentBoost: 2.4,
+  fogDensityScale: 0.7,
+  machineGlowBoost: 1.9,
+} as const;
+
+/**
+ * Zone holding a floor point: the sheds' north wall separates the machine
+ * room, the vestibule's north wall the train sheds, its east wall the
+ * luggage office.
+ */
+export function station33ZoneAt(x: number, z: number): Station33ZoneId {
+  if (z < COCHERAS_NORTH_WALL_Z) return 'subestacion';
+  if (z < NORTH_WALL_Z) return 'cocheras';
   return x > EAST_WALL_X ? 'consigna' : 'vestibule';
 }
 
@@ -339,9 +523,10 @@ export const EMERGENCY_LAMP = { x: -3.75, y: 2.6, z: VESTIBULE.minZ } as const;
 /**
  * Dynamic lights in priority order within each room. A quality level keeps
  * the first POINT_LIGHT_BUDGET entries, taking the player's room first and
- * filling up with the other room's; everything else glows through emissive
+ * filling up with the other rooms'; everything else glows through emissive
  * meshes. The luggage-office lights are short so they never leak through
- * the wall it shares with the vestibule.
+ * the wall it shares with the vestibule; the train-shed lights stay deep
+ * enough in the hall for the same reason.
  */
 export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: 0, y: 3.85, z: 5.6, color: FLUORESCENT_COLOR, intensity: 9, distance: 12, circuit: 'steady', zone: 'vestibule' },
@@ -353,25 +538,85 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: 17.5, y: 2.95, z: 9.2, color: FLUORESCENT_COLOR, intensity: 5, distance: 7, circuit: 'steady', zone: 'consigna' },
   { x: 17.5, y: 2.95, z: 14.8, color: FLUORESCENT_COLOR, intensity: 4.5, distance: 7, circuit: 'failing', zone: 'consigna' },
   { x: 10.6, y: 2.95, z: 9.9, color: FLUORESCENT_COLOR, intensity: 4, distance: 4.5, circuit: 'unstable', zone: 'consigna' },
+  { x: 11, y: 3.95, z: -6.5, color: FLUORESCENT_COLOR, intensity: 8, distance: 10, circuit: 'steady', zone: 'cocheras' },
+  { x: 11, y: 3.95, z: -15.5, color: FLUORESCENT_COLOR, intensity: 7, distance: 11, circuit: 'unstable', zone: 'cocheras' },
+  { x: 13.0, y: 3.4, z: -25.9, color: EMERGENCY_COLOR, intensity: 4.5, distance: 8, circuit: 'emergency', zone: 'cocheras' },
+  { x: 20.3, y: 2.6, z: -11.0, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6.5, circuit: 'amber', zone: 'cocheras' },
+  { x: 11, y: 3.95, z: -23.5, color: FLUORESCENT_COLOR, intensity: 5, distance: 8, circuit: 'failing', zone: 'cocheras' },
+  // The machine room waits in the red of its battery lamp until its own mains come on.
+  { x: POWER_LEVER.x, y: 3.4, z: SUBESTACION.hall.minZ + 0.5, color: EMERGENCY_COLOR, intensity: 4.5, distance: 8, circuit: 'emergency', zone: 'subestacion' },
+  { x: 12.6, y: 4.4, z: -39.6, color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing', zone: 'subestacion' },
+  { x: 7.4, y: 4.4, z: -38.5, color: FLUORESCENT_COLOR, intensity: 8, distance: 11, circuit: 'mains', zone: 'subestacion' },
+  { x: 17.6, y: 4.4, z: -42.5, color: FLUORESCENT_COLOR, intensity: 8, distance: 11, circuit: 'mains', zone: 'subestacion' },
+  { x: SUBESTACION.gallery.maxX - 0.3, y: 2.6, z: -30.5, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6, circuit: 'amber', zone: 'subestacion' },
 ];
 
 /**
- * Linear fluorescent fixtures along Z, hung under the vault or the
+ * Linear fluorescent fixtures along Z, hung under the vaults or the
  * luggage-office ceiling. The vestibule slot at (2, 6.75) is empty: that
- * fixture tore loose and dangles from one chain.
+ * fixture tore loose and dangles from one chain. The train sheds hang two
+ * rows, over the floor between the tracks and over the east lane. `dead`
+ * tubes are broken for good; `mains` ones wait for the main switch.
  */
 export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly z: number; readonly circuit: Station33LightCircuit | 'dead' }> = [
   { x: -2, z: 2.5, circuit: 'failing' },
   { x: 2, z: 2.5, circuit: 'steady' },
   { x: -2, z: 6.75, circuit: 'steady' },
   { x: -2, z: 11.25, circuit: 'unstable' },
-  { x: 2, z: 11.25, circuit: 'dead' },
+  { x: 2, z: 11.25, circuit: 'mains' },
   { x: -2, z: 15.5, circuit: 'steady' },
   { x: 2, z: 15.5, circuit: 'failing' },
   { x: 10.6, z: 9.9, circuit: 'unstable' },
   { x: 17.5, z: 9.2, circuit: 'steady' },
-  { x: 19.4, z: 12, circuit: 'dead' },
+  { x: 19.4, z: 12, circuit: 'mains' },
   { x: 17.5, z: 14.8, circuit: 'failing' },
+  { x: 11, z: -2.8, circuit: 'mains' },
+  { x: 11, z: -6.5, circuit: 'steady' },
+  { x: 11, z: -11, circuit: 'steady' },
+  { x: 11, z: -15.5, circuit: 'unstable' },
+  { x: 11, z: -19.5, circuit: 'mains' },
+  { x: 11, z: -23.5, circuit: 'failing' },
+  { x: 19.2, z: -4.5, circuit: 'unstable' },
+  { x: 19.2, z: -13.5, circuit: 'dead' },
+  { x: 19.2, z: -22, circuit: 'failing' },
+  { x: 7.4, z: -38.5, circuit: 'mains' },
+  { x: 7.4, z: -43.5, circuit: 'mains' },
+  { x: 12.6, z: -37.2, circuit: 'mains' },
+  { x: 12.6, z: -39.6, circuit: 'failing' },
+  { x: 17.6, z: -37.2, circuit: 'dead' },
+  { x: 17.6, z: -42.5, circuit: 'mains' },
+];
+
+/** A fitting mounted on a wall face at (x, z), `facing` into its room. */
+export interface Station33WallFitting {
+  readonly x: number;
+  readonly z: number;
+  readonly facingX: number;
+  readonly facingZ: number;
+}
+
+/**
+ * Caged bulkhead lamps of the train sheds and the machine room. `dead`
+ * globes are smashed; `mains` ones light only once the main switch is thrown.
+ */
+export const STATION33_WALL_LAMPS: ReadonlyArray<Station33WallFitting & { readonly circuit: Station33LightCircuit | 'dead' }> = [
+  { x: COCHERAS.hall.maxX, z: -11.0, facingX: -1, facingZ: 0, circuit: 'amber' },
+  { x: COCHERAS.hall.maxX, z: -23.4, facingX: -1, facingZ: 0, circuit: 'mains' },
+  { x: 16.6, z: COCHERAS.hall.maxZ, facingX: 0, facingZ: -1, circuit: 'amber' },
+  { x: 8.6, z: COCHERAS.hall.minZ, facingX: 0, facingZ: 1, circuit: 'dead' },
+  { x: SUBESTACION.gallery.maxX, z: -30.5, facingX: -1, facingZ: 0, circuit: 'amber' },
+  { x: SUBESTACION.hall.minX, z: -35.8, facingX: 1, facingZ: 0, circuit: 'mains' },
+  { x: SUBESTACION.hall.maxX, z: -35.4, facingX: -1, facingZ: 0, circuit: 'mains' },
+  { x: 6.2, z: SUBESTACION.hall.maxZ, facingX: 0, facingZ: -1, circuit: 'dead' },
+];
+
+/**
+ * Red battery beacons at 3.4 m: over the sheds' blast gate, beside the
+ * wicket the horde breaks through, and over the machine room's main switch.
+ */
+export const STATION33_BEACONS: ReadonlyArray<Station33WallFitting> = [
+  { x: 13.0, z: COCHERAS.hall.minZ, facingX: 0, facingZ: 1 },
+  { x: POWER_LEVER.x, z: SUBESTACION.hall.minZ, facingX: 0, facingZ: 1 },
 ];
 
 /** Amber glass sconces on the side walls; `yaw` faces the hall. */
@@ -456,6 +701,7 @@ export const STATION33_INTRO_POWER_UP: Readonly<Record<Exclude<Station33LightCir
   failing: 1.8,
   steady: 2.4,
   unstable: 3.1,
+  mains: 3.6,
 };
 
 /** Ambient events the intro fires on its own clock, by `STATION33_AMBIENT_EVENTS` id. */

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
-import { RING_DEFINITIONS } from '../src/game/rings/RingCatalog';
+import { RING_DEFINITIONS, type RingEffect } from '../src/game/rings/RingCatalog';
 import { DEATH_FALL_DURATION } from '../src/player/DeathFall';
 import type { Input } from '../src/player/Input';
 import { EYE_HEIGHT } from '../src/player/PlayerController';
@@ -13,8 +13,9 @@ import type { ZombieManager } from '../src/zombies/ZombieManager';
 import { installCanvasDocument, makeContext, type TestContext } from './coopHarness';
 
 const RESURRECTION = RING_DEFINITIONS.resurrection;
+const EFFECT = RESURRECTION.effect as Extract<RingEffect, { kind: 'resurrection' }>;
 const [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE] = RESURRECTION.prices;
-const { getUp: GET_UP, protection: PROTECTION } = RESURRECTION.effect;
+const { getUp: GET_UP, protection: PROTECTION } = EFFECT;
 /** Protected (invulnerable and ignored) while getting up and for the ring's protection after. */
 const PROTECTED_FOR = GET_UP + PROTECTION;
 const LETHAL = 10_000;
@@ -96,7 +97,7 @@ describe('Resurrection ring', () => {
     internals.onPlayerHit(LETHAL);
     expect(internals.gameOver).toBe(false);
     expect(side.hud.showGameOver).not.toHaveBeenCalled();
-    expect(internals.health.hp).toBe(PLAYER_MAX_HP * RESURRECTION.effect.reviveFraction);
+    expect(internals.health.hp).toBe(PLAYER_MAX_HP * EFFECT.reviveFraction);
     expect(internals.health.isInvulnerable).toBe(true);
     expect(side.ctx.audio.playResurrection).toHaveBeenCalledOnce();
     expect(side.hud.flashRing).toHaveBeenCalledOnce();
@@ -104,7 +105,7 @@ describe('Resurrection ring', () => {
 
     // Still inside the invulnerability window: the next blow does nothing.
     internals.onPlayerHit(LETHAL);
-    expect(internals.health.hp).toBe(PLAYER_MAX_HP * RESURRECTION.effect.reviveFraction);
+    expect(internals.health.hp).toBe(PLAYER_MAX_HP * EFFECT.reviveFraction);
     internals.health.update(PROTECTED_FOR - 0.1);
     expect(internals.health.isInvulnerable).toBe(true);
     internals.health.update(0.2);

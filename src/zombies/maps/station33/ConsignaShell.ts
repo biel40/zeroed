@@ -1,34 +1,19 @@
-import * as THREE from 'three';
-import { POINT_DOOR_SIZE } from '../../doors/PointDoor';
-import { wallSpans, type WallAxis, type WallOpening } from '../shared/ArenaStructure';
-import { CONSIGNA, STATION33_DOORS, STATION33_WALL_THICKNESS, VESTIBULE } from '../Station33Config';
+import type * as THREE from 'three';
+import { wallSpans, type WallOpening } from '../shared/ArenaStructure';
+import { CONSIGNA, STATION33_WALL_THICKNESS } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
-import { stationWallOpenings } from './WallOpenings';
+import { stationWallLine as line, type StationWallLine } from './WallOpenings';
 
 const HALF_THICKNESS = STATION33_WALL_THICKNESS / 2;
 const SKIRTING_HEIGHT = 0.14;
 const { corridor, hall, ceilingHeight } = CONSIGNA;
-
-interface WallLine {
-  readonly axis: WallAxis;
-  readonly fixed: number;
-  readonly min: number;
-  readonly max: number;
-  /** +1/-1: the room side of the wall along its normal axis. */
-  readonly inward: number;
-  readonly openings: ReadonlyArray<WallOpening>;
-}
-
-function line(axis: WallAxis, fixed: number, min: number, max: number, inward: number, extra: ReadonlyArray<WallOpening> = []): WallLine {
-  return { axis, fixed, min, max, inward, openings: [...stationWallOpenings(axis, fixed, min, max), ...extra] };
-}
 
 /**
  * Walls of the luggage office: the corridor's two sides, then the hall,
  * whose west wall opens onto the corridor. Corridor walls stop at the
  * vestibule's east wall and at the hall's west wall.
  */
-export function consignaWalls(): ReadonlyArray<WallLine> {
+export function consignaWalls(): ReadonlyArray<StationWallLine> {
   const hallWest = hall.minX - HALF_THICKNESS;
   const hallOuterMinZ = hall.minZ - STATION33_WALL_THICKNESS;
   const hallOuterMaxZ = hall.maxZ + STATION33_WALL_THICKNESS;
@@ -50,8 +35,7 @@ export function consignaWalls(): ReadonlyArray<WallLine> {
 
 /**
  * Floor, flat ceiling and glazed-tile walls of the luggage office, with a
- * granite skirting, and the steel frame and enamel plate of its door on
- * both faces of the vestibule wall.
+ * granite skirting. Its door frame comes from `DoorFrames`.
  */
 export function buildConsignaShell(context: Station33BuildContext): void {
   const { structure, materials } = context;
@@ -85,10 +69,9 @@ export function buildConsignaShell(context: Station33BuildContext): void {
     seed += 5;
     addSkirting(context, wall);
   }
-  for (const door of STATION33_DOORS) addDoorFrame(context, door.x, door.z);
 }
 
-function addSkirting(context: Station33BuildContext, wall: WallLine): void {
+function addSkirting(context: Station33BuildContext, wall: StationWallLine): void {
   const face = wall.fixed + wall.inward * (HALF_THICKNESS + 0.015);
   for (const [from, to] of wallSpans(wall.min, wall.max, wall.openings)) {
     const along = (from + to) / 2;
@@ -96,20 +79,4 @@ function addSkirting(context: Station33BuildContext, wall: WallLine): void {
     if (wall.axis === 'z') context.batch.addBox(context.materials.darkGranite, face, SKIRTING_HEIGHT / 2, along, 0.03, SKIRTING_HEIGHT, length, 0, 0, 0, along);
     else context.batch.addBox(context.materials.darkGranite, along, SKIRTING_HEIGHT / 2, face, length, SKIRTING_HEIGHT, 0.03, 0, 0, 0, along);
   }
-}
-
-/** Painted steel jambs and lintel on both faces of a door in the vestibule's east wall, plate on the hall side. */
-function addDoorFrame(context: Station33BuildContext, wallX: number, z: number): void {
-  const { batch, materials, signage, group } = context;
-  const { width, height } = POINT_DOOR_SIZE;
-  for (const side of [-1, 1]) {
-    const x = wallX + side * (HALF_THICKNESS + 0.03);
-    for (const jamb of [-1, 1]) batch.addBox(materials.paintedSteel, x, height / 2, z + jamb * (width / 2 + 0.05), 0.07, height, 0.1);
-    batch.addBox(materials.paintedSteel, x, height + 0.05, z, 0.07, 0.1, width + 0.2);
-  }
-  const plate = new THREE.Mesh(signage.signGeometry('luggage-office', 0.7, 0.35), signage.material);
-  plate.position.set(VESTIBULE.maxX - 0.012, height + 0.32, z);
-  plate.rotation.y = -Math.PI / 2;
-  plate.userData.mapRole = 'sign';
-  group.add(plate);
 }

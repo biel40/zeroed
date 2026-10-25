@@ -10,7 +10,7 @@ import {
   STATION33_POINT_LIGHTS,
   VESTIBULE,
 } from '../src/zombies/maps/Station33Config';
-import { vaultHeightAt } from '../src/zombies/maps/station33/VaultProfile';
+import { VESTIBULE_VAULT } from '../src/zombies/maps/station33/VaultProfile';
 import type { ArenaAmbientCue } from '../src/zombies/maps/ZombieArena';
 import { installCanvasDocument, makeContext, TEST_PROFILE } from './coopHarness';
 
@@ -96,7 +96,7 @@ describe('Station 33 intro', () => {
       expect(z).toBeGreaterThan(VESTIBULE.minZ + 0.3);
       expect(z).toBeLessThan(VESTIBULE.maxZ - 0.3);
       expect(y).toBeGreaterThan(0.5);
-      expect(y).toBeLessThan(vaultHeightAt(x) - 0.4);
+      expect(y).toBeLessThan(VESTIBULE_VAULT.heightAt(x) - 0.4);
       for (const box of solids) expect(box.containsPoint(intro.camera.position), `t=${time.toFixed(2)}`).toBe(false);
       intro.update(0.05, player);
     }

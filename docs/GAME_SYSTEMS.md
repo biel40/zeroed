@@ -89,7 +89,9 @@ guardandose automaticamente al ajustarlos.
   golpe; el arco visible no es un ataque de area.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
-  continua de canal unico, sin teletransporte.
+  continua de canal unico, sin teletransporte. La rejilla se reconstruye en
+  cada cambio de barrera, asi que cada obstaculo solo marca las celdas a su
+  alcance (mismo predicado exacto, coste proporcional al area ocupada).
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
   fallback sintetizado si falta el asset.
 - Audio direccional (`SpatialCue`): aparicion, inicio del ataque (gruñido o
@@ -152,12 +154,34 @@ guardandose automaticamente al ajustarlos.
   abierta, la MP5 (1000 / 500) en
   pared, la Mystery Box y la taquilla del
   anillo de Resurreccion. Las rejillas este del vestibulo se separaron para
-  dejar un pasillo de 5,8 m. Un unico rectangulo de `playerBounds` y de navegacion cubre
-  ambas salas: muros y la puerta cerrada son lo que impide el paso. Reiniciar
-  cierra la puerta y duerme la zona. Aun no tiene final. La arena solo
+  dejar un pasillo de 5,8 m. La Fase 3 son las cocheras, tras una puerta de
+  servicio (1250) en el muro norte junto a la escalera: una nave de dovelas
+  de hierro con dos trenes abandonados (uno junto al muro, que se pierde en
+  un tunel hundido, y un vagon descarrilado con un carril a cada lado), tres
+  entradas mas (postigo del germozatvor, rejilla y puerta de la subestacion)
+  y la M60 (2500 / 1250) en pared. La Fase 4 es la sala de maquinas, tras una
+  puerta de pago (1500) en el muro norte de las cocheras: galeria de servicio,
+  motor-generadores, transformadores, dos entradas mas y el interruptor
+  general (`PowerLever`, un `ArenaPowerSwitch`). Un unico rectangulo de
+  `playerBounds` y de navegacion cubre todas las salas: muros, trenes y
+  puertas cerradas son lo que impide el paso, y la arena para al jugador en
+  cada entrada de tipo puerta para que ningun pasadizo de spawn sea
+  transitable; los muros de mas de 20 m se parten porque el filtro de
+  obstaculos de los zombis ignora los solidos mayores. Reiniciar cierra las
+  puertas y duerme sus zonas. Aun no tiene final. La arena solo
   orquesta: cada zona tiene su builder en `station33/`, y la luz y la
   atmosfera son sistemas propios. Direccion de arte y directrices del mapa:
   `STATION_33.md`.
+- Interruptor general de un mapa (`ArenaPowerSwitch`, opcional): el modo lo
+  ofrece y lo acciona con USE, gratis y una vez por partida
+  (`ZombiesPowerSwitch`: aviso, sonido `playPowerSwitch` y cartel); el mapa
+  anima la palanca y se enciende. En Station 33, al cerrar los contactos,
+  `switchOnPower` restablece la red: `Station33Lighting.restoreMains` repite
+  el arranque por circuitos de la intro y deja luces y emisivos multiplicados
+  y con fallos mas raros, enciende el circuito `mains` (apagado del todo
+  hasta entonces), sube relleno y entorno, aclara la niebla, hace temblar la
+  estacion y las taquillas se ven mucho mas brillantes. Factores en
+  `STATION33_MAINS`; reiniciar lo devuelve todo a oscuras.
 - Puertas de pago de Station 33: la misma `PointDoorView`/`BuyableDoorVisual`
   que la mansion con chapas de acero en lugar de tablones y superficie de
   impacto metalica.
@@ -280,11 +304,30 @@ prompt, la muerte y el reinicio.
   ella). Una vineta azul, espejo de la roja de vida baja (que se oculta
   mientras tanto), cubre exactamente ese tiempo y parpadea durante el ultimo
   segundo para avisar del final. Sin carga, el flujo de muerte no cambia.
+- Prestidigitacion (menique, pasivo, verde): una sola compra por run, 3500.
+  Mientras se lleva, todas las recargas duran la mitad (`reloadSpeed`:
+  `ZombiesRings` fija `Weapon.reloadTimeScale` en todo el arsenal mediante
+  `ModeContext.setReloadTimeScale`; animacion y sonidos siguen el progreso).
+  Se vende en la taquilla de la tripulacion de las cocheras de Station 33 y
+  necesita electricidad.
+- Una maquina puede esperar a la electricidad del mapa
+  (`ArenaRingMachine.powered`): hasta entonces esta apagada, no suena y su
+  prompt solo avisa de que hay que encender la electricidad, sin cobrar. En
+  Station 33 la electricidad (`Station33Power`) empieza apagada en cada run y
+  la enciende el interruptor general de la sala de maquinas. Antes, un rayo de la
+  ZEUS-77 que hace tierra a menos de 1 m de una maquina que espera la
+  electricidad le da 60 s de corriente (`ArenaRingMachine.energize`; otro
+  rayo reinicia el minuto, no lo suma): vende y suena, parpadea los ultimos
+  10 s y vuelve a apagarse. Un aviso lo anuncia y el arco electrico va del
+  arma a la taquilla. El anillo comprado sigue funcionando sin corriente.
 - Las maquinas suenan como las de bebidas: `ZombiesRings` sigue cada frame a
-  la mas cercana en la planta del jugador y `AudioSystem.setRingJingle`
-  mantiene un unico bucle (volumen, paneo y apagado por distancia y
-  orientacion, sin allocations), callado en intro, pausa, derrota y final.
-  `ring_machine_jingle.mp3` sustituye al tono procedural si existe.
+  la mas cercana con electricidad en la planta del jugador y
+  `AudioSystem.setRingJingle` mantiene un unico bucle con la melodia de su
+  anillo (`RingDefinition.jingle`, en `RingJingleTunes.ts`; volumen, paneo y
+  apagado por distancia y orientacion, sin allocations salvo al cambiar de
+  melodia), callado en intro, pausa, derrota y final. El MP3 de cada melodia
+  (`sampleFile`, p. ej. `ring_machine_jingle.mp3`) sustituye al tono
+  procedural si existe.
 - El anillo se ve en el dedo de la mano derecha en primera persona
   (`HandRings`, hijo del hueso de la falange, sin tocar la pose ni subir nunca
   hacia la mira); brilla con su esmalte al ponerselo y al dispararse y se apaga
@@ -329,7 +372,7 @@ no era la GPU. `?debug` muestra la escala actual.
 
 Station 33 mantiene visibles solo las luces puntuales que caben en ese mismo
 presupuesto (`POINT_LIGHT_BUDGET`): las de la sala donde esta el jugador, por
-prioridad, y las de la otra para completar; el cambio de sala espera a que el
+prioridad, y las de las demas para completar; el cambio de sala espera a que el
 jugador cruce claramente la puerta. Fusiona su decoracion estatica en una
 malla por material (`StaticMeshBatch`); columnas, torniquetes, taquillas,
 mostrador, carro y bancos chocan con proxies AABB invisibles.

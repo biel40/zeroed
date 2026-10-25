@@ -17,7 +17,10 @@ codigo: actualiza la guia.
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
   cuatro entradas con chapas de acero, la AK-47 y la Vector (900 / 625) en pared
-  y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera puerta de pago. Cada fase
+  y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera
+  puerta de pago, la Fase 3 las cocheras tras la segunda y la Fase 4 la sala
+  de maquinas (la subestacion) tras la tercera. La escalera mecanica sigue
+  sellada: bajarla es la fase siguiente. Cada fase
   debe ser jugable por si misma y nunca abrir puertas hacia el vacio. El plan
   de ejes (hacia el norte y hacia abajo) esta documentado al principio de
   `Station33Config.ts`.
@@ -68,18 +71,95 @@ codigo: actualiza la guia.
   provisional; `public/assets/audio/ring_machine_jingle.mp3` la sustituye en
   cuanto exista (pista libre de derechos, en bucle limpio).
 
+## Las cocheras (Fase 3)
+
+- La via muerta de apartado donde se quedaron los trenes de la evacuacion:
+  la sala mas amplia del mapa, una nave de dovelas de hierro fundido (anillos
+  de tunel con pestañas, pernos, oxido y filtraciones) bajo una boveda
+  rebajada, con un zocalo verde pintado y bandejas de cables a lo largo de
+  los muros. Mas industrial, oscura y mojada que el vestibulo; el marmol se
+  queda al otro lado de la puerta.
+- Se entra por una puerta de servicio («СЛУЖЕБНЫЙ ПРОХОД», 1250 Points) en el
+  muro norte del vestibulo, al este de la escalera. Al abrirla, lo primero que
+  se ve es la cabina del tren oeste: faros muertos, pilotos rojos a bateria y
+  la caja de luz «ПОСАДКИ НЕТ» (no hay embarque) parpadeando. Es la imagen de
+  la zona; cualquier cambio debe preservarla.
+- Dos vias a lo largo de Z que terminan en toperas sobre el anden de
+  entrada. El tren oeste se pega al muro, tiene una puerta abierta con
+  maletas caidas y su remolque se pierde en un tunel hundido que el propio
+  vagon tapona. El vagon este descarrilo y se inclina sobre su via: deja un
+  carril de paso a cada lado y espacio en ambos extremos, asi que la nave es
+  un circuito para entrenar a la horda alrededor del tren.
+- Tres entradas: el postigo del germozatvor (puerta hermetica de defensa
+  civil, «НЕ ОТКРЫВАТЬ») al final de la via este, con su baliza roja; una
+  rejilla y la puerta de la subestacion en el muro este. La M60 (2500 / 1250) espera en el muro del
+  anden, entre las dos toperas. La Mystery Box sigue en la consigna.
+- En el mismo muro, al este de las toperas, estan las taquillas de la
+  tripulacion bajo la placa «ДЕПО»; en medio, la taquilla abierta del anillo
+  de Prestidigitacion (3500). Sin electricidad esta muerta: ni brillo ni
+  musica, y el aviso dice que hay que encender la electricidad. Encendida,
+  brilla en verde y suena su propia melodia, un paso de prestidigitador en re
+  menor, distinta de la cajita de musica de la consigna.
+- Antes del interruptor general hay un atajo: un rayo de la ZEUS-77 (de la Mystery
+  Box) contra la taquilla la alimenta un minuto. Se ve el arco hasta la
+  taquilla, que se enciende y, en sus ultimos 10 s, tartamudea como un
+  fluorescente antes de morir.
+- Los vagones son de la epoca: esmalte azul desvaido con franja crema,
+  ventanas rotas que dejan ver un interior completamente negro, numero de
+  ruta 33. Nada de pintadas ni colores vivos; el unico color intenso es el
+  rojo de las luces a bateria.
+
+## La sala de maquinas (Fase 4)
+
+- La subestacion de traccion que alimentaba la estacion, al fondo de las
+  cocheras: una puerta de pago (1500, placa «ТЯГОВАЯ ПОДСТАНЦИЯ») entre el
+  tunel hundido y el germozatvor abre una galeria de servicio baja que
+  desemboca en la sala. Nadie ha bajado desde la evacuacion: telaranas en
+  cada rincon, aceite bajo las maquinas, el libro de guardia por el suelo.
+- Mas tecnica que las cocheras: yeso sobre zocalo verde, techo plano de
+  hormigon bajo vigas de acero, bandejas de cables y tuberias. Dos grupos
+  motor-generador sobre bancadas (volante con franjas de peligro, colector
+  de cobre), dos transformadores de aceite con aisladores de porcelana y
+  cuadros electricos con relojes y seccionadores. Un pasillo central lleva
+  de la galeria al interruptor; alrededor de los motores hay carriles para
+  dar vueltas a la horda. Dos entradas: una rejilla en el muro este y la
+  puerta del tunel de cables («ВХОДА НЕТ») en el norte.
+- Al final del eje de la galeria, entre los cuadros, el interruptor general
+  («ГЛАВНЫЙ РУБИЛЬНИК»): un seccionador de cuchillas oxidado sobre pizarra,
+  con las cuchillas colgando abiertas y cubierto de telaranas; una cruza los
+  contactos y otras van de las cuchillas a la placa. Sin corriente, la sala
+  solo tiene el rojo de su baliza a bateria y un fluorescente agonizante.
+- Accionarlo es gratis y una sola vez por partida: la palanca chirria, las
+  cuchillas suben rompiendo las telaranas y cierran con un chispazo. En ese
+  instante la estacion entera recupera la red: las luces se apagan y vuelven
+  circuito a circuito (como en la intro), los motores arrancan y hacen temblar
+  todo, y desde entonces todo esta mas iluminado y estable: luces y lamparas
+  mas intensas, fluorescentes que apenas tartamudean, los tubos y lamparas
+  del circuito `mains` encendidos, mas luz de relleno y menos niebla. Las
+  maquinas (las taquillas de anillos y la futura potenciadora de armas) se
+  ven mucho mas iluminadas: brillo multiplicado, bombilla de su color
+  encendida con destello y un charco de luz en el suelo. Todo con materiales
+  emisivos y aditivos, nunca luces nuevas.
+- Los multiplicadores viven en `STATION33_MAINS`; cualquier maquina nueva
+  (Pack-a-Punch incluido) debe leer `Station33Power` y aplicar
+  `machineGlowBoost` como las taquillas.
+
 ## Anillos
 
 - Los anillos son las perks de Zeroed: alianzas que los evacuados dejaron en
   las taquillas. Uno por dedo de la mano derecha, cada uno en un dedo fijo,
   visibles en primera persona; el HUD solo apoya.
-- Su brillo es un acento frio (turquesa para Resurreccion); el dorado sigue
-  reservado a lo premium. Un anillo gastado se queda en el dedo, sin brillo.
-- Catalogo previsto (solo existe Resurreccion): anular, Resurreccion (salva una
-  muerte); corazon, Vitalidad (vida maxima); indice, Doble impacto (dano y
-  cadencia); menique, Cadencia (recarga); pulgar, un anillo de utilidad (por
-  ejemplo, tercera arma). Las fases siguientes anadiran el interruptor de la
-  subestacion (maquinas que exigen energia) y el Pack-a-Punch.
+- Su brillo es un acento frio (turquesa para Resurreccion, verde para
+  Prestidigitacion); el dorado sigue reservado a lo premium. Un anillo
+  gastado se queda en el dedo, sin brillo.
+- Catalogo: anular, Resurreccion (salva una muerte, en la consigna); menique,
+  Prestidigitacion (recargas al doble de velocidad, en las cocheras, exige
+  electricidad). Previstos: corazon, Vitalidad (vida maxima); indice, Doble
+  impacto (dano y cadencia); pulgar, un anillo de utilidad (por ejemplo,
+  tercera arma). La siguiente maquina prevista es el Pack-a-Punch.
+- Cada taquilla toca la melodia de su anillo. Las de ahora son provisionales
+  y procedurales (`RingJingleTunes.ts`); un MP3 libre de derechos con el
+  nombre de su `sampleFile` en `public/assets/audio/` sustituye a cada una.
 
 ## Paleta y materiales
 
@@ -90,6 +170,9 @@ codigo: actualiza la guia.
 - Superficies: marmol claro con vetas, granito gris y rojo gastado por el paso,
   yeso de boveda con cercos de humedad, hormigon oscuro en los pasadizos, acero
   verde militar desconchado hasta el oxido, bronce en marcos y barandillas.
+  En las cocheras: dovelas de hierro fundido, solera de hormigon con manchas
+  de aceite, balasto oscuro, esmalte azul desvaido de los vagones y franjas
+  de peligro gastadas en toperas y germozatvor.
 - Todas las texturas se generan en codigo (`Station33Materials.ts`); el mapa no
   depende de assets externos. Mantenerlo asi salvo decision explicita.
 
@@ -127,7 +210,7 @@ codigo: actualiza la guia.
 
 - Pocas luces reales: cada sala tiene su lista priorizada de luces puntuales
   y la sala donde esta el jugador ocupa primero el presupuesto de calidad (las
-  de la otra completan); el resto brilla con materiales emisivos que siguen a
+  de las demas completan); el resto brilla con materiales emisivos que siguen a
   su circuito. Un numero fijo de luces visibles evita recompilar shaders.
 - La geometria estatica se agrupa en un unico batch; cada mueble solido tiene
   un proxy AABB simple que para balas, zombies y jugador.
@@ -148,6 +231,9 @@ codigo: actualiza la guia.
 - La Mystery Box vive en la consigna. Aun no hay final.
 - Nada de recursos que rompan el tono: fuego, colores saturados, humor,
   señaletica traducida o UI que explique lo que el escenario puede mostrar.
+- Ningun solido puede superar 20 m de planta (el filtro de obstaculos de los
+  zombis lo ignoraria y abriria un paso fantasma): parte los muros largos.
 - Valida con `npm run typecheck` y `npm test` (`tests/station33.test.ts` y
   `tests/mapIntro.test.ts` cubren disposicion, puertas, rutas, luces,
-  ambiente e intro).
+  ambiente e intro). Para revisar una zona sin jugar hasta ella usa el visor
+  de mapas (`tools/viewers/map-viewer.html`).

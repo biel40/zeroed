@@ -27,6 +27,13 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.
 
+## Visor de mapas
+
+`map-viewer.html` construye un mapa de Zombies con el render del juego, abre todas las puertas de pago y lo muestra desde una cámara fija, con luces, parpadeos y polvo animados. Sirve para revisar una zona sin jugar hasta ella.
+
+- `http://localhost:5173/tools/viewers/map-viewer.html?map=station-33&cam=5.6,1.65,3.5&look=6.5,1.5,-8`: la puerta de las cocheras vista desde el vestíbulo.
+- Parámetros: `map=` (id del registro), `cam=x,y,z` y `look=x,y,z`, `fov=`, `quality=low|medium|high`, `doors=0` para dejar las puertas cerradas y `power=1` para accionar el interruptor general del mapa.
+
 ## Visor de interacciones
 
 `http://localhost:5173/tools/viewers/interaction-viewer.html` usa el render y CSS reales del HUD para revisar avisos, precios y requisitos sobre fondos claros, oscuros y con detalle. Permite cambiar entre los tres idiomas, teclado y controles tactiles, y repetir la entrada. Respeta la visibilidad guardada en Ajustes > Accesibilidad y el movimiento reducido del sistema.

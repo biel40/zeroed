@@ -193,7 +193,7 @@ export class Game {
           phase,
           !!weapon.definition.audio.energy,
           reloadAnim?.style ?? 'rifle',
-          reloadAnim ? (reloadAnim.chargeEnd - reloadAnim.charge) * weapon.definition.reloadTime : 0,
+          reloadAnim ? (reloadAnim.chargeEnd - reloadAnim.charge) * weapon.definition.reloadTime * weapon.reloadTimeScale : 0,
         );
       if (weapon.definition.boltAction) view.onBoltEject = () => this.ejectShell(view);
       this.player.camera.add(view.root);
@@ -242,6 +242,9 @@ export class Game {
         entry.weapon.setInfiniteReserve();
         this.inventory.pin(id);
         return true;
+      },
+      setReloadTimeScale: (scale) => {
+        for (const entry of this.arsenal.values()) entry.weapon.reloadTimeScale = scale;
       },
       resetArsenal: () => this.resetArsenal(),
       returnToMainMenu: () => this.returnToMainMenu(),

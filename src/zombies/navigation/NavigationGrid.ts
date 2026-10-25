@@ -146,13 +146,7 @@ export class NavigationGrid {
     this.cols = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) / cellSize));
     this.rows = Math.max(1, Math.ceil((bounds.maxZ - bounds.minZ) / cellSize));
     this.walkable = new Uint8Array(this.cols * this.rows);
-    for (let row = 0; row < this.rows; row++) {
-      for (let col = 0; col < this.cols; col++) {
-        const x = bounds.minX + (col + 0.5) * cellSize;
-        const z = bounds.minZ + (row + 0.5) * cellSize;
-        this.walkable[row * this.cols + col] = this.isClearPoint(x, z) ? 1 : 0;
-      }
-    }
+    this.rasterizeWalkable();
     const cellCount = this.cols * this.rows;
     this.gScore = new Float32Array(cellCount);
     this.parent = new Int32Array(cellCount);
@@ -381,6 +375,37 @@ export class NavigationGrid {
     const score = this.heapScore[a];
     this.heapScore[a] = this.heapScore[b];
     this.heapScore[b] = score;
+  }
+
+  /**
+   * Fills `walkable` with what `isClearPoint` answers at every cell centre,
+   * but tests each obstacle only against the cells within body reach of it
+   * instead of every cell against every obstacle: rebuilds run on every
+   * barrier change, and large maps would otherwise pay cells x obstacles.
+   */
+  private rasterizeWalkable(): void {
+    for (let index = 0; index < this.walkable.length; index++) {
+      this.walkable[index] = this.contains(this.centerX(index), this.centerZ(index)) ? 1 : 0;
+    }
+    const radius = this.bodyRadius;
+    const radiusSq = radius * radius;
+    for (const rect of this.obstacles) {
+      const fromCol = this.toColumn(rect.minX - radius);
+      const toCol = this.toColumn(rect.maxX + radius);
+      const fromRow = this.toRow(rect.minZ - radius);
+      const toRow = this.toRow(rect.maxZ + radius);
+      for (let row = fromRow; row <= toRow; row++) {
+        for (let col = fromCol; col <= toCol; col++) {
+          const index = row * this.cols + col;
+          if (this.walkable[index] === 0) continue;
+          const x = this.centerX(index);
+          const z = this.centerZ(index);
+          const dx = x - Math.max(rect.minX, Math.min(rect.maxX, x));
+          const dz = z - Math.max(rect.minZ, Math.min(rect.maxZ, z));
+          if (dx * dx + dz * dz < radiusSq) this.walkable[index] = 0;
+        }
+      }
+    }
   }
 
   private toColumn(x: number): number {

@@ -28,6 +28,8 @@ import {
   PLAYER_REGEN_RATE,
   RAYGUN_UNLOCK_KILLS,
   ZOMBIE_ATTACK_DAMAGE,
+  ZEUS_MACHINE_CHARGE_REACH,
+  ZEUS_MACHINE_CHARGE_SECONDS,
   ZOMBIES_RESERVE_AMMO,
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
@@ -49,6 +51,7 @@ import type {
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
 import { ZombiesGasMask } from './ZombiesGasMask';
+import { ZombiesPowerSwitch } from './ZombiesPowerSwitch';
 import { ZombiesRings } from './ZombiesRings';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { IntroCinematic } from '../rendering/IntroCinematic';
@@ -101,6 +104,7 @@ export class ZombiesMode implements GameMode {
   private rings: ZombiesRings | null = null;
   /** The map's wearable gas mask; null on maps without one. */
   private gasMask: ZombiesGasMask | null = null;
+  private powerSwitch: ZombiesPowerSwitch | null = null;
   private readonly rounds = new RoundManager();
   private readonly health = new PlayerHealth(
     PLAYER_MAX_HP,
@@ -212,6 +216,7 @@ export class ZombiesMode implements GameMode {
 
     this.rings = new ZombiesRings(ctx, this.arena.ringMachines ?? [], this.economy);
     this.gasMask = this.arena.gasMaskRack ? new ZombiesGasMask(ctx, this.arena.gasMaskRack) : null;
+    this.powerSwitch = this.arena.powerSwitch ? new ZombiesPowerSwitch(ctx, this.arena.powerSwitch) : null;
 
     if (boxPlacement) {
       this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
@@ -418,7 +423,7 @@ export class ZombiesMode implements GameMode {
     return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
   }
 
-  /** E pressed: door unlock > barrier repair > soul lamp > ritual > gas mask > purchases (rings among them). */
+  /** E pressed: door unlock > barrier repair > soul lamp > ritual > gas mask > power switch > purchases (rings among them). */
   onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
 
@@ -454,6 +459,8 @@ export class ZombiesMode implements GameMode {
 
     // Both need the right hand: the mask waits for the knife to come back.
     if (!this.knife.isAttacking && this.gasMask?.interact()) return;
+
+    if (this.powerSwitch?.interact()) return;
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -548,6 +555,9 @@ export class ZombiesMode implements GameMode {
 
     const gasMaskPrompt = this.gasMask?.prompt();
     if (gasMaskPrompt) return gasMaskPrompt;
+
+    const powerSwitchPrompt = this.powerSwitch?.prompt();
+    if (powerSwitchPrompt) return powerSwitchPrompt;
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
@@ -1101,10 +1111,18 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
-    // A Tesla bolt that strikes the environment just grounds out: an electric
+    // A Tesla bolt that strikes the environment grounds out: an electric
     // crack, no chain (the design chains zombie-to-zombie, never from dirt).
+    // Grounded into a ring machine waiting for power, it runs it for a while.
     if (isTesla) {
       this.ctx.audio.playTeslaShot();
+      const machine = this.rings?.energizeMachineAt(point, ZEUS_MACHINE_CHARGE_SECONDS, ZEUS_MACHINE_CHARGE_REACH);
+      if (machine) {
+        const muzzle = this.ctx.player.camera.getWorldPosition(this.tmpDirection);
+        const { x, y, z } = machine.position;
+        this.chain.discharge([muzzle.clone(), new THREE.Vector3(x, y, z)]);
+        this.ctx.audio.playTeslaChain(1);
+      }
       return;
     }
 

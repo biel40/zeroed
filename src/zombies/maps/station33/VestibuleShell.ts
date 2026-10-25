@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { wallSpans, type WallAxis, type WallOpening } from '../shared/ArenaStructure';
+import { wallSpans } from '../shared/ArenaStructure';
 import { ESCALATOR_PORTAL, STATION33_WALL_THICKNESS, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import { MURAL_LAYOUT, muralUv } from './Station33Signage';
-import { VAULT_CENTER_Y, VAULT_HALF_ANGLE, VAULT_RADIUS, vaultHeightAt } from './VaultProfile';
-import { stationWallOpenings } from './WallOpenings';
+import { VESTIBULE_VAULT, vaultLunetteGeometry, vaultRibGeometry, vaultSurfaceGeometry } from './VaultProfile';
+import { stationWallOpenings, type StationWallLine } from './WallOpenings';
 
 const HALF_THICKNESS = STATION33_WALL_THICKNESS / 2;
 const DADO_HEIGHT = 1.1;
@@ -12,18 +12,8 @@ const CORNICE_Y = 3.78;
 /** Transverse ribs of the vault line up with the column rows. */
 const RIB_ZS = [4.5, 9, 13.5] as const;
 
-interface WallLine {
-  readonly axis: WallAxis;
-  readonly fixed: number;
-  readonly min: number;
-  readonly max: number;
-  /** +1/-1: the hall side of the wall along its normal axis. */
-  readonly inward: number;
-  readonly openings: ReadonlyArray<WallOpening>;
-}
-
 /** The four walls of the hall. Side walls run past the corners to close them. */
-export function vestibuleWalls(): ReadonlyArray<WallLine> {
+export function vestibuleWalls(): ReadonlyArray<StationWallLine> {
   const west = VESTIBULE.minX - HALF_THICKNESS;
   const east = VESTIBULE.maxX + HALF_THICKNESS;
   const north = VESTIBULE.minZ - HALF_THICKNESS;
@@ -39,7 +29,10 @@ export function vestibuleWalls(): ReadonlyArray<WallLine> {
       min: VESTIBULE.minX,
       max: VESTIBULE.maxX,
       inward: 1,
-      openings: [{ center: ESCALATOR_PORTAL.centerX, width: ESCALATOR_PORTAL.width, bottom: 0, top: ESCALATOR_PORTAL.height }],
+      openings: [
+        { center: ESCALATOR_PORTAL.centerX, width: ESCALATOR_PORTAL.width, bottom: 0, top: ESCALATOR_PORTAL.height },
+        ...stationWallOpenings('x', north, VESTIBULE.minX, VESTIBULE.maxX),
+      ],
     },
     {
       axis: 'x',
@@ -84,7 +77,7 @@ export function buildVestibuleShell(context: Station33BuildContext): void {
 }
 
 /** Polished dark granite skirting on the hall face of every solid wall stretch. */
-function addDado(context: Station33BuildContext, wall: WallLine): void {
+function addDado(context: Station33BuildContext, wall: StationWallLine): void {
   const face = wall.fixed + wall.inward * (HALF_THICKNESS + 0.02);
   const min = Math.max(wall.min, wall.axis === 'z' ? VESTIBULE.minZ : VESTIBULE.minX);
   const max = Math.min(wall.max, wall.axis === 'z' ? VESTIBULE.maxZ : VESTIBULE.maxX);
@@ -114,21 +107,9 @@ function addCornices(context: Station33BuildContext): void {
 
 function addVault(context: Station33BuildContext): void {
   const { materials, structure, group } = context;
-  const length = VESTIBULE.maxZ - VESTIBULE.minZ + 0.3;
-  const centerZ = (VESTIBULE.minZ + VESTIBULE.maxZ) / 2;
-  // Cylinder axis Y turned onto Z; theta = PI points straight up after the turn.
-  const geometry = new THREE.CylinderGeometry(
-    VAULT_RADIUS, VAULT_RADIUS, length, 32, 1, true, Math.PI - VAULT_HALF_ANGLE, VAULT_HALF_ANGLE * 2,
-  );
-  geometry.rotateX(Math.PI / 2);
-  const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
-  const arcLength = VAULT_RADIUS * VAULT_HALF_ANGLE * 2;
   const metersPerTile = materials.vaultPlaster.userData.metersPerTile as number;
-  for (let index = 0; index < uv.count; index++) {
-    uv.setXY(index, uv.getX(index) * arcLength / metersPerTile, uv.getY(index) * length / metersPerTile);
-  }
+  const geometry = vaultSurfaceGeometry(VESTIBULE_VAULT, VESTIBULE.minZ - 0.15, VESTIBULE.maxZ + 0.15, metersPerTile);
   const vault = new THREE.Mesh(geometry, materials.vaultPlaster);
-  vault.position.set(0, VAULT_CENTER_Y, centerZ);
   vault.name = 'vestibule-vault';
   vault.receiveShadow = true;
   vault.userData.surface = 'concrete';
@@ -136,38 +117,13 @@ function addVault(context: Station33BuildContext): void {
   group.add(vault);
   structure.addSolid(vault, false);
 
-  for (const z of RIB_ZS) {
-    const rib = new THREE.ExtrudeGeometry(vaultBand(0.16), { depth: 0.34, bevelEnabled: false, curveSegments: 24 });
-    rib.translate(0, 0, z - 0.17);
-    context.batch.add(rib, materials.stucco);
-  }
-}
-
-/** Annular strip hugging the vault's underside, `thickness` deep, in the XY plane. */
-function vaultBand(thickness: number): THREE.Shape {
-  const shape = new THREE.Shape();
-  const start = Math.PI / 2 + VAULT_HALF_ANGLE;
-  const end = Math.PI / 2 - VAULT_HALF_ANGLE;
-  shape.absarc(0, VAULT_CENTER_Y, VAULT_RADIUS, start, end, true);
-  shape.absarc(0, VAULT_CENTER_Y, VAULT_RADIUS - thickness, end, start, false);
-  shape.closePath();
-  return shape;
+  for (const z of RIB_ZS) context.batch.add(vaultRibGeometry(VESTIBULE_VAULT, z, 0.16, 0.34), materials.stucco);
 }
 
 /** Plaster infill between an end wall's top and the vault. */
 function addLunette(context: Station33BuildContext, z: number, facing: number): void {
-  const shape = new THREE.Shape();
-  shape.moveTo(VESTIBULE.minX, VESTIBULE.wallHeight);
-  shape.absarc(0, VAULT_CENTER_Y, VAULT_RADIUS, Math.PI / 2 + VAULT_HALF_ANGLE, Math.PI / 2 - VAULT_HALF_ANGLE, true);
-  shape.lineTo(VESTIBULE.minX, VESTIBULE.wallHeight);
-  const geometry = new THREE.ShapeGeometry(shape, 24);
-  // Shape UVs are raw metres: rescale them to the plaster's tile size.
-  const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
   const metersPerTile = context.materials.vaultPlaster.userData.metersPerTile as number;
-  for (let index = 0; index < uv.count; index++) uv.setXY(index, uv.getX(index) / metersPerTile, uv.getY(index) / metersPerTile);
-  if (facing < 0) geometry.rotateY(Math.PI);
-  const lunette = new THREE.Mesh(geometry, context.materials.vaultPlaster);
-  lunette.position.z = z;
+  const lunette = new THREE.Mesh(vaultLunetteGeometry(VESTIBULE_VAULT, z, facing, metersPerTile), context.materials.vaultPlaster);
   lunette.name = facing > 0 ? 'north-lunette' : 'south-lunette';
   lunette.userData.surface = 'concrete';
   lunette.userData.mapRole = 'lunette';
@@ -184,7 +140,7 @@ function addMural(context: Station33BuildContext): void {
   const samples = 24;
   for (let step = 0; step <= samples; step++) {
     const x = halfWidth - (halfWidth * 2 * step) / samples;
-    shape.lineTo(x, vaultHeightAt(x) - 0.08);
+    shape.lineTo(x, VESTIBULE_VAULT.heightAt(x) - 0.08);
   }
   shape.closePath();
   const geometry = new THREE.ShapeGeometry(shape);

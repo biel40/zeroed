@@ -214,6 +214,13 @@ export const CHAIN_MAX_TARGETS = 20;
  */
 export const ZOMBIE_ELECTRIFIED_DURATION = 2.8;
 /**
+ * Seconds of power one ZEUS-77 bolt gives a ring machine still waiting for
+ * the map's power: a way to buy its ring before the switch is thrown.
+ */
+export const ZEUS_MACHINE_CHARGE_SECONDS = 60;
+/** Metres from a ring machine within which a ZEUS-77 bolt's impact charges it. */
+export const ZEUS_MACHINE_CHARGE_REACH = 1;
+/**
  * Maximum hop distance between two zombies in the same chain, meters. 9 m
  * lets the arc walk through a whole horde without cutting early, while the
  * per-hop radius still stops it from crossing the map to a far straggler.

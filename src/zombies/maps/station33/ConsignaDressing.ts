@@ -12,7 +12,7 @@ const { corridor, hall, ceilingHeight } = CONSIGNA;
  * tiles. Litter stays flat and away from the entrances.
  */
 export function buildConsignaDressing(context: Station33BuildContext): void {
-  for (const locker of STATION33_RING_LOCKERS) addLostPropertyPlate(context, locker.x, locker.z, locker.facingX, locker.facingZ);
+  for (const locker of STATION33_RING_LOCKERS.filter((candidate) => candidate.zone === 'consigna')) addLostPropertyPlate(context, locker.x, locker.z, locker.facingX, locker.facingZ);
   addDroppedLuggage(context);
   addLooseLitter(context);
   addDecals(context);

@@ -8,8 +8,11 @@ import {
   FLUORESCENT_COLOR,
   FLUORESCENT_FIXTURES,
   STATION33_INTRO_POWER_UP,
+  STATION33_MAINS,
   STATION33_POINT_LIGHTS,
+  STATION33_BEACONS,
   STATION33_START_ZONE,
+  STATION33_WALL_LAMPS,
   station33ZoneAt,
   type Station33LightCircuit,
   type Station33ZoneId,
@@ -17,14 +20,25 @@ import {
 import type { Station33BuildContext } from './Station33BuildContext';
 import { ceilingHeightAt } from './VaultProfile';
 
+type FluorescentCircuit = Exclude<Station33LightCircuit, 'amber' | 'emergency'>;
+interface FaultWindow { readonly rate: number; readonly faultChance: number; readonly floor: number }
+
 /** Fault windows of the fluorescent circuits: how often they stutter and how dark they get. */
-const FLUORESCENT_FAULTS = {
+const FLUORESCENT_FAULTS: Readonly<Record<FluorescentCircuit, FaultWindow>> = {
   steady: { rate: 0.6, faultChance: 0.06, floor: 0.3 },
   unstable: { rate: 1.1, faultChance: 0.3, floor: 0.12 },
   failing: { rate: 1.7, faultChance: 0.6, floor: 0.02 },
-} as const;
+  mains: { rate: 0.5, faultChance: 0.03, floor: 0.4 },
+};
+/** Once the substation feeds them, even the worn circuits only stutter now and then. */
+const RESTORED_FAULTS: Readonly<Record<FluorescentCircuit, FaultWindow>> = {
+  steady: { rate: 0.5, faultChance: 0.02, floor: 0.5 },
+  unstable: { rate: 0.8, faultChance: 0.08, floor: 0.3 },
+  failing: { rate: 1.2, faultChance: 0.2, floor: 0.15 },
+  mains: { rate: 0.5, faultChance: 0.02, floor: 0.5 },
+};
 
-const CIRCUITS: ReadonlyArray<Station33LightCircuit> = ['steady', 'unstable', 'failing', 'amber', 'emergency'];
+const CIRCUITS: ReadonlyArray<Station33LightCircuit> = ['steady', 'unstable', 'failing', 'amber', 'emergency', 'mains'];
 /** Each circuit runs its own clock offset, so no two fault patterns line up. */
 const CIRCUIT_PHASES: Readonly<Record<Station33LightCircuit, number>> = {
   steady: 0.37,
@@ -32,6 +46,7 @@ const CIRCUIT_PHASES: Readonly<Record<Station33LightCircuit, number>> = {
   failing: 5.13,
   amber: 1.7,
   emergency: 0,
+  mains: 4.4,
 };
 /** Seconds a circuit stutters on its starters before it holds. */
 const STARTER_FLICKER = 0.5;
@@ -41,6 +56,7 @@ const FIXTURE_Y = 4.05;
 const FIXTURE_DROP = 0.25;
 /** Metres past the door before the real lights follow the player into the other room. */
 const ZONE_SWITCH_MARGIN = 0.6;
+const ZONE_SWITCH_PROBES: ReadonlyArray<readonly [number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const TUBE_LENGTH = 1.55;
 
 function hash(value: number): number {
@@ -50,13 +66,14 @@ function hash(value: number): number {
 
 /**
  * Brightness 0..1 of a light circuit at `time`. Fluorescents hum steadily
- * and fall into irregular stutter windows; amber bulbs breathe; the
- * battery emergency lamp pulses slowly. Deterministic and allocation free.
+ * and fall into irregular stutter windows (rarer and shallower once the
+ * mains are `restored`); amber bulbs breathe; the battery emergency lamp
+ * pulses slowly. Deterministic and allocation free.
  */
-export function circuitLevel(circuit: Station33LightCircuit, time: number, phase: number): number {
+export function circuitLevel(circuit: Station33LightCircuit, time: number, phase: number, restored = false): number {
   if (circuit === 'emergency') return 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(time * 2.4 + phase));
   if (circuit === 'amber') return 0.9 + 0.06 * Math.sin(time * 1.7 + phase) + 0.04 * Math.sin(time * 5.3 + phase * 2);
-  const fault = FLUORESCENT_FAULTS[circuit];
+  const fault = (restored ? RESTORED_FAULTS : FLUORESCENT_FAULTS)[circuit];
   const window = Math.floor(time * fault.rate + phase);
   if (hash(window + phase * 31) >= fault.faultChance) return 0.97 + 0.03 * hash(Math.floor(time * 30));
   const stutter = hash(Math.floor(time * 22) + window * 7.3);
@@ -96,6 +113,8 @@ export class Station33Lighting {
   private tremorRemaining = 0;
   /** Seconds into a cold start, or null when the mains are simply on. */
   private powerUpElapsed: number | null = null;
+  /** The main switch has been thrown this run. */
+  private mainsRestored = false;
 
   constructor(private readonly context: Station33BuildContext) {
     for (const circuit of CIRCUITS) {
@@ -107,7 +126,9 @@ export class Station33Lighting {
     }
     this.buildFluorescentFixtures();
     this.buildSconces();
+    this.buildWallLamps();
     this.buildEmergencyLamp();
+    this.buildBeacons();
     this.buildPointLights();
     this.showLightsFor(STATION33_START_ZONE);
     this.update(0);
@@ -140,6 +161,21 @@ export class Station33Lighting {
     this.powerUpElapsed = 0;
   }
 
+  /**
+   * The main switch is thrown: the lights cut out and kick back in circuit
+   * by circuit, like the intro's cold start, then burn brighter and
+   * steadier for the rest of the run, with the `mains` circuit alive.
+   */
+  restoreMains(): void {
+    this.mainsRestored = true;
+    this.powerUp();
+  }
+
+  /** True once the main switch has fed the station this run. */
+  get isMainsRestored(): boolean {
+    return this.mainsRestored;
+  }
+
   /** Ends a cold start at once: every circuit back to normal. */
   finishPowerUp(): void {
     this.powerUpElapsed = null;
@@ -161,12 +197,17 @@ export class Station33Lighting {
       if (this.powerUpElapsed >= POWER_UP_END) this.powerUpElapsed = null;
     }
     const mains = this.mainsLevel();
+    const boost = this.mainsRestored ? STATION33_MAINS.lightBoost : 1;
     for (const circuit of CIRCUITS) {
-      const level = circuitLevel(circuit, this.time, CIRCUIT_PHASES[circuit]);
-      this.levels.set(circuit, circuit === 'emergency' ? level : level * mains * this.powerUpLevel(circuit));
+      const level = circuitLevel(circuit, this.time, CIRCUIT_PHASES[circuit], this.mainsRestored);
+      if (circuit === 'emergency') this.levels.set(circuit, level);
+      else if (circuit === 'mains' && !this.mainsRestored) this.levels.set(circuit, 0);
+      else this.levels.set(circuit, level * mains * this.powerUpLevel(circuit) * boost);
     }
     for (const entry of this.circuitMaterials) {
-      entry.material.color.copy(entry.baseColor).multiplyScalar(Math.max(0.04, this.levels.get(entry.circuit)!));
+      // Live tubes never go fully black; a substation tube with no feed does.
+      const floor = entry.circuit === 'mains' && !this.mainsRestored ? 0 : 0.04;
+      entry.material.color.copy(entry.baseColor).multiplyScalar(Math.max(floor, this.levels.get(entry.circuit)!));
     }
     for (const entry of this.lights) {
       entry.light.intensity = entry.baseIntensity * this.levels.get(entry.circuit)!;
@@ -179,16 +220,24 @@ export class Station33Lighting {
     this.dipRemaining = 0;
     this.tremorRemaining = 0;
     this.powerUpElapsed = null;
+    this.mainsRestored = false;
     this.update(0);
   }
 
-  /** Switches rooms only once the observer is clearly past the door, so the doorway never flickers. */
+  /**
+   * Switches rooms only once the observer is clearly past the door (no
+   * point within the margin still lies in the lit room), so the doorway
+   * never flickers.
+   */
   private followObserver(observer: THREE.Vector3): void {
-    const margin = this.lightZone === 'vestibule' ? -ZONE_SWITCH_MARGIN : ZONE_SWITCH_MARGIN;
-    this.showLightsFor(station33ZoneAt(observer.x + margin));
+    const zone = station33ZoneAt(observer.x, observer.z);
+    if (zone === this.lightZone) return;
+    const nearLitRoom = ZONE_SWITCH_PROBES.some(([dx, dz]) =>
+      station33ZoneAt(observer.x + dx * ZONE_SWITCH_MARGIN, observer.z + dz * ZONE_SWITCH_MARGIN) === this.lightZone);
+    if (!nearLitRoom) this.showLightsFor(zone);
   }
 
-  /** The room's lights in authored priority, then the other room's, up to the quality budget. */
+  /** The room's lights in authored priority, then the other rooms', up to the quality budget. */
   private showLightsFor(zone: Station33ZoneId): void {
     if (zone === this.lightZone) return;
     this.lightZone = zone;
@@ -221,7 +270,7 @@ export class Station33Lighting {
     const { batch, materials } = this.context;
     const deadTube = materials.greySteel;
     for (const fixture of FLUORESCENT_FIXTURES) {
-      const ceiling = ceilingHeightAt(fixture.x);
+      const ceiling = ceilingHeightAt(fixture.x, fixture.z);
       const y = Math.min(FIXTURE_Y, ceiling - FIXTURE_DROP);
       batch.addBox(materials.greySteel, fixture.x, y + 0.05, fixture.z, 0.26, 0.08, 1.75);
       for (const offset of [-0.65, 0.65]) {
@@ -250,6 +299,41 @@ export class Station33Lighting {
       const globe = new THREE.SphereGeometry(0.13, 12, 8);
       globe.translate(x, 2.75, sconce.z);
       batch.add(globe, sconce.lit ? this.circuitMaterial('amber') : materials.windowGlass);
+    }
+  }
+
+  /** Bulkhead lamps: wall plate, glass globe on its circuit (or smashed and dark) and a wire cage. */
+  private buildWallLamps(): void {
+    const { batch, materials } = this.context;
+    const y = 2.6;
+    for (const lamp of STATION33_WALL_LAMPS) {
+      const at = (out: number): { x: number; z: number } => ({ x: lamp.x + lamp.facingX * out, z: lamp.z + lamp.facingZ * out });
+      const plate = at(0.03);
+      const across = lamp.facingX !== 0 ? { x: 0.06, z: 0.26 } : { x: 0.26, z: 0.06 };
+      batch.addBox(materials.greySteel, plate.x, y, plate.z, across.x, 0.3, across.z);
+      const center = at(0.16);
+      const globe = new THREE.SphereGeometry(0.11, 12, 8).scale(1, 1.25, 1).translate(center.x, y, center.z);
+      batch.add(globe, lamp.circuit === 'dead' ? materials.windowGlass : this.circuitMaterial(lamp.circuit));
+      for (const angle of [0, Math.PI / 2]) {
+        const hoop = new THREE.TorusGeometry(0.13, 0.008, 4, 14).rotateY(angle).scale(1, 1.25, 1).translate(center.x, y, center.z);
+        batch.add(hoop, materials.greySteel);
+      }
+    }
+  }
+
+  /** Battery beacons: housing, red lens on the emergency circuit and a hood. */
+  private buildBeacons(): void {
+    const { batch, materials } = this.context;
+    const y = 3.4;
+    for (const beacon of STATION33_BEACONS) {
+      const at = (out: number): { x: number; z: number } => ({ x: beacon.x + beacon.facingX * out, z: beacon.z + beacon.facingZ * out });
+      const yaw = Math.atan2(beacon.facingX, beacon.facingZ);
+      const housing = at(0.06);
+      batch.addBox(materials.greySteel, housing.x, y, housing.z, 0.3, 0.3, 0.12, 0, yaw, 0);
+      const front = at(0.17);
+      const lens = new THREE.CylinderGeometry(0.11, 0.11, 0.12, 14).rotateX(Math.PI / 2).rotateY(yaw).translate(front.x, y, front.z);
+      batch.add(lens, this.circuitMaterial('emergency'));
+      batch.addBox(materials.greySteel, front.x, y + 0.17, front.z, 0.34, 0.03, 0.26, 0, yaw, 0);
     }
   }
 

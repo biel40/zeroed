@@ -72,7 +72,37 @@ export interface ArenaRingMachine {
   readonly floor: number;
   readonly useRange: number;
   readonly lookDotMin: number;
+  /**
+   * False while the machine waits for the map's power: it neither sells nor
+   * plays its jingle, and shows itself dark. Machines without that need are
+   * always powered.
+   */
+  readonly powered: boolean;
+  /**
+   * Temporary power for `seconds` (a ZEUS-77 bolt), counted down by the map.
+   * A new charge restarts the count instead of adding to it. Returns false,
+   * changing nothing, when the machine needs no power or the map's power is
+   * already on. Omitted by machines that never wait for power.
+   */
+  energize?(seconds: number): boolean;
   setDisplay(display: RingMachineDisplay): void;
+}
+
+/**
+ * A map's main switch: thrown once (free), it brings the map's power on for
+ * the rest of the run. The mode only offers and throws it; the map plays
+ * the lever and lights itself up.
+ */
+export interface ArenaPowerSwitch {
+  readonly id: string;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  /** True once thrown this run. */
+  readonly isOn: boolean;
+  /** Throws the switch; false when it already is. */
+  activate(): boolean;
 }
 
 /** How a map closes its run: the HUD cinematic, its audio and how long it lasts. */
@@ -213,6 +243,8 @@ export interface ZombieArena {
   readonly ringMachines?: ReadonlyArray<ArenaRingMachine>;
   /** Optional easter egg: a gas mask the player can wear. */
   readonly gasMaskRack?: ArenaGasMaskRack;
+  /** Optional: the switch that powers the map's machines; maps without power omit it. */
+  readonly powerSwitch?: ArenaPowerSwitch;
   /** Paid interaction that ends the run with the map's own ending. */
   readonly completionInteraction?: ArenaCompletionInteraction;
   /** Opening cinematic; omitted when the map starts straight into play. */

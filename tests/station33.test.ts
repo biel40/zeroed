@@ -9,10 +9,15 @@ import { mysteryBoxFootprint } from '../src/zombies/MysteryBoxFootprint';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { ZombieSpawnPoint } from '../src/zombies/ZombieSpawner';
+import { t } from '../src/i18n/i18n';
+import { actionKey } from '../src/ui/InteractionPrompts';
 import { POINT_LIGHT_BUDGET } from '../src/zombies/maps/shared/PointLightBudget';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
 import {
+  COCHERAS,
   CONSIGNA,
+  COCHERAS_TRACKS,
+  COCHERAS_TRAIN_CARS,
   ESCALATOR_PORTAL,
   SERVICE_PASSAGE,
   STATION33_BARRIERS,
@@ -20,11 +25,16 @@ import {
   STATION33_PLAYER_BOUNDS,
   STATION33_PLAYER_SPAWN,
   STATION33_POINT_LIGHTS,
+  STATION33_RING_LOCKERS,
   STATION33_SPAWNS,
   STATION33_WALL_BUYS,
   STATION33_WALL_THICKNESS,
+  SUBESTACION,
+  POWER_LEVER,
+  TRAIN_CAR,
   TURNSTILE_LINE,
   VESTIBULE,
+  station33ZoneAt,
   type Station33Barrier,
   type Station33ZoneId,
 } from '../src/zombies/maps/Station33Config';
@@ -34,7 +44,7 @@ import { installCanvasDocument, makeContext, TEST_PROFILE } from './coopHarness'
 
 const DT = 1 / 60;
 const ZOMBIE_BAND = { bottom: 0.05, top: 1.8 } as const;
-const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall] as const;
+const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall] as const;
 
 let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
@@ -99,6 +109,23 @@ function openDoorTo(arena: ZombieArena, zone: Station33ZoneId): void {
   expect(arena.activateDoor(door.id)).toBe(true);
 }
 
+/** Doors bought, in order, on the way from the vestibule into each zone. */
+const DOORS_TO: Readonly<Record<Station33ZoneId, ReadonlyArray<Station33ZoneId>>> = {
+  vestibule: [],
+  consigna: ['consigna'],
+  cocheras: ['cocheras'],
+  subestacion: ['cocheras', 'subestacion'],
+};
+
+function openWayTo(arena: ZombieArena, zone: Station33ZoneId): void {
+  for (const step of DOORS_TO[zone]) openDoorTo(arena, step);
+}
+
+/** Barrier ids of the given zones, in config order. */
+function barrierIdsOf(...zones: Station33ZoneId[]): string[] {
+  return STATION33_BARRIERS.filter((barrier) => zones.includes(barrier.zone)).map((barrier) => barrier.id);
+}
+
 /** Runs one zombie from `spawn` at a stationary player until it lands a hit. */
 function chaseUntilHit(arena: Station33Arena, spawn: ZombieSpawnPoint, playerX: number, playerZ: number, seconds: number): { hit: boolean; path: THREE.Vector3[] } {
   const manager = new ZombieManager(() => 0, {}, false, [spawn], arena.barriers, [], () => 1);
@@ -145,6 +172,8 @@ function walk(arena: ZombieArena, x: number, z: number, yaw: number, seconds: nu
 }
 
 const FACE_EAST = -Math.PI / 2;
+const FACE_NORTH = 0;
+const FACE_WEST = Math.PI / 2;
 
 describe('Station 33 layout', () => {
   it('initializes and restarts single-player with the luggage-office Mystery Box', () => {
@@ -159,9 +188,11 @@ describe('Station 33 layout', () => {
     expect(state.box).not.toBeNull();
   });
 
-  it('starts with the vestibule alone: the luggage-office door locked and its entrances dormant', () => {
+  it('starts with the vestibule alone: both doors locked and the other entrances dormant', () => {
     const arena: ZombieArena = makeArena();
-    expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([['to-consigna', 750, true]]);
+    expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
+      ['to-consigna', 750, true], ['to-cocheras', 1250, true], ['to-subestacion', 1500, true],
+    ]);
     expect(arena.activateDoor('escalator')).toBe(false);
     expect(arena.completionInteraction).toBeUndefined();
     expect(arena.soulLampInteractions).toBeUndefined();
@@ -176,9 +207,10 @@ describe('Station 33 layout', () => {
     for (const box of solidBoxes(arena)) expect(box.intersectsBox(player)).toBe(false);
   });
 
-  it('places every zombie spawn outside both rooms, clear of colliders, behind its own entrance', () => {
+  it('places every zombie spawn outside every room, clear of colliders, behind its own entrance', () => {
     const arena = makeArena();
     openDoorTo(arena, 'consigna');
+    openDoorTo(arena, 'cocheras');
     const solids = solidBoxes(arena);
     for (const spawn of Object.values(STATION33_SPAWNS).flat()) {
       expect(insideRoom(spawn.x, spawn.z), `spawn ${spawn.barrierId}`).toBe(false);
@@ -213,10 +245,10 @@ describe('Station 33 layout', () => {
 
   it.each(STATION33_BARRIERS.map((barrier) => [barrier.id, barrier.zone] as const))('gives the %s entrance (%s) a walkable route to the player spawn', (id, zone) => {
     const arena = makeArena();
-    if (zone !== 'vestibule') openDoorTo(arena, zone);
+    openWayTo(arena, zone);
     openBarrier(arena, id);
     const spawn = arena.spawnPoints.find((point) => (point as ZombieSpawnPoint).barrierId === id) as ZombieSpawnPoint;
-    const { hit } = chaseUntilHit(arena, spawn, STATION33_PLAYER_SPAWN.x, STATION33_PLAYER_SPAWN.z, 60);
+    const { hit } = chaseUntilHit(arena, spawn, STATION33_PLAYER_SPAWN.x, STATION33_PLAYER_SPAWN.z, 120);
     expect(hit).toBe(true);
   });
 
@@ -244,7 +276,10 @@ describe('Station 33 layout', () => {
   it('hangs every wall buy 2 cm off a wall, within reach, at the configured prices', () => {
     const arena = makeArena();
     openDoorTo(arena, 'consigna');
-    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([['ak47', 1750, 900], ['mp5', 1000, 500], ['vector', 900, 625]]);
+    openDoorTo(arena, 'cocheras');
+    expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([
+      ['ak47', 1750, 900], ['mp5', 1000, 500], ['vector', 900, 625], ['m60', 2500, 1250],
+    ]);
     const vectors = arena.wallBuys.filter((wallBuy) => wallBuy.weaponId === 'vector');
     expect(vectors).toHaveLength(1);
     expect(vectors[0].position.x).toBeGreaterThan(VESTIBULE.minX);
@@ -298,7 +333,9 @@ describe('Station 33 luggage office', () => {
     openDoorTo(arena, 'consigna');
     expect(topologyChanges).toBe(1);
     expect(arena.activateDoor('to-consigna')).toBe(false);
-    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(STATION33_BARRIERS.map((barrier) => barrier.id));
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(
+      barrierIdsOf('vestibule', 'consigna'),
+    );
     expect(arena.spawnPoints).toEqual([...STATION33_SPAWNS.vestibule, ...STATION33_SPAWNS.consigna]);
     expect(walk(arena, 6.2, 8.8, FACE_EAST, 3).x).toBeGreaterThan(CONSIGNA.corridor.minX + 1);
     // Down the corridor and into the hall, never past its far wall.
@@ -333,30 +370,44 @@ describe('Station 33 luggage office', () => {
 
     const vestibuleReach = (point: { x: number; z: number }): number => Math.hypot(
       point.x - THREE.MathUtils.clamp(point.x, STATION33_PLAYER_BOUNDS.minX, VESTIBULE.maxX - 0.4),
-      point.z - THREE.MathUtils.clamp(point.z, STATION33_PLAYER_BOUNDS.minZ, STATION33_PLAYER_BOUNDS.maxZ),
+      point.z - THREE.MathUtils.clamp(point.z, VESTIBULE.minZ + 0.4, STATION33_PLAYER_BOUNDS.maxZ),
     );
     expect(vestibuleReach(arena.mysteryBoxPlacement.position)).toBeGreaterThan(arena.mysteryBoxPlacement.useRange + 1);
     for (const wallBuy of arena.wallBuys.filter((candidate) => candidate.position.x > VESTIBULE.maxX)) {
       expect(vestibuleReach(wallBuy.position), wallBuy.id).toBeGreaterThan(wallBuy.useRange + 1);
     }
 
-    expect(arena.ringMachines).toHaveLength(1);
-    for (const machine of arena.ringMachines) {
-      expect(machine.ringId).toBe('resurrection');
-      expect(insideRoom(machine.position.x, machine.position.z)).toBe(true);
-      expect(vestibuleReach(machine.position)).toBeGreaterThan(machine.useRange + 1);
+    openDoorTo(arena, 'cocheras');
+    expect(arena.ringMachines.map((machine) => machine.ringId)).toEqual(['resurrection', 'sleightOfHand']);
+    for (const config of STATION33_RING_LOCKERS) {
+      const machine = arena.ringMachines.find((candidate) => candidate.id === config.id)!;
+      expect(insideRoom(machine.position.x, machine.position.z), config.id).toBe(true);
+      expect(station33ZoneAt(machine.position.x, machine.position.z), config.id).toBe(config.zone);
+      expect(vestibuleReach(machine.position), config.id).toBeGreaterThan(machine.useRange + 1);
       for (const passage of passages) expect(passage.containsPoint(new THREE.Vector3(machine.position.x, 1, machine.position.z))).toBe(false);
       // The player can stand in front of it, within reach.
-      const stand = { x: machine.position.x - 0.6, z: machine.position.z };
-      expect(solidBoxes(arena).some((box) => box.intersectsBox(bodyBox(stand.x, stand.z, 0.3)))).toBe(false);
+      const stand = { x: machine.position.x + config.facingX * 0.6, z: machine.position.z + config.facingZ * 0.6 };
+      expect(solidBoxes(arena).some((box) => box.intersectsBox(bodyBox(stand.x, stand.z, 0.3))), config.id).toBe(false);
       expect(Math.hypot(stand.x - machine.position.x, stand.z - machine.position.z)).toBeLessThan(machine.useRange);
     }
+  });
+
+  it('keeps the Sleight of Hand locker dark until the power is on, and again after a reset', () => {
+    const arena = makeArena();
+    const [resurrection, sleight] = arena.ringMachines;
+    expect(resurrection.powered).toBe(true);
+    expect(sleight.powered).toBe(false);
+    arena.switchOnPower();
+    expect(sleight.powered).toBe(true);
+    arena.reset();
+    expect(sleight.powered).toBe(false);
+    expect(resurrection.powered).toBe(true);
   });
 
   it('shows the ring for sale, hides it once bought, and restocks on reset', () => {
     const arena = makeArena();
     const [machine] = arena.ringMachines;
-    const ring = arena.group.getObjectByName('locker-ring')!;
+    const ring = arena.group.getObjectByName(`ring-locker:${machine.id}`)!.getObjectByName('locker-ring')!;
     expect(ring.visible).toBe(true);
     machine.setDisplay('empty');
     expect(ring.visible).toBe(false);
@@ -365,6 +416,205 @@ describe('Station 33 luggage office', () => {
     expect(ring.visible).toBe(false);
     arena.reset();
     expect(ring.visible).toBe(true);
+  });
+});
+
+describe('Station 33 train sheds', () => {
+  const { hall } = COCHERAS;
+
+  it('stays walled off and silent until its service door is bought', () => {
+    const arena = makeArena();
+    expect(walk(arena, 5.6, 1.6, FACE_NORTH, 3).z).toBeGreaterThan(VESTIBULE.minZ);
+    expect(arena.spawnPoints.some((point) => (point as ZombieSpawnPoint).barrierId?.startsWith('cocheras'))).toBe(false);
+
+    openDoorTo(arena, 'cocheras');
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(
+      barrierIdsOf('vestibule', 'cocheras'),
+    );
+    expect(arena.spawnPoints).toEqual([...STATION33_SPAWNS.vestibule, ...STATION33_SPAWNS.cocheras]);
+    // Through the door onto the apron, up to the west track's buffer stop.
+    const end = walk(arena, 5.6, 1.6, FACE_NORTH, 4);
+    expect(end.z).toBeLessThan(hall.maxZ - 3);
+    expect(end.z).toBeGreaterThan(COCHERAS_TRACKS.west.bufferZ);
+  });
+
+  it('keeps the trains solid and leaves open lanes on both sides of the derailed car', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'cocheras');
+    const lead = COCHERAS_TRAIN_CARS.find((car) => car.id === 'west-lead')!;
+    expect(walk(arena, 10, (lead.minZ + lead.maxZ) / 2, FACE_WEST, 4).x).toBeGreaterThan(lead.x + TRAIN_CAR.width / 2);
+    // Between the trains and down the east lane, all the way to the far wall.
+    for (const x of [8.6, 19.5]) {
+      const end = walk(arena, x, -3, FACE_NORTH, 10);
+      expect(end.z, `lane at x = ${x}`).toBeLessThan(hall.minZ + 1);
+      expect(end.z, `lane at x = ${x}`).toBeGreaterThan(hall.minZ);
+    }
+  });
+
+  it('seals the west tunnel with the trailer car and keeps the sheds off the escalator shaft', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'cocheras');
+    const solids = solidBoxes(arena);
+    const { x } = COCHERAS_TRACKS.west;
+    const half = COCHERAS_TRACKS.portal.width / 2;
+    for (let along = x - half; along <= x + half; along += 0.1) {
+      const body = bodyBox(along, hall.minZ - STATION33_WALL_THICKNESS / 2, 0.35);
+      expect(solids.some((box) => box.intersectsBox(body)), `portal at x = ${along.toFixed(1)}`).toBe(true);
+    }
+    expect(hall.minX - STATION33_WALL_THICKNESS).toBeGreaterThan(ESCALATOR_PORTAL.centerX + ESCALATOR_PORTAL.width / 2 + 0.3);
+    const walls = new THREE.Box3(
+      new THREE.Vector3(hall.minX - STATION33_WALL_THICKNESS, 0, hall.minZ - STATION33_WALL_THICKNESS),
+      new THREE.Vector3(hall.maxX + STATION33_WALL_THICKNESS, 3, hall.maxZ),
+    ).expandByScalar(-0.01);
+    for (const barrier of STATION33_BARRIERS.filter((candidate) => candidate.zone !== 'cocheras')) {
+      expect(walls.intersectsBox(passageBox(barrier)), `${barrier.id} vs sheds`).toBe(false);
+    }
+  });
+
+  it('keeps the trains and props off the entrances it opens', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'cocheras');
+    const solids = structureBoxes(arena);
+    for (const spawn of STATION33_SPAWNS.cocheras) {
+      const breach = bodyBox(spawn.breachX!, spawn.breachZ!, 0.4);
+      expect(solids.some((box) => box.intersectsBox(breach)), spawn.barrierId).toBe(false);
+    }
+  });
+
+  it('sells the M60 on the apron, out of reach from the other rooms', () => {
+    const arena = makeArena();
+    const m60 = arena.wallBuys.find((wallBuy) => wallBuy.weaponId === 'm60')!;
+    expect(m60.position.z).toBeLessThan(hall.maxZ);
+    expect(m60.position.x).toBeGreaterThan(hall.minX);
+    expect(m60.position.x).toBeLessThan(hall.maxX);
+    for (const room of [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall]) {
+      const reach = Math.hypot(
+        m60.position.x - THREE.MathUtils.clamp(m60.position.x, room.minX + 0.4, room.maxX - 0.4),
+        m60.position.z - THREE.MathUtils.clamp(m60.position.z, room.minZ + 0.4, room.maxZ - 0.4),
+      );
+      expect(reach).toBeGreaterThan(m60.useRange + 1);
+    }
+  });
+});
+
+describe('Station 33 machine room', () => {
+  const { gallery, hall } = SUBESTACION;
+
+  it('stays walled off until its door is bought, then opens the gallery and the hall', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'cocheras');
+    expect(walk(arena, 11, -24, FACE_NORTH, 3).z).toBeGreaterThan(COCHERAS.hall.minZ);
+    expect(arena.spawnPoints.some((point) => (point as ZombieSpawnPoint).barrierId?.startsWith('subestacion'))).toBe(false);
+
+    openDoorTo(arena, 'subestacion');
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(barrierIdsOf('vestibule', 'cocheras', 'subestacion'));
+    expect(arena.spawnPoints).toEqual([...STATION33_SPAWNS.vestibule, ...STATION33_SPAWNS.cocheras, ...STATION33_SPAWNS.subestacion]);
+    // Down the gallery and the aisle, up to the main switch.
+    const end = walk(arena, 11, -24, FACE_NORTH, 12);
+    expect(end.z).toBeLessThan(hall.minZ + 1.2);
+    expect(Math.hypot(end.x - arena.powerSwitch.position.x, end.z - arena.powerSwitch.position.z)).toBeLessThan(arena.powerSwitch.useRange);
+  });
+
+  it('fits its gallery between the dead tunnel and the blast-gate passage, clear of every other passage', () => {
+    const blastGate = STATION33_BARRIERS.find((barrier) => barrier.id === 'cocheras-blast-gate')!;
+    const tunnelEast = COCHERAS_TRACKS.west.x + COCHERAS_TRACKS.portal.width / 2 + STATION33_WALL_THICKNESS;
+    expect(gallery.minX - STATION33_WALL_THICKNESS).toBeGreaterThan(tunnelEast);
+    expect(gallery.maxX + STATION33_WALL_THICKNESS).toBeLessThan(passageBox(blastGate).min.x);
+    for (const room of [gallery, hall]) {
+      const walls = new THREE.Box3(
+        new THREE.Vector3(room.minX - STATION33_WALL_THICKNESS, 0, room.minZ - STATION33_WALL_THICKNESS),
+        new THREE.Vector3(room.maxX + STATION33_WALL_THICKNESS, 3, room.maxZ),
+      ).expandByScalar(-0.01);
+      for (const barrier of STATION33_BARRIERS.filter((candidate) => candidate.zone !== 'subestacion')) {
+        expect(walls.intersectsBox(passageBox(barrier)), barrier.id).toBe(false);
+      }
+    }
+    expect(hall.minX - STATION33_WALL_THICKNESS).toBeGreaterThan(ESCALATOR_PORTAL.centerX + ESCALATOR_PORTAL.width / 2 + 0.3);
+  });
+
+  it('stops the player at every walk-through gate once its boards are gone', () => {
+    const arena = makeArena();
+    openWayTo(arena, 'subestacion');
+    for (const barrier of arena.barriers) {
+      while (!barrier.isOpen) barrier.damage(100);
+    }
+    const blastGate = STATION33_BARRIERS.find((barrier) => barrier.id === 'cocheras-blast-gate')!;
+    expect(walk(arena, blastGate.x, COCHERAS.hall.minZ + 2, FACE_NORTH, 3).z).toBeGreaterThan(COCHERAS.hall.minZ);
+    const tunnel = STATION33_BARRIERS.find((barrier) => barrier.id === 'subestacion-cable-tunnel')!;
+    expect(walk(arena, tunnel.x, hall.minZ + 1.6, FACE_NORTH, 3).z).toBeGreaterThan(hall.minZ);
+  });
+});
+
+describe('Station 33 main switch', () => {
+  /** Runs Station 33 with the player in front of the main switch, looking at it. */
+  function atTheSwitch() {
+    const side = makeContext();
+    const mode = new ZombiesMode('station-33');
+    mode.init(side.ctx);
+    const arena = (mode as unknown as { arena: Station33Arena }).arena;
+    side.player.teleport(POWER_LEVER.x, EYE_HEIGHT, POWER_LEVER.z + 0.9, 0);
+    side.player.face(FACE_NORTH);
+    side.player.rig.updateMatrixWorld(true);
+    return { side, mode, arena };
+  }
+
+  it('is offered once and thrown for free, and the lever powers the station as it closes', () => {
+    const { side, mode, arena } = atTheSwitch();
+    const sleight = arena.ringMachines.find((machine) => machine.ringId === 'sleightOfHand')!;
+    expect(mode.getInteractPrompt()).toBe(t('prompt.powerSwitch', { key: actionKey(false) }));
+    mode.onInteract();
+    expect(arena.powerSwitch.isOn).toBe(true);
+    expect(side.ctx.audio.playPowerSwitch).toHaveBeenCalledOnce();
+    expect(side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('banner.powerOn'));
+    expect(mode.getInteractPrompt()).toBeNull();
+    // The blades still travel; the power arrives when they close.
+    expect(sleight.powered).toBe(false);
+    arena.update(0.6);
+    expect(sleight.powered).toBe(true);
+    expect(arena.group.getObjectByName('power-lever-web')!.visible).toBe(false);
+    mode.onInteract();
+    expect(side.ctx.audio.playPowerSwitch).toHaveBeenCalledOnce();
+  });
+
+  it('lights the whole station up: mains lamps, brighter lights, more fill, thinner haze, blazing lockers', () => {
+    const scene = new THREE.Scene();
+    const arena = new Station33Arena(scene, { ...TEST_PROFILE, quality: 'high' });
+    arena.init();
+    const inMachineRoom = new THREE.Vector3(11, 1.7, -40);
+    const visibleIntensity = (): number => {
+      let total = 0;
+      for (let step = 0; step < 40; step++) {
+        arena.update(0.25, inMachineRoom);
+        arena.group.traverse((object) => { if (object instanceof THREE.PointLight && object.visible) total += object.intensity; });
+      }
+      return total;
+    };
+    const hemisphere = (): number => {
+      let intensity = 0;
+      arena.group.traverse((object) => { if (object instanceof THREE.HemisphereLight) intensity = object.intensity; });
+      return intensity;
+    };
+    const bulb = (): number => {
+      const material = (arena.group.getObjectByName('locker-bulb') as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      return material.color.r + material.color.g + material.color.b;
+    };
+    const before = { light: visibleIntensity(), hemisphere: hemisphere(), fog: (scene.fog as THREE.FogExp2).density, environment: scene.environmentIntensity, bulb: bulb() };
+
+    arena.switchOnPower();
+    arena.update(5, inMachineRoom);
+    expect(visibleIntensity()).toBeGreaterThan(before.light * 1.5);
+    expect(hemisphere()).toBeGreaterThan(before.hemisphere);
+    expect((scene.fog as THREE.FogExp2).density).toBeLessThan(before.fog);
+    expect(scene.environmentIntensity).toBeGreaterThan(before.environment);
+    expect(bulb()).toBeGreaterThan(before.bulb * 10);
+
+    arena.reset();
+    expect(arena.powerSwitch.isOn).toBe(false);
+    expect(hemisphere()).toBe(before.hemisphere);
+    expect((scene.fog as THREE.FogExp2).density).toBe(before.fog);
+    expect(scene.environmentIntensity).toBe(before.environment);
+    expect(arena.group.getObjectByName('power-lever-web')!.visible).toBe(true);
+    expect(arena.ringMachines.find((machine) => machine.ringId === 'sleightOfHand')!.powered).toBe(false);
   });
 });
 
@@ -378,7 +628,7 @@ describe('Station 33 lights and ambience', () => {
     };
     expect(arena.pointLightCount).toBe(POINT_LIGHT_BUDGET[quality]);
     expect(visibleLights()).toBe(POINT_LIGHT_BUDGET[quality]);
-    const observers = [new THREE.Vector3(0, 1.7, 15), new THREE.Vector3(17.5, 1.7, 12), new THREE.Vector3(10, 1.7, 10)];
+    const observers = [new THREE.Vector3(0, 1.7, 15), new THREE.Vector3(17.5, 1.7, 12), new THREE.Vector3(10, 1.7, 10), new THREE.Vector3(11, 1.7, -14)];
     for (let step = 0; step < 600; step++) arena.update(0.5, observers[step % observers.length]);
     expect(visibleLights()).toBe(POINT_LIGHT_BUDGET[quality]);
   });
@@ -401,6 +651,24 @@ describe('Station 33 lights and ambience', () => {
       if (object instanceof THREE.PointLight && object.visible && object.position.x > VESTIBULE.maxX) officeLights.push(object);
     });
     expect(officeLights.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('hands the real lights to the train sheds once the player is past their door', () => {
+    const arena = makeArena({ ...TEST_PROFILE, quality: 'low' });
+    const shedsLit = (): number => {
+      let count = 0;
+      arena.group.traverse((object) => { if (object instanceof THREE.PointLight && object.visible && object.position.z < VESTIBULE.minZ) count++; });
+      return count;
+    };
+    const at = (z: number): void => arena.update(0, new THREE.Vector3(5.6, 1.7, z));
+    at(-0.5);
+    expect(shedsLit()).toBe(0);
+    at(-1.2);
+    expect(shedsLit()).toBe(POINT_LIGHT_BUDGET.low);
+    at(0.2);
+    expect(shedsLit()).toBe(POINT_LIGHT_BUDGET.low);
+    at(0.8);
+    expect(shedsLit()).toBe(0);
   });
 
   it('switches rooms only once the player is clearly past the door, and back to the vestibule on reset', () => {
@@ -491,6 +759,7 @@ describe('Station 33 reset', () => {
     arena.group.traverse((object) => { if (object instanceof THREE.PointLight) baseline.intensities.push(object.intensity); });
 
     openDoorTo(arena, 'consigna');
+    openDoorTo(arena, 'cocheras');
     for (const barrier of arena.barriers) {
       while (!barrier.isOpen) barrier.damage(100);
     }
