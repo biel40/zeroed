@@ -3,6 +3,7 @@ import { projectMaterialUVs, wallSpans, type WallOpening } from '../shared/Arena
 import { seededRandom } from '../shared/ProceduralNoise';
 import {
   MANSION_AREA_LIGHTS,
+  MANSION_BANQUET_HALL,
   MANSION_BARRIERS,
   MANSION_BUNKER_CEILING_Y,
   MANSION_BUNKER_DIVIDER_X,
@@ -227,12 +228,14 @@ function addGroundJoists(context: MansionBuildContext): void {
     if (!clearOfFixtures(minX, maxX, z - JOIST.width / 2, z + JOIST.width / 2)) return;
     batch.addBox(materials.charredWood, (minX + maxX) / 2, y, z, maxX - minX, JOIST.height, JOIST.width, 0, 0, 0, Math.round(z * 10 + minX));
   };
-  // Start room: joists span its short (north-south) side.
-  const startMinZ = 2 + half;
-  const startMaxZ = 10.15 - half;
-  for (let x = -6.4; x <= 8.5; x += JOIST.spacing) {
-    if (!clearOfFixtures(x - JOIST.width / 2, x + JOIST.width / 2, startMinZ, startMaxZ)) continue;
-    batch.addBox(materials.charredWood, x, y, (startMinZ + startMaxZ) / 2, JOIST.width, JOIST.height, startMaxZ - startMinZ, 0, 0, 0, Math.round(x * 10));
+  const joistAlongZ = (x: number, minZ: number, maxZ: number): void => {
+    if (!clearOfFixtures(x - JOIST.width / 2, x + JOIST.width / 2, minZ, maxZ)) return;
+    batch.addBox(materials.charredWood, x, y, (minZ + maxZ) / 2, JOIST.width, JOIST.height, maxZ - minZ, 0, 0, 0, Math.round(x * 10));
+  };
+  // Start room and banquet hall: joists span their short (north-south) side.
+  for (let x = -6.4; x <= 8.5; x += JOIST.spacing) joistAlongZ(x, 2 + half, 10.15 - half);
+  for (let x = -6.4; x < MANSION_BANQUET_HALL.maxX - half; x += JOIST.spacing) {
+    joistAlongZ(x, MANSION_BANQUET_HALL.northZ + half, MANSION_BANQUET_HALL.southZ - half);
   }
   // Mystery Box room, east hall and stair room: joists run east-west.
   const eastFaceX = MANSION_EAST_WALL_X - half;

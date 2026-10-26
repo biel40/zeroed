@@ -26,8 +26,8 @@ const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3,
 /**
  * Seepage points in the ceilings; the third one is the hole the vault
  * plaster fell from, the next two soak the luggage office, three drip from
- * the joints of the train sheds' iron rings and the last two leak onto the
- * machine-room floor.
+ * the joints of the train sheds' iron rings, two leak onto the machine-room
+ * floor and the last one into the substation gallery.
  */
 const DRIP_SOURCES = [
   { x: -1.2, z: 7.3, interval: 2.3 },
@@ -40,6 +40,7 @@ const DRIP_SOURCES = [
   { x: 19.4, z: -24.1, interval: 2.8 },
   { x: 9.2, z: -36.5, interval: 2.4 },
   { x: 16.9, z: -38.6, interval: 1.8 },
+  { x: 12.7, z: -30.4, interval: 2.2 },
 ] as const;
 /** Severed cables hanging out of the ceilings: anchor, length and sway phase. */
 const HANGING_CABLES = [
@@ -50,6 +51,7 @@ const HANGING_CABLES = [
   { x: 12.9, z: -13.2, length: 2.1, phase: 1.1 },
   { x: 18.6, z: -18.4, length: 1.5, phase: 3.6 },
   { x: 12.0, z: -44.2, length: 1.3, phase: 0.9 },
+  { x: 9.3, z: -31.6, length: 0.7, phase: 2.7 },
 ] as const;
 /** The fluorescent fixture that tore loose from its slot and hangs by one chain. */
 const DANGLING_FIXTURE = { x: 2, z: 6.75, chain: 0.9 } as const;

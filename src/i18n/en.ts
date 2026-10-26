@@ -141,7 +141,8 @@ export const en = {
   'prompt.rechargeRing': 'RECHARGE {ring}\n{key} — {cost} PTS',
   'prompt.ringNeedsPower': '{ring} RING\nTHE POWER MUST BE TURNED ON',
 
-  'door.to-dining': 'DINING HALL',
+  'door.to-dining': 'PARLOUR',
+  'door.to-banquet': 'BANQUET HALL',
   'door.to-east-hall': 'EAST HALL',
   'door.to-consigna': 'LUGGAGE OFFICE',
   'door.openBunker': 'Open sealed bunker',

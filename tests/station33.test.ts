@@ -544,6 +544,33 @@ describe('Station 33 machine room', () => {
     const tunnel = STATION33_BARRIERS.find((barrier) => barrier.id === 'subestacion-cable-tunnel')!;
     expect(walk(arena, tunnel.x, hall.minZ + 1.6, FACE_NORTH, 3).z).toBeGreaterThan(hall.minZ);
   });
+
+  it('tiles its own floor, at the vestibule granite\'s texel density', () => {
+    const arena = makeArena();
+    const floorMaterial = (name: string): THREE.MeshStandardMaterial => (arena.group.getObjectByName(name) as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const texelsPerMetre = (material: THREE.MeshStandardMaterial): number => material.map!.image.width / (material.userData.metersPerTile as number);
+    for (const name of ['subestacion-gallery-floor', 'subestacion-hall-floor']) {
+      expect(floorMaterial(name).name).toBe('station33_machine_room_floor');
+      expect(texelsPerMetre(floorMaterial(name))).toBeCloseTo(texelsPerMetre(floorMaterial('vestibule-floor')));
+    }
+  });
+
+  it('keeps the mimic diagram\'s feeder lamps dark until the mains come back', () => {
+    const arena = makeArena();
+    const lamp = (): number => {
+      let brightness = -1;
+      arena.group.traverse((object) => {
+        const material = (object as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (material?.name === 'station33_mimic_live') brightness = material.color.r + material.color.g + material.color.b;
+      });
+      return brightness;
+    };
+    arena.update(1, new THREE.Vector3(11, 1.7, -40));
+    expect(lamp()).toBe(0);
+    arena.switchOnPower();
+    for (let step = 0; step < 20; step++) arena.update(0.5, new THREE.Vector3(11, 1.7, -40));
+    expect(lamp()).toBeGreaterThan(0.2);
+  });
 });
 
 describe('Station 33 main switch', () => {

@@ -1,8 +1,10 @@
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { buildSubestacionDressing } from './SubestacionDressing';
+import { buildSubestacionFloorDetail } from './SubestacionFloorDetail';
 import { buildSubestacionFurniture } from './SubestacionFurniture';
 import { buildSubestacionShell } from './SubestacionShell';
+import { buildSubestacionWallGear } from './SubestacionWallGear';
 
 /**
  * Phase 4 zone: the traction substation north of the train sheds, behind
@@ -12,5 +14,7 @@ import { buildSubestacionShell } from './SubestacionShell';
 export function buildSubestacion(context: Station33BuildContext, lighting: Station33Lighting): void {
   buildSubestacionShell(context);
   buildSubestacionFurniture(context, lighting);
+  buildSubestacionFloorDetail(context);
+  buildSubestacionWallGear(context, lighting);
   buildSubestacionDressing(context);
 }

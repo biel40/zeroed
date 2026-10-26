@@ -28,6 +28,7 @@ import type {
 } from './ZombieArena';
 import { createMansionSurfaceMaterials, type MansionSurfaceMaterials } from './BurnedMansionMaterials';
 import { MansionAtmosphere } from './burnedMansion/MansionAtmosphere';
+import { MansionBanquetGhost } from './burnedMansion/MansionBanquetGhost';
 import type { MansionBuildContext } from './burnedMansion/MansionBuildContext';
 import { MansionDecorBatch } from './burnedMansion/MansionDecorBatch';
 import { buildMansionDressing } from './burnedMansion/MansionDressing';
@@ -45,6 +46,8 @@ import {
   MANSION_AMBIENCE,
   MANSION_AMMO_REFILLS,
   MANSION_AREA_LIGHTS,
+  MANSION_BANQUET_GHOST,
+  MANSION_BANQUET_HALL,
   MANSION_BARRIERS,
   MANSION_BLAST_DOOR_ID,
   MANSION_BUNKER_BOUNDS,
@@ -72,6 +75,7 @@ import {
   MANSION_WALL_HEIGHT,
   MANSION_WALL_THICKNESS,
   MANSION_WINDOW_OPENING,
+  isOutsideMansion,
 } from './BurnedMansionConfig';
 
 const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
@@ -89,6 +93,13 @@ interface RankedPointLight {
 }
 
 type WallAxis = 'x' | 'z';
+
+/** Centre of a configured door along its wall. */
+function doorAlong(doorId: string): number {
+  const door = MANSION_DOORS.find((candidate) => candidate.id === doorId);
+  if (!door) throw new Error(`Unknown mansion door ${doorId}`);
+  return door.outwardZ !== 0 ? door.x : door.z;
+}
 
 /** Visual meshes wholly on one floor, split by whether the stairwell exposes them. */
 interface FloorMeshSet {
@@ -256,7 +267,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   readonly useWallCollision = true;
   readonly playerBounds = MANSION_GROUND_BOUNDS;
   readonly navigationBounds = [
-    { floor: 0, minX: -16, maxX: 16, minZ: -18, maxZ: 18, baseY: 0 },
+    { floor: 0, minX: -16, maxX: 16, minZ: -27, maxZ: 18, baseY: 0 },
     { floor: -1, ...MANSION_BUNKER_BOUNDS, baseY: MANSION_BUNKER_Y },
   ] as const;
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
@@ -296,6 +307,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private secretWallCollider!: THREE.Mesh;
   private readonly areaLights = new CreepyAreaLights();
   private readonly atmosphere: MansionAtmosphere;
+  private readonly banquetGhost: MansionBanquetGhost;
   private readonly rankedPointLights: RankedPointLight[] = [];
   private readonly floorMeshSets: FloorMeshSet[] = (['ground', 'bunker'] as const).flatMap((floor) =>
     [false, true].map((nearStairs) => ({ floor, nearStairs, meshes: [], rendered: true })),
@@ -331,6 +343,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     buildMansionExterior(dressing);
     this.buildLighting(dressing);
     this.atmosphere = new MansionAtmosphere(dressing);
+    this.banquetGhost = new MansionBanquetGhost(this.group);
     // No mansion light casts shadows; the batch only receives them.
     dressing.batch.build(this.group, 'burned-mansion-static', { castShadow: false, receiveShadow: true });
     this.secretRoom = new SecretRoomSystem(this.group, this.secretWall, profile);
@@ -446,6 +459,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     }
     this.areaLights.update(dt);
     this.atmosphere.update(dt);
+    this.banquetGhost.update(dt);
     if (observerPosition) {
       this.updatePointLightBudget(observerPosition);
       this.updateFloorRendering(observerPosition);
@@ -461,6 +475,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     for (const refill of this.ammoRefills) refill.reset();
     this.secretRoom.reset();
     this.atmosphere.reset();
+    this.banquetGhost.reset();
     this.activeSpawnZones.clear();
     this.activeSpawnZones.add('start');
     this.openDoorIds.clear();
@@ -477,6 +492,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     if (doorId === 'nuclear-bunker') return this.doorViews[index].beginOpening();
     this.openDoorIds.add(doorId);
     this.activeSpawnZones.add(doorId);
+    if (doorId === MANSION_BANQUET_GHOST.doorId) this.banquetGhost.tryAppear();
     this.refreshProgressionState();
     this.onTopologyChanged?.();
     return true;
@@ -542,8 +558,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       point.breachX === undefined ||
       point.breachZ === undefined
     ) return false;
-    const outside = point.x < -7.45 || point.x > MANSION_EAST_WALL_X + 0.3 || point.z < -8.45 || point.z > 10.45;
-    if (!outside) return false;
+    if (!isOutsideMansion(point.x, point.z)) return false;
     const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === point.barrierId);
     if (!barrier) return false;
     const approachSide =
@@ -593,15 +608,20 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       10 - STAIR_APERTURE_MAX_Z, this.materials.parquet,
     );
 
-    this.addWindowedWall('z', -7.15, -8, 10, [-3.2, 3.2, 5.4]);
-    this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10, [-2.5]);
+    this.addWindowedWall('z', -7.15, -8, 10);
+    this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10);
     // North and south walls reach the outer face of the widened east wall so
-    // the east-wing corners stay closed.
+    // the east-wing corners stay closed. West of the bunker divider the old
+    // north facade is now the banquet hall's door wall (buildInterior).
     const eastOuterX = MANSION_EAST_WALL_X + MANSION_WALL_THICKNESS / 2;
-    this.addWindowedWall('x', -8.15, -7, eastOuterX, [-5.5, -3.5, 1.6]);
-    this.addWindowedWall('x', 10.15, -7, eastOuterX, [-5.5, -3.5]);
+    this.addAxisWall(
+      'x', MANSION_BANQUET_HALL.southZ, (MANSION_BUNKER_DIVIDER_X + eastOuterX) / 2,
+      MANSION_WALL_HEIGHT / 2, eastOuterX - MANSION_BUNKER_DIVIDER_X, MANSION_WALL_HEIGHT,
+    );
+    this.addWindowedWall('x', 10.15, -7, eastOuterX);
 
     this.addSlab('mansion-roof', 1, 3.28, 1, 16.6, 0.16, 18.6, this.materials.ceilingBurned);
+    this.buildBanquetShell();
 
     // The bunker mirrors the whole mansion footprint, and its ceiling repeats
     // the exact stair aperture of the ground slab so the stairwell stays open.
@@ -698,6 +718,31 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     }
   }
 
+  /** Outer walls, floor and roof of the banquet wing north of the old facade. */
+  private buildBanquetShell(): void {
+    const { minX, maxX, southZ, northZ } = MANSION_BANQUET_HALL;
+    const half = MANSION_WALL_THICKNESS / 2;
+    const westX = minX - half;
+    const eastX = maxX + half;
+    const northOuterZ = northZ - half;
+    // The north wall closes both corners; the west wall also fills the old
+    // facade's outer corner, the east wall stops at the facade.
+    this.addWindowedWall('x', northZ, westX, eastX);
+    this.addWindowedWall('z', minX, northZ + half, southZ + half);
+    this.addWindowedWall('z', maxX, northZ + half, southZ - half);
+    const floorDepth = southZ + half - northOuterZ;
+    this.addSlab('banquet-floor', (westX + eastX) / 2, -0.08, northOuterZ + floorDepth / 2, eastX - westX, 0.16, floorDepth, this.materials.parquet);
+    const roofDepth = southZ - half - northOuterZ;
+    this.addSlab('banquet-roof', (westX + eastX) / 2, 3.28, northOuterZ + roofDepth / 2, eastX - westX, 0.16, roofDepth, this.materials.ceilingBurned);
+    // Papered chimney breast; the fireplace surround on its front is dressing.
+    const { chimney } = MANSION_BANQUET_HALL;
+    const breastBackX = maxX - half;
+    this.addWall(
+      (chimney.frontX + breastBackX) / 2, MANSION_WALL_HEIGHT / 2, chimney.z,
+      breastBackX - chimney.frontX, MANSION_WALL_HEIGHT, chimney.breadth,
+    );
+  }
+
   private buildSecretWall(): THREE.Mesh {
     const geometry = new THREE.BoxGeometry(
       MANSION_WALL_THICKNESS,
@@ -741,8 +786,13 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.addDoorWall('x', 2, -7, 0, -3.5, 0);
     this.addWall(4.5, MANSION_WALL_HEIGHT / 2, 2, 9, MANSION_WALL_HEIGHT, MANSION_WALL_THICKNESS);
 
-    // The east hall is the third room between its paid entrance and the sealed bunker.
-    this.addDoorWall('z', 0, -8, 2, -2.5, 0);
+    // The Mystery Box room and the east hall only meet through the banquet hall.
+    this.addWall(0, MANSION_WALL_HEIGHT / 2, -3, MANSION_WALL_THICKNESS, MANSION_WALL_HEIGHT, 10);
+    const southZ = MANSION_BANQUET_HALL.southZ;
+    this.addDoorWall('x', southZ, -7, 0, doorAlong('to-banquet'), 0);
+    this.addDoorWall('x', southZ, 0, MANSION_BUNKER_DIVIDER_X, doorAlong('to-east-hall'), 0);
+
+    // The east hall is the last room between the banquet hall and the sealed bunker.
     this.addDoorWall('z', MANSION_BUNKER_DIVIDER_X, -8, 2, -2.5, 0);
   }
 
@@ -855,6 +905,26 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private buildProps(): void {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
     this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
+    // The banquet furniture is dressing; these invisible volumes make it solid.
+    this.addFurnitureCollider('banquet-table-collider', MANSION_BANQUET_HALL.table);
+    this.addFurnitureCollider('banquet-sideboard-collider', MANSION_BANQUET_HALL.sideboard);
+    this.addFurnitureCollider('banquet-china-cabinet-collider', MANSION_BANQUET_HALL.chinaCabinet);
+  }
+
+  private addFurnitureCollider(
+    name: string,
+    footprint: { readonly x: number; readonly z: number; readonly width: number; readonly depth: number; readonly height: number },
+  ): void {
+    const collider = new THREE.Mesh(
+      new THREE.BoxGeometry(footprint.width, footprint.height, footprint.depth),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    collider.position.set(footprint.x, footprint.height / 2, footprint.z);
+    collider.name = name;
+    collider.userData.surface = 'wood';
+    collider.userData.mapRole = 'furniture-collider';
+    this.structure.addSolid(collider, true);
+    this.group.add(collider);
   }
 
   private buildSecretPickups(): ReadonlyArray<ArenaWeaponPickup> {
@@ -1133,7 +1203,11 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       { x: -7.0, y: 2.42, z: 5.4, width: 1.7, height: 1.35, rotationY: Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -7.0, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: -3.5, y: 2.42, z: 10.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
-      { x: -3.5, y: 2.4, z: -8.0, width: 1.8, height: 1.25, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: -3.8, y: 2.6, z: -7.985, width: 1.8, height: 1.0, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
+      // Banquet hall: smoke over its windows and the wall buy.
+      { x: -5.3, y: 2.42, z: MANSION_BANQUET_HALL.northZ + 0.165, width: 1.9, height: 1.3, rotationY: 0, material: this.materials.sootHeavy, role: 'soot-detail' },
+      { x: MANSION_BANQUET_HALL.maxX - 0.165, y: 2.4, z: MANSION_BANQUET_HALL.eastWindowZ, width: 1.8, height: 1.25, rotationY: -Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: 3.4, y: 1.3, z: MANSION_BANQUET_HALL.southZ - 0.165, width: 0.9, height: 1.3, rotationY: Math.PI, material: this.materials.bloodSmear, role: 'blood-stain' },
       // On the east stairwell wall, which now hides that stretch of the outer wall.
       { x: 7.81, y: 2.45, z: -5.6, width: 1.9, height: 1.35, rotationY: -Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.5, y: 2.55, z: 1.835, width: 2.05, height: 1.15, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
@@ -1209,13 +1283,12 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     ];
   }
 
-  private addWindowedWall(
-    axis: WallAxis,
-    fixed: number,
-    min: number,
-    max: number,
-    openingCenters: ReadonlyArray<number>,
-  ): void {
+  /** Outer wall from `min` to `max`, opened at every configured barrier window on its line. */
+  private addWindowedWall(axis: WallAxis, fixed: number, min: number, max: number): void {
+    const openingCenters = MANSION_BARRIERS
+      .filter((barrier) => (axis === 'x' ? barrier.outwardZ !== 0 && barrier.z === fixed : barrier.outwardX !== 0 && barrier.x === fixed))
+      .map((barrier) => (axis === 'x' ? barrier.x : barrier.z))
+      .filter((center) => center > min && center < max);
     const span = max - min;
     const center = (min + max) / 2;
     const middleHeight = MANSION_WINDOW_OPENING.top - MANSION_WINDOW_OPENING.sill;

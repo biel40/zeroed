@@ -25,9 +25,14 @@ export type SignId =
   | 'route-33'
   | 'depot'
   | 'substation'
-  | 'main-switch';
+  | 'main-switch'
+  | 'high-voltage'
+  | 'men-at-work'
+  | 'mimic-diagram';
 
-const ATLAS_SIZE = 1024;
+const ATLAS_WIDTH = 1024;
+/** One 128 px row below the original square, for the machine room's plates. */
+const ATLAS_HEIGHT = 1152;
 
 /** Atlas cells in canvas pixels: x, y, width, height. */
 const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
@@ -50,6 +55,9 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   depot: [896, 896, 128, 128],
   substation: [0, 896, 256, 128],
   'main-switch': [256, 896, 256, 128],
+  'high-voltage': [0, 1024, 256, 128],
+  'men-at-work': [256, 1024, 256, 128],
+  'mimic-diagram': [512, 1024, 512, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -71,6 +79,16 @@ export interface Station33Signage {
   /** Plane showing locker number tag `index` (wraps over LOCKER_PLATE_COUNT). */
   lockerPlateGeometry(index: number, width: number, height: number): THREE.PlaneGeometry;
 }
+
+/**
+ * Mimic diagram composition, shared with the board that carries its lamps:
+ * where each feeder drops from the busbar (fraction of the plate width) and
+ * the height of the lamp row (fraction of the plate height from its top).
+ */
+export const MIMIC_LAYOUT = {
+  feeders: [0.12, 0.27, 0.42, 0.58, 0.73, 0.88],
+  lampRow: 0.84,
+} as const;
 
 /** Mural composition, shared with the builder that shapes its geometry. */
 export const MURAL_LAYOUT = {
@@ -189,7 +207,7 @@ function printLines(context: CanvasRenderingContext2D, x: number, y: number, wid
 
 function paintAtlas(context: CanvasRenderingContext2D): void {
   const random = seededRandom(3333);
-  context.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
+  context.clearRect(0, 0, ATLAS_WIDTH, ATLAS_HEIGHT);
   enamelPlate(context, 'exit', '#d9d3c1', '#3a3a36', '#a3241a', ['ВЫХОД В ГОРОД'], 66, random);
   enamelPlate(context, 'ticket-office', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['КАССЫ'], 84, random);
   enamelPlate(context, 'no-smoking', '#e4e0d4', '#a3241a', '#1b1b1b', ['НЕ КУРИТЬ'], 46, random);
@@ -230,10 +248,83 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   paintSubstationSigns(context, random);
 }
 
-/** Machine room: the gallery door's plate and the danger plate over the main switch. */
+/**
+ * Machine room: the gallery door's plate, the danger plate over the main
+ * switch, the high-voltage warning on the machines, the "men at work" tag
+ * someone hung on a switchboard and the mimic diagram of the network.
+ */
 function paintSubstationSigns(context: CanvasRenderingContext2D, random: () => number): void {
   enamelPlate(context, 'substation', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['ТЯГОВАЯ', 'ПОДСТАНЦИЯ'], 36, random);
   enamelPlate(context, 'main-switch', '#e4e0d4', '#a3241a', '#a3241a', ['ГЛАВНЫЙ', 'РУБИЛЬНИК'], 36, random);
+  enamelPlate(context, 'high-voltage', '#e4e0d4', '#a3241a', '#a3241a', ['СТОЙ!', '', 'НАПРЯЖЕНИЕ'], 30, random);
+  const [vx, vy, vw, vh] = SIGN_REGIONS['high-voltage'];
+  lightningArrow(context, vx + vw / 2, vy + vh / 2, vw * 0.62, '#1b1b1b');
+  enamelPlate(context, 'men-at-work', '#e4e0d4', '#a3241a', '#a3241a', ['НЕ ВКЛЮЧАТЬ!', 'РАБОТАЮТ ЛЮДИ'], 27, random);
+  paintMimicDiagram(context, random);
+}
+
+/** Horizontal lightning arrow of the Soviet danger plates: a zigzag ending in a barb. */
+function lightningArrow(context: CanvasRenderingContext2D, x: number, y: number, length: number, color: string): void {
+  const half = length / 2;
+  const rise = length * 0.09;
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(x - half, y - rise * 0.4);
+  context.lineTo(x + half * 0.1, y - rise);
+  context.lineTo(x - half * 0.05, y - rise * 0.15);
+  context.lineTo(x + half * 0.72, y - rise * 0.55);
+  context.lineTo(x + half * 0.68, y - rise * 1.5);
+  context.lineTo(x + half, y + rise * 0.2);
+  context.lineTo(x + half * 0.6, y + rise * 1.4);
+  context.lineTo(x + half * 0.64, y + rise * 0.45);
+  context.lineTo(x - half * 0.1, y + rise * 0.85);
+  context.lineTo(x + half * 0.05, y);
+  context.lineTo(x - half, y + rise * 0.35);
+  context.closePath();
+  context.fill();
+}
+
+/**
+ * Mimic diagram of the substation: two incoming transformers feed a busbar
+ * across the board, which drops through a breaker to each feeder. Its lamps
+ * are geometry on the board (see `MIMIC_LAYOUT`), not paint.
+ */
+function paintMimicDiagram(context: CanvasRenderingContext2D, random: () => number): void {
+  const [x, y, width, height] = SIGN_REGIONS['mimic-diagram'];
+  context.fillStyle = '#1b1b1b';
+  context.fillRect(x, y, width, height);
+  context.fillStyle = '#34403a';
+  context.fillRect(x + 5, y + 5, width - 10, height - 10);
+  context.strokeStyle = '#d6cfba';
+  context.lineWidth = 3;
+  const busY = y + 44;
+  context.beginPath();
+  context.moveTo(x + 30, busY);
+  context.lineTo(x + width - 30, busY);
+  for (const share of [0.34, 0.66]) {
+    // Incoming transformer: two linked windings above the bus.
+    const cx = x + width * share;
+    context.moveTo(cx, busY);
+    context.lineTo(cx, y + 31);
+    for (const cy of [y + 24, y + 13]) {
+      context.moveTo(cx + 7, cy);
+      context.arc(cx, cy, 7, 0, Math.PI * 2);
+    }
+  }
+  for (const share of MIMIC_LAYOUT.feeders) {
+    const fx = x + width * share;
+    context.moveTo(fx, busY);
+    context.lineTo(fx, y + 60);
+    context.strokeRect(fx - 7, y + 60, 14, 14);
+    context.moveTo(fx, y + 74);
+    context.lineTo(fx, y + height * MIMIC_LAYOUT.lampRow - 9);
+  }
+  context.stroke();
+  lettering(context, 'СХЕМА ПИТАНИЯ', x + 82, y + 18, 15, '#d6cfba');
+  MIMIC_LAYOUT.feeders.forEach((share, index) => {
+    lettering(context, `Ф-${index + 1}`, x + width * share + 22, y + 84, 13, '#d6cfba');
+  });
+  weather(context, x, y, width, height, random, 70);
 }
 
 /**
@@ -361,7 +452,7 @@ function paintMural(context: CanvasRenderingContext2D): void {
 
 export function createStation33Signage(anisotropyLimit: number): Station33Signage {
   const anisotropy = Math.min(anisotropyLimit, 8);
-  const atlas = makeCanvas(ATLAS_SIZE, ATLAS_SIZE);
+  const atlas = makeCanvas(ATLAS_WIDTH, ATLAS_HEIGHT);
   paintAtlas(atlas.context);
   const atlasTexture = canvasTexture(atlas.canvas, anisotropy);
   const mural = makeCanvas(MURAL_LAYOUT.canvasWidth, MURAL_LAYOUT.canvasHeight);
@@ -374,8 +465,8 @@ export function createStation33Signage(anisotropyLimit: number): Station33Signag
       // Canvas rows grow downwards; texture v grows upwards (flipY).
       uv.setXY(
         index,
-        (x + uv.getX(index) * cellWidth) / ATLAS_SIZE,
-        1 - (y + (1 - uv.getY(index)) * cellHeight) / ATLAS_SIZE,
+        (x + uv.getX(index) * cellWidth) / ATLAS_WIDTH,
+        1 - (y + (1 - uv.getY(index)) * cellHeight) / ATLAS_HEIGHT,
       );
     }
     return geometry;

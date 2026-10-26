@@ -120,7 +120,16 @@ codigo: actualiza la guia.
   hormigon bajo vigas de acero, bandejas de cables y tuberias. Dos grupos
   motor-generador sobre bancadas (volante con franjas de peligro, colector
   de cobre), dos transformadores de aceite con aisladores de porcelana y
-  cuadros electricos con relojes y seccionadores. Un pasillo central lleva
+  cuadros electricos con relojes y seccionadores. El suelo es de baldosa
+  metlaj (terracota y arena, 15 cm) empapada de aceite, con baldosas rotas y
+  arrancadas, a la densidad del granito del vestibulo; sobre ella, la zanja de
+  cables del pasillo con chapa estriada, lineas de seguridad alrededor de los
+  motores y la alfombra dielectrica ante los cuadros. Arriba, barras de cobre
+  colgadas que bajan a los transformadores; en los muros, placas «СТОЙ!
+  НАПРЯЖЕНИЕ», la etiqueta «НЕ ВКЛЮЧАТЬ! РАБОТАЮТ ЛЮДИ» olvidada en un
+  seccionador y la mnemosquema de la red, cuyos pilotos verdes solo se
+  encienden con la red (los rojos, a bateria, marcan alimentadores
+  muertos). Un pasillo central lleva
   de la galeria al interruptor; alrededor de los motores hay carriles para
   dar vueltas a la horda. Dos entradas: una rejilla en el muro este y la
   puerta del tunel de cables («ВХОДА НЕТ») en el norte.

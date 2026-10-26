@@ -61,7 +61,7 @@ function addDutyLog(context: Station33BuildContext): void {
     const sheet = new THREE.PlaneGeometry(0.16 + random() * 0.08, 0.22 + random() * 0.06);
     sheet.rotateX(-Math.PI / 2);
     sheet.rotateY(random() * Math.PI * 2);
-    sheet.translate(8.0 + random() * 6.0, 0.004 + index * 0.0002, hall.minZ + 1.0 + random() * 2.4);
+    sheet.translate(8.0 + random() * 6.0, 0.004 + index * 0.0002, hall.minZ + 1.35 + random() * 1.2);
     context.batch.add(sheet, context.materials.paper);
   }
 }
@@ -77,10 +77,14 @@ function addDecal(context: Station33BuildContext, material: THREE.Material, x: n
 /** Oil pooled under the machines, seepage down the plaster and the horde's trail from the grille. */
 function addDecals(context: Station33BuildContext): void {
   const { materials } = context;
-  for (const [x, z, size] of [[7.9, -39.0, 1.6], [13.5, -41.8, 1.4], [18.0, -42.6, 1.8], [11.2, -36.0, 1.2]] as const) {
+  for (const [x, z, size] of [[7.9, -39.0, 1.6], [13.5, -41.8, 1.4], [18.0, -42.6, 1.8], [9.6, -36.0, 1.2]] as const) {
     addDecal(context, materials.floorGrime, x, 0.004, z, size, size * 0.7, 'floor');
   }
-  addDecal(context, materials.puddle, 16.9, 0.006, -38.6, 1.4, 1.0, 'floor');
+  // Under the ceiling leaks of the hall and the gallery.
+  for (const [x, z, size] of [[16.9, -38.6, 1.4], [9.2, -36.5, 0.9], [12.7, -30.4, 1.1]] as const) {
+    addDecal(context, materials.puddle, x, 0.006, z, size, size * 0.7, 'floor');
+  }
+  addDecal(context, materials.waterStreak, gallery.maxX - 0.035, SUBESTACION.galleryHeight - 0.9, -30.4, 1.0, 1.6, -Math.PI / 2);
   const streakY = hallHeight - 1.1;
   for (const x of [6.4, 16.8]) addDecal(context, materials.waterStreak, x, streakY, hall.minZ + 0.035, 1.2, 1.8, 0);
   for (const z of [-41.6, -44.6]) addDecal(context, materials.waterStreak, hall.minX + 0.035, streakY, z, 1.2, 1.8, Math.PI / 2);

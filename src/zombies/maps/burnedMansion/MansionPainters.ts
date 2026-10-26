@@ -523,3 +523,221 @@ export function portraitPainter(size: number, seed: number): () => Painter {
     };
   };
 }
+
+/** 1 inside an ellipse centred on (cx, cy), softened over `soft` of its radius. */
+function inEllipse(px: number, py: number, cx: number, cy: number, rx: number, ry: number, soft = 0.04): number {
+  return 1 - smoothstep(Math.hypot((px - cx) / rx, (py - cy) / ry), 1 - soft, 1 + soft);
+}
+
+/** Distance from (px, py) to the segment a-b. */
+function segmentDistance(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const t = THREE.MathUtils.clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy), 0, 1);
+  return Math.hypot(px - ax - dx * t, py - ay - dy * t);
+}
+
+/** Height over width of the officer portrait canvas; the painter stretches `py` by it. */
+const OFFICER_CANVAS_ASPECT = 1.37;
+
+/**
+ * Oil portrait of a German officer of the Second World War: field-grey tunic
+ * with silver shoulder boards, collar tabs and a dark cross at the throat,
+ * peaked cap with a plain cockade. The eyes are hollow sockets with a red
+ * pinpoint (the glow mask) and blood runs from them under a thin smile; a
+ * knife slash across the chest and a corner the fire reached finish it.
+ */
+export function officerPortraitPainter(size: number): () => Painter {
+  return () => {
+    const random = seededRandom(5281);
+    const brush = tileableNoise(random, size / 32, size);
+    const scorchEdge = tileableNoise(random, size / 8, size);
+    const block: CharBlock = { crack: 0, dome: 0, id: 0 };
+    const color: Rgb = [0, 0, 0];
+    const lit: Rgb = [0, 0, 0];
+    const paint = (rgb: Rgb, alpha: number): void => {
+      if (alpha > 0) mix(color, rgb, alpha, color);
+    };
+    const shaded = (rgb: Rgb, light: number): Rgb => {
+      lit[0] = rgb[0] * light;
+      lit[1] = rgb[1] * light;
+      lit[2] = rgb[2] * light;
+      return lit;
+    };
+    const fieldGrey: Rgb = [84, 88, 76];
+    const capGrey: Rgb = [78, 82, 72];
+    const darkGreen: Rgb = [42, 50, 40];
+    const silver: Rgb = [158, 152, 132];
+    const skin: Rgb = [166, 154, 134];
+    const pallor: Rgb = [112, 122, 98];
+    const blood: Rgb = [98, 8, 6];
+    const black: Rgb = [12, 10, 10];
+    const ribbon: ReadonlyArray<Rgb> = [[140, 30, 28], [196, 186, 166], [22, 22, 22]];
+    return (x, y, texel) => {
+      const px = x / size - 0.5;
+      const py = (y / size - 0.5) * OFFICER_CANVAS_ASPECT;
+      let roughness = 0.5;
+      let glow = 0;
+      let lift = 0;
+      // Murky backdrop with a sickly halo behind the head.
+      mix([30, 27, 22], [70, 64, 46], (1 - smoothstep(Math.hypot(px, py - 0.05), 0.05, 0.5)) * 0.8, color);
+
+      // Tunic, lit from the left, with lapel edges, buttons, boards and ribbons.
+      const torso = inEllipse(px, py, 0, -0.66, 0.47, 0.44, 0.03);
+      paint(shaded(fieldGrey, 1 - 0.35 * smoothstep(px, -0.2, 0.45)), torso);
+      if (torso > 0.5) {
+        const lapel = Math.abs(Math.abs(px) - (0.11 + (-0.22 - py) * 0.25));
+        if (py < -0.22 && py > -0.62 && lapel < 0.007) paint([40, 44, 38], 1);
+        for (const buttonY of [-0.46, -0.56]) paint([120, 118, 104], inEllipse(px, py, 0, buttonY, 0.013, 0.013, 0.2));
+        for (const side of [-1, 1]) {
+          paint(silver, inEllipse(px, py, side * 0.34, -0.33, 0.085, 0.028, 0.1) * (0.75 + brush(x * 4 % size, y * 4 % size) * 0.25));
+        }
+        if (px > -0.24 && px < -0.12 && py > -0.42 && py < -0.395) paint(ribbon[Math.floor((px + 0.24) / 0.012) % 3], 1);
+      }
+      if (Math.abs(px) < 0.12 && py > -0.25 && py < -0.17) paint(darkGreen, 1);
+      const tabX = Math.abs(px);
+      if (tabX > 0.05 && tabX < 0.1 && py > -0.235 && py < -0.19) paint(Math.abs(py + 0.2125) < 0.006 ? darkGreen : silver, 0.9);
+      // The cross at the throat, black with a silver rim.
+      const crossX = Math.abs(px);
+      const crossY = Math.abs(py + 0.275);
+      const arm = Math.max(crossX, crossY);
+      const flare = 0.007 + arm * 0.45;
+      if (arm < 0.035 && Math.min(crossX, crossY) < flare) {
+        paint(arm > 0.029 || Math.min(crossX, crossY) > flare - 0.004 ? silver : [16, 16, 18], 1);
+      }
+      if (Math.abs(px) < 0.065 && py > -0.2 && py < -0.05) paint([122, 112, 96], 1);
+
+      // Gaunt face, lit from the left and greening towards the jaw.
+      const head = inEllipse(px, py, 0, 0.04, 0.145, 0.19, 0.06);
+      if (head > 0) {
+        const face = shaded(skin, 0.65 + 0.35 * (1 - smoothstep(px, -0.12, 0.14)));
+        mix(face, pallor, smoothstep(py, 0.05, -0.14) * 0.35, face);
+        paint(face, head);
+        for (const side of [-1, 1]) paint([70, 60, 52], inEllipse(px, py, side * 0.085, -0.025, 0.04, 0.055, 0.6) * 0.45);
+        // Shadow of the visor across the brow and eyes.
+        if (py > 0.11) paint(black, head * smoothstep(py, 0.11, 0.165) * 0.55);
+        paint([70, 58, 48], inEllipse(px, py, 0.02, 0.02, 0.014, 0.04, 0.8) * head * 0.4);
+        // A thin grin, curling up at the corners.
+        if (Math.abs(px) < 0.055 && Math.abs(py - (-0.072 + px * px * 9)) < 0.0035) paint([46, 26, 24], 1);
+        for (const side of [-1, 1]) {
+          const eyeX = side * 0.055;
+          paint(black, inEllipse(px, py, eyeX, 0.075, 0.042, 0.026, 0.35));
+          const tearEnd = side < 0 ? -0.07 : -0.01;
+          const tearWidth = 0.0055 * (1 - (0.06 - py) * 2);
+          if (py < 0.06 && py > tearEnd && Math.abs(px - eyeX - 0.004 * Math.sin(py * 60)) < tearWidth) {
+            paint(blood, 1);
+            roughness = 0.2;
+          }
+          const pupil = Math.hypot(px - eyeX, py - 0.075);
+          if (pupil < 0.03) {
+            const core = 1 - smoothstep(pupil, 0.008, 0.014);
+            paint([232, 42, 24], core);
+            glow = Math.max(glow, core, (1 - pupil / 0.03) * 0.3);
+          }
+        }
+      }
+
+      // Peaked cap: crown and raised front, dark band, silver cord, black visor, cockade.
+      const crown = Math.max(
+        inEllipse(px, py, 0, 0.235, 0.215, 0.065),
+        py > 0.235 ? inEllipse(px, py, 0, 0.275, 0.15, 0.075) : 0,
+      );
+      paint(shaded(capGrey, 1 - 0.3 * smoothstep(px, -0.15, 0.2)), crown);
+      if (Math.abs(px) < 0.165 && py > 0.18 && py < 0.222) paint([34, 38, 32], 1);
+      if (Math.abs(px) < 0.15 && Math.abs(py - 0.2) < 0.005) paint(silver, 1);
+      const visor = py < 0.18 ? inEllipse(px, py, 0, 0.168, 0.17, 0.028, 0.08) : 0;
+      if (visor > 0) {
+        paint([12, 12, 14], visor);
+        if (py > 0.17 && px > -0.1 && px < -0.02) paint([70, 70, 74], visor);
+        roughness = 0.2;
+      }
+      paint(silver, inEllipse(px, py, 0, 0.25, 0.022, 0.018, 0.1));
+      paint([96, 28, 26], inEllipse(px, py, 0, 0.25, 0.012, 0.01, 0.2));
+
+      // A knife slash across the chest and a corner the fire reached.
+      const slash = segmentDistance(px, py, -0.36, -0.12, 0.42, -0.6) + (brush(x, y) - 0.5) * 0.008;
+      let shade = Math.max(0.25, 1 - Math.hypot(px, py * 0.8) * 0.9);
+      if (slash < 0.007) {
+        mix(color, [8, 6, 5], 1, color);
+        lift = -0.5;
+      } else if (slash < 0.018) {
+        mix(color, [96, 84, 64], 0.6, color);
+        lift = 0.2;
+      }
+      const corner = Math.hypot(px - 0.5, py + OFFICER_CANVAS_ASPECT / 2) + (scorchEdge(x, y) - 0.5) * 0.12;
+      if (corner < 0.18) {
+        mix(color, [10, 8, 7], 1, color);
+        lift = -0.3;
+      } else {
+        shade *= 1 - (1 - smoothstep(corner, 0.18, 0.3)) * 0.7;
+      }
+      charBlock(x, y, 8, 8, 5283, block);
+      // Faint craquelure: felt in the varnish more than seen.
+      shade *= (0.88 + brush(x, y) * 0.2) * (1 - block.crack * 0.06);
+      texel.color[0] = color[0] * shade;
+      texel.color[1] = color[1] * shade;
+      texel.color[2] = color[2] * shade;
+      texel.height = 0.5 + (brush(x, y) - 0.5) * 0.3 - block.crack * 0.08 + lift;
+      texel.roughness = roughness + block.crack * 0.2;
+      texel.emissive = glow;
+    };
+  };
+}
+
+/** Width over depth of the banquet rug; the painter stretches `u` by it. */
+export const BANQUET_RUG_ASPECT = 1.94;
+
+/**
+ * Oxblood Persian rug under the banquet table: navy border with gold
+ * rosettes, a lozenge lattice in the field and a central medallion, worn
+ * along the pile and burnt through in two places.
+ */
+export function rugPainter(size: number): () => Painter {
+  return () => {
+    const random = seededRandom(5291);
+    const wear = tileableNoise(random, size / 16, size);
+    const pile = tileableNoise(random, size / 64, size);
+    const burnEdge = tileableNoise(random, size / 8, size);
+    const gold: Rgb = [150, 110, 52];
+    const color: Rgb = [0, 0, 0];
+    const fract = (value: number): number => value - Math.floor(value);
+    return (x, y, texel) => {
+      const u = x / size;
+      const v = y / size;
+      const across = Math.min(u, 1 - u) * BANQUET_RUG_ASPECT;
+      const along = Math.min(v, 1 - v);
+      const edge = Math.min(across, along);
+      const runner = across < along ? v : u * BANQUET_RUG_ASPECT;
+      mix(color, [104, 24, 24], 1, color);
+      const lattice = Math.abs(fract(u * BANQUET_RUG_ASPECT * 6) - 0.5) + Math.abs(fract(v * 6) - 0.5);
+      if (Math.abs(lattice - 0.5) < 0.035) mix(color, [64, 14, 14], 1, color);
+      const medallion = Math.hypot((u - 0.5) * BANQUET_RUG_ASPECT, v - 0.5);
+      if (medallion < 0.235) mix(color, medallion > 0.215 ? gold : medallion < 0.08 ? [104, 24, 24] : [40, 30, 52], 1, color);
+      if (medallion < 0.02) mix(color, gold, 1, color);
+      if (edge < 0.12) {
+        mix(color, [34, 30, 48], 1, color);
+        if (Math.abs(edge - 0.07) < 0.022 && Math.sin(runner * Math.PI * 2 * 9) > 0.6) mix(color, gold, 1, color);
+      }
+      if (Math.abs(edge - 0.13) < 0.008) mix(color, gold, 1, color);
+      if (edge < 0.02) mix(color, [42, 32, 26], 1, color);
+      let shade = 0.8 + (wear(x, y) - 0.5) * 0.45 + (pile(x, y) - 0.5) * 0.15;
+      let height = 0.5 + (pile(x, y) - 0.5) * 0.3;
+      let roughness = 0.95;
+      for (const [cx, cy, radius] of [[0.78, 0.55, 0.09], [0.2, 0.25, 0.05]] as const) {
+        const burn = Math.hypot((u - cx) * BANQUET_RUG_ASPECT, v - cy) + (burnEdge(x, y) - 0.5) * 0.05;
+        if (burn < radius) {
+          mix(color, [14, 11, 9], 1, color);
+          height = 0.3;
+          roughness = 1;
+        } else {
+          shade *= 1 - (1 - smoothstep(burn, radius, radius * 1.7)) * 0.55;
+        }
+      }
+      texel.color[0] = color[0] * shade;
+      texel.color[1] = color[1] * shade;
+      texel.color[2] = color[2] * shade;
+      texel.height = height;
+      texel.roughness = roughness;
+    };
+  };
+}

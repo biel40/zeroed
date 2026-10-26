@@ -11,12 +11,24 @@ const { hall } = SUBESTACION;
  * west wall, one east of the central aisle that runs from the gallery to
  * the main switch.
  */
-const MOTOR_GENERATORS = [{ x: 6.3, z: -40.4 }, { x: 15.1, z: -40.4 }] as const;
-const MOTOR_GENERATOR = { plinthWidth: 2.6, plinthLength: 6.4, plinthHeight: 0.45, shaftY: 1.4 } as const;
+export const MOTOR_GENERATORS = [{ x: 6.3, z: -40.4 }, { x: 15.1, z: -40.4 }] as const;
+export const MOTOR_GENERATOR = { plinthWidth: 2.6, plinthLength: 6.4, plinthHeight: 0.45, shaftY: 1.4 } as const;
 /** Two oil-cooled transformers in the north-east corner, clear of the cable-tunnel door. */
-const TRANSFORMERS = { x: 19.6, zs: [-43.8, -41.4], width: 2.0, depth: 1.6, height: 2.0 } as const;
-/** Switchboards along the north wall on either side of the main switch. */
-const SWITCHBOARD = { depth: 0.55, height: 2.2, gap: 0.8, length: 2.6 } as const;
+export const TRANSFORMERS = { x: 19.6, zs: [-43.8, -41.4], width: 2.0, depth: 1.6, height: 2.0 } as const;
+/** Switchboards along the north wall on either side of the main switch, three panels each. */
+export const SWITCHBOARD = { depth: 0.55, height: 2.2, gap: 0.8, length: 2.6, panels: 3 } as const;
+
+/** Span of the switchboard on `side` of the main switch and its panel centres, west to east. */
+export function switchboardLayout(side: -1 | 1): { readonly minX: number; readonly maxX: number; readonly front: number; readonly panelXs: readonly number[] } {
+  const { depth, gap, length, panels } = SWITCHBOARD;
+  const nearX = POWER_LEVER.x + side * gap;
+  const farX = nearX + side * length;
+  const minX = Math.min(nearX, farX);
+  const maxX = Math.max(nearX, farX);
+  const panelWidth = (maxX - minX) / panels;
+  const panelXs = Array.from({ length: panels }, (_, panel) => minX + panelWidth * (panel + 0.5));
+  return { minX, maxX, front: hall.minZ + depth, panelXs };
+}
 const OIL_DRUMS: ReadonlyArray<readonly [number, number]> = [[4.75, -35.0], [5.45, -35.15], [4.95, -35.75]];
 
 /**
@@ -111,17 +123,11 @@ function addTransformer(context: Station33BuildContext, z: number): void {
  */
 function addSwitchboard(context: Station33BuildContext, lighting: Station33Lighting, side: -1 | 1): void {
   const { batch, materials } = context;
-  const { depth, height, gap, length } = SWITCHBOARD;
-  const nearX = POWER_LEVER.x + side * gap;
-  const farX = nearX + side * length;
-  const minX = Math.min(nearX, farX);
-  const maxX = Math.max(nearX, farX);
-  const front = hall.minZ + depth;
+  const { depth, height, panels } = SWITCHBOARD;
+  const { minX, maxX, front, panelXs } = switchboardLayout(side);
   batch.addBox(materials.greySteel, (minX + maxX) / 2, height / 2, hall.minZ + depth / 2, maxX - minX, height, depth);
-  const panels = 3;
   const panelWidth = (maxX - minX) / panels;
-  for (let panel = 0; panel < panels; panel++) {
-    const cx = minX + panelWidth * (panel + 0.5);
+  panelXs.forEach((cx, panel) => {
     batch.addBox(materials.greySteel, cx, 1.05, front + 0.01, panelWidth - 0.06, 1.8, 0.02);
     batch.addBox(materials.rubber, cx + panelWidth / 2 - 0.03, 1.05, front + 0.012, 0.012, 1.8, 0.02);
     for (const dx of [-0.2, 0.2]) {
@@ -133,7 +139,7 @@ function addSwitchboard(context: Station33BuildContext, lighting: Station33Light
     for (const dx of [-0.08, 0, 0.08]) batch.addBox(materials.greySteel, cx + dx, 1.18, front + 0.09, 0.012, 0.18, 0.06, 0.6, 0, 0);
     const lamp = new THREE.SphereGeometry(0.03, 10, 6).translate(cx, 1.9, front + 0.035);
     batch.add(lamp, lighting.circuitMaterial('mains'));
-  }
+  });
   addProxy(context, 'switchboard', { x: minX, y: 0, z: hall.minZ }, { x: maxX, y: height, z: front + 0.05 }, 'metal');
 }
 

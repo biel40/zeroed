@@ -16,6 +16,8 @@ import {
   BARRIER_CONFIG,
   MANSION_BARRIERS,
   MANSION_AMMO_REFILLS,
+  MANSION_BANQUET_GHOST,
+  MANSION_BANQUET_HALL,
   MANSION_BUNKER_BOUNDS,
   MANSION_BUNKER_DIVIDER_X,
   MANSION_BUNKER_ENDING,
@@ -36,6 +38,7 @@ import {
   MANSION_SPECIAL_WEAPON_CASES,
   SOUL_LAMP_REQUIRED_SOULS,
   MANSION_WALL_BUYS,
+  isOutsideMansion,
 } from '../src/zombies/maps/BurnedMansionConfig';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
 import { RITUAL_SCARE_TIMELINE } from '../src/zombies/secret-room/SecretRoomSystem';
@@ -178,6 +181,7 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
     const boxRoom = [MANSION_BOX_PLACEMENT.position.x + 1.2, MANSION_BOX_PLACEMENT.position.z] as const;
+    const banquetHall = [-1.5, -9.6] as const;
     const eastHall = [1.6, -5] as const;
     const bunkerVestibule = [MANSION_STAIR_CENTER_X, -3.3] as const;
 
@@ -185,9 +189,16 @@ describe('Burned Mansion topology', () => {
     unlock(arena, 'to-dining');
     expect(canWalk(spawn, boxRoom, arena.wallColliders)).toBe(true);
 
-    expect(canWalk(boxRoom, eastHall, arena.wallColliders)).toBe(false);
+    expect(canWalk(boxRoom, banquetHall, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(false);
+    expect(canWalk(boxRoom, eastHall, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(false);
+    unlock(arena, 'to-banquet');
+    expect(canWalk(boxRoom, banquetHall, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
+
+    expect(canWalk(banquetHall, eastHall, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(false);
     unlock(arena, 'to-east-hall');
-    expect(canWalk(boxRoom, eastHall, arena.wallColliders)).toBe(true);
+    expect(canWalk(banquetHall, eastHall, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
+    // The Mystery Box room and the east hall share a solid wall: the way runs through the banquet hall.
+    expect(arena.wallColliders.some((box) => box.containsPoint(new THREE.Vector3(0, 1, -2.5)))).toBe(true);
 
     expect(canWalk(eastHall, bunkerVestibule, arena.wallColliders)).toBe(false);
     const bunkerDoor = arena.doors.find((door) => door.id === 'nuclear-bunker')!;
@@ -442,8 +453,8 @@ describe('Burned Mansion topology', () => {
 
   it('places each standard wall buy in its intended progression zone', () => {
     const arena = makeArena();
-    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'l96', 'ak47', 'm4a1', 'm60']);
-    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 1250, 1750, 1500, 2500]);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'l96', 'ak47', 'vector', 'm4a1', 'm60']);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 1250, 1750, 1200, 1500, 2500]);
     expect(MANSION_WALL_BUYS.every((buy) => buy.ammoPrice > 0)).toBe(true);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm1911')!.position.z).toBeGreaterThan(2);
     // The L96 shares the starting-room wall without overlapping the pistol or the paid door.
@@ -453,14 +464,20 @@ describe('Burned Mansion topology', () => {
     expect(l96.position.x - 0.9).toBeGreaterThan(0);
     expect(l96.position.x + 0.9).toBeLessThan(MANSION_EAST_WALL_X);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'ak47')!.position.x).toBeLessThan(0);
+    // The Vector hangs inside the banquet hall, north of the old facade.
+    const vector = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'vector')!;
+    expect(vector.floor).toBe(0);
+    expect(vector.position.z).toBeLessThan(MANSION_BANQUET_HALL.southZ);
+    expect(vector.position.z).toBeGreaterThan(MANSION_BANQUET_HALL.northZ);
+    expect(vector.position.x).toBeCloseTo(MANSION_BANQUET_HALL.minX + 0.17);
     const m4a1 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm4a1')!;
     expect(m4a1.position.x).toBeGreaterThan(0);
     expect(m4a1.position.x).toBeLessThan(MANSION_BUNKER_DIVIDER_X);
     expect(m4a1.position.x - 0.35).toBeGreaterThan(2.2);
     expect(MANSION_BUNKER_DIVIDER_X).toBe(4.2);
     expect(MANSION_EAST_WALL_X - MANSION_BUNKER_DIVIDER_X).toBeCloseTo(4.95);
-    expect(arena.wallBuys).toHaveLength(5);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(5);
+    expect(arena.wallBuys).toHaveLength(6);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(6);
   });
 
   it('mounts the bunker M60 on a visible wall reachable from the stairs', () => {
@@ -536,6 +553,7 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     expect(arena.doors.map((door) => [door.id, door.cost])).toEqual([
       ['to-dining', MANSION_DOOR_COSTS.diningHall],
+      ['to-banquet', MANSION_DOOR_COSTS.banquetHall],
       ['to-east-hall', MANSION_DOOR_COSTS.eastHall],
       ['nuclear-bunker', 9999],
     ]);
@@ -1094,22 +1112,24 @@ describe('Burned Mansion topology', () => {
     expect(arena.barriers).toHaveLength(4);
     expect(arena.spawnPoints).toHaveLength(4);
     unlock(arena, 'to-dining');
-    expect(arena.barriers).toHaveLength(7);
-    expect(arena.spawnPoints).toHaveLength(7);
-    unlock(arena, 'to-east-hall');
-    expect(arena.barriers).toHaveLength(8);
-    expect(arena.spawnPoints).toHaveLength(8);
-    unlock(arena, 'nuclear-bunker');
+    expect(arena.barriers).toHaveLength(6);
+    expect(arena.spawnPoints).toHaveLength(6);
+    unlock(arena, 'to-banquet');
     expect(arena.barriers).toHaveLength(9);
     expect(arena.spawnPoints).toHaveLength(9);
+    // The east hall has no outer wall of its own.
+    unlock(arena, 'to-east-hall');
+    expect(arena.barriers).toHaveLength(9);
+    expect(arena.spawnPoints).toHaveLength(9);
+    unlock(arena, 'nuclear-bunker');
+    expect(arena.barriers).toHaveLength(10);
+    expect(arena.spawnPoints).toHaveLength(10);
   });
 
   it('defines every zombie spawn outside with a route through its assigned barricade', () => {
     for (const point of Object.values(MANSION_SPAWNS).flat()) {
       expect(point.exterior).toBe(true);
-      expect(
-        point.x < -7.45 || point.x > MANSION_EAST_WALL_X + 0.3 || point.z < -8.45 || point.z > 10.45,
-      ).toBe(true);
+      expect(isOutsideMansion(point.x, point.z)).toBe(true);
       const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === point.barrierId);
       expect(barrier).toBeDefined();
       const approachSide =
@@ -1155,6 +1175,60 @@ describe('Burned Mansion topology', () => {
     expect(arena.group.getObjectByName('box-room-cabinet')).toBeUndefined();
     expect(arena.wallColliders.some((collider) => collider.equals(removedCabinetBounds))).toBe(false);
     expect(arena.group.getObjectByName('east-hall-charred-cabinet')).toBeDefined();
+  });
+
+  it('furnishes the banquet hall with solid table, sideboard, china cabinet and chimney breast', () => {
+    const arena = makeArena();
+    const { table, sideboard, chinaCabinet, chimney } = MANSION_BANQUET_HALL;
+    const blocked = (x: number, y: number, z: number): boolean =>
+      arena.wallColliders.some((box) => box.containsPoint(new THREE.Vector3(x, y, z)));
+    for (const piece of [table, sideboard, chinaCabinet]) expect(blocked(piece.x, piece.height / 2, piece.z)).toBe(true);
+    expect(blocked(chimney.frontX + 0.2, 2.5, chimney.z)).toBe(true);
+    // The hall keeps a walkable loop between both doors, both north windows and the fireplace.
+    const southDoorway = [-3.8, MANSION_BANQUET_HALL.southZ - 0.6] as const;
+    for (const target of [[1.9, -9], [-5.3, MANSION_BANQUET_HALL.northZ + 0.8], [2.4, MANSION_BANQUET_HALL.northZ + 0.8], [chimney.frontX - 0.8, chimney.z]] as const) {
+      expect(canWalk(southDoorway, target, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
+    }
+  });
+
+  it('rarely shows the banquet ghost for a few seconds when the banquet door opens', () => {
+    const findGhost = (arena: BurnedMansionArena): THREE.Sprite => arena.group.getObjectByName('banquet-ghost') as THREE.Sprite;
+    const roll = vi.spyOn(Math, 'random');
+    try {
+      roll.mockReturnValue(MANSION_BANQUET_GHOST.chance + 0.01);
+      const unlucky = makeArena();
+      unlock(unlucky, 'to-dining');
+      unlock(unlucky, 'to-banquet');
+      expect(findGhost(unlucky).visible).toBe(false);
+
+      roll.mockReturnValue(0);
+      const arena = makeArena();
+      unlock(arena, 'to-dining');
+      expect(findGhost(arena).visible).toBe(false);
+      unlock(arena, 'to-banquet');
+      const ghost = findGhost(arena);
+      expect(ghost.visible).toBe(true);
+      expect(ghost.position.z).toBeLessThan(MANSION_BANQUET_HALL.southZ);
+      expect(ghost.position.z).toBeGreaterThan(MANSION_BANQUET_HALL.northZ);
+      arena.update(MANSION_BANQUET_GHOST.durationSeconds / 2);
+      expect((ghost.material as THREE.SpriteMaterial).opacity).toBeGreaterThan(0.5);
+      expect(arena.colliders).not.toContain(ghost);
+      arena.update(MANSION_BANQUET_GHOST.durationSeconds);
+      expect(ghost.visible).toBe(false);
+    } finally {
+      roll.mockRestore();
+    }
+  });
+
+  it('hangs the officer portrait whose pupils glow in the dark', () => {
+    const arena = makeArena();
+    const portrait = arena.group.children
+      .filter((child): child is THREE.Mesh => child instanceof THREE.Mesh)
+      .find((mesh) => (mesh.material as THREE.Material).name === 'officer_portrait');
+    expect(portrait).toBeDefined();
+    const material = portrait!.material as THREE.MeshStandardMaterial;
+    expect(material.emissiveMap).toBeInstanceOf(THREE.DataTexture);
+    expect(material.emissive.r).toBeGreaterThan(material.emissive.g * 4);
   });
 
   it('routes a wider Brute through the stairs for a player inside the bunker', () => {
@@ -1435,7 +1509,7 @@ describe('Burned Mansion topology', () => {
 
     arena.update(0.43, new THREE.Vector3(0, 1, 0));
 
-    expect(lights).toHaveLength(7);
+    expect(lights).toHaveLength(8);
     expect(bulbs).toHaveLength(lights.length);
     expect(lights.every((light) => light.color.getHex() === 0xff180c)).toBe(true);
     expect(lights.every((light, index) => light.intensity !== initialIntensities[index])).toBe(true);
@@ -1514,6 +1588,7 @@ describe('Burned Mansion topology', () => {
   it('routes from the start room to the east hall only through the open doors', () => {
     const arena = makeArena();
     unlock(arena, 'to-dining');
+    unlock(arena, 'to-banquet');
     unlock(arena, 'to-east-hall');
     const manager = new ZombieManager(() => 0.5, {}, false, [[-6, 5.5]]);
     manager.setNavigationBounds(arena.navigationBounds);
@@ -1528,10 +1603,12 @@ describe('Burned Mansion topology', () => {
       damage += amount;
     };
 
+    const facadeZ = MANSION_BANQUET_HALL.southZ;
     let crossedDining = false;
+    let crossedBanquet = false;
     let crossedEastHall = false;
     const previous = zombie.position.clone();
-    for (let frame = 0; frame < 1200 && damage === 0; frame++) {
+    for (let frame = 0; frame < 3600 && damage === 0; frame++) {
       manager.update(1 / 60, 2, -4, 0);
       const { x, z } = zombie.position;
       if (previous.z >= 2 && z < 2) {
@@ -1539,15 +1616,23 @@ describe('Burned Mansion topology', () => {
         expect(Math.abs(x + 3.5)).toBeLessThan(1.1);
         crossedDining = true;
       }
-      if (previous.x <= 0 && x > 0) {
-        // The only x = 0 crossing available is the east hall door aperture.
-        expect(Math.abs(z + 2.5)).toBeLessThan(1.1);
+      if (previous.z >= facadeZ && z < facadeZ) {
+        // Into the banquet hall only through its door from the Mystery Box room.
+        expect(Math.abs(x + 3.8)).toBeLessThan(1.1);
+        crossedBanquet = true;
+      }
+      if (previous.z <= facadeZ && z > facadeZ) {
+        // Out of it only through the east hall door.
+        expect(Math.abs(x - 1.9)).toBeLessThan(1.1);
         crossedEastHall = true;
       }
+      // The Mystery Box room and the east hall no longer share a door.
+      if (z > facadeZ) expect(Math.sign(previous.x) * Math.sign(x)).not.toBe(-1);
       previous.copy(zombie.position);
     }
 
     expect(crossedDining).toBe(true);
+    expect(crossedBanquet).toBe(true);
     expect(crossedEastHall).toBe(true);
     expect(damage).toBeGreaterThan(0);
   });
@@ -1592,20 +1677,26 @@ describe('Burned Mansion topology', () => {
       ...(manager as unknown as { pool: { actives: Set<Zombie> } }).pool.actives,
     ][0];
     zombie.state = 'walk';
+    manager.setNavigationBounds(arena.navigationBounds);
 
     unlock(arena, 'to-dining');
     manager.registerColliders([...arena.colliders]);
     for (let frame = 0; frame < 900; frame++) manager.update(1 / 60, -3.5, -2.5, 0);
     expect(zombie.position.z).toBeLessThan(2);
 
+    unlock(arena, 'to-banquet');
+    manager.registerColliders([...arena.colliders]);
+    for (let frame = 0; frame < 1500; frame++) manager.update(1 / 60, -1.5, -9.6, 0);
+    expect(zombie.position.z).toBeLessThan(MANSION_BANQUET_HALL.southZ);
+
     unlock(arena, 'to-east-hall');
     manager.registerColliders([...arena.colliders]);
     for (let frame = 0; frame < 2400; frame++) manager.update(1 / 60, 2.5, -5, 0);
     expect(zombie.position.x).toBeGreaterThan(0);
+    expect(zombie.position.z).toBeGreaterThan(MANSION_BANQUET_HALL.southZ);
 
     unlock(arena, 'nuclear-bunker');
     manager.registerColliders([...arena.colliders]);
-    manager.setNavigationBounds(arena.navigationBounds);
     for (let frame = 0; frame < 1500; frame++) manager.update(1 / 60, MANSION_STAIR_CENTER_X, -1.9, 0);
     expect(zombie.position.x).toBeGreaterThan(MANSION_BUNKER_DIVIDER_X);
     expect(zombie.position.z).toBeLessThan(0);
@@ -1693,10 +1784,11 @@ describe('Burned Mansion topology', () => {
     expect(barrierImpacts).toBe(BARRIER_CONFIG.boardCount);
   });
 
-  it.each(['start-west-a', 'start-south', 'box-north', 'bunker-east'])(
+  it.each(['start-west-a', 'start-south', 'box-west-south', 'banquet-north-west', 'banquet-east', 'bunker-east'])(
     'queues a full horde through %s with real walls and navigation bounds', (id) => {
       const arena = makeArena();
       unlock(arena, 'to-dining');
+      unlock(arena, 'to-banquet');
       unlock(arena, 'to-east-hall');
       unlock(arena, 'nuclear-bunker');
       const barrier = arena.barriers.find((candidate) => candidate.id === id)!;
@@ -1758,12 +1850,12 @@ describe('Burned Mansion topology', () => {
     expect(bunkerMaterial.name).toBe('bunker_floor_concrete');
 
     expect(arena.group.children.filter((child) => child.userData.mapRole === 'soot-detail').length).toBeGreaterThan(5);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'blood-stain')).toHaveLength(2);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'blood-stain')).toHaveLength(3);
     const frames = arena.group.children.filter((child) => child.userData.mapRole === 'window-frames');
     expect(frames).toHaveLength(2);
     expect(frames.every((frame) => frame instanceof THREE.InstancedMesh)).toBe(true);
     const pointLights = arena.group.children.filter((child) => child instanceof THREE.PointLight);
-    expect(pointLights).toHaveLength(12);
+    expect(pointLights).toHaveLength(13);
     expect(pointLights.every((light) => !light.castShadow)).toBe(true);
   });
 
@@ -1803,6 +1895,7 @@ describe('Burned Mansion topology', () => {
   it('restores doors, active zones, colliders and barrier state on restart', () => {
     const arena = makeArena();
     unlock(arena, 'to-dining');
+    unlock(arena, 'to-banquet');
     unlock(arena, 'to-east-hall');
     unlock(arena, 'nuclear-bunker');
     const barrier = arena.barriers[0];
@@ -1818,7 +1911,7 @@ describe('Burned Mansion topology', () => {
     expect(barrier.boards.every((board) => board.hp === board.maxHp)).toBe(true);
     expect(
       arena.colliders.filter((object) => object.name.startsWith('point-door-collider:')),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
   });
 
   it('registers the actual locked door mesh for non-recursive projectile raycasts', () => {

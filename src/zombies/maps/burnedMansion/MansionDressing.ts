@@ -2,17 +2,20 @@ import * as THREE from 'three';
 import { buildGasMaskModel, GAS_MASK_LENS_CENTER } from '../../gasMask/GasMaskModel';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { MANSION_BUNKER_Y } from '../BurnedMansionConfig';
+import { buildBanquetFurniture } from './MansionBanquetHall';
 import type { MansionBuildContext } from './MansionBuildContext';
-import { MANSION_BUNKER_FACES, MANSION_GROUND_FACES, type MansionWallFace } from './MansionLayout';
+import { addFramedPicture, addOnFace, mansionWallFace as face, onFace } from './MansionWallMounts';
 
 /**
  * Story and wear of the house, all non-solid and kept flat on the floor or
  * flush on the walls: crooked portraits and a mirror, dead sconces, peeling
- * paper, fallen joists, plaster, books and ash; in the bunker, gas masks,
- * junction boxes and abandoned paperwork. Wall pieces avoid windows, doors,
- * wall buys and soul lamps. Returns the one gas mask the player can wear.
+ * paper, fallen joists, plaster, books and ash, and the banquet hall's laid
+ * table; in the bunker, gas masks, junction boxes and abandoned paperwork.
+ * Wall pieces avoid windows, doors, wall buys and soul lamps. Returns the one
+ * gas mask the player can wear.
  */
 export function buildMansionDressing(context: MansionBuildContext): MansionHookedGasMask {
+  buildBanquetFurniture(context);
   addWallArt(context);
   addSconces(context);
   addPeelingPaper(context);
@@ -22,65 +25,15 @@ export function buildMansionDressing(context: MansionBuildContext): MansionHooke
   return addBunkerProps(context);
 }
 
-const FACES = new Map([...MANSION_GROUND_FACES, ...MANSION_BUNKER_FACES].map((face) => [face.id, face]));
-
-function face(id: string): MansionWallFace {
-  const found = FACES.get(id);
-  if (!found) throw new Error(`Unknown mansion wall face ${id}`);
-  return found;
-}
-
-/**
- * World matrix of a point on a face: `along` the face, `height` above its
- * floor, `offset` proud of the wall, local +z facing the room and `tilt`
- * turning it about that normal.
- */
-function onFace(target: MansionWallFace, along: number, height: number, offset: number, tilt = 0): THREE.Matrix4 {
-  const yaw = target.axis === 'x' ? (target.inward > 0 ? 0 : Math.PI) : target.inward > 0 ? Math.PI / 2 : -Math.PI / 2;
-  const across = target.plane + target.inward * offset;
-  const x = target.axis === 'x' ? along : across;
-  const z = target.axis === 'x' ? across : along;
-  return new THREE.Matrix4().compose(
-    new THREE.Vector3(x, target.floorY + height, z),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, tilt, 'YXZ')),
-    new THREE.Vector3(1, 1, 1),
-  );
-}
-
-function addOnFace(context: MansionBuildContext, geometry: THREE.BufferGeometry, material: THREE.Material, target: MansionWallFace, along: number, height: number, offset: number, tilt = 0): void {
-  context.batch.add(geometry, material, onFace(target, along, height, offset, tilt));
-}
-
-/** Gilt frame of `width` x `height` (outer) around a picture plane, built in face-local space. */
-function addFramedPicture(
-  context: MansionBuildContext,
-  target: MansionWallFace,
-  along: number,
-  height: number,
-  width: number,
-  tall: number,
-  picture: THREE.Material,
-  tilt: number,
-): void {
-  const border = 0.07;
-  const frame = (x: number, y: number, sizeX: number, sizeY: number): void => {
-    const geometry = new THREE.BoxGeometry(sizeX, sizeY, 0.045).translate(x, y, 0.0225);
-    addOnFace(context, geometry, context.materials.gilt, target, along, height, 0.004, tilt);
-  };
-  frame(0, tall / 2 - border / 2, width, border);
-  frame(0, -tall / 2 + border / 2, width, border);
-  frame(-width / 2 + border / 2, 0, border, tall - border * 2);
-  frame(width / 2 - border / 2, 0, border, tall - border * 2);
-  const canvas = new THREE.PlaneGeometry(width - border * 2 + 0.01, tall - border * 2 + 0.01).translate(0, 0, 0.012);
-  addOnFace(context, canvas, picture, target, along, height, 0.004, tilt);
-}
-
 function addWallArt(context: MansionBuildContext): void {
   const { materials } = context;
   const [portraitA, portraitB] = materials.portraits;
   addFramedPicture(context, face('start-east'), 6.0, 1.85, 0.72, 0.92, portraitA, 0.05);
   addFramedPicture(context, face('box-east'), 0.4, 1.9, 0.64, 0.82, portraitB, -0.08);
   addFramedPicture(context, face('hall-south'), 2.4, 1.8, 0.66, 0.86, portraitA, 0.03);
+  // The family looks down on the banquet table from over the sideboard.
+  addFramedPicture(context, face('banquet-north'), -1.45, 2.0, 0.95, 1.2, portraitB, -0.02);
+  addFramedPicture(context, face('banquet-west'), -16.3, 1.85, 0.7, 0.9, portraitA, 0.06);
   // The mirror over the start room's divider wall, between the two wall buys.
   addFramedPicture(context, face('start-north'), 1.6, 1.8, 0.66, 1.02, materials.mirrorGlass, 0);
   for (const [x, y, length, angle] of [[1.52, 1.95, 0.5, 0.9], [1.72, 1.62, 0.42, -0.6], [1.58, 1.62, 0.3, 2.2]] as const) {
@@ -103,10 +56,13 @@ function addSconces(context: MansionBuildContext): void {
   const sconces: ReadonlyArray<readonly [string, number, boolean]> = [
     ['start-south', -4.5, true],
     ['start-west', 4.3, false],
-    ['box-north', -4.5, true],
+    ['box-north', -5.9, true],
     ['box-west', -1.4, true],
     ['hall-north', 3.3, false],
     ['start-east', 3.6, true],
+    ['banquet-west', -9.9, true],
+    ['banquet-west', -14.2, false],
+    ['banquet-east', -9.9, true],
   ];
   for (const [faceId, along, shaded] of sconces) {
     const target = face(faceId);
@@ -129,7 +85,9 @@ function addPeelingPaper(context: MansionBuildContext): void {
     ['start-north', 6.9, 2.95, 0.34],
     ['box-north', -1.0, 2.9, 0.28],
     ['hall-east', 0.7, 3.0, 0.3],
-    ['box-west', 0.9, 2.95, 0.24],
+    ['box-west', -6.9, 2.95, 0.24],
+    ['banquet-north', 3.6, 2.95, 0.3],
+    ['banquet-south', -6.2, 3.0, 0.28],
   ];
   strips.forEach(([faceId, along, top, width], index) => {
     const target = face(faceId);
@@ -157,6 +115,7 @@ function addFallenTimber(context: MansionBuildContext): void {
     [-2.0, -6.6, 1.4, 0.3],
     [2.7, -0.7, 1.1, 1.3],
     [7.8, 0.5, 0.9, 0.2],
+    [-5.6, -14.2, 1.5, 0.7],
   ];
   beams.forEach(([x, z, length, yaw], index) => {
     batch.addBox(materials.charredWood, x, 0.06, z, 0.13, 0.12, length, 0.02, yaw, index % 2 ? 0.08 : -0.06, index);
@@ -167,7 +126,7 @@ function addRubbleAndLitter(context: MansionBuildContext): void {
   const { batch, materials } = context;
   const random = seededRandom(5303);
   // Plaster that dropped from the burnt-through ceiling.
-  for (const [cx, cz] of [[-4.8, 4.4], [5.6, 8.4], [-2.6, -1.2], [2.9, -6.9], [7.6, 1.0]] as const) {
+  for (const [cx, cz] of [[-4.8, 4.4], [5.6, 8.4], [-2.6, -1.2], [2.9, -6.9], [7.6, 1.0], [-5.0, -9.4], [3.0, -14.6], [-5.6, -16.6]] as const) {
     for (let index = 0; index < 7; index++) {
       const size = 0.06 + random() * 0.16;
       batch.addBox(
@@ -211,12 +170,14 @@ function addFloorDecals(context: MansionBuildContext): void {
   // Burn marks under the worst of the ceiling damage.
   const scorches: ReadonlyArray<readonly [number, number, number, number]> = [
     [-3.7, 5.2, 2.8, 0.35], [6.2, 5.0, 1.8, 1.2], [-2.8, -3.6, 2.0, 2.1], [2.0, -4.0, 1.6, 0.6], [6.8, -1.8, 1.4, 2.6],
+    [-1.5, -12.95, 3.4, 0.1], [2.4, -10.0, 1.5, 1.8], [2.9, -16.4, 1.3, 0.9],
   ];
   scorches.forEach(([x, z, size, yaw], index) => addFloorDecal(context, floorScorch, x, 0.004 + index * 0.0003, z, size, size * 0.8, yaw));
   // Ash drifted against the skirting and into the corners.
   const drifts: ReadonlyArray<readonly [number, number, number, number]> = [
     [-6.4, 9.3, 1.6, 0.4], [8.3, 2.8, 1.4, 1.2], [-6.3, -7.3, 1.5, 0.9], [-0.8, 1.3, 1.2, 0.2],
     [3.4, -7.4, 1.3, 1.9], [8.4, 1.3, 1.2, 0.6], [0.9, 9.4, 1.8, 0.1], [-6.4, 0.9, 1.1, 2.4],
+    [-6.4, -17.1, 1.4, 0.5], [3.5, -8.8, 1.3, 1.4], [3.3, -12.0, 1.2, 1.6],
   ];
   drifts.forEach(([x, z, size, yaw], index) => addFloorDecal(context, ashDrift, x, 0.006 + index * 0.0003, z, size, size * 0.6, yaw));
   // Bunker: dust and grime where nobody has swept for decades.

@@ -20,7 +20,7 @@ const FENCE = { halfX: 25, halfZ: 28, height: 1.75, picketSpacing: 0.32, postSpa
 /** x, z, height, seed: outside the navigation bounds or far from every lane. */
 const DEAD_TREES: ReadonlyArray<readonly [number, number, number, number]> = [
   [-19, -6, 6.5, 1], [-21, 9, 7.2, 2], [-17, 16, 5.8, 3], [-8, 21, 6.8, 4], [6, 22, 7.5, 5],
-  [17, 15, 6.2, 6], [21, 3, 7.0, 7], [19, -11, 6.0, 8], [8, -21, 6.6, 9], [-6, -20, 5.6, 10],
+  [17, 15, 6.2, 6], [21, 3, 7.0, 7], [19, -11, 6.0, 8], [8, -21, 6.6, 9], [-9.5, -21, 5.6, 10],
   [-15, -16, 6.9, 11], [14, -18, 5.9, 12], [-23, -18, 7.8, 13], [22, 20, 6.4, 14],
 ];
 /** Family plot north-west of the house: x, z, yaw, lean. */

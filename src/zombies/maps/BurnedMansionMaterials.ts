@@ -8,8 +8,10 @@ import {
   deadLawnPainter,
   formedConcretePainter,
   gravestonePainter,
+  officerPortraitPainter,
   parquetPainter,
   portraitPainter,
+  rugPainter,
   rustySteelPainter,
   slabConcretePainter,
   treadPlatePainter,
@@ -59,6 +61,10 @@ export interface MansionSurfaceMaterials {
   readonly paper: THREE.MeshStandardMaterial;
   readonly wroughtIron: THREE.MeshStandardMaterial;
   readonly portraits: readonly THREE.MeshStandardMaterial[];
+  /** The officer over the banquet fireplace; his pupils glow red through the emissive map. */
+  readonly officerPortrait: THREE.MeshStandardMaterial;
+  /** Burnt Persian rug under the banquet table, one texture over its whole plane. */
+  readonly rug: THREE.MeshStandardMaterial;
   readonly lawn: THREE.MeshStandardMaterial;
   readonly bark: THREE.MeshStandardMaterial;
   readonly gravestone: THREE.MeshStandardMaterial;
@@ -214,6 +220,14 @@ export function createMansionSurfaceMaterials(anisotropyLimit: number): MansionS
       anisotropy,
       1,
     )),
+    officerPortrait: surfaceMaterial(
+      'officer_portrait',
+      bake('mansion-officer-portrait', 256, 2, officerPortraitPainter(256)),
+      anisotropy,
+      1,
+      { emissive: 0xff2a12, emissiveIntensity: 2.4 },
+    ),
+    rug: surface('burnt_rug', 'mansion-rug', 256, 2, rugPainter, 1),
     lawn: surface('dead_lawn', 'mansion-lawn', 256, 2, deadLawnPainter, 3),
     bark: surface('dead_bark', 'mansion-bark', 128, 4, barkPainter, 0.8),
     gravestone: surface('weathered_stone', 'mansion-gravestone', 128, 2, gravestonePainter, 0.8),

@@ -120,7 +120,7 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   ambos clientes; el anfitrión resuelve impactos, splash y cadenas y atribuye
   cada baja al tirador. El desbloqueo de Ray Gun a 115 bajas es individual.
 - Arsenal: ambos empiezan con la M1911 y pueden llevar dos armas. Las compras
-  de pared de Burned Mansion (AK-47, M4A1 y M60) cuestan puntos individuales;
+  de pared de Burned Mansion (AK-47, Vector, M4A1 y M60) cuestan puntos individuales;
   el anfitrión valida la compra y confirma el arma al invitado. La munición
   también puede reponerse en la pared con el precio del modo individual.
 - Puertas: empiezan cerradas; el anfitrión valida la puerta, cobra solo al

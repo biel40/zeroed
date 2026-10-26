@@ -36,7 +36,7 @@ export function subestacionWalls(): ReadonlyArray<{ readonly wall: StationWallLi
 }
 
 /**
- * Oil-stained concrete floors, flat slabs, plaster walls over a green
+ * Chequered ceramic-tile floors, flat slabs, plaster walls over a green
  * wainscot, the I-beams across the hall and the cable trays and pipes that
  * feed the machines.
  */
@@ -54,8 +54,8 @@ export function buildSubestacionShell(context: Station33BuildContext): void {
   const hallMinX = hall.minX - STATION33_WALL_THICKNESS;
   const hallMaxX = hall.maxX + STATION33_WALL_THICKNESS;
   const hallMinZ = hall.minZ - STATION33_WALL_THICKNESS;
-  slab('subestacion-gallery-floor', galleryMinX, galleryMaxX, gallery.minZ, gallery.maxZ, -0.08, materials.depotFloor, 81);
-  slab('subestacion-hall-floor', hallMinX, hallMaxX, hallMinZ, gallery.minZ, -0.08, materials.depotFloor, 83);
+  slab('subestacion-gallery-floor', galleryMinX, galleryMaxX, gallery.minZ, gallery.maxZ, -0.08, materials.machineRoomFloor, 81);
+  slab('subestacion-hall-floor', hallMinX, hallMaxX, hallMinZ, gallery.minZ, -0.08, materials.machineRoomFloor, 83);
   slab('subestacion-gallery-ceiling', galleryMinX, galleryMaxX, gallery.minZ, gallery.maxZ, galleryHeight + 0.08, materials.serviceConcrete, 85);
   slab('subestacion-hall-ceiling', hallMinX, hallMaxX, hallMinZ, gallery.minZ, hallHeight + 0.08, materials.serviceConcrete, 87);
 

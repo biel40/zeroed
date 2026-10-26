@@ -25,6 +25,10 @@ export interface Station33Materials {
   readonly tubbing: THREE.MeshStandardMaterial;
   /** Oil-stained concrete slabs of the train-shed floor. */
   readonly depotFloor: THREE.MeshStandardMaterial;
+  /** Small chequered ceramic tiles of the machine room, oil-soaked, cracked and patchy. */
+  readonly machineRoomFloor: THREE.MeshStandardMaterial;
+  /** Diamond-tread steel plate over the machine room's cable trenches. */
+  readonly checkerPlate: THREE.MeshStandardMaterial;
   /** Dark ballast between and around the rails. */
   readonly trackBed: THREE.MeshStandardMaterial;
   /** Faded blue enamel of the metro cars, grimy and rust-blooming. */
@@ -269,6 +273,107 @@ function depotFloorPainter(size: number, slabs: number): () => Painter {
   };
 }
 
+/**
+ * Soviet metlakh tiles of the machine room: `tiles` x `tiles` small
+ * terracotta and sand squares in a chequer, bevelled at their edges, with
+ * grime packed into the grout and oil soaked into dull glossy patches.
+ * Some tiles are cracked across, some chipped at a corner and a few are
+ * knocked out down to the cement bed.
+ */
+function metlakhPainter(size: number, tiles: number): () => Painter {
+  return () => {
+    const random = seededRandom(3481);
+    const oil = tileableNoise(random, size / 4, size);
+    const grime = tileableNoise(random, size / 8, size);
+    const fine = tileableNoise(random, size / 64, size);
+    const terracotta: Rgb = [96, 54, 40];
+    const sand: Rgb = [112, 100, 80];
+    const cement: Rgb = [60, 58, 53];
+    const soot: Rgb = [34, 30, 26];
+    const tinted: Rgb = [0, 0, 0];
+    const tileSize = size / tiles;
+    const grout = 1.5;
+    const bevel = 3;
+    return (x, y, texel) => {
+      const tileX = Math.floor(x / tileSize);
+      const tileY = Math.floor(y / tileSize);
+      const localX = x - tileX * tileSize;
+      const localY = y - tileY * tileSize;
+      const edge = Math.min(localX, localY, tileSize - 1 - localX, tileSize - 1 - localY);
+      const stain = THREE.MathUtils.smoothstep(oil(x, y), 0.58, 0.88);
+      const dirt = THREE.MathUtils.smoothstep(grime(x, y), 0.4, 0.9);
+      // Chipped corner: a bite out of one corner, picked per tile.
+      const corner = Math.floor(hash2(tileX, tileY, 71) * 4);
+      const cornerX = corner % 2 === 0 ? localX : tileSize - 1 - localX;
+      const cornerY = corner < 2 ? localY : tileSize - 1 - localY;
+      const chipped = hash2(tileX, tileY, 73) > 0.86 && cornerX + cornerY < tileSize * (0.18 + hash2(tileX, tileY, 79) * 0.14);
+      const missing = hash2(tileX, tileY, 61) > 0.975;
+      if (edge < grout || missing || chipped) {
+        mix(cement, soot, Math.min(1, dirt * 0.6 + stain * 0.5 + (edge < grout ? 0.35 : 0)), tinted);
+        const shade = 0.8 + fine(x, y) * 0.35;
+        texel.color[0] = tinted[0] * shade;
+        texel.color[1] = tinted[1] * shade;
+        texel.color[2] = tinted[2] * shade;
+        texel.height = edge < grout ? 0 : 0.15 + fine(x, y) * 0.15;
+        texel.roughness = 0.95;
+        return;
+      }
+      // Hairline crack across a few tiles, through a point near their centre.
+      const angle = hash2(tileX, tileY, 83) * Math.PI;
+      const offset = (hash2(tileX, tileY, 89) - 0.5) * tileSize * 0.4;
+      const crackDistance = Math.abs((localX - tileSize / 2) * Math.sin(angle) - (localY - tileSize / 2) * Math.cos(angle) - offset);
+      const cracked = hash2(tileX, tileY, 97) > 0.9 && crackDistance < 0.8;
+      const base = (tileX + tileY) % 2 === 0 ? terracotta : sand;
+      mix(base, soot, dirt * 0.3 + stain * 0.45, tinted);
+      const speck = hash2(x, y, 101) > 0.96 ? 0.78 : 1;
+      const tone = 0.88 + hash2(tileX, tileY, 67) * 0.2;
+      const shade = tone * (0.92 + fine(x, y) * 0.14) * speck * (cracked ? 0.45 : 1);
+      texel.color[0] = tinted[0] * shade;
+      texel.color[1] = tinted[1] * shade;
+      texel.color[2] = tinted[2] * shade;
+      texel.height = cracked ? 0.35 : 0.45 + 0.35 * THREE.MathUtils.smoothstep(edge, grout, grout + bevel);
+      // Unglazed and matt; oil leaves a dull sheen, grime dulls it again.
+      texel.roughness = cracked ? 0.95 : 0.72 - stain * 0.38 + dirt * 0.14;
+    };
+  };
+}
+
+/**
+ * Diamond-tread steel plate: lens-shaped lugs in alternating diagonals,
+ * worn bright on top, with rust blooming in the hollows between them.
+ */
+function checkerPlatePainter(size: number, cells: number): () => Painter {
+  return () => {
+    const random = seededRandom(3487);
+    const rust = tileableNoise(random, size / 4, size);
+    const fine = tileableNoise(random, size / 32, size);
+    const steel: Rgb = [64, 64, 61];
+    const rusted: Rgb = [86, 56, 38];
+    const tinted: Rgb = [0, 0, 0];
+    const cell = size / cells;
+    const halfLength = cell * 0.38;
+    const halfWidth = cell * 0.1;
+    return (x, y, texel) => {
+      const cellX = Math.floor(x / cell);
+      const cellY = Math.floor(y / cell);
+      const dx = x - (cellX + 0.5) * cell;
+      const dy = y - (cellY + 0.5) * cell;
+      const diagonal = (cellX + cellY) % 2 === 0 ? 1 : -1;
+      const along = (dx + diagonal * dy) * Math.SQRT1_2;
+      const across = (dx - diagonal * dy) * Math.SQRT1_2;
+      const lug = Math.max(0, 1 - (along / halfLength) ** 2 - (across / halfWidth) ** 2);
+      const corrosion = THREE.MathUtils.smoothstep(rust(x, y) + fine(x, y) * 0.25 - lug * 0.3, 0.55, 0.9);
+      mix(steel, rusted, corrosion, tinted);
+      const shade = (lug > 0 ? 1.15 + lug * 0.2 : 0.82 + fine(x, y) * 0.12) * (1 - corrosion * 0.15);
+      texel.color[0] = tinted[0] * shade;
+      texel.color[1] = tinted[1] * shade;
+      texel.color[2] = tinted[2] * shade;
+      texel.height = 0.3 + Math.sqrt(lug) * 0.6;
+      texel.roughness = lug > 0 ? 0.38 + corrosion * 0.3 : 0.62 + corrosion * 0.3;
+    };
+  };
+}
+
 /** Coarse plain-weave jute with uneven, slubbed threads; the tile is small, so no broad stains that would repeat. */
 function burlapPainter(size: number): () => Painter {
   return () => {
@@ -480,6 +585,9 @@ export function createStation33Materials(anisotropyLimit: number): Station33Mate
     // Two 1 m segments per tile: a tunnel ring every metre, joints every metre around it.
     tubbing: surfaceMaterial('station33_tubbing', bake('tubbing', 256, 3, tubbingPainter(256, 2)), anisotropy, 2, { metalness: 0.35, side: THREE.DoubleSide }),
     depotFloor: surfaceMaterial('station33_depot_floor', bake('depot-floor', 256, 2, depotFloorPainter(256, 2)), anisotropy, 3),
+    // Sixteen 15 cm tiles per 2.4 m tile: the vestibule granite's texel density.
+    machineRoomFloor: surfaceMaterial('station33_machine_room_floor', bake('machine-room-floor', 512, 3, metlakhPainter(512, 16)), anisotropy, 2.4),
+    checkerPlate: surfaceMaterial('station33_checker_plate', bake('checker-plate', 256, 4, checkerPlatePainter(256, 8)), anisotropy, 0.6, { metalness: 0.5 }),
     trackBed: surfaceMaterial('station33_track_bed', bake('track-bed', 256, 4, trackBedPainter(256)), anisotropy, 1.2),
     carriagePaint: surfaceMaterial('station33_carriage_paint', bake('carriage-paint', 256, 1.5, carriagePainter(256)), anisotropy, 2.5, { metalness: 0.3 }),
     hazardPaint: surfaceMaterial('station33_hazard_paint', bake('hazard-paint', 128, 1, hazardPainter(128)), anisotropy, 0.8, { metalness: 0.2 }),

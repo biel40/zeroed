@@ -1,4 +1,5 @@
 import {
+  MANSION_BANQUET_HALL,
   MANSION_BARRIERS,
   MANSION_BLAST_DOOR_ID,
   MANSION_BUNKER_CEILING_Y,
@@ -44,9 +45,14 @@ export interface MansionWallFace {
 const HALF = MANSION_WALL_THICKNESS / 2;
 const WEST_FACE_X = -7.15 + HALF;
 const EAST_FACE_X = MANSION_EAST_WALL_X - HALF;
-const NORTH_FACE_Z = -8.15 + HALF;
+const NORTH_FACE_Z = MANSION_BANQUET_HALL.southZ + HALF;
 const SOUTH_FACE_Z = 10.15 - HALF;
 const DIVIDER_Z = 2;
+const BANQUET_SOUTH_FACE_Z = MANSION_BANQUET_HALL.southZ - HALF;
+const BANQUET_NORTH_FACE_Z = MANSION_BANQUET_HALL.northZ + HALF;
+const BANQUET_WEST_FACE_X = MANSION_BANQUET_HALL.minX + HALF;
+const BANQUET_EAST_FACE_X = MANSION_BANQUET_HALL.maxX - HALF;
+const CHIMNEY = MANSION_BANQUET_HALL.chimney;
 
 function windowsOn(axis: 'x' | 'z', plane: number, from: number, to: number): number[] {
   return MANSION_BARRIERS
@@ -91,7 +97,7 @@ function groundFace(id: string, axis: 'x' | 'z', plane: number, inward: 1 | -1, 
   };
 }
 
-/** Faces of the four ground-floor rooms: start, Mystery Box room, east hall and stair room. */
+/** Faces of the five ground-floor rooms: start, Mystery Box room, banquet hall, east hall and stair room. */
 export const MANSION_GROUND_FACES: ReadonlyArray<MansionWallFace> = [
   groundFace('start-south', 'x', SOUTH_FACE_Z, -1, WEST_FACE_X, EAST_FACE_X),
   groundFace('start-north', 'x', DIVIDER_Z + HALF, 1, WEST_FACE_X, EAST_FACE_X),
@@ -101,6 +107,16 @@ export const MANSION_GROUND_FACES: ReadonlyArray<MansionWallFace> = [
   groundFace('box-south', 'x', DIVIDER_Z - HALF, -1, WEST_FACE_X, -HALF),
   groundFace('box-west', 'z', WEST_FACE_X, 1, NORTH_FACE_Z, DIVIDER_Z - HALF),
   groundFace('box-east', 'z', -HALF, -1, NORTH_FACE_Z, DIVIDER_Z - HALF),
+  groundFace('banquet-south', 'x', BANQUET_SOUTH_FACE_Z, -1, BANQUET_WEST_FACE_X, BANQUET_EAST_FACE_X),
+  groundFace('banquet-north', 'x', BANQUET_NORTH_FACE_Z, 1, BANQUET_WEST_FACE_X, BANQUET_EAST_FACE_X),
+  groundFace('banquet-west', 'z', BANQUET_WEST_FACE_X, 1, BANQUET_NORTH_FACE_Z, BANQUET_SOUTH_FACE_Z),
+  groundFace('banquet-east', 'z', BANQUET_EAST_FACE_X, -1, BANQUET_NORTH_FACE_Z, BANQUET_SOUTH_FACE_Z),
+  // The fireplace surround interrupts the chimney breast's panelling like a doorway.
+  {
+    ...groundFace('banquet-chimney', 'z', CHIMNEY.frontX, -1, CHIMNEY.z - CHIMNEY.breadth / 2, CHIMNEY.z + CHIMNEY.breadth / 2),
+    doors: [CHIMNEY.z],
+    doorWidth: CHIMNEY.surroundWidth,
+  },
   groundFace('hall-north', 'x', NORTH_FACE_Z, 1, HALF, MANSION_BUNKER_DIVIDER_X - HALF),
   groundFace('hall-south', 'x', DIVIDER_Z - HALF, -1, HALF, MANSION_BUNKER_DIVIDER_X - HALF),
   groundFace('hall-west', 'z', HALF, 1, NORTH_FACE_Z, DIVIDER_Z - HALF),

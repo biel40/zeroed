@@ -145,9 +145,15 @@ guardandose automaticamente al ajustarlos.
 
 ## Mapas e interacciones
 
-- `BurnedMansionArena`: dos plantas, colision, nueve ventanas, puertas por
+- `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
-  unico mapa cooperativo. Su ambientacion es una casa victoriana quemada sobre
+  unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
+  la Mystery Box, gran comedor (ala norte con la Vector en pared; mesa,
+  aparador, vitrina y chimenea solidos, y sobre ella el retrato de un oficial
+  aleman cuyas pupilas brillan en rojo; easter egg de la Torre Quemada de
+  Pokemon: al abrir su puerta, con una probabilidad baja, un fantasma
+  visual aparece unos segundos sobre la mesa) y pasillo este con la puerta del
+  bunker; el salon y el pasillo solo se comunican a traves del comedor. Su ambientacion es una casa victoriana quemada sobre
   un bunker de defensa civil: papel damasco, zocalo de nogal y parquet
   carbonizados, vigas a la vista, madera que aun humea (brillo emisivo que
   respira), lamparas de laton arriba y apliques enjaulados abajo, ceniza,

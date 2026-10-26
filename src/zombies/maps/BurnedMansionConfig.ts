@@ -28,9 +28,10 @@ export const MANSION_NUCLEAR_ENDING = {
   duration: NUCLEAR_ENDING_DURATION,
 } as const satisfies ArenaEnding;
 
-/** Door costs in points. */
+/** Door costs in points. `diningHall` is the legacy key of the Mystery Box room's door. */
 export const MANSION_DOOR_COSTS = {
   diningHall: 750,
+  banquetHall: 1000,
   eastHall: 1250,
   nuclearBunker: 9999,
 } as const;
@@ -64,13 +65,65 @@ export const MANSION_STAIR_CENTER_X = 6.65;
 export const MANSION_STAIR_TOP_Z = -3.8;
 export const MANSION_STAIR_BOTTOM_Z = -7.3;
 
+/**
+ * Great dining hall north of the Mystery Box room and the east hall, as wall
+ * centre lines: its south wall is the old north facade, pierced by the doors
+ * from both rooms, and its east wall continues the bunker divider. The
+ * furniture footprints are shared by the arena's colliders and the dressing.
+ */
+const BANQUET_NORTH_Z = -17.75;
+export const MANSION_BANQUET_HALL = {
+  minX: -7.15,
+  maxX: MANSION_BUNKER_DIVIDER_X,
+  southZ: -8.15,
+  northZ: BANQUET_NORTH_Z,
+  /**
+   * Centre of the east window, far enough from the stair room's outer corner
+   * for the zombies queueing outside it.
+   */
+  eastWindowZ: BANQUET_NORTH_Z + 2.4,
+  /** Long table together with the chairs around it. */
+  table: { x: -1.5, z: -12.95, width: 5.7, depth: 2.1, height: 1 },
+  /** Sideboard against the north wall, between its two windows. */
+  sideboard: { x: -1.45, z: BANQUET_NORTH_Z + 0.4, width: 2.2, depth: 0.5, height: 0.95 },
+  /** Glazed china cabinet against the south wall, between its two doors. */
+  chinaCabinet: { x: -1, z: -8.53, width: 1.4, depth: 0.45, height: 2.1 },
+  /**
+   * Full-height chimney breast standing out of the east wall to `frontX`;
+   * the fireplace surround is centred on its front face.
+   */
+  chimney: { frontX: MANSION_BUNKER_DIVIDER_X - 0.55, z: -12, breadth: 2.3, surroundWidth: 1.7 },
+} as const;
+
+/**
+ * Easter egg for Pokémon's Burned Tower: opening the banquet door rarely
+ * shows a ghost over the head of the table, in line with the doorway,
+ * drifting `driftX` toward the west wall before it fades.
+ */
+export const MANSION_BANQUET_GHOST = {
+  doorId: 'to-banquet',
+  chance: 0.05,
+  durationSeconds: 2.6,
+  position: { x: -3.6, y: 1.65, z: MANSION_BANQUET_HALL.table.z },
+  driftX: -1.5,
+  size: 1.2,
+} as const;
+
 /** Ground-floor movement bounds. */
 export const MANSION_GROUND_BOUNDS = {
   minX: -6.6,
   maxX: MANSION_EAST_WALL_X - 0.55,
-  minZ: -7.6,
+  minZ: MANSION_BANQUET_HALL.northZ + 0.7,
   maxZ: 9.6,
 } as const;
+
+/** True when (x, z) lies clear of the outer faces of the house and its banquet wing. */
+export function isOutsideMansion(x: number, z: number): boolean {
+  const outsideMain = x < -7.45 || x > MANSION_EAST_WALL_X + 0.3 || z < -8.45 || z > 10.45;
+  const insideBanquet = x > MANSION_BANQUET_HALL.minX - 0.3 && x < MANSION_BANQUET_HALL.maxX + 0.3
+    && z > MANSION_BANQUET_HALL.northZ - 0.3 && z < MANSION_BANQUET_HALL.southZ;
+  return outsideMain && !insideBanquet;
+}
 
 export const MANSION_SECRET_ROOM = {
   centerX: -9.4,
@@ -110,6 +163,8 @@ export interface MansionAreaLight {
 export const MANSION_AREA_LIGHTS: ReadonlyArray<MansionAreaLight> = [
   { x: -3.8, y: 2.55, z: 6.5, intensity: 2.4, distance: 6.5, floor: 0 },
   { x: -4.5, y: 2.35, z: -4.8, intensity: 1.7, distance: 6.5, floor: 0 },
+  // Over the banquet table.
+  { x: MANSION_BANQUET_HALL.table.x, y: 2.35, z: MANSION_BANQUET_HALL.table.z, intensity: 1.9, distance: 7.5, floor: 0 },
   { x: 2.1, y: 2.35, z: -4.8, intensity: 1.1, distance: 5.2, floor: 0 },
   { x: 3.4, y: MANSION_BUNKER_Y + 2.45, z: -5.6, intensity: 1.05, distance: 5.5, floor: -1 },
   { x: -1.4, y: MANSION_BUNKER_Y + 2.35, z: -4.6, intensity: 1.35, distance: 7, floor: -1 },
@@ -238,9 +293,10 @@ export const MANSION_BARRIERS: ReadonlyArray<{
   { id: 'start-south', x: -3.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
   { id: 'start-south-west', x: -5.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
   { id: 'box-west', x: -7.15, z: -3.2, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
-  { id: 'box-north', x: -3.5, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-dining' },
-  { id: 'box-north-west', x: -5.5, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-dining' },
-  { id: 'east-hall-north', x: 1.6, z: -8.15, outwardX: 0, outwardZ: -1, zone: 'to-east-hall' },
+  { id: 'box-west-south', x: -7.15, z: 0.3, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
+  { id: 'banquet-north-west', x: -5.3, z: MANSION_BANQUET_HALL.northZ, outwardX: 0, outwardZ: -1, zone: 'to-banquet' },
+  { id: 'banquet-north-east', x: 2.4, z: MANSION_BANQUET_HALL.northZ, outwardX: 0, outwardZ: -1, zone: 'to-banquet' },
+  { id: 'banquet-east', x: MANSION_BANQUET_HALL.maxX, z: MANSION_BANQUET_HALL.eastWindowZ, outwardX: 1, outwardZ: 0, zone: 'to-banquet' },
   { id: 'bunker-east', x: MANSION_EAST_WALL_X, z: -2.5, outwardX: 1, outwardZ: 0, zone: 'nuclear-bunker' },
 ];
 
@@ -261,7 +317,9 @@ export const MANSION_DOORS: ReadonlyArray<{
   requiredMessage?: TranslationKey;
 }> = [
   { id: 'to-dining', x: -3.5, z: 2, outwardX: 0, outwardZ: -1, cost: MANSION_DOOR_COSTS.diningHall, y: 0, floor: 0 },
-  { id: 'to-east-hall', x: 0, z: -2.5, outwardX: 1, outwardZ: 0, cost: MANSION_DOOR_COSTS.eastHall, y: 0, floor: 0 },
+  // Both rooms north of the start room open into the banquet hall, the only way on to the bunker.
+  { id: 'to-banquet', x: -3.8, z: MANSION_BANQUET_HALL.southZ, outwardX: 0, outwardZ: -1, cost: MANSION_DOOR_COSTS.banquetHall, y: 0, floor: 0 },
+  { id: 'to-east-hall', x: 1.9, z: MANSION_BANQUET_HALL.southZ, outwardX: 0, outwardZ: 1, cost: MANSION_DOOR_COSTS.eastHall, y: 0, floor: 0 },
   {
     id: MANSION_BLAST_DOOR_ID,
     x: MANSION_BUNKER_DIVIDER_X,
@@ -307,6 +365,16 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
   {
+    // Banquet hall west wall, facing the long table.
+    id: 'banquet-vector',
+    weaponId: 'vector',
+    price: 1200,
+    ammoPrice: 600,
+    position: { x: MANSION_BANQUET_HALL.minX + 0.17, y: 1.45, z: MANSION_BANQUET_HALL.table.z },
+    yaw: Math.PI / 2,
+    floor: 0,
+  },
+  {
     id: 'east-hall-m4a1',
     weaponId: 'm4a1',
     price: 1500,
@@ -328,6 +396,11 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   },
 ];
 
+/** Banquet north windows: spawn, approach and breach lines. */
+const BANQUET_SPAWN_Z = MANSION_BANQUET_HALL.northZ - 7;
+const BANQUET_APPROACH_Z = MANSION_BANQUET_HALL.northZ - 0.9;
+const BANQUET_BREACH_Z = MANSION_BANQUET_HALL.northZ + 0.6;
+
 /** Spawn points per unlocked zone. Zone ids match door ids + 'start'. */
 export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPoint>>> = {
   start: [
@@ -338,11 +411,22 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
   ],
   'to-dining': [
     { x: -14, z: -3.2, barrierId: 'box-west', approachX: -8.05, approachZ: -3.2, breachX: -6.55, breachZ: -3.2, exterior: true },
-    { x: -3.5, z: -16, barrierId: 'box-north', approachX: -3.5, approachZ: -9.05, breachX: -3.5, breachZ: -7.55, exterior: true },
-    { x: -5.5, z: -16, barrierId: 'box-north-west', approachX: -5.5, approachZ: -9.05, breachX: -5.5, breachZ: -7.55, exterior: true },
+    { x: -14, z: 0.3, barrierId: 'box-west-south', approachX: -8.05, approachZ: 0.3, breachX: -6.55, breachZ: 0.3, exterior: true },
   ],
-  'to-east-hall': [
-    { x: 1.6, z: -16, barrierId: 'east-hall-north', approachX: 1.6, approachZ: -9.05, breachX: 1.6, breachZ: -7.55, exterior: true },
+  // The east hall has no outer wall left: its zombies come in through the banquet hall.
+  'to-banquet': [
+    { x: -5.3, z: BANQUET_SPAWN_Z, barrierId: 'banquet-north-west', approachX: -5.3, approachZ: BANQUET_APPROACH_Z, breachX: -5.3, breachZ: BANQUET_BREACH_Z, exterior: true },
+    { x: 2.4, z: BANQUET_SPAWN_Z, barrierId: 'banquet-north-east', approachX: 2.4, approachZ: BANQUET_APPROACH_Z, breachX: 2.4, breachZ: BANQUET_BREACH_Z, exterior: true },
+    {
+      x: 14,
+      z: MANSION_BANQUET_HALL.eastWindowZ,
+      barrierId: 'banquet-east',
+      approachX: MANSION_BANQUET_HALL.maxX + 0.9,
+      approachZ: MANSION_BANQUET_HALL.eastWindowZ,
+      breachX: MANSION_BANQUET_HALL.maxX - 0.6,
+      breachZ: MANSION_BANQUET_HALL.eastWindowZ,
+      exterior: true,
+    },
   ],
   'nuclear-bunker': [
     {

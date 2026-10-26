@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
 import {
+  MANSION_BANQUET_HALL,
   MANSION_BUNKER_CEILING_Y,
   MANSION_BUNKER_Y,
   MANSION_EAST_WALL_X,
@@ -19,12 +20,18 @@ const BUNKER_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 20, med
 /** Ground-floor air volume, inside the outer walls. */
 const HOUSE = { minX: -6.8, maxX: MANSION_EAST_WALL_X - 0.4, minZ: -7.8, maxZ: 9.8 } as const;
 const BUNKER = { minX: MANSION_SECRET_ROOM.entranceX + 0.3, maxX: MANSION_EAST_WALL_X - 0.5, minZ: -9.2, maxZ: 1.7 } as const;
-/** Where embers still lift off: the scorched start-room ceiling, the stair shaft and the east-hall cabinet. */
+/**
+ * Where embers still lift off: the scorched start-room ceiling, the stair
+ * shaft, the east-hall cabinet, the burnt end of the banquet table and the
+ * logs in the banquet fireplace.
+ */
 const EMBER_SOURCES = [
   new THREE.Vector3(-3.7, 0.4, 5.2),
   new THREE.Vector3(6.65, 0.2, -5.6),
   new THREE.Vector3(0.6, 0.3, -6.1),
   new THREE.Vector3(6.2, 0.2, 5.0),
+  new THREE.Vector3(MANSION_BANQUET_HALL.table.x + 1.2, 0.8, MANSION_BANQUET_HALL.table.z + 0.1),
+  new THREE.Vector3(MANSION_BANQUET_HALL.chimney.frontX - 0.25, 0.35, MANSION_BANQUET_HALL.chimney.z),
 ] as const;
 const EMBER_COLOR = new THREE.Color(0xff7a2e);
 const ASH_FALL_SPEED = 0.05;

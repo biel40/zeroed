@@ -139,7 +139,8 @@ export const es: Record<TranslationKey, string> = {
   'prompt.rechargeRing': 'RECARGAR {ring}\n{key} — {cost} PTS',
   'prompt.ringNeedsPower': 'ANILLO {ring}\nHAY QUE ENCENDER LA ELECTRICIDAD',
 
-  'door.to-dining': 'COMEDOR',
+  'door.to-dining': 'SALÓN',
+  'door.to-banquet': 'GRAN COMEDOR',
   'door.to-east-hall': 'PASILLO ESTE',
   'door.to-consigna': 'CONSIGNA',
   'door.openBunker': 'Abrir el búnker sellado',
