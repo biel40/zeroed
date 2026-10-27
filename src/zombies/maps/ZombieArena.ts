@@ -231,6 +231,12 @@ export interface ArenaAmbientCue extends AmbientCuePlayback {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
 }
 
+/** A zombie a map stages outside its spawn points (a jumpscare): where it bursts out. */
+export interface ArenaAmbush {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+}
+
 /** Scene mood owned by the map and applied when the arena initializes. */
 export interface ArenaAmbience {
   readonly backgroundColor: number;
@@ -304,6 +310,12 @@ export interface ZombieArena {
   readonly zombieEyes?: ZombieEyeColors;
   /** Optional: ambient sounds the map schedules itself; the mode plays them. */
   onAmbientCue?: ((cue: ArenaAmbientCue) => void) | null;
+  /**
+   * Optional: a map scare asks the mode for one zombie of the round at its
+   * spot. The mode returns true when it spawned one; only then does the map
+   * play its reveal, otherwise it may ask again later.
+   */
+  onAmbush?: ((ambush: ArenaAmbush) => boolean) | null;
   /** Optional visual event fired when a rebuilt board finishes seating. */
   onBarrierBoardRebuilt?: (() => void) | null;
   /**

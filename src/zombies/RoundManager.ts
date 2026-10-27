@@ -58,6 +58,17 @@ export class RoundManager {
     if (this.phase === 'active') this.pendingSpawns++;
   }
 
+  /**
+   * Hands one of the round's pending spawns to a map-staged spawn (an
+   * ambush), so the round's total stays the same. Null outside an active
+   * round or once every zombie of the round is out.
+   */
+  takePendingSpawn(): RoundConfig | null {
+    if (this.phase !== 'active' || this.pendingSpawns === 0) return null;
+    this.pendingSpawns--;
+    return this.config;
+  }
+
   /** Back to the pre-round-1 state (used by the game-over restart). */
   reset(startDelay = ROUND_START_DELAY): void {
     this.phase = 'break';

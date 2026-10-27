@@ -100,6 +100,39 @@ export const TICKET_OFFICE = {
   windows: 3,
 } as const;
 
+const TICKET_OFFICE_FRONT_X = VESTIBULE.minX + TICKET_OFFICE.depth;
+const TICKET_BAY = (TICKET_OFFICE.maxZ - TICKET_OFFICE.minZ) / TICKET_OFFICE.windows;
+
+/**
+ * The ticket office's glazed windows, south to north: each a pair of
+ * casements hinged at its outer edges, `x` on the glass plane.
+ */
+export const TICKET_WINDOWS: ReadonlyArray<{ readonly x: number; readonly z: number; readonly width: number }> =
+  Array.from({ length: TICKET_OFFICE.windows }, (_, index) => ({
+    x: TICKET_OFFICE_FRONT_X - 0.12,
+    z: TICKET_OFFICE.minZ + TICKET_BAY * (index + 0.5),
+    width: TICKET_BAY - 0.16,
+  }));
+
+/** Glass centre height and height of the ticket windows. */
+export const TICKET_WINDOW_GLASS = { centerY: 1.53, height: 0.94 } as const;
+
+/**
+ * Easter-egg jumpscare: walking up to the ticket office rarely bursts one
+ * window open with a zombie of the round right behind the counter. Rolled
+ * once per approach, at most once per run.
+ */
+export const TICKET_WINDOW_AMBUSH = {
+  chance: 0.05,
+  /** Approach distance from the facade in front of each window. */
+  radius: 2.2,
+  /** Where the zombie stands, out from the facade: clear of its collider by a body radius. */
+  standOff: 0.55,
+} as const;
+
+/** Points on the facade in front of each window that the player approaches. */
+export const TICKET_WINDOW_AMBUSH_SITES = TICKET_WINDOWS.map((window) => ({ x: TICKET_OFFICE_FRONT_X, z: window.z }));
+
 /** Benches against the east wall; one bench lies overturned near the escalator. */
 export const VESTIBULE_BENCHES = [
   // Yaw turns the backrest (local -Z) against the wall.

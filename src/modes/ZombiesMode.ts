@@ -42,7 +42,7 @@ import { RITUAL_SCARE_TIMELINE } from '../zombies/secret-room/SecretRoomSystem';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
-import { hasSoulRitual, type ZombieArena } from '../zombies/maps/ZombieArena';
+import { hasSoulRitual, type ArenaAmbush, type ZombieArena } from '../zombies/maps/ZombieArena';
 import type {
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
@@ -65,6 +65,8 @@ import { CodeLockDialog } from '../ui/CodeLockDialog';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
+/** Camera jolt of a map ambush: the player flinches before anything hits. */
+const AMBUSH_TRAUMA = 0.45;
 const TRAUMA_DECAY = 2.1;
 const SHAKE_MAX_ANGLE = 0.04;
 /** Distant moans drift in every few seconds, never on a fixed rhythm. */
@@ -207,6 +209,7 @@ export class ZombiesMode implements GameMode {
     );
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     this.arena.onAmbientCue = (cue) => ctx.audio.playAmbientCue(cue, this.spatialCueFor(cue.position));
+    this.arena.onAmbush = (ambush) => this.spawnAmbush(ambush);
     ctx.scene.add(this.zombies.group);
     this.arena.onTopologyChanged = () => this.syncArenaTopology();
     if (hasSoulRitual(this.arena)) {
@@ -1094,7 +1097,7 @@ export class ZombiesMode implements GameMode {
     if (deathPosition && floor !== undefined && hasSoulRitual(this.arena)) {
       this.arena.captureSoul(deathPosition, floor);
     }
-    if (!this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) {
+    if (ZOMBIE_MAPS[this.mapId].rayGunKillMilestone && !this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) {
       this.unlockRayGun();
     }
   }
@@ -1156,6 +1159,26 @@ export class ZombiesMode implements GameMode {
       equipped: () => this.ctx.getEquippedWeaponId(),
       invincible: (enabled) => this.health.setInvincible(enabled),
     });
+  }
+
+  /**
+   * A map's jumpscare: one zombie the round still owes bursts out at the
+   * map's spot, so the round's total is unchanged. Refused between rounds,
+   * once the round has nobody left to send, or when the spot is blocked.
+   */
+  private spawnAmbush(ambush: ArenaAmbush): boolean {
+    if (!this.runAcceptsInput()) return false;
+    const config = this.rounds.takePendingSpawn();
+    if (!config) return false;
+    const player = this.ctx.player.rig.position;
+    const { x, z } = ambush.position;
+    if (!this.zombies.spawnAmbushZombie(config, x, z, this.rounds.round, player.x, player.z)) {
+      this.rounds.requeueSpawn();
+      return false;
+    }
+    this.ctx.audio.playAmbushScare(this.spatialCueFor(ambush.position));
+    this.trauma = Math.min(1, this.trauma + AMBUSH_TRAUMA);
+    return true;
   }
 
   private onPlayerHit(damage: number): void {

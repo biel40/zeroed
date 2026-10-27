@@ -79,8 +79,8 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
     reveals: boolean[];
   }
 
-  function makeMode(): { mode: ZombiesMode; ctx: MockContext } {
-    const mode = new ZombiesMode();
+  function makeMode(mapId: 'burned-mansion' | 'station-33' = 'burned-mansion'): { mode: ZombiesMode; ctx: MockContext } {
+    const mode = new ZombiesMode(mapId);
     const ctx: MockContext = { granted: [], banners: [], reveals: [] };
     (mode as unknown as { ctx: unknown }).ctx = {
       grantWeapon: (id: WeaponId) => ctx.granted.push(id),
@@ -123,6 +123,14 @@ describe('Ray Gun unlock at the 115-kill milestone', () => {
     expect(ctx.granted.filter((w) => w === 'raygun')).toHaveLength(1);
     expect(ctx.banners.filter((b) => b === 'RAY GUN UNLOCKED')).toHaveLength(1);
     expect(ctx.reveals).toHaveLength(1);
+  });
+
+  it('does not grant or announce the milestone in Station 33', () => {
+    const { mode, ctx } = makeMode('station-33');
+    kill(mode, RAYGUN_UNLOCK_KILLS + 50);
+    expect(ctx.granted).toEqual([]);
+    expect(ctx.banners).toEqual([]);
+    expect(ctx.reveals).toEqual([]);
   });
 
   it('re-arms the milestone after a restart (new run, fresh kill count)', () => {

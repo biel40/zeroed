@@ -10,6 +10,7 @@ import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import { AmbientEventScheduler } from './shared/AmbientEventScheduler';
+import { AmbushTrigger } from './shared/AmbushTrigger';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
 import { ArenaStructure } from './shared/ArenaStructure';
 import { MapPower } from './shared/MapPower';
@@ -30,6 +31,7 @@ import { WeaponStation } from './shared/WeaponStation';
 import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
+import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
   STATION33_AMBIENCE,
@@ -55,11 +57,13 @@ import {
   STATION33_WALL_THICKNESS,
   STATION33_ZOMBIE_EYES,
   STATION33_ZOMBIE_SKINS,
+  TICKET_WINDOW_AMBUSH,
+  TICKET_WINDOW_AMBUSH_SITES,
   type Station33AmbientEvent,
   type Station33ZoneId,
 } from './Station33Config';
 import { createStation33Materials } from './Station33Materials';
-import type { ArenaAmbientCue, ArenaRingMachine, ZombieArena } from './ZombieArena';
+import type { ArenaAmbientCue, ArenaAmbush, ArenaRingMachine, ZombieArena } from './ZombieArena';
 
 /** Seconds the motor-generators shake the station as they spin up. */
 const MAINS_SPIN_UP = 2.5;
@@ -122,6 +126,7 @@ export class Station33Arena implements ZombieArena {
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
   onAmbientCue: ((cue: ArenaAmbientCue) => void) | null = null;
+  onAmbush: ((ambush: ArenaAmbush) => boolean) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -138,6 +143,8 @@ export class Station33Arena implements ZombieArena {
   private readonly atmosphere: Station33Atmosphere;
   private readonly power = new MapPower();
   private readonly ambientEvents = new AmbientEventScheduler(STATION33_AMBIENT_EVENTS);
+  private readonly ticketShutters: TicketWindowShutters;
+  private readonly ticketAmbush = new AmbushTrigger(TICKET_WINDOW_AMBUSH_SITES, TICKET_WINDOW_AMBUSH);
   private readonly hemisphere: THREE.HemisphereLight;
   /** Seconds into the intro while its cues are pending, else null. */
   private introTime: number | null = null;
@@ -161,6 +168,7 @@ export class Station33Arena implements ZombieArena {
     this.lighting = new Station33Lighting(context);
     this.lighting.registerMaterial(context.signage.litMaterial, 'unstable');
     buildVestibule(context);
+    this.ticketShutters = new TicketWindowShutters(context);
     buildEscalatorHead(context, this.lighting);
     buildConsigna(context);
     buildCocheras(context, this.lighting);
@@ -223,6 +231,8 @@ export class Station33Arena implements ZombieArena {
     for (const station of this.weaponStations) station.update(dt);
     for (const pickup of this.weaponPickups) pickup.update(dt);
     this.powerSwitch.update(dt);
+    this.updateTicketAmbush(observerPosition);
+    this.ticketShutters.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
     this.lighting.update(dt, observerPosition);
     this.atmosphere.update(dt);
@@ -238,6 +248,8 @@ export class Station33Arena implements ZombieArena {
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
+    this.ticketAmbush.reset();
+    this.ticketShutters.reset();
     this.introTime = null;
     this.ambientEvents.reset();
     this.lighting.reset();
@@ -333,6 +345,21 @@ export class Station33Arena implements ZombieArena {
       this.barrierViews[index].group.visible = this.activeZones.has(STATION33_BARRIERS[index].zone);
     }
     this.refreshColliders();
+  }
+
+  /**
+   * The vestibule easter egg: walking up to the ticket office rarely throws
+   * one window open on a zombie of the round, standing right behind the
+   * counter. The window only bursts once the mode has spawned it.
+   */
+  private updateTicketAmbush(observer?: THREE.Vector3): void {
+    if (!observer) return;
+    const site = this.ticketAmbush.update(observer.x, observer.z);
+    if (site === null) return;
+    const { x, z } = TICKET_WINDOW_AMBUSH_SITES[site];
+    if (!this.onAmbush?.({ position: { x: x + TICKET_WINDOW_AMBUSH.standOff, y: 0, z }, floor: 0 })) return;
+    this.ticketAmbush.spring();
+    this.ticketShutters.burst(site);
   }
 
   private updateIntroCues(dt: number): void {

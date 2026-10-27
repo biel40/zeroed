@@ -354,7 +354,7 @@ guardandose automaticamente al ajustarlos.
   cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),
   con dano completo a cada uno; una pared la detiene;
   reutiliza la recarga de fusil y no necesita accionar el cerrojo entre disparos.
-  Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
+  En Burned Mansion se garantiza la Ray Gun a 115 bajas; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
   ajustado al tamano y orientacion de la caja, tanto en individual como en

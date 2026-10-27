@@ -1170,7 +1170,7 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh
  * rolls and unlocks never touch the network. This is NOT the slot list:
  * the zombies inventory starts with the M1911 alone (see
  * ZombiesMode.startingInventory); both Wonder Weapons can come from the
- * Mystery Box, while the Ray Gun is also guaranteed at 115 kills. Map
+ * Mystery Box, while the Ray Gun is also guaranteed at 115 kills in Burned Mansion. Map
  * exclusives (the ФАКЕЛ-33) are not here: the map registry adds them to
  * the preload of their own map only (`ZombieMapDefinition.exclusiveWeapons`).
  */

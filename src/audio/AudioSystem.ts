@@ -1225,6 +1225,24 @@ export class AudioSystem {
   }
 
   /**
+   * Map ambush: casements slamming against their stops and a dissonant,
+   * shrieking stab from the zombie behind them. Never softened by distance:
+   * the player is always right there.
+   */
+  public playAmbushScare(cue: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, { ...cue, attenuation: 1, muffle: 0 });
+    const t = audio.ctx.currentTime;
+    this.tick(0, 520, 0.9, 1.2, 0.12, output);
+    this.tick(0.02, 160, 0.8, 0.9, 0.22, output);
+    this.tick(0.19, 900, 0.35, 2, 0.06, output);
+    this.sweep(0, 'sawtooth', 620, 1180, 0.32, 0.55, t, output);
+    this.sweep(0, 'square', 655, 1240, 0.16, 0.5, t, output);
+    this.sweep(0.05, 'sawtooth', 110, 52, 0.4, 0.8, t + 0.05, output);
+  }
+
+  /**
    * Rising earthy groan from the point where a zombie enters the map: an
    * upward glide reads as "arriving".
    */

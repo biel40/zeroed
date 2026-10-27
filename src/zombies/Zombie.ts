@@ -226,6 +226,11 @@ export class Zombie implements HitTarget {
     apply(this.headHitbox, this.headBaseScale);
   }
 
+  /** Ends the ground rise at once: the body appears standing (a map ambush). */
+  skipSpawnRise(): void {
+    if (this.state === 'spawn') this.setWalk();
+  }
+
   /** HitTarget hook: pure visual feedback; damage arrives via applyDamage. */
   onHit(): void {
     if (this.isAlive) this.visual.hitFlash();

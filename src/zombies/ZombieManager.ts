@@ -529,6 +529,34 @@ export class ZombieManager {
       this.pool.release(zombie);
       return false;
     }
+    this.placeZombie(zombie, spawn, config, round, typeId);
+    this.assignSpawnRoute(zombie, spawn);
+    this.registerSpawned(zombie);
+    return true;
+  }
+
+  /**
+   * A map-staged scare: one plain walker of the round bursts out at (x, z)
+   * standing, facing the player and already hunting them, with no ground
+   * rise, barrier or entry route. False when the pool is full or the spot is
+   * blocked; the caller then keeps the spawn for the round.
+   */
+  spawnAmbushZombie(config: RoundConfig, x: number, z: number, round: number, playerX: number, playerZ: number): boolean {
+    const profile = ZOMBIE_TYPE_CONFIGS.normal;
+    if (this.hitsObstacle(x, z, 0, profile.bodyRadius)) return false;
+    const zombie = this.pool.acquire(profile.modelId);
+    if (!zombie) return false;
+    this.placeZombie(zombie, { x, z }, config, round, 'normal');
+    zombie.barrierTarget = null;
+    this.entryRoutes.delete(zombie);
+    zombie.faceTowards(playerX, playerZ);
+    zombie.skipSpawnRise();
+    this.registerSpawned(zombie);
+    return true;
+  }
+
+  private placeZombie(zombie: Zombie, spawn: ZombieSpawnPoint, config: RoundConfig, round: number, typeId: ZombieTypeId): void {
+    const profile = ZOMBIE_TYPE_CONFIGS[typeId];
     this.roundState.delete(zombie);
     this.headings.delete(zombie);
     this.stairTraversals.delete(zombie);
@@ -554,11 +582,12 @@ export class ZombieManager {
       typeId,
       ZOMBIE_ATTACK_DAMAGE * profile.damageMultiplier,
     );
-    this.assignSpawnRoute(zombie, spawn);
+  }
+
+  private registerSpawned(zombie: Zombie): void {
     this.colliders.push(zombie.torsoHitbox, zombie.headHitbox);
     this.networkIds.set(zombie, this.nextNetworkId++);
     this.onZombieSpawned?.(zombie);
-    return true;
   }
 
   private assignSpawnRoute(zombie: Zombie, spawn: ZombieSpawnPoint): void {

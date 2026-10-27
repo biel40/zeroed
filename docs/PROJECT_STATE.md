@@ -53,7 +53,8 @@
   del vestibulo (puerta de 3000), junto a la AK-47 en pared. Al comprar un
   anillo, las manos se lo ponen con una animacion.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
-  melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria. En
+  melee validado, pasos 3D y ZEUS-77 legendaria. La Ray Gun se entrega a
+  115 bajas solo en Burned Mansion. En
   Station 33 los walkers visten uniformes sovieticos (guerra y guerra fria) o
   ropa de evacuado mediante skins por mapa.
 - Burned Mansion con dos plantas, bunker, escalera continua, progresion pagada,

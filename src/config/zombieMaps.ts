@@ -19,6 +19,8 @@ export interface ZombieMapDefinition {
   readonly coop: boolean;
   /** Sold separately once payments exist; the closed beta unlocks it for testers. */
   readonly premium: boolean;
+  /** Whether the 115-kill Ray Gun reward is enabled on this map. */
+  readonly rayGunKillMilestone: boolean;
   /**
    * Weapons only this map hands out (sold by its own stations). They are
    * preloaded on this map alone, never pooled in the Mystery Box and never
@@ -37,6 +39,7 @@ export const ZOMBIE_MAPS = {
     nameKey: 'map.burnedMansion',
     coop: true,
     premium: false,
+    rayGunKillMilestone: true,
     exclusiveWeapons: [],
     createArena: (scene, profile) => new BurnedMansionArena(scene, profile),
   },
@@ -47,6 +50,7 @@ export const ZOMBIE_MAPS = {
     nameKey: 'map.station33',
     coop: false,
     premium: true,
+    rayGunKillMilestone: false,
     exclusiveWeapons: ['fakel'],
     createArena: (scene, profile) => new Station33Arena(scene, profile),
   },

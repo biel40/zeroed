@@ -74,7 +74,7 @@ function addTurnstile(context: Station33BuildContext, x: number): void {
   addProxy(context, 'turnstile', { x, y: height / 2, z }, { x: width + 0.08, y: height + 0.04, z: length + 0.08 }, 'metal');
 }
 
-/** Ticket-office facade: wooden panelling, granite counter and three dark windows. */
+/** Ticket-office facade: wooden panelling, granite counter and the frames of three windows. */
 function addTicketOffice(context: Station33BuildContext): void {
   const { batch, materials, signage, group } = context;
   const { minZ, maxZ, depth, height, windows } = TICKET_OFFICE;
@@ -91,11 +91,11 @@ function addTicketOffice(context: Station33BuildContext): void {
   for (let index = 0; index <= windows; index++) {
     batch.addBox(materials.varnishedWood, centerX, 1.53, minZ + index * bay, depth, 0.94, 0.16);
   }
+  // The glazed casements are animated (see TicketWindowShutters); an open
+  // one shows the booth's panelled back wall.
+  batch.addBox(materials.varnishedWood, backX + 0.03, 1.53, centerZ, 0.04, 0.94, length);
   for (let index = 0; index < windows; index++) {
-    const z = minZ + bay * (index + 0.5);
-    batch.addBox(materials.windowGlass, frontX - 0.12, 1.53, z, 0.03, 0.94, bay - 0.16);
-    batch.addBox(materials.bronze, frontX - 0.1, 1.53, z, 0.04, 0.05, bay - 0.16);
-    batch.addBox(materials.bronze, frontX - 0.1, 1.09, z, 0.04, 0.05, bay * 0.35);
+    batch.addBox(materials.bronze, frontX - 0.1, 1.09, minZ + bay * (index + 0.5), 0.04, 0.05, bay * 0.35);
   }
   const plate = new THREE.Mesh(signage.signGeometry('ticket-office', 1.8, 0.45), signage.material);
   plate.position.set(frontX + 0.012, 2.38, centerZ);
