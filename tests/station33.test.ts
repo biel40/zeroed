@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { DeviceProfile, QualityLevel } from '../src/core/DeviceProfile';
 import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
 import type { Input } from '../src/player/Input';
@@ -11,6 +11,7 @@ import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { ZombieSpawnPoint } from '../src/zombies/ZombieSpawner';
 import { t } from '../src/i18n/i18n';
 import { actionKey } from '../src/ui/InteractionPrompts';
+import { CodeLockDialog } from '../src/ui/CodeLockDialog';
 import { POINT_LIGHT_BUDGET } from '../src/zombies/maps/shared/PointLightBudget';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
 import {
@@ -30,6 +31,7 @@ import {
   STATION33_SPAWNS,
   STATION33_WALL_BUYS,
   STATION33_WALL_THICKNESS,
+  STATION33_WEAPON_CHEST,
   SUBESTACION,
   POWER_LEVER,
   TRAIN_CAR,
@@ -42,6 +44,10 @@ import {
 import { circuitLevel } from '../src/zombies/maps/station33/Station33Lighting';
 import type { ArenaAmbientCue, ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { installCanvasDocument, makeContext, TEST_PROFILE } from './coopHarness';
+
+vi.mock('../src/ui/CodeLockDialog', () => ({
+  CodeLockDialog: vi.fn(function () { return { dispose: vi.fn() }; }),
+}));
 
 const DT = 1 / 60;
 const ZOMBIE_BAND = { bottom: 0.05, top: 1.8 } as const;
@@ -56,6 +62,91 @@ function makeArena(profile: DeviceProfile = TEST_PROFILE): Station33Arena {
   arena.init();
   return arena;
 }
+
+describe('Station 33 combination chest', () => {
+  it('requires the exact code, reveals its weapon, grants once, and relocks on restart', () => {
+    const arena = makeArena();
+    const [chest] = arena.weaponPickups;
+    const model = arena.group.getObjectByName(`code-chest:${chest.id}`)!;
+    const weapon = model.getObjectByName('chest-weapon')!;
+    expect(chest.codeLock.locked).toBe(true);
+    expect(weapon.visible).toBe(false);
+    expect(chest.claim()).toBe(false);
+    for (const code of ['', '0000', '199', '19980', ' 1998']) expect(chest.codeLock.unlock(code)).toBe(false);
+    expect(chest.codeLock.unlock('1998')).toBe(true);
+    expect(chest.codeLock.locked).toBe(false);
+    expect(weapon.visible).toBe(true);
+    arena.update(1);
+    expect(model.getObjectByName('chest-lid')!.rotation.x).toBeLessThan(-1);
+    expect(chest.claim()).toBe(true);
+    expect(chest.available).toBe(false);
+    expect(weapon.visible).toBe(false);
+    expect(chest.claim()).toBe(false);
+    expect(chest.codeLock.unlock('1998')).toBe(false);
+    arena.reset();
+    expect(chest.available).toBe(true);
+    expect(chest.codeLock.locked).toBe(true);
+    expect(weapon.visible).toBe(false);
+    expect(model.getObjectByName('chest-lid')!.rotation.x).toBe(0);
+  });
+
+  it('fits inside militia with an accessible front and a solid body', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'milicia');
+    const chest = arena.weaponPickups[0];
+    expect(station33ZoneAt(chest.position.x, chest.position.z)).toBe('milicia');
+    const bounds = new THREE.Box3().setFromObject(arena.group.getObjectByName(chest.id)!);
+    expect(bounds.min.x).toBeGreaterThan(MILICIA.hall.minX);
+    expect(bounds.max.x).toBeLessThan(MILICIA.hall.maxX);
+    expect(bounds.min.z).toBeGreaterThan(MILICIA.hall.minZ);
+    for (const barrier of STATION33_BARRIERS) {
+      expect(bounds.intersectsBox(passageBox(barrier)), barrier.id).toBe(false);
+      expect(bounds.intersectsBox(bodyBox(barrier.x, barrier.z, 0.4)), barrier.id).toBe(false);
+    }
+    for (const box of structureBoxes(arena).filter((box) => !box.equals(bounds))) expect(box.intersectsBox(bounds)).toBe(false);
+    const stand = bodyBox(chest.position.x, chest.position.z - 0.8, 0.3);
+    expect(solidBoxes(arena).some((box) => box.intersectsBox(stand))).toBe(false);
+  });
+
+  it('requires entry to militia and grants the unlocked Barrett free through the normal inventory path', () => {
+    const side = makeContext();
+    const mode = new ZombiesMode('station-33');
+    mode.init(side.ctx);
+    const arena = (mode as unknown as { arena: Station33Arena }).arena;
+    const chest = arena.weaponPickups[0];
+    side.player.teleport(chest.position.x, EYE_HEIGHT, chest.position.z - 0.8, 0);
+    side.player.face(Math.PI);
+    side.player.rig.updateMatrixWorld(true);
+    expect(mode.getInteractPrompt()).toBeNull();
+    openDoorTo(arena, 'milicia');
+    expect(mode.getInteractPrompt()).toBe(t('prompt.codeChest', { key: actionKey(false) }));
+    side.ctx.input.releaseAll = vi.fn();
+    mode.onInteract();
+    expect(mode.isSimulationPaused()).toBe(true);
+    expect(mode.isGameplayInputEnabled()).toBe(false);
+    expect(mode.onPointerUnlock()).toBe(true);
+    expect(side.ctx.grantWeapon).not.toHaveBeenCalled();
+    const [unlock, close] = vi.mocked(CodeLockDialog).mock.calls.at(-1)!;
+    expect(unlock('0000')).toBe(false);
+    expect(chest.codeLock.locked).toBe(true);
+    expect(unlock(STATION33_WEAPON_CHEST.code)).toBe(true);
+    close();
+    expect(mode.isSimulationPaused()).toBe(false);
+    expect(mode.isGameplayInputEnabled()).toBe(true);
+    expect(side.ctx.lockPointer).toHaveBeenCalled();
+    vi.mocked(side.ctx.canGrantWeapon).mockReturnValue(true);
+    vi.mocked(side.ctx.grantWeapon).mockReturnValue(true);
+    expect(chest.cost).toBe(0);
+    mode.onInteract();
+    expect(side.ctx.grantWeapon).toHaveBeenCalledExactlyOnceWith('barrett');
+    expect(chest.available).toBe(false);
+    mode.onInteract();
+    expect(side.ctx.grantWeapon).toHaveBeenCalledTimes(1);
+    mode.onRestartRequested();
+    expect(chest.codeLock.locked).toBe(true);
+    expect(chest.available).toBe(true);
+  });
+});
 
 /** World AABBs of everything solid a zombie body or the player can bump into. */
 function solidBoxes(arena: ZombieArena): THREE.Box3[] {

@@ -61,6 +61,7 @@ import { ZombiesFlames } from './ZombiesFlames';
 import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { IntroCinematic } from '../rendering/IntroCinematic';
+import { CodeLockDialog } from '../ui/CodeLockDialog';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
@@ -112,6 +113,7 @@ export class ZombiesMode implements GameMode {
   /** The map's wearable gas mask; null on maps without one. */
   private gasMask: ZombiesGasMask | null = null;
   private powerSwitch: ZombiesPowerSwitch | null = null;
+  private codeLockDialog: CodeLockDialog | null = null;
   private crystalRecoveries: ZombiesCrystalRecovery[] = [];
   private readonly rounds = new RoundManager();
   private readonly health = new PlayerHealth(
@@ -445,12 +447,19 @@ export class ZombiesMode implements GameMode {
 
   /** Skip the pause screen while the game-over panel is up. */
   onPointerUnlock(): boolean {
-    return this.gameOver || !this.runFlow.acceptsGameplay;
+    return !!this.codeLockDialog || this.gameOver || !this.runFlow.acceptsGameplay;
+  }
+
+  isSimulationPaused(): boolean { return this.codeLockDialog !== null; }
+
+  onExit(): void {
+    this.codeLockDialog?.dispose();
+    this.codeLockDialog = null;
   }
 
   /** Shell gate for movement, weapons and interactions: closed while getting back up. */
   isGameplayInputEnabled(): boolean {
-    return this.runAcceptsInput() && !(this.rings?.isGettingUp ?? false);
+    return !this.codeLockDialog && this.runAcceptsInput() && !(this.rings?.isGettingUp ?? false);
   }
 
   /** Getting back up after a Resurrection ring: the player can look around, nothing else. */
@@ -523,6 +532,18 @@ export class ZombiesMode implements GameMode {
 
     const pickup = this.findFacingWeaponPickup();
     if (pickup) {
+      if (pickup.codeLock?.locked) {
+        const lock = pickup.codeLock;
+        this.ctx.input.releaseAll();
+        this.ctx.hud.setInteractionPrompt(null);
+        this.codeLockDialog = new CodeLockDialog((code) => lock.unlock(code), () => {
+          this.codeLockDialog = null;
+          this.ctx.input.releaseAll();
+          this.ctx.lockPointer();
+        });
+        this.ctx.unlockPointer();
+        return;
+      }
       if (weaponCaseLocked(pickup, this.kills)) {
         this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, this.kills, this.ctx.profile.useTouchControls));
         return;
@@ -1295,6 +1316,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private restart(): void {
+    this.onExit();
     this.endIntro();
     this.gameOver = false;
     this.gameOverPending = false;

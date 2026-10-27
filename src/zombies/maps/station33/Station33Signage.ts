@@ -32,11 +32,20 @@ export type SignId =
   | 'militia'
   | 'evidence'
   | 'wanted'
-  | 'decontamination';
+  | 'decontamination'
+  | 'militia-poster'
+  | 'vigilance-poster'
+  | 'serve-the-people'
+  | 'honour-board'
+  | 'duty-roster'
+  | 'holding-cell';
 
 const ATLAS_WIDTH = 1024;
-/** Two 128 px rows below the original square: the machine room's plates, then the militia post's. */
-const ATLAS_HEIGHT = 1280;
+/**
+ * Two 128 px rows below the original square (the machine room's plates, then
+ * the militia post's), then a 384 px band of the post's red corner.
+ */
+const ATLAS_HEIGHT = 1664;
 
 /** Atlas cells in canvas pixels: x, y, width, height. */
 const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
@@ -66,6 +75,12 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   evidence: [256, 1152, 256, 128],
   wanted: [512, 1152, 256, 128],
   decontamination: [768, 1152, 256, 128],
+  'militia-poster': [0, 1280, 256, 384],
+  'vigilance-poster': [256, 1280, 256, 384],
+  'serve-the-people': [512, 1280, 512, 128],
+  'honour-board': [512, 1408, 512, 128],
+  'duty-roster': [512, 1536, 256, 128],
+  'holding-cell': [768, 1536, 256, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -273,6 +288,94 @@ function paintMilitiaSigns(context: CanvasRenderingContext2D, random: () => numb
   printLines(context, x + 70, y + 40, 56, 4, random);
   printLines(context, x + 188, y + 40, 52, 4, random);
   weather(context, x, y, width, height, random, 30);
+  paintRedCornerSigns(context, random);
+}
+
+/** Five-pointed star pointing up, centred on (x, y), as a polygon. */
+function paintStar(context: CanvasRenderingContext2D, x: number, y: number, outer: number, color: string): void {
+  context.fillStyle = color;
+  context.beginPath();
+  for (let index = 0; index < 10; index++) {
+    const [vx, vy] = starVertex(index, outer, outer * 0.4);
+    // Canvas rows grow downwards, so the star's y flips.
+    if (index === 0) context.moveTo(x + vx, y - vy);
+    else context.lineTo(x + vx, y - vy);
+  }
+  context.closePath();
+  context.fill();
+}
+
+/** Sunburst of alternating rays behind a poster's star. */
+function paintRays(context: CanvasRenderingContext2D, x: number, y: number, radius: number, rays: number, color: string): void {
+  context.fillStyle = color;
+  for (let ray = 0; ray < rays; ray += 2) {
+    const from = (ray / rays) * Math.PI * 2;
+    const to = ((ray + 1) / rays) * Math.PI * 2;
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(x + Math.cos(from) * radius, y + Math.sin(from) * radius);
+    context.lineTo(x + Math.cos(to) * radius, y + Math.sin(to) * radius);
+    context.closePath();
+    context.fill();
+  }
+}
+
+/**
+ * The militia post's red corner: two propaganda posters (a star over rays,
+ * a call for vigilance), the slogan banner, the board of honour's header,
+ * the duty roster pinned by the desk and the holding cell's plate.
+ */
+function paintRedCornerSigns(context: CanvasRenderingContext2D, random: () => number): void {
+  const [px, py, pw, ph] = SIGN_REGIONS['militia-poster'];
+  context.fillStyle = '#c9bb94';
+  context.fillRect(px + 4, py + 4, pw - 8, ph - 8);
+  context.save();
+  context.beginPath();
+  context.rect(px + 14, py + 14, pw - 28, 230);
+  context.clip();
+  context.fillStyle = '#8f2018';
+  context.fillRect(px + 14, py + 14, pw - 28, 230);
+  paintRays(context, px + pw / 2, py + 130, 220, 24, 'rgba(214, 160, 70, 0.35)');
+  context.restore();
+  paintStar(context, px + pw / 2, py + 128, 78, '#d8a640');
+  paintStar(context, px + pw / 2, py + 128, 62, '#b8261a');
+  lettering(context, 'МИЛИЦИЯ', px + pw / 2, py + 282, 40, '#8f2018');
+  lettering(context, 'НА СТРАЖЕ ПОРЯДКА', px + pw / 2, py + 326, 20, '#2a2620');
+  weather(context, px, py, pw, ph, random, 80);
+
+  const [vx, vy, vw, vh] = SIGN_REGIONS['vigilance-poster'];
+  tornPaper(context, 'vigilance-poster', 0.94, random);
+  context.fillStyle = '#1b1b1b';
+  context.fillRect(vx + 14, vy + 14, vw - 28, 200);
+  paintStar(context, vx + vw / 2, vy + 104, 64, '#b8261a');
+  context.fillStyle = '#8f2018';
+  context.fillRect(vx + 14, vy + 226, vw - 28, 64);
+  lettering(context, 'БУДЬ', vx + vw / 2, vy + 244, 26, '#efe6cf');
+  lettering(context, 'БДИТЕЛЕН!', vx + vw / 2, vy + 272, 28, '#efe6cf');
+  printLines(context, vx + 24, vy + 304, vw - 48, 3, random);
+  weather(context, vx, vy, vw, vh, random, 70);
+
+  enamelPlate(context, 'serve-the-people', '#8f2018', '#d8a640', '#efe2c0', ['СЛУЖИМ НАРОДУ'], 62, random);
+  const [sx, sy, , sh] = SIGN_REGIONS['serve-the-people'];
+  for (const offset of [44, 512 - 44]) paintStar(context, sx + offset, sy + sh / 2, 26, '#d8a640');
+  enamelPlate(context, 'honour-board', '#8f2018', '#d8a640', '#d8a640', ['ДОСКА ПОЧЁТА'], 64, random);
+
+  const [rx, ry, rw, rh] = SIGN_REGIONS['duty-roster'];
+  context.fillStyle = '#c9bf9f';
+  context.fillRect(rx + 4, ry + 4, rw - 8, rh - 8);
+  lettering(context, 'ГРАФИК ДЕЖУРСТВ', rx + rw / 2, ry + 20, 20, '#2a2620');
+  context.strokeStyle = 'rgba(40, 36, 30, 0.7)';
+  context.lineWidth = 1;
+  for (let row = 0; row < 6; row++) context.strokeRect(rx + 12, ry + 34 + row * 14, rw - 24, 14);
+  for (let column = 1; column < 7; column++) {
+    context.beginPath();
+    context.moveTo(rx + 12 + column * ((rw - 24) / 7), ry + 34);
+    context.lineTo(rx + 12 + column * ((rw - 24) / 7), ry + 118);
+    context.stroke();
+  }
+  weather(context, rx, ry, rw, rh, random, 20);
+
+  enamelPlate(context, 'holding-cell', '#d9d3c1', '#3a3a36', '#1b1b1b', ['КПЗ'], 70, random);
 }
 
 /**

@@ -8,6 +8,7 @@ export function weaponCaseLocked(pickup: ArenaWeaponPickup, kills: number): bool
 }
 
 export function weaponCasePrompt(pickup: ArenaWeaponPickup, kills: number, touch: boolean): string {
+  if (pickup.codeLock?.locked) return t('prompt.codeChest', { key: actionKey(touch) });
   return weaponCaseLocked(pickup, kills)
     ? t('prompt.weaponCaseLocked', { label: pickup.interactionLabel, kills, required: pickup.requiredKills ?? 0 })
     : t('prompt.pickup', { label: pickup.interactionLabel, key: actionKey(touch) });

@@ -3,6 +3,7 @@ import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { WeaponStationPlacement } from './shared/WeaponStation';
+import type { CodeWeaponChestPlacement } from './shared/CodeWeaponChest';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import type { LockerSize } from './shared/LockerBank';
@@ -171,14 +172,20 @@ export const COCHERAS = {
  * of the vestibule whose east wall is the vestibule's west wall, so its
  * door opens straight into it. It shares the vestibule's south line, and
  * its north wall stays clear of the passage behind the vestibule's west
- * service door. Flat, low office ceiling.
+ * service door. Flat office ceiling under concrete beams, high enough for
+ * the post's red corner and the interrogation lamp.
  */
 export const MILICIA = {
-  hall: { minX: -14.6, maxX: VESTIBULE.minX - STATION33_WALL_THICKNESS, minZ: 5.8, maxZ: VESTIBULE.maxZ },
-  ceilingHeight: 3.0,
+  hall: { minX: -18.2, maxX: VESTIBULE.minX - STATION33_WALL_THICKNESS, minZ: 5.8, maxZ: VESTIBULE.maxZ },
+  ceilingHeight: 3.4,
 } as const;
 
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
+/** Evidence chest against the south wall, beside the holding cell, facing the room. */
+export const STATION33_WEAPON_CHEST: CodeWeaponChestPlacement = {
+  id: 'milicia-barrett-chest', weaponId: 'barrett', code: '1998',
+  x: -12.7, z: MILICIA.hall.maxZ - 0.6, yaw: Math.PI, requiredDoorId: 'to-milicia',
+};
 const EAST_WALL_X = VESTIBULE.maxX + STATION33_WALL_THICKNESS / 2;
 const NORTH_WALL_Z = VESTIBULE.minZ - STATION33_WALL_THICKNESS / 2;
 const SOUTH_WALL_Z = VESTIBULE.maxZ + STATION33_WALL_THICKNESS / 2;
@@ -426,6 +433,17 @@ export const COCHERAS_CREW_LOCKERS = { minX: 17.3, maxX: 20.6 } as const;
 /** Evidence lockers on the militia post's west wall, facing its door. */
 export const MILICIA_EVIDENCE_LOCKERS = { minZ: 7.4, maxZ: 11.6 } as const;
 
+/** Centre of the interrogation table in the post's west half, under its hanging lamp. */
+export const MILICIA_INTERROGATION = { x: -15.9, z: 12.2 } as const;
+
+/**
+ * Holding cell in the post's south-west corner: a barred front along
+ * `frontZ` with its door opening between `doorMinX` and `sideX`, and a
+ * barred side along `sideX`. The door hangs swung right open along the
+ * side line.
+ */
+export const MILICIA_CELL = { frontZ: 14.4, doorMinX: -15.8, sideX: -14.6, barHeight: 2.4, barSpacing: 0.13 } as const;
+
 /**
  * The Resurrection locker at the end of the luggage-office corridor's axis,
  * the Sleight of Hand locker in the middle of the train crews' bank, and
@@ -489,7 +507,7 @@ export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
  * empty ground west of the train sheds stays walled off.
  */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -15.5, maxX: 27.8, minZ: -53.5, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: -19.1, maxX: 27.8, minZ: -53.5, maxZ: 24.7, baseY: 0 },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -542,6 +560,8 @@ export interface Station33PointLight {
 export const FLUORESCENT_COLOR = 0xd2eadf;
 export const AMBER_LAMP_COLOR = 0xffa65a;
 export const EMERGENCY_COLOR = 0xff2a12;
+/** Ruby glass of the militia post's lit star. */
+export const MILICIA_STAR_COLOR = 0xff3a26;
 
 /**
  * The station's main switch: a knife-switch lever on the machine room's
@@ -614,8 +634,12 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: 17.6, y: 4.4, z: -42.5, color: FLUORESCENT_COLOR, intensity: 8, distance: 11, circuit: 'mains', zone: 'subestacion' },
   { x: SUBESTACION.gallery.maxX - 0.3, y: 2.6, z: -30.5, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6, circuit: 'amber', zone: 'subestacion' },
   // Short enough to stop at the vestibule wall; the battery lamp keeps the cell red.
-  { x: -11.2, y: 2.75, z: 9.6, color: FLUORESCENT_COLOR, intensity: 4.5, distance: 4.2, circuit: 'unstable', zone: 'milicia' },
-  { x: -12.6, y: 2.6, z: 16.4, color: EMERGENCY_COLOR, intensity: 2.6, distance: 4, circuit: 'emergency', zone: 'milicia' },
+  { x: -11.2, y: 3.0, z: 9.6, color: FLUORESCENT_COLOR, intensity: 4.5, distance: 4.2, circuit: 'unstable', zone: 'milicia' },
+  // The interrogation lamp over the table in the west half of the post.
+  { x: MILICIA_INTERROGATION.x, y: 2.3, z: MILICIA_INTERROGATION.z, color: AMBER_LAMP_COLOR, intensity: 3.4, distance: 5, circuit: 'failing', zone: 'milicia' },
+  { x: -16.4, y: 2.6, z: 16.4, color: EMERGENCY_COLOR, intensity: 2.6, distance: 4, circuit: 'emergency', zone: 'milicia' },
+  // The ruby star over the Armour locker, fed by the substation like the locker itself.
+  { x: MILICIA.hall.minX + 1.0, y: 2.9, z: 9.45, color: MILICIA_STAR_COLOR, intensity: 3, distance: 4.5, circuit: 'mains', zone: 'milicia' },
 ];
 
 /**
@@ -654,6 +678,8 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: 17.6, z: -42.5, circuit: 'mains' },
   { x: -11.2, z: 9.6, circuit: 'unstable' },
   { x: -11.2, z: 14.4, circuit: 'mains' },
+  { x: -14.4, z: 9.6, circuit: 'mains' },
+  { x: -16.4, z: 16.2, circuit: 'dead' },
 ];
 
 /** A fitting mounted on a wall face at (x, z), `facing` into its room. */

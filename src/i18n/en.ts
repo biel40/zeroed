@@ -3,6 +3,13 @@
  * `{name}` placeholders are filled by `t()`.
  */
 export const en = {
+  'prompt.codeChest': "LOCKED CHEST\n{key} · Enter code",
+  'chest.title': "Combination padlock",
+  'chest.code': "Four-digit code",
+  'chest.erase': "Erase",
+  'chest.open': "Open",
+  'chest.close': "Back",
+  'chest.incorrect': "Incorrect code",
   'menu.tagline': 'THE DEAD ARE COMING',
   'menu.zombies': 'ZOMBIES',
   'map.burnedMansion': 'BURNED MANSION',

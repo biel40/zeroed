@@ -40,6 +40,10 @@ export interface Station33Materials {
   readonly bronze: THREE.MeshStandardMaterial;
   readonly rubber: THREE.MeshStandardMaterial;
   readonly varnishedWood: THREE.MeshStandardMaterial;
+  /** Faded red baize of banners, flags, the table cloth and the corridor runner. */
+  readonly redCloth: THREE.MeshStandardMaterial;
+  /** Glossy red enamel of the stars. */
+  readonly redEnamel: THREE.MeshStandardMaterial;
   readonly windowGlass: THREE.MeshStandardMaterial;
   readonly rubble: THREE.MeshStandardMaterial;
   readonly luggage: readonly THREE.MeshStandardMaterial[];
@@ -596,6 +600,8 @@ export function createStation33Materials(anisotropyLimit: number): Station33Mate
     bronze: new THREE.MeshStandardMaterial({ name: 'station33_bronze', color: 0x6a5232, roughness: 0.45, metalness: 0.8 }),
     rubber: new THREE.MeshStandardMaterial({ name: 'station33_rubber', color: 0x141414, roughness: 0.75 }),
     varnishedWood: new THREE.MeshStandardMaterial({ name: 'station33_varnished_wood', color: 0x4c301c, roughness: 0.6 }),
+    redCloth: new THREE.MeshStandardMaterial({ name: 'station33_red_cloth', color: 0x6e1712, roughness: 0.95, side: THREE.DoubleSide }),
+    redEnamel: new THREE.MeshStandardMaterial({ name: 'station33_red_enamel', color: 0x8e1a12, roughness: 0.35, metalness: 0.25 }),
     windowGlass: new THREE.MeshStandardMaterial({ name: 'station33_window_glass', color: 0x0c1312, roughness: 0.12, metalness: 0.3 }),
     rubble: new THREE.MeshStandardMaterial({ name: 'station33_rubble', color: 0x5d5b55, roughness: 0.98 }),
     luggage: [0x4a2e1c, 0x2b3440, 0x5f5236, 0x3a3d32].map((color, index) =>

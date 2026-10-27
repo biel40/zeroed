@@ -345,7 +345,12 @@ guardandose automaticamente al ajustarlos.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega ninguna de las
   dos armas que lleva el comprador al activarla, en individual y cooperativo.
   La PPSh-41 forma parte del arsenal estandar de la caja; la Vector sigue disponible.
-  El Barrett .50 solo se obtiene en la caja: francotirador pesado semiautomatico,
+  El Barrett .50 se obtiene en la caja y, en Station 33, gratis en el baul
+  con candado numerico del puesto de milicia (tras la puerta de 3000).
+  `CodeWeaponChest` usa el contrato `ArenaWeaponPickup` con `codeLock` opcional:
+  el teclado pausa la simulacion individual, abrir revela el arma y recogerla
+  pasa por el inventario habitual; una entrega por partida, restaurada al reiniciar.
+  Es un francotirador pesado semiautomatico,
   con mira telescopica, mayor dano y retroceso que la L96 y menor movilidad;
   cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),
   con dano completo a cada uno; una pared la detiene;

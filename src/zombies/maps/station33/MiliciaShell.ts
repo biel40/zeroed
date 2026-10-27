@@ -12,6 +12,9 @@ const DADO_HEIGHT = 1.3;
 const SHARED_WALL_X = VESTIBULE.minX - HALF_THICKNESS;
 /** The post's paint on that wall stands just proud of the marble's back face. */
 const SHARED_FACE_X = hall.maxX - 0.012;
+/** Beams across X at these Z, between the rows of fluorescent fixtures. */
+const CEILING_BEAM_ZS = [7.4, 12.0, 17.4] as const;
+const BEAM_DEPTH = 0.28;
 
 /**
  * Walls of the militia post. Its east wall is the vestibule's west wall,
@@ -57,6 +60,24 @@ export function buildMiliciaShell(context: Station33BuildContext): void {
     addDado(context, wall);
   }
   addSharedWallFacing(context);
+  addCeilingBeams(context);
+}
+
+/** Cast-concrete beams across the room, clear of the fluorescent fixtures, over a plaster cornice. */
+function addCeilingBeams(context: Station33BuildContext): void {
+  const { batch, materials } = context;
+  const width = hall.maxX - hall.minX;
+  const x = (hall.minX + hall.maxX) / 2;
+  for (const z of CEILING_BEAM_ZS) {
+    batch.addBox(materials.serviceConcrete, x, ceilingHeight - BEAM_DEPTH / 2, z, width, BEAM_DEPTH, 0.3, 0, 0, 0, z);
+  }
+  const cornice = 0.12;
+  const y = ceilingHeight - cornice / 2;
+  batch.addBox(materials.stucco, x, y, hall.minZ + cornice / 2, width, cornice, cornice);
+  batch.addBox(materials.stucco, x, y, hall.maxZ - cornice / 2, width, cornice, cornice);
+  const length = hall.maxZ - hall.minZ;
+  batch.addBox(materials.stucco, hall.minX + cornice / 2, y, (hall.minZ + hall.maxZ) / 2, cornice, cornice, length);
+  batch.addBox(materials.stucco, SHARED_FACE_X - cornice / 2, y, (hall.minZ + hall.maxZ) / 2, cornice, cornice, length);
 }
 
 /** Wainscot and its dark stripe on every solid stretch of a wall's room side. */

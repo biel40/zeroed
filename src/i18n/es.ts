@@ -1,6 +1,13 @@
 import type { TranslationKey } from './en';
 
 export const es: Record<TranslationKey, string> = {
+  'prompt.codeChest': "BAÚL CERRADO\n{key} · Introducir código",
+  'chest.title': "Candado numérico",
+  'chest.code': "Código de cuatro cifras",
+  'chest.erase': "Borrar",
+  'chest.open': "Abrir",
+  'chest.close': "Volver",
+  'chest.incorrect': "Código incorrecto",
   'menu.tagline': 'LOS MUERTOS SE ACERCAN',
   'menu.zombies': 'ZOMBIS',
   'map.burnedMansion': 'BURNED MANSION',

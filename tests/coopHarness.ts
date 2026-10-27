@@ -31,6 +31,7 @@ export function installCanvasDocument(): () => void {
     createRadialGradient: () => ({ addColorStop: () => undefined }),
     beginPath: () => undefined, moveTo: () => undefined, lineTo: () => undefined, arc: () => undefined, arcTo: () => undefined,
     closePath: () => undefined, fill: () => undefined, stroke: () => undefined, clearRect: () => undefined,
+    rect: () => undefined, clip: () => undefined,
     save: () => undefined, restore: () => undefined, translate: () => undefined, rotate: () => undefined,
   };
   Object.defineProperty(globalThis, 'document', {

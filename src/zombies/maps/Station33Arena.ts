@@ -27,6 +27,7 @@ import type { Station33BuildContext } from './station33/Station33BuildContext';
 import { Station33Lighting } from './station33/Station33Lighting';
 import { station33PowerLeverLook, station33RingLockerLook, station33WeaponStationLook } from './station33/Station33Machines';
 import { WeaponStation } from './shared/WeaponStation';
+import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
 import { buildVestibule } from './station33/VestibuleBuilder';
@@ -47,6 +48,7 @@ import {
   STATION33_POWER_SWITCH,
   STATION33_RING_LOCKERS,
   STATION33_WEAPON_STATIONS,
+  STATION33_WEAPON_CHEST,
   STATION33_SPAWNS,
   STATION33_START_ZONE,
   STATION33_WALL_BUYS,
@@ -115,6 +117,7 @@ export class Station33Arena implements ZombieArena {
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly ringMachines: ReadonlyArray<ArenaRingMachine>;
   readonly weaponStations: ReadonlyArray<WeaponStation>;
+  readonly weaponPickups: ReadonlyArray<CodeWeaponChest>;
   readonly powerSwitch: PowerLever;
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
@@ -162,7 +165,8 @@ export class Station33Arena implements ZombieArena {
     buildConsigna(context);
     buildCocheras(context, this.lighting);
     buildSubestacion(context, this.lighting);
-    buildMilicia(context);
+    buildMilicia(context, this.lighting);
+    this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST)];
     buildDoorFrames(context);
     buildServicePassages(context, this.lighting, STATION33_BARRIERS);
     const ringLockerLook = station33RingLockerLook(context);
@@ -217,6 +221,7 @@ export class Station33Arena implements ZombieArena {
     for (const view of this.doorViews) view.update(dt);
     for (const locker of this.ringLockers) locker.update(dt);
     for (const station of this.weaponStations) station.update(dt);
+    for (const pickup of this.weaponPickups) pickup.update(dt);
     this.powerSwitch.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
     this.lighting.update(dt, observerPosition);
@@ -232,6 +237,7 @@ export class Station33Arena implements ZombieArena {
     this.powerSwitch.reset();
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
+    for (const pickup of this.weaponPickups) pickup.reset();
     this.introTime = null;
     this.ambientEvents.reset();
     this.lighting.reset();

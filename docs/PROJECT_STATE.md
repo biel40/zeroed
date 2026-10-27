@@ -27,7 +27,9 @@
   camaras, culata maciza con apoyacara y monopie plegado, cerrojo visible por la
   ventana, remaches de chapa estampada, nervios en la camisa, palanca del
   cargador y alza delantera abatida) y mira telescopica,
-  exclusivo de la Mystery Box en individual y cooperativo (7 balas y 40 de reserva).
+  disponible en la Mystery Box en individual y cooperativo (7 balas y 40 de reserva).
+  Station 33 tambien lo ofrece gratis una vez por partida en un baul con candado
+  numerico en el puesto de milicia; reiniciar cierra el baul y repone el arma.
   Se sobrecalienta y bloquea tras cuatro disparos rapidos, destroza a los zombis
   en pedazos, atraviesa hasta cinco zombis en linea y admite un MP3 propio (`barrett_shot.mp3`, aun no incluido).
 - ФАКЕЛ-33, lanzallamas experimental exclusivo de Station 33: se compra (3500)

@@ -1,6 +1,13 @@
 import type { TranslationKey } from './en';
 
 export const ca: Record<TranslationKey, string> = {
+  'prompt.codeChest': "BAGUL TANCAT\n{key} · Introdueix el codi",
+  'chest.title': "Cadenat numèric",
+  'chest.code': "Codi de quatre xifres",
+  'chest.erase': "Esborra",
+  'chest.open': "Obre",
+  'chest.close': "Torna",
+  'chest.incorrect': "Codi incorrecte",
   'menu.tagline': 'ELS MORTS S’ACOSTEN',
   'menu.zombies': 'ZOMBIS',
   'map.burnedMansion': 'BURNED MANSION',
