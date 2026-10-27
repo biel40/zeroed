@@ -186,7 +186,6 @@ export class CoopHostMode implements GameMode {
     };
     this.zombies.onZombieAttack = (zombie, target) => {
       this.send({ type: 'zombieAttack', zombieId: this.zombies.networkIdOf(zombie), target });
-      ctx.audio.playZombieAttack(this.world.spatialCueFor(voicePoint(zombie.position)), zombie.typeId === 'brute');
     };
     this.zombies.onZombieDamaged = (damage) => { this.players[this.shooter].totalDamage += damage; };
     this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(zombie, headshot, source);
@@ -716,8 +715,6 @@ export class CoopHostMode implements GameMode {
       for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(killer.kills);
     }
     if (headshot) killer.headshots++;
-    if (source === 'raygun') this.ctx.audio.playRayVaporize?.();
-    else if (source === 'barrett') this.ctx.audio.playZombieShatter();
     const rewardMultiplier = ZOMBIE_TYPE_CONFIGS[zombie.typeId].killRewardMultiplier;
     if (source === 'knife') killer.economy.awardKnifeKill(rewardMultiplier);
     else killer.economy.awardKill(headshot, rewardMultiplier);
@@ -758,7 +755,6 @@ export class CoopHostMode implements GameMode {
       return;
     }
     if (this.players.host.life.state === 'alive' && this.players.host.health.damage(damage)) {
-      this.ctx.audio.playPlayerHurt(attacker && this.world.spatialCueFor(voicePoint(attacker.position)));
       this.ctx.hud.flashDamage();
       if (this.players.host.health.isDead) this.players.host.life.down();
       this.sendMatchState();

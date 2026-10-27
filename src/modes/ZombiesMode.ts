@@ -200,10 +200,8 @@ export class ZombiesMode implements GameMode {
       );
     };
     this.zombies.onZombieDamaged = (damage) => { this.totalDamage += damage; };
-    this.zombies.onPlayerAttack = (damage, _target, attacker) => this.onPlayerHit(damage, voicePoint(attacker.position));
+    this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
     this.zombies.onZombieSpawned = (zombie) => ctx.audio.playZombieSpawn(this.spatialCueFor(voicePoint(zombie.position)));
-    this.zombies.onZombieAttack = (zombie) =>
-      ctx.audio.playZombieAttack(this.spatialCueFor(voicePoint(zombie.position)), zombie.typeId === 'brute');
     this.zombies.onBarrierImpact = (barrier) => ctx.audio.playBarrierBreak(
       this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
     );
@@ -1089,18 +1087,6 @@ export class ZombiesMode implements GameMode {
       this.headshots++;
     }
 
-    // A lethal headshot already has a strong dedicated impact. Layering the
-    // generic death growl at the same instant masks its short crack.
-    if (source === 'raygun') {
-      this.ctx.audio.playRayVaporize?.();
-    } else if (source === 'barrett') {
-      this.ctx.audio.playZombieShatter();
-    } else if (source === 'fakel') {
-      this.ctx.audio.playZombieIncinerate();
-    } else if (!headshot) {
-      this.ctx.audio.playZombieDeath();
-    }
-
     // Rewards are mutually exclusive: the risky knife finisher beats a
     // headshot, and neither stacks with the ordinary kill payout.
     if (source === 'knife') this.economy.awardKnifeKill(rewardMultiplier);
@@ -1172,10 +1158,9 @@ export class ZombiesMode implements GameMode {
     });
   }
 
-  private onPlayerHit(damage: number, from?: { readonly x: number; readonly y: number; readonly z: number }): void {
+  private onPlayerHit(damage: number): void {
     if (!this.runAcceptsInput()) return;
     if (!this.health.damage(damage)) return;
-    this.ctx.audio.playPlayerHurt(from && this.spatialCueFor(from));
     this.ctx.hud.flashDamage();
     // Trauma-based shake: offsets pile up and decay smoothly.
     this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);

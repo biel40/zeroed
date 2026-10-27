@@ -434,8 +434,6 @@ export class CoopGuestMode implements GameMode {
         else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
         break;
       case 'playerDamaged': {
-        const attacker = message.attackerId === undefined ? null : this.replica.zombieOf(message.attackerId);
-        this.ctx.audio.playPlayerHurt(attacker ? this.world.spatialCueFor(voicePoint(attacker.position)) : undefined);
         this.ctx.hud.flashDamage();
         break;
       }
@@ -488,16 +486,12 @@ export class CoopGuestMode implements GameMode {
   }
 
   private replicateAttack(zombieId: number, target: 'host' | 'guest'): void {
-    let attacker: Zombie | null = null;
     if (target === 'guest') {
       const position = this.ctx.player.rig.position;
-      attacker = this.replica.attack(zombieId, position.x, position.y, position.z);
+      this.replica.attack(zombieId, position.x, position.y, position.z);
     } else {
       const host = this.hostAvatar.latest;
-      if (host) attacker = this.replica.attack(zombieId, host.x, host.y, host.z);
-    }
-    if (attacker) {
-      this.ctx.audio.playZombieAttack(this.world.spatialCueFor(voicePoint(attacker.position)), attacker.typeId === 'brute');
+      if (host) this.replica.attack(zombieId, host.x, host.y, host.z);
     }
   }
 

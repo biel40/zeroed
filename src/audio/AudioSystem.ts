@@ -467,29 +467,6 @@ export class AudioSystem {
     }
   }
 
-  /**
-   * Burnt to death: the body goes up with a whoomp, an agonised howl breaks
-   * off, the fat sizzles and the fire pops and spits over it for a while.
-   */
-  public playZombieIncinerate(): void {
-    this.sweep(0, 'sine', 110, 40, 0.34, 0.32);
-    this.scrape(0, 600, 2400, 0.16, 0.3);
-    this.sweep(0.02, 'sawtooth', 460, 130, 0.13, 0.7);
-    this.sweep(0.05, 'square', 690, 210, 0.04, 0.55);
-    this.scrape(0.12, 6200, 2800, 0.1, 1.1);
-    for (let pop = 0; pop < 7; pop++) {
-      this.tick(0.2 + pop * 0.13 + Math.random() * 0.08, 1300 + Math.random() * 2600, 0.05 + Math.random() * 0.05, 3, 0.03);
-    }
-  }
-
-  /** Weapon blew a body apart: a wet low burst, tearing flesh and pieces slapping down. */
-  public playZombieShatter(): void {
-    this.sweep(0, 'sine', 120, 38, 0.5, 0.28);
-    this.scrape(0, 900, 260, 0.34, 0.32);
-    this.tick(0.01, 420, 0.4, 2, 0.16);
-    for (let i = 0; i < 4; i++) this.tick(0.32 + i * 0.09 + Math.random() * 0.05, 300 + Math.random() * 220, 0.16, 3, 0.07);
-  }
-
   /** Decaying room echo after a heavy report: sub boom, rumble and two early reflections. */
   private playShotTail(volume: number, tail: number): void {
     const audio: AudioContextParts | null = this.context();
@@ -809,33 +786,6 @@ export class AudioSystem {
     this.tick(0.05, 900, 0.16, 3, 0.08);
   }
 
-  /** Ray Gun vaporization: ascending harmonic plasma sizzle as a zombie dissolves into ash. */
-  public playRayVaporize(): void {
-    const audio: AudioContextParts | null = this.context();
-    if (!audio) return;
-    const { ctx, master, noise } = audio;
-    const t: number = ctx.currentTime;
-
-    const sizzle: AudioBufferSourceNode = ctx.createBufferSource();
-    sizzle.buffer = noise;
-    const filter: BiquadFilterNode = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.Q.value = 3.2;
-    filter.frequency.setValueAtTime(950, t);
-    filter.frequency.exponentialRampToValueAtTime(4200, t + 0.68);
-    const gain: GainNode = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.28, t + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
-    sizzle.connect(filter);
-    filter.connect(gain);
-    gain.connect(master);
-    sizzle.start(t, Math.random() * 0.4, 0.78);
-
-    this.sweep(0, 'sine', 240, 1180, 0.22, 0.55, t);
-    this.sweep(0.04, 'triangle', 520, 2100, 0.14, 0.48, t);
-  }
-
   /**
    * Tesla shot: a sharp crack (high filtered noise) over a rising mains-hum
    * sweep — a capacitor bank discharging, not a powder report.
@@ -1116,12 +1066,6 @@ export class AudioSystem {
     this.ringJingle = null;
   }
 
-  /** Low guttural drop when a zombie dies. */
-  public playZombieDeath(): void {
-    this.sweep(0, 'sawtooth', 190, 52, 0.3, 0.34);
-    this.tick(0.03, 170, 0.3);
-  }
-
   /** Quiet stereo cue emitted from a soul lamp when one soul reaches it. */
   public playSoulAbsorb(cue: SpatialCue): void {
     const audio = this.context();
@@ -1282,7 +1226,7 @@ export class AudioSystem {
 
   /**
    * Rising earthy groan from the point where a zombie enters the map: an
-   * upward glide reads as "arriving", the opposite of the death drop.
+   * upward glide reads as "arriving".
    */
   public playZombieSpawn(cue: SpatialCue): void {
     const audio = this.context();
@@ -1292,55 +1236,6 @@ export class AudioSystem {
     this.tick(0, 120, 0.3, 0.8, 0.32, output);
     this.sweep(0.08, 'sawtooth', 58, 96, 0.2, 0.7, t + 0.08, output);
     this.sweep(0.14, 'triangle', 90, 150, 0.12, 0.55, t + 0.14, output);
-  }
-
-  /** Wind-up cue from the attacker: Brutus roars, every other zombie snarls. */
-  public playZombieAttack(cue: SpatialCue, brute: boolean): void {
-    if (brute) this.playBruteRoar(cue);
-    else this.playZombieAttackTell(cue);
-  }
-
-  /**
-   * Snarl at the start of a zombie wind-up, from the attacker's position:
-   * it lands ~0.5 s before the hit, enough to turn or step out of reach.
-   */
-  private playZombieAttackTell(cue: SpatialCue): void {
-    const audio = this.context();
-    if (!audio) return;
-    const output = this.spatialBus(audio, cue);
-    const t = audio.ctx.currentTime;
-    this.sweep(0, 'sawtooth', 210, 120, 0.26, 0.24, t, output);
-    this.sweep(0.02, 'square', 140, 90, 0.08, 0.2, t + 0.02, output);
-    this.tick(0, 1100, 0.16, 1.2, 0.12, output);
-  }
-
-  /** Brutus attack tell: a layered sub-bass roar distinct from common zombie vocals. */
-  public playBruteRoar(cue: SpatialCue): void {
-    const audio: AudioContextParts | null = this.context();
-    if (!audio) return;
-    // The roar is a lethal warning: never let distance bury it.
-    const output = this.spatialBus(audio, cue, 0.6);
-    const t: number = audio.ctx.currentTime;
-    this.sweep(0, 'sawtooth', 92, 38, 0.48, 0.62, t, output);
-    this.sweep(0.035, 'triangle', 138, 54, 0.3, 0.48, t, output);
-    this.tick(0.09, 78, 0.34, 0.7, 0.22, output);
-  }
-
-  /**
-   * Heavy thump when the player takes a hit, centered. With the attacker's
-   * cue, a claw rasp also comes from the side the hit came from.
-   */
-  public playPlayerHurt(from?: SpatialCue): void {
-    const audio: AudioContextParts | null = this.context();
-    if (!audio) return;
-    const t: number = audio.ctx.currentTime;
-    this.sweep(0, 'triangle', 130, 65, 0.55, 0.18, t);
-    this.tick(0, 380, 0.35);
-    if (!from) return;
-    // Point-blank by definition: keep the direction, not the distance.
-    const output = this.spatialBus(audio, { ...from, attenuation: 1 });
-    this.tick(0, 1600, 0.3, 1.5, 0.08, output);
-    this.tick(0.03, 620, 0.2, 1.1, 0.1, output);
   }
 
   /**

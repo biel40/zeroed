@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { LANGUAGES, setLanguage, t } from '../src/i18n/i18n';
+import { isTranslationKey, LANGUAGES, setLanguage, t } from '../src/i18n/i18n';
 import { resetSettings, updateSettings } from '../src/core/PlayerSettings';
 import { actionKey, doorPrompt, wallBuyPrompt } from '../src/ui/InteractionPrompts';
 import { bindInteractionPromptVisibility, interactionPromptContent } from '../src/ui/InteractionPromptView';
 import { PointDoor } from '../src/zombies/doors/PointDoor';
+import { STATION33_DOORS } from '../src/zombies/maps/Station33Config';
 
 describe('interaction prompt presentation', () => {
   afterEach(() => { setLanguage('en'); resetSettings(); });
@@ -57,5 +58,17 @@ describe('interaction prompt presentation', () => {
     const door = new PointDoor('bunker', 0, 0, 0, 1, { cost: 9999, prompt: 'door.openBunker' });
     expect(interactionPromptContent(doorPrompt(door, false)).action?.key).toBe('E');
     expect(interactionPromptContent(doorPrompt(door, true)).action?.key).toBe('USE');
+  });
+
+  it.each(LANGUAGES)('shows translated Station 33 destinations in %s', (language) => {
+    setLanguage(language);
+    for (const config of STATION33_DOORS) {
+      const nameKey = `door.${config.id}`;
+      expect(isTranslationKey(nameKey)).toBe(true);
+      if (!isTranslationKey(nameKey)) continue;
+      const door = new PointDoor(config.id, config.x, config.z, config.outwardX, config.outwardZ, { cost: config.cost });
+      expect(doorPrompt(door, false)).toContain(t(nameKey));
+      expect(doorPrompt(door, false)).toContain(`${config.cost} PTS`);
+    }
   });
 });

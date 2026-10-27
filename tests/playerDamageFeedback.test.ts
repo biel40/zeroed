@@ -7,7 +7,6 @@ interface DamageFeedbackInternals {
   ctx: {
     player: { camera: THREE.PerspectiveCamera };
     hud: { flashDamage: () => void };
-    audio: { playPlayerHurt: () => void };
   };
   trauma: number;
   onPlayerHit(damage: number): void;
@@ -19,8 +18,7 @@ describe('player damage feedback', () => {
     const mode = new ZombiesMode() as unknown as DamageFeedbackInternals;
     const camera = new THREE.PerspectiveCamera();
     const flashDamage = vi.fn();
-    const playPlayerHurt = vi.fn();
-    mode.ctx = { player: { camera }, hud: { flashDamage }, audio: { playPlayerHurt } };
+    mode.ctx = { player: { camera }, hud: { flashDamage } };
 
     mode.onPlayerHit(25);
     const traumaBeforeUpdate = mode.trauma;
@@ -28,25 +26,10 @@ describe('player damage feedback', () => {
 
     const angularImpulse = Math.hypot(camera.rotation.x, camera.rotation.y, camera.rotation.z);
     expect(flashDamage).toHaveBeenCalledOnce();
-    expect(playPlayerHurt).toHaveBeenCalledOnce();
     expect(traumaBeforeUpdate).toBeGreaterThan(0);
     expect(mode.trauma).toBeLessThan(traumaBeforeUpdate);
     expect(angularImpulse).toBeGreaterThan(0.008);
     expect(angularImpulse).toBeLessThan(0.03);
-  });
-
-  it('plays the hurt cue from the side the attacker struck from', () => {
-    const mode = new ZombiesMode() as unknown as DamageFeedbackInternals;
-    const camera = new THREE.PerspectiveCamera();
-    camera.position.set(0, 1.7, 0);
-    camera.updateMatrixWorld(true);
-    const playPlayerHurt = vi.fn();
-    mode.ctx = { player: { camera }, hud: { flashDamage: vi.fn() }, audio: { playPlayerHurt } };
-
-    (mode as unknown as { onPlayerHit(damage: number, from: { x: number; y: number; z: number }): void })
-      .onPlayerHit(10, { x: 1, y: 1.7, z: 0 });
-
-    expect(playPlayerHurt.mock.calls[0][0].pan).toBeCloseTo(1);
   });
 
   it('draws each ambient moan from a living zombie and stays silent with none', () => {

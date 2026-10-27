@@ -180,9 +180,8 @@ guardandose automaticamente al ajustarlos.
   alcance (mismo predicado exacto, coste proporcional al area ocupada).
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
   fallback sintetizado si falta el asset.
-- Audio direccional (`SpatialCue`): aparicion, inicio del ataque (gruñido o
-  rugido del Brute), tablas arrancadas, gemidos ambientales (siempre de un
-  zombie vivo) y el golpe recibido suenan desde su origen. Las fuentes a la
+- Audio direccional (`SpatialCue`): aparicion, tablas arrancadas y gemidos
+  ambientales (siempre de un zombie vivo) suenan desde su origen. Las fuentes a la
   espalda o en otra planta pasan por un paso bajo que las apaga, tambien en
   los pasos, para distinguir delante/detras y arriba/abajo. En cooperativo el
   invitado reproduce las mismas señales a partir de los eventos del anfitrion.
