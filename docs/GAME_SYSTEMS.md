@@ -247,7 +247,12 @@ guardandose automaticamente al ajustarlos.
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
   puerta de servicio y dos rejillas), la PPSh-41 (1250 / 625) en pared
-  y la escalera mecanica sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
+  y la escalera mecanica sellada. Easter egg del vestibulo: al acercarse a
+  la ventanilla de billetes, con una probabilidad baja por acercamiento (una
+  vez por partida), una ventana se abre de golpe y sale un zombi de la ronda
+  que se puede matar; consume un spawn pendiente, asi que no cambia el total
+  de la ronda (`shared/AmbushTrigger`, `ZombieArena.onAmbush`).
+  La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
   el muro este: dos entradas mas, que solo generan zombis con la puerta
   abierta, la MP5 (1000 / 500) en
   pared, la Mystery Box y la taquilla del

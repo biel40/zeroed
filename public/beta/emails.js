@@ -23,4 +23,5 @@ export const DEVELOPER_EMAILS = [
   'giani.1997@gmail.com',
   'icabe.96@gmail.com',
   'ivancabe.96@gmail.com',
+  'tolittoginard11@gmail.com',
 ];
