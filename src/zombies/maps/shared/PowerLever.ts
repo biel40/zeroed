@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { makeSoftDotTexture } from '../../doors/BuyableDoorVisual';
-import { placement } from '../shared/StaticMeshBatch';
-import { POWER_LEVER } from '../Station33Config';
 import type { ArenaPowerSwitch } from '../ZombieArena';
 import { cobwebGeometry } from './Cobwebs';
-import type { Station33BuildContext } from './Station33BuildContext';
+import type { MapBuildKit } from './MapBuildKit';
+import { addSolidProxy } from './SolidProxy';
+import { placement } from './StaticMeshBatch';
 
 /** Mounting plate on the wall: width, height and centre height. */
 const PLATE = { width: 1.1, height: 1.6, centerY: 1.6 } as const;
@@ -19,18 +19,48 @@ const THROW_DURATION = 0.55;
 /** Share of the throw where the blades tear through the web across the jaws. */
 const WEB_TEAR_AT = 0.7;
 const SPARK_DURATION = 0.4;
+/** Where the player stands to use it and how deep its proxy stands out of the wall. */
+const USE_POINT_OUT = 0.35;
+const PROXY_DEPTH = 0.3;
+
+/** Where a map mounts its power switch: on a wall face at (x, z), facing into the room. */
+export interface PowerLeverPlacement {
+  readonly id: string;
+  readonly x: number;
+  readonly z: number;
+  readonly facingX: number;
+  readonly facingZ: number;
+}
+
+/** Materials of the switch, named as the maps' material sets name them. */
+export interface PowerLeverMaterials {
+  readonly greySteel: THREE.Material;
+  readonly hazardPaint: THREE.Material;
+  readonly darkGranite: THREE.Material;
+  readonly bronze: THREE.Material;
+  readonly rubber: THREE.Material;
+  readonly varnishedWood: THREE.Material;
+  readonly cobweb: THREE.Material;
+}
+
+/** A map's switch look: its materials and, optionally, the danger plate over it. */
+export interface PowerLeverLook {
+  readonly materials: PowerLeverMaterials;
+  readonly plate?: { readonly geometry: THREE.BufferGeometry; readonly material: THREE.Material };
+}
 
 /**
- * The station's main switch: a three-pole knife switch on a slate board,
- * rusted, hung with cobwebs and framed in hazard stripes under its danger
- * plate. Throwing it swings the blades up into the copper jaws (tearing the
- * web strung across them) and, as the contacts close in a spark, calls
- * `onThrown`, which powers the station. Static parts go to the shared
- * batch; the blades, the torn web and the spark animate here.
+ * Main power switch for any map: a three-pole knife switch on a slate
+ * board, rusted, hung with cobwebs and framed in hazard stripes under its
+ * danger plate. Throwing it swings the blades up into the copper jaws
+ * (tearing the web strung across them) and, as the contacts close in a
+ * spark, calls `onThrown`, which powers the map (`MapPower`). Static parts
+ * go to the shared batch; the blades, the torn web and the spark animate
+ * here. Stands on the ground floor (floor 0, y 0).
  */
 export class PowerLever implements ArenaPowerSwitch {
-  readonly id = 'station33-main-switch';
-  readonly position = { x: POWER_LEVER.x, y: 1.5, z: POWER_LEVER.z + 0.35 } as const;
+  readonly id: string;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly floor = 0;
   readonly useRange = 2.0;
   readonly lookDotMin = 0.5;
@@ -44,15 +74,23 @@ export class PowerLever implements ArenaPowerSwitch {
   private throwElapsed: number | null = null;
   private sparkRemaining = 0;
 
-  constructor(context: Station33BuildContext, private readonly onThrown: () => void) {
+  constructor(
+    kit: MapBuildKit,
+    config: PowerLeverPlacement,
+    look: PowerLeverLook,
+    private readonly onThrown: () => void,
+  ) {
+    this.id = config.id;
+    this.position = { x: config.x + config.facingX * USE_POINT_OUT, y: 1.5, z: config.z + config.facingZ * USE_POINT_OUT };
     this.group.name = 'power-lever';
-    this.group.position.set(POWER_LEVER.x, 0, POWER_LEVER.z);
-    context.group.add(this.group);
-    this.buildMount(context);
-    this.buildBlades(context);
-    this.buildTornWebs(context);
+    this.group.position.set(config.x, 0, config.z);
+    this.group.rotation.y = Math.atan2(config.facingX, config.facingZ);
+    kit.group.add(this.group);
+    this.buildMount(kit, config, look);
+    this.buildBlades(look.materials);
+    this.buildTornWebs(look.materials.cobweb);
     this.spark = new THREE.SpriteMaterial({
-      name: 'station33_switch_spark', map: makeSoftDotTexture(), color: 0xcfe6ff, transparent: true,
+      name: 'power_lever_spark', map: makeSoftDotTexture(), color: 0xcfe6ff, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
     });
     const spark = new THREE.Sprite(this.spark);
@@ -97,14 +135,14 @@ export class PowerLever implements ArenaPowerSwitch {
     this.tornWebs.visible = true;
   }
 
-  /** Painted plate, hazard frame, slate board, copper jaws and hinge clips, feed cables, plate and webs. */
-  private buildMount(context: Station33BuildContext): void {
-    const { batch, materials, signage, structure } = context;
-    const world = placement(POWER_LEVER.x, 0, POWER_LEVER.z).clone();
+  /** Painted plate, hazard frame, slate board, copper jaws and hinge clips, feed cables, danger plate and webs. */
+  private buildMount(kit: MapBuildKit, config: PowerLeverPlacement, look: PowerLeverLook): void {
+    const { materials } = look;
+    const world = placement(config.x, 0, config.z, 0, this.group.rotation.y, 0).clone();
     const local = new THREE.Matrix4();
     const part = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number): void => {
       local.makeTranslation(x, y, z);
-      batch.add(geometry, material, world.clone().multiply(local));
+      kit.batch.add(geometry, material, world.clone().multiply(local));
     };
     const box = (material: THREE.Material, x: number, y: number, z: number, width: number, height: number, depth: number): void =>
       part(new THREE.BoxGeometry(width, height, depth), material, x, y, z);
@@ -119,23 +157,27 @@ export class PowerLever implements ArenaPowerSwitch {
       const feed = new THREE.CylinderGeometry(0.022, 0.022, 0.5, 6);
       part(feed, materials.rubber, x, HINGE.y + BLADE_LENGTH + 0.32, 0.13);
     }
-    part(signage.signGeometry('main-switch', 0.7, 0.35), signage.material, 0, centerY + height / 2 + 0.36, 0.012);
+    if (look.plate) part(look.plate.geometry, look.plate.material, 0, centerY + height / 2 + 0.36, 0.012);
     // Old webs in the frame's corners, grey with dust.
     part(cobwebGeometry(0.42, 0.42, 'top-left'), materials.cobweb, -width / 2 - 0.08, centerY + height / 2 + 0.08, 0.08);
     part(cobwebGeometry(0.34, 0.5, 'bottom-right'), materials.cobweb, width / 2 + 0.08, centerY - height / 2 - 0.08, 0.08);
     part(cobwebGeometry(0.3, 0.3, 'top-right'), materials.cobweb, width / 2 + 0.08, centerY + height / 2 + 0.08, 0.08);
-    const halfWidth = width / 2 + 0.1;
-    structure.addBox(POWER_LEVER.x, (centerY + height / 2) / 2 + 0.05, POWER_LEVER.z + 0.15, halfWidth * 2, centerY + height / 2 + 0.1, 0.3, materials.collider, {
-      name: 'power-lever', surface: 'metal', mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true,
-    });
+    // One axis-aligned proxy over the board, as wide as its frame and standing out of the wall.
+    const halfAlong = width / 2 + 0.1;
+    const top = centerY + height / 2 + 0.1;
+    const alongX = Math.abs(config.facingZ) > Math.abs(config.facingX);
+    const centerX = config.x + config.facingX * PROXY_DEPTH / 2;
+    const centerZ = config.z + config.facingZ * PROXY_DEPTH / 2;
+    const halfX = alongX ? halfAlong : PROXY_DEPTH / 2;
+    const halfZ = alongX ? PROXY_DEPTH / 2 : halfAlong;
+    addSolidProxy(kit, 'power-lever', { x: centerX - halfX, y: 0, z: centerZ - halfZ }, { x: centerX + halfX, y: top, z: centerZ + halfZ }, 'metal');
   }
 
   /**
    * One web strung across the copper jaws and one from each outer hanging
    * blade back to the slate: all in the blades' path, gone once thrown.
    */
-  private buildTornWebs(context: Station33BuildContext): void {
-    const { cobweb } = context.materials;
+  private buildTornWebs(cobweb: THREE.Material): void {
     const jaws = new THREE.Mesh(cobwebGeometry(0.62, 0.55, 'top-left').translate(-0.36, 2.34, HINGE.out + 0.05), cobweb);
     this.tornWebs.add(jaws);
     for (const x of [BLADE_XS[0] - 0.01, BLADE_XS[2] + 0.01]) {
@@ -148,8 +190,7 @@ export class PowerLever implements ArenaPowerSwitch {
   }
 
   /** Three blades on their hinge, the insulating crossbar and the handle with its worn wooden grip. */
-  private buildBlades(context: Station33BuildContext): void {
-    const { materials } = context;
+  private buildBlades(materials: PowerLeverMaterials): void {
     this.blades.position.set(0, HINGE.y, HINGE.out);
     this.blades.name = 'power-lever-blades';
     for (const x of BLADE_XS) {

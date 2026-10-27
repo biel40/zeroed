@@ -15,7 +15,8 @@ import { ReviveGesture } from '../../rendering/ReviveGesture';
 import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { Weapon } from '../../weapons/Weapon';
-import { KNIFE_RANGE, Knife } from '../../weapons/Knife';
+import { Knife } from '../../weapons/Knife';
+import { KnifeCombat } from '../../weapons/KnifeCombat';
 import type { MeleeArmDriver } from '../../weapons/ViewArms';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../../zombies/MysteryBox';
 import { MysteryBoxView } from '../../zombies/MysteryBoxView';
@@ -76,7 +77,7 @@ export class CoopGuestMode implements GameMode {
   private boxWait = 0;
   private revivePending = 0;
   private readonly knife = new Knife();
-  private readonly knifeRaycaster = new THREE.Raycaster();
+  private readonly knifeCombat = new KnifeCombat();
   private readonly knifeOrigin = new THREE.Vector3();
   private readonly knifeDirection = new THREE.Vector3();
 
@@ -91,6 +92,8 @@ export class CoopGuestMode implements GameMode {
     this.world.placeLocalPlayer('guest');
     const castShadows = !ctx.profile.useReducedEffects;
     this.replica = new ZombieReplica(ctx.assets.getZombieModels(), castShadows, ctx.hitColliders);
+    this.replica.setWallColliders(this.world.arena.wallColliders);
+    this.world.onTopologyChanged = () => this.replica.setWallColliders(this.world.arena.wallColliders);
     ctx.player.setBodyColliders(this.replica.actives);
     ctx.scene.add(this.replica.group);
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
@@ -540,11 +543,11 @@ export class CoopGuestMode implements GameMode {
     this.replica.group.updateMatrixWorld(true);
     camera.getWorldPosition(this.knifeOrigin);
     camera.getWorldDirection(this.knifeDirection);
-    this.knifeRaycaster.set(this.knifeOrigin, this.knifeDirection);
-    this.knifeRaycaster.near = 0;
-    this.knifeRaycaster.far = KNIFE_RANGE;
-    const impact = this.knifeRaycaster.intersectObjects(this.ctx.hitColliders, false)[0];
-    const zombie = impact?.object.userData.zombie as Zombie | undefined;
+    const impact = this.knifeCombat.findImpact(
+      this.knifeOrigin, this.knifeDirection, this.ctx.player.floor, this.ctx.hitColliders,
+    );
+    if (!impact) return;
+    const zombie = impact.object.userData.zombie as Zombie | undefined;
     const zombieId = zombie ? this.replica.networkIdOf(zombie) : null;
     if (!zombie?.isAlive || zombie.floor !== this.ctx.player.floor || zombieId === null) return;
     this.ctx.stats.registerHit(impact.distance);

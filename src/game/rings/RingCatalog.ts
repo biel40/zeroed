@@ -5,7 +5,7 @@ import type { TranslationKey } from '../../i18n/i18n';
 export const RING_FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const;
 export type RingFinger = (typeof RING_FINGERS)[number];
 
-export type RingId = 'resurrection' | 'sleightOfHand';
+export type RingId = 'resurrection' | 'sleightOfHand' | 'armor';
 
 /**
  * What a ring does, as data. Each kind has one hook in the mode that reads
@@ -30,6 +30,12 @@ export type RingEffect =
     readonly kind: 'reloadSpeed';
     /** Multiplier on reload durations (0.5 = twice as fast). */
     readonly reloadTimeScale: number;
+  }
+  | {
+    /** Passive while worn: the player's maximum health is multiplied. */
+    readonly kind: 'maxHealth';
+    /** Multiplier on max HP (2 = twice the health). */
+    readonly maxHpScale: number;
   };
 
 export interface RingDefinition {
@@ -45,7 +51,7 @@ export interface RingDefinition {
    */
   readonly prices: readonly number[];
   readonly chargesPerPurchase: number;
-  /** Enamel glow of the ring, a cold accent of the palette (gold stays premium). */
+  /** Enamel glow of the ring: a cold accent of the palette, Armour's red aside (gold stays premium). */
   readonly glowColor: number;
   /** Tune its machine plays around it, like a perk jingle. */
   readonly jingle: RingJingleId;
@@ -80,5 +86,18 @@ export const RING_DEFINITIONS: Readonly<Record<RingId, RingDefinition>> = {
     glowColor: 0x4fe08a,
     jingle: 'conjurer',
     effect: { kind: 'reloadSpeed', reloadTimeScale: 0.5 },
+  },
+  armor: {
+    id: 'armor',
+    finger: 'middle',
+    nameKey: 'ring.armor',
+    descriptionKey: 'ring.armor.description',
+    // Passive and bought once a run, at the price of a health perk machine.
+    prices: [2500],
+    chargesPerPurchase: 1,
+    // Red by the user's choice: the one warm ring on the hand.
+    glowColor: 0xe0283a,
+    jingle: 'march',
+    effect: { kind: 'maxHealth', maxHpScale: 2 },
   },
 };

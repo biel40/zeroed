@@ -12,7 +12,8 @@ maquina del mapa, se ve en la mano en primera persona y el HUD solo apoya.
 Referencia completa: Resurreccion. Archivos:
 - `src/game/rings/RingCatalog.ts` y `PlayerRings.ts`;
 - `src/modes/ZombiesRings.ts`;
-- `src/zombies/maps/station33/RingLocker.ts`;
+- `src/weapons/RingDonning.ts` y `HandRings.ts` (las manos se lo ponen al comprarlo);
+- `src/zombies/maps/shared/RingLocker.ts` y `LockerBank.ts` (la maquina, comun a todos los mapas);
 - los tests `playerRings`, `resurrectionRing` y `ringJingle`.
 
 Lee "Anillos" en `docs/GAME_SYSTEMS.md` y `docs/STATION_33.md`.
@@ -65,7 +66,14 @@ Sin cambios, porque se derivan del catalogo:
   - Una maquina es una `ArenaRingMachine`: el mapa solo la presenta con
     `setDisplay('stocked' | 'empty' | 'recharge')` y el modo vende.
   - Un mapa sin `ringMachines` no vende anillos.
-  - En Station 33 se reutiliza `RingLocker`, que ya toma el color de `glowColor`.
+  - Cualquier mapa reutiliza el `RingLocker` compartido, que ya toma el color
+    de `glowColor`: una entrada de colocacion (`RingLockerPlacement`) en el
+    config del mapa, un hueco en un banco (`addLockerBank` con
+    `ringLockersOn`) y el look del mapa (`RingLockerLook`; en Station 33,
+    `station33/Station33Machines.ts`). Si necesita electricidad, el mapa le
+    pasa su `MapPower` y su `PowerLever`. No escribas una maquina por mapa.
+  - La animacion de ponerselo (`RingDonning`) es comun: no hay que tocarla
+    para un anillo nuevo.
   - Coloca la taquilla en un banco libre, lejos de entradas, puertas y de la Mystery Box.
 - **Solo individual:** el cooperativo no tiene anillos. No los anadas ahi sin
   que el usuario lo pida: haria falta replicarlos en `Protocol.ts` y validarlos

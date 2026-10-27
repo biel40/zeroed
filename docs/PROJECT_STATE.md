@@ -13,14 +13,30 @@
   compartido desktop/tactil. No hay pagos: premium solo es presentacion.
 - Armas declarativas, balistica segmentada, energia, headshots, recargas,
   economia, rondas, Mystery Box, wall buys, barreras, puertas y pickups.
+- Consola de desarrollador en individual: activar `MOTDRULES` y abrir con F2.
+  Permite equipar armas, conceder anillos, reponer municion, multiplicar dano
+  y desactivar invencibilidad para pruebas. Pausa al escribir y reinicia sus
+  ajustes con la partida; `help` muestra los comandos.
+- Inspeccion de arma con F (solo escritorio): giro de flancos y, en fusiles y
+  subfusiles de cargador de caja o tambor y en la M1911, comprobacion del cargador
+  con sus balas restantes. Cerrojo, cinta y armas de energia solo giran.
 - PPSh-41 con tambor de 71 balas, disponible en la Mystery Box y en la pared
   del vestibulo de Station 33 en el lugar de la Vector; la Vector sigue en la caja.
+- Barrett .50 semiautomatico con modelo procedural propio estilo M82A1 (cajon de
+  techo plano con carril completo, guardamanos perforado, freno en flecha de dos
+  camaras, culata maciza con apoyacara y monopie plegado) y mira telescopica,
+  exclusivo de la Mystery Box en individual y cooperativo (7 balas y 40 de reserva).
+  Se sobrecalienta y bloquea tras cuatro disparos rapidos, destroza a los zombis
+  en pedazos, atraviesa hasta cinco zombis en linea y admite un MP3 propio (`barrett_shot.mp3`, aun no incluido).
 - Anillos (perks) en individual: el de Resurreccion se compra en la consigna
   de Station 33, se ve en el anular, salva una muerte y se recarga. El de
   Prestidigitacion (menique, recargas al doble de velocidad) esta en las
   cocheras pero exige electricidad: el interruptor general de la sala de
   maquinas la enciende, y un rayo de la ZEUS-77 contra la taquilla la
-  alimenta 60 s.
+  alimenta 60 s. El de Armadura (corazon, rojo, vida maxima doble, 2500)
+  tambien exige electricidad y esta en el puesto de milicia, tercera salida
+  del vestibulo (puerta de 3000), junto a la M4A1 en pared. Al comprar un
+  anillo, las manos se lo ponen con una animacion.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
   melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria. En
   Station 33 los walkers visten uniformes sovieticos (guerra y guerra fria) o

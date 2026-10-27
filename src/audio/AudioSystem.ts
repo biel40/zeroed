@@ -199,7 +199,7 @@ export class AudioSystem {
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private dryFireBuffer: AudioBuffer | null = null;
   private doorPurchaseBuffer: AudioBuffer | null = null;
-  private readonly ambientSamples = new Map<string, AudioBuffer | null>();
+  private readonly optionalSamples = new Map<string, AudioBuffer | null>();
   private ringJingle: RingJingle | null = null;
   /** Rendered procedural loops and decoded MP3s per tune (a requested MP3 stays null until it decodes). */
   private readonly ringJingleLoops = new Map<RingJingleId, AudioBuffer>();
@@ -278,6 +278,11 @@ export class AudioSystem {
     }
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
+    const sample = config.sampleFile ? this.optionalSample(config.sampleFile) : null;
+    if (sample) {
+      this.playSample(audio, sample, config.volume);
+      return;
+    }
     const { ctx, master, noise } = audio;
     const t: number = ctx.currentTime;
     const duration: number = config.duration;
@@ -318,6 +323,29 @@ export class AudioSystem {
       this.metalClang(0.038, 1250, config.mechanism, 0.05);
       this.tick(0.052, 430, config.mechanism * 0.8, 3, 0.06);
     }
+  }
+
+  /** Starts decoding a weapon's optional shot MP3 so the first trigger pull already uses it. */
+  public preloadShotSample(config: WeaponAudioConfig): void {
+    if (config.sampleFile) this.optionalSample(config.sampleFile);
+  }
+
+  /**
+   * Redlined barrel: steam hissing off the hot steel and a dull tick of the
+   * locked trigger. Plays when the lockout starts and on each blocked pull.
+   */
+  public playBarrelOverheat(): void {
+    this.scrape(0, 5200, 2600, 0.16, 0.55);
+    this.tick(0, 2200, 0.14);
+    this.metalClang(0.04, 3100, 0.06, 0.18);
+  }
+
+  /** Weapon blew a body apart: a wet low burst, tearing flesh and pieces slapping down. */
+  public playZombieShatter(): void {
+    this.sweep(0, 'sine', 120, 38, 0.5, 0.28);
+    this.scrape(0, 900, 260, 0.34, 0.32);
+    this.tick(0.01, 420, 0.4, 2, 0.16);
+    for (let i = 0; i < 4; i++) this.tick(0.32 + i * 0.09 + Math.random() * 0.05, 300 + Math.random() * 220, 0.16, 3, 0.07);
   }
 
   /** Decaying room echo after a heavy report: sub boom, rumble and two early reflections. */
@@ -1219,7 +1247,7 @@ export class AudioSystem {
     const audio = this.context();
     if (!audio) return;
     const output = this.spatialBus(audio, spatial, AMBIENT_CUE_MIN_ATTENUATION);
-    const sample = cue.sampleFile ? this.ambientSample(cue.sampleFile) : null;
+    const sample = cue.sampleFile ? this.optionalSample(cue.sampleFile) : null;
     if (sample) {
       const source = audio.ctx.createBufferSource();
       source.buffer = sample;
@@ -1233,14 +1261,14 @@ export class AudioSystem {
     else this.playPowerDip(audio, output, t);
   }
 
-  /** Optional ambience files load on first use; null until (or unless) they decode. */
-  private ambientSample(file: string): AudioBuffer | null {
-    if (!this.ambientSamples.has(file)) {
-      this.ambientSamples.set(file, null);
+  /** Optional ambience and weapon files load on first use; null until (or unless) they decode. */
+  private optionalSample(file: string): AudioBuffer | null {
+    if (!this.optionalSamples.has(file)) {
+      this.optionalSamples.set(file, null);
       void this.loadSample(`${import.meta.env.BASE_URL}assets/audio/${file}`)
-        .then((buffer) => this.ambientSamples.set(file, buffer));
+        .then((buffer) => this.optionalSamples.set(file, buffer));
     }
-    return this.ambientSamples.get(file) ?? null;
+    return this.optionalSamples.get(file) ?? null;
   }
 
   /** Dead public-address horn: static, a warped two-tone chime and a garbled voice. */

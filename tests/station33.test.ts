@@ -19,6 +19,7 @@ import {
   COCHERAS_TRACKS,
   COCHERAS_TRAIN_CARS,
   ESCALATOR_PORTAL,
+  MILICIA,
   SERVICE_PASSAGE,
   STATION33_BARRIERS,
   STATION33_DOORS,
@@ -44,7 +45,7 @@ import { installCanvasDocument, makeContext, TEST_PROFILE } from './coopHarness'
 
 const DT = 1 / 60;
 const ZOMBIE_BAND = { bottom: 0.05, top: 1.8 } as const;
-const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall] as const;
+const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall, MILICIA.hall] as const;
 
 let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
@@ -115,6 +116,7 @@ const DOORS_TO: Readonly<Record<Station33ZoneId, ReadonlyArray<Station33ZoneId>>
   consigna: ['consigna'],
   cocheras: ['cocheras'],
   subestacion: ['cocheras', 'subestacion'],
+  milicia: ['milicia'],
 };
 
 function openWayTo(arena: ZombieArena, zone: Station33ZoneId): void {
@@ -191,7 +193,7 @@ describe('Station 33 layout', () => {
   it('starts with the vestibule alone: both doors locked and the other entrances dormant', () => {
     const arena: ZombieArena = makeArena();
     expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
-      ['to-consigna', 750, true], ['to-cocheras', 1250, true], ['to-subestacion', 1500, true],
+      ['to-consigna', 750, true], ['to-cocheras', 1250, true], ['to-subestacion', 1500, true], ['to-milicia', 3000, true],
     ]);
     expect(arena.activateDoor('escalator')).toBe(false);
     expect(arena.completionInteraction).toBeUndefined();
@@ -211,6 +213,7 @@ describe('Station 33 layout', () => {
     const arena = makeArena();
     openDoorTo(arena, 'consigna');
     openDoorTo(arena, 'cocheras');
+    openDoorTo(arena, 'milicia');
     const solids = solidBoxes(arena);
     for (const spawn of Object.values(STATION33_SPAWNS).flat()) {
       expect(insideRoom(spawn.x, spawn.z), `spawn ${spawn.barrierId}`).toBe(false);
@@ -278,7 +281,7 @@ describe('Station 33 layout', () => {
     openDoorTo(arena, 'consigna');
     openDoorTo(arena, 'cocheras');
     expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([
-      ['ak47', 1750, 900], ['mp5', 1000, 500], ['ppsh41', 1250, 625], ['m60', 2500, 1250],
+      ['ak47', 1750, 900], ['mp5', 1000, 500], ['ppsh41', 1250, 625], ['m60', 2500, 1250], ['m4a1', 1500, 750],
     ]);
     const ppshBuys = arena.wallBuys.filter((wallBuy) => wallBuy.weaponId === 'ppsh41');
     expect(ppshBuys).toHaveLength(1);
@@ -370,7 +373,7 @@ describe('Station 33 luggage office', () => {
     for (const passage of passages) expect(passage.intersectsBox(crate)).toBe(false);
 
     const vestibuleReach = (point: { x: number; z: number }): number => Math.hypot(
-      point.x - THREE.MathUtils.clamp(point.x, STATION33_PLAYER_BOUNDS.minX, VESTIBULE.maxX - 0.4),
+      point.x - THREE.MathUtils.clamp(point.x, VESTIBULE.minX + 0.4, VESTIBULE.maxX - 0.4),
       point.z - THREE.MathUtils.clamp(point.z, VESTIBULE.minZ + 0.4, STATION33_PLAYER_BOUNDS.maxZ),
     );
     expect(vestibuleReach(arena.mysteryBoxPlacement.position)).toBeGreaterThan(arena.mysteryBoxPlacement.useRange + 1);
@@ -379,7 +382,8 @@ describe('Station 33 luggage office', () => {
     }
 
     openDoorTo(arena, 'cocheras');
-    expect(arena.ringMachines.map((machine) => machine.ringId)).toEqual(['resurrection', 'sleightOfHand']);
+    openDoorTo(arena, 'milicia');
+    expect(arena.ringMachines.map((machine) => machine.ringId)).toEqual(['resurrection', 'sleightOfHand', 'armor']);
     for (const config of STATION33_RING_LOCKERS) {
       const machine = arena.ringMachines.find((candidate) => candidate.id === config.id)!;
       expect(insideRoom(machine.position.x, machine.position.z), config.id).toBe(true);

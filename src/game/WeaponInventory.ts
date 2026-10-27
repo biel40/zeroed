@@ -65,7 +65,7 @@ export class WeaponInventory {
   }
 
   /** Adds or replaces a weapon following the rules in the class docstring. */
-  grant(id: WeaponId): GrantResult {
+  grant(id: WeaponId, replacePinned = false): GrantResult {
     const carried = this.slots.indexOf(id);
     if (carried !== -1) {
       this.current = carried;
@@ -77,13 +77,14 @@ export class WeaponInventory {
       return { equipped: id, dropped: null };
     }
     let replaceIndex = this.current;
-    if (this.pinned.has(this.slots[replaceIndex])) {
+    if (!replacePinned && this.pinned.has(this.slots[replaceIndex])) {
       replaceIndex = this.slots.findIndex((slotId) => !this.pinned.has(slotId));
       if (replaceIndex === -1) {
         return { equipped: this.slots[this.current], dropped: null };
       }
     }
     const dropped = this.slots[replaceIndex];
+    this.pinned.delete(dropped);
     this.slots[replaceIndex] = id;
     this.current = replaceIndex;
     return { equipped: id, dropped };

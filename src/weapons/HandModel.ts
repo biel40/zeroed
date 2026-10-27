@@ -522,6 +522,8 @@ export function handGeometries(detail: HandDetail, side: ArmSide): THREE.BufferG
 export interface DigitRingSeat extends DigitSection {
   readonly bone: number;
   readonly along: number;
+  /** Length of digit left past the seat, out to the tip (a ring slides on over it). */
+  readonly toTip: number;
 }
 
 /** Rings sit halfway along the proximal phalanx, clear of the knuckle web. */
@@ -535,5 +537,6 @@ export function digitRingSeat(finger: RingFinger, side: ArmSide): DigitRingSeat 
   const along = RING_SEAT_ALONG * spec.lengths[segment];
   const start = segment === 0 ? 0 : spec.lengths[0];
   const section = digitSection(spec, start + along, { halfWidth: 0, back: 0, front: 0 });
-  return { ...section, bone: spec.bones[segment + 1], along };
+  const toTip = spec.lengths.slice(segment).reduce((sum, length) => sum + length, 0) - along;
+  return { ...section, bone: spec.bones[segment + 1], along, toTip };
 }

@@ -1,0 +1,24 @@
+import type { LockerLook } from '../shared/LockerBank';
+import type { PowerLeverLook } from '../shared/PowerLever';
+import type { RingLockerLook } from '../shared/RingLocker';
+import { CONSIGNA_LOCKER, STATION33_MAINS } from '../Station33Config';
+import type { Station33BuildContext } from './Station33BuildContext';
+
+/**
+ * How Station 33 dresses the shared machine pieces: grey steel lockers with
+ * green enamel doors and Cyrillic number tags, ring lockers that blaze on
+ * the mains, and a knife switch under its danger plate. Every room builds
+ * its banks, ring lockers and switch from these looks.
+ */
+export function station33LockerLook(context: Station33BuildContext): LockerLook {
+  return { size: CONSIGNA_LOCKER, materials: context.materials, tags: context.signage };
+}
+
+export function station33RingLockerLook(context: Station33BuildContext): RingLockerLook {
+  return { size: CONSIGNA_LOCKER, materials: context.materials, mainsGlowBoost: STATION33_MAINS.machineGlowBoost };
+}
+
+export function station33PowerLeverLook(context: Station33BuildContext): PowerLeverLook {
+  const { materials, signage } = context;
+  return { materials, plate: { geometry: signage.signGeometry('main-switch', 0.7, 0.35), material: signage.material } };
+}

@@ -20,7 +20,8 @@ codigo: actualiza la guia.
   y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera
   puerta de pago, la Fase 3 las cocheras tras la segunda y la Fase 4 la sala
   de maquinas (la subestacion) tras la tercera. La escalera mecanica sigue
-  sellada: bajarla es la fase siguiente. Cada fase
+  sellada: bajarla es la fase siguiente. Aparte de las fases, el puesto de
+  milicia (la puerta mas cara, 3000) es la tercera salida del vestibulo. Cada fase
   debe ser jugable por si misma y nunca abrir puertas hacia el vacio. El plan
   de ejes (hacia el norte y hacia abajo) esta documentado al principio de
   `Station33Config.ts`.
@@ -150,8 +151,30 @@ codigo: actualiza la guia.
   encendida con destello y un charco de luz en el suelo. Todo con materiales
   emisivos y aditivos, nunca luces nuevas.
 - Los multiplicadores viven en `STATION33_MAINS`; cualquier maquina nueva
-  (Pack-a-Punch incluido) debe leer `Station33Power` y aplicar
-  `machineGlowBoost` como las taquillas.
+  (Pack-a-Punch incluido) debe leer la `MapPower` del mapa y aplicar
+  `machineGlowBoost` como las taquillas, y escribirse en `shared/` para que
+  otros mapas la reutilicen (Station 33 es el mapa base).
+
+## El puesto de milicia
+
+- La comisaria de la estacion («МИЛИЦИЯ»): el sitio donde tendria sentido
+  guardar proteccion y armas, y por eso vende la Armadura y la M4A1. Es la
+  tercera salida del vestibulo, por su muro oeste, entre la AK-47 y la
+  taquilla de billetes y en linea con los tornos. La puerta (3000) da
+  directamente a la sala: comparte el muro del vestibulo, cubierto por su
+  lado con yeso y el zocalo verde de oficina sovietica sobre metlaj.
+- Al fondo, en el eje de la puerta, las taquillas de pruebas bajo la placa
+  «ВЕЩЕСТВЕННЫЕ ДОКАЗАТЕЛЬСТВА»; en medio, la taquilla abierta del anillo
+  Armadura (rojo, 2500), que necesita electricidad como la de las cocheras.
+  La M4A1 (1500 / 750) esta en el muro norte, por encima del zocalo.
+- La historia: la mesa del oficial de guardia con el telefono y el libro de
+  guardia, su silla volcada y los partes por el suelo; la celda de detencion
+  del rincon suroeste con la puerta de barrotes abierta de par en par; un
+  armero con cascos y escudos antidisturbios; un archivador con un cajon
+  fuera, y carteles de busca y captura a los que les arrancaron las fotos.
+- Fluorescente inestable sobre la mesa y la lampara roja a bateria sobre la
+  celda; el segundo tubo es de la red y solo se enciende con el interruptor
+  general. Los zombis entran por la puerta trasera del muro sur.
 
 ## Anillos
 
@@ -159,11 +182,13 @@ codigo: actualiza la guia.
   las taquillas. Uno por dedo de la mano derecha, cada uno en un dedo fijo,
   visibles en primera persona; el HUD solo apoya.
 - Su brillo es un acento frio (turquesa para Resurreccion, verde para
-  Prestidigitacion); el dorado sigue reservado a lo premium. Un anillo
+  Prestidigitacion); la Armadura es roja por decision del usuario, la unica
+  calida. El dorado sigue reservado a lo premium. Un anillo
   gastado se queda en el dedo, sin brillo.
 - Catalogo: anular, Resurreccion (salva una muerte, en la consigna); menique,
   Prestidigitacion (recargas al doble de velocidad, en las cocheras, exige
-  electricidad). Previstos: corazon, Vitalidad (vida maxima); indice, Doble
+  electricidad); corazon, Armadura (vida maxima doble, en el puesto de
+  milicia, exige electricidad). Previstos: indice, Doble
   impacto (dano y cadencia); pulgar, un anillo de utilidad (por ejemplo,
   tercera arma). La siguiente maquina prevista es el Pack-a-Punch.
 - Cada taquilla toca la melodia de su anillo. Las de ahora son provisionales

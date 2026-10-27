@@ -225,6 +225,8 @@ function armGeometry(side: ArmSide, detail: ArmDetail): THREE.BufferGeometry {
 export interface RingSeat extends DigitSection {
   readonly bone: THREE.Bone;
   readonly along: number;
+  /** Length of digit left past the seat, out to the tip. */
+  readonly toTip: number;
 }
 
 /**

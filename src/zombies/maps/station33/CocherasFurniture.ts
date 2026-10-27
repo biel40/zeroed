@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import type { SurfaceType } from '../../../shooting/HitTarget';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { COCHERAS, COCHERAS_CREW_LOCKERS } from '../Station33Config';
-import { addLockerBank, ringLockersOn, WallFrame } from './LockerBank';
+import { addLockerBank, ringLockersOn, WallFrame } from '../shared/LockerBank';
+import { addSolidProxy } from '../shared/SolidProxy';
+import { COCHERAS, COCHERAS_CREW_LOCKERS, CONSIGNA_LOCKER, station33RingLockersIn } from '../Station33Config';
+import { station33LockerLook } from './Station33Machines';
 import type { Station33BuildContext } from './Station33BuildContext';
 
 const { hall } = COCHERAS;
@@ -39,22 +40,13 @@ export function buildCocherasFurniture(context: Station33BuildContext): void {
  */
 function addCrewLockers(context: Station33BuildContext): void {
   const frame = new WallFrame('x', hall.maxZ, -1);
-  addLockerBank(context, {
+  addLockerBank(context, station33LockerLook(context), {
     frame,
     from: COCHERAS_CREW_LOCKERS.minX,
     to: COCHERAS_CREW_LOCKERS.maxX,
     ajar: [4],
-    ringLockers: ringLockersOn(frame, 'cocheras'),
+    ringLockers: ringLockersOn(frame, station33RingLockersIn('cocheras'), CONSIGNA_LOCKER.depth),
   }, CREW_LOCKER_FIRST_TAG);
-}
-
-function addProxy(context: Station33BuildContext, name: string, min: THREE.Vector3Like, max: THREE.Vector3Like, surface: SurfaceType): void {
-  context.structure.addBox(
-    (min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2,
-    max.x - min.x, max.y - min.y, max.z - min.z,
-    context.materials.collider,
-    { name, surface, mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true },
-  );
 }
 
 /** Two timber rims, a core wound with cable and a loose end trailing on the floor. */
@@ -74,7 +66,7 @@ function addCableDrum(context: Station33BuildContext): void {
     new THREE.Vector3(x + 1.6, 0.03, z + 1.5),
   ]);
   batch.add(new THREE.TubeGeometry(tail, 16, 0.03, 5), materials.rubber);
-  addProxy(context, 'cable-drum', { x: x - width / 2, y: 0, z: z - radius }, { x: x + width / 2, y: radius * 2, z: z + radius }, 'wood');
+  addSolidProxy(context, 'cable-drum', { x: x - width / 2, y: 0, z: z - radius }, { x: x + width / 2, y: radius * 2, z: z + radius }, 'wood');
 }
 
 /**
@@ -102,7 +94,7 @@ function addSandbags(context: Station33BuildContext): void {
   slumped.rotateY(0.5).translate(x + length / 2 + 0.25, 0, z + 0.3);
   batch.add(slumped, materials.burlap);
   const top = (courses - 1) * pitch + height;
-  addProxy(context, 'sandbags', { x: x - length / 2, y: 0, z: z - depth / 2 }, { x: x + length / 2, y: top, z: z + depth / 2 }, 'concrete');
+  addSolidProxy(context, 'sandbags', { x: x - length / 2, y: 0, z: z - depth / 2 }, { x: x + length / 2, y: top, z: z + depth / 2 }, 'concrete');
 }
 
 /**
@@ -156,5 +148,5 @@ function addCabinet(context: Station33BuildContext): void {
   door.translate(x - depth / 2, height * 0.55, z - width / 2 + 0.03);
   batch.add(door, materials.greySteel);
   batch.addBox(materials.hazardPaint, x - depth / 2 - 0.004, height - 0.15, z, 0.01, 0.12, width - 0.1);
-  addProxy(context, 'switch-cabinet', { x: back - depth, y: 0, z: z - width / 2 }, { x: back, y: height, z: z + width / 2 }, 'metal');
+  addSolidProxy(context, 'switch-cabinet', { x: back - depth, y: 0, z: z - width / 2 }, { x: back, y: height, z: z + width / 2 }, 'metal');
 }

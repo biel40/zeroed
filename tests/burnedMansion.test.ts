@@ -1226,9 +1226,42 @@ describe('Burned Mansion topology', () => {
       .filter((child): child is THREE.Mesh => child instanceof THREE.Mesh)
       .find((mesh) => (mesh.material as THREE.Material).name === 'officer_portrait');
     expect(portrait).toBeDefined();
-    const material = portrait!.material as THREE.MeshStandardMaterial;
-    expect(material.emissiveMap).toBeInstanceOf(THREE.DataTexture);
-    expect(material.emissive.r).toBeGreaterThan(material.emissive.g * 4);
+    const eyes = arena.group.getObjectByName('mansion-portrait-eyes')!;
+    expect(eyes.children).toHaveLength(2);
+    const material = (eyes.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial;
+    expect(material.map).toBeInstanceOf(THREE.DataTexture);
+    expect(material.color.r).toBeGreaterThan(2);
+    expect(material.toneMapped).toBe(false);
+    expect(arena.colliders).not.toContain(eyes.children[0]);
+    expect((portrait!.material as THREE.MeshStandardMaterial).emissiveMap).toBeNull();
+  });
+
+  it('follows the local observer smoothly within the painted sockets and resets the gaze', () => {
+    const arena = makeArena();
+    const eyes = arena.group.getObjectByName('mansion-portrait-eyes')!;
+    const initial = eyes.children.map((pupil) => pupil.position.clone());
+    const observer = (x: number, y: number, z: number): THREE.Vector3 => eyes.localToWorld(new THREE.Vector3(x, y, z));
+    arena.update(1 / 60, observer(3, 2, 2));
+    const firstShift = eyes.children[0].position.x - initial[0].x;
+    expect(firstShift).toBeGreaterThan(0);
+    arena.update(1, observer(3, 2, 2));
+    expect(eyes.children[0].position.x - initial[0].x).toBeGreaterThan(firstShift);
+    for (const [index, pupil] of eyes.children.entries()) {
+      expect(pupil.position.x).toBeGreaterThan(initial[index].x);
+      expect(pupil.position.y).toBeGreaterThan(initial[index].y);
+      expect(pupil.position.distanceTo(initial[index])).toBeLessThan(0.016);
+    }
+    arena.update(1, observer(-100, -100, 0.01));
+    for (const [index, pupil] of eyes.children.entries()) {
+      expect(pupil.position.x).toBeLessThan(initial[index].x);
+      expect(pupil.position.y).toBeLessThan(initial[index].y);
+      expect(pupil.position.distanceTo(initial[index])).toBeLessThan(0.016);
+    }
+    arena.update(10, observer(0, 0, -2));
+    expect(eyes.children[0].position.distanceTo(initial[0])).toBeLessThan(1e-6);
+    arena.update(1, observer(2, 0, 2));
+    arena.reset();
+    expect(eyes.children.map((pupil) => pupil.position)).toEqual(initial);
   });
 
   it('routes a wider Brute through the stairs for a player inside the bunker', () => {

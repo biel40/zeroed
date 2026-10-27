@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { SurfaceType } from '../../../shooting/HitTarget';
 import { placement } from '../shared/StaticMeshBatch';
+import { addSolidProxy } from '../shared/SolidProxy';
 import { POWER_LEVER, SUBESTACION } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
@@ -40,20 +40,11 @@ const OIL_DRUMS: ReadonlyArray<readonly [number, number]> = [[4.75, -35.0], [5.4
 export function buildSubestacionFurniture(context: Station33BuildContext, lighting: Station33Lighting): void {
   for (const set of MOTOR_GENERATORS) addMotorGenerator(context, set.x, set.z);
   for (const z of TRANSFORMERS.zs) addTransformer(context, z);
-  addProxy(context, 'transformers',
+  addSolidProxy(context, 'transformers',
     { x: TRANSFORMERS.x - TRANSFORMERS.width / 2 - 0.25, y: 0, z: Math.min(...TRANSFORMERS.zs) - TRANSFORMERS.depth / 2 },
     { x: hall.maxX, y: TRANSFORMERS.height + 0.8, z: Math.max(...TRANSFORMERS.zs) + TRANSFORMERS.depth / 2 }, 'metal');
   for (const side of [-1, 1] as const) addSwitchboard(context, lighting, side);
   addOilDrums(context);
-}
-
-function addProxy(context: Station33BuildContext, name: string, min: THREE.Vector3Like, max: THREE.Vector3Like, surface: SurfaceType): void {
-  context.structure.addBox(
-    (min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2,
-    max.x - min.x, max.y - min.y, max.z - min.z,
-    context.materials.collider,
-    { name, surface, mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true },
-  );
 }
 
 /**
@@ -89,7 +80,7 @@ function addMotorGenerator(context: Station33BuildContext, x: number, z: number)
     new THREE.Vector3(x + 1.32, plinthHeight, generatorZ + 0.4),
   ]);
   batch.add(new THREE.TubeGeometry(feed, 10, 0.05, 6), materials.rubber);
-  addProxy(context, 'motor-generator',
+  addSolidProxy(context, 'motor-generator',
     { x: x - plinthWidth / 2, y: 0, z: z - plinthLength / 2 },
     { x: x + plinthWidth / 2, y: shaftY + 1.25, z: z + plinthLength / 2 }, 'metal');
 }
@@ -140,7 +131,7 @@ function addSwitchboard(context: Station33BuildContext, lighting: Station33Light
     const lamp = new THREE.SphereGeometry(0.03, 10, 6).translate(cx, 1.9, front + 0.035);
     batch.add(lamp, lighting.circuitMaterial('mains'));
   });
-  addProxy(context, 'switchboard', { x: minX, y: 0, z: hall.minZ }, { x: maxX, y: height, z: front + 0.05 }, 'metal');
+  addSolidProxy(context, 'switchboard', { x: minX, y: 0, z: hall.minZ }, { x: maxX, y: height, z: front + 0.05 }, 'metal');
 }
 
 /** Three rusty oil drums huddled in the south-west corner, one dented and leaning. */
@@ -154,5 +145,5 @@ function addOilDrums(context: Station33BuildContext): void {
       batch.add(new THREE.TorusGeometry(0.3, 0.015, 4, 20).rotateX(Math.PI / 2), materials.greySteel, placement(x, y, z, lean, 0, 0));
     }
   });
-  addProxy(context, 'oil-drums', { x: 4.4, y: 0, z: -36.1 }, { x: 5.8, y: 0.9, z: -34.65 }, 'metal');
+  addSolidProxy(context, 'oil-drums', { x: 4.4, y: 0, z: -36.1 }, { x: 5.8, y: 0.9, z: -34.65 }, 'metal');
 }

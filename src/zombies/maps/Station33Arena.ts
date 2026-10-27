@@ -12,18 +12,20 @@ import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import { AmbientEventScheduler } from './shared/AmbientEventScheduler';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
 import { ArenaStructure } from './shared/ArenaStructure';
+import { MapPower } from './shared/MapPower';
+import { PowerLever } from './shared/PowerLever';
+import { RingLocker } from './shared/RingLocker';
 import { StaticMeshBatch } from './shared/StaticMeshBatch';
 import { buildCocheras } from './station33/CocherasBuilder';
 import { buildConsigna } from './station33/ConsignaBuilder';
 import { buildDoorFrames } from './station33/DoorFrames';
 import { buildEscalatorHead } from './station33/EscalatorHeadBuilder';
-import { PowerLever } from './station33/PowerLever';
-import { RingLocker } from './station33/RingLocker';
+import { buildMilicia } from './station33/MiliciaBuilder';
 import { buildServicePassages } from './station33/ServicePassageBuilder';
 import { Station33Atmosphere } from './station33/Station33Atmosphere';
 import type { Station33BuildContext } from './station33/Station33BuildContext';
 import { Station33Lighting } from './station33/Station33Lighting';
-import { Station33Power } from './station33/Station33Power';
+import { station33PowerLeverLook, station33RingLockerLook } from './station33/Station33Machines';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
 import { buildVestibule } from './station33/VestibuleBuilder';
@@ -41,6 +43,7 @@ import {
   STATION33_OPENINGS,
   STATION33_PLAYER_BOUNDS,
   STATION33_PLAYER_SPAWN,
+  STATION33_POWER_SWITCH,
   STATION33_RING_LOCKERS,
   STATION33_SPAWNS,
   STATION33_START_ZONE,
@@ -90,7 +93,9 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * two abandoned trains, three more entrances, the M60 and the crew locker
  * that sells the Sleight of Hand ring once the power is on. Phase 4 is the
  * machine room behind the third door: two more entrances and the main
- * switch, which powers the station for the rest of the run.
+ * switch, which powers the station for the rest of the run. The militia
+ * post, the vestibule's third way out behind its dearest door, sells the
+ * M4A1 and, once the power is on, the Armour ring.
  */
 export class Station33Arena implements ZombieArena {
   readonly id = 'station-33';
@@ -125,7 +130,7 @@ export class Station33Arena implements ZombieArena {
   private readonly activeZones = new Set<Station33ZoneId>([STATION33_START_ZONE]);
   private readonly lighting: Station33Lighting;
   private readonly atmosphere: Station33Atmosphere;
-  private readonly power = new Station33Power();
+  private readonly power = new MapPower();
   private readonly ambientEvents = new AmbientEventScheduler(STATION33_AMBIENT_EVENTS);
   private readonly hemisphere: THREE.HemisphereLight;
   /** Seconds into the intro while its cues are pending, else null. */
@@ -142,6 +147,7 @@ export class Station33Arena implements ZombieArena {
       group: this.group,
       structure: this.structure,
       batch: new StaticMeshBatch(),
+      collider: materials.collider,
       materials,
       signage: createStation33Signage(profile.anisotropyLimit),
       profile,
@@ -153,11 +159,13 @@ export class Station33Arena implements ZombieArena {
     buildConsigna(context);
     buildCocheras(context, this.lighting);
     buildSubestacion(context, this.lighting);
+    buildMilicia(context);
     buildDoorFrames(context);
     buildServicePassages(context, this.lighting, STATION33_BARRIERS);
-    this.ringLockers = STATION33_RING_LOCKERS.map((locker) => new RingLocker(context, locker, this.power));
+    const ringLockerLook = station33RingLockerLook(context);
+    this.ringLockers = STATION33_RING_LOCKERS.map((locker) => new RingLocker(context, locker, ringLockerLook, this.power));
     this.ringMachines = this.ringLockers;
-    this.powerSwitch = new PowerLever(context, () => this.switchOnPower());
+    this.powerSwitch = new PowerLever(context, STATION33_POWER_SWITCH, station33PowerLeverLook(context), () => this.switchOnPower());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
     this.hemisphere = createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects);

@@ -1,6 +1,8 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41';
 
 export type FireMode = 'auto' | 'semi';
+
+export type ShellCasingProfile = 'standard' | 'bmg50';
 
 export type WeaponState = 'ready' | 'reloading' | 'cycling' | 'equipping';
 
@@ -24,6 +26,10 @@ export interface RecoilConfig {
   readonly cameraShare: number;
   /** Recoil multiplier while fully aiming down sights. */
   readonly adsRecoilMultiplier: number;
+  /** Optional sharp upward camera jolt per shot that settles within a blink; heavy rifles only. */
+  readonly cameraJolt?: number;
+  /** Optional backward shove of the player per shot (m/s), damped out by movement; heavy rifles only. */
+  readonly playerPush?: number;
 }
 
 export interface SpreadConfig {
@@ -37,6 +43,63 @@ export interface SpreadConfig {
   readonly maxBloom: number;
   /** Bloom recovery per second. */
   readonly bloomRecovery: number;
+}
+
+/**
+ * Barrel overheating under sustained full-auto fire (automatic weapons
+ * only): the muzzle glows orange, smokes more and the spread grows.
+ */
+export interface BarrelHeatConfig {
+  /** Consecutive rapid shots that take a cold barrel to full heat. */
+  readonly shotsToOverheat: number;
+  /** Seconds a fully hot barrel needs to cool down once firing stops. */
+  readonly coolTime: number;
+  /**
+   * Seconds the barrel holds its heat after each shot before it starts
+   * cooling; absent keeps a quarter second. A hold longer than the gap
+   * between shots lets rapid semi-automatic fire stack heat exactly.
+   */
+  readonly coolDelay?: number;
+  /** A fully hot barrel locks the trigger until it has cooled completely. */
+  readonly lockout?: boolean;
+  /** Extra dispersion (radians) at full overheat. */
+  readonly maxSpreadBonus: number;
+  /**
+   * Glow sleeve size in model metres (before `view.scale`). Absent sizes it
+   * from `view.barrelRadius`; set it when the barrel hides inside a jacket
+   * or shroud so the glow wraps what the player actually sees.
+   */
+  readonly glow?: BarrelGlowSize;
+}
+
+/**
+ * Heavy muzzle smoke: on top of the standard shot puff, a muzzle brake vents
+ * clouds out to both sides of the view (clear of the sight line) and the
+ * overheat wisps grow by the same scale.
+ */
+export interface MuzzleSmokeConfig {
+  /** Side-vented puffs released per shot, alternating left and right. */
+  readonly puffs: number;
+  /** Size multiplier over the standard shot puff and the overheat wisps. */
+  readonly scale: number;
+  /** Seconds each vented puff lingers. */
+  readonly life: number;
+}
+
+/** Heavy ballistic flash, in view-model metres and seconds; absent keeps the ordinary flash. */
+export interface MuzzleFlashConfig {
+  readonly length: number;
+  readonly width: number;
+  readonly sideLength: number;
+  readonly coreScale: number;
+  readonly duration: number;
+  readonly lightIntensity: number;
+}
+
+export interface BarrelGlowSize {
+  readonly radius: number;
+  /** Stretch behind the muzzle that glows. */
+  readonly length: number;
 }
 
 export interface AdsConfig {
@@ -55,6 +118,12 @@ export interface ProjectileConfig {
   readonly maxDistance: number;
   /** Linear velocity decay (1/s). 0 disables drag. */
   readonly drag: number;
+  /**
+   * Optional number of zombies one round passes through, each taking full
+   * damage, before it stops; absent stops at the first. Walls and other
+   * targets always stop it.
+   */
+  readonly maxTargets?: number;
 }
 
 export interface WeaponAudioConfig {
@@ -68,6 +137,12 @@ export interface WeaponAudioConfig {
   readonly tail?: number;
   /** Optional volume of the reciprocating carrier slamming home after each shot. */
   readonly mechanism?: number;
+  /**
+   * Optional MP3 in `public/assets/audio/` that replaces the procedural
+   * report once decoded, played at `volume`; a missing file keeps the
+   * procedural shot.
+   */
+  readonly sampleFile?: string;
   /**
    * Energy weapons get a sci-fi synth shot instead of a powder report; the
    * value picks the voice: the Ray Gun's warbling zap or the arc weapon's.
@@ -192,7 +267,8 @@ export type HandPoseId =
   | 'magazineGrab'
   | 'supportMagwell'
   | 'boltPinch'
-  | 'relaxed';
+  | 'relaxed'
+  | 'openHand';
 
 type Vec3 = readonly [number, number, number];
 
@@ -284,9 +360,10 @@ export interface ViewModelConfig {
    * stock, scope, liftable bolt); 'mp5' uses the MP5A3 builder (drum sight,
    * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
    * ("Super V" lower, full rail, folding sights); 'ppsh41' uses the wooden
-   * stock, perforated jacket and drum-fed PPSh-41. Default: generic long gun.
+   * stock, perforated jacket and drum-fed PPSh-41; 'barrett' builds the heavy
+   * semiautomatic .50 rifle with a ventilated shroud and muzzle brake. Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'mp5' | 'vector' | 'ppsh41';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'barrett' | 'mp5' | 'vector' | 'ppsh41';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
@@ -320,6 +397,12 @@ export interface WeaponDefinition {
   readonly energy?: EnergyWeaponConfig;
   readonly recoil: RecoilConfig;
   readonly spread: SpreadConfig;
+  /** Full-auto barrel overheating; absence means the barrel never heats. */
+  readonly heat?: BarrelHeatConfig;
+  readonly muzzleSmoke?: MuzzleSmokeConfig;
+  readonly muzzleFlash?: MuzzleFlashConfig;
+  /** World-space spent case; absent keeps the standard small brass casing. */
+  readonly shellCasing?: ShellCasingProfile;
   readonly ads: AdsConfig;
   readonly projectile: ProjectileConfig;
   readonly moveSpeedMultiplier: number;
@@ -331,6 +414,7 @@ export interface WeaponDefinition {
 export type WeaponEventType =
   | 'shot'
   | 'dryFire'
+  | 'overheated'
   | 'reloadStart'
   | 'reloadEnd'
   | 'boltStart'

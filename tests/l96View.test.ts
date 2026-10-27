@@ -31,7 +31,7 @@ afterAll(() => {
 });
 
 function fakeWeapon(state: Weapon['state'], stateProgress: number): Weapon {
-  return { state, stateProgress, adsAlpha: 0, reloadType: 'empty' } as Weapon;
+  return { state, stateProgress, adsAlpha: 0, reloadType: 'empty', ammoInMagazine: 0, inspectProgress: null, definition } as Weapon;
 }
 
 describe('L96A1 view model', () => {

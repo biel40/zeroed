@@ -5,6 +5,7 @@ import { ZombieVisual } from '../src/zombies/ZombieVisual';
 import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
+  ZOMBIE_BARRIER_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_RECOVERY,
   ZOMBIE_BARRIER_ATTACK_RECOVERY,
   ZOMBIE_CORPSE_LINGER,
@@ -133,9 +134,21 @@ describe('Zombie attacks', () => {
     expect(zombie.tryAttack()).toBe(true);
   });
 
-  it('reduces the normal attack cycle by 25% without changing dodge timing', () => {
+  it('lands a fast strike while preserving the normal attack cycle', () => {
     expect(ZOMBIE_ATTACK_DURATION + ZOMBIE_ATTACK_RECOVERY).toBeCloseTo(1.45 * 0.75, 6);
-    expect(ZOMBIE_ATTACK_HIT_MOMENT).toBe(0.475);
+    expect(ZOMBIE_ATTACK_HIT_MOMENT).toBe(0.18);
+  });
+
+  it('keeps barricade damage on its slower contact marker', () => {
+    const zombie = makeZombie();
+    step(zombie, ZOMBIE_SPAWN_DURATION + 0.1);
+    let hits = 0;
+    zombie.onAttackLanded = () => hits++;
+    expect(zombie.tryBarrierAttack()).toBe(true);
+    zombie.update(ZOMBIE_ATTACK_HIT_MOMENT, 0);
+    expect(hits).toBe(0);
+    zombie.update(ZOMBIE_BARRIER_ATTACK_HIT_MOMENT - ZOMBIE_ATTACK_HIT_MOMENT + 0.001, 0);
+    expect(hits).toBe(1);
   });
 
   it('preserves the attack recovery of special zombies', () => {

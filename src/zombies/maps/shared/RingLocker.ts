@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { RING_DEFINITIONS, type RingId } from '../../../game/rings/RingCatalog';
 import { makeSoftDotTexture } from '../../doors/BuyableDoorVisual';
-import { placement } from '../shared/StaticMeshBatch';
-import { CONSIGNA_LOCKER, STATION33_MAINS, type Station33RingLocker } from '../Station33Config';
 import type { ArenaRingMachine, RingMachineDisplay } from '../ZombieArena';
-import type { Station33BuildContext } from './Station33BuildContext';
-import type { Station33Power } from './Station33Power';
+import type { LockerFront, LockerMaterials, LockerSize } from './LockerBank';
+import type { MapBuildKit } from './MapBuildKit';
+import type { MapPower } from './MapPower';
+import { placement } from './StaticMeshBatch';
 
 const SHELF_Y = 1.05;
 const DOOR_SWING = 2.6;
@@ -23,16 +23,33 @@ const BULB_LEVEL = { off: 0.03, mains: 2.2 } as const;
 const MAINS_FLARE = { opacity: 0.85, scale: 0.9 } as const;
 const MAINS_POOL = { opacity: 0.4, width: 1.8, depth: 1.5 } as const;
 
+/** Where a map puts a ring locker and what it sells. */
+export interface RingLockerPlacement extends LockerFront {
+  readonly id: string;
+  readonly ringId: RingId;
+  /** Sells only once the map's power is on (dark and silent until then). */
+  readonly requiresPower: boolean;
+}
+
+/** A map's ring-locker look: its lockers' size and materials, and how much brighter it blazes on the mains. */
+export interface RingLockerLook {
+  readonly size: LockerSize;
+  readonly materials: LockerMaterials;
+  /** Glow multiplier once the power switch feeds the map. */
+  readonly mainsGlowBoost: number;
+}
+
 /**
- * Ring machine of Station 33: one tall locker left open in a bank of
- * lockers, a velvet cushion on its shelf and a wedding ring glowing on it
- * in the ring's own cold enamel colour. A locker that needs the station's
- * power waits dark (ring on show, no glow) until it comes on, or until a
- * ZEUS-77 bolt charges it for a while. Once the main switch feeds the
- * station, every locker blazes (`STATION33_MAINS.machineGlowBoost`) under a
- * bulb of its ring's colour. The cabinet is static (shared batch); the
- * ring, its halo, the inner trim and the bulb are animated here and lit
- * only by their own emissive materials, never by a light.
+ * Ring machine for any map: one tall locker left open in a bank of
+ * lockers (`addLockerBank` leaves its gap), a velvet cushion on its shelf
+ * and a wedding ring glowing on it in the ring's own enamel colour. A
+ * locker that needs the map's power waits dark (ring on show, no glow)
+ * until it comes on, or until a ZEUS-77 bolt charges it for a while. Once
+ * the power switch feeds the map, every locker blazes
+ * (`RingLockerLook.mainsGlowBoost`) under a bulb of its ring's colour. The
+ * cabinet is static (shared batch); the ring, its halo, the inner trim and
+ * the bulb are animated here and lit only by their own emissive materials,
+ * never by a light. Stands on the ground floor (floor 0, y 0).
  */
 export class RingLocker implements ArenaRingMachine {
   readonly id: string;
@@ -59,10 +76,11 @@ export class RingLocker implements ArenaRingMachine {
   private charge = 0;
 
   constructor(
-    context: Station33BuildContext,
-    config: Station33RingLocker,
-    /** The station's main power: it unlocks the lockers that need it and makes every locker blaze. */
-    private readonly power: Station33Power,
+    kit: MapBuildKit,
+    config: RingLockerPlacement,
+    private readonly look: RingLockerLook,
+    /** The map's power: it unlocks the lockers that need it and makes every locker blaze. */
+    private readonly power: MapPower,
   ) {
     this.id = config.id;
     this.requiresPower = config.requiresPower;
@@ -70,31 +88,31 @@ export class RingLocker implements ArenaRingMachine {
     this.position = { x: config.x, y: SHELF_Y + 0.1, z: config.z };
     this.glowColor = new THREE.Color(RING_DEFINITIONS[config.ringId].glowColor);
     this.enamel = new THREE.MeshStandardMaterial({
-      name: 'station33_ring_enamel', color: this.glowColor, emissive: this.glowColor, roughness: 0.25, metalness: 0.1,
+      name: 'ring_locker_enamel', color: this.glowColor, emissive: this.glowColor, roughness: 0.25, metalness: 0.1,
     });
-    this.trim = new THREE.MeshBasicMaterial({ name: 'station33_ring_locker_trim', color: this.glowColor.clone() });
+    this.trim = new THREE.MeshBasicMaterial({ name: 'ring_locker_trim', color: this.glowColor.clone() });
     this.halo = new THREE.SpriteMaterial({
-      name: 'station33_ring_halo', map: makeSoftDotTexture(), color: this.glowColor, transparent: true,
+      name: 'ring_locker_halo', map: makeSoftDotTexture(), color: this.glowColor, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
     });
     this.haloSprite = new THREE.Sprite(this.halo);
-    this.bulb = new THREE.MeshBasicMaterial({ name: 'station33_ring_locker_bulb', color: this.glowColor.clone() });
+    this.bulb = new THREE.MeshBasicMaterial({ name: 'ring_locker_bulb', color: this.glowColor.clone() });
     const softDot = makeSoftDotTexture();
     this.flare = new THREE.SpriteMaterial({
-      name: 'station33_ring_locker_flare', map: softDot, color: this.glowColor, transparent: true,
+      name: 'ring_locker_flare', map: softDot, color: this.glowColor, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
     });
     this.pool = new THREE.MeshBasicMaterial({
-      name: 'station33_ring_locker_pool', map: softDot, color: this.glowColor, transparent: true,
+      name: 'ring_locker_pool', map: softDot, color: this.glowColor, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
     });
 
     this.group.name = `ring-locker:${config.id}`;
     this.group.position.set(config.x, 0, config.z);
     this.group.rotation.y = Math.atan2(config.facingX, config.facingZ);
-    context.group.add(this.group);
-    this.buildCabinet(context);
-    this.buildGlow(context);
+    kit.group.add(this.group);
+    this.buildCabinet(kit);
+    this.buildGlow();
     this.buildRing();
     this.reset();
   }
@@ -122,7 +140,7 @@ export class RingLocker implements ArenaRingMachine {
     const pulse = this.display === 'recharge'
       ? 0.55 + 0.45 * Math.sin(this.time * 1.4)
       : 0.85 + 0.15 * Math.sin(this.time * 2.3);
-    const mains = this.power.on ? STATION33_MAINS.machineGlowBoost : 1;
+    const mains = this.power.on ? this.look.mainsGlowBoost : 1;
     const glow = this.level * pulse * this.chargeFlicker() * mains;
     // Unlit trim and enamel keep a faint floor only while powered: without power the locker is dead.
     const floor = this.powered ? 1 : 0;
@@ -151,15 +169,15 @@ export class RingLocker implements ArenaRingMachine {
   }
 
   /** Steel carcass, dark back, shelf and open door: all static. */
-  private buildCabinet(context: Station33BuildContext): void {
-    const { batch, materials } = context;
+  private buildCabinet(kit: MapBuildKit): void {
+    const { materials, size } = this.look;
     const world = placement(this.group.position.x, 0, this.group.position.z, 0, this.group.rotation.y, 0).clone();
     const local = new THREE.Matrix4();
     const part = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, yaw = 0): void => {
       local.makeRotationY(yaw).setPosition(x, y, z);
-      batch.add(geometry, material, world.clone().multiply(local));
+      kit.batch.add(geometry, material, world.clone().multiply(local));
     };
-    const { depth, height, ringLockerWidth } = CONSIGNA_LOCKER;
+    const { depth, height, ringLockerWidth } = size;
     const half = ringLockerWidth / 2;
     for (const side of [-1, 1]) part(new THREE.BoxGeometry(0.02, height, depth), materials.greySteel, side * (half - 0.01), height / 2, -depth / 2);
     part(new THREE.BoxGeometry(ringLockerWidth, 0.04, depth + 0.04), materials.greySteel, 0, height + 0.02, -depth / 2 + 0.01);
@@ -173,9 +191,9 @@ export class RingLocker implements ArenaRingMachine {
     part(door, materials.paintedSteel, -half, 0.12 + doorHeight / 2, 0.01, -DOOR_SWING);
   }
 
-  /** Cold trim along the inside of the opening, a soft halo behind the ring and the marquee bulb on top. */
-  private buildGlow(context: Station33BuildContext): void {
-    const { depth, height, ringLockerWidth } = CONSIGNA_LOCKER;
+  /** Trim along the inside of the opening, a soft halo behind the ring and the marquee bulb on top. */
+  private buildGlow(): void {
+    const { depth, height, ringLockerWidth } = this.look.size;
     const half = ringLockerWidth / 2;
     const strip = (width: number, stripHeight: number, x: number, y: number): void => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, stripHeight, 0.01), this.trim);
@@ -191,7 +209,7 @@ export class RingLocker implements ArenaRingMachine {
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), this.bulb);
     bulb.name = 'locker-bulb';
     bulb.position.set(0, height + 0.11, -0.08);
-    const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.11, 0.06, 12), context.materials.greySteel);
+    const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.11, 0.06, 12), this.look.materials.greySteel);
     hood.position.set(0, height + 0.2, -0.08);
     const flare = new THREE.Sprite(this.flare);
     flare.position.copy(bulb.position);
@@ -205,12 +223,12 @@ export class RingLocker implements ArenaRingMachine {
 
   /** Velvet cushion with the ring standing in its fold: worn silver band and an enamel bezel. */
   private buildRing(): void {
-    const { depth } = CONSIGNA_LOCKER;
-    const velvet = new THREE.MeshStandardMaterial({ name: 'station33_ring_cushion', color: 0x1b2633, roughness: 1 });
+    const { depth } = this.look.size;
+    const velvet = new THREE.MeshStandardMaterial({ name: 'ring_locker_cushion', color: 0x1b2633, roughness: 1 });
     const cushion = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10).scale(0.17, 0.045, 0.13), velvet);
     cushion.position.set(0, SHELF_Y + 0.05, -depth / 2);
     this.group.add(cushion);
-    const silver = new THREE.MeshStandardMaterial({ name: 'station33_ring_band', color: 0xb9b4a8, roughness: 0.3, metalness: 1 });
+    const silver = new THREE.MeshStandardMaterial({ name: 'ring_locker_band', color: 0xb9b4a8, roughness: 0.3, metalness: 1 });
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.007, 10, 32), silver);
     const bezel = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.008, 16), this.enamel);
     bezel.position.y = 0.041;

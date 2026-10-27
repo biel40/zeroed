@@ -35,6 +35,40 @@ fija cuanto recorre un cargador de caja para salir y donde se alinea el nuevo,
 que se ensena entero antes de entrar. La mano lo sujeta desde la base
 (`hands.magazine`) y los golpes (encaje, tapa, cierre de la accion) suenan en
 el mismo fotograma del impacto.
+Las balas superiores del cargador (`reloadParts.rounds`, `MagazineRounds`) solo
+se dibujan con el cargador fuera y muestran las que lleva: el vaciado sale sin
+ellas y el nuevo las ensena llenas.
+Solo en escritorio, F inspecciona el arma (`Weapon.inspect`, `InspectAnimator`):
+la levanta por su flanco derecho, la gira al izquierdo y, en cargadores de caja
+o tambor y en la M1911 (`rifle`, `rock`, `drum`, `pistol`), saca el cargador con la mano de apoyo para
+ensenar sus balas antes de encajarlo. Es solo visual y local: no toca la
+municion, y disparar, apuntar, recargar, cambiar de arma, el cuchillo o un menu
+la interrumpen sin retrasar la accion.
+Las armas automaticas se recalientan con fuego sostenido (`BarrelHeat`, dato
+`heat` de la definicion): rafagas cortas no lo notan, pero asoma en poco mas
+de un segundo de fuego continuo; al pasar del umbral la punta del cañon (o de
+la camisa que lo oculta, `heat.glow`, como en la PPSh-41) brilla de rojo a
+naranja (`BarrelGlow`), la boca suelta mas
+humo y sigue humeando hasta enfriarse (`BarrelSmoke`) y la dispersion crece
+hasta `maxSpreadBonus`. Se enfria tras una breve pausa sin disparar y vuelve a
+frio al equipar o reiniciar la municion. Es solo local: el companero no lo ve.
+Un `heat.lockout` bloquea el gatillo al llegar al maximo hasta enfriarse del
+todo (evento `overheated`: siseo y chasquido en cada intento); `heat.coolDelay`
+retiene el calor entre disparos para que un semiautomatico lo acumule. El
+Barrett lo usa: cuatro disparos seguidos (menos de 0.6 s entre ellos) lo
+bloquean hasta enfriarse. Un `audio.sampleFile` sustituye el disparo procedural por
+un MP3 de `public/assets/audio/` (el Barrett espera `barrett_shot.mp3`); sin
+el archivo suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
+anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
+del jugador (el Barrett, unos 11 cm por disparo). `muzzleSmoke` suelta nubes
+de humo a ambos lados de la boca (fuera de la linea de mira), mas duraderas,
+y agranda las volutas de recalentamiento; el Barrett lo usa y su bloqueo dura
+unos 4 s.
+`muzzleFlash` anade al Barrett una llamarada frontal y chorros laterales en
+las dos camaras del freno de boca: nucleo brillante, lenguas naranjas que se
+expanden y apagan en 0.14 s y un golpe de luz mas intenso sobre el entorno.
+El Barrett expulsa una vaina .50 propia (`shellCasing`), de unos 10 cm,
+con cuello hueco; cae de lado y permanece visible 4 s en el pool de casquillos.
 `BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
@@ -86,6 +120,8 @@ guardandose automaticamente al ajustarlos.
   la horda avance como un bloque sincronizado.
 - El melee valida distancia XZ, diferencia vertical, linea de ataque, ventana de
   esquiva e instante de impacto. El feedback de dano respeta invulnerabilidad.
+  El golpe conecta a los 180 ms, con los brazos sincronizados al impacto y la
+  cadencia entre ataques conservada. Las barricadas mantienen su golpe a 475 ms.
 - La cabeza usa una hitbox ajustada al craneo. Un headshot concede 150 Points y
   una baja con cuchillo concede 200 Points por su mayor riesgo y dificultad.
 - Un arma sin cargador ni reserva permanece equipada: el disparo queda
@@ -96,9 +132,13 @@ guardandose automaticamente al ajustarlos.
   sujeta por la mano izquierda, la derecha suelta la empunadura y vuelve con el
   cuchillo (que solo existe fuera de pantalla), cruza la pantalla con el filo
   por delante y el golpe se resuelve
-  cuando la hoja pasa por la mira. Tiene 2.05 m de alcance y usa el primer
-  collider bajo la mira, por lo que paredes y enemigos cercanos bloquean el
-  golpe; el arco visible no es un ataque de area.
+  cuando la hoja pasa por la mira. El barrido frontal abarca 100 grados y
+  alcanza 2.4 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
+  un solo objetivo, priorizando la mira y despues la alineacion y proximidad;
+  paredes y cuerpos interpuestos bloquean cada trayectoria. La seleccion y
+  validacion del invitado comparten estas reglas. Conserva dano por ronda,
+  cadencia y recompensa. El tajo cruza mas alto y mas ancho, con hoja biselada,
+  vaciado longitudinal y empunadura nervada.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
   continua de canal unico, sin teletransporte. La rejilla se reconstruye en
@@ -131,7 +171,13 @@ guardandose automaticamente al ajustarlos.
   espaldas), automaticas (sacudidas por cada impacto y se desploma de bruces),
   headshot con arma de fuego (se derrumba inerte), Ray Gun (vaporizacion de
   1.0 s con `RayGunDissolveShader`, borde incandescente verde y cenizas
-  ascendentes) y Tesla (convulsiona rigido y cae). Un disparo por la espalda lo
+  ascendentes), Tesla (convulsiona rigido y cae) y Barrett (`shatter`, siempre,
+  incluso en headshot: el cuerpo desaparece y `ZombieGibs` lanza sus pedazos con
+  munones rojos, restos y gotas de sangre varios metros en la direccion del
+  disparo, con una nube de sangre que queda un instante en el aire;
+  rebotan en las paredes del mapa (`wallColliders`, via `GibWalls`), donde la
+  sangre queda pegada, y caen al suelo o encima de muebles; un charco se
+  extiende bajo el cuerpo; reposan el tiempo del cadaver y se encogen). Un disparo por la espalda lo
   tumba hacia delante y los impactos laterales giran la caida hacia el empuje.
   La pose viva se funde con la caida conservando la inercia de la marcha; el
   cuerpo llega al suelo con impacto y, hasta aterrizar, nunca vuelve a subir
@@ -150,7 +196,8 @@ guardandose automaticamente al ajustarlos.
   unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
   la Mystery Box, gran comedor (ala norte con la Vector en pared; mesa,
   aparador, vitrina y chimenea solidos, y sobre ella el retrato de un oficial
-  aleman cuyas pupilas brillan en rojo; easter egg de la Torre Quemada de
+  aleman cuyas pupilas brillan en rojo y siguen suavemente al jugador local
+  dentro de sus cuencas, tambien en cooperativo; easter egg de la Torre Quemada de
   Pokemon: al abrir su puerta, con una probabilidad baja, un fantasma
   visual aparece unos segundos sobre la mesa) y pasillo este con la puerta del
   bunker; el salon y el pasillo solo se comunican a traves del comedor. Su ambientacion es una casa victoriana quemada sobre
@@ -256,6 +303,11 @@ guardandose automaticamente al ajustarlos.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega ninguna de las
   dos armas que lleva el comprador al activarla, en individual y cooperativo.
   La PPSh-41 forma parte del arsenal estandar de la caja; la Vector sigue disponible.
+  El Barrett .50 solo se obtiene en la caja: francotirador pesado semiautomatico,
+  con mira telescopica, mayor dano y retroceso que la L96 y menor movilidad;
+  cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),
+  con dano completo a cada uno; una pared la detiene;
+  reutiliza la recarga de fusil y no necesita accionar el cerrojo entre disparos.
   Ray Gun garantizada a 115 bajas; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
@@ -281,6 +333,22 @@ guardandose automaticamente al ajustarlos.
   El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
   en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
   restaura el cierre y el inventario inicial.
+  Tras activarlo, F2 abre una consola local de desarrollador que pausa la
+  partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
+  El panel ofrece selectores de armas y anillos, botones de municion y
+  proteccion, y un multiplicador de dano con restauracion. Cada accion
+  explica su efecto y muestra el resultado; la escritura de comandos queda
+  en un desplegable avanzado y utiliza la misma validacion.
+  `help`, `weapons` y `rings` muestran la ayuda y los catalogos actuales.
+  `weapon <id>` equipa incluso con las ranuras fijadas por modo Dios;
+  `ring <id>` (alias `drink`) concede o recarga los anillos sin consumir
+  compras ni exigir maquinas del mapa. `ammo full|infinite` afecta al arma
+  equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
+  Ray Gun y cadenas ZEUS) y `invincible on|off` permite probar salud y
+  resurreccion. No es un sistema de mejora comprable: son ajustes temporales
+  de prueba, reiniciados con la run. Historial con arriba/abajo y `clear`
+  para limpiar la salida. Solo individual, disponible con el mismo acceso
+  existente a `MOTDRULES`.
   El final de 30000 Points es el que declara la mansion (`MANSION_NUCLEAR_ENDING`) y pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
   La secuencia nuclear dura 25 s y es CSS puro (transform/opacity, sin bordes
@@ -329,16 +397,28 @@ prompt, la muerte y el reinicio.
   `ModeContext.setReloadTimeScale`; animacion y sonidos siguen el progreso).
   Se vende en la taquilla de la tripulacion de las cocheras de Station 33 y
   necesita electricidad.
+- Armadura (corazon, pasivo, rojo): una sola compra por run, 2500. Mientras
+  se lleva, la vida maxima se duplica (`maxHealth`: `ZombiesRings` fija
+  `PlayerHealth.setMaxHpScale`; al subir suma la vida ganada al momento, al
+  reiniciar vuelve a la base). Se vende en el puesto de milicia de Station 33
+  y necesita electricidad.
 - Una maquina puede esperar a la electricidad del mapa
   (`ArenaRingMachine.powered`): hasta entonces esta apagada, no suena y su
   prompt solo avisa de que hay que encender la electricidad, sin cobrar. En
-  Station 33 la electricidad (`Station33Power`) empieza apagada en cada run y
-  la enciende el interruptor general de la sala de maquinas. Antes, un rayo de la
+  Station 33 la electricidad (`MapPower`, compartida) empieza apagada en cada
+  run y la enciende el interruptor general de la sala de maquinas
+  (`PowerLever`, compartido). Antes, un rayo de la
   ZEUS-77 que hace tierra a menos de 1 m de una maquina que espera la
   electricidad le da 60 s de corriente (`ArenaRingMachine.energize`; otro
   rayo reinicia el minuto, no lo suma): vende y suena, parpadea los ultimos
   10 s y vuelve a apagarse. Un aviso lo anuncia y el arco electrico va del
   arma a la taquilla. El anillo comprado sigue funcionando sin corriente.
+- Las piezas del mundo son comunes a todos los mapas (`src/zombies/maps/shared/`):
+  la taquilla de anillo (`RingLocker`), el banco de taquillas que le deja hueco
+  (`LockerBank`), el interruptor (`PowerLever`), la electricidad (`MapPower`)
+  y los solidos de atrezo (`addSolidProxy`), todos sobre un `MapBuildKit`. Un
+  mapa nuevo solo da su colocacion y su look (medidas, materiales, carteles);
+  Station 33 lo hace en `station33/Station33Machines.ts`.
 - Las maquinas suenan como las de bebidas: `ZombiesRings` sigue cada frame a
   la mas cercana con electricidad en la planta del jugador y
   `AudioSystem.setRingJingle` mantiene un unico bucle con la melodia de su
@@ -350,7 +430,14 @@ prompt, la muerte y el reinicio.
 - El anillo se ve en el dedo de la mano derecha en primera persona
   (`HandRings`, hijo del hueso de la falange, sin tocar la pose ni subir nunca
   hacia la mira); brilla con su esmalte al ponerselo y al dispararse y se apaga
-  gastado. `Game.prepare` los muestra todos para compilar sus shaders.
+  gastado.
+- Al comprar un anillo las manos se lo ponen (`RingDonning`, 2,2 s): el arma
+  baja, la mano derecha sube abierta, la izquierda suelta el arma, lleva el
+  anillo a la punta del dedo y lo desliza hasta su sitio, donde destella, y
+  ambas vuelven al arma. Es un `MeleeArmDriver` con `SupportArmDriver` para
+  la mano izquierda (`ViewArms`); mientras dura no se dispara, ni se apunta,
+  ni se usa el cuchillo o la mascara. Solo presentacion: el efecto rige desde
+  la compra. Recargar no repite la animacion. `Game.prepare` los muestra todos para compilar sus shaders.
 - El HUD muestra iconos compactos por anillo (tambien en movil) y la pausa,
   nombre, dedo y estado; un anillo gastado se atenua.
 - `MOTDRULES` no concede anillos: con invencibilidad nunca se gastarian. Con
@@ -374,7 +461,7 @@ no detiene la partida. `MULTIPLAYER.md` define el alcance y los limites.
 
 ## Rendimiento
 
-Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 10,
+Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 24,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
 
 `DeviceProfile` fija una calidad Baja/Media/Alta: la elegida en Ajustes

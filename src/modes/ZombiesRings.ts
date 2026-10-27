@@ -3,15 +3,17 @@ import { spatialMuffle, spatialPan } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { PlayerHealth } from '../game/PlayerHealth';
 import { PlayerRings } from '../game/rings/PlayerRings';
-import { RING_DEFINITIONS } from '../game/rings/RingCatalog';
+import { RING_DEFINITIONS, type RingId } from '../game/rings/RingCatalog';
 import { t } from '../i18n/i18n';
 import { getUpPose } from '../player/ReviveGetUp';
 import { actionKey } from '../ui/InteractionPrompts';
+import { RingDonning } from '../weapons/RingDonning';
+import type { MeleeArmDriver } from '../weapons/ViewArms';
 import type { ArenaRingMachine, RingMachineDisplay } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 
-/** How strongly the worn ring flares when put on or recharged, and when it fires. */
-const WEAR_PULSE = 0.8;
+/** How strongly the worn ring flares when recharged, and when it fires (putting it on flares it on its own). */
+const RECHARGE_PULSE = 0.8;
 const FIRE_PULSE = 1;
 /** The machines' jingle plays at full volume up to here, then fades out by JINGLE_RANGE (metres). */
 const JINGLE_FULL_VOLUME_DISTANCE = 2.5;
@@ -39,12 +41,15 @@ export function protectionVignette(elapsed: number, remaining: number): number {
  * Rings in a single-player Zombies run. Sells and recharges them at the
  * map's powered ring machines through the shared wallet, fires their
  * effects (a charged Resurrection ring takes the place of a death, a
- * Sleight of Hand ring speeds every reload) and keeps the first-person
- * hand, the machines, the weapons and the HUD in step with the run's `PlayerRings`.
- * `ZombiesMode` delegates every ring concern here.
+ * Sleight of Hand ring speeds every reload, an Armour ring doubles the
+ * max health), plays the hands putting a new ring on and keeps the
+ * first-person hand, the machines, the weapons, the health and the HUD in
+ * step with the run's `PlayerRings`. `ZombiesMode` delegates every ring
+ * concern here.
  */
 export class ZombiesRings {
   private readonly rings = new PlayerRings();
+  private readonly donning: RingDonning;
   private readonly forward = new THREE.Vector3();
   private readonly listener = new THREE.Vector3();
   /** Seconds into getting back up after a resurrection, and how long it takes; null when standing. */
@@ -58,8 +63,26 @@ export class ZombiesRings {
     private readonly ctx: ModeContext,
     private readonly machines: ReadonlyArray<ArenaRingMachine>,
     private readonly economy: PlayerEconomy,
+    private readonly health: PlayerHealth,
   ) {
+    this.donning = new RingDonning(ctx.player.camera, ctx.handRings);
     this.present();
+  }
+
+  /** True while the hands are putting a ring on: both are busy. */
+  get isDonning(): boolean {
+    return this.donning.isAnimating;
+  }
+
+  /** Uses the same effects and presentation as a purchase, on any map. */
+  grant(ringId: RingId): void {
+    this.rings.grant(ringId);
+    this.processEvents();
+  }
+
+  /** Putting a ring on borrows both arms while it plays. */
+  get armDriver(): MeleeArmDriver | null {
+    return this.donning.isAnimating ? this.donning : null;
   }
 
   /** Prompt of the faced machine while it has something to sell (or waits for power), else null. */
@@ -149,6 +172,7 @@ export class ZombiesRings {
    * on its own once standing) and the slump adds to the recoil rotation.
    */
   update(dt: number): void {
+    this.donning.update(dt);
     this.updateProtection(dt);
     if (this.getUpElapsed === null) return;
     this.getUpElapsed += Math.max(0, dt);
@@ -209,6 +233,7 @@ export class ZombiesRings {
     this.protectionRemaining = 0;
     this.ctx.hud.setProtection(0);
     this.rings.reset();
+    this.donning.reset();
     this.ctx.handRings.clear();
     this.present();
   }
@@ -245,18 +270,20 @@ export class ZombiesRings {
         case 'purchased':
           audio.playRingPurchase();
           hud.showRoundBanner(name, t('banner.ringWorn', { finger: t(`ring.finger.${ring.finger}`) }));
+          this.donning.start(ring.finger);
           break;
         case 'recharged':
           audio.playRingRecharge();
           hud.showRoundBanner(name, t('banner.ringRecharged'));
+          handRings.pulse(ring.finger, RECHARGE_PULSE);
           break;
         case 'consumed':
           audio.playResurrection();
           hud.flashRing();
           hud.showRoundBanner(name, t('banner.ringActivated'));
+          handRings.pulse(ring.finger, FIRE_PULSE);
           break;
       }
-      handRings.pulse(ring.finger, event.type === 'consumed' ? FIRE_PULSE : WEAR_PULSE);
     }
     this.rings.clearEvents();
   }
@@ -275,9 +302,23 @@ export class ZombiesRings {
     return scale;
   }
 
-  /** Hand, machines, HUD and the weapons' reload speed read the current rings. */
+  /**
+   * Max-health multiplier of the worn rings: the strongest charged health
+   * ring, or 1 without one. Passive, like the reload rings.
+   */
+  private maxHpScale(): number {
+    let scale = 1;
+    for (const { ringId, charges } of this.rings.worn) {
+      const { effect } = RING_DEFINITIONS[ringId];
+      if (effect.kind === 'maxHealth' && charges > 0) scale = Math.max(scale, effect.maxHpScale);
+    }
+    return scale;
+  }
+
+  /** Hand, machines, HUD, max health and the weapons' reload speed read the current rings. */
   private present(): void {
     this.ctx.setReloadTimeScale(this.reloadTimeScale());
+    this.health.setMaxHpScale(this.maxHpScale());
     const worn = this.rings.worn;
     for (const { ringId, finger, charges } of worn) {
       this.ctx.handRings.show(finger, charges > 0 ? 'charged' : 'spent', RING_DEFINITIONS[ringId].glowColor);

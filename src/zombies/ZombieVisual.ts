@@ -13,12 +13,13 @@ import { ShinyStars } from './ShinyStars';
 import { ZombieElectricArcs } from './ZombieElectricArcs';
 import { ZombieLimb } from './ZombieLimb';
 import { buildZombieRestClips, type ZombieRestClips } from './ZombieMotionClips';
-import { ZOMBIE_DEATH_PROFILES, type ZombieDeathStyle } from './ZombieDeath';
+import { ZOMBIE_DEATH_PROFILES, type ZombieFallStyle } from './ZombieDeath';
 import { sampleMeleeMotion, sampleWindowMotion, boardPullProgress,
   BOARD_PULL_DISTANCE, BOARD_PULL_DROP, BOARD_PULL_DURATION } from './ZombieAttackMotion';
 import {
   ZOMBIE_ATTACK_LUNGE,
   ZOMBIE_ATTACK_HIT_MOMENT,
+  ZOMBIE_BARRIER_ATTACK_HIT_MOMENT,
   ZOMBIE_DEATH_FALL,
   ZOMBIE_TYPE_CONFIGS,
   type ZombieModelId,
@@ -486,6 +487,8 @@ function placeOnAnchor(
 export class ZombieVisual {
   readonly root = new THREE.Group();
   readonly modelId: ZombieModelId;
+  /** Body tint of this instance; gibs reuse it so the pieces match the body. */
+  readonly tint: number;
   /**
    * Animated anchor the torso hitbox rides: the Hips bone on a GLB rig, the
    * hips group on the procedural fallback, or `root` as a last resort.
@@ -497,7 +500,7 @@ export class ZombieVisual {
   private readonly mixer: THREE.AnimationMixer | null = null;
   private readonly actions = new Map<ZombieState, THREE.AnimationAction>();
   /** One generated fall per death style; empty on the procedural fallback. */
-  private readonly deathActions = new Map<ZombieDeathStyle, THREE.AnimationAction>();
+  private readonly deathActions = new Map<ZombieFallStyle, THREE.AnimationAction>();
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
@@ -558,7 +561,7 @@ export class ZombieVisual {
   private deathLean = 0;
   private deathSide = 0;
   private deathTime = 0;
-  private deathStyle: ZombieDeathStyle = 'knockback';
+  private deathStyle: ZombieFallStyle = 'knockback';
   /** Body yaw the fall turns towards so it travels away from the impact. */
   private deathTwist = 0;
   private readonly poseBones: THREE.Object3D[] = [];
@@ -605,6 +608,7 @@ export class ZombieVisual {
     castShadow = true,
   ) {
     this.modelId = modelId;
+    this.tint = tint;
     this.modelConfig = ZOMBIE_MODELS[modelId];
 
     if (source) {
@@ -902,7 +906,7 @@ export class ZombieVisual {
    * body-local direction of the killing impact; impact-following falls turn
    * up to DEATH_MAX_TWIST towards it so a side hit never falls sideways-on.
    */
-  public prepareDeath(style: ZombieDeathStyle, pushX: number, pushZ: number): void {
+  public prepareDeath(style: ZombieFallStyle, pushX: number, pushZ: number): void {
     this.deathStyle = style;
     const profile = ZOMBIE_DEATH_PROFILES[style];
     if (!profile.followsImpact || (pushX === 0 && pushZ === 0)) {
@@ -929,7 +933,8 @@ export class ZombieVisual {
         this.poseFrom[i].copy(this.poseBones[i].quaternion);
         this.positionFrom[i].copy(this.poseBones[i].position);
       }
-      this.transitionDuration = state === 'death' ? DEATH_CROSSFADE_SECONDS : CROSSFADE_SECONDS;
+      this.transitionDuration = state === 'death' ? DEATH_CROSSFADE_SECONDS
+        : state === 'attack' ? Math.min(CROSSFADE_SECONDS, ZOMBIE_ATTACK_HIT_MOMENT * 0.5) : CROSSFADE_SECONDS;
       this.transitionTime = state === 'spawn' || (state === 'barrierBreak' && previous === 'barrierAttack')
         ? this.transitionDuration : 0;
     }
@@ -973,7 +978,9 @@ export class ZombieVisual {
         base.reset();
         base.enabled = true;
         base.play();
-        if (this.currentAction) base.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
+        // Settle the base before the fast melee contact so wrists and shoulders
+        // do not keep blending out of locomotion through the strike.
+        if (this.currentAction) base.crossFadeFrom(this.currentAction, this.transitionDuration, false);
         this.currentAction = base;
       }
       this.locomotionAction = base;
@@ -1414,7 +1421,7 @@ export class ZombieVisual {
           sampleMeleeMotion(progress, neutralZ, 0.24, z, z - 0.08, neutralZ),
         );
       } else {
-        const elapsed = progress * this.attackDuration - ZOMBIE_ATTACK_HIT_MOMENT;
+        const elapsed = progress * this.attackDuration - ZOMBIE_BARRIER_ATTACK_HIT_MOMENT;
         const pull = boardPullProgress(elapsed);
         const release = smoothStep(Math.max(0, Math.min(1, (elapsed - BOARD_PULL_DURATION) / 0.095)));
         // Wind-up stays behind the contact plane. The shoulder drives the

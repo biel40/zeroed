@@ -4,14 +4,14 @@ import {
   createZombieDeathPose,
   sampleZombieDeath,
   ZOMBIE_DEATH_PROFILES,
-  ZOMBIE_DEATH_STYLES,
+  ZOMBIE_FALL_STYLES,
   type ZombieDeathProfile,
-  type ZombieDeathStyle,
+  type ZombieFallStyle,
 } from './ZombieDeath';
 
 export interface ZombieRestClips {
   readonly idle: THREE.AnimationClip;
-  readonly deaths: ReadonlyMap<ZombieDeathStyle, THREE.AnimationClip>;
+  readonly deaths: ReadonlyMap<ZombieFallStyle, THREE.AnimationClip>;
 }
 
 const IDLE_DURATION = 3.2;
@@ -262,8 +262,8 @@ export function buildZombieRestClips(root: THREE.Object3D, height: number): Zomb
     }
     return lifts;
   };
-  const deaths = new Map<ZombieDeathStyle, THREE.AnimationClip>();
-  for (const style of ZOMBIE_DEATH_STYLES) {
+  const deaths = new Map<ZombieFallStyle, THREE.AnimationClip>();
+  for (const style of ZOMBIE_FALL_STYLES) {
     const profile = ZOMBIE_DEATH_PROFILES[style];
     const frames = Math.ceil(profile.duration * DEATH_FPS);
     const lifts = floorLifts(profile, frames);

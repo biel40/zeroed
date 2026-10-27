@@ -5,6 +5,7 @@ import { findVaultStart, openingDepth, vaultProgress, WINDOW_VAULT, type VaultOp
 import {
   ZOMBIE_ATTACK_DURATION,
   ZOMBIE_ATTACK_HIT_MOMENT,
+  ZOMBIE_BARRIER_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_RECOVERY,
   ZOMBIE_BARRIER_ATTACK_RECOVERY,
   ZOMBIE_BARRIER_BREAK_FINISH_DURATION,
@@ -20,6 +21,8 @@ import {
 } from './ZombieConfig';
 import { ZOMBIE_MODELS, ZombieVisual } from './ZombieVisual';
 import { resolveZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from './ZombieDeath';
+import type { GibWalls } from './GibWalls';
+import { ZombieGibs } from './ZombieGibs';
 
 export type ZombieState =
   | 'spawn'
@@ -30,7 +33,14 @@ export type ZombieState =
   | 'barrierAttack'
   | 'barrierBreak';
 
-export type ZombieDeathKind = 'normal' | 'raygun';
+/** Lifecycle of the death: a fallen corpse, the Ray Gun dissolve, or a body blown into gibs. */
+export type ZombieDeathKind = 'normal' | 'raygun' | 'shatter';
+
+/** Death lifecycle a replicated style implies; the Ray Gun dissolve also follows a lethal headshot locally. */
+function deathKindOf(style: ZombieDeathStyle): ZombieDeathKind {
+  if (style === 'blast') return 'raygun';
+  return style === 'shatter' ? 'shatter' : 'normal';
+}
 
 // Shared invisible hitbox geometry across every pooled zombie.
 let torsoGeometry: THREE.CapsuleGeometry | null = null;
@@ -103,10 +113,13 @@ export class Zombie implements HitTarget {
   private deathGroundY = 0;
   /** Window this body is climbing through, from outside its sill until it is clear inside. */
   private vaultOpening: VaultOpening | null = null;
+  /** Pieces shown in place of the body after a 'shatter' death; built on the first one. */
+  private gibs: ZombieGibs | null = null;
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
   readonly impact = new THREE.Vector2();
 
-  constructor(visual?: ZombieVisual) {
+  /** `gibWalls` is the map wall set shared by the pool; a shattered body's pieces bounce off it. */
+  constructor(visual?: ZombieVisual, private readonly gibWalls: GibWalls = { boxes: [] }) {
     this.visual = visual ?? new ZombieVisual('walker', null, ZOMBIE_MODELS.walker.tints[0]);
 
     // Hitboxes are parented onto the animated rig (bones, or the procedural
@@ -185,6 +198,8 @@ export class Zombie implements HitTarget {
     this.visual.setDissolveProgress(0);
     this.visual.setOpacity(1);
     this.visual.setSpawnRise(0);
+    this.visual.root.visible = true;
+    this.gibs?.hide();
     this.visual.setState('spawn');
     this.group.visible = true;
   }
@@ -228,8 +243,8 @@ export class Zombie implements HitTarget {
     this.reactToDamage(amount, headshot, sourceX, sourceZ);
     if (this.hp <= 0) {
       const killSource = source === 'normal' ? undefined : source;
-      const deathKind: ZombieDeathKind = killSource === 'raygun' ? 'raygun' : 'normal';
-      this.enterDeath(resolveZombieDeathStyle(killSource, headshot, this.impact.y), deathKind, headshot);
+      const style = resolveZombieDeathStyle(killSource, headshot, this.impact.y);
+      this.enterDeath(style, killSource === 'raygun' ? 'raygun' : deathKindOf(style), headshot);
       return true;
     }
     return false;
@@ -246,7 +261,7 @@ export class Zombie implements HitTarget {
   public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1): void {
     if (!this.isAlive) return;
     this.impact.set(impactX, impactZ);
-    this.enterDeath(style, style === 'blast' ? 'raygun' : 'normal');
+    this.enterDeath(style);
   }
 
   /** ZEUS-77 hit: residual arcs crawl over the body, surviving or not. */
@@ -287,13 +302,24 @@ export class Zombie implements HitTarget {
 
   private enterDeath(
     style: ZombieDeathStyle,
-    deathKind: ZombieDeathKind = style === 'blast' ? 'raygun' : 'normal',
+    deathKind: ZombieDeathKind = deathKindOf(style),
     headshot = false,
   ): void {
     this.deathGroundY = this.position.y;
     this.deathStyle = style;
     this.deathKind = deathKind;
     this.state = 'death';
+    this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
+    if (style === 'shatter') {
+      // The body is gone at once; its pieces take the corpse's place and time.
+      this.visual.root.visible = false;
+      if (!this.gibs) {
+        this.gibs = new ZombieGibs(this.visual.tint, this.gibWalls);
+        this.group.add(this.gibs.group);
+      }
+      this.gibs.burst(this.impact.x, this.impact.y, ZOMBIE_TYPE_CONFIGS[this.typeId].bodyScale[1], this.group.rotation.y);
+      return;
+    }
     this.visual.prepareDeath(style, this.impact.x, this.impact.y);
     this.visual.setState('death');
     if (style === 'shock') this.electrify();
@@ -302,7 +328,6 @@ export class Zombie implements HitTarget {
       this.tmpImpactOrigin.set(0, headshot ? 1.55 : 1.05, 0);
       this.visual.setDissolveProgress(0.01, this.tmpImpactOrigin);
     } else {
-      this.stateTimer = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
       this.visual.setDissolveProgress(0);
     }
   }
@@ -319,7 +344,7 @@ export class Zombie implements HitTarget {
     return true;
   }
 
-  /** Starts the dedicated barrier strike. Gameplay impact timing stays aligned with melee. */
+  /** Starts the dedicated barrier strike with its own deliberate impact timing. */
   tryBarrierAttack(): boolean {
     if (!this.isAlive || this.attackCooldown > 0 || this.state === 'barrierAttack') return false;
     this.state = 'barrierAttack';
@@ -408,7 +433,8 @@ export class Zombie implements HitTarget {
         // callback can now continue from the exact displayed contact pose.
         this.visual.update(dt, visualSpeed);
         visualUpdated = true;
-        if (!this.attackApplied && elapsed >= ZOMBIE_ATTACK_HIT_MOMENT) {
+        const hitMoment = this.state === 'attack' ? ZOMBIE_ATTACK_HIT_MOMENT : ZOMBIE_BARRIER_ATTACK_HIT_MOMENT;
+        if (!this.attackApplied && elapsed + 1e-9 >= hitMoment) {
           this.attackApplied = true;
           this.onAttackLanded?.();
         }
@@ -438,6 +464,17 @@ export class Zombie implements HitTarget {
         }
         const total = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
         const elapsed = total - Math.max(0, this.stateTimer);
+        if (this.deathKind === 'shatter') {
+          // The hidden body needs no animation; only its pieces move.
+          this.gibs?.update(dt, Math.max(0, elapsed - ZOMBIE_DEATH_FALL - ZOMBIE_CORPSE_LINGER) / ZOMBIE_DEATH_FADE);
+          if (this.stateTimer <= 0) {
+            this.group.visible = false;
+            this.gibs?.hide();
+            this.visual.root.visible = true;
+            this.onDeathFinished?.();
+          }
+          return;
+        }
         this.visual.setDeathProgress(Math.min(1, elapsed / ZOMBIE_DEATH_FALL));
         if (elapsed > ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER) {
           const fade =
@@ -463,6 +500,7 @@ export class Zombie implements HitTarget {
 
   public dispose(): void {
     this.visual.dispose();
+    this.gibs?.dispose();
   }
 
   private setWalk(): void {

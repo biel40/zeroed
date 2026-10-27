@@ -27,6 +27,17 @@
   mano en primera persona como senal principal (el HUD solo apoya). Su efecto
   es dato en la definicion mas un gancho en el modo; no hay un framework de
   modificadores. Las maquinas son una capacidad opcional del mapa.
+- **Station 33 es el mapa base.** Lo que un mapa ofrece al jugador (anillos
+  y sus maquinas, electricidad e interruptor, puertas de pago, wall buys,
+  caja, bancos de taquillas, solidos de atrezo) se construye una vez y lo
+  reutilizan todos los mapas: la logica vive detras de los contratos de
+  `ZombieArena` y en el modo, las piezas del mundo en
+  `src/zombies/maps/shared/` (`MapBuildKit`, `MapPower`, `RingLocker`,
+  `PowerLever`, `LockerBank`, `SolidProxy`, `Cobwebs`), y cada mapa solo
+  aporta datos de colocacion y su "look" (medidas, materiales con los nombres
+  que piden las piezas, carteles). Una pieza nueva que hoy solo use un mapa
+  se escribe ya sin depender de el; si algo nace atado a un mapa y otro lo
+  necesita, se mueve a `shared/` en lugar de copiarse.
 - **Armas declarativas.** `WeaponDefinition` concentra cadencia, dano, recoil,
   municion, ADS, proyectil y presentacion; no hay subclases por arma.
 - **Economia por autoridad.** `PlayerEconomy` centraliza Points; el modo decide

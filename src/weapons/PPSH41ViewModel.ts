@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cylinderZ, extrudeProfile, profilePath, profileShape, shapeWidth, type ProfilePoint } from './ProfileGeometry';
 import { steelWearTexture, woodGrainTexture } from './ProceduralTextures';
+import { buildMagazineRounds, CARTRIDGES, cartridgeMaterials, feedLipSeats } from './MagazineRounds';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -317,6 +318,11 @@ export function buildPPSH41(config: ViewModelConfig): BuiltProcedural {
   }
   add('drum-winding-latch', new RoundedBoxGeometry(0.033, 0.007, 0.004, 1, 0.001), steel, magazine, 0, mag.centerY, mag.depth / 2 + 0.005);
   add('drum-latch-pin', cylinderZ(0.004, 0.004, 0.006, 12), edge, magazine, 0, mag.centerY, mag.depth / 2 + 0.006);
+  // The top rounds of the drum show at the feed lips of its neck.
+  const { brass, copper } = cartridgeMaterials();
+  const cartridge = CARTRIDGES.tokarev762x25;
+  const rounds = buildMagazineRounds('ppsh41-magazine-rounds', cartridge, feedLipSeats(cartridge, 0.0085, 0.0165, 0.003), brass, copper);
+  magazine.add(rounds);
 
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
@@ -326,6 +332,6 @@ export function buildPPSH41(config: ViewModelConfig): BuiltProcedural {
     ejectionPosition: new THREE.Vector3(0.026, 0.008, -0.053).multiplyScalar(config.scale),
     sightY: config.sightHeight * config.scale,
     openBolt: handle,
-    reloadParts: { magazine, handle },
+    reloadParts: { magazine, handle, rounds },
   };
 }

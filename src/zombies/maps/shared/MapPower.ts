@@ -1,10 +1,10 @@
 /**
- * The station's mains, fed by the machine room's main switch. Every run
- * starts with it off (the lights run dim and flickering on what is left);
- * throwing the switch turns it on for the rest of the run: the lockers
- * that wait for it start selling and every machine blazes.
+ * A map's mains, fed by its power switch. Every run starts with it off;
+ * throwing the switch turns it on for the rest of the run: the machines
+ * that wait for it start selling and every machine glows brighter. The
+ * arena owns one and hands it to its machines.
  */
-export class Station33Power {
+export class MapPower {
   private live = false;
 
   get on(): boolean {

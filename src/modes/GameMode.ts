@@ -41,7 +41,7 @@ export interface ModeContext {
    * Adds a weapon to the player inventory, honouring the mode's slot cap.
    * Mystery Box and Wall Buy grants arrive with fresh ammo.
    */
-  grantWeapon(id: WeaponId): boolean;
+  grantWeapon(id: WeaponId, replacePinned?: boolean): boolean;
   canGrantWeapon(id: WeaponId): boolean;
   hasWeapon(id: WeaponId): boolean;
   /** Weapon selected when an interaction begins. */
@@ -136,6 +136,9 @@ export interface GameMode {
   getCinematicCamera?(): THREE.Camera | null;
   /** Ordered desktop keyboard input for mode-owned developer commands. */
   onKeyInput?(key: string): void;
+  /** Optional local developer tools; absent in cooperative modes. */
+  isDeveloperConsoleEnabled?(): boolean;
+  executeDeveloperCommand?(line: string): string;
   /** Interact key (E) pressed while gameplay input is active. */
   onInteract?(): void;
   /** Dedicated quick-melee action; does not consume an inventory slot. */

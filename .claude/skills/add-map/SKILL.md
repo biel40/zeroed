@@ -5,6 +5,8 @@ description: Anadir un mapa nuevo de Zombies a Zeroed (registro, arena que cumpl
 
 # Anadir un mapa a Zeroed
 
+Station 33 es el mapa base: un mapa nuevo se monta con sus sistemas, no los
+reimplementa (ver "Station 33 es el mapa base" en `docs/DECISIONS.md`).
 Referencia completa: Station 33 (`src/zombies/maps/Station33Config.ts`,
 `Station33Arena.ts`, `station33/`, `tests/station33.test.ts`,
 `docs/STATION_33.md`). Sigue AGENTS.md: los modos no dependen de un mapa
@@ -41,7 +43,16 @@ Reutiliza lo compartido antes de crear algo: `WindowBarrier`, `PointDoor` /
 - `ArenaStructure` (muros y huecos);
 - `StaticMeshBatch` (atrezo en una sola malla) y `BoxUVs`;
 - `PointLightBudget`, `AmbientEventScheduler` y `ArenaAmbience`;
-- `BloodDecalTexture` y `ProceduralNoise`.
+- `BloodDecalTexture` y `ProceduralNoise`;
+- `MapBuildKit`, que el `<Mapa>BuildContext` extiende (grupo, estructura, lote y material de colision);
+- `addSolidProxy` (colisionador de atrezo), `Cobwebs`, y `LockerBank` / `WallFrame` (bancos de taquillas);
+- `RingLocker` (maquina de anillos), `MapPower` y `PowerLever` (electricidad e interruptor, para `ringMachines` y `powerSwitch`).
+
+Cada pieza pide sus materiales por nombre (`greySteel`, `paintedSteel`...):
+el `<Mapa>Materials` los define con esos nombres y el mapa solo da su look y
+su colocacion (en Station 33, `station33/Station33Machines.ts`). Si algo que
+necesitas solo existe dentro de `station33/`, muevelo a `shared/` y haz que
+Station 33 lo use desde alli.
 
 Tambien la navegacion de `src/zombies/navigation/` (`NavigationGrid`,
 `ZombieNavigationService`). Para los pasajes ocultos de los spawns, toma como

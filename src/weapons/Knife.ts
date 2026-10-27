@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { ARM_FOREARM_LENGTH, ARM_UPPER_LENGTH } from './ArmRig';
+import { buildKnifeModel } from './KnifeViewModel';
 import { RIGHT_SHOULDER } from './ViewArms';
 import type { MeleeArmDriver } from './ViewArms';
 
 export const KNIFE_ATTACK_DURATION = 0.72;
-export const KNIFE_RANGE = 2.05;
+export const KNIFE_RANGE = 2.4;
 
 export function knifeDamageForRound(maxHp: number, round: number): number {
   return maxHp / Math.max(1, round);
@@ -46,13 +47,14 @@ const HAND_IN_FOREARM = (() => {
 // Hidden below the right edge of the screen.
 const REST: ArmPose = { yaw: -0.879, pitch: -2.067, roll: 0.394, flex: 2.009, twist: -0.851 };
 // Raised on the right, edge already facing the cut.
-const DRAW: ArmPose = { yaw: 0.144, pitch: 0.168, roll: -0.295, flex: 1.27, twist: -0.079 };
+const DRAW: ArmPose = { yaw: -0.12, pitch: 0.25, roll: -0.295, flex: 1.27, twist: -0.079 };
 // Wind-up: the shoulder pulls the blade back against the cut before release.
-const COCK: ArmPose = { yaw: 0.092, pitch: 0.214, roll: -0.334, flex: 1.27, twist: -0.112 };
+const COCK: ArmPose = { yaw: -0.17, pitch: 0.29, roll: -0.334, flex: 1.27, twist: -0.112 };
 // Blade spanning the crosshair: the instant the cut is resolved.
-const CROSS: ArmPose = { yaw: 0.375, pitch: 0.271, roll: -0.128, flex: 0.668, twist: -0.034 };
-const CUT_END: ArmPose = { yaw: 0.819, pitch: 0.118, roll: -0.164, flex: 0.443, twist: 0.202 };
-const FOLLOW: ArmPose = { yaw: 0.948, pitch: 0.033, roll: -0.247, flex: 0.414, twist: 0.274 };
+const CROSS: ArmPose = { yaw: 0.48, pitch: 0.37, roll: -0.22, flex: 0.668, twist: -0.034 };
+// Carry the cut across at chest height before dropping into recovery.
+const CUT_END: ArmPose = { yaw: 1.12, pitch: 0.48, roll: -0.24, flex: 0.443, twist: 0.202 };
+const FOLLOW: ArmPose = { yaw: 1.24, pitch: 0.38, roll: -0.3, flex: 0.414, twist: 0.274 };
 // Recovery drops the arm below the cut instead of retracing it.
 const RETRACT: ArmPose = { yaw: 0.89, pitch: -1.404, roll: -0.045, flex: 1.765, twist: 0.503 };
 
@@ -272,15 +274,6 @@ export class Knife implements MeleeArmDriver {
   }
 
   private buildView(): void {
-    const bladeMaterial = new THREE.MeshStandardMaterial({
-      color: 0xb9bdba, metalness: 0.88, roughness: 0.3, envMapIntensity: 1.4,
-    });
-    const edgeMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe2e5df, metalness: 0.92, roughness: 0.2, envMapIntensity: 1.7,
-    });
-    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x25282a, metalness: 0.78, roughness: 0.45 });
-    const wood = new THREE.MeshStandardMaterial({ color: 0x4b2415, metalness: 0.03, roughness: 0.78 });
-
     this.shoulder.name = 'knife-upper-arm';
     this.shoulder.position.copy(RIGHT_SHOULDER);
     this.root.add(this.shoulder);
@@ -297,48 +290,6 @@ export class Knife implements MeleeArmDriver {
     knife.position.set(0, 0, -HANDLE_CENTER).applyQuaternion(knife.quaternion);
     this.hand.add(knife);
 
-    const bladeShape = new THREE.Shape();
-    bladeShape.moveTo(0, -0.045);
-    bladeShape.lineTo(0.31, -0.052);
-    bladeShape.lineTo(0.46, 0.012);
-    bladeShape.lineTo(0.31, 0.065);
-    bladeShape.lineTo(0.04, 0.06);
-    bladeShape.lineTo(0, 0.035);
-    bladeShape.closePath();
-    const bladeGeometry = new THREE.ExtrudeGeometry(bladeShape, {
-      depth: 0.012, bevelEnabled: true, bevelSegments: 1, bevelSize: 0.004, bevelThickness: 0.003,
-    });
-    bladeGeometry.rotateY(Math.PI / 2);
-    bladeGeometry.translate(-0.006, 0.025, -0.055);
-    const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-    blade.name = 'knife-blade';
-    knife.add(blade);
-
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.012, 0.31), edgeMaterial);
-    edge.name = 'knife-edge';
-    edge.position.set(-0.007, -0.018, -0.25);
-    edge.rotation.x = -0.035;
-    knife.add(edge);
-
-    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.035), darkMetal);
-    guard.name = 'knife-guard';
-    guard.position.z = -0.055;
-    guard.rotation.z = 0.08;
-    knife.add(guard);
-    const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.033, 0.1, 4, 10), wood);
-    grip.name = 'knife-grip';
-    grip.rotation.x = Math.PI / 2;
-    grip.position.z = HANDLE_CENTER;
-    knife.add(grip);
-    for (const z of [0.012, 0.138]) {
-      const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.004, 5, 10), darkMetal);
-      wrap.rotation.x = Math.PI / 2;
-      wrap.position.z = z;
-      knife.add(wrap);
-    }
-    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 7), darkMetal);
-    pommel.position.z = 0.155;
-    pommel.scale.z = 0.65;
-    knife.add(pommel);
+    buildKnifeModel(knife);
   }
 }

@@ -28,11 +28,14 @@ export type SignId =
   | 'main-switch'
   | 'high-voltage'
   | 'men-at-work'
-  | 'mimic-diagram';
+  | 'mimic-diagram'
+  | 'militia'
+  | 'evidence'
+  | 'wanted';
 
 const ATLAS_WIDTH = 1024;
-/** One 128 px row below the original square, for the machine room's plates. */
-const ATLAS_HEIGHT = 1152;
+/** Two 128 px rows below the original square: the machine room's plates, then the militia post's. */
+const ATLAS_HEIGHT = 1280;
 
 /** Atlas cells in canvas pixels: x, y, width, height. */
 const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
@@ -58,6 +61,9 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   'high-voltage': [0, 1024, 256, 128],
   'men-at-work': [256, 1024, 256, 128],
   'mimic-diagram': [512, 1024, 512, 128],
+  militia: [0, 1152, 256, 128],
+  evidence: [256, 1152, 256, 128],
+  wanted: [512, 1152, 256, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -246,6 +252,25 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   // Painted last so the older cells keep their weathering.
   paintTrainShedSigns(context, random);
   paintSubstationSigns(context, random);
+  paintMilitiaSigns(context, random);
+}
+
+/**
+ * Militia post: the door plate, the evidence-room plate over the Armour
+ * locker and a "wanted" bulletin whose photographs were torn off.
+ */
+function paintMilitiaSigns(context: CanvasRenderingContext2D, random: () => number): void {
+  enamelPlate(context, 'militia', '#1c2a3a', '#b9ae8c', '#e2d8b8', ['МИЛИЦИЯ'], 46, random);
+  enamelPlate(context, 'evidence', '#d9d3c1', '#3a3a36', '#9a1f16', ['ВЕЩЕСТВЕННЫЕ', 'ДОКАЗАТЕЛЬСТВА'], 27, random);
+  const [x, y, width, height] = SIGN_REGIONS.wanted;
+  tornPaper(context, 'wanted', 0.92, random);
+  lettering(context, 'РАЗЫСКИВАЕТСЯ', x + width / 2, y + 18, 24, '#8f2018');
+  // Pale squares where the photographs were glued, then torn away.
+  context.fillStyle = 'rgba(214, 206, 182, 0.9)';
+  for (const left of [x + 18, x + 136]) context.fillRect(left, y + 36, 46, 56);
+  printLines(context, x + 70, y + 40, 56, 4, random);
+  printLines(context, x + 188, y + 40, 52, 4, random);
+  weather(context, x, y, width, height, random, 30);
 }
 
 /**

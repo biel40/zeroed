@@ -51,6 +51,8 @@ interface Projectile extends TrajectoryState {
   config: ProjectileConfig | null;
   weapon: Weapon | null;
   tracer: THREE.Mesh;
+  /** Zombies this round has already passed through; their hitboxes no longer stop it. */
+  readonly pierced: unknown[];
 }
 
 /**
@@ -75,6 +77,8 @@ export class BallisticsSystem {
   private readonly projectiles: Projectile[] = [];
   private readonly raycaster = new THREE.Raycaster();
   private readonly hits: THREE.Intersection[] = [];
+  /** Segment hits minus the zombies the round already pierced. */
+  private readonly openHits: THREE.Intersection[] = [];
   private readonly segmentOrigin = new THREE.Vector3();
   private readonly segmentDirection = new THREE.Vector3();
   private readonly hitNormal = new THREE.Vector3();
@@ -111,6 +115,7 @@ export class BallisticsSystem {
         config: null,
         weapon: null,
         tracer,
+        pierced: [],
       });
     }
   }
@@ -129,6 +134,7 @@ export class BallisticsSystem {
     p.travelled = 0;
     p.config = config;
     p.weapon = weapon;
+    p.pierced.length = 0;
     p.tracer.visible = true;
   }
 
@@ -163,24 +169,7 @@ export class BallisticsSystem {
         this.raycaster.intersectObjects(this.colliders, false, this.hits);
 
         if (this.hits.length > 0) {
-          // Head-priority resolution: see resolveSegmentHit.
-          const hit = resolveSegmentHit(this.hits) ?? this.hits[0];
-          p.active = false;
-          p.tracer.visible = false;
-
-          if (hit.face) {
-            this.hitNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
-          } else {
-            this.hitNormal.set(0, 1, 0);
-          }
-
-          const target = hit.object.userData.target as HitTarget | undefined;
-          if (target) {
-            target.onHit();
-            this.onTargetHit?.(target, p.travelled + hit.distance, hit.point, this.hitNormal, hit.object, p.weapon);
-          } else {
-            this.onEnvironmentHit?.(hit.point, this.hitNormal, hit.object);
-          }
+          this.resolveImpacts(p);
         } else if (p.travelled >= p.config.maxDistance) {
           p.active = false;
           p.tracer.visible = false;
@@ -191,6 +180,45 @@ export class BallisticsSystem {
         this.segmentDirection.set(p.vx, p.vy, p.vz).normalize();
         p.tracer.position.set(p.x, p.y, p.z);
         p.tracer.quaternion.setFromUnitVectors(Z_AXIS, this.segmentDirection);
+      }
+    }
+  }
+
+  /**
+   * Reports this segment's impacts nearest first. A round with
+   * `maxTargets` keeps going through zombies (each one once) until it has
+   * hit that many; anything else, or the last zombie, stops it.
+   */
+  private resolveImpacts(p: Projectile): void {
+    const maxTargets = p.config?.maxTargets ?? 1;
+    while (p.active) {
+      this.openHits.length = 0;
+      for (const hit of this.hits) {
+        if (!p.pierced.includes(hit.object.userData.zombie)) this.openHits.push(hit);
+      }
+      if (this.openHits.length === 0) return;
+
+      // Head-priority resolution: see resolveSegmentHit.
+      const hit = resolveSegmentHit(this.openHits) ?? this.openHits[0];
+      const zombie: unknown = hit.object.userData.zombie;
+      if (zombie) p.pierced.push(zombie);
+      if (!zombie || p.pierced.length >= maxTargets) {
+        p.active = false;
+        p.tracer.visible = false;
+      }
+
+      if (hit.face) {
+        this.hitNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+      } else {
+        this.hitNormal.set(0, 1, 0);
+      }
+
+      const target = hit.object.userData.target as HitTarget | undefined;
+      if (target) {
+        target.onHit();
+        this.onTargetHit?.(target, p.travelled + hit.distance, hit.point, this.hitNormal, hit.object, p.weapon);
+      } else {
+        this.onEnvironmentHit?.(hit.point, this.hitNormal, hit.object);
       }
     }
   }

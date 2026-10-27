@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import type { SurfaceType } from '../../../shooting/HitTarget';
 import { placement } from '../shared/StaticMeshBatch';
-import { CONSIGNA, CONSIGNA_LOCKER } from '../Station33Config';
-import { addLockerBank, ringLockersOn, WallFrame, type LockerBank } from './LockerBank';
+import { addLockerBank, ringLockersOn, WallFrame, type LockerBank } from '../shared/LockerBank';
+import { addSolidProxy } from '../shared/SolidProxy';
+import { CONSIGNA, CONSIGNA_LOCKER, station33RingLockersIn } from '../Station33Config';
+import { station33LockerLook } from './Station33Machines';
 import type { Station33BuildContext } from './Station33BuildContext';
 
 const { hall } = CONSIGNA;
@@ -13,7 +14,7 @@ const EAST_WALL = new WallFrame('z', hall.maxX, -1);
 const LOCKER_BANKS: ReadonlyArray<LockerBank> = [
   { frame: NORTH_WALL, from: hall.minX, to: 16.45, ajar: [3], ringLockers: [] },
   { frame: NORTH_WALL, from: 18.75, to: hall.maxX - CONSIGNA_LOCKER.depth, ajar: [], ringLockers: [] },
-  { frame: EAST_WALL, from: hall.minZ + CONSIGNA_LOCKER.depth, to: 13.8, ajar: [1, 13], ringLockers: ringLockersOn(EAST_WALL, 'consigna') },
+  { frame: EAST_WALL, from: hall.minZ + CONSIGNA_LOCKER.depth, to: 13.8, ajar: [1, 13], ringLockers: ringLockersOn(EAST_WALL, station33RingLockersIn('consigna'), CONSIGNA_LOCKER.depth) },
   { frame: new WallFrame('z', hall.minX, 1), from: 13.4, to: 16.2, ajar: [5], ringLockers: [] },
 ];
 
@@ -28,18 +29,10 @@ const CART = { x: 18.9, z: 12.6, yaw: 0.5, length: 1.15, width: 0.62 } as const;
  */
 export function buildConsignaFurniture(context: Station33BuildContext): void {
   let plate = 0;
-  for (const bank of LOCKER_BANKS) plate = addLockerBank(context, bank, plate);
+  const look = station33LockerLook(context);
+  for (const bank of LOCKER_BANKS) plate = addLockerBank(context, look, bank, plate);
   addCounter(context);
   addCart(context);
-}
-
-function addProxy(context: Station33BuildContext, name: string, min: THREE.Vector3Like, max: THREE.Vector3Like, surface: SurfaceType): void {
-  context.structure.addBox(
-    (min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2,
-    max.x - min.x, max.y - min.y, max.z - min.z,
-    context.materials.collider,
-    { name, surface, mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true },
-  );
 }
 
 /** Granite-topped timber counter with the corrugated steel shutter of the luggage window behind it. */
@@ -60,7 +53,7 @@ function addCounter(context: Station33BuildContext): void {
   plate.rotation.y = Math.PI;
   plate.userData.mapRole = 'sign';
   group.add(plate);
-  addProxy(context, 'luggage-counter', { x: minX - 0.03, y: 0, z: z - depth / 2 - 0.08 }, { x: maxX + 0.03, y: height, z: hall.maxZ }, 'wood');
+  addSolidProxy(context, 'luggage-counter', { x: minX - 0.03, y: 0, z: z - depth / 2 - 0.08 }, { x: maxX + 0.03, y: height, z: hall.maxZ }, 'wood');
 }
 
 /** Porter's flatbed cart left in the hall with two suitcases still strapped on. */
@@ -82,5 +75,5 @@ function addCart(context: Station33BuildContext): void {
   part(new THREE.BoxGeometry(0.62, 0.2, 0.42), materials.luggage[1], 0.12, 0.42, 0.02);
   part(new THREE.BoxGeometry(0.5, 0.18, 0.36), materials.luggage[2], 0.18, 0.61, -0.03);
   const bounds = new THREE.Box3(new THREE.Vector3(-length / 2, 0, -width / 2 - 0.05), new THREE.Vector3(length / 2, 1.05, width / 2 + 0.05)).applyMatrix4(world);
-  addProxy(context, 'luggage-cart', bounds.min, bounds.max, 'metal');
+  addSolidProxy(context, 'luggage-cart', bounds.min, bounds.max, 'metal');
 }

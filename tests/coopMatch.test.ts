@@ -177,7 +177,8 @@ describe('co-op combat authority', () => {
     const id = host(match).zombies.networkIdOf(zombie);
     const replica = replicaOf(match, zombie);
     const guestPosition = match.guestSide.player.rig.position;
-    zombie.group.position.set(guestPosition.x, zombie.group.position.y, guestPosition.z - 1);
+    zombie.update(1); // Finish emerging so the visible body reaches the slash.
+    zombie.group.position.set(guestPosition.x, zombie.group.position.y, guestPosition.z + 1);
     zombie.hp = 1;
     match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
     match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
@@ -187,6 +188,37 @@ describe('co-op combat authority', () => {
     match.step();
     // The guest plays the same knife death the host resolved.
     expect(replica.deathStyle).toBe('slash');
+  });
+
+  it('validates the guest slash direction and obstruction before accepting a side hit', () => {
+    const match = startedMatch();
+    const zombie = spawnOne(match);
+    const id = host(match).zombies.networkIdOf(zombie);
+    const position = match.guestSide.player.rig.position;
+    const claim = (): void => match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
+    const hp = zombie.hp;
+
+    // The guest starts facing +Z: the host must reject a body behind it.
+    zombie.group.position.set(position.x, zombie.position.y, position.z - 1);
+    claim();
+    expect(zombie.hp).toBe(hp);
+
+    zombie.group.position.set(position.x, zombie.position.y, position.z + 4);
+    claim();
+    expect(zombie.hp).toBe(hp);
+
+    zombie.group.position.set(position.x + 0.9, zombie.position.y, position.z + 1.2);
+    const blocker = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 0.1), new THREE.MeshBasicMaterial());
+    blocker.position.set(position.x + 0.45, position.y, position.z + 0.6);
+    blocker.updateMatrixWorld(true);
+    match.hostSide.ctx.hitColliders.push(blocker);
+    claim();
+    expect(zombie.hp).toBe(hp);
+
+    match.hostSide.ctx.hitColliders.splice(match.hostSide.ctx.hitColliders.indexOf(blocker), 1);
+    claim();
+    expect(host(match).players.guest.kills).toBe(1);
+    expect(host(match).players.guest.economy.points).toBe(200);
   });
 
   it('kills a zombie exactly once when both players shoot it', () => {
@@ -319,7 +351,7 @@ describe('co-op Mystery Box', () => {
     expect(host(match).box.result).toBe('vector');
   });
 
-  it.each(['vector', 'ppsh41'] as const)('charges once and grants the host-selected %s to the buyer', (weaponId) => {
+  it.each(['vector', 'ppsh41', 'barrett'] as const)('charges once and grants the host-selected %s to the buyer', (weaponId) => {
     const match = startedMatch();
     // Pick the middle of this weapon's live-pool weight, independent of pool growth.
     const index = MYSTERY_BOX_POOL.findIndex((entry) => entry.weaponId === weaponId);

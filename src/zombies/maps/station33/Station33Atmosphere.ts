@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { COCHERAS, CONSIGNA, SUBESTACION, VESTIBULE } from '../Station33Config';
+import { COCHERAS, CONSIGNA, MILICIA, SUBESTACION, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { ceilingHeightAt, VESTIBULE_VAULT } from './VaultProfile';
@@ -15,12 +15,13 @@ interface DustVolume {
   readonly seed: number;
 }
 
-/** Motes over the vestibule, the luggage-office hall, the train sheds and the machine room. */
+/** Motes over the vestibule, the luggage-office hall, the train sheds, the machine room and the militia post. */
 const DUST_VOLUMES: ReadonlyArray<DustVolume> = [
   { room: VESTIBULE, count: { low: 30, medium: 60, high: 90 }, ceiling: 4.1, seed: 3407 },
   { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
   { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60 }, ceiling: 4.1, seed: 3419 },
   { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: 4.1, seed: 3421 },
+  { room: MILICIA.hall, count: { low: 8, medium: 16, high: 24 }, ceiling: MILICIA.ceilingHeight - 0.2, seed: 3423 },
 ];
 const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5 };
 /**

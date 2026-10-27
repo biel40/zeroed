@@ -1,13 +1,20 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Zombie } from '../src/zombies/Zombie';
-import { roundConfig, ZOMBIE_ELECTRIFIED_DURATION, ZOMBIE_SPAWN_DURATION } from '../src/zombies/ZombieConfig';
+import {
+  roundConfig,
+  ZOMBIE_CORPSE_LINGER,
+  ZOMBIE_DEATH_FADE,
+  ZOMBIE_DEATH_FALL,
+  ZOMBIE_ELECTRIFIED_DURATION,
+  ZOMBIE_SPAWN_DURATION,
+} from '../src/zombies/ZombieConfig';
 import {
   createZombieDeathPose,
   resolveZombieDeathStyle,
   sampleZombieDeath,
   ZOMBIE_DEATH_PROFILES,
-  ZOMBIE_DEATH_STYLES,
+  ZOMBIE_FALL_STYLES,
   type ZombieDeathStyle,
   type ZombieKillSource,
 } from '../src/zombies/ZombieDeath';
@@ -52,7 +59,7 @@ describe('zombie death style resolution', () => {
 
   it('authors every profile from the living hang and inside its own duration', () => {
     const pose = createZombieDeathPose();
-    for (const style of ZOMBIE_DEATH_STYLES) {
+    for (const style of ZOMBIE_FALL_STYLES) {
       const profile = ZOMBIE_DEATH_PROFILES[style];
       sampleZombieDeath(profile, 0, pose);
       // The first frame is the upright rest the crossfade starts from.
@@ -156,5 +163,74 @@ describe('lethal blow attribution', () => {
     expect(zombie.impact.toArray()).toEqual([0.6, -0.8]);
     expect(zombie.visual.root.rotation.order).toBe('YXZ');
     expect(new THREE.Vector2(...zombie.impact.toArray()).length()).toBeCloseTo(1, 6);
+  });
+});
+
+describe('Barrett shatter death', () => {
+  const ZOMBIE_DEATH_TOTAL = ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER + ZOMBIE_DEATH_FADE;
+  const gibsOf = (zombie: Zombie): THREE.Object3D => zombie.group.getObjectByName('zombie-gibs')!;
+
+  it('always blows the body apart, headshot or shot in the back', () => {
+    expect(resolveZombieDeathStyle('barrett', false, -1)).toBe('shatter');
+    expect(resolveZombieDeathStyle('barrett', true, -1)).toBe('shatter');
+    expect(resolveZombieDeathStyle('barrett', false, 0.9)).toBe('shatter');
+  });
+
+  it('swaps the body for pieces that fly away from the shot and come to rest on the floor', () => {
+    const zombie = standingZombie();
+    expect(zombie.applyDamage(1000, false, 0, -5, 'barrett')).toBe(true);
+    expect(zombie.deathStyle).toBe('shatter');
+    expect(zombie.deathKind).toBe('shatter');
+    expect(zombie.visual.root.visible).toBe(false);
+    const gibs = gibsOf(zombie);
+    expect(gibs.visible).toBe(true);
+    const mist = gibs.children.filter((child) => child instanceof THREE.Sprite);
+    expect(mist.length).toBeGreaterThan(0);
+    zombie.update(0.2, 0);
+    // A red spray hangs in the air for a moment, then thins away.
+    expect(mist.every((cloud) => cloud.visible && cloud.position.y > 0.6)).toBe(true);
+    for (let t = 0; t < ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER; t += 1 / 60) zombie.update(1 / 60, 0);
+    const pieces = gibs.children.filter((child) => child instanceof THREE.Mesh);
+    expect(pieces.length).toBeGreaterThan(10);
+    const center = new THREE.Vector3();
+    for (const piece of pieces) {
+      expect(piece.position.y).toBeGreaterThan(0);
+      expect(piece.position.y).toBeLessThan(0.3);
+      center.add(piece.position);
+    }
+    // Shot from -z: the remains are thrown well back along +z, away from the shooter.
+    expect(center.divideScalar(pieces.length).z).toBeGreaterThan(2.5);
+  });
+
+  it('keeps the remains on this side of a wall, with blood splatted against it', () => {
+    // Turned sideways and shot from -z: the wall blocks the world +z side whatever the body's yaw.
+    const wall = new THREE.Box3(new THREE.Vector3(-5, -1, 1.5), new THREE.Vector3(5, 4, 1.8));
+    const zombie = new Zombie(undefined, { boxes: [wall] });
+    zombie.spawn(0, 0, 100, 1);
+    zombie.update(ZOMBIE_SPAWN_DURATION, 0);
+    zombie.group.rotation.y = Math.PI / 2;
+    zombie.applyDamage(1000, false, 0, -5, 'barrett');
+    for (let t = 0; t < ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER; t += 1 / 60) zombie.update(1 / 60, 0);
+    const gibs = gibsOf(zombie);
+    gibs.updateWorldMatrix(true, true);
+    const world = new THREE.Vector3();
+    const pieces = gibs.children.filter((child) => child instanceof THREE.Mesh);
+    for (const piece of pieces) expect(piece.getWorldPosition(world).z).toBeLessThan(1.5);
+    // Plenty of remains piled up against the wall instead of passing through it.
+    expect(pieces.filter((piece) => piece.getWorldPosition(world).z > 0.8).length).toBeGreaterThan(10);
+  });
+
+  it('recycles like any corpse and restores the body on respawn, also on a replica', () => {
+    const finished = vi.fn();
+    const zombie = standingZombie();
+    zombie.onDeathFinished = finished;
+    zombie.playReplicatedDeath('shatter', 0, 1);
+    expect(zombie.deathKind).toBe('shatter');
+    for (let t = 0; t <= ZOMBIE_DEATH_TOTAL + 0.05; t += 1 / 60) zombie.update(1 / 60, 0);
+    expect(finished).toHaveBeenCalledOnce();
+    expect(zombie.group.visible).toBe(false);
+    zombie.spawn(0, 0, 100, 1);
+    expect(zombie.visual.root.visible).toBe(true);
+    expect(gibsOf(zombie).visible).toBe(false);
   });
 });

@@ -160,6 +160,16 @@ export const HAND_POSES: Readonly<Record<HandPoseId, HandPose>> = {
     thumb: { base: [0.45, 0.5, 1.8], curl: [0.12, 0.16] },
     grip: [-0.03, -0.006, -0.07],
   },
+  // Held up to take a ring: fingers fanned out, the middle one dead straight
+  // so a ring slides from its tip to its seat along one line.
+  openHand: {
+    index: finger(0.06, 0.05, 0.03, 0.16),
+    middle: finger(0, 0, 0, 0),
+    ring: finger(0.1, 0.08, 0.05, -0.15),
+    pinky: finger(0.16, 0.12, 0.08, -0.28),
+    thumb: { base: [0.45, 0.5, 1.8], curl: [0.12, 0.16] },
+    grip: [-0.03, -0.006, -0.07],
+  },
 };
 
 // --- Fitting the fingers to a held part -------------------------------------

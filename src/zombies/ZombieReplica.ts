@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ZombieNetState } from '../network/Protocol';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../network/Interpolation';
 import type { VaultOpening } from './barriers/WindowVault';
+import type { GibWalls } from './GibWalls';
 import { Zombie } from './Zombie';
 import { ZOMBIE_ATTACK_LUNGE, ZOMBIE_TYPE_CONFIGS, MAX_ALIVE } from './ZombieConfig';
 import type { ZombieDeathStyle } from './ZombieDeath';
@@ -50,6 +51,8 @@ export class ZombieReplica {
   private readonly clock = new RemoteClock(INTERPOLATION_DELAY);
   private readonly bracket: SampleBracket<ZombieSample> = { from: null, to: null, alpha: 0 };
   private generation = 0;
+  /** Wall set shared by every pooled zombie's gibs. */
+  private readonly gibWalls: GibWalls = { boxes: [] };
 
   public constructor(
     sources: ZombieModelSources,
@@ -60,11 +63,16 @@ export class ZombieReplica {
       const modelId = ZOMBIE_POOL_MODELS[index];
       const model = ZOMBIE_MODELS[modelId];
       const zombie = new Zombie(new ZombieVisual(modelId, zombiePoolSource(sources, index),
-        model.tints[index % model.tints.length], castShadows));
+        model.tints[index % model.tints.length], castShadows), this.gibWalls);
       zombie.onDeathFinished = () => this.release(zombie);
       this.group.add(zombie.group);
       return zombie;
     }, MAX_ALIVE);
+  }
+
+  /** Map wall boxes the remains of a shattered zombie bounce off; refresh on topology changes. */
+  public setWallColliders(walls: ReadonlyArray<THREE.Box3>): void {
+    this.gibWalls.boxes = walls;
   }
 
   public get aliveCount(): number {

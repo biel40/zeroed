@@ -122,10 +122,13 @@ describe('PPSh-41 view model', () => {
 
   it('batches its detail within the existing mobile weapon budget', () => {
     const built = buildProceduralViewModel(view);
+    // The drum's rounds are only drawn while it is out of the well (reload, inspection).
+    const rounds = built.reloadParts!.rounds!;
     let meshes = 0;
     let triangles = 0;
     built.group.traverse((part) => {
       if (!(part instanceof THREE.Mesh)) return;
+      if (rounds.getObjectById(part.id)) return;
       meshes++;
       triangles += (part.geometry.index?.count ?? part.geometry.attributes.position.count) / 3;
     });

@@ -34,6 +34,7 @@ import {
   type ZombieModelId,
   type ZombieTypeId,
 } from './ZombieConfig';
+import type { GibWalls } from './GibWalls';
 import { Zombie } from './Zombie';
 import type { ZombieKillSource } from './ZombieDeath';
 export type { ZombieKillSource } from './ZombieDeath';
@@ -223,6 +224,8 @@ export class ZombieManager {
   public onBarrierImpact: ((barrier: WindowBarrier) => void) | null = null;
 
   private readonly pool: ZombiePool;
+  /** Wall set shared by every pooled zombie's gibs. */
+  private readonly gibWalls: GibWalls = { boxes: [] };
   private spawner: ZombieSpawner;
   private readonly rng: () => number;
   private colliders: THREE.Object3D[] = [];
@@ -306,6 +309,7 @@ export class ZombieManager {
       const tint = model.tints[(this.nextZombieId - 1) % model.tints.length];
       const zombie = new Zombie(
         new ZombieVisual(modelId, zombiePoolSource(sources, index), tint, castShadows),
+        this.gibWalls,
       );
       this.zombieIds.set(zombie, this.nextZombieId++);
       zombie.onDeathFinished = () => this.finishDeath(zombie);
@@ -331,6 +335,11 @@ export class ZombieManager {
     this.movement.clear();
     this.stuckState.clear();
     this.rebuildNavigation();
+  }
+
+  /** Map wall boxes the remains of a shattered zombie bounce off; refresh on topology changes. */
+  setWallColliders(walls: ReadonlyArray<THREE.Box3>): void {
+    this.gibWalls.boxes = walls;
   }
 
   /** Replace spawn points when a new zone is unlocked. */

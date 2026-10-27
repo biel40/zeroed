@@ -4,9 +4,14 @@ import { shapePreservingTangent } from './ZombieAttackMotion';
 /** What dealt the lethal blow. Rewards only distinguish the knife. */
 export type ZombieKillSource = WeaponId | 'knife';
 
-export const ZOMBIE_DEATH_STYLES = [
+/** Deaths the body performs by falling: each has a profile and a baked clip. */
+export const ZOMBIE_FALL_STYLES = [
   'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock',
 ] as const;
+export type ZombieFallStyle = typeof ZOMBIE_FALL_STYLES[number];
+
+/** Every death a killing blow can pick; 'shatter' blows the body apart into gibs (ZombieGibs) instead of falling. */
+export const ZOMBIE_DEATH_STYLES = [...ZOMBIE_FALL_STYLES, 'shatter'] as const;
 /** Visual death performance; gameplay timing is identical for every style. */
 export type ZombieDeathStyle = typeof ZOMBIE_DEATH_STYLES[number];
 
@@ -14,6 +19,7 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   knife: 'slash',
   m1911: 'knockback',
   l96: 'knockback',
+  barrett: 'shatter',
   m4a1: 'riddled',
   mp5: 'riddled',
   vector: 'riddled',
@@ -35,6 +41,8 @@ export function resolveZombieDeathStyle(
   pushZ: number,
 ): ZombieDeathStyle {
   const style = source ? WEAPON_DEATH_STYLES[source] : 'knockback';
+  // Nothing is left standing to fall, whatever the round hit.
+  if (style === 'shatter') return style;
   if (headshot && style !== 'slash' && style !== 'shock') return 'headshot';
   if ((style === 'knockback' || style === 'blast') && pushZ > 0.35) return 'stumble';
   return style;
@@ -179,7 +187,7 @@ const slashClutch = curve([0, 0], [0.18, 1], [1, 1]);
  * Back falls end on the back with arms splayed; forward falls end face down
  * with the head turned aside; every resting pose keeps hands above the floor.
  */
-export const ZOMBIE_DEATH_PROFILES: Record<ZombieDeathStyle, ZombieDeathProfile> = {
+export const ZOMBIE_DEATH_PROFILES: Record<ZombieFallStyle, ZombieDeathProfile> = {
   // Single heavy round: staggers back a step, arches and lands on its back.
   knockback: {
     duration: 1,

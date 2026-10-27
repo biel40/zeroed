@@ -26,6 +26,8 @@ export interface RoundedEdges {
   readonly segments?: number;
   /** Pulls the bevel inside the outline so the side profile keeps its exact size. */
   readonly keepOutline?: boolean;
+  /** Subdivisions of curved contours; small vents need fewer than large silhouettes. */
+  readonly curveSegments?: number;
 }
 
 /**
@@ -44,7 +46,7 @@ export function extrudeProfile(
     bevelSize: bevel,
     bevelOffset: rounded?.keepOutline ? -bevel : 0,
     bevelSegments: rounded?.segments ?? 2,
-    curveSegments: 8,
+    curveSegments: rounded?.curveSegments ?? 8,
     steps: 1,
   });
   geometry.translate(0, 0, -depth / 2);

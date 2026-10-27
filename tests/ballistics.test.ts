@@ -81,3 +81,50 @@ it('keeps the firing weapon attached to a bullet until impact', () => {
   ballistics.update(0.1);
   expect(hits).toEqual([firedWeapon]);
 });
+
+describe('Barrett penetration', () => {
+  /** A zombie stand-in at `z`: torso box plus a head box, both pointing at the same zombie. */
+  function zombieAt(z: number, id: number): THREE.Mesh[] {
+    const zombie = { id };
+    const target = { onHit: vi.fn() };
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.4));
+    torso.position.set(0, 0, z);
+    torso.userData = { zombie, target, hitPart: 'torso' };
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3));
+    head.position.set(0, 0, z - 0.05);
+    head.userData = { zombie, target, hitPart: 'head' };
+    for (const mesh of [torso, head]) mesh.updateMatrixWorld(true);
+    return [torso, head];
+  }
+
+  function fire(weaponId: 'barrett' | 'l96', colliders: THREE.Object3D[]): number[] {
+    const ballistics = new BallisticsSystem(colliders, new THREE.Group());
+    const hitZombies: number[] = [];
+    ballistics.onTargetHit = (_target, _distance, _point, _normal, object) => {
+      hitZombies.push((object.userData.zombie as { id: number }).id);
+    };
+    ballistics.onEnvironmentHit = () => hitZombies.push(-1);
+    ballistics.spawn(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), WEAPON_DEFINITIONS[weaponId].projectile);
+    for (let i = 0; i < 30; i++) ballistics.update(1 / 60);
+    return hitZombies;
+  }
+
+  it('passes through up to five zombies in a line, each hit once, and stops at the fifth', () => {
+    const line = Array.from({ length: 7 }, (_, index) => zombieAt(-3 - index * 1.2, index)).flat();
+    expect(WEAPON_DEFINITIONS.barrett.projectile.maxTargets).toBe(5);
+    expect(fire('barrett', line)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('is stopped by a wall in between', () => {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2));
+    wall.position.z = -5.5;
+    wall.updateMatrixWorld(true);
+    const line = [zombieAt(-3, 0), zombieAt(-4.2, 1), [wall], zombieAt(-7, 2)].flat();
+    expect(fire('barrett', line)).toEqual([0, 1, -1]);
+  });
+
+  it('leaves every other weapon stopping at the first zombie', () => {
+    const line = [zombieAt(-3, 0), zombieAt(-4.2, 1)].flat();
+    expect(fire('l96', line)).toEqual([0]);
+  });
+});

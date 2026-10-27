@@ -44,12 +44,22 @@ function spentMaterial(): THREE.MeshStandardMaterial {
   return sharedSpent;
 }
 
+/**
+ * A ring being put on: still out of sight on its way to the hand, or held
+ * somewhere off its seat (carried, then slid along the finger).
+ */
+type DonningState = 'unseen' | 'held';
+
 interface RingSlot {
   readonly finger: RingFinger;
   readonly mesh: THREE.Mesh;
   readonly lit: THREE.MeshStandardMaterial;
+  /** Seat position in the bone frame, and the finger length from there to the tip. */
+  readonly seat: THREE.Vector3;
+  readonly toTip: number;
   state: HandRingState | null;
   pulse: number;
+  donning: DonningState | null;
 }
 
 /**
@@ -67,7 +77,7 @@ export class HandRings {
     const geometry = ringGeometry();
     const side = arm.side === 'right' ? 1 : -1;
     for (const finger of RING_FINGERS) {
-      const { bone, along, halfWidth, back, front } = arm.ringSeat(finger);
+      const { bone, along, toTip, halfWidth, back, front } = arm.ringSeat(finger);
       const lit = new THREE.MeshStandardMaterial({ name: `hand-ring-enamel-${finger}`, roughness: 0.25, metalness: 0.1 });
       const mesh = new THREE.Mesh(geometry, [bandMaterial(), lit]);
       mesh.name = `hand-ring-${arm.side}-${finger}`;
@@ -79,7 +89,7 @@ export class HandRings {
       mesh.visible = false;
       mesh.frustumCulled = false;
       bone.add(mesh);
-      this.slots.set(finger, { finger, mesh, lit, state: null, pulse: 0 });
+      this.slots.set(finger, { finger, mesh, lit, seat: mesh.position.clone(), toTip, state: null, pulse: 0, donning: null });
     }
   }
 
@@ -97,8 +107,48 @@ export class HandRings {
     for (const slot of this.slots.values()) {
       slot.state = null;
       slot.pulse = 0;
-      this.apply(slot);
+      this.seat(slot.finger);
     }
+  }
+
+  /** The ring of `finger` is being put on: out of sight until the other hand brings it. */
+  beginDonning(finger: RingFinger): void {
+    const slot = this.slots.get(finger)!;
+    slot.donning = 'unseen';
+    this.apply(slot);
+  }
+
+  /** While being put on, the ring of `finger` sits at world `point`, still facing along the finger. */
+  hold(finger: RingFinger, point: THREE.Vector3): void {
+    const slot = this.slots.get(finger)!;
+    slot.donning = 'held';
+    slot.mesh.position.copy(slot.mesh.parent!.worldToLocal(point.clone()));
+    this.apply(slot);
+  }
+
+  /** Puts the ring of `finger` on its seat: done being put on. */
+  seat(finger: RingFinger): void {
+    const slot = this.slots.get(finger)!;
+    slot.donning = null;
+    slot.mesh.position.copy(slot.seat);
+    this.apply(slot);
+  }
+
+  /**
+   * World point of the ring centre on `finger` after sliding `distance`
+   * metres from its seat toward the tip (past it beyond `tipDistance`), on
+   * the finger as it is posed now. Exact for a straight finger.
+   */
+  alongFinger(finger: RingFinger, distance: number, out: THREE.Vector3): THREE.Vector3 {
+    const slot = this.slots.get(finger)!;
+    out.copy(slot.seat);
+    out.z -= distance;
+    return slot.mesh.parent!.localToWorld(out);
+  }
+
+  /** Finger length from the seat of `finger` out to its tip. */
+  tipDistance(finger: RingFinger): number {
+    return this.slots.get(finger)!.toTip;
   }
 
   /** Brief flare of a worn ring: 1 is the strongest (the ring firing). */
@@ -133,7 +183,7 @@ export class HandRings {
   private apply(slot: RingSlot): void {
     // Warm-up alternates both enamel variants across the fingers.
     const state = this.warmup ? (RING_FINGERS.indexOf(slot.finger) % 2 === 0 ? 'charged' : 'spent') : slot.state;
-    slot.mesh.visible = state !== null;
+    slot.mesh.visible = state !== null && (this.warmup || slot.donning !== 'unseen');
     // A spent ring flares too as it fires, then its enamel goes dark.
     const glowing = state === 'charged' || slot.pulse > 0;
     (slot.mesh.material as THREE.Material[])[1] = glowing ? slot.lit : spentMaterial();

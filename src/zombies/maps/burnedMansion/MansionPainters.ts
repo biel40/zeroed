@@ -538,13 +538,14 @@ function segmentDistance(px: number, py: number, ax: number, ay: number, bx: num
 }
 
 /** Height over width of the officer portrait canvas; the painter stretches `py` by it. */
-const OFFICER_CANVAS_ASPECT = 1.37;
+export const OFFICER_CANVAS_ASPECT = 1.37;
+export const OFFICER_EYES = { x: 0.055, y: 0.075 } as const;
 
 /**
  * Oil portrait of a German officer of the Second World War: field-grey tunic
  * with silver shoulder boards, collar tabs and a dark cross at the throat,
- * peaked cap with a plain cockade. The eyes are hollow sockets with a red
- * pinpoint (the glow mask) and blood runs from them under a thin smile; a
+ * peaked cap with a plain cockade. The eyes are hollow sockets (animated
+ * pupils are separate meshes) and blood runs from them under a thin smile; a
  * knife slash across the chest and a corner the fire reached finish it.
  */
 export function officerPortraitPainter(size: number): () => Painter {
@@ -577,7 +578,6 @@ export function officerPortraitPainter(size: number): () => Painter {
       const px = x / size - 0.5;
       const py = (y / size - 0.5) * OFFICER_CANVAS_ASPECT;
       let roughness = 0.5;
-      let glow = 0;
       let lift = 0;
       // Murky backdrop with a sickly halo behind the head.
       mix([30, 27, 22], [70, 64, 46], (1 - smoothstep(Math.hypot(px, py - 0.05), 0.05, 0.5)) * 0.8, color);
@@ -620,19 +620,13 @@ export function officerPortraitPainter(size: number): () => Painter {
         // A thin grin, curling up at the corners.
         if (Math.abs(px) < 0.055 && Math.abs(py - (-0.072 + px * px * 9)) < 0.0035) paint([46, 26, 24], 1);
         for (const side of [-1, 1]) {
-          const eyeX = side * 0.055;
-          paint(black, inEllipse(px, py, eyeX, 0.075, 0.042, 0.026, 0.35));
+          const eyeX = side * OFFICER_EYES.x;
+          paint(black, inEllipse(px, py, eyeX, OFFICER_EYES.y, 0.042, 0.026, 0.35));
           const tearEnd = side < 0 ? -0.07 : -0.01;
           const tearWidth = 0.0055 * (1 - (0.06 - py) * 2);
           if (py < 0.06 && py > tearEnd && Math.abs(px - eyeX - 0.004 * Math.sin(py * 60)) < tearWidth) {
             paint(blood, 1);
             roughness = 0.2;
-          }
-          const pupil = Math.hypot(px - eyeX, py - 0.075);
-          if (pupil < 0.03) {
-            const core = 1 - smoothstep(pupil, 0.008, 0.014);
-            paint([232, 42, 24], core);
-            glow = Math.max(glow, core, (1 - pupil / 0.03) * 0.3);
           }
         }
       }
@@ -679,7 +673,7 @@ export function officerPortraitPainter(size: number): () => Painter {
       texel.color[2] = color[2] * shade;
       texel.height = 0.5 + (brush(x, y) - 0.5) * 0.3 - block.crack * 0.08 + lift;
       texel.roughness = roughness + block.crack * 0.2;
-      texel.emissive = glow;
+      texel.emissive = 0;
     };
   };
 }

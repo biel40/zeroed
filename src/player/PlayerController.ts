@@ -163,6 +163,11 @@ export class PlayerController {
   get deathFallFinished(): boolean { return (this.deathFallElapsed ?? 0) >= DEATH_FALL_DURATION; }
   public playReviveImpulse(): void { this.cameraImpulse = 0.035; }
   public playShotImpulse(strength = 0.012): void { this.cameraImpulse += strength; }
+  /** Nudges the player backwards along the view; movement damping eats it within a fraction of a second. */
+  public applyShotPush(speed: number): void {
+    this.velocity.x += Math.sin(this.yaw) * speed;
+    this.velocity.z += Math.cos(this.yaw) * speed;
+  }
 
   /** The gaze levels out so the body drops straight down, then the death pose takes the camera. */
   private updateDeathFall(dt: number): void {

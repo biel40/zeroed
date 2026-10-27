@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { accelerate, dampedWobble, impact, overshootRamp, pulse, ramp } from './AnimationCurves';
+import { roundsInViewMagazine, showRounds } from './MagazineRounds';
 import type { Weapon } from './Weapon';
 import type { MagazineDropPool } from './MagazineDrop';
 import type { ReloadAnimConfig, ReloadPhase, ReloadPoseConfig, ReloadStyle } from './WeaponTypes';
@@ -56,57 +58,75 @@ export interface ReloadParts {
   handle: THREE.Object3D | null;
   /** Belt feed cover pivot (rotates open). */
   cover: THREE.Object3D | null;
-  /** Cartridges riding on the magazine: hidden while an emptied one is out. */
+  /**
+   * Cartridges riding on the magazine, one child per round from the top
+   * down; they show only the rounds it carries (see MagazineRounds).
+   */
   rounds?: THREE.Object3D | null;
 }
 
-interface HomePose {
+/** Rest transform of an animated part, restored whenever its animation ends. */
+export interface HomePose {
   readonly position: THREE.Vector3;
   readonly quaternion: THREE.Quaternion;
 }
 
-function captureHome(object: THREE.Object3D): HomePose {
+export function captureHome(object: THREE.Object3D): HomePose {
   return { position: object.position.clone(), quaternion: object.quaternion.clone() };
 }
 
-function restoreHome(object: THREE.Object3D, home: HomePose): void {
+export function restoreHome(object: THREE.Object3D, home: HomePose): void {
   object.position.copy(home.position);
   object.quaternion.copy(home.quaternion);
 }
 
-/** Smooth 0→1→0 curve over [start, end] for a progress value. */
-function pulse(p: number, start: number, end: number): number {
-  if (p <= start || p >= end) return 0;
-  return Math.sin(((p - start) / (end - start)) * Math.PI);
-}
-
-/** 0→1 eased ramp over [start, end]. */
-function ramp(p: number, start: number, end: number): number {
-  const t = Math.min(1, Math.max(0, (p - start) / (end - start)));
-  return t * t * (3 - 2 * t);
-}
-
-/** 0→1 over [start, end] gathering speed until it lands: a push or a slam. */
-function accelerate(p: number, start: number, end: number): number {
-  return Math.min(1, Math.max(0, (p - start) / (end - start))) ** 2;
-}
-
-/** Spring settle over t in [0, 1]: a quick swing that dies out, exactly 0 at both ends. */
-function dampedWobble(t: number): number {
-  return Math.exp(-5 * t) * Math.sin(3 * Math.PI * t);
-}
-
-/** 0→1 over [start, end] that arrives fast and swings slightly past 1 before settling (ease-out-back). */
-function overshootRamp(p: number, start: number, end: number): number {
-  const u = Math.min(1, Math.max(0, (p - start) / (end - start))) - 1;
-  return 1 + u * u * (2.2 * u + 1.2);
-}
-
-/** Hit envelope over [start, end]: snaps to 1 in its first fifth, then dies away. */
-function impact(p: number, start: number, end: number): number {
-  if (p <= start || p >= end) return 0;
-  const t = (p - start) / (end - start);
-  return t < 0.2 ? Math.sin((t / 0.2) * (Math.PI / 2)) : (1 - (t - 0.2) / 0.8) ** 2;
+/**
+ * Magazine leaving the weapon, per style. t: 0 (seated) → 1 (free). Shared
+ * by the reload and the inspection's magazine check.
+ */
+export function poseDetachedMagazine(mag: THREE.Object3D, home: HomePose, config: ReloadAnimConfig, t: number): void {
+  const height = config.magSize[1];
+  const clear = ((config.wellDepth ?? 1) + BOX_CLEAR) * height;
+  restoreHome(mag, home);
+  switch (config.style) {
+    case 'rock':
+      // AK rock: pivot on the front lug so the base swings forward, then away.
+      mag.rotateX(t * 0.9);
+      mag.position.y -= t * height * 0.9;
+      mag.position.z -= t * height * 0.35;
+      break;
+    case 'belt':
+      mag.position.x -= t * height * 0.6;
+      mag.position.y -= t * height * 1.1;
+      break;
+    case 'cell':
+      // Power cell rises out of its cage with a slow spin.
+      mag.position.y += t * height * 1.5;
+      mag.rotateY(t * 2.2);
+      break;
+    case 'drum':
+    case 'rifle':
+      // The hand strips it down out of the well until it hangs clear,
+      // tipping it away as it lets go.
+      mag.translateY(-ramp(t, 0, 0.85) * clear);
+      mag.rotateX(ramp(t, 0.55, 1) * 0.18);
+      break;
+    case 'pistol': {
+      // The release pops it a few millimeters, then it slides out along
+      // the raked grip, gathering speed, until it hangs fully clear.
+      const pop = ramp(t, 0, 0.18) * 0.005;
+      const fall = Math.max(0, (t - 0.12) / 0.88) ** 2 * clear;
+      mag.translateY(-(pop + fall));
+      mag.rotateX(t * t * 0.2);
+      break;
+    }
+    case 'bolt':
+      // Box magazine drawn straight down out of the well, then its open top
+      // turned to the eye: an emptied one shows its follower.
+      mag.position.y -= ramp(t, 0, 0.7) * height * 1.5;
+      mag.rotateZ(ramp(t, 0.6, 1) * BOLT_MAG_SHOW_ROLL);
+      break;
+  }
 }
 
 /**
@@ -148,6 +168,7 @@ export class ReloadAnimator {
   }
 
   update(weapon: Weapon): void {
+    if (this.parts.rounds) showRounds(this.parts.rounds, roundsInViewMagazine(weapon, this.config));
     if (weapon.state !== 'reloading') {
       if (this.wasReloading) this.restore();
       this.wasReloading = false;
@@ -162,9 +183,6 @@ export class ReloadAnimator {
     const p = weapon.stateProgress;
     const c = this.config;
     const empty = weapon.reloadType === 'empty';
-    // An emptied magazine comes out (and drops) without its rounds; the
-    // fresh one shows them from the moment the hand brings it in.
-    if (this.parts.rounds) this.parts.rounds.visible = !empty || p >= c.magIn;
     this.cross(p, c.magOut, 'magOut');
     this.cross(p, c.magDrop, 'magDrop');
     this.cross(p, c.magIn, 'magIn');
@@ -246,7 +264,7 @@ export class ReloadAnimator {
     if (p < c.magDrop) {
       // Detaching: slide/rock out of the well.
       const t = ramp(p, c.magOut, c.magDrop);
-      this.applyMagOut(mag, t, height);
+      poseDetachedMagazine(mag, this.magHome, c, t);
       return;
     }
     // Fresh magazine coming in.
@@ -289,53 +307,6 @@ export class ReloadAnimator {
     canister.position.addScaledVector(CANISTER_AWAY, away);
     canister.rotateX(away * CANISTER_AWAY_TILT);
     canister.rotateZ(twist * CANISTER_TWIST);
-  }
-
-  /** Magazine leaving the weapon, per style. t: 0 (seated) → 1 (free). */
-  private applyMagOut(mag: THREE.Object3D, t: number, height: number): void {
-    const home = this.magHome as HomePose;
-    const clear = ((this.config.wellDepth ?? 1) + BOX_CLEAR) * height;
-    mag.position.copy(home.position);
-    mag.quaternion.copy(home.quaternion);
-    switch (this.config.style) {
-      case 'rock':
-        // AK rock: pivot on the front lug so the base swings forward, then away.
-        mag.rotateX(t * 0.9);
-        mag.position.y -= t * height * 0.9;
-        mag.position.z -= t * height * 0.35;
-        break;
-      case 'belt':
-        mag.position.x -= t * height * 0.6;
-        mag.position.y -= t * height * 1.1;
-        break;
-      case 'cell':
-        // Power cell rises out of its cage with a slow spin.
-        mag.position.y += t * height * 1.5;
-        mag.rotateY(t * 2.2);
-        break;
-      case 'drum':
-      case 'rifle':
-        // The hand strips it down out of the well until it hangs clear,
-        // tipping it away as it lets go.
-        mag.translateY(-ramp(t, 0, 0.85) * clear);
-        mag.rotateX(ramp(t, 0.55, 1) * 0.18);
-        break;
-      case 'pistol': {
-        // The release pops it a few millimeters, then it slides out along
-        // the raked grip, gathering speed, until it hangs fully clear.
-        const pop = ramp(t, 0, 0.18) * 0.005;
-        const fall = Math.max(0, (t - 0.12) / 0.88) ** 2 * clear;
-        mag.translateY(-(pop + fall));
-        mag.rotateX(t * t * 0.2);
-        break;
-      }
-      case 'bolt':
-        // Box magazine drawn straight down out of the well, then its open top
-        // turned to the eye: an emptied one shows its follower.
-        mag.position.y -= ramp(t, 0, 0.7) * height * 1.5;
-        mag.rotateZ(ramp(t, 0.6, 1) * BOLT_MAG_SHOW_ROLL);
-        break;
-    }
   }
 
   /** Fresh magazine being inserted. t: 0 (approach) → 1 (seated). */
@@ -534,7 +505,6 @@ export class ReloadAnimator {
       this.parts.magazine.visible = true;
       restoreHome(this.parts.magazine, this.magHome);
     }
-    if (this.parts.rounds) this.parts.rounds.visible = true;
     if (this.parts.handle && this.handleHome) restoreHome(this.parts.handle, this.handleHome);
     if (this.parts.cover && this.coverHome) restoreHome(this.parts.cover, this.coverHome);
     this.bodyDip = 0;

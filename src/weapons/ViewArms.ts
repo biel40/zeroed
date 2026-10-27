@@ -20,6 +20,12 @@ const LEFT_REACH = new THREE.Vector3(-0.4, -0.34, 0.1);
 /** Finger poses settle in ~0.15 s instead of snapping. */
 const POSE_RATE = 22;
 
+/**
+ * Camera-space point the support hand rises from when the weapon offers it
+ * no grip to start from (a one-handed hold): below the screen, left.
+ */
+const LEFT_REST = new THREE.Vector3(-0.28, -0.58, -0.3);
+
 /** A mode-owned melee animation that borrows the right arm (the knife). */
 export interface MeleeArmDriver {
   /** 0..1 dip of the firearm view while the melee plays. */
@@ -28,6 +34,22 @@ export interface MeleeArmDriver {
   readonly armWeight: number;
   /** World-space grip point, hand rotation and elbow position of the melee hand. */
   readHandTarget(grip: THREE.Vector3, rotation: THREE.Quaternion, elbow: THREE.Vector3): void;
+  /** Finger pose of the right hand while the animation owns it; a fist when absent. */
+  readonly handPose?: HandPose;
+  /** Present when the animation takes the left hand off the weapon too. */
+  readonly support?: SupportArmDriver;
+}
+
+/** The left-hand half of an animation that works on the right hand (putting a ring on). */
+export interface SupportArmDriver {
+  /** 0..1 share of the left hand taken off the weapon. */
+  readonly supportWeight: number;
+  /** Finger pose of the left hand once it is mostly off the weapon. */
+  readonly supportPose: HandPose;
+  /** World-space grip point and rotation of the left hand, read once the right hand is placed this frame. */
+  readSupportTarget(grip: THREE.Vector3, rotation: THREE.Quaternion): void;
+  /** The left hand is placed and grips `grip` (world space): what it carries goes there. */
+  carry(grip: THREE.Vector3): void;
 }
 
 /** The weapon view parts the arms follow. */
@@ -58,6 +80,8 @@ export class ViewArms {
   private readonly meleeGrip = new THREE.Vector3();
   private readonly meleeRotation = new THREE.Quaternion();
   private readonly meleeElbow = new THREE.Vector3();
+  private readonly supportGrip = new THREE.Vector3();
+  private readonly supportRotation = new THREE.Quaternion();
 
   constructor(detail: ArmDetail = ARM_DETAIL.desktop) {
     this.root.name = 'view-arms';
@@ -90,18 +114,32 @@ export class ViewArms {
         melee.readHandTarget(this.meleeGrip, this.meleeRotation, this.meleeElbow);
         this.grip.lerp(this.meleeGrip, meleeWeight);
         this.rotation.slerp(this.meleeRotation, meleeWeight);
-        if (meleeWeight >= 0.5) pose = HAND_POSES.fist;
+        if (meleeWeight >= 0.5) pose = melee.handPose ?? HAND_POSES.fist;
       }
       this.right.setHandPose(pose, blend);
       this.right.reachGrip(this.grip, this.rotation, this.root.localToWorld(this.shoulder), this.meleeElbow, meleeWeight);
     }
 
-    // Left hand: always on the weapon (it keeps holding it during the knife).
-    const leftPose = weaponVisible ? hands.read('left', this.grip, this.rotation) : null;
+    // Left hand: on the weapon (it keeps holding it during the knife), unless
+    // a support driver takes it off to work on the right hand.
+    let leftPose = weaponVisible ? hands.read('left', this.grip, this.rotation) : null;
+    const support = melee?.support ?? null;
+    const supportWeight = support ? THREE.MathUtils.clamp(support.supportWeight, 0, 1) : 0;
+    if (support && supportWeight > 0) {
+      support.readSupportTarget(this.supportGrip, this.supportRotation);
+      if (leftPose === null) {
+        this.root.localToWorld(this.grip.copy(LEFT_REST));
+        this.rotation.copy(this.supportRotation);
+      }
+      this.grip.lerp(this.supportGrip, supportWeight);
+      this.rotation.slerp(this.supportRotation, supportWeight);
+      if (leftPose === null || supportWeight >= 0.5) leftPose = support.supportPose;
+    }
     this.left.root.visible = leftPose !== null;
     if (leftPose !== null) {
       this.left.setHandPose(leftPose, blend);
       this.left.reachGrip(this.grip, this.rotation, this.root.localToWorld(this.shoulder.copy(LEFT_REACH)));
+      if (support) support.carry(this.left.getGripWorldPosition(this.supportGrip));
     }
   }
 }

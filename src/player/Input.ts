@@ -70,6 +70,11 @@ export class Input {
     this.state.endFrame();
   }
 
+  releaseAll(): void {
+    this.state.releaseAll();
+    this.state.endFrame();
+  }
+
   requestPointerLock(): void {
     if (!this.useTouchControls) this.desktop.requestPointerLock();
   }

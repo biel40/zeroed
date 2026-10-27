@@ -29,6 +29,7 @@ import type {
 import { createMansionSurfaceMaterials, type MansionSurfaceMaterials } from './BurnedMansionMaterials';
 import { MansionAtmosphere } from './burnedMansion/MansionAtmosphere';
 import { MansionBanquetGhost } from './burnedMansion/MansionBanquetGhost';
+import { MansionWatchingPortrait } from './burnedMansion/MansionWatchingPortrait';
 import type { MansionBuildContext } from './burnedMansion/MansionBuildContext';
 import { MansionDecorBatch } from './burnedMansion/MansionDecorBatch';
 import { buildMansionDressing } from './burnedMansion/MansionDressing';
@@ -308,6 +309,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private readonly areaLights = new CreepyAreaLights();
   private readonly atmosphere: MansionAtmosphere;
   private readonly banquetGhost: MansionBanquetGhost;
+  private readonly watchingPortrait: MansionWatchingPortrait;
   private readonly rankedPointLights: RankedPointLight[] = [];
   private readonly floorMeshSets: FloorMeshSet[] = (['ground', 'bunker'] as const).flatMap((floor) =>
     [false, true].map((nearStairs) => ({ floor, nearStairs, meshes: [], rendered: true })),
@@ -344,6 +346,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.buildLighting(dressing);
     this.atmosphere = new MansionAtmosphere(dressing);
     this.banquetGhost = new MansionBanquetGhost(this.group);
+    this.watchingPortrait = new MansionWatchingPortrait(dressing);
     // No mansion light casts shadows; the batch only receives them.
     dressing.batch.build(this.group, 'burned-mansion-static', { castShadow: false, receiveShadow: true });
     this.secretRoom = new SecretRoomSystem(this.group, this.secretWall, profile);
@@ -460,6 +463,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.areaLights.update(dt);
     this.atmosphere.update(dt);
     this.banquetGhost.update(dt);
+    this.watchingPortrait.update(dt, observerPosition);
     if (observerPosition) {
       this.updatePointLightBudget(observerPosition);
       this.updateFloorRendering(observerPosition);
@@ -476,6 +480,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.secretRoom.reset();
     this.atmosphere.reset();
     this.banquetGhost.reset();
+    this.watchingPortrait.reset();
     this.activeSpawnZones.clear();
     this.activeSpawnZones.add('start');
     this.openDoorIds.clear();

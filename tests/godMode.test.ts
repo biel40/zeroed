@@ -4,6 +4,32 @@ import type { WeaponId } from '../src/weapons/WeaponTypes';
 import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
 
 describe('Zombies GOD_MODE developer command', () => {
+  it('gates console execution, overrides pinned grants and keeps tools available with invincibility off', () => {
+    const mode = new ZombiesMode();
+    const grantWeapon = vi.fn(() => true);
+    (mode as unknown as { ctx: unknown }).ctx = {
+      grantWeapon,
+      setWeaponInfiniteReserve: () => true,
+      getEquippedWeaponId: () => 'm1911',
+      hud: { showRoundBanner: () => undefined },
+      audio: { playTeslaUnlock: () => undefined },
+    };
+    (mode as unknown as { arena: unknown }).arena = {};
+    expect(mode.isDeveloperConsoleEnabled()).toBe(false);
+    mode.executeDeveloperCommand('weapon m1911');
+    expect(grantWeapon).not.toHaveBeenCalled();
+    for (const key of 'MOTDRULES') mode.onKeyInput(key);
+    mode.executeDeveloperCommand('weapon m1911');
+    expect(grantWeapon).toHaveBeenLastCalledWith('m1911', true);
+    mode.executeDeveloperCommand('invincible off');
+    expect(mode.isDeveloperConsoleEnabled()).toBe(true);
+    const health = (mode as unknown as { health: { damage(amount: number): boolean } }).health;
+    expect(health.damage(1)).toBe(true);
+    (mode as unknown as { gameOver: boolean }).gameOver = true;
+    grantWeapon.mockClear();
+    mode.executeDeveloperCommand('weapon raygun');
+    expect(grantWeapon).not.toHaveBeenCalled();
+  });
   it('activates once after MOTDRULES and grants infinite-ammo Ray Gun and Zeus', () => {
     const mode = new ZombiesMode();
     const events: string[] = [];

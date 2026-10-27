@@ -146,6 +146,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       maxBloom: 0.02,
       bloomRecovery: 0.03,
     },
+    heat: { shotsToOverheat: 22, coolTime: 5, maxSpreadBonus: 0.012 },
     ads: { fov: 55, speed: 9, sensitivity: 0.7 },
     projectile: { muzzleVelocity: 880, gravity: 9.8, maxDistance: 400, drag: 0.04 },
     moveSpeedMultiplier: 1,
@@ -245,6 +246,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       maxBloom: 0.026,
       bloomRecovery: 0.03,
     },
+    heat: { shotsToOverheat: 22, coolTime: 4.5, maxSpreadBonus: 0.014 },
     ads: { fov: 58, speed: 11, sensitivity: 0.72 },
     projectile: { muzzleVelocity: 400, gravity: 9.8, maxDistance: 200, drag: 0.08 },
     moveSpeedMultiplier: 1.03,
@@ -349,6 +351,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       maxBloom: 0.02,
       bloomRecovery: 0.04,
     },
+    heat: { shotsToOverheat: 25, coolTime: 4.5, maxSpreadBonus: 0.014 },
     ads: { fov: 58, speed: 11, sensitivity: 0.72 },
     projectile: { muzzleVelocity: 380, gravity: 9.8, maxDistance: 35, drag: 0.25 },
     moveSpeedMultiplier: 1.02,
@@ -447,6 +450,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       maxBloom: 0.027,
       bloomRecovery: 0.035,
     },
+    // The barrel hides inside the perforated jacket: the glow wraps the jacket nose.
+    heat: { shotsToOverheat: 40, coolTime: 5, maxSpreadBonus: 0.014, glow: { radius: 0.026, length: 0.09 } },
     ads: { fov: 58, speed: 10, sensitivity: 0.72 },
     projectile: { muzzleVelocity: 488, gravity: 9.8, maxDistance: 150, drag: 0.1 },
     moveSpeedMultiplier: 0.98,
@@ -534,6 +539,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       maxBloom: 0.035,
       bloomRecovery: 0.025,
     },
+    heat: { shotsToOverheat: 20, coolTime: 5, maxSpreadBonus: 0.014 },
     ads: { fov: 55, speed: 8, sensitivity: 0.7 },
     projectile: { muzzleVelocity: 715, gravity: 9.8, maxDistance: 400, drag: 0.05 },
     moveSpeedMultiplier: 0.96,
@@ -628,6 +634,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       maxBloom: 0.06,
       bloomRecovery: 0.02,
     },
+    heat: { shotsToOverheat: 30, coolTime: 6, maxSpreadBonus: 0.016 },
     ads: { fov: 62, speed: 4, sensitivity: 0.8 },
     projectile: { muzzleVelocity: 850, gravity: 9.8, maxDistance: 500, drag: 0.05 },
     moveSpeedMultiplier: 0.82,
@@ -776,6 +783,86 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         magSize: [0.028, 0.09, 0.07],
         // Blued steel 5-round detachable box magazine.
         magColor: 0x17191b,
+      },
+    },
+  },
+
+  barrett: {
+    id: 'barrett',
+    name: 'BARRETT .50',
+    muzzleFlash: { length: 0.7, width: 0.24, sideLength: 0.55, coreScale: 2.2, duration: 0.14, lightIntensity: 28 },
+    shellCasing: 'bmg50',
+    fireModes: ['semi'],
+    defaultFireMode: 'semi',
+    rpm: 150,
+    magazineSize: 7,
+    reloadTime: 4.2,
+    tacticalReloadTime: 3.4,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: true,
+    damage: 1800,
+    // Four rounds faster than the cool delay redline the barrel and lock
+    // the trigger until it has fully cooled (~4 s); the glow covers the
+    // brake and the exposed barrel behind it.
+    heat: { shotsToOverheat: 4, coolTime: 3.2, coolDelay: 0.6, lockout: true, maxSpreadBonus: 0.014, glow: { radius: 0.055, length: 0.3 } },
+    // The arrowhead brake vents thick clouds to both sides on every shot.
+    muzzleSmoke: { puffs: 6, scale: 1.8, life: 1.6 },
+    recoil: {
+      verticalKick: 0.19, horizontalKick: 0.02, horizontalBias: 0,
+      kickVariance: 0.15, recoverySpeed: 4, recoveryDelay: 0.28,
+      cameraShare: 0.85, adsRecoilMultiplier: 1,
+      // A .50 BMG punch: a hard snap of the view and the shooter rocked ~11 cm back.
+      cameraJolt: 0.075, playerPush: 1.6,
+    },
+    spread: { hipBase: 0.03, adsBase: 0.0005, bloomPerShot: 0.006, maxBloom: 0.018, bloomRecovery: 0.024 },
+    ads: { fov: 16, speed: 3.5, sensitivity: 0.35 },
+    // A .50 round punches through up to five zombies in a line.
+    projectile: { muzzleVelocity: 850, gravity: 9.8, maxDistance: 700, drag: 0.025, maxTargets: 5 },
+    moveSpeedMultiplier: 0.8,
+    equipTime: 0.7,
+    audio: { volume: 1.15, duration: 0.38, lowpass: 1800, thump: 62, crack: 0.55, tail: 1.15, mechanism: 0.3, sampleFile: 'barrett_shot.mp3' },
+    view: {
+      frame: 'barrett',
+      hip: [0.19, -0.215, -0.31],
+      ads: [0, 0, -0.35],
+      sway: 1.2,
+      bob: 0.8,
+      visualRecoil: { kickImpulse: 3.8, pitchImpulse: 12, rollImpulse: 3, stiffness: 115, damping: 17 },
+      scale: 1,
+      bodyColor: 0x50585e,
+      accentColor: 0x191c1f,
+      barrelLength: 0.74,
+      barrelRadius: 0.018,
+      receiverLength: 0.46,
+      stockLength: 0.29,
+      magazine: 'box',
+      optic: 'scope',
+      sightHeight: 0.095,
+      bulk: 1.4,
+      hands: {
+        right: {
+          position: [0, -0.116, 0.06], axis: [0, 1, -0.03], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+          hold: { size: [0.034, 0.05], axis: [0, 0.96, -0.28] }, trigger: [0, -0.086, -0.012],
+        },
+        left: {
+          position: [0, -0.0045, -0.37], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.074, 0.099], axis: [0, 0, -1] },
+        },
+        action: { position: [0.057, -0.005, 0], axis: [0, 1, 0], palm: [-1, 0.3, 0], pose: 'boltPinch' },
+        magazine: {
+          position: [0, -0.112, 0], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
+          hold: { size: [0.052, 0.145], axis: [0, 0, 1] },
+        },
+      },
+      reloadAnim: {
+        style: 'rifle',
+        magOut: 0.1, magDrop: 0.28, magIn: 0.43, magSeat: 0.68, charge: 0.77, chargeEnd: 0.96,
+        swapPose: { shift: [-0.07, 0.07, -0.28], yaw: 0.5, roll: -0.24, tilt: -0.08 },
+        rackPose: { shift: [-0.025, 0.04, -0.04], yaw: -0.12, roll: 0.24, tilt: -0.1 },
+        wellDepth: 0.22,
+        magSize: [0.052, 0.15, 0.145],
+        magColor: 0x2b3034,
       },
     },
   },
@@ -971,7 +1058,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm60', 'l96', 'm1911'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm60', 'l96', 'barrett', 'm1911'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
@@ -990,6 +1077,7 @@ export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'ak47',
   'm60',
   'l96',
+  'barrett',
   'raygun',
   'tesla',
 ];

@@ -12,9 +12,11 @@ import {
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_ATTACK_VERTICAL_TOLERANCE,
   ZOMBIE_BARRIER_ATTACK_DAMAGE,
+  ZOMBIE_BARRIER_ATTACK_HIT_MOMENT,
   ZOMBIE_BARRIER_BREAK_FINISH_DURATION,
   ZOMBIE_BASE_HP,
   ZOMBIE_BASE_SPEED,
+  ZOMBIE_SPAWN_DURATION,
   ZOMBIE_TYPE_CONFIGS,
 } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
@@ -201,7 +203,7 @@ describe('ZombieManager barrier feedback', () => {
     stepUntilState(manager, zombie, 'barrierAttack');
     expect(zombie.state).toBe('barrierAttack');
     expect(facingDot(zombie, barrier.position.x, barrier.position.z)).toBeCloseTo(1, 6);
-    step(manager, ZOMBIE_ATTACK_HIT_MOMENT, 0, 4);
+    step(manager, ZOMBIE_BARRIER_ATTACK_HIT_MOMENT, 0, 4);
     expect(barrier.isOpen).toBe(true);
 
     manager.update(DT, 0, 4);
@@ -427,7 +429,7 @@ describe('ZombieManager movement', () => {
     manager.onPlayerAttack = (amount) => {
       damage += amount;
     };
-    // Spawn rise (1.1 s) + wind-up (0.475 s) -> exactly one hit in 2 seconds.
+    // Spawn rise and facing alignment leave time for one fast strike.
     step(manager, 2);
     expect(damage).toBe(ZOMBIE_ATTACK_DAMAGE);
   });
@@ -617,6 +619,24 @@ describe('ZombieManager attack dodge window', () => {
     expect(damage()).toBe(ZOMBIE_ATTACK_DAMAGE);
   });
 
+  it('catches a close player who starts retreating 100 ms after the attack begins', () => {
+    const { manager } = makeManager();
+    manager.spawnZombie(roundConfig(1), 0, 4);
+    const zombie = actives(manager)[0];
+    zombie.position.set(0, 0, 2.8);
+    const player: TestPlayer = { x: 0, z: 4 };
+    const damage = trackDamage(manager);
+
+    expect(stepUntilAttack(manager, zombie, player)).toBe(true);
+    stepWith(manager, 0.1, player);
+    expect(damage()).toBe(0);
+    stepWith(manager, ZOMBIE_ATTACK_DURATION, player, (p, dt) => {
+      p.z += RETREAT_SPEED * dt;
+    });
+
+    expect(damage()).toBe(ZOMBIE_ATTACK_DAMAGE);
+  });
+
   it('lets a player stepping sideways out of range dodge the bite', () => {
     const { manager } = makeManager();
     manager.spawnZombie(roundConfig(1), 0, 4);
@@ -643,7 +663,7 @@ describe('ZombieManager attack dodge window', () => {
     const damage = trackDamage(manager);
 
     // Player never moves: both bites connect, exactly once each.
-    step(manager, ZOMBIE_ATTACK_DURATION + 2, 0, 4);
+    step(manager, ZOMBIE_SPAWN_DURATION + ZOMBIE_ATTACK_DURATION, 0, 4);
     expect(damage()).toBe(2 * ZOMBIE_ATTACK_DAMAGE);
   });
 

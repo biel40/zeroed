@@ -96,13 +96,15 @@ describe('Knife', () => {
     const cutEnd = sampleBlade(knife, camera, KNIFE_ATTACK_DURATION * 0.4);
 
     // Raised on the right before the cut, out to the lower left after it.
-    expect(drawn.hiltNdc.x).toBeGreaterThan(0.3);
-    expect(cutEnd.hiltNdc.x).toBeLessThan(0);
+    expect(drawn.hiltNdc.x).toBeGreaterThan(0.6);
+    expect(cutEnd.hiltNdc.x).toBeLessThan(-0.6);
     expect(cutEnd.hiltNdc.y).toBeLessThan(drawn.hiltNdc.y);
+    // The useful sweep stays near the crosshair instead of diving below it.
+    expect(Math.abs(cutEnd.hiltNdc.y)).toBeLessThan(0.3);
     // At contact the blade spans the crosshair horizontally.
     expect(contact.hiltNdc.x).toBeGreaterThan(0);
     expect(contact.tipNdc.x).toBeLessThan(0);
-    expect(Math.abs(contact.hiltNdc.y)).toBeLessThan(0.3);
+    expect(Math.abs(contact.hiltNdc.y)).toBeLessThan(0.1);
     // The edge leads the leftward cut; the tip is not aimed at the crosshair.
     const justAfter = sampleBlade(knife, camera, KNIFE_HIT_MOMENT + 0.01);
     const cutDirection = justAfter.hilt.clone().add(justAfter.tip)

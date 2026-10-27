@@ -61,7 +61,7 @@ export interface MansionSurfaceMaterials {
   readonly paper: THREE.MeshStandardMaterial;
   readonly wroughtIron: THREE.MeshStandardMaterial;
   readonly portraits: readonly THREE.MeshStandardMaterial[];
-  /** The officer over the banquet fireplace; his pupils glow red through the emissive map. */
+  /** The officer over the banquet fireplace; animated pupils are separate from the canvas. */
   readonly officerPortrait: THREE.MeshStandardMaterial;
   /** Burnt Persian rug under the banquet table, one texture over its whole plane. */
   readonly rug: THREE.MeshStandardMaterial;
@@ -225,7 +225,6 @@ export function createMansionSurfaceMaterials(anisotropyLimit: number): MansionS
       bake('mansion-officer-portrait', 256, 2, officerPortraitPainter(256)),
       anisotropy,
       1,
-      { emissive: 0xff2a12, emissiveIntensity: 2.4 },
     ),
     rug: surface('burnt_rug', 'mansion-rug', 256, 2, rugPainter, 1),
     lawn: surface('dead_lawn', 'mansion-lawn', 256, 2, deadLawnPainter, 3),

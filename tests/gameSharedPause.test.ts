@@ -8,9 +8,13 @@ const prototype = Game.prototype as unknown as Record<string, (this: Stub, ...ar
 function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; weapon: Stub } {
   const weapon = {
     update: vi.fn(),
+    inspect: vi.fn(),
+    cancelInspect: vi.fn(),
     pendingEvents: [],
     clearEvents: vi.fn(),
     currentSpread: () => 0,
+    heat: { intensity: 0 },
+    definition: {},
   };
   const game: Stub = Object.create(Game.prototype);
   Object.assign(game, {
@@ -26,10 +30,11 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     },
     profile: { useTouchControls: false },
     inventory: { currentWeapon: 'm1911', weapons: ['m1911'] },
-    arsenal: new Map([['m1911', { weapon, view: { root: { visible: true }, update: vi.fn() } }]]),
+    arsenal: new Map([['m1911', { weapon, view: { root: { visible: true }, update: vi.fn(), getMuzzleWorldPosition: vi.fn() } }]]),
     frameInput: { trigger: false, ads: false, repeatSemiAuto: false },
     ballistics: { update: vi.fn() },
     effects: { update: vi.fn() },
+    barrelSmoke: { update: vi.fn() },
     magazineDrops: { update: vi.fn() },
     viewArms: { update: vi.fn() },
     flashLight: { intensity: 0 },
@@ -92,6 +97,37 @@ describe('local pause vs shared simulation', () => {
     game.paused = true;
     prototype.handlePointerLockChange.call(game, true);
     expect(exitPointerLock).toHaveBeenCalledOnce();
+  });
+});
+
+describe('weapon inspection input', () => {
+  const pressing = (code: string) => (pressed: string): boolean => pressed === code;
+
+  it('inspects the weapon on F with mouse and keyboard', () => {
+    const { game, weapon } = stubGame(false, false);
+    game.input.wasPressed = pressing('KeyF');
+    prototype.frame.call(game);
+    expect(weapon.inspect).toHaveBeenCalledOnce();
+  });
+
+  it('never inspects with touch controls', () => {
+    const { game, weapon } = stubGame(false, false);
+    game.profile.useTouchControls = true;
+    game.input.wasPressed = pressing('KeyF');
+    prototype.frame.call(game);
+    expect(weapon.inspect).not.toHaveBeenCalled();
+  });
+
+  it('ends the inspection for the knife and while combat input is gated', () => {
+    const knife = stubGame(false, false);
+    knife.game.mode.onMeleeAttack = vi.fn();
+    knife.game.input.wasPressed = pressing('Digit3');
+    prototype.frame.call(knife.game);
+    expect(knife.weapon.cancelInspect).toHaveBeenCalled();
+
+    const menu = stubGame(true, true);
+    prototype.frame.call(menu.game);
+    expect(menu.weapon.cancelInspect).toHaveBeenCalled();
   });
 });
 

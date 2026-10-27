@@ -29,6 +29,18 @@ describe('Ring catalog', () => {
 });
 
 describe('PlayerRings', () => {
+  it('grants and recharges developer perks without consuming purchase stock; reset removes them', () => {
+    const rings = new PlayerRings();
+    rings.grant('resurrection');
+    expect(rings.consumeCharge('resurrection')).toBe(true);
+    rings.grant('resurrection');
+    expect(rings.chargesOf('resurrection')).toBe(1);
+    expect(rings.purchasesOf('resurrection')).toBe(0);
+    expect(rings.pendingEvents.at(-1)).toEqual({ type: 'recharged', ringId: 'resurrection' });
+    rings.reset();
+    expect(rings.worn).toEqual([]);
+    expect(rings.priceOf('resurrection')).toBe(500);
+  });
   it('buys a ring once, occupies its finger and charges the first price', () => {
     const rings = new PlayerRings();
     const economy = wallet(3000);

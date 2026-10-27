@@ -25,7 +25,8 @@ import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { Weapon } from '../../weapons/Weapon';
 import type { WeaponDefinition, WeaponId } from '../../weapons/WeaponTypes';
-import { KNIFE_ATTACK_DURATION, KNIFE_RANGE, Knife, knifeDamageForRound } from '../../weapons/Knife';
+import { KNIFE_ATTACK_DURATION, Knife, knifeDamageForRound } from '../../weapons/Knife';
+import { KnifeCombat } from '../../weapons/KnifeCombat';
 import type { MeleeArmDriver } from '../../weapons/ViewArms';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../../zombies/MysteryBox';
 import { mysteryBoxFootprint } from '../../zombies/MysteryBoxFootprint';
@@ -137,7 +138,7 @@ export class CoopHostMode implements GameMode {
   private readonly guestTarget = { id: 'guest' as const, x: 0, y: EYE_HEIGHT, z: 0, floor: 0 };
   private readonly tmpDirection = new THREE.Vector3();
   private readonly knife = new Knife();
-  private readonly knifeRaycaster = new THREE.Raycaster();
+  private readonly knifeCombat = new KnifeCombat();
   private readonly knifeOrigin = new THREE.Vector3();
   private lastGuestKnife = -Infinity;
   private phase: MatchPhase = 'waiting';
@@ -172,10 +173,12 @@ export class CoopHostMode implements GameMode {
     this.zombies.setBodyObstacles([mysteryBoxFootprint(arena.mysteryBoxPlacement)]);
     ctx.player.setBodyColliders(this.zombies.actives);
     this.zombies.registerColliders(ctx.hitColliders);
+    this.zombies.setWallColliders(arena.wallColliders);
     this.world.onTopologyChanged = () => {
       this.zombies.setSpawnPoints(arena.spawnPoints);
       this.zombies.setBarriers(arena.barriers);
       this.zombies.registerColliders(ctx.hitColliders);
+      this.zombies.setWallColliders(arena.wallColliders);
     };
     this.zombies.onZombieSpawned = (zombie) => {
       this.send({ type: 'zombieSpawn', zombie: this.zombieState(zombie) });
@@ -600,11 +603,11 @@ export class CoopHostMode implements GameMode {
     this.zombies.group.updateMatrixWorld(true);
     camera.getWorldPosition(this.knifeOrigin);
     camera.getWorldDirection(this.tmpDirection);
-    this.knifeRaycaster.set(this.knifeOrigin, this.tmpDirection);
-    this.knifeRaycaster.near = 0;
-    this.knifeRaycaster.far = KNIFE_RANGE;
-    const impact = this.knifeRaycaster.intersectObjects(this.ctx.hitColliders, false)[0];
-    const zombie = impact?.object.userData.zombie as Zombie | undefined;
+    const impact = this.knifeCombat.findImpact(
+      this.knifeOrigin, this.tmpDirection, this.ctx.player.floor, this.ctx.hitColliders,
+    );
+    if (!impact) return;
+    const zombie = impact.object.userData.zombie as Zombie | undefined;
     if (!zombie?.isAlive || zombie.floor !== this.ctx.player.floor) return;
     this.ctx.stats.registerHit(impact.distance);
     this.ctx.hud.showHitmarker();
@@ -620,7 +623,11 @@ export class CoopHostMode implements GameMode {
     if (now - this.lastGuestKnife < KNIFE_ATTACK_DURATION) return;
     const zombie = this.zombies.findByNetworkId(zombieId);
     if (!zombie?.isAlive || zombie.floor !== state.floor) return;
-    if (Math.hypot(zombie.position.x - state.x, zombie.position.z - state.z) > KNIFE_RANGE + 0.5) return;
+    this.zombies.group.updateMatrixWorld(true);
+    this.knifeOrigin.set(state.x, state.y, state.z);
+    this.tmpDirection.set(-Math.sin(state.yaw) * Math.cos(state.pitch), Math.sin(state.pitch),
+      -Math.cos(state.yaw) * Math.cos(state.pitch));
+    if (!this.knifeCombat.findImpact(this.knifeOrigin, this.tmpDirection, state.floor, this.ctx.hitColliders, zombie)) return;
     this.lastGuestKnife = now;
     this.applyKnifeDamage('guest', zombie);
   }
@@ -710,6 +717,7 @@ export class CoopHostMode implements GameMode {
     }
     if (headshot) killer.headshots++;
     if (source === 'raygun') this.ctx.audio.playRayVaporize?.();
+    else if (source === 'barrett') this.ctx.audio.playZombieShatter();
     const rewardMultiplier = ZOMBIE_TYPE_CONFIGS[zombie.typeId].killRewardMultiplier;
     if (source === 'knife') killer.economy.awardKnifeKill(rewardMultiplier);
     else killer.economy.awardKill(headshot, rewardMultiplier);

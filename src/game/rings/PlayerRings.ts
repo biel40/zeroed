@@ -87,6 +87,13 @@ export class PlayerRings {
     this.pendingEvents.length = 0;
   }
 
+  /** Developer handout: restores charges without spending Points or purchase stock. */
+  grant(ringId: RingId): void {
+    const type = this.has(ringId) ? 'recharged' : 'purchased';
+    this.charges.set(ringId, RING_DEFINITIONS[ringId].chargesPerPurchase);
+    this.pendingEvents.push({ type, ringId });
+  }
+
   /** New run: no rings, no charges, prices back to the first, no pending events. */
   reset(): void {
     this.charges.clear();

@@ -11,15 +11,17 @@ import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
 import { PlayerController } from '../player/PlayerController';
+import { BarrelSmoke } from '../rendering/BarrelSmoke';
 import { Effects } from '../rendering/Effects';
 import { isFadeMaterial, setFadeBlending } from '../rendering/FadeMaterials';
 import { BallisticsSystem } from '../shooting/BallisticsSystem';
 import type { SurfaceType } from '../shooting/HitTarget';
 import { HUD } from '../ui/HUD';
+import { DeveloperConsole } from '../ui/DeveloperConsole';
 import { clamp } from '../utils/math';
 import { Weapon } from '../weapons/Weapon';
 import { MagazineDropPool } from '../weapons/MagazineDrop';
-import type { WeaponId } from '../weapons/WeaponTypes';
+import type { ShellCasingProfile, WeaponId } from '../weapons/WeaponTypes';
 import { WeaponView } from '../weapons/WeaponView';
 import { ViewArms } from '../weapons/ViewArms';
 import { armDetailFor } from '../weapons/FirstPersonArm';
@@ -53,6 +55,7 @@ export class Game {
   private readonly player: PlayerController;
   private readonly ballistics: BallisticsSystem;
   private readonly effects: Effects;
+  private readonly barrelSmoke: BarrelSmoke;
   private readonly audio: AudioSystem;
   private readonly stats = new Stats();
   /** Every weapon the mode may use, preloaded once; the inventory picks slots. */
@@ -83,6 +86,7 @@ export class Game {
   private pointerLockRequested = false;
   private gameplayStarted = false;
   private disposed = false;
+  private developerConsole: DeveloperConsole | null = null;
 
   /** Last applied viewport size in CSS pixels; also drives the spread math. */
   private viewportWidth = 1;
@@ -147,6 +151,7 @@ export class Game {
     this.scene.add(this.player.rig);
 
     this.effects = new Effects(this.scene);
+    this.barrelSmoke = new BarrelSmoke(this.effects);
     this.magazineDrops = new MagazineDropPool(this.scene);
     this.viewArms = new ViewArms(armDetailFor(this.profile));
     this.player.camera.add(this.viewArms.root);
@@ -195,7 +200,7 @@ export class Game {
           reloadAnim?.style ?? 'rifle',
           reloadAnim ? (reloadAnim.chargeEnd - reloadAnim.charge) * weapon.definition.reloadTime * weapon.reloadTimeScale : 0,
         );
-      if (weapon.definition.boltAction) view.onBoltEject = () => this.ejectShell(view);
+      if (weapon.definition.boltAction) view.onBoltEject = () => this.ejectShell(view, weapon.definition.shellCasing);
       this.player.camera.add(view.root);
       this.arsenal.set(id, { weapon, view });
     }
@@ -221,7 +226,7 @@ export class Game {
       handRings: this.viewArms.rings,
       lockPointer: () => this.start(),
       unlockPointer: () => document.exitPointerLock(),
-      grantWeapon: (id) => this.grantWeapon(id),
+      grantWeapon: (id, replacePinned) => this.grantWeapon(id, replacePinned),
       canGrantWeapon: (id) => this.arsenal.has(id),
       hasWeapon: (id) => this.inventory.has(id),
       getEquippedWeaponId: () => this.inventory.currentWeapon,
@@ -274,6 +279,23 @@ export class Game {
     });
     // ESC to resume while the menu is open and the pointer is unlocked.
     document.addEventListener('keydown', this.handleEscapeKey);
+
+    if (this.mode.executeDeveloperCommand) {
+      this.developerConsole = new DeveloperConsole({
+        canOpen: () => this.gameplayStarted && !this.paused
+          && !!this.mode.isDeveloperConsoleEnabled?.(),
+        execute: (line) => this.mode.executeDeveloperCommand!(line),
+        onOpen: () => {
+          this.input.releaseAll();
+          this.pause();
+          this.hud.hidePauseMenu();
+        },
+        onClose: () => {
+          this.input.releaseAll();
+          this.resume();
+        },
+      });
+    }
 
     if (new URLSearchParams(window.location.search).has('debug')) {
       this.debugElement = document.createElement('div');
@@ -347,6 +369,7 @@ export class Game {
     this.audio.resume();
     void this.audio.loadMysteryBoxOpenAsset();
     void this.audio.loadDryFireAsset();
+    for (const { weapon } of this.arsenal.values()) this.audio.preloadShotSample(weapon.definition.audio);
     void this.audio.loadDoorPurchaseAsset();
     if (this.profile.useTouchControls) {
       this.gameplayStarted = true;
@@ -471,6 +494,7 @@ export class Game {
     if (this.disposed) return;
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
+    this.developerConsole?.dispose();
     this.input.dispose();
     document.removeEventListener('keydown', this.handleEscapeKey);
     window.removeEventListener('resize', this.handleResize);
@@ -550,11 +574,11 @@ export class Game {
    * Weapon pickup/purchase: the weapon enters the inventory (slot cap rules
    * live in WeaponInventory), arrives with fresh ammo, and is equipped.
    */
-  private grantWeapon(id: WeaponId): boolean {
+  private grantWeapon(id: WeaponId, replacePinned = false): boolean {
     const entry = this.arsenal.get(id);
     if (!entry) return false;
     const previousId = this.inventory.currentWeapon;
-    const { equipped } = this.inventory.grant(id);
+    const { equipped } = this.inventory.grant(id, replacePinned);
     const equippedEntry = this.entry(equipped);
     if (equipped === id) {
       const keepInfiniteReserve = equippedEntry.weapon.reserveAmmo === null && this.inventory.isPinned(id);
@@ -617,27 +641,31 @@ export class Game {
     }
 
     this.audio.playShot(weapon.definition.audio);
+    const { cameraJolt, playerPush } = weapon.definition.recoil;
+    if (cameraJolt) this.player.playShotImpulse(cameraJolt);
+    if (playerPush) this.player.applyShotPush(playerPush);
     view.onShot();
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
     this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
-    this.flashLight.intensity = energy ? 10 : 9;
+    this.flashLight.intensity = energy ? 10 : (weapon.definition.muzzleFlash?.lightIntensity ?? 9);
     this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
 
     if (energy) {
       this.player.playShotImpulse(0.014);
       this.effects.puff(this.tmpMuzzle, energy.color, 0.2);
     } else {
-      this.effects.puff(this.tmpMuzzle, 0xdedede, 0.26);
+      this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
+      this.barrelSmoke.onShot(this.tmpMuzzle, weapon.heat.intensity, this.tmpRight, weapon.definition.muzzleSmoke);
       // Bolt actions keep the case chambered until the bolt is worked.
-      if (!weapon.definition.boltAction) this.ejectShell(view);
+      if (!weapon.definition.boltAction) this.ejectShell(view, weapon.definition.shellCasing);
     }
   }
 
-  private ejectShell(view: WeaponView): void {
+  private ejectShell(view: WeaponView, profile?: ShellCasingProfile): void {
     this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
     view.getEjectionWorldPosition(this.tmpEject);
-    this.effects.ejectShell(this.tmpEject, this.tmpRight);
+    this.effects.ejectShell(this.tmpEject, this.tmpRight, profile);
   }
 
   private processWeaponEvents(): void {
@@ -649,6 +677,9 @@ export class Game {
           break;
         case 'dryFire':
           this.audio.playDryFire();
+          break;
+        case 'overheated':
+          this.audio.playBarrelOverheat();
           break;
         case 'reloadStart':
           this.audio.playReloadStart(
@@ -723,12 +754,15 @@ export class Game {
       weapon = this.currentWeapon;
       if (allowCombatInput && this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
       if (allowCombatInput && this.input.wasPressed('KeyX')) weapon.cycleFireMode();
+      // Inspecting is a desktop-only flourish: touch layouts get no button for it.
+      if (allowCombatInput && !this.profile.useTouchControls && this.input.wasPressed('KeyF')) weapon.inspect();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
       if (allowCombatInput && (
         this.input.wasPressed('Digit3') ||
         this.input.wasPressed('Numpad3') ||
         this.input.wasPressed('TouchKnife')
       )) {
+        weapon.cancelInspect();
         this.mode.onMeleeAttack?.();
       }
       allowGameplayInput =
@@ -740,6 +774,8 @@ export class Game {
 
     // Interactions may equip a purchased/picked-up weapon in this same frame.
     weapon = this.currentWeapon;
+    // A menu, a downed player or a mode lock ends the inspection.
+    if (!allowCombatInput) weapon.cancelInspect();
 
     const fallbackAttack = this.mode.usesFallbackAttack?.() ?? false;
     if (!allowGameplayInput && !this.paused
@@ -774,6 +810,10 @@ export class Game {
       melee?.firearmLowering ?? 0,
     );
     this.viewArms.update(dt, this.currentView, melee);
+    if (this.currentView.root.visible) {
+      this.currentView.getMuzzleWorldPosition(this.tmpMuzzle);
+      this.barrelSmoke.update(dt, this.tmpMuzzle, weapon.heat.intensity, weapon.definition.muzzleSmoke?.scale);
+    }
     this.effects.update(dt);
     this.magazineDrops.update(dt);
 

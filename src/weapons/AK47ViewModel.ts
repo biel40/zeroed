@@ -5,6 +5,7 @@ import {
   cylinderZ, extrudeProfile, profilePath, profileShape, shapeWidth, type ProfilePoint,
 } from './ProfileGeometry';
 import { steelWearTexture, woodGrainTexture } from './ProceduralTextures';
+import { buildMagazineRounds, CARTRIDGES, cartridgeMaterials, feedLipSeats } from './MagazineRounds';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -330,6 +331,10 @@ export function buildAk47(config: ViewModelConfig): BuiltProcedural {
     }
   }
   add('magazine-floorplate', extrudeProfile(profileShape(ak47MagazineFloorplate()), mag.width + 0.003, 0.001), magazineSteel, magazine);
+  const { brass, copper } = cartridgeMaterials();
+  const cartridge = CARTRIDGES.soviet762x39;
+  const rounds = buildMagazineRounds('ak47-magazine-rounds', cartridge, feedLipSeats(cartridge, mag.hidden, 0.0275, 0.004), brass, copper);
+  magazine.add(rounds);
 
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
@@ -338,6 +343,6 @@ export function buildAk47(config: ViewModelConfig): BuiltProcedural {
     muzzlePosition: new THREE.Vector3(0, 0, nut.frontZ - 0.003).multiplyScalar(config.scale),
     ejectionPosition: new THREE.Vector3(0.018, 0.006, -0.08).multiplyScalar(config.scale),
     sightY: sightY * config.scale,
-    reloadParts: { magazine, handle },
+    reloadParts: { magazine, handle, rounds },
   };
 }

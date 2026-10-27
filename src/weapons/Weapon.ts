@@ -1,3 +1,4 @@
+import { BarrelHeat } from './BarrelHeat';
 import { RecoilController } from './RecoilController';
 import type {
   FireMode,
@@ -9,6 +10,9 @@ import type {
 } from './WeaponTypes';
 import { lerp, moveToward } from '../utils/math';
 
+/** Seconds a full weapon inspection lasts. */
+export const INSPECT_TIME = 3.6;
+
 /**
  * Pure weapon logic: fire cadence, ammo, reload, bolt cycling, ADS blend and
  * spread bloom. Contains no Three.js code so it can be unit tested directly.
@@ -16,6 +20,8 @@ import { lerp, moveToward } from '../utils/math';
  */
 export class Weapon {
   readonly recoil: RecoilController;
+  /** Barrel temperature: drives the overheat glow, smoke and spread bonus. */
+  readonly heat: BarrelHeat;
   ammoInMagazine: number;
   /** Remaining reserve rounds; null means a bottomless reserve. */
   reserveAmmo: number | null;
@@ -39,6 +45,8 @@ export class Weapon {
   private reloadAfterEquip = false;
   private bloom = 0;
   private prevTrigger = false;
+  /** Seconds into the running inspection; null when the weapon is not being inspected. */
+  private inspectTimer: number | null = null;
 
   constructor(
     readonly definition: WeaponDefinition,
@@ -52,6 +60,7 @@ export class Weapon {
     reserveOverride?: number,
   ) {
     this.recoil = new RecoilController(definition.recoil, rng);
+    this.heat = new BarrelHeat(definition.heat);
     this.ammoInMagazine = definition.magazineSize;
     // arguments.length distinguishes "no override passed" from an explicit
     // undefined override — the former keeps the definition, the latter
@@ -76,23 +85,44 @@ export class Weapon {
     return 1 - this.stateTimer / this.stateDuration;
   }
 
+  /**
+   * 0 → 1 progress of the running inspection, or null. Inspecting is purely
+   * visual: it never blocks firing, aiming or reloading, any of which ends it.
+   */
+  get inspectProgress(): number | null {
+    return this.inspectTimer === null ? null : this.inspectTimer / INSPECT_TIME;
+  }
+
+  /** Starts an inspection from a ready, unaimed weapon. */
+  inspect(): boolean {
+    if (this.weaponState !== 'ready' || this.adsAlpha > 0 || this.inspectTimer !== null) return false;
+    this.inspectTimer = 0;
+    return true;
+  }
+
+  cancelInspect(): void {
+    this.inspectTimer = null;
+  }
+
   get currentBloom(): number {
     return this.bloom;
   }
 
   currentSpread(): number {
     const s = this.definition.spread;
-    return lerp(s.hipBase, s.adsBase, this.adsAlpha) + this.bloom;
+    return lerp(s.hipBase, s.adsBase, this.adsAlpha) + this.bloom + this.heat.spreadBonus;
   }
 
   update(dt: number, input: WeaponFrameInput): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.recoil.update(dt);
+    this.heat.update(dt);
     this.bloom = Math.max(0, this.bloom - this.definition.spread.bloomRecovery * dt);
 
     const canAim = this.weaponState === 'ready' || this.weaponState === 'cycling';
     const adsTarget = input.ads && canAim ? 1 : 0;
     this.adsAlpha = moveToward(this.adsAlpha, adsTarget, this.definition.ads.speed * dt);
+    this.updateInspection(dt, input);
 
     if (this.weaponState !== 'ready') {
       this.stateTimer -= dt;
@@ -128,6 +158,7 @@ export class Weapon {
     this.prevTrigger = false;
     this.adsAlpha = 0;
     this.bloom = 0;
+    this.heat.reset();
     this.recoil.reset();
     this.enterState('equipping', this.definition.equipTime);
   }
@@ -155,6 +186,8 @@ export class Weapon {
     this.bloom = 0;
     this.adsAlpha = 0;
     this.prevTrigger = false;
+    this.inspectTimer = null;
+    this.heat.reset();
     this.recoil.reset();
     this.pendingEvents.length = 0;
   }
@@ -185,6 +218,11 @@ export class Weapon {
   private tryFire(triggerEdge: boolean): void {
     if (this.weaponState !== 'ready' || this.cooldown > 0) return;
 
+    if (this.heat.overheated) {
+      if (triggerEdge) this.pendingEvents.push({ type: 'overheated' });
+      return;
+    }
+
     if (this.ammoInMagazine <= 0) {
       // Dry fire clicks only on a fresh press so full-auto does not spam.
       if (triggerEdge) this.pendingEvents.push({ type: 'dryFire' });
@@ -200,7 +238,9 @@ export class Weapon {
       this.definition.spread.maxBloom,
       this.bloom + this.definition.spread.bloomPerShot,
     );
+    this.heat.onShot();
     this.pendingEvents.push({ type: 'shot' });
+    if (this.heat.overheated) this.pendingEvents.push({ type: 'overheated' });
 
     if (this.definition.boltAction) {
       this.enterState('cycling', this.definition.boltCycleTime, 'boltStart');
@@ -209,7 +249,20 @@ export class Weapon {
     }
   }
 
+  /** Advances the inspection; the trigger or the aim interrupt it so the shot is never delayed. */
+  private updateInspection(dt: number, input: WeaponFrameInput): void {
+    if (this.inspectTimer === null) return;
+    if (input.trigger || input.ads) {
+      this.inspectTimer = null;
+      return;
+    }
+    this.inspectTimer += dt;
+    if (this.inspectTimer >= INSPECT_TIME) this.inspectTimer = null;
+  }
+
   private enterState(state: WeaponState, duration: number, event?: WeaponEvent['type']): void {
+    // Reloading, cycling the bolt or equipping take the weapon out of the inspection.
+    this.inspectTimer = null;
     this.weaponState = state;
     this.stateTimer = duration;
     this.stateDuration = duration;

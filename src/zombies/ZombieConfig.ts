@@ -156,9 +156,11 @@ export const ZOMBIE_SPAWN_DURATION = 1.1;
 export const ZOMBIE_ATTACK_DURATION = 0.75;
 /**
  * Wind-up before the blow connects and the player's dodge window. The shared
- * procedural attack curves place every variant at contact at exactly 0.475 s.
+ * procedural attack curves place every variant at contact at exactly 0.18 s.
  */
-export const ZOMBIE_ATTACK_HIT_MOMENT = 0.475;
+export const ZOMBIE_ATTACK_HIT_MOMENT = 0.18;
+/** Barricade strikes retain their deliberate wind-up and board-pull timing. */
+export const ZOMBIE_BARRIER_ATTACK_HIT_MOMENT = 0.475;
 /**
  * Death fall, corpse linger and fade-out before the body is recycled. The
  * lifetime is the same for every death style; longer falls (ZombieDeath)
@@ -193,6 +195,7 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   ak47: 300,
   m60: 500,
   l96: 60,
+  barrett: 40,
   raygun: 160,
 };
 

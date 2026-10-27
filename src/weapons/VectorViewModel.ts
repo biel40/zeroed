@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { cylinderZ, extrudeProfile, profilePath, profileShape, shapeWidth, type ProfilePoint } from './ProfileGeometry';
 import { steelWearTexture } from './ProceduralTextures';
+import { buildMagazineRounds, CARTRIDGES, cartridgeMaterials, feedLipSeats } from './MagazineRounds';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -257,6 +258,10 @@ export function buildVector(config: ViewModelConfig): BuiltProcedural {
     add('magazine-rib', new THREE.BoxGeometry(0.0014, 0.14, 0.006), magazineMaterial, magazine, side * (mag.width / 2 + 0.0003), -0.08, 0.004);
   }
   add('magazine-floorplate', extrudeProfile(profileShape(mag.floorplate), mag.width + 0.004, 0.0015, { segments: 2 }), magazineMaterial, magazine);
+  const { brass, copper } = cartridgeMaterials();
+  const cartridge = CARTRIDGES.parabellum9;
+  const rounds = buildMagazineRounds('vector-magazine-rounds', cartridge, feedLipSeats(cartridge, 0.05, 0.015, 0.0035), brass, copper);
+  magazine.add(rounds);
 
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
@@ -265,6 +270,6 @@ export function buildVector(config: ViewModelConfig): BuiltProcedural {
     muzzlePosition: new THREE.Vector3(0, boreY, hider.frontZ - 0.004).multiplyScalar(config.scale),
     ejectionPosition: new THREE.Vector3(UPPER_WIDTH / 2 + 0.006, 0.018, -0.105).multiplyScalar(config.scale),
     sightY: sightY * config.scale,
-    reloadParts: { magazine, handle },
+    reloadParts: { magazine, handle, rounds },
   };
 }

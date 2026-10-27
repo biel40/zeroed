@@ -6,20 +6,38 @@
  */
 export class PlayerHealth {
   hp: number;
+  private currentMaxHp: number;
   private invulnTimer = 0;
   private invincible = false;
   /** Seconds since the last landed hit; regen starts once it passes the delay. */
   private regenTimer = 0;
 
   constructor(
-    readonly maxHp = 100,
+    /** Max HP without bonuses (the Armour ring scales it). */
+    readonly baseMaxHp = 100,
     private readonly invulnDuration = 0.9,
     /** Seconds without taking damage before regeneration starts. 0 disables it. */
     private readonly regenDelay = 0,
     /** HP recovered per second once the delay has elapsed. 0 disables regen. */
     private readonly regenRate = 0,
   ) {
-    this.hp = maxHp;
+    this.currentMaxHp = baseMaxHp;
+    this.hp = baseMaxHp;
+  }
+
+  get maxHp(): number {
+    return this.currentMaxHp;
+  }
+
+  /**
+   * Max HP becomes `scale` times the base (the Armour ring). Raising it
+   * grants the extra HP at once; lowering it caps the current HP. The dead
+   * stay dead.
+   */
+  setMaxHpScale(scale: number): void {
+    const next = this.baseMaxHp * scale;
+    if (!this.isDead) this.hp = Math.min(next, this.hp + Math.max(0, next - this.currentMaxHp));
+    this.currentMaxHp = next;
   }
 
   get isDead(): boolean {
@@ -59,7 +77,8 @@ export class PlayerHealth {
   }
 
   reset(): void {
-    this.hp = this.maxHp;
+    this.currentMaxHp = this.baseMaxHp;
+    this.hp = this.baseMaxHp;
     this.invulnTimer = 0;
     this.regenTimer = 0;
     this.invincible = false;

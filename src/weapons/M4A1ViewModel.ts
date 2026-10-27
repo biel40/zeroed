@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { cylinderZ, extrudeProfile, profilePath, profileShape, type ProfilePoint } from './ProfileGeometry';
+import { buildMagazineRounds, CARTRIDGES, cartridgeMaterials, feedLipSeats } from './MagazineRounds';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -227,6 +228,10 @@ export function buildM4A1(config: ViewModelConfig): BuiltProcedural {
     const rib: ProfilePoint[] = [[topZ - 0.0015, -0.003], [topZ + 0.0015, -0.003], [bottomZ + 0.0015, -0.1], [bottomZ - 0.0015, -0.1]];
     add('magazine-rib', extrude(rib, mag.width + 0.002), magazineMaterial, 0, 0, 0, magazine);
   }
+  const { brass, copper } = cartridgeMaterials();
+  const cartridge = CARTRIDGES.nato556;
+  const rounds = buildMagazineRounds('m4a1-magazine-rounds', cartridge, feedLipSeats(cartridge, 0.06, 0.028, 0.0035), brass, copper);
+  magazine.add(rounds);
 
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
@@ -235,6 +240,6 @@ export function buildM4A1(config: ViewModelConfig): BuiltProcedural {
     muzzlePosition: new THREE.Vector3(0, boreY, profile.muzzleZ - 0.005).multiplyScalar(config.scale),
     ejectionPosition: new THREE.Vector3(profile.upperWidth / 2 + 0.008, 0.016, -0.05).multiplyScalar(config.scale),
     sightY: config.sightHeight * config.scale,
-    reloadParts: { magazine, handle },
+    reloadParts: { magazine, handle, rounds },
   };
 }

@@ -113,7 +113,8 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   reclamación que el anfitrión acepta una sola vez por disparo validado
   (`ShotValidator`: cadencia máxima y un crédito por disparo, según el arma).
   El cuchillo reutiliza el ataque del modo individual; el anfitrión valida
-  alcance, cadencia, daño y puntos de cada impacto del invitado.
+  alcance, arco frontal, altura, obstáculos, cadencia, daño y puntos de cada
+  impacto del invitado con la misma selección de cuerpos que el modo individual.
 - Arsenal especial: la Mystery Box cobra 950 Points al jugador que la activa,
   muestra la misma tirada a ambos y reserva el resultado para ese comprador.
   L96 usa la balistica compartida. Ray Gun y ZEUS-77 muestran proyectiles en

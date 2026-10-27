@@ -3,15 +3,19 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { clamp, damp } from '../utils/math';
+import { BarrelGlow, defaultBarrelGlowSize } from './BarrelGlow';
+import { MuzzleFlash } from './MuzzleFlash';
 import type { MagazineDropPool } from './MagazineDrop';
 import { buildAk47 } from './AK47ViewModel';
 import { buildL96 } from './L96ViewModel';
+import { buildBarrett } from './BarrettViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
 import { buildMP5 } from './MP5ViewModel';
 import { buildVector } from './VectorViewModel';
 import { buildPPSH41 } from './PPSH41ViewModel';
 import { buildM60 } from './M60ViewModel';
 import { buildRayGun } from './RayGunViewModel';
+import { InspectAnimator } from './InspectAnimator';
 import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import { WeaponHands } from './WeaponHands';
@@ -920,7 +924,10 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
   roundBullet.scale.z = 1.4;
   roundBullet.position.z = -0.007;
   round.add(roundCase, roundBullet);
-  magazine.add(round);
+  const rounds = new THREE.Group();
+  rounds.name = 'm1911-magazine-rounds';
+  rounds.add(round);
+  magazine.add(rounds);
   group.add(magazine);
 
   group.scale.setScalar(config.scale);
@@ -939,7 +946,7 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
     ),
     sightY,
     slide,
-    reloadParts: { magazine, handle: slide, rounds: round },
+    reloadParts: { magazine, handle: slide, rounds },
   };
 }
 
@@ -1115,6 +1122,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'vector') return buildVector(view);
   if (view.frame === 'ppsh41') return buildPPSH41(view);
   if (view.frame === 'l96') return buildL96(view);
+  if (view.frame === 'barrett') return buildBarrett(view);
   return buildProcedural(view);
 }
 
@@ -1183,10 +1191,14 @@ export class WeaponView {
   private readonly muzzle = new THREE.Object3D();
   private readonly ejectionPort = new THREE.Object3D();
   private readonly flash: THREE.Mesh;
+  private readonly heavyFlash: MuzzleFlash | null = null;
+  /** Overheated barrel tip; only weapons with a heat config get one. */
+  private readonly barrelGlow: BarrelGlow | null = null;
   private readonly spring: SpringRecoil;
   private readonly hipPosition: THREE.Vector3;
   private readonly adsPosition: THREE.Vector3;
   private readonly animator: ReloadAnimator | null = null;
+  private readonly inspector: InspectAnimator;
   /** Hand targets: grips, reload choreography and the action hand. */
   readonly hands: WeaponHands;
   private flashTime = 0;
@@ -1269,6 +1281,7 @@ export class WeaponView {
         dropPool,
       );
     }
+    this.inspector = new InspectAnimator(view.reloadAnim ?? null, reloadParts.magazine ?? null);
 
     const isEnergyFlash = view.energyColor !== undefined;
     const flashMaterial = new THREE.MeshBasicMaterial({
@@ -1301,6 +1314,15 @@ export class WeaponView {
     }
     this.flash.visible = false;
     this.muzzle.add(this.flash);
+    if (definition.muzzleFlash) {
+      this.heavyFlash = new MuzzleFlash(definition.muzzleFlash);
+      this.muzzle.add(this.heavyFlash.root);
+    }
+    if (definition.heat) {
+      const glow = definition.heat.glow ?? defaultBarrelGlowSize(view.barrelRadius);
+      this.barrelGlow = new BarrelGlow({ radius: glow.radius * view.scale, length: glow.length * view.scale });
+      this.muzzle.add(this.barrelGlow.mesh);
+    }
 
     this.root.position.copy(this.hipPosition);
     this.root.visible = false;
@@ -1429,18 +1451,21 @@ export class WeaponView {
     return { magazine, handle };
   }
 
-  /** Wired by Game: reload phase events for audio synchronization. */
+  /** Wired by Game: reload (and inspection magazine check) phase events for audio synchronization. */
   set onReloadPhase(handler: ((phase: ReloadPhase) => void) | null) {
     if (this.animator) this.animator.onPhase = handler;
+    this.inspector.onPhase = handler;
   }
 
   /** Called by Game on every shot event. */
   onShot(): void {
     const isEnergy = this.definition.view.energyColor !== undefined;
     this.flashTime = isEnergy ? ENERGY_FLASH_DURATION : FLASH_DURATION;
-    this.flash.scale.setScalar(isEnergy ? 0.95 + Math.random() * 0.35 : 0.8 + Math.random() * 0.5);
+    this.flash.scale.setScalar((isEnergy ? 0.95 + Math.random() * 0.35 : 0.8 + Math.random() * 0.5)
+      * (this.definition.muzzleFlash?.coreScale ?? 1));
     this.flash.rotation.z = Math.random() * Math.PI * 2;
     this.flash.visible = true;
+    this.heavyFlash?.trigger();
     this.spring.kick();
     // Pistol slide cycles with every shot.
     if (this.slide) this.slideBlowback = 1;
@@ -1450,11 +1475,13 @@ export class WeaponView {
 
   /** Clears every transient pose when this view is hidden or the run resets. */
   reset(): void {
+    this.inspector.reset();
     this.animator?.reset();
     this.hands.reset();
     this.spring.reset();
     this.flashTime = 0;
     this.flash.visible = false;
+    this.heavyFlash?.reset();
     this.swayX = 0;
     this.swayY = 0;
     this.slideBlowback = 0;
@@ -1516,10 +1543,18 @@ export class WeaponView {
     this.root.rotation.x += this.spring.pitch;
     this.root.rotation.z += this.spring.roll;
 
-    // 5. State-driven animations. The reload animator runs every frame so
-    // it can restore parts the moment the state is left (weapon switch).
+    // 5. State-driven animations. The inspection seats its magazine before
+    // a reload that interrupts it takes over, and the reload animator runs
+    // every frame so it can restore parts the moment the state is left
+    // (weapon switch).
+    this.inspector.update(dt, weapon);
+    this.root.position.add(this.inspector.bodyShift);
+    this.root.rotation.x += this.inspector.bodyTilt;
+    this.root.rotation.z += this.inspector.bodyRoll;
+    this.root.rotation.y += this.inspector.bodyYaw;
     this.animator?.update(weapon);
     this.hands.update(weapon);
+    this.barrelGlow?.update(weapon.heat.intensity);
     if (weapon.state !== 'cycling') this.boltEjected = false;
     switch (weapon.state) {
       case 'reloading': {
@@ -1568,6 +1603,7 @@ export class WeaponView {
       this.root.rotation.x -= lowering * 0.5;
       this.root.rotation.z += lowering * 0.3;
     }
+    this.heavyFlash?.update(dt);
     if (this.flashTime > 0) {
       this.flashTime -= dt;
       if (this.flashTime <= 0) this.flash.visible = false;

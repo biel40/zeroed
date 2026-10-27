@@ -19,4 +19,7 @@ export const BETA_EMAILS = [
 export const DEVELOPER_EMAILS = [
   'bielet40@gmail.com',
   'biel40aws@gmail.com',
+  'giani.1997@gmail.com',
+  'icabe.96@gmail.com',
+  'ivancabe.96@gmail.com',
 ];

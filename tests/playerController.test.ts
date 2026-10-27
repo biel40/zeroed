@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Input } from '../src/player/Input';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { DEFAULT_PLAYER_BOUNDS, PlayerController } from '../src/player/PlayerController';
 import type { Weapon } from '../src/weapons/Weapon';
 
@@ -103,5 +104,19 @@ describe('PlayerController jump action', () => {
     expect(player.rig.position.y).toBeGreaterThan(groundY);
     step(player, input, 2);
     expect(player.rig.position.y).toBeCloseTo(groundY, 5);
+  });
+});
+
+describe('PlayerController heavy-rifle shot push', () => {
+  it('rocks the standing player several centimetres straight back from the view', () => {
+    const player = new PlayerController(1);
+    const start = player.rig.position.clone();
+    player.applyShotPush(WEAPON_DEFINITIONS.barrett.recoil.playerPush!);
+    step(player, inputStub(new Set()), 1);
+    // Facing -z at yaw 0, so "back" is +z.
+    const moved = player.rig.position.z - start.z;
+    expect(moved).toBeGreaterThan(0.05);
+    expect(moved).toBeLessThan(0.15);
+    expect(player.rig.position.x).toBeCloseTo(start.x, 6);
   });
 });

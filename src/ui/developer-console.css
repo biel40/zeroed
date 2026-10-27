@@ -1,0 +1,64 @@
+.developer-console {
+  position: fixed;
+  inset: 16px 16px auto;
+  z-index: 10000;
+  max-width: 920px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  margin: 0 auto;
+  padding: 24px;
+  color: #d9f5e5;
+  background: rgba(8, 17, 14, .97);
+  border: 1px solid #47745b;
+  border-radius: 8px;
+  box-shadow: 0 12px 50px #000a;
+  font: 14px/1.5 'Segoe UI', system-ui, sans-serif;
+}
+.developer-console[hidden] { display: none; }
+.developer-console header, .developer-console form { display: flex; gap: 12px; align-items: center; }
+.developer-console header { justify-content: space-between; }
+.developer-console header strong { font-size: 20px; }
+.developer-console pre {
+  max-height: 110px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #07110d;
+  border-left: 3px solid #80dca2;
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 16px 0;
+  font: 13px/1.6 monospace;
+}
+.developer-console input { flex: 1; min-width: 0; user-select: text; -webkit-user-select: text; }
+.developer-console input, .developer-console button, .developer-console select {
+  padding: 8px 12px;
+  border: 1px solid #47745b;
+  border-radius: 4px;
+  background: #12251c;
+  color: inherit;
+  font: inherit;
+}
+.developer-console button { cursor: pointer; font-weight: 600; }
+.developer-console button:hover { background: #284c36; border-color: #8de4ae; }
+.developer-console :focus-visible { outline: 2px solid #8de4ae; outline-offset: 2px; }
+.dev-intro { color: #a5c8b3; margin: 8px 0 20px; }
+.dev-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dev-card { background: #112219; border: 1px solid #2d4e3a; border-radius: 8px; padding: 16px; }
+.dev-card h3 { color: #e9fff0; font-size: 16px; margin-bottom: 4px; }
+.dev-card p { color: #a5c8b3; margin-bottom: 12px; }
+.dev-card select { display: block; width: 100%; margin-bottom: 10px; }
+.dev-card button { margin: 4px 8px 0 0; }
+.dev-card label { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.dev-card input[type='number'] { flex: none; width: 90px; }
+.dev-card .dev-effect { font-size: 12px; color: #8de4ae; }
+.dev-card-wide { grid-column: 1 / -1; }
+.developer-console details { border-top: 1px solid #2d4e3a; padding-top: 12px; }
+.developer-console summary { cursor: pointer; color: #a5c8b3; }
+.dev-command-help { white-space: pre-line; margin: 12px 0; font: 12px/1.6 monospace; }
+@media (max-width: 600px) {
+  .developer-console { inset: 8px 8px auto; padding: 14px; max-height: calc(100dvh - 16px); }
+  .developer-console header { align-items: flex-start; }
+  .developer-console header strong { font-size: 17px; }
+  .dev-controls { grid-template-columns: 1fr; }
+}

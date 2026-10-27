@@ -4,7 +4,6 @@ import { placement } from '../shared/StaticMeshBatch';
 import { MANSION_BANQUET_HALL } from '../BurnedMansionConfig';
 import { BANQUET_RUG_ASPECT } from './MansionPainters';
 import type { MansionBuildContext } from './MansionBuildContext';
-import { addFramedPicture, mansionWallFace } from './MansionWallMounts';
 
 /**
  * Furniture of the banquet hall, visual only: a long walnut table still laid
@@ -79,14 +78,16 @@ function addTable(context: MansionBuildContext): void {
     context.batch.add(new THREE.CylinderGeometry(0.13, 0.11, 0.012, 16).translate(x, topY + 0.006, z), materials.paper, frame);
     context.batch.add(new THREE.CylinderGeometry(0.03, 0.022, 0.13, 8).translate(x - Math.sign(x) * 0.2, topY + 0.065, z * 0.75), materials.brass, frame);
   }
-  // A stained runner down the middle carries the candelabra and the wine.
-  box(materials.paper, 0, topY + 0.002, 0, 4.0, 0.004, 0.36);
-  for (const x of [-1.1, 1.1]) addCandelabrum(context, frame, x, topY + 0.004, 0);
+  // A stained runner down the middle carries the candelabra and the wine. It is
+  // thicker than the burn patch so their top faces never share a depth.
+  const runnerTop = topY + 0.008;
+  box(materials.paper, 0, (topY + runnerTop) / 2, 0, 4.0, runnerTop - topY, 0.36);
+  for (const x of [-1.1, 1.1]) addCandelabrum(context, frame, x, runnerTop, 0);
   for (const [x, z] of [[-0.4, 0.12], [0.55, -0.1], [1.75, 0.08]] as const) {
-    addBottle(context, new THREE.Matrix4().makeTranslation(x, topY + 0.004, z).premultiply(frame));
+    addBottle(context, new THREE.Matrix4().makeTranslation(x, runnerTop, z).premultiply(frame));
   }
   // One knocked over, rolled against a plate.
-  const fallen = new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(-1.45, topY + 0.042, -0.1);
+  const fallen = new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(-1.45, runnerTop + 0.038, -0.1);
   addBottle(context, fallen.premultiply(frame));
 }
 
@@ -239,6 +240,4 @@ function addFireplace(context: MansionBuildContext): void {
   for (const tilt of [-0.06, 0, 0.07]) {
     context.batch.add(new THREE.CylinderGeometry(0.008, 0.008, 0.68, 6).rotateZ(tilt).translate(ironsX + tilt * 0.3, 0.36, 0.2), materials.wroughtIron, frame);
   }
-  // The officer hangs a little crooked over the mantel, his eyes on the table.
-  addFramedPicture(context, mansionWallFace('banquet-chimney'), chimney.z, 2.1, 0.98, 1.3, materials.officerPortrait, 0.03, 0.1);
 }

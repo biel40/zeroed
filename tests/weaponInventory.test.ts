@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { WeaponInventory } from '../src/game/WeaponInventory';
 
 describe('WeaponInventory (zombies two-weapon rule)', () => {
+  it('allows an explicit developer grant to replace the selected pinned weapon only', () => {
+    const inventory = new WeaponInventory(['raygun', 'tesla'], 2);
+    inventory.pin('raygun');
+    inventory.pin('tesla');
+    expect(inventory.grant('m1911').equipped).toBe('raygun');
+    expect(inventory.grant('m1911', true)).toEqual({ equipped: 'm1911', dropped: 'raygun' });
+    expect(inventory.weapons).toEqual(['m1911', 'tesla']);
+    expect(inventory.isPinned('raygun')).toBe(false);
+    expect(inventory.isPinned('tesla')).toBe(true);
+  });
   it('starts with the M1911 alone and one empty slot', () => {
     const inventory = new WeaponInventory(['m1911'], 2);
     expect(inventory.weapons).toEqual(['m1911']);

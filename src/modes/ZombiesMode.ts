@@ -7,10 +7,12 @@ import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
 import { PlayerHealth } from '../game/PlayerHealth';
 import { DeveloperCommand } from '../game/DeveloperCommand';
+import { DeveloperConsoleCommands } from '../game/DeveloperConsoleCommands';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
-import { KNIFE_RANGE, Knife, knifeDamageForRound } from '../weapons/Knife';
+import { Knife, knifeDamageForRound } from '../weapons/Knife';
+import { KnifeCombat } from '../weapons/KnifeCombat';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
 import { ChainLightning } from '../zombies/ChainLightning';
 import { EnergyProjectiles } from '../zombies/EnergyProjectiles';
@@ -121,6 +123,7 @@ export class ZombiesMode implements GameMode {
   private rayGunUnlocked = false;
   private godModeEnabled = false;
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
+  private readonly developerCommands = new DeveloperConsoleCommands();
   private gameOver = false;
   /** Dead, but the game-over panel waits for the death fall to finish. */
   private gameOverPending = false;
@@ -139,7 +142,7 @@ export class ZombiesMode implements GameMode {
   private readonly tmpDirection = new THREE.Vector3();
   private readonly tmpAudioPosition = new THREE.Vector3();
   private readonly knife = new Knife();
-  private readonly knifeRaycaster = new THREE.Raycaster();
+  private readonly knifeCombat = new KnifeCombat();
 
   constructor(readonly mapId: ZombieMapId = 'burned-mansion') {}
 
@@ -176,6 +179,7 @@ export class ZombiesMode implements GameMode {
     const boxPlacement = this.arena.mysteryBoxPlacement;
     this.zombies.setBodyObstacles(boxPlacement ? [mysteryBoxFootprint(boxPlacement)] : []);
     this.zombies.registerColliders(ctx.hitColliders);
+    this.zombies.setWallColliders(this.arena.wallColliders ?? []);
     this.zombies.onZombieKilled = (zombie, headshot, source) => this.onZombieKilled(
       headshot,
       { x: zombie.position.x, y: zombie.position.y, z: zombie.position.z },
@@ -215,7 +219,7 @@ export class ZombiesMode implements GameMode {
     this.knife.onImpact = () => this.applyKnifeImpact();
     ctx.player.camera.add(this.knife.root);
 
-    this.rings = new ZombiesRings(ctx, this.arena.ringMachines ?? [], this.economy);
+    this.rings = new ZombiesRings(ctx, this.arena.ringMachines ?? [], this.economy, this.health);
     this.gasMask = this.arena.gasMaskRack ? new ZombiesGasMask(ctx, this.arena.gasMaskRack) : null;
     this.powerSwitch = this.arena.powerSwitch ? new ZombiesPowerSwitch(ctx, this.arena.powerSwitch) : null;
 
@@ -318,7 +322,7 @@ export class ZombiesMode implements GameMode {
     const lethal = this.zombies.damageZombie(
       zombie,
       part,
-      weapon.definition.damage,
+      weapon.definition.damage * this.developerCommands.damageScale(weapon.definition.id),
       weapon.definition.id,
     );
     // A surviving headshot pays 150 here; lethal hits pay through the kill
@@ -335,10 +339,10 @@ export class ZombiesMode implements GameMode {
     return true;
   }
 
-  /** The knife, or the hand putting the gas mask on, withholds fire and ADS. */
+  /** The knife, or the hands putting the gas mask or a ring on, withhold fire and ADS. */
   usesFallbackAttack(): boolean {
     return this.isGameplayInputEnabled() && !!this.ctx
-      && (this.knife.isAttacking || (this.gasMask?.isAnimating ?? false));
+      && (this.knife.isAttacking || this.handsBusy());
   }
 
   getFallbackWeaponName(): string | null {
@@ -346,27 +350,30 @@ export class ZombiesMode implements GameMode {
   }
 
   getMeleeArm(): MeleeArmDriver | null {
-    return this.knife.enabled ? this.knife : (this.gasMask?.armDriver ?? null);
+    return this.knife.enabled ? this.knife : (this.gasMask?.armDriver ?? this.rings?.armDriver ?? null);
+  }
+
+  /** The hands are putting the gas mask or a new ring on. */
+  private handsBusy(): boolean {
+    return (this.gasMask?.isAnimating ?? false) || (this.rings?.isDonning ?? false);
   }
 
   public onMeleeAttack(): void {
-    if (!this.isGameplayInputEnabled() || this.gasMask?.isAnimating) return;
+    if (!this.isGameplayInputEnabled() || this.handsBusy()) return;
     this.knife.setEnabled(true);
     this.knife.trigger();
   }
 
-  /** The center ray gives melee the same occlusion rules as firearms: a wall
-   * or a nearer zombie consumes the first contact before anything behind it. */
+  /** Resolve the visible slash against one unobstructed body in its frontal arc. */
   private applyKnifeImpact(): void {
     if (!this.usesFallbackAttack()) return;
     this.ctx.player.camera.updateWorldMatrix(true, false);
     this.zombies.group.updateMatrixWorld(true);
     this.ctx.player.camera.getWorldPosition(this.tmpAudioPosition);
     this.ctx.player.camera.getWorldDirection(this.tmpDirection);
-    this.knifeRaycaster.set(this.tmpAudioPosition, this.tmpDirection);
-    this.knifeRaycaster.near = 0;
-    this.knifeRaycaster.far = KNIFE_RANGE;
-    const impact = this.knifeRaycaster.intersectObjects(this.ctx.hitColliders, false)[0];
+    const impact = this.knifeCombat.findImpact(
+      this.tmpAudioPosition, this.tmpDirection, this.ctx.player.floor, this.ctx.hitColliders,
+    );
     if (!impact) return;
     const zombie = impact.object.userData.zombie as Zombie | undefined;
     if (!zombie?.isAlive || zombie.floor !== this.ctx.player.floor) return;
@@ -458,8 +465,8 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
-    // Both need the right hand: the mask waits for the knife to come back.
-    if (!this.knife.isAttacking && this.gasMask?.interact()) return;
+    // Both need the right hand: the mask waits for the knife, or a ring going on, to finish.
+    if (!this.knife.isAttacking && !(this.rings?.isDonning ?? false) && this.gasMask?.interact()) return;
 
     if (this.powerSwitch?.interact()) return;
 
@@ -924,6 +931,7 @@ export class ZombiesMode implements GameMode {
     this.zombies.setSpawnPoints(this.arena.spawnPoints);
     this.zombies.setBarriers(this.arena.barriers);
     this.zombies.registerColliders(this.ctx.hitColliders);
+    this.zombies.setWallColliders(this.arena.wallColliders ?? []);
   }
 
   private processRoundEvents(): void {
@@ -976,6 +984,8 @@ export class ZombiesMode implements GameMode {
     // generic death growl at the same instant masks its short crack.
     if (source === 'raygun') {
       this.ctx.audio.playRayVaporize?.();
+    } else if (source === 'barrett') {
+      this.ctx.audio.playZombieShatter();
     } else if (!headshot) {
       this.ctx.audio.playZombieDeath();
     }
@@ -1027,8 +1037,28 @@ export class ZombiesMode implements GameMode {
     this.ctx.setWeaponInfiniteReserve('raygun');
     this.ctx.grantWeapon('tesla');
     this.ctx.setWeaponInfiniteReserve('tesla');
-    this.ctx.hud.showRoundBanner(t('banner.godMode'), 'MOTDRULES');
+    this.ctx.hud.showRoundBanner(t('banner.godMode'), t('dev.hint'));
     this.ctx.audio.playTeslaUnlock();
+  }
+
+  isDeveloperConsoleEnabled(): boolean {
+    return this.godModeEnabled && this.runAcceptsInput();
+  }
+
+  executeDeveloperCommand(line: string): string {
+    if (!this.isDeveloperConsoleEnabled()) return t('dev.unavailable');
+    return this.developerCommands.execute(line, {
+      equip: (id) => this.ctx.grantWeapon(id, true),
+      ring: (id) => {
+        if (!this.rings) return false;
+        this.rings.grant(id);
+        return true;
+      },
+      refill: () => this.ctx.refillEquippedWeaponAmmo(),
+      infiniteAmmo: () => { this.ctx.setWeaponInfiniteReserve(this.ctx.getEquippedWeaponId()); },
+      equipped: () => this.ctx.getEquippedWeaponId(),
+      invincible: (enabled) => this.health.setInvincible(enabled),
+    });
   }
 
   private onPlayerHit(damage: number, from?: { readonly x: number; readonly y: number; readonly z: number }): void {
@@ -1099,7 +1129,8 @@ export class ZombiesMode implements GameMode {
       const headshot = part === 'head';
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
-      const chain = this.zombies.applyChainLightning(zombie, CHAIN_ZAP_DAMAGE, part);
+      const chain = this.zombies.applyChainLightning(zombie,
+        CHAIN_ZAP_DAMAGE * this.developerCommands.damageScale('tesla'), part);
       if (headshot && zombie.isAlive) this.economy.awardHit(true);
       this.ctx.audio.playTeslaChain(chain.length);
       // Arc from the muzzle through each electrocuted zombie in order.
@@ -1136,12 +1167,14 @@ export class ZombiesMode implements GameMode {
       this.ctx.stats.registerHit(distance);
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
-      const lethal = this.zombies.damageZombie(zombie, part, raygun.damage, 'raygun');
+      const lethal = this.zombies.damageZombie(zombie, part,
+        raygun.damage * this.developerCommands.damageScale('raygun'), 'raygun');
       if (!lethal) this.economy.awardHit(headshot);
     }
     // Splash includes the directly-hit zombie: the Ray Gun fantasy is that
     // a bullseye on a packed horde is devastating.
-    this.zombies.applySplash(point, config.splashRadius, config.splashDamage);
+    this.zombies.applySplash(point, config.splashRadius,
+      config.splashDamage * this.developerCommands.damageScale('raygun'));
   }
 
   /** Death: the body collapses in first person; the verdict waits for the fall to land. */
@@ -1181,6 +1214,7 @@ export class ZombiesMode implements GameMode {
     this.headshots = 0;
     this.rayGunUnlocked = false;
     this.godModeEnabled = false;
+    this.developerCommands.reset();
     this.godModeCommand.reset();
     this.economy.reset();
     this.health.reset();

@@ -1,9 +1,12 @@
 import * as THREE from 'three';
+import { CARTRIDGES } from '../weapons/MagazineRounds';
+import type { ShellCasingProfile } from '../weapons/WeaponTypes';
 
 const MAX_BULLET_HOLES = 96;
 const MAX_SHELLS = 24;
 const MAX_SPARKS = 16;
-const MAX_SMOKE = 10;
+// Room for overheated-barrel wisps and heavy muzzle-brake clouds on top of shot and impact puffs.
+const MAX_SMOKE = 40;
 const SHELL_LIFETIME = 1.4;
 const SPARK_LIFETIME = 0.14;
 const SMOKE_LIFETIME = 0.7;
@@ -13,6 +16,7 @@ const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 interface ShellCasing {
   mesh: THREE.Mesh;
+  profile: ShellCasingProfile;
   velocity: THREE.Vector3;
   spinX: number;
   spinZ: number;
@@ -31,6 +35,8 @@ interface SmokePuff {
   sprite: THREE.Sprite;
   material: THREE.SpriteMaterial;
   life: number;
+  /** Seconds this puff lives in total. */
+  duration: number;
   baseSize: number;
   riseSpeed: number;
   active: boolean;
@@ -38,6 +44,27 @@ interface SmokePuff {
 
 let holeTexture: THREE.CanvasTexture | null = null;
 let smokeTexture: THREE.CanvasTexture | null = null;
+
+/** Spent .50 brass: rim, tapered body, shoulder and an open neck, without a projectile. */
+function buildHeavyShellGeometry(): THREE.LatheGeometry {
+  const { caseRadius: radius, caseLength, shoulderLength, bulletRadius: neck } = CARTRIDGES.bmg50;
+  const length = caseLength + shoulderLength;
+  const bottom = -length / 2;
+  const top = length / 2;
+  return new THREE.LatheGeometry([
+    new THREE.Vector2(0, bottom),
+    new THREE.Vector2(radius, bottom),
+    new THREE.Vector2(radius, bottom + 0.002),
+    new THREE.Vector2(radius * 0.92, bottom + 0.003),
+    new THREE.Vector2(radius * 0.96, bottom + 0.005),
+    new THREE.Vector2(radius * 0.9, top - shoulderLength - 0.012),
+    new THREE.Vector2(neck, top - 0.012),
+    new THREE.Vector2(neck, top),
+    new THREE.Vector2(neck - 0.0008, top),
+    new THREE.Vector2(neck - 0.0008, top - 0.015),
+    new THREE.Vector2(0, top - 0.015),
+  ], 12);
+}
 
 function getSmokeTexture(): THREE.CanvasTexture {
   if (smokeTexture) return smokeTexture;
@@ -79,6 +106,10 @@ function getHoleTexture(): THREE.CanvasTexture {
  * per shot after construction.
  */
 export class Effects {
+  private readonly shellGeometries: Record<ShellCasingProfile, THREE.BufferGeometry> = {
+    standard: new THREE.CylinderGeometry(0.005, 0.005, 0.016, 8),
+    bmg50: buildHeavyShellGeometry(),
+  };
   private readonly holes: THREE.Mesh[] = [];
   private readonly shells: ShellCasing[] = [];
   private readonly sparks: Spark[] = [];
@@ -107,7 +138,7 @@ export class Effects {
       this.holes.push(hole);
     }
 
-    const shellGeometry = new THREE.CylinderGeometry(0.005, 0.005, 0.016, 8);
+    const shellGeometry = this.shellGeometries.standard;
     const shellMaterial = new THREE.MeshStandardMaterial({
       color: 0xc8a24a,
       roughness: 0.3,
@@ -119,6 +150,7 @@ export class Effects {
       this.scene.add(mesh);
       this.shells.push({
         mesh,
+        profile: 'standard',
         velocity: new THREE.Vector3(),
         spinX: 0,
         spinZ: 0,
@@ -155,7 +187,7 @@ export class Effects {
       const sprite = new THREE.Sprite(material);
       sprite.visible = false;
       this.scene.add(sprite);
-      this.smoke.push({ sprite, material, life: 0, baseSize: 0.3, riseSpeed: 0.3, active: false });
+      this.smoke.push({ sprite, material, life: 0, duration: SMOKE_LIFETIME, baseSize: 0.3, riseSpeed: 0.3, active: false });
     }
   }
 
@@ -176,13 +208,16 @@ export class Effects {
     hole.visible = true;
   }
 
-  ejectShell(position: THREE.Vector3, rightDirection: THREE.Vector3): void {
+  ejectShell(position: THREE.Vector3, rightDirection: THREE.Vector3, profile: ShellCasingProfile = 'standard'): void {
     const shell = this.shells[this.shellCursor];
     this.shellCursor = (this.shellCursor + 1) % MAX_SHELLS;
 
     shell.active = true;
     shell.resting = false;
-    shell.life = SHELL_LIFETIME;
+    shell.profile = profile;
+    shell.life = profile === 'bmg50' ? 4 : SHELL_LIFETIME;
+    shell.mesh.geometry = this.shellGeometries[profile];
+    shell.mesh.rotation.set(0, 0, Math.PI / 2);
     shell.mesh.visible = true;
     shell.mesh.position.copy(position);
     shell.velocity
@@ -205,13 +240,14 @@ export class Effects {
     spark.mesh.scale.setScalar(0.7);
   }
 
-  /** Small smoke/dust puff; tinted per surface (muzzle gas, dirt, wood…). */
-  puff(point: THREE.Vector3, tint: number, size: number): void {
+  /** Small smoke/dust puff; tinted per surface (muzzle gas, dirt, wood…). `lifetime` lets heavy clouds linger. */
+  puff(point: THREE.Vector3, tint: number, size: number, lifetime: number = SMOKE_LIFETIME): void {
     const puff = this.smoke[this.smokeCursor];
     this.smokeCursor = (this.smokeCursor + 1) % MAX_SMOKE;
 
     puff.active = true;
-    puff.life = SMOKE_LIFETIME;
+    puff.life = lifetime;
+    puff.duration = lifetime;
     puff.baseSize = size;
     puff.riseSpeed = 0.25 + Math.random() * 0.2;
     puff.material.color.setHex(tint);
@@ -240,6 +276,11 @@ export class Effects {
 
       if (shell.mesh.position.y <= SHELL_REST_Y && shell.velocity.y < 0) {
         shell.mesh.position.y = SHELL_REST_Y;
+        if (shell.profile === 'bmg50') {
+          // The case lies on its side, with its radius above the platform surface.
+          shell.mesh.rotation.set(0, shell.mesh.rotation.y + shell.mesh.rotation.z, Math.PI / 2);
+          shell.mesh.position.y += CARTRIDGES.bmg50.caseRadius - 0.005;
+        }
         shell.velocity.set(0, 0, 0);
         shell.resting = true;
       }
@@ -267,7 +308,7 @@ export class Effects {
         puff.material.opacity = 0;
         continue;
       }
-      const t = puff.life / SMOKE_LIFETIME;
+      const t = puff.life / puff.duration;
       puff.material.opacity = 0.28 * t;
       puff.sprite.scale.setScalar(puff.baseSize * (0.5 + (1 - t) * 1.6));
       puff.sprite.position.y += puff.riseSpeed * dt;

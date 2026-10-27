@@ -222,8 +222,10 @@ describe('Game pause resume', () => {
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
+      preloadShotSample: vi.fn(),
     };
     game.profile = { isMobile: true, useTouchControls: true };
+    game.arsenal = new Map();
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { hidePauseMenu: vi.fn(), hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
 
@@ -237,6 +239,7 @@ describe('Game pause resume', () => {
     game.paused = true;
     game.gameplayStarted = true;
     game.profile = { isMobile: false, useTouchControls: false };
+    game.arsenal = new Map();
     game.audio = {
       resume: vi.fn(),
       pauseMusic: vi.fn(),
@@ -244,6 +247,7 @@ describe('Game pause resume', () => {
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
+      preloadShotSample: vi.fn(),
     };
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { showPauseMenu: vi.fn() };
@@ -308,6 +312,7 @@ describe('Game pause resume', () => {
     game.paused = true;
     game.gameplayStarted = true;
     game.profile = { isMobile: false, useTouchControls: false };
+    game.arsenal = new Map();
     game.audio = {
       resume: vi.fn(),
       pauseMusic: vi.fn(),
@@ -316,6 +321,7 @@ describe('Game pause resume', () => {
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
+      preloadShotSample: vi.fn(),
     };
     game.input = { requestPointerLock: vi.fn() };
     game.hud = { showPauseMenu: vi.fn() };
@@ -642,5 +648,12 @@ describe('AudioSystem sampled effects', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('encasquillada_arma.mp3'));
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('door_purchase.mp3'));
     expect(starts).toHaveLength(3);
+
+    // A weapon's shot MP3 replaces its whole procedural report (one source, no noise layers).
+    audio.preloadShotSample(WEAPON_DEFINITIONS.barrett.audio);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    audio.playShot(WEAPON_DEFINITIONS.barrett.audio);
+    expect(starts).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('barrett_shot.mp3'));
   });
 });

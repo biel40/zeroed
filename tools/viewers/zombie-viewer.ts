@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { ZombieState } from '../../src/zombies/Zombie';
 import { ZOMBIE_ATTACK_DURATION, ZOMBIE_BARRIER_ATTACK_RECOVERY, ZOMBIE_ELECTRIFIED_DURATION } from '../../src/zombies/ZombieConfig';
 import { resolveClip, ZombieVisual, ZOMBIE_MODELS } from '../../src/zombies/ZombieVisual';
-import { isZombieDeathStyle, ZOMBIE_DEATH_STYLES, type ZombieDeathStyle } from '../../src/zombies/ZombieDeath';
+import { ZOMBIE_FALL_STYLES, type ZombieFallStyle } from '../../src/zombies/ZombieDeath';
 import { createSkinnedWalkerSource } from '../../src/zombies/skins/ZombieSkinBuilder';
 import { ZOMBIE_SKINS, type ZombieSkinId } from '../../src/zombies/skins/ZombieSkinCatalog';
 import { STATION33_ZOMBIE_EYES } from '../../src/zombies/maps/Station33Config';
@@ -26,7 +26,7 @@ const state: ZombieState =
 const fixedTime = params.has('time') ? Math.max(0, Number(params.get('time')) || 0) : null;
 const deathParam = params.get('death');
 const allDeaths = state === 'death' && deathParam === 'all';
-const deathStyle: ZombieDeathStyle = isZombieDeathStyle(deathParam) ? deathParam : 'knockback';
+const deathStyle: ZombieFallStyle = ZOMBIE_FALL_STYLES.find((style) => style === deathParam) ?? 'knockback';
 /** Death review loop: walk briefly, fall, hold the corpse, repeat. */
 const DEATH_LEAD = 0.4;
 const DEATH_CYCLE = 3.2;
@@ -76,13 +76,13 @@ const visuals: ZombieVisual[] = [];
 const placements: THREE.Group[] = [];
 const labels: HTMLElement[] = [];
 const referenceMixers = new Map<ZombieVisual, THREE.AnimationMixer>();
-const deathStyles = new Map<ZombieVisual, ZombieDeathStyle>();
+const deathStyles = new Map<ZombieVisual, ZombieFallStyle>();
 const deathClocks = new Map<ZombieVisual, number>();
 const source = { scene: gltf.scene, clips: gltf.animations };
-const layout: readonly { yaw: number; style: ZombieDeathStyle; skin: ZombieSkinId | null }[] = close
+const layout: readonly { yaw: number; style: ZombieFallStyle; skin: ZombieSkinId | null }[] = close
   ? [{ yaw: 0, style: deathStyle, skin: singleSkin }]
   : allDeaths
-    ? ZOMBIE_DEATH_STYLES.map((style) => ({ yaw: 0.65, style, skin: singleSkin }))
+    ? ZOMBIE_FALL_STYLES.map((style) => ({ yaw: 0.65, style, skin: singleSkin }))
     : allSkins
       ? (Object.keys(ZOMBIE_SKINS) as ZombieSkinId[]).map((skin) => ({ yaw: 0.45, style: deathStyle, skin }))
       : [0, 0.75, Math.PI / 2].map((yaw) => ({ yaw, style: deathStyle, skin: singleSkin }));

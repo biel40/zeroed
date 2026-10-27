@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { cylinderZ, extrudeProfile, profilePath, profileShape, strut, type ProfilePoint } from './ProfileGeometry';
+import { buildMagazineRounds, CARTRIDGES, cartridgeMaterials } from './MagazineRounds';
 import { mergeAssemblies } from './ViewModelBatching';
 import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
@@ -74,8 +75,6 @@ export function buildL96(config: ViewModelConfig): BuiltProcedural {
   });
   const magazineMaterial = new THREE.MeshStandardMaterial({ color: config.reloadAnim!.magColor, metalness: 0.7, roughness: 0.48 });
   const bore = new THREE.MeshBasicMaterial({ color: 0x030404 });
-  const brass = new THREE.MeshStandardMaterial({ color: 0xb8893c, metalness: 0.9, roughness: 0.3, envMapIntensity: 1.4 });
-  const copper = new THREE.MeshStandardMaterial({ color: 0x9a5a34, metalness: 0.85, roughness: 0.32, envMapIntensity: 1.3 });
 
   const add = (
     name: string, geometry: THREE.BufferGeometry, material: THREE.Material,
@@ -183,16 +182,10 @@ export function buildL96(config: ViewModelConfig): BuiltProcedural {
 
   // 7.62 rounds staggered between the feed lips, bullets forward. Hidden in
   // the stock while seated; they show once the magazine is out.
-  const rounds = new THREE.Group();
-  rounds.name = 'l96-magazine-rounds';
-  magazine.add(rounds);
   const caseRear = mag.depth / 2 - 0.001;
-  const caseLength = 0.045;
-  for (const [x, y] of [[0.0055, 0.035], [-0.0055, 0.0275]] as const) {
-    add('round-case', cylinderZ(0.006, 0.006, caseLength, 12), brass, rounds, x, y, caseRear - caseLength / 2);
-    add('round-neck', cylinderZ(0.006, 0.0042, 0.006, 12), brass, rounds, x, y, caseRear - caseLength - 0.003);
-    add('round-bullet', cylinderZ(0.0042, 0.0008, 0.017, 12), copper, rounds, x, y, caseRear - caseLength - 0.0145);
-  }
+  const { brass, copper } = cartridgeMaterials();
+  const rounds = buildMagazineRounds('l96-magazine-rounds', CARTRIDGES.nato762, [[0.0055, 0.035, caseRear], [-0.0055, 0.0275, caseRear]], brass, copper);
+  magazine.add(rounds);
   mergeAssemblies(magazine);
 
   // Folded bipod: clamp under the forend stud, legs forward under the barrel.

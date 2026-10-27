@@ -1,10 +1,12 @@
-import type { RingId } from '../../game/rings/RingCatalog';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
+import type { LockerSize } from './shared/LockerBank';
+import type { PowerLeverPlacement } from './shared/PowerLever';
+import type { RingLockerPlacement } from './shared/RingLocker';
 import type { SignId } from './station33/Station33Signage';
 import type {
   ArenaAmbience,
@@ -37,6 +39,9 @@ import type {
  *   in the sheds' north wall: a gallery between the west track's dead
  *   tunnel and the blast-gate passage, then the traction substation past
  *   their dead ends, z down to -46.4, with the station's main switch.
+ * - The militia post (`milicia`, built) is a side room behind the dearest
+ *   paid door, in the vestibule's west wall: x < -7.3 and z >= 5.8, north
+ *   of nothing but the vestibule service door's passage.
  * - Phase 5 opens the escalator: an incline from z = 0 down to the mezzanine
  *   (floor -1), joined with `floorTransitions` like the mansion stairs.
  * - Phase 6 is the central platform (floor -2) with tracks along Z further
@@ -129,7 +134,7 @@ export interface Station33Barrier {
   readonly zone: Station33ZoneId;
 }
 
-export type Station33ZoneId = 'vestibule' | 'consigna' | 'cocheras' | 'subestacion';
+export type Station33ZoneId = 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia';
 
 export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
 
@@ -158,6 +163,18 @@ export const COCHERAS = {
   hall: { minX: 4.2, maxX: CONSIGNA.hall.maxX, minZ: -26.6, maxZ: VESTIBULE.minZ - STATION33_WALL_THICKNESS },
   wallHeight: 4.4,
   vaultApexY: 6.3,
+} as const;
+
+/**
+ * The station militia post, interior faces like VESTIBULE: one room west
+ * of the vestibule whose east wall is the vestibule's west wall, so its
+ * door opens straight into it. It shares the vestibule's south line, and
+ * its north wall stays clear of the passage behind the vestibule's west
+ * service door. Flat, low office ceiling.
+ */
+export const MILICIA = {
+  hall: { minX: -14.6, maxX: VESTIBULE.minX - STATION33_WALL_THICKNESS, minZ: 5.8, maxZ: VESTIBULE.maxZ },
+  ceilingHeight: 3.0,
 } as const;
 
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
@@ -243,8 +260,8 @@ export const COCHERAS_TRAIN_CARS: ReadonlyArray<Station33TrainCar> = [
  * Zombie entrances: the vestibule's surface stairs, service door and two
  * vents, the luggage office's porters' stairs and grille, then the train
  * sheds' blast-gate wicket, grille and substation door, then the machine
- * room's grille and cable-tunnel door. Each zone's entrances only wake once
- * its door is bought.
+ * room's grille and cable-tunnel door, and the militia post's back door.
+ * Each zone's entrances only wake once its door is bought.
  */
 export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'surface-stairs', x: -3.6, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'vestibule' },
@@ -259,6 +276,8 @@ export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'cocheras-substation-door', x: COCHERAS_EAST_WALL_X, z: -17.5, outwardX: 1, outwardZ: 0, kind: 'gate', zone: 'cocheras' },
   { id: 'subestacion-vent-east', x: SUBESTACION_EAST_WALL_X, z: -38.0, outwardX: 1, outwardZ: 0, kind: 'vent', zone: 'subestacion' },
   { id: 'subestacion-cable-tunnel', x: 18.4, z: SUBESTACION_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'subestacion' },
+  // The post's own way up to the street, east of its holding cell.
+  { id: 'milicia-back-door', x: -10.2, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'milicia' },
 ];
 
 export interface Station33Door {
@@ -280,7 +299,9 @@ export interface Station33Door {
  * sits beside the east bench, clear of both vent openings; the second is a
  * service door in the north wall east of the escalator, facing the cab of
  * the west train; the third opens the machine room's gallery between the
- * sheds' dead tunnel and blast gate.
+ * sheds' dead tunnel and blast gate. The militia post's door (3000), the
+ * vestibule's third way out, sits in the west wall between the AK-47 and
+ * the ticket office, in line with the turnstiles.
  */
 export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
   { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna', plate: 'luggage-office' },
@@ -289,6 +310,7 @@ export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
     id: 'to-subestacion', x: (SUBESTACION.gallery.minX + SUBESTACION.gallery.maxX) / 2, z: COCHERAS_NORTH_WALL_Z,
     outwardX: 0, outwardZ: -1, cost: 1500, zone: 'subestacion', plate: 'substation',
   },
+  { id: 'to-milicia', x: WEST_WALL_X, z: 9.45, outwardX: -1, outwardZ: 0, cost: 3000, zone: 'milicia', plate: 'militia' },
 ];
 
 /** Dead-end service passage behind every entrance, where its zombies appear. */
@@ -330,17 +352,18 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
   consigna: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'consigna').map(spawnBehind),
   cocheras: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'cocheras').map(spawnBehind),
   subestacion: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'subestacion').map(spawnBehind),
+  milicia: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'milicia').map(spawnBehind),
 };
 
 /** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
 export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   {
-    // A Soviet station keeps the rifle of the era by the turnstiles.
+    // A Soviet station keeps the rifle of the era by the turnstiles, clear of the militia door.
     id: 'vestibule-ak47',
     weaponId: 'ak47',
     price: 1750,
     ammoPrice: 900,
-    position: { x: WEST_WALL_X + 0.17, y: 1.45, z: 8.0 },
+    position: { x: WEST_WALL_X + 0.17, y: 1.45, z: 7.4 },
     yaw: Math.PI / 2,
     floor: 0,
   },
@@ -374,6 +397,16 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     yaw: Math.PI,
     floor: 0,
   },
+  {
+    // The post's confiscated rifle on its north wall, above the wainscot.
+    id: 'milicia-m4a1',
+    weaponId: 'm4a1',
+    price: 1500,
+    ammoPrice: 750,
+    position: { x: -11.0, y: 1.62, z: MILICIA.hall.minZ + 0.02 },
+    yaw: 0,
+    floor: 0,
+  },
 ];
 
 /** The luggage office's crate, against the north lockers with its front to the hall. */
@@ -385,24 +418,14 @@ export const STATION33_BOX_PLACEMENT: MysteryBoxPlacement = {
   floor: 0,
 };
 
-/** Open locker holding a ring, built into a bank of lockers of its room. */
-export interface Station33RingLocker {
-  readonly id: string;
-  readonly ringId: RingId;
+/** Open locker holding a ring (the shared `RingLocker`), built into a bank of lockers of its room. */
+export interface Station33RingLocker extends RingLockerPlacement {
   /** Room whose locker bank holds it. */
   readonly zone: Station33ZoneId;
-  /** Centre of the locker's open front, on the hall face of its bank. */
-  readonly x: number;
-  readonly z: number;
-  /** Direction the open front faces (into the hall). */
-  readonly facingX: number;
-  readonly facingZ: number;
-  /** Sells only once the station's power is on (dark and silent until then). */
-  readonly requiresPower: boolean;
 }
 
-/** Depth and height of the lockers that line the walls (luggage office, train crew). */
-export const CONSIGNA_LOCKER = { depth: 0.5, height: 2.0, columnWidth: 0.42, rows: 3, ringLockerWidth: 0.62 } as const;
+/** Size of the lockers that line the walls (luggage office, train crew, evidence room). */
+export const CONSIGNA_LOCKER = { depth: 0.5, height: 2.0, columnWidth: 0.42, rows: 3, ringLockerWidth: 0.62 } as const satisfies LockerSize;
 
 /**
  * Staff lockers of the train crews on the sheds' apron wall, east of the
@@ -410,10 +433,14 @@ export const CONSIGNA_LOCKER = { depth: 0.5, height: 2.0, columnWidth: 0.42, row
  */
 export const COCHERAS_CREW_LOCKERS = { minX: 17.3, maxX: 20.6 } as const;
 
+/** Evidence lockers on the militia post's west wall, facing its door. */
+export const MILICIA_EVIDENCE_LOCKERS = { minZ: 7.4, maxZ: 11.6 } as const;
+
 /**
  * The Resurrection locker at the end of the luggage-office corridor's axis,
- * and the Sleight of Hand locker in the middle of the train crews' bank,
- * which waits for the power.
+ * the Sleight of Hand locker in the middle of the train crews' bank, and
+ * the Armour locker among the militia's evidence lockers on the axis of
+ * its door; both of the last wait for the power.
  */
 export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
   {
@@ -425,7 +452,16 @@ export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
     x: (COCHERAS_CREW_LOCKERS.minX + COCHERAS_CREW_LOCKERS.maxX) / 2, z: COCHERAS.hall.maxZ - CONSIGNA_LOCKER.depth,
     facingX: 0, facingZ: -1, requiresPower: true,
   },
+  {
+    id: 'milicia-armor', ringId: 'armor', zone: 'milicia',
+    x: MILICIA.hall.minX + CONSIGNA_LOCKER.depth, z: 9.45, facingX: 1, facingZ: 0, requiresPower: true,
+  },
 ];
+
+/** The ring lockers of one room. */
+export function station33RingLockersIn(zone: Station33ZoneId): ReadonlyArray<Station33RingLocker> {
+  return STATION33_RING_LOCKERS.filter((locker) => locker.zone === zone);
+}
 
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
 
@@ -438,7 +474,7 @@ export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as co
  * walkable.
  */
 export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
-  minX: VESTIBULE.minX + 0.4,
+  minX: MILICIA.hall.minX + 0.4,
   maxX: CONSIGNA.hall.maxX - 0.4,
   minZ: SUBESTACION.hall.minZ + 0.4,
   maxZ: VESTIBULE.maxZ - 0.4,
@@ -450,7 +486,7 @@ export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
  * empty ground west of the train sheds stays walled off.
  */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -13.5, maxX: 27.8, minZ: -53.5, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: -15.5, maxX: 27.8, minZ: -53.5, maxZ: 24.7, baseY: 0 },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -510,6 +546,11 @@ export const EMERGENCY_COLOR = 0xff2a12;
  */
 export const POWER_LEVER = { x: (SUBESTACION.gallery.minX + SUBESTACION.gallery.maxX) / 2, z: SUBESTACION.hall.minZ } as const;
 
+/** The shared knife switch (`PowerLever`) on that wall, facing into the machine room. */
+export const STATION33_POWER_SWITCH: PowerLeverPlacement = {
+  id: 'station33-main-switch', x: POWER_LEVER.x, z: POWER_LEVER.z, facingX: 0, facingZ: 1,
+};
+
 /**
  * What throwing the main switch changes for the rest of the run, as
  * multipliers: real lights and lamps burn brighter and steadier, the fill
@@ -528,12 +569,13 @@ export const STATION33_MAINS = {
 /**
  * Zone holding a floor point: the sheds' north wall separates the machine
  * room, the vestibule's north wall the train sheds, its east wall the
- * luggage office.
+ * luggage office and its west wall the militia post.
  */
 export function station33ZoneAt(x: number, z: number): Station33ZoneId {
   if (z < COCHERAS_NORTH_WALL_Z) return 'subestacion';
   if (z < NORTH_WALL_Z) return 'cocheras';
-  return x > EAST_WALL_X ? 'consigna' : 'vestibule';
+  if (x > EAST_WALL_X) return 'consigna';
+  return x < WEST_WALL_X ? 'milicia' : 'vestibule';
 }
 
 /** Battery emergency lamp beside the sealed escalator portal. */
@@ -568,6 +610,9 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: 7.4, y: 4.4, z: -38.5, color: FLUORESCENT_COLOR, intensity: 8, distance: 11, circuit: 'mains', zone: 'subestacion' },
   { x: 17.6, y: 4.4, z: -42.5, color: FLUORESCENT_COLOR, intensity: 8, distance: 11, circuit: 'mains', zone: 'subestacion' },
   { x: SUBESTACION.gallery.maxX - 0.3, y: 2.6, z: -30.5, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6, circuit: 'amber', zone: 'subestacion' },
+  // Short enough to stop at the vestibule wall; the battery lamp keeps the cell red.
+  { x: -11.2, y: 2.75, z: 9.6, color: FLUORESCENT_COLOR, intensity: 4.5, distance: 4.2, circuit: 'unstable', zone: 'milicia' },
+  { x: -12.6, y: 2.6, z: 16.4, color: EMERGENCY_COLOR, intensity: 2.6, distance: 4, circuit: 'emergency', zone: 'milicia' },
 ];
 
 /**
@@ -604,6 +649,8 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: 12.6, z: -39.6, circuit: 'failing' },
   { x: 17.6, z: -37.2, circuit: 'dead' },
   { x: 17.6, z: -42.5, circuit: 'mains' },
+  { x: -11.2, z: 9.6, circuit: 'unstable' },
+  { x: -11.2, z: 14.4, circuit: 'mains' },
 ];
 
 /** A fitting mounted on a wall face at (x, z), `facing` into its room. */

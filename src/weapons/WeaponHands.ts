@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { fitHandPose, HAND_POSES, holdGripPoint } from './HandPoses';
 import type { HandPose, HeldPart } from './HandPoses';
+import { checksMagazine, INSPECT_TIMELINE } from './InspectAnimator';
 import { HANDLE_RELEASE_FRACTION, HANDLE_TRAVEL } from './ReloadAnimator';
 import type { Weapon } from './Weapon';
 import type { HandGripConfig, ReloadAnimConfig, WeaponHandsConfig } from './WeaponTypes';
@@ -105,6 +106,7 @@ export class WeaponHands {
   private state: Weapon['state'] = 'ready';
   private progress = 0;
   private emptyReload = false;
+  private inspectProgress: number | null = null;
 
   /** Handle at the end of its stroke, in its parent's frame: where the hand lets go. */
   private readonly handleRear: THREE.Matrix4 | null = null;
@@ -148,12 +150,14 @@ export class WeaponHands {
     this.state = weapon.state;
     this.progress = weapon.stateProgress;
     this.emptyReload = weapon.reloadType === 'empty';
+    this.inspectProgress = weapon.inspectProgress;
   }
 
   /** Clears transient state so the hands return to their grips at once. */
   reset(): void {
     this.state = 'ready';
     this.progress = 0;
+    this.inspectProgress = null;
   }
 
   /**
@@ -178,7 +182,9 @@ export class WeaponHands {
     const reload = this.reload;
     const magazine = this.parts.magazine;
     const grip = this.magazineGrip;
-    if (this.state !== 'reloading' || !reload || !magazine || !grip) return pose;
+    if (!reload || !magazine || !grip) return pose;
+    if (this.inspectProgress !== null) return this.applyMagazineCheck(position, rotation, pose, this.inspectProgress);
+    if (this.state !== 'reloading') return pose;
     const p = this.progress;
     // A pistol magazine falls free: the hand goes straight for the pouch.
     const extract = reload.style !== 'pistol';
@@ -197,6 +203,19 @@ export class WeaponHands {
     if (release > 0) this.blend(position, rotation, this.anchors.left as Grip, this.root, release);
     const busy = (extract ? grab : toPouch) > 0.5 && release < 0.5;
     return busy ? grip.pose : pose;
+  }
+
+  /** Inspection magazine check: the support hand rides the magazine out and back in. */
+  private applyMagazineCheck(position: THREE.Vector3, rotation: THREE.Quaternion, pose: HandPose, p: number): HandPose {
+    const grip = this.magazineGrip;
+    const magazine = this.parts.magazine;
+    if (!grip || !magazine || !checksMagazine(this.reload)) return pose;
+    const T = INSPECT_TIMELINE;
+    const weight = ramp(p, T.magOut - REACH_LEAD, T.magOut) * (1 - ramp(p, T.magSeat, T.magSeat + 0.06));
+    if (weight <= 0) return pose;
+    magazine.updateWorldMatrix(true, false);
+    this.blend(position, rotation, grip, magazine, weight);
+    return weight > 0.5 ? grip.pose : pose;
   }
 
   /**

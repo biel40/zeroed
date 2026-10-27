@@ -42,6 +42,20 @@ export const RING_JINGLE_TUNES = {
     decay: 0.22,
     sampleFile: 'ring_sleight_jingle.mp3',
   },
+  /** Armour: a militia band's march in G minor, square and clipped; eight 1 s bars. */
+  march: {
+    beat: 1 / 4,
+    melody: [
+      67, 0, 67, 70, 74, 0, 72, 70,
+      69, 0, 65, 69, 72, 0, 70, 69,
+      67, 0, 67, 70, 74, 0, 75, 74,
+      72, 70, 69, 65, 67, 0, 0, 0,
+    ],
+    bass: [43, 50, 41, 48, 43, 50, 45, 43],
+    bassEvery: 4,
+    decay: 0.18,
+    sampleFile: 'ring_armor_jingle.mp3',
+  },
 } as const satisfies Record<string, RingJingleTune>;
 
 export type RingJingleId = keyof typeof RING_JINGLE_TUNES;

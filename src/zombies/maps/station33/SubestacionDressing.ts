@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { STATION33_BARRIERS, SUBESTACION } from '../Station33Config';
-import { cobwebGeometry, type CobwebCorner } from './Cobwebs';
+import { cobwebGeometry, type CobwebCorner } from '../shared/Cobwebs';
 import type { Station33BuildContext } from './Station33BuildContext';
 
 const { gallery, hall, hallHeight } = SUBESTACION;

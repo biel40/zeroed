@@ -49,7 +49,7 @@ function roll(machine: MysteryBoxMachine): WeaponId {
 describe('Mystery Box pool', () => {
   it('contains the standard weapons, Ray Gun and ZEUS-77', () => {
     expect(MYSTERY_BOX_POOL.map((entry) => entry.weaponId).sort()).toEqual(
-      ['ak47', 'l96', 'm4a1', 'm60', 'mp5', 'ppsh41', 'raygun', 'tesla', 'vector'].sort(),
+      ['ak47', 'barrett', 'l96', 'm4a1', 'm60', 'mp5', 'ppsh41', 'raygun', 'tesla', 'vector'].sort(),
     );
   });
 

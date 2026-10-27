@@ -24,7 +24,7 @@ Sigue AGENTS.md; ningun modo depende de un arma concreta.
 | Archivo | Que anadir |
 |---|---|
 | `src/weapons/WeaponTypes.ts` | El id en `WeaponId` y el valor en `ViewModelConfig.frame` (con su linea en el comentario). |
-| `src/config/weapons.ts` | La `WeaponDefinition` (comentario breve: arma real y papel de juego), el id en `WEAPON_ORDER` y en `ZOMBIES_WEAPON_PRELOAD`. |
+| `src/config/weapons.ts` | La `WeaponDefinition` (comentario breve: arma real y papel de juego), el id en `WEAPON_ORDER` y en `ZOMBIES_WEAPON_PRELOAD`. Si es automatica, su `heat` (ver 3b). |
 | `src/weapons/<Arma>ViewModel.ts` | `<ARMA>_PROFILE` exportado + `build<Arma>(config)`. |
 | `src/weapons/WeaponView.ts` | Import y rama en `buildProceduralViewModel`. |
 | `src/zombies/wallbuys/WallBuyView.ts` | Rama en el constructor + `build<Arma>Silhouette` trazada desde el mismo `<ARMA>_PROFILE`. |
@@ -47,6 +47,10 @@ tocar.
 - Presupuesto: <= 24 meshes tras el merge y pocas miles de caras.
 - Partes de recarga: `reloadParts.magazine` y `reloadParts.handle` (palanca
   de carga o cerrojo). Estilos de recarga en `ReloadStyle`.
+- Balas del cargador: `reloadParts.rounds` con `buildMagazineRounds` y el
+  calibre de `CARTRIDGES` (`MagazineRounds`), sobre la boca del cargador
+  (`feedLipSeats`). Solo se dibujan con el cargador fuera; los estilos `rifle`,
+  `rock`, `drum` y `pistol` lo sacan tambien al inspeccionar (F).
 - Miras: la linea de mira es `sightHeight`; ninguna pieza puede taparla
   (alzas con hueco, tambor/base por debajo). La mano de apoyo y los dedos
   nunca cubren las miras.
@@ -68,6 +72,26 @@ tocar.
   deforma la base del pulgar.
 - Colores: `bodyColor` (metal) y `accentColor` (polimero/madera) en la definicion.
 
+## 3b. Recalentamiento (obligatorio en automaticas)
+
+Toda arma con `'auto'` en `fireModes` lleva `heat: BarrelHeatConfig`; las
+semiautomaticas y de energia no (lo exige `tests/barrelHeat.test.ts`). Con el
+dato basta: `BarrelHeat` (en `Weapon`) suma la dispersion, `BarrelGlow` pinta
+la punta del cañon de rojo a naranja y `BarrelSmoke` (en `Game`) anade humo.
+No hay que tocar el modelo.
+
+- Es deliberadamente poco realista: debe verse pronto. El brillo aparece al
+  35 % de `shotsToOverheat` y tiene que asomar en menos de 1.5 s de fuego
+  continuo (lo exige el test).
+- `shotsToOverheat`: ~20-25 en cargadores de 30 (mas bajo cuanto menor la
+  cadencia); PPSh-41 40, M60 30.
+- `coolTime`: 4.5-6 s de caliente a frio (mas en armas pesadas).
+- `maxSpreadBonus`: 0.012-0.016 rad, un poco por debajo del `maxBloom`.
+- El brillo se coloca en el ancla de la boca y por defecto envuelve un cañon
+  de `view.barrelRadius`. Si el cañon queda oculto en una camisa, funda o
+  guardamanos que llega a la boca (PPSh-41), fija `heat.glow` (radio y
+  longitud en metros) para envolver esa pieza, sin llegar a `sightHeight`.
+
 ## 4. Wall buy
 
 - Precios de referencia: subfusil 1000 / 500, carabina 1500 / 750, fusil
@@ -82,6 +106,9 @@ tocar.
 - Crea `tests/<arma>View.test.ts` siguiendo `tests/mp5View.test.ts`:
   definicion, caja + wall buy, dimensiones/presupuesto del modelo, linea de
   mira libre (raycast), recarga y silueta.
+- `tests/barrelHeat.test.ts` comprueba que cada automatica tenga `heat` y
+  ninguna otra; si el arma es semiautomatica sin energia, anadela a la lista
+  "no barrel glow" de ese test.
 - `tests/firstPersonArms.test.ts` recorre todas las armas automaticamente
   (manos, codos, munecas, dedos, miras): debe pasar sin excepciones.
 - Anade el id a `STANDARD_FIREARMS` de `tests/headshotRewards.test.ts` y al
