@@ -82,13 +82,21 @@ se carboniza a trozos hasta quedar negra con grietas de brasas que respiran
 y quemaduras en carne viva (`ZombieCharShader`, encadenado al shader de
 disolucion, sin recompilar), suben chispas y ceniza (las particulas de la
 Ray Gun en naranja) y un charco de sangre se extiende bajo el cuerpo
-(`ZombieBloodPool`). Quemarse vivo ya oscurece la piel. El chorro es una malla en el mundo (`FlameJet`: nucleo azul
-palido, cuerpo naranja con ruido que fluye y unas bocanadas al final, tres
-draw calls, sin luces nuevas: la luz de boca del shell parpadea como fuego) y
+(`ZombieBloodPool`). Quemarse vivo ya oscurece la piel. El chorro vive en el mundo (`FlameJet`): una vara presurizada de unos 3 m,
+blanca con nucleo azul y dos helices carmesi del cristal girando a su
+alrededor, que se rompe en bolas de fuego (`FlameParticles`, pools fijos,
+la mitad con efectos reducidos). Cada bola conserva la punteria con la que
+salio, asi que al barrer el fuego se curva y se arrastra; frenan, se hinchan
+y suben al final del alcance, se aplastan contra la pared que corta el
+chorro, sueltan humo aceitoso y chispas en estela. Encender lanza una bola
+de fuego. Seis draw calls mientras arde y ninguna al apagarse; sin luces
+nuevas: la luz de boca del shell se adelanta 2,6 m y parpadea como fuego,
+cada tick sacude un poco la camara y el arma vibra en las manos. Y
 cada cuerpo ardiendo lleva unas lenguas de fuego sobre sus articulaciones
 (`ZombieFlames`, un draw call por cuerpo, que siguen en el cadaver mientras
 dura la quemadura). El rugido es un bucle (`FlameStreamLoop`) con
-encendido, crepitacion escasa, corte y siseo de la boquilla caliente, que
+encendido explosivo, gruñido de horno ondulante, crepitacion escasa, corte y
+siseo de la boquilla caliente, que
 el shell alimenta solo con un arma de llama y silencia al pausar. Un
 `heat.warning` avisa antes del bloqueo (silbido) y anuncia cuando vuelve a
 poder disparar (`cooledDown`: chasquido y piloto que se reenciende); las

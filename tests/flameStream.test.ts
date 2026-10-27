@@ -10,6 +10,7 @@ import { BURN_TICK_SECONDS, ZombieBurns } from '../src/zombies/ZombieBurns';
 import type { ZombieKillSource } from '../src/zombies/ZombieDeath';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
+import { FlameParticles } from '../src/zombies/FlameParticles';
 import { STATION33_WEAPON_STATIONS, SUBESTACION, station33ZoneAt } from '../src/zombies/maps/Station33Config';
 import { MapPower } from '../src/zombies/maps/shared/MapPower';
 import { WeaponStation, type WeaponStationLook } from '../src/zombies/maps/shared/WeaponStation';
@@ -131,6 +132,7 @@ describe('ZombiesFlames', () => {
     const hud = { showHitmarker: vi.fn() };
     const ctx = {
       scene,
+      profile: { useReducedEffects: false },
       player: { floor: 0, camera },
       hud,
       stats: { registerHit: vi.fn() },
@@ -199,20 +201,78 @@ describe('ZombiesFlames', () => {
     expect(flames.burningCount).toBe(0);
   });
 
-  it('draws the stream only while it is fed, then lets it die out', () => {
+  it('draws the stream only while it is fed, then lets the fire roll on and die out', () => {
     const { flames, scene, weapon } = setup([]);
-    const jet = scene.getObjectByName('flame-jet')!;
-    for (let t = 0; t < 1; t += 1 / 120) {
-      weapon.update(1 / 120, { trigger: true, ads: false });
-      weapon.clearEvents();
-      flames.update(1 / 120, true);
+    const shown = (name: string): boolean => scene.getObjectByName(name)!.visible;
+    const run = (seconds: number, trigger: boolean): void => {
+      for (let t = 0; t < seconds; t += 1 / 120) {
+        weapon.update(1 / 120, { trigger, ads: false });
+        weapon.clearEvents();
+        flames.update(1 / 120, true);
+      }
+    };
+    run(1, true);
+    for (const name of ['flame-jet-rod', 'flame_fireballs', 'flame_sparks']) expect(shown(name), name).toBe(true);
+    run(0.5, false);
+    expect(shown('flame-jet-rod')).toBe(false);
+    run(3, false);
+    for (const name of ['flame_fireballs', 'flame_smoke', 'flame_sparks']) expect(shown(name), name).toBe(false);
+  });
+});
+
+describe('Flame particles', () => {
+  const forward = new THREE.Vector3(0, 0, -1);
+  const origin = new THREE.Vector3();
+  const fireballs = (particles: FlameParticles): THREE.Vector3[] => {
+    const mesh = particles.group.getObjectByName('flame_fireballs') as THREE.Mesh<THREE.InstancedBufferGeometry>;
+    const offsets = mesh.geometry.getAttribute('aOffset');
+    return Array.from({ length: mesh.geometry.instanceCount }, (_, index) => new THREE.Vector3().fromBufferAttribute(offsets, index));
+  };
+
+  it('throws a fireball on ignition and keeps every pool within its cap', () => {
+    const particles = new FlameParticles();
+    particles.ignite(origin, forward, Infinity);
+    particles.update(1 / 60);
+    expect(fireballs(particles).length).toBeGreaterThanOrEqual(25);
+    for (let t = 0; t < 3; t += 1 / 60) {
+      particles.emit(1 / 60, origin, forward, Infinity);
+      particles.update(1 / 60);
     }
-    expect(jet.visible).toBe(true);
-    for (let t = 0; t < 1; t += 1 / 120) {
-      weapon.update(1 / 120, { trigger: false, ads: false });
-      flames.update(1 / 120, true);
+    expect(fireballs(particles).length).toBeLessThanOrEqual(140);
+    expect(new FlameParticles(true).group.getObjectByName('flame_fireballs')).toBeDefined();
+  });
+
+  it('keeps the aim each puff left with, so a sweep bends the fire into an arc', () => {
+    const particles = new FlameParticles();
+    for (let t = 0; t < 0.3; t += 1 / 60) {
+      particles.emit(1 / 60, origin, forward, Infinity);
+      particles.update(1 / 60);
     }
-    expect(jet.visible).toBe(false);
+    const right = new THREE.Vector3(1, 0, 0);
+    for (let t = 0; t < 0.1; t += 1 / 60) {
+      particles.emit(1 / 60, origin, right, Infinity);
+      particles.update(1 / 60);
+    }
+    const positions = fireballs(particles);
+    expect(positions.some((point) => point.z < -3 && Math.abs(point.x) < 1)).toBe(true);
+    expect(positions.some((point) => point.x > 1.5 && Math.abs(point.z) < 1)).toBe(true);
+  });
+
+  it('carries the fire out to about the weapon reach in the open and splashes it across a wall', () => {
+    const open = new FlameParticles();
+    const walled = new FlameParticles();
+    for (let t = 0; t < 1; t += 1 / 60) {
+      open.emit(1 / 60, origin, forward, Infinity);
+      walled.emit(1 / 60, origin, forward, 3);
+      open.update(1 / 60);
+      walled.update(1 / 60);
+    }
+    const farthest = Math.max(...fireballs(open).map((point) => -point.z));
+    expect(farthest).toBeGreaterThan(flame.range * 0.8);
+    expect(farthest).toBeLessThan(flame.range * 1.4);
+    const atWall = fireballs(walled);
+    expect(Math.max(...atWall.map((point) => -point.z))).toBeLessThan(3.6);
+    expect(Math.max(...atWall.map((point) => Math.abs(point.x)))).toBeGreaterThan(0.8);
   });
 });
 

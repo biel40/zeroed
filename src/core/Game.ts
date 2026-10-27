@@ -37,7 +37,9 @@ const FLASH_LIGHT_DECAY = 26;
 const ENERGY_FLASH_LIGHT_DECAY = 160;
 /** A flame stream relights the muzzle light every tick; a slow decay turns that into a firelight flicker. */
 const FLAME_LIGHT_DECAY = 9;
-const FLAME_LIGHT = { color: 0xff8a3a, intensity: 6 } as const;
+const FLAME_LIGHT = { color: 0xff7a2e, intensity: 11, ahead: 2.6 } as const;
+/** Each tick of a flame stream rattles the view up or down a hair: the weapon fights the hands. */
+const FLAME_RUMBLE = 0.0055;
 const MAX_SPREAD_PIXELS = 130;
 /** A driver that never reports its programs ready must not hold the loading screen. */
 const SHADER_WARMUP_TIMEOUT_MS = 10000;
@@ -658,7 +660,11 @@ export class Game {
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
     if (flame) {
-      // The scene's single muzzle light becomes the stream's firelight; no shells, no powder smoke.
+      // The scene's single muzzle light becomes the stream's firelight, out where the fire
+      // burns so it lights the room ahead; no shells, no powder smoke.
+      this.player.camera.getWorldDirection(this.tmpRight);
+      this.flashLight.position.addScaledVector(this.tmpRight, FLAME_LIGHT.ahead);
+      this.player.playShotImpulse((Math.random() * 2 - 1) * FLAME_RUMBLE);
       this.flashLight.color.setHex(FLAME_LIGHT.color);
       this.flashLight.intensity = FLAME_LIGHT.intensity * (0.75 + Math.random() * 0.5);
       this.flashLightDecay = FLAME_LIGHT_DECAY;

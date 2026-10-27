@@ -26,7 +26,7 @@ const SIGHT_SLACK = 0.3;
  */
 export class ZombiesFlames {
   private readonly burns = new ZombieBurns<Zombie>();
-  private readonly jet = new FlameJet();
+  private readonly jet: FlameJet;
   private readonly raycaster = new THREE.Raycaster();
   private readonly rayHits: THREE.Intersection[] = [];
   private readonly candidates: Zombie[] = [];
@@ -47,6 +47,8 @@ export class ZombiesFlames {
     private readonly staticColliders: () => ReadonlyArray<THREE.Object3D>,
     private readonly damageScale: (id: WeaponId) => number,
   ) {
+    // Reduced-effects profiles keep half the fire particles.
+    this.jet = new FlameJet(ctx.profile.useReducedEffects);
     ctx.scene.add(this.jet.group);
   }
 
@@ -102,7 +104,7 @@ export class ZombiesFlames {
     const reach = this.reachAlong(this.origin, this.direction, this.range);
     this.end.copy(this.origin).addScaledVector(this.direction, reach);
     this.ctx.getMuzzleWorldPosition(this.muzzle);
-    this.jet.update(dt, active, this.muzzle, this.end);
+    this.jet.update(dt, active, this.muzzle, this.end, reach < this.range - 0.01);
   }
 
   /** Restart: nobody burns and the stream is gone. */

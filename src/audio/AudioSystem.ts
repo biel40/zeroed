@@ -392,11 +392,13 @@ export class AudioSystem {
     }
   }
 
-  /** The stream catches: igniter click, a whoosh opening up and a soft thump. */
+  /** The stream catches: igniter snap, a fireball ripping open with a deep whoomp and a sub punch. */
   private playFlameIgnite(): void {
-    this.tick(0, 3200, 0.12, 8, 0.03);
-    this.scrape(0, 420, 2200, 0.2, 0.22);
-    this.sweep(0, 'sine', 95, 45, 0.28, 0.18);
+    this.tick(0, 3200, 0.14, 8, 0.03);
+    this.scrape(0, 260, 2600, 0.34, 0.34);
+    this.scrape(0.02, 900, 4200, 0.12, 0.22);
+    this.sweep(0, 'sine', 120, 38, 0.5, 0.42);
+    this.sweep(0.01, 'triangle', 70, 30, 0.3, 0.5);
   }
 
   /** The valve shuts: the roar folds down and the line vents its pressure. */

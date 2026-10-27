@@ -1115,7 +1115,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       ads: [0, 0, -0.3],
       sway: 1.15,
       bob: 1.05,
-      visualRecoil: { kickImpulse: 0.18, pitchImpulse: 0.35, rollImpulse: 0.25, stiffness: 140, damping: 16 },
+      visualRecoil: { kickImpulse: 0.42, pitchImpulse: 0.7, rollImpulse: 1.1, stiffness: 150, damping: 15 },
       scale: 1.05,
       // Worn military green paint over dark steel.
       bodyColor: 0x3e4a33,

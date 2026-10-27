@@ -1,6 +1,9 @@
 /** Loudest the roar gets at full stream, before the effects mix. */
-const ROAR_GAIN = 0.3;
-const RUMBLE_GAIN = 0.22;
+const ROAR_GAIN = 0.36;
+const RUMBLE_GAIN = 0.34;
+/** Churning furnace growl: band-passed noise swept by a slow, uneven wobble. */
+const GROWL_GAIN = 0.2;
+const GROWL = { centre: 320, depth: 180, rate: 5.3, flutter: 13.7 } as const;
 /** Hiss of the hot nozzle: faint while cold, loudest at the redline. */
 const HISS_GAIN = 0.07;
 /** Roar brightness: a dull blowtorch when cold, a harsher bark at the redline. */
@@ -13,7 +16,7 @@ const EPSILON = 0.01;
 
 /**
  * Continuous roar of a flame stream: a low-passed noise roar, a sub rumble
- * under it and a nozzle hiss that rises with the heat. The graph is built
+ * under it, a churning furnace growl and a nozzle hiss that rises with the heat. The graph is built
  * once, keeps running silently between bursts and only receives new
  * automation when the level or heat actually change (no per-frame
  * allocations). One-shot cues (ignition, crackles, warnings) live in
@@ -25,6 +28,8 @@ export class FlameStreamLoop {
   private readonly roarGain: GainNode;
   private readonly rumbleGain: GainNode;
   private readonly hissGain: GainNode;
+  private readonly growlGain: GainNode;
+  private readonly oscillators: OscillatorNode[] = [];
   private level = 0;
   private heat = 0;
 
@@ -44,6 +49,25 @@ export class FlameStreamLoop {
     rumbleFilter.connect(this.rumbleGain);
     this.loop(noise, rumbleFilter, 0.73);
 
+    const growlFilter = ctx.createBiquadFilter();
+    growlFilter.type = 'bandpass';
+    growlFilter.frequency.value = GROWL.centre;
+    growlFilter.Q.value = 1.6;
+    this.growlGain = this.gain(output);
+    growlFilter.connect(this.growlGain);
+    this.loop(noise, growlFilter, 0.57);
+    // Two detuned wobbles on the band's centre: the fire churns instead of hissing evenly.
+    for (const [rate, depth] of [[GROWL.rate, GROWL.depth], [GROWL.flutter, GROWL.depth * 0.4]] as const) {
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = rate;
+      const lfoDepth = ctx.createGain();
+      lfoDepth.gain.value = depth;
+      lfo.connect(lfoDepth);
+      lfoDepth.connect(growlFilter.frequency);
+      lfo.start();
+      this.oscillators.push(lfo);
+    }
+
     const hissFilter = ctx.createBiquadFilter();
     hissFilter.type = 'highpass';
     hissFilter.frequency.value = 4200;
@@ -61,13 +85,14 @@ export class FlameStreamLoop {
     this.heat = heat;
     this.roarGain.gain.setTargetAtTime(level * ROAR_GAIN * (0.85 + heat * 0.3), t, fade);
     this.rumbleGain.gain.setTargetAtTime(level * RUMBLE_GAIN, t, fade);
+    this.growlGain.gain.setTargetAtTime(level * GROWL_GAIN * (0.8 + heat * 0.5), t, fade);
     this.roarFilter.frequency.setTargetAtTime(ROAR_CUTOFF.cold + (ROAR_CUTOFF.hot - ROAR_CUTOFF.cold) * heat, t, 0.2);
     // The hot nozzle keeps hissing between bursts until it cools.
     this.hissGain.gain.setTargetAtTime(HISS_GAIN * heat * heat * (0.4 + level * 0.6), t, 0.25);
   }
 
   stop(): void {
-    for (const source of this.sources) {
+    for (const source of [...this.sources, ...this.oscillators]) {
       try {
         source.stop();
       } catch {
@@ -75,6 +100,7 @@ export class FlameStreamLoop {
       }
     }
     this.sources.length = 0;
+    this.oscillators.length = 0;
   }
 
   private gain(output: AudioNode): GainNode {
