@@ -2,6 +2,7 @@ import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
+import type { WeaponStationPlacement } from './shared/WeaponStation';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import type { LockerSize } from './shared/LockerBank';
@@ -462,6 +463,19 @@ export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
 export function station33RingLockersIn(zone: Station33ZoneId): ReadonlyArray<Station33RingLocker> {
   return STATION33_RING_LOCKERS.filter((locker) => locker.zone === zone);
 }
+
+/**
+ * The ФАКЕЛ-33 decontamination cabinet on the machine room's south wall,
+ * east of the gallery: the experimental flamethrower nobody signed out,
+ * sold after power and startup-crystal recovery (3500), its spare core crystals
+ * refilled there afterwards (1750).
+ */
+export const STATION33_WEAPON_STATIONS: ReadonlyArray<WeaponStationPlacement> = [
+  {
+    id: 'subestacion-fakel', weaponId: 'fakel', price: 3500, ammoPrice: 1750, ammoPromptKey: 'prompt.coreCrystals',
+    x: 17.0, z: SUBESTACION.hall.maxZ, facingX: 0, facingZ: -1, requiresPower: true, requiresStartupCrystal: true,
+  },
+];
 
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
 

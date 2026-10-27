@@ -5,6 +5,7 @@ import { WeaponInventory } from '../src/game/WeaponInventory';
 import { COOP_WEAPONS, coopReserveAmmo } from '../src/modes/coop/CoopWeapons';
 import { parseGuestMessage, parseHostMessage } from '../src/network/Protocol';
 import { HANDLE_RELEASE_FRACTION, HANDLE_TRAVEL, ReloadAnimator } from '../src/weapons/ReloadAnimator';
+import { BARRETT_PROFILE } from '../src/weapons/BarrettViewModel';
 import { Weapon } from '../src/weapons/Weapon';
 import { buildProceduralViewModel, buildWeaponDisplayModel } from '../src/weapons/WeaponView';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../src/zombies/MysteryBox';
@@ -133,10 +134,10 @@ describe('Barrett .50 model', () => {
       meshes++;
       triangles += (part.geometry.index?.count ?? part.geometry.attributes.position.count) / 3;
     });
-    // Draw calls stay at the mobile cap; the perforated shroud, two-chamber brake
-    // and full-length rail are worth a few more triangles on a box-only weapon.
+    // Draw calls stay at the mobile cap; the perforated shroud, two-chamber brake,
+    // full-length rail, visible bolt and rivet rows are worth the extra triangles.
     expect(meshes).toBeLessThanOrEqual(30);
-    expect(triangles).toBeLessThan(16000);
+    expect(triangles).toBeLessThan(18000);
     const display = buildWeaponDisplayModel(definition, null, 0.72);
     expect(new THREE.Box3().setFromObject(display).getSize(new THREE.Vector3()).z).toBeCloseTo(0.72);
   });
@@ -180,6 +181,24 @@ describe('Barrett .50 model', () => {
     const port = ray.intersectObject(built.group, true);
     expect(port.length).toBeGreaterThan(0);
     expect(port[0].point.x).toBeLessThan(0.02);
+  });
+
+  it('shows the bolt through the port and the rivet rows of the stamped receiver and shroud', () => {
+    const built = buildProceduralViewModel(definition.view);
+    built.group.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster();
+    const firstHitX = (part: string, y: number, z: number): number | undefined => {
+      ray.set(new THREE.Vector3(0.2, y, z), new THREE.Vector3(-1, 0, 0));
+      return ray.intersectObject(built.group.getObjectByName(`barrett-${part}`)!, true)[0]?.point.x;
+    };
+    const { carrier, seamRivets, shroudRivets, shroud } = BARRETT_PROFILE;
+    // The bolt head sits inside the port, well clear of the left cover plate.
+    expect(firstHitX('receiver', carrier.y, carrier.frontZ + 0.012)).toBeGreaterThan(0.005);
+    // Rivet heads stand proud of the flanks; between them the flank is flush.
+    const seamZ = seamRivets.firstZ - seamRivets.pitch;
+    expect(firstHitX('receiver', seamRivets.y, seamZ)).toBeGreaterThan(0.0375);
+    expect(firstHitX('shroud', shroudRivets.y, shroudRivets.firstZ)).toBeGreaterThan(shroud.width / 2 + 0.0012);
+    expect(firstHitX('shroud', shroudRivets.y, shroudRivets.firstZ - shroudRivets.pitch / 2)).toBeLessThan(shroud.width / 2 + 0.0005);
   });
 
   it('racks the charging handle only on an empty reload and restores the magazine', () => {

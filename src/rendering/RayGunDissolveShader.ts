@@ -319,7 +319,7 @@ export class RayGunAshParticles {
   private readonly phases = new Float32Array(ASH_PARTICLE_COUNT);
   private readonly positionAttr: THREE.BufferAttribute;
 
-  public constructor(height = 1.8) {
+  public constructor(height = 1.8, colors: { readonly edge: number; readonly hot: number } = { edge: RAYGUN_NEON_GREEN, hot: RAYGUN_HOT_CORE }) {
     this.geometry = new THREE.BufferGeometry();
     const initialPositions = new Float32Array(ASH_PARTICLE_COUNT * 3);
     const scales = new Float32Array(ASH_PARTICLE_COUNT);
@@ -360,8 +360,8 @@ export class RayGunAshParticles {
       uniforms: {
         uProgress: { value: 0 },
         uPointScale: { value: 68 },
-        uEdgeColor: { value: new THREE.Color(RAYGUN_NEON_GREEN) },
-        uHotColor: { value: new THREE.Color(RAYGUN_HOT_CORE) },
+        uEdgeColor: { value: new THREE.Color(colors.edge) },
+        uHotColor: { value: new THREE.Color(colors.hot) },
       },
       transparent: true,
       blending: THREE.AdditiveBlending,

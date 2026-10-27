@@ -23,6 +23,10 @@ import { ZOMBIE_MODELS, ZombieVisual } from './ZombieVisual';
 import { resolveZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from './ZombieDeath';
 import type { GibWalls } from './GibWalls';
 import { ZombieGibs } from './ZombieGibs';
+import { ZombieBloodPool } from './ZombieBloodPool';
+
+/** Metres ahead of the feet where a body burnt to death lies on its chest. */
+const BURN_POOL_FORWARD = 0.6;
 
 export type ZombieState =
   | 'spawn'
@@ -115,6 +119,8 @@ export class Zombie implements HitTarget {
   private vaultOpening: VaultOpening | null = null;
   /** Pieces shown in place of the body after a 'shatter' death; built on the first one. */
   private gibs: ZombieGibs | null = null;
+  /** Blood under a body burnt to death; built on the first one. */
+  private bloodPool: ZombieBloodPool | null = null;
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
   readonly impact = new THREE.Vector2();
 
@@ -200,6 +206,7 @@ export class Zombie implements HitTarget {
     this.visual.setSpawnRise(0);
     this.visual.root.visible = true;
     this.gibs?.hide();
+    this.bloodPool?.hide();
     this.visual.setState('spawn');
     this.group.visible = true;
   }
@@ -264,6 +271,11 @@ export class Zombie implements HitTarget {
     this.enterDeath(style);
   }
 
+  /** ФАКЕЛ-33 fire on the body for `seconds`, surviving or not; damage is the mode's (ZombieBurns). */
+  public ignite(seconds: number): void {
+    if (this.group.visible) this.visual.ignite(seconds);
+  }
+
   /** ZEUS-77 hit: residual arcs crawl over the body, surviving or not. */
   public electrify(): void {
     if (this.group.visible) this.visual.electrify(ZOMBIE_ELECTRIFIED_DURATION);
@@ -323,6 +335,15 @@ export class Zombie implements HitTarget {
     this.visual.prepareDeath(style, this.impact.x, this.impact.y);
     this.visual.setState('death');
     if (style === 'shock') this.electrify();
+    if (style === 'burn') {
+      this.visual.incinerate();
+      if (!this.bloodPool) {
+        this.bloodPool = new ZombieBloodPool();
+        this.group.add(this.bloodPool.mesh);
+      }
+      // The body falls forward onto its face: the blood spreads under its chest.
+      this.bloodPool.bleed(BURN_POOL_FORWARD * ZOMBIE_TYPE_CONFIGS[this.typeId].bodyScale[2]);
+    }
     if (deathKind === 'raygun') {
       this.stateTimer = ZOMBIE_RAYGUN_DEATH_DURATION;
       this.tmpImpactOrigin.set(0, headshot ? 1.55 : 1.05, 0);
@@ -476,6 +497,7 @@ export class Zombie implements HitTarget {
           return;
         }
         this.visual.setDeathProgress(Math.min(1, elapsed / ZOMBIE_DEATH_FALL));
+        this.bloodPool?.update(dt, Math.max(0, elapsed - ZOMBIE_DEATH_FALL - ZOMBIE_CORPSE_LINGER) / ZOMBIE_DEATH_FADE);
         if (elapsed > ZOMBIE_DEATH_FALL + ZOMBIE_CORPSE_LINGER) {
           const fade =
             (elapsed - ZOMBIE_DEATH_FALL - ZOMBIE_CORPSE_LINGER) / ZOMBIE_DEATH_FADE;
@@ -486,6 +508,7 @@ export class Zombie implements HitTarget {
           this.group.visible = false;
           this.group.position.y = 0;
           this.visual.setOpacity(1);
+          this.bloodPool?.hide();
           this.onDeathFinished?.();
           return;
         }
@@ -500,6 +523,7 @@ export class Zombie implements HitTarget {
 
   public dispose(): void {
     this.visual.dispose();
+    this.bloodPool?.dispose();
     this.gibs?.dispose();
   }
 

@@ -6,7 +6,7 @@ export type ZombieKillSource = WeaponId | 'knife';
 
 /** Deaths the body performs by falling: each has a profile and a baked clip. */
 export const ZOMBIE_FALL_STYLES = [
-  'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock',
+  'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock', 'burn',
 ] as const;
 export type ZombieFallStyle = typeof ZOMBIE_FALL_STYLES[number];
 
@@ -28,6 +28,8 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   m60: 'riddled',
   raygun: 'blast',
   tesla: 'shock',
+  // Burnt alive: thrashes in the fire, kneels and collapses curled up, charred (ZombieVisual.incinerate).
+  fakel: 'burn',
 };
 
 /**
@@ -43,7 +45,7 @@ export function resolveZombieDeathStyle(
   const style = source ? WEAPON_DEATH_STYLES[source] : 'knockback';
   // Nothing is left standing to fall, whatever the round hit.
   if (style === 'shatter') return style;
-  if (headshot && style !== 'slash' && style !== 'shock') return 'headshot';
+  if (headshot && style !== 'slash' && style !== 'shock' && style !== 'burn') return 'headshot';
   if ((style === 'knockback' || style === 'blast') && pushZ > 0.35) return 'stumble';
   return style;
 }
@@ -181,6 +183,8 @@ const handPath = (x: Key[], y: Key[], z: Key[]): readonly [Curve, Curve, Curve] 
 const riddledShake = curve([0, 1], [0.55, 0.8], [0.75, 0.2], [1, 0]);
 const shockShake = curve([0, 0], [0.06, 1], [0.55, 1], [0.65, 0.3], [0.8, 0]);
 const slashClutch = curve([0, 0], [0.18, 1], [1, 1]);
+const burnWrithe = curve([0, 0], [0.08, 1], [0.5, 1], [0.78, 0.35], [0.86, 0]);
+const burnTwitch = curve([0.82, 0], [0.88, 1], [1, 0.25]);
 
 /**
  * Hand-keyed performances baked into clips per rig (ZombieMotionClips).
@@ -316,6 +320,41 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieFallStyle, ZombieDeathProfile> 
       knees: curve([0, 0], [0.3, 0.25], [0.7, 0.1], [1, 0.08]),
     },
     hand: handPath([[0.2, 0.24], [0.5, 0.34], [1, 0.34]], [[0.2, 0.62], [0.5, 0.85], [1, 0.8]], [[0.2, 0.3], [0.5, 0.15], [1, 0.02]]),
+  },
+  // ФАКЕЛ-33: burnt alive. It claws at its burning face and writhes, the knees
+  // give, it pitches onto its face and draws its limbs in like a charred corpse.
+  burn: {
+    duration: 1.6,
+    fall: 'forward',
+    followsImpact: false,
+    channels: {
+      drop: curve([0, 0], [0.12, 0.04], [0.32, 0.08], [0.48, 0.38], [0.58, 0.42], [0.8, 0.84, IMPACT], [0.87, 0.81], [1, 0.83, IMPACT]),
+      travel: curve([0, 0], [0.3, -0.04], [0.55, 0.02], [0.8, 0.2], [1, 0.22]),
+      pitch: curve([0, 0], [0.15, -0.18], [0.32, -0.1], [0.5, 0.25], [0.62, 0.45], [0.81, 1.46, IMPACT], [0.88, 1.38], [1, 1.42]),
+      roll: curve([0.6, 0], [1, 0.22]),
+      spine: curve([0, 0], [0.15, -0.32], [0.35, 0.1], [0.55, 0.3], [0.82, 0.15], [1, 0.42]),
+      nod: curve([0, 0], [0.12, -0.5], [0.4, 0.2], [0.6, 0.35], [0.85, -0.2], [1, -0.28]),
+      turn: curve([0.78, 0], [1, 0.75]),
+      plant: curve([0, 1], [0.45, 1], [0.6, 0.6], [0.82, 0]),
+      knees: curve([0.82, 0], [1, 0.4]),
+    },
+    // Hands up at the face, then drawn in to the chest: the boxer's crouch of the burnt.
+    hand: handPath([[0.12, 0.14], [0.5, 0.16], [0.8, 0.2], [1, 0.16]], [[0.12, 0.85], [0.5, 0.82], [0.8, 0.6], [1, 0.66]], [[0.12, 0.2], [0.5, 0.18], [0.8, 0.06], [1, 0.04]]),
+    layer(t, pose) {
+      const writhe = burnWrithe(t);
+      const a = tremor(t, 7) * writhe;
+      const b = tremor(t + 0.41, 5.5) * writhe;
+      const twitch = tremor(t, 14) * burnTwitch(t) * 0.35;
+      pose.roll += b * 0.06;
+      pose.spine += a * 0.16 + twitch * 0.1;
+      pose.twist += b * 0.32;
+      pose.nod += a * 0.22;
+      pose.tilt += b * 0.2;
+      pose.left[0] += a * 0.05;
+      pose.right[0] -= b * 0.05;
+      pose.left[1] += b * 0.06 + twitch * 0.02;
+      pose.right[1] += a * 0.06;
+    },
   },
   // Tesla: rigid on its toes, arched and trembling, then it crumples forward.
   shock: {

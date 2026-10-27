@@ -81,6 +81,12 @@
   y el idioma siguen siendo solo del menu principal: el idioma, en un
   desplegable con banderas en la esquina del panel.
 
+- **Armas exclusivas de mapa como dato del registro.** Un mapa declara en
+  `ZombieMapDefinition.exclusiveWeapons` las armas que solo el reparte (la
+  ФАКЕЛ-33 en Station 33); `ZombiesMode` las precarga solo en ese mapa y las
+  vende su `ArenaWeaponStation`. Nunca entran en la Mystery Box, en
+  `ZOMBIES_WEAPON_PRELOAD` ni en el cooperativo, y el modo no conoce el mapa.
+
 ## Deudas de contrato
 
 Identificar energia por arma/tipo y no por color; registrar propiedad de

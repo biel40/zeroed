@@ -48,6 +48,48 @@ export function steelWearTexture(): THREE.CanvasTexture | null {
   return steelWear;
 }
 
+let chippedPaint: THREE.CanvasTexture | null | undefined;
+
+/**
+ * Worn military paint tinted by the material colour: soot and grime
+ * clouding the field, chips knocked back to pale primer and bare steel, and
+ * rust freckles bleeding from them. Extrusion and cylinder UVs are in
+ * metres or wraps, so the repeat keeps the chips a few millimetres wide.
+ */
+export function chippedPaintTexture(): THREE.CanvasTexture | null {
+  if (chippedPaint !== undefined) return chippedPaint;
+  const random = seededRandom(1933);
+  chippedPaint = canvasTexture(256, 256, (ctx) => {
+    ctx.fillStyle = '#d9d9d2';
+    ctx.fillRect(0, 0, 256, 256);
+    for (let cloud = 0; cloud < 40; cloud++) {
+      ctx.fillStyle = `rgba(40, 38, 30, ${0.03 + random() * 0.07})`;
+      ctx.fillRect(random() * 256, random() * 256, 20 + random() * 60, 10 + random() * 40);
+    }
+    for (let chip = 0; chip < 140; chip++) {
+      const x = random() * 256;
+      const y = random() * 256;
+      const size = 1 + random() * 5;
+      const bare = random() < 0.45;
+      ctx.fillStyle = bare ? 'rgba(255, 255, 255, 0.95)' : 'rgba(240, 236, 214, 0.8)';
+      ctx.fillRect(x, y, size * (0.6 + random()), size * (0.4 + random() * 0.8));
+      if (bare && random() < 0.6) {
+        ctx.fillStyle = `rgba(120, 58, 22, ${0.25 + random() * 0.35})`;
+        ctx.fillRect(x + random() * size, y + size, 1 + random() * 2, 2 + random() * 7);
+      }
+    }
+    for (let scratch = 0; scratch < 30; scratch++) {
+      ctx.fillStyle = 'rgba(250, 250, 240, 0.35)';
+      ctx.fillRect(random() * 256, random() * 256, 8 + random() * 30, 0.7);
+    }
+  });
+  if (chippedPaint) {
+    chippedPaint.colorSpace = THREE.SRGBColorSpace;
+    chippedPaint.repeat.set(5, 5);
+  }
+  return chippedPaint;
+}
+
 let woodGrain: THREE.CanvasTexture | null | undefined;
 
 /**

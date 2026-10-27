@@ -11,6 +11,8 @@ import type { ZombieState } from './Zombie';
 import { windowVaultPose, type WindowVaultPose } from './barriers/WindowVault';
 import { ShinyStars } from './ShinyStars';
 import { ZombieElectricArcs } from './ZombieElectricArcs';
+import { ZombieFlames } from './ZombieFlames';
+import { installZombieChar, setZombieChar } from '../rendering/ZombieCharShader';
 import { ZombieLimb } from './ZombieLimb';
 import { buildZombieRestClips, type ZombieRestClips } from './ZombieMotionClips';
 import { ZOMBIE_DEATH_PROFILES, type ZombieFallStyle } from './ZombieDeath';
@@ -135,6 +137,23 @@ const ELECTRIC_COLOR = 0x5fc8ff;
 const ELECTRIC_FADE = 0.8;
 /** Joints the residual arcs jump between, spread head to toe. */
 const ARC_ANCHORS = ['Hips', 'Spine2', 'Head', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
+/**
+ * ФАКЕЛ-33 burns: a living body scorches up to SCORCH_ALIVE while it burns;
+ * one burnt to death chars completely over CHAR_SECONDS, its embers glow
+ * for EMBER_HOLD and die out over EMBER_FADE, while ash and sparks rise for
+ * EMBER_RISE_SECONDS and the fire engulfs it (BURN_FURY) for INCINERATE_FIRE.
+ */
+const SCORCH_ALIVE = 0.4;
+const SCORCH_RATE = 0.16;
+const CHAR_SECONDS = 1.1;
+const EMBER_HOLD = 1.8;
+const EMBER_FADE = 1.6;
+const EMBER_RISE_SECONDS = 2.6;
+const INCINERATE_FIRE = 3.2;
+const BURN_FURY = 1.7;
+const EMBER_COLORS = { edge: 0xff4a12, hot: 0xffd18a } as const;
+/** Joints the ФАКЕЛ-33 fire stands on: few and spread, so the body stays readable. */
+const FLAME_ANCHORS = ['Hips', 'Spine2', 'Head', 'LeftForeArm', 'RightForeArm', 'LeftUpLeg', 'RightUpLeg'];
 /** Faint ashen glow kept very low so the pale bodies read in the dark. */
 const UNDEAD_GLOW = 0x221d1a;
 const UNDEAD_GLOW_INTENSITY = 0.12;
@@ -534,6 +553,13 @@ export class ZombieVisual {
   /** Seconds of ZEUS-77 charge left on the body; arcs persist through death. */
   private electrified = 0;
   private readonly electricArcs: ZombieElectricArcs;
+  /** Seconds of ФАКЕЛ-33 fire left on the body; it keeps burning through death. */
+  private burning = 0;
+  private readonly flames: ZombieFlames;
+  /** 0..1 char of the skin while burning alive; seconds since a burn death began (null when none). */
+  private scorch = 0;
+  private incinerateTime: number | null = null;
+  private readonly embers: RayGunAshParticles;
   /** True while flash or charge own the emissive; the glow is restored once both end. */
   private emissiveOverridden = false;
   private opacity = 1;
@@ -748,6 +774,7 @@ export class ZombieVisual {
     for (const material of this.fadeMaterials) registerFadeMaterial(material);
     for (const material of this.materials) {
       installRayGunDissolve(material, this.modelConfig.height);
+      installZombieChar(material);
     }
     this.root.updateMatrixWorld(true);
     placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
@@ -765,6 +792,15 @@ export class ZombieVisual {
       : ARC_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
     this.electricArcs = new ZombieElectricArcs(arcAnchors);
     this.root.add(this.electricArcs.mesh);
+    const rig = this.rig;
+    const flameAnchors = rig
+      ? [rig.hips, rig.torso, rig.head, rig.armL, rig.armR, rig.legL, rig.legR]
+      : FLAME_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
+    this.flames = new ZombieFlames(flameAnchors);
+    this.root.add(this.flames.mesh);
+    this.embers = new RayGunAshParticles(this.modelConfig.height, EMBER_COLORS);
+    this.embers.points.name = 'zombie-burn-embers';
+    this.root.add(this.embers.points);
     this.rayGunAsh = new RayGunAshParticles(this.modelConfig.height);
     this.root.add(this.rayGunAsh.points);
     // Pitch and roll tip the body in its own frame; the death twist then yaws the result.
@@ -780,6 +816,12 @@ export class ZombieVisual {
     this.flash = this.electrified = 0;
     this.emissiveOverridden = false;
     this.electricArcs.hide();
+    this.burning = 0;
+    this.flames.hide();
+    this.scorch = 0;
+    this.incinerateTime = null;
+    this.embers.reset();
+    for (const material of this.materials) setZombieChar(material, 0, 0, 0);
     this.restoreBasePose();
     this.motionSpeed = this.lean = this.turnLean = 0;
     this.reactionX = this.reactionZ = 0;
@@ -1042,6 +1084,21 @@ export class ZombieVisual {
     this.flash = 1;
   }
 
+  /** Keeps ФАКЕЛ-33 fire on the body (alive or dead) for at least `seconds`. */
+  public ignite(seconds: number): void {
+    this.burning = Math.max(this.burning, seconds);
+  }
+
+  /**
+   * Burnt to death: the fire engulfs the falling body, the skin chars to
+   * charcoal with glowing cracks and raw, bloody burns, and ash and sparks
+   * rise off it while the embers slowly die.
+   */
+  public incinerate(): void {
+    this.incinerateTime = 0;
+    this.burning = Math.max(this.burning, INCINERATE_FIRE);
+  }
+
   /** Keeps ZEUS-77 arcs crawling over the body (alive or dead) for at least `seconds`. */
   public electrify(seconds: number): void {
     this.electrified = Math.max(this.electrified, seconds);
@@ -1276,9 +1333,36 @@ export class ZombieVisual {
     this.electrified = Math.max(0, this.electrified - dt);
     const charge = Math.min(1, this.electrified / ELECTRIC_FADE);
     this.electricArcs.update(dt, charge * this.opacity);
+    this.burning = Math.max(0, this.burning - dt);
+    this.updateBurn(dt);
     if (this.flash > 0 || charge > 0 || this.dissolveProgress > 0 || this.emissiveOverridden) {
       this.updateEmissive(dt, charge);
     }
+  }
+
+  /** Fire, char, embers and ash of the ФАКЕЛ-33; idle (no uniform writes) on a body that never burnt. */
+  private updateBurn(dt: number): void {
+    const incinerating = this.incinerateTime !== null;
+    if (!incinerating && this.burning <= 0 && this.scorch <= 0) {
+      this.flames.update(dt, 0, this.opacity);
+      return;
+    }
+    let char = this.scorch;
+    let ember = this.burning > 0 ? 0.55 : 0;
+    let fury = 1;
+    if (this.incinerateTime !== null) {
+      const time = (this.incinerateTime += dt);
+      char = Math.max(char, Math.min(1, time / CHAR_SECONDS));
+      ember = time < EMBER_HOLD ? 1 : Math.max(0.12, 1 - (time - EMBER_HOLD) / EMBER_FADE);
+      fury = 1 + (BURN_FURY - 1) * Math.max(0, 1 - time / INCINERATE_FIRE);
+      this.embers.setProgress(time / EMBER_RISE_SECONDS);
+    } else if (this.burning > 0) {
+      this.scorch = Math.min(SCORCH_ALIVE, this.scorch + SCORCH_RATE * dt);
+      char = this.scorch;
+    }
+    this.flames.update(dt, this.burning, this.opacity, fury);
+    const time = this.idlePhase;
+    for (const material of this.materials) setZombieChar(material, char, ember * this.opacity, time);
   }
 
   /** Red hit flash beats the electric flicker and dissolve glow; the undead glow returns when all end. */
@@ -1524,6 +1608,8 @@ export class ZombieVisual {
   public dispose(): void {
     this.mixer?.stopAllAction();
     this.rayGunAsh.dispose();
+    this.embers.dispose();
+    this.flames.dispose();
     if (this.shinyStars) {
       this.shinyStars.points.geometry.dispose();
       this.shinyStars.points.material.dispose();

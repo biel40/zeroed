@@ -24,10 +24,23 @@
   del vestibulo de Station 33 en el lugar de la Vector; la Vector sigue en la caja.
 - Barrett .50 semiautomatico con modelo procedural propio estilo M82A1 (cajon de
   techo plano con carril completo, guardamanos perforado, freno en flecha de dos
-  camaras, culata maciza con apoyacara y monopie plegado) y mira telescopica,
+  camaras, culata maciza con apoyacara y monopie plegado, cerrojo visible por la
+  ventana, remaches de chapa estampada, nervios en la camisa, palanca del
+  cargador y alza delantera abatida) y mira telescopica,
   exclusivo de la Mystery Box en individual y cooperativo (7 balas y 40 de reserva).
   Se sobrecalienta y bloquea tras cuatro disparos rapidos, destroza a los zombis
   en pedazos, atraviesa hasta cinco zombis en linea y admite un MP3 propio (`barrett_shot.mp3`, aun no incluido).
+- ФАКЕЛ-33, lanzallamas experimental exclusivo de Station 33: se compra (3500)
+  en el armario de descontaminacion de la sala de maquinas con la electricidad
+  encendida, tras recuperar el cristal de arranque de un portador de la horda
+  e instalarlo gratis en el armario; alli se reponen sus cristales (1750).
+  El portador lleva un gran marcador rojo y energia orbital; el HUD guia cada
+  paso con direccion y distancia. El desafio se reinicia con la partida.
+  Chorro continuo de 9 m que
+  quema hasta doce zombis por tick y los deja ardiendo 4 s, con tres cristales
+  de repuesto; se bloquea tras 4 s de fuego continuo y su recarga cambia el
+  cristal rojo del nucleo. Sus victimas mueren calcinadas: se retuercen, caen
+  encogidas, la piel se carboniza con brasas y dejan un charco de sangre.
 - Anillos (perks) en individual: el de Resurreccion se compra en la consigna
   de Station 33, se ve en el anular, salva una muerte y se recarga. El de
   Prestidigitacion (menique, recargas al doble de velocidad) esta en las

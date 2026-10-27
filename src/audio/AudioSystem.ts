@@ -2,6 +2,7 @@ import type { SurfaceType } from '../shooting/HitTarget';
 import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
 import { HANDLE_RELEASE_FRACTION } from '../weapons/ReloadAnimator';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
+import { FlameStreamLoop } from './FlameStreamLoop';
 import { MusicManager, type EndingAudioId } from './MusicManager';
 import { RING_JINGLE_TUNES, renderRingJingle, type RingJingleId } from './RingJingleTunes';
 import { muffleCutoff, type SpatialCue } from './SpatialCue';
@@ -117,6 +118,19 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
     coverClose: 1380,
     complete: 2600,
   },
+  // Glass core crystal in a steel cage: its own foley (playCrystalReloadPhase) reads these as pitches.
+  crystal: {
+    start: 1900,
+    magOut: 3600,
+    magDrop: 2800,
+    magIn: 2200,
+    magSeat: 1200,
+    chargeStart: 70,
+    chargeEnd: 160,
+    coverOpen: 2400,
+    coverClose: 1500,
+    complete: 2600,
+  },
   // A heavy screw-on canister: deeper twists than the light cell.
   canister: {
     start: 1500,
@@ -201,6 +215,11 @@ export class AudioSystem {
   private doorPurchaseBuffer: AudioBuffer | null = null;
   private readonly optionalSamples = new Map<string, AudioBuffer | null>();
   private ringJingle: RingJingle | null = null;
+  /** Looping layers of a flame stream, built on its first burst. */
+  private flameLoop: FlameStreamLoop | null = null;
+  private flameOn = false;
+  private nextFlameCrackle = 0;
+  private nextCoolingTick = 0;
   /** Rendered procedural loops and decoded MP3s per tune (a requested MP3 stays null until it decodes). */
   private readonly ringJingleLoops = new Map<RingJingleId, AudioBuffer>();
   private readonly ringJingleSamples = new Map<RingJingleId, AudioBuffer | null>();
@@ -260,6 +279,9 @@ export class AudioSystem {
     this.stopEndingAudio();
     this.stopWind();
     this.stopRingJingle();
+    this.flameLoop?.stop();
+    this.flameLoop = null;
+    this.flameOn = false;
     const ctx = this.ctx;
     this.ctx = null;
     this.master = null;
@@ -340,6 +362,124 @@ export class AudioSystem {
     this.metalClang(0.04, 3100, 0.06, 0.18);
   }
 
+  /**
+   * Per-frame state of a flame weapon's stream (ФАКЕЛ-33): the roar loop
+   * follows `on` and `heat` (0..1), ignition and cut-off play on the edges,
+   * sparse crackles ride the burning stream and a hot nozzle ticks as it
+   * cools. A silent call with no stream and no heat costs nothing.
+   */
+  public setFlameStream(on: boolean, heat: number): void {
+    if (!on && !this.flameOn && heat <= 0 && !this.flameLoop) return;
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    this.flameLoop ??= new FlameStreamLoop(audio.ctx, audio.master, audio.noise);
+    this.flameLoop.set(on ? 1 : 0, heat);
+    if (on && !this.flameOn) this.playFlameIgnite();
+    if (!on && this.flameOn) this.playFlameCutoff();
+    this.flameOn = on;
+    const t = audio.ctx.currentTime;
+    if (on && t >= this.nextFlameCrackle) {
+      this.nextFlameCrackle = t + 0.07 + Math.random() * 0.18;
+      const pops = 1 + Math.floor(Math.random() * 3);
+      for (let pop = 0; pop < pops; pop++) {
+        this.tick(pop * 0.018 * Math.random(), 1600 + Math.random() * 2800, 0.025 + Math.random() * 0.035, 3, 0.022);
+      }
+    }
+    if (!on && heat > 0.4 && t >= this.nextCoolingTick) {
+      // Hot steel contracting: a faint tink now and then until it cools.
+      this.nextCoolingTick = t + 0.45 + Math.random() * 1.1;
+      this.metalClang(0, 3300 + Math.random() * 1600, 0.035 * heat, 0.05);
+    }
+  }
+
+  /** The stream catches: igniter click, a whoosh opening up and a soft thump. */
+  private playFlameIgnite(): void {
+    this.tick(0, 3200, 0.12, 8, 0.03);
+    this.scrape(0, 420, 2200, 0.2, 0.22);
+    this.sweep(0, 'sine', 95, 45, 0.28, 0.18);
+  }
+
+  /** The valve shuts: the roar folds down and the line vents its pressure. */
+  private playFlameCutoff(): void {
+    this.scrape(0, 1400, 320, 0.12, 0.3);
+    this.tick(0.03, 5200, 0.05, 2, 0.26);
+  }
+
+  /** The nozzle nears the redline: a rising whistle over steam and a groan of the hot metal. */
+  public playFlameHeatWarning(): void {
+    this.sweep(0, 'sine', 900, 1900, 0.11, 0.45);
+    this.scrape(0, 6000, 3500, 0.08, 0.5);
+    this.metalClang(0.1, 700, 0.1, 0.2);
+  }
+
+  /** The locked nozzle cooled: valve click, the pilot flame relighting and a bright ping. */
+  public playFlameReady(): void {
+    this.tick(0, 2600, 0.2, 10, 0.03);
+    this.scrape(0.05, 300, 1600, 0.12, 0.18);
+    this.sweep(0.06, 'sine', 1400, 1800, 0.06, 0.12);
+  }
+
+  /**
+   * Core crystal swap, phase by phase: the cage latch and hinge, the spent
+   * crystal sliding out as its hum dies and clinking away, the fresh one
+   * sliding in and seating, the lid slammed and latched, then the core
+   * charging up (over the charge window) and pulsing alive.
+   */
+  private playCrystalReloadPhase(phase: ReloadPhase, profile: ReloadProfile, actionDuration: number): void {
+    const boost = AudioSystem.boostReloadVolume;
+    switch (phase) {
+      case 'coverOpen':
+        this.tick(0, profile.coverOpen, boost(0.22), 10, 0.03);
+        this.scrape(0.02, 900, 1500, boost(0.12), 0.16);
+        break;
+      case 'magOut':
+        this.scrape(0, profile.magOut, profile.magOut * 0.66, boost(0.1), 0.22);
+        this.sweep(0, 'sine', 420, 90, boost(0.12), 0.35);
+        break;
+      case 'magDrop':
+        this.tick(0, profile.magDrop, boost(0.08), 12, 0.06);
+        break;
+      case 'magIn':
+        this.scrape(0, profile.magIn, profile.magIn * 1.55, boost(0.1), 0.2);
+        break;
+      case 'magSeat':
+        this.tick(0, profile.magSeat, boost(0.24));
+        this.sweep(0, 'triangle', 180, 70, boost(0.3), 0.08);
+        break;
+      case 'coverClose':
+        this.metalClang(0, profile.coverClose, boost(0.34), 0.1);
+        this.tick(0.02, profile.coverOpen, boost(0.2), 10, 0.03);
+        break;
+      case 'chargeStart': {
+        const duration = Math.max(0.2, actionDuration);
+        this.sweep(0, 'sine', profile.chargeStart, profile.chargeStart * 5, boost(0.22), duration);
+        this.sweep(0, 'triangle', profile.chargeStart * 2, profile.chargeStart * 10, boost(0.07), duration);
+        break;
+      }
+      case 'chargeEnd':
+        this.sweep(0, 'sine', profile.chargeEnd, profile.chargeEnd * 0.32, boost(0.4), 0.25);
+        this.tick(0, 3800, boost(0.16), 4, 0.08);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Burnt to death: the body goes up with a whoomp, an agonised howl breaks
+   * off, the fat sizzles and the fire pops and spits over it for a while.
+   */
+  public playZombieIncinerate(): void {
+    this.sweep(0, 'sine', 110, 40, 0.34, 0.32);
+    this.scrape(0, 600, 2400, 0.16, 0.3);
+    this.sweep(0.02, 'sawtooth', 460, 130, 0.13, 0.7);
+    this.sweep(0.05, 'square', 690, 210, 0.04, 0.55);
+    this.scrape(0.12, 6200, 2800, 0.1, 1.1);
+    for (let pop = 0; pop < 7; pop++) {
+      this.tick(0.2 + pop * 0.13 + Math.random() * 0.08, 1300 + Math.random() * 2600, 0.05 + Math.random() * 0.05, 3, 0.03);
+    }
+  }
+
   /** Weapon blew a body apart: a wet low burst, tearing flesh and pieces slapping down. */
   public playZombieShatter(): void {
     this.sweep(0, 'sine', 120, 38, 0.5, 0.28);
@@ -392,6 +532,10 @@ export class AudioSystem {
     const profile: ReloadProfile = RELOAD_PROFILES[style] ?? RELOAD_PROFILES.rifle;
     const boost = AudioSystem.boostReloadVolume;
 
+    if (style === 'crystal') {
+      this.playCrystalReloadPhase(phase, profile, actionDuration);
+      return;
+    }
     if (energy) {
       switch (phase) {
         case 'magOut':
@@ -536,6 +680,12 @@ export class AudioSystem {
       this.sweep(0, 'sine', profile.start * 0.3, profile.start * 0.7, boost(0.18), 0.09);
       return;
     }
+    if (style === 'crystal') {
+      // The feed valve shuts and the line vents before the cage is opened.
+      this.tick(0, profile.start, boost(0.2));
+      this.scrape(0.04, 5000, 2500, boost(0.1), 0.28);
+      return;
+    }
     // A low body thump under the ticks so the cue reads as a mechanical
     // handling sound, not just a faint click lost under gunfire/music.
     this.sweep(0, 'triangle', 150, 50, boost(style === 'pistol' ? 0.65 : 0.58), 0.12);
@@ -550,6 +700,12 @@ export class AudioSystem {
     if (energy) {
       this.sweep(0, 'sine', profile.complete * 0.28, profile.complete * 0.72, boost(0.16), 0.1);
       this.tick(0.045, profile.complete, boost(0.24));
+      return;
+    }
+    if (style === 'crystal') {
+      // The pilot flame relights on the fresh core.
+      this.scrape(0, 300, 1500, boost(0.12), 0.2);
+      this.tick(0, profile.complete, boost(0.18), 10, 0.03);
       return;
     }
     if (style === 'drum') {

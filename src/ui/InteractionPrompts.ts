@@ -1,5 +1,6 @@
 import { isTranslationKey, t } from '../i18n/i18n';
 import type { PointDoor } from '../zombies/doors/PointDoor';
+import type { TranslationKey } from '../i18n/i18n';
 import type { ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
 
 export function weaponCaseLocked(pickup: ArenaWeaponPickup, kills: number): boolean {
@@ -26,9 +27,9 @@ export function doorPrompt(door: PointDoor, touch: boolean): string {
 }
 
 export function wallBuyPrompt(weapon: string, owned: boolean, wallBuy: { readonly price: number; readonly ammoPrice: number },
-  touch: boolean): string {
+  touch: boolean, ammoPromptKey: TranslationKey = 'prompt.weaponAmmo'): string {
   const key = actionKey(touch);
   return owned
-    ? t('prompt.weaponAmmo', { key, weapon, cost: wallBuy.ammoPrice })
+    ? t(ammoPromptKey, { key, weapon, cost: wallBuy.ammoPrice })
     : t('prompt.buyWeapon', { key, weapon, cost: wallBuy.price });
 }

@@ -12,6 +12,7 @@ import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import type { WeaponId } from '../../weapons/WeaponTypes';
+import type { TranslationKey } from '../../i18n/i18n';
 
 export interface MysteryBoxPlacement {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -58,6 +59,35 @@ export interface ArenaAmmoRefill {
   activate(): void;
   update?(dt: number): void;
   reset(): void;
+}
+
+/**
+ * A map's special-weapon station (an equipment cabinet rather than a chalk
+ * outline): like a wall buy it sells its weapon once and then refills that
+ * weapon's ammunition for its owner, but it may wait for the map's power.
+ * The mode charges and grants; the map only presents it.
+ */
+export interface ArenaWeaponStation {
+  readonly id: string;
+  readonly weaponId: WeaponId;
+  readonly price: number;
+  readonly ammoPrice: number;
+  /** Prompt of the refill; absent keeps the wall buys' ammunition prompt. */
+  readonly ammoPromptKey?: TranslationKey;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  /** False while the station waits for the map's power: it sells nothing and shows itself dark. */
+  readonly powered: boolean;
+  /** Optional run challenge: recover a carrier's crystal before this station can sell. */
+  readonly requiresStartupCrystal?: boolean;
+  /** Presentation of the challenge lock; purchasing remains the mode's responsibility. */
+  setLocked?(locked: boolean): void;
+  /** Whether the player carries the weapon: its rack shows it hanging or empty. */
+  setOwned(owned: boolean): void;
+  /** A purchase or refill just went through. */
+  activate(): void;
 }
 
 /**
@@ -245,6 +275,8 @@ export interface ZombieArena {
   readonly ringMachines?: ReadonlyArray<ArenaRingMachine>;
   /** Optional easter egg: a gas mask the player can wear. */
   readonly gasMaskRack?: ArenaGasMaskRack;
+  /** Optional: special-weapon stations (the ФАКЕЛ-33 cabinet); maps without them omit it. */
+  readonly weaponStations?: ReadonlyArray<ArenaWeaponStation>;
   /** Optional: the switch that powers the map's machines; maps without power omit it. */
   readonly powerSwitch?: ArenaPowerSwitch;
   /** Paid interaction that ends the run with the map's own ending. */

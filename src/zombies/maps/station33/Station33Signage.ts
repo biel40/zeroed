@@ -31,7 +31,8 @@ export type SignId =
   | 'mimic-diagram'
   | 'militia'
   | 'evidence'
-  | 'wanted';
+  | 'wanted'
+  | 'decontamination';
 
 const ATLAS_WIDTH = 1024;
 /** Two 128 px rows below the original square: the machine room's plates, then the militia post's. */
@@ -64,6 +65,7 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   militia: [0, 1152, 256, 128],
   evidence: [256, 1152, 256, 128],
   wanted: [512, 1152, 256, 128],
+  decontamination: [768, 1152, 256, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -285,6 +287,8 @@ function paintSubstationSigns(context: CanvasRenderingContext2D, random: () => n
   const [vx, vy, vw, vh] = SIGN_REGIONS['high-voltage'];
   lightningArrow(context, vx + vw / 2, vy + vh / 2, vw * 0.62, '#1b1b1b');
   enamelPlate(context, 'men-at-work', '#e4e0d4', '#a3241a', '#a3241a', ['НЕ ВКЛЮЧАТЬ!', 'РАБОТАЮТ ЛЮДИ'], 27, random);
+  // The ФАКЕЛ-33 cabinet: experimental decontamination equipment, in faded hazard ochre.
+  enamelPlate(context, 'decontamination', '#b9993f', '#1d1b17', '#1d1b17', ['ФАКЕЛ-33', 'ДЕЗАКТИВАЦИЯ'], 30, random);
   paintMimicDiagram(context, random);
 }
 

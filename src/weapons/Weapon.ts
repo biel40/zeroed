@@ -47,6 +47,7 @@ export class Weapon {
   private prevTrigger = false;
   /** Seconds into the running inspection; null when the weapon is not being inspected. */
   private inspectTimer: number | null = null;
+  private secondsSinceShot = Infinity;
 
   constructor(
     readonly definition: WeaponDefinition,
@@ -104,6 +105,15 @@ export class Weapon {
     this.inspectTimer = null;
   }
 
+  /**
+   * True while the trigger keeps a cadence going: the last shot left less
+   * than one and a half shot intervals ago. A continuous weapon (flame
+   * stream) reads it as "the stream is on".
+   */
+  get isFiring(): boolean {
+    return this.secondsSinceShot <= (60 / this.definition.rpm) * 1.5;
+  }
+
   get currentBloom(): number {
     return this.bloom;
   }
@@ -115,8 +125,13 @@ export class Weapon {
 
   update(dt: number, input: WeaponFrameInput): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
+    this.secondsSinceShot += dt;
     this.recoil.update(dt);
+    const wasLocked = this.heat.overheated;
     this.heat.update(dt);
+    if (wasLocked && !this.heat.overheated && this.definition.heat?.warning !== undefined) {
+      this.pendingEvents.push({ type: 'cooledDown' });
+    }
     this.bloom = Math.max(0, this.bloom - this.definition.spread.bloomRecovery * dt);
 
     const canAim = this.weaponState === 'ready' || this.weaponState === 'cycling';
@@ -158,6 +173,7 @@ export class Weapon {
     this.prevTrigger = false;
     this.adsAlpha = 0;
     this.bloom = 0;
+    this.secondsSinceShot = Infinity;
     this.heat.reset();
     this.recoil.reset();
     this.enterState('equipping', this.definition.equipTime);
@@ -187,6 +203,7 @@ export class Weapon {
     this.adsAlpha = 0;
     this.prevTrigger = false;
     this.inspectTimer = null;
+    this.secondsSinceShot = Infinity;
     this.heat.reset();
     this.recoil.reset();
     this.pendingEvents.length = 0;
@@ -238,8 +255,14 @@ export class Weapon {
       this.definition.spread.maxBloom,
       this.bloom + this.definition.spread.bloomPerShot,
     );
+    const heatBefore = this.heat.level;
     this.heat.onShot();
+    this.secondsSinceShot = 0;
     this.pendingEvents.push({ type: 'shot' });
+    const warning = this.definition.heat?.warning;
+    if (warning !== undefined && heatBefore < warning && this.heat.level >= warning) {
+      this.pendingEvents.push({ type: 'heatWarning' });
+    }
     if (this.heat.overheated) this.pendingEvents.push({ type: 'overheated' });
 
     if (this.definition.boltAction) {

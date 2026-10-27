@@ -49,6 +49,13 @@ export const BARRETT_PROFILE = {
   brake: { rearZ: -0.883, frontZ: -0.997, halfWidth: 0.046, halfHeight: 0.029 },
   /** Prominent takedown pins joining upper and lower, front and rear. */
   pinZ: [-0.232, 0.142] as readonly number[],
+  /** Bolt carrier riding inside the receiver, seen through the ejection port. */
+  carrier: { rearZ: -0.012, frontZ: -0.152, y: 0.006, halfWidth: 0.016, halfHeight: 0.017 },
+  /** Rivet rows of the stamped receiver: along the upper/lower seam and the shroud plates' lower flange. */
+  seamRivets: { y: -0.021, firstZ: 0.12, pitch: 0.043, count: 9 },
+  shroudRivets: { y: -0.046, firstZ: -0.2, pitch: 0.054, count: 8 },
+  /** Stamped stiffening rib running along each shroud plate between the hole rows. */
+  shroudRib: { y: -0.017, height: 0.004 },
 } as const;
 
 /** Concave longitudinal flutes cut into the exposed barrel, not raised bars. */
@@ -182,6 +189,36 @@ export function buildBarrett(config: ViewModelConfig): BuiltProcedural {
   // Port edges: a bevelled frame around the right-flank opening.
   add(action, new THREE.BoxGeometry(0.002, 0.003, 0.128), silver, 0.0365, 0.0265, -0.084);
   add(action, new THREE.BoxGeometry(0.002, 0.003, 0.128), silver, 0.0365, -0.0135, -0.084);
+  // Bolt carrier behind the port: its slab body, the polished rotating bolt
+  // head with locking lugs, the extractor claw and the cam pin in its slot.
+  const C = P.carrier;
+  add(action, new RoundedBoxGeometry(C.halfWidth * 2, C.halfHeight * 2, C.rearZ - C.frontZ, 1, 0.003), dark,
+    -0.005, C.y, (C.rearZ + C.frontZ) / 2);
+  add(action, cylinderZ(0.011, 0.011, 0.03, 14), silver, -0.005, C.y, C.frontZ + 0.012);
+  for (const angle of [Math.PI / 4, -Math.PI / 4]) {
+    const lug = add(action, new THREE.BoxGeometry(0.006, 0.006, 0.012), silver,
+      -0.005 + Math.cos(angle) * 0.012, C.y + Math.sin(angle) * 0.012, C.frontZ + 0.004);
+    lug.rotation.z = angle;
+  }
+  add(action, new THREE.BoxGeometry(0.003, 0.005, 0.022), silver, 0.0075, C.y + 0.002, C.frontZ + 0.016);
+  add(action, new THREE.CylinderGeometry(0.0035, 0.0035, 0.006, 8).rotateZ(Math.PI / 2), silver, 0.0125, C.y + 0.004, -0.098);
+  add(action, new THREE.BoxGeometry(0.002, 0.008, 0.03), dark, 0.0115, C.y + 0.004, -0.098);
+  // Rivet heads closing the stamped upper over the lower, both flanks.
+  const rivet = (radius: number): THREE.BufferGeometry => new THREE.CylinderGeometry(radius * 0.8, radius, 0.0018, 8).rotateZ(Math.PI / 2);
+  const SR = P.seamRivets;
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < SR.count; i++) {
+      const z = SR.firstZ - i * SR.pitch;
+      // The takedown pin heads keep their spot on the flank.
+      if (P.pinZ.some((pin) => Math.abs(pin - z) < 0.015)) continue;
+      const head = add(action, rivet(0.0032), steel, side * 0.0372, SR.y, z);
+      if (side < 0) head.rotation.y = Math.PI;
+    }
+  }
+  // Magazine release paddle just behind the well, on the shooter's side.
+  const release = add(action, new RoundedBoxGeometry(0.004, 0.026, 0.012, 1, 0.0015), dark, 0.0352, -0.06, -0.052);
+  release.rotation.x = 0.18;
+  add(action, new THREE.CylinderGeometry(0.003, 0.003, 0.004, 8).rotateZ(Math.PI / 2), silver, 0.0372, -0.05, -0.052);
 
   // Lower receiver, magazine-well collar, grip, guard and trigger.
   add(action, extrudeProfile(profileShape(P.lower), 0.066, 0.002, rounded), steel);
@@ -231,6 +268,22 @@ export function buildBarrett(config: ViewModelConfig): BuiltProcedural {
       }
     }
     add(shroud, extrudeProfile(plate, 0.003, 0, { curveSegments: 4 }), steel, side * (S.width / 2 - 0.0015));
+    // Pressed stiffening rib between the hole rows and the rivets of the lower flange.
+    const rib = P.shroudRib;
+    add(shroud, new RoundedBoxGeometry(0.003, rib.height, S.rearZ - S.frontZ - 0.03, 1, 0.0012), steel,
+      side * (S.width / 2 + 0.001), rib.y, (S.rearZ + S.frontZ) / 2 + 0.008);
+    const RV = P.shroudRivets;
+    for (let i = 0; i < RV.count; i++) {
+      const head = add(shroud, new THREE.CylinderGeometry(0.0026, 0.0032, 0.0018, 8).rotateZ(Math.PI / 2), steel,
+        side * (S.width / 2 + 0.0009), RV.y, RV.firstZ - i * RV.pitch);
+      if (side < 0) head.rotation.y = Math.PI;
+    }
+  }
+  // Folding front iron sight laid flat on the front of the rail: hinge block, post and protective ears.
+  add(shroud, new RoundedBoxGeometry(0.026, 0.008, 0.02, 1, 0.002), dark, 0, P.rail.y + 0.008, P.rail.frontZ + 0.02);
+  add(shroud, new THREE.BoxGeometry(0.004, 0.003, 0.03), dark, 0, P.rail.y + 0.0135, P.rail.frontZ + 0.04);
+  for (const side of [-1, 1]) {
+    add(shroud, new THREE.BoxGeometry(0.003, 0.006, 0.026), dark, side * 0.009, P.rail.y + 0.014, P.rail.frontZ + 0.038);
   }
   const shroudLength = S.rearZ - S.frontZ;
   add(shroud, new RoundedBoxGeometry(S.width, 0.005, shroudLength, 1, 0.0015), steel, 0, S.topY - 0.0025, (S.rearZ + S.frontZ) / 2);
@@ -281,7 +334,7 @@ export function buildBarrett(config: ViewModelConfig): BuiltProcedural {
   add(handle, cylinderZ(0.007, 0.007, 0.028, 16), dark, 0.057, -0.005);
   for (const z of [-0.008, 0, 0.008]) add(handle, cylinderZ(0.0075, 0.0075, 0.0015, 16), silver, 0.057, -0.005, z);
 
-  // Ten-round box magazine, a hand's depth below the well, with pressed ribs and a base pad.
+  // Box magazine, a hand's depth below the well, with pressed ribs and a base pad.
   const magazine = assembly('magazine', 0, -0.095, -0.142);
   const magBottom = -0.108;
   add(magazine, extrudeProfile(profileShape([[-0.0725, 0.04], [0.0725, 0.04], [0.07, magBottom], [-0.068, magBottom]]), 0.052, 0.0025, rounded), magazineSteel);

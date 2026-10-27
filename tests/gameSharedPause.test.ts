@@ -16,6 +16,12 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     heat: { intensity: 0 },
     definition: {},
   };
+  const view = {
+    root: { visible: true },
+    // The real view recomputes scope visibility on every update.
+    update: vi.fn(() => { view.root.visible = true; }),
+    getMuzzleWorldPosition: vi.fn(),
+  };
   const game: Stub = Object.create(Game.prototype);
   Object.assign(game, {
     clock: { getDelta: () => 0.016 },
@@ -30,13 +36,14 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     },
     profile: { useTouchControls: false },
     inventory: { currentWeapon: 'm1911', weapons: ['m1911'] },
-    arsenal: new Map([['m1911', { weapon, view: { root: { visible: true }, update: vi.fn(), getMuzzleWorldPosition: vi.fn() } }]]),
+    arsenal: new Map([['m1911', { weapon, view }]]),
     frameInput: { trigger: false, ads: false, repeatSemiAuto: false },
     ballistics: { update: vi.fn() },
     effects: { update: vi.fn() },
+    audio: { setFlameStream: vi.fn() },
     barrelSmoke: { update: vi.fn() },
     magazineDrops: { update: vi.fn() },
-    viewArms: { update: vi.fn() },
+    viewArms: { root: { visible: true }, update: vi.fn() },
     flashLight: { intensity: 0 },
     viewportHeight: 100,
     hud: { update: vi.fn(), setInteractionPrompt: vi.fn() },
@@ -128,6 +135,35 @@ describe('weapon inspection input', () => {
     const menu = stubGame(true, true);
     prototype.frame.call(menu.game);
     expect(menu.weapon.cancelInspect).toHaveBeenCalled();
+  });
+});
+
+describe('cinematic first-person visibility', () => {
+  it.each([false, true])('hides weapons and both arms until handoff (touch: %s)', (touch) => {
+    const { game } = stubGame(false, false);
+    game.profile.useTouchControls = touch;
+    const camera = {};
+    game.mode.getCinematicCamera = () => camera;
+    game.mode.isGameplayInputEnabled = () => false;
+    prototype.frame.call(game);
+    expect(game.currentView.root.visible).toBe(false);
+    expect(game.viewArms.root.visible).toBe(false);
+    expect(game.renderer.render).toHaveBeenLastCalledWith(game.scene, camera);
+
+    game.mode.getCinematicCamera = () => null;
+    game.mode.isGameplayInputEnabled = () => true;
+    prototype.frame.call(game);
+    expect(game.currentView.root.visible).toBe(true);
+    expect(game.viewArms.root.visible).toBe(true);
+    expect(game.renderer.render).toHaveBeenLastCalledWith(game.scene, game.player.camera);
+  });
+
+  it('preserves scoped weapon hiding when gameplay resumes', () => {
+    const { game } = stubGame(false, false);
+    const view = game.arsenal.get('m1911').view;
+    view.update.mockImplementation(() => { view.root.visible = false; });
+    prototype.frame.call(game);
+    expect(view.root.visible).toBe(false);
   });
 });
 

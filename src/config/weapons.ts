@@ -790,7 +790,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   barrett: {
     id: 'barrett',
     name: 'BARRETT .50',
-    muzzleFlash: { length: 0.7, width: 0.24, sideLength: 0.55, coreScale: 2.2, duration: 0.14, lightIntensity: 28 },
+    muzzleFlash: { length: 0.78, width: 0.26, sideLength: 0.6, coreScale: 2.4, duration: 0.14, lightIntensity: 32 },
     shellCasing: 'bmg50',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
@@ -807,13 +807,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     // brake and the exposed barrel behind it.
     heat: { shotsToOverheat: 4, coolTime: 3.2, coolDelay: 0.6, lockout: true, maxSpreadBonus: 0.014, glow: { radius: 0.055, length: 0.3 } },
     // The arrowhead brake vents thick clouds to both sides on every shot.
-    muzzleSmoke: { puffs: 6, scale: 1.8, life: 1.6 },
+    muzzleSmoke: { puffs: 6, scale: 2, life: 1.6 },
     recoil: {
-      verticalKick: 0.19, horizontalKick: 0.02, horizontalBias: 0,
+      verticalKick: 0.21, horizontalKick: 0.022, horizontalBias: 0,
       kickVariance: 0.15, recoverySpeed: 4, recoveryDelay: 0.28,
       cameraShare: 0.85, adsRecoilMultiplier: 1,
-      // A .50 BMG punch: a hard snap of the view and the shooter rocked ~11 cm back.
-      cameraJolt: 0.075, playerPush: 1.6,
+      // A .50 BMG punch: a hard snap of the view and the shooter rocked ~12 cm back.
+      cameraJolt: 0.085, playerPush: 1.8,
     },
     spread: { hipBase: 0.03, adsBase: 0.0005, bloomPerShot: 0.006, maxBloom: 0.018, bloomRecovery: 0.024 },
     ads: { fov: 16, speed: 3.5, sensitivity: 0.35 },
@@ -821,17 +821,17 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 850, gravity: 9.8, maxDistance: 700, drag: 0.025, maxTargets: 5 },
     moveSpeedMultiplier: 0.8,
     equipTime: 0.7,
-    audio: { volume: 1.15, duration: 0.38, lowpass: 1800, thump: 62, crack: 0.55, tail: 1.15, mechanism: 0.3, sampleFile: 'barrett_shot.mp3' },
+    audio: { volume: 1.3, duration: 0.38, lowpass: 1800, thump: 62, crack: 0.55, tail: 1.15, mechanism: 0.3, sampleFile: 'barrett_shot.mp3' },
     view: {
       frame: 'barrett',
       hip: [0.19, -0.215, -0.31],
       ads: [0, 0, -0.35],
       sway: 1.2,
       bob: 0.8,
-      visualRecoil: { kickImpulse: 3.8, pitchImpulse: 12, rollImpulse: 3, stiffness: 115, damping: 17 },
+      visualRecoil: { kickImpulse: 4.2, pitchImpulse: 13.5, rollImpulse: 3.3, stiffness: 115, damping: 17 },
       scale: 1,
-      bodyColor: 0x50585e,
-      accentColor: 0x191c1f,
+      bodyColor: 0x464d52,
+      accentColor: 0x15181a,
       barrelLength: 0.74,
       barrelRadius: 0.018,
       receiverLength: 0.46,
@@ -1056,9 +1056,113 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       },
     },
   },
+  /**
+   * ФАКЕЛ-33 — original experimental Soviet decontamination flamethrower,
+   * exclusive to Station 33 (its map declares it and sells it from a
+   * powered weapon station). A red core crystal feeds a short, wide stream
+   * that scorches up to twelve zombies per tick and leaves them burning for
+   * four seconds, enough to kill on its own: the horde breaker at close
+   * range, useless past nine metres. One crystal lasts eight seconds of
+   * fire, three spares ride in reserve, and four seconds of continuous fire
+   * redline the nozzle and lock it until cool.
+   */
+  fakel: {
+    id: 'fakel',
+    name: 'ФАКЕЛ-33',
+    fireModes: ['auto'],
+    defaultFireMode: 'auto',
+    // Each "round" is one tick of the stream; the magazine is one crystal's charge.
+    rpm: 750,
+    magazineSize: 100,
+    reserveAmmo: 300,
+    // Every reload swaps the crystal, so a tactical one takes as long.
+    reloadTime: 3.4,
+    tacticalReloadTime: 3.4,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 45,
+    flame: { range: 9, coneHalfAngle: 0.24, maxTargets: 12, burnSeconds: 4, burnDamagePerSecond: 120 },
+    // Redlines in four seconds of continuous fire and stays locked about four more;
+    // the warning comes a second before the lockout.
+    heat: {
+      shotsToOverheat: 50, coolTime: 3.5, coolDelay: 0.35, lockout: true, warning: 0.75,
+      maxSpreadBonus: 0.01, glow: { radius: 0.052, length: 0.09 },
+    },
+    recoil: {
+      verticalKick: 0.0015,
+      horizontalKick: 0.0012,
+      horizontalBias: 0,
+      kickVariance: 0.5,
+      recoverySpeed: 12,
+      recoveryDelay: 0.05,
+      cameraShare: 0.3,
+      adsRecoilMultiplier: 0.8,
+    },
+    // The cone is the spread: aim jitter only stirs the stream.
+    spread: { hipBase: 0.02, adsBase: 0.012, bloomPerShot: 0, maxBloom: 0, bloomRecovery: 1 },
+    ads: { fov: 62, speed: 7, sensitivity: 0.85 },
+    projectile: { muzzleVelocity: 30, gravity: 0, maxDistance: 7, drag: 0 },
+    moveSpeedMultiplier: 0.88,
+    equipTime: 0.75,
+    // The stream has its own looping roar (AudioSystem.setFlameStream); no per-tick report.
+    audio: { volume: 0.5, duration: 0.2, lowpass: 900, thump: 70 },
+    view: {
+      // Dedicated procedural builder (FakelViewModel). It shares the ZEUS-77's
+      // grip and support sleeve positions, so both use the same hand anchors.
+      frame: 'fakel',
+      hip: [0.24, -0.22, -0.44],
+      ads: [0, 0, -0.3],
+      sway: 1.15,
+      bob: 1.05,
+      visualRecoil: { kickImpulse: 0.18, pitchImpulse: 0.35, rollImpulse: 0.25, stiffness: 140, damping: 16 },
+      scale: 1.05,
+      // Worn military green paint over dark steel.
+      bodyColor: 0x3e4a33,
+      accentColor: 0x25282b,
+      barrelLength: 0.4,
+      barrelRadius: 0.028,
+      receiverLength: 0.24,
+      stockLength: 0.18,
+      magazine: 'internal',
+      optic: 'irons',
+      sightHeight: 0.075,
+      bulk: 1.1,
+      hands: {
+        // The whole hand closes on the grip and squeezes the lever in front of it.
+        right: {
+          position: [0, -0.085, 0.091], axis: [0, 1, -0.12], palm: [-1, -0.1, 0], pose: 'handleGrip',
+          hold: { size: [0.054, 0.054], axis: [0, 0.946, -0.326] },
+        },
+        // Underhand on the rubber sleeve behind the heat shield.
+        left: {
+          position: [0, 0.0126, -0.15], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.08, 0.08], axis: [0, 0, -1] },
+        },
+        // Lifts the crystal by its top, out of the open cage.
+        magazine: { position: [0, 0.04, 0], axis: [0, 0, 1], palm: [0, -1, 0], pose: 'magazineGrab' },
+      },
+      reloadAnim: {
+        style: 'crystal',
+        coverOpen: 0.1,
+        magOut: 0.2,
+        magDrop: 0.36,
+        magIn: 0.52,
+        magSeat: 0.66,
+        coverClose: 0.74,
+        // The charge window re-energises the fresh core: a pulse of light and hum.
+        charge: 0.78,
+        chargeEnd: 0.93,
+        // Lowered and canted towards the eye so the cage on the left flank faces the camera.
+        swapPose: { shift: [-0.05, 0.05, 0.03], yaw: 0.18, roll: 0.28, tilt: -0.15 },
+        magSize: [0.032, 0.034, 0.074],
+        magColor: 0xc4161c,
+      },
+    },
+  },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm60', 'l96', 'barrett', 'm1911'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm60', 'l96', 'barrett', 'm1911', 'fakel'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
@@ -1066,7 +1170,9 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh
  * rolls and unlocks never touch the network. This is NOT the slot list:
  * the zombies inventory starts with the M1911 alone (see
  * ZombiesMode.startingInventory); both Wonder Weapons can come from the
- * Mystery Box, while the Ray Gun is also guaranteed at 115 kills.
+ * Mystery Box, while the Ray Gun is also guaranteed at 115 kills. Map
+ * exclusives (the ФАКЕЛ-33) are not here: the map registry adds them to
+ * the preload of their own map only (`ZombieMapDefinition.exclusiveWeapons`).
  */
 export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm1911',

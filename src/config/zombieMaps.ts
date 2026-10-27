@@ -4,6 +4,7 @@ import type { TranslationKey } from '../i18n/i18n';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { Station33Arena } from '../zombies/maps/Station33Arena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
+import type { WeaponId } from '../weapons/WeaponTypes';
 
 export type ZombieArenaFactory = (scene: THREE.Scene, profile: DeviceProfile) => ZombieArena;
 
@@ -18,6 +19,12 @@ export interface ZombieMapDefinition {
   readonly coop: boolean;
   /** Sold separately once payments exist; the closed beta unlocks it for testers. */
   readonly premium: boolean;
+  /**
+   * Weapons only this map hands out (sold by its own stations). They are
+   * preloaded on this map alone, never pooled in the Mystery Box and never
+   * reachable on another map or in co-op.
+   */
+  readonly exclusiveWeapons: readonly WeaponId[];
   readonly createArena: ZombieArenaFactory;
 }
 
@@ -30,6 +37,7 @@ export const ZOMBIE_MAPS = {
     nameKey: 'map.burnedMansion',
     coop: true,
     premium: false,
+    exclusiveWeapons: [],
     createArena: (scene, profile) => new BurnedMansionArena(scene, profile),
   },
   'station-33': {
@@ -39,6 +47,7 @@ export const ZOMBIE_MAPS = {
     nameKey: 'map.station33',
     coop: false,
     premium: true,
+    exclusiveWeapons: ['fakel'],
     createArena: (scene, profile) => new Station33Arena(scene, profile),
   },
 } as const satisfies Record<string, ZombieMapDefinition>;

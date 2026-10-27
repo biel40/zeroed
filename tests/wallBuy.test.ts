@@ -38,7 +38,7 @@ function makePurchase(startingPoints: number, owned: boolean, ammoFull = false) 
       updateZombies: () => undefined,
     },
   };
-  const purchase = (mode as unknown as { purchaseWallBuy(buy: WallBuy): void }).purchaseWallBuy.bind(mode);
+  const purchase = (mode as unknown as { purchaseWeaponOffer(buy: WallBuy): boolean }).purchaseWeaponOffer.bind(mode);
   return { economy, calls, purchase };
 }
 

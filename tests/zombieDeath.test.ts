@@ -38,6 +38,7 @@ describe('zombie death style resolution', () => {
     ['m60', false, 'riddled'],
     ['raygun', false, 'blast'],
     ['tesla', false, 'shock'],
+    ['fakel', false, 'burn'],
     [undefined, false, 'knockback'],
     ['m1911', true, 'headshot'],
     ['m60', true, 'headshot'],
@@ -46,6 +47,8 @@ describe('zombie death style resolution', () => {
     // Electrocution and the blade read better than a generic head snap.
     ['tesla', true, 'shock'],
     ['knife', true, 'slash'],
+    // Burnt alive, whatever the stream licked.
+    ['fakel', true, 'burn'],
   ])('%s (headshot: %s) dies with %s', (source, headshot, style) => {
     expect(resolveZombieDeathStyle(source, headshot, -1)).toBe(style);
   });

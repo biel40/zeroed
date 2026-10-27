@@ -49,6 +49,17 @@ const BOX_FETCH = new THREE.Vector3(-0.03, 0, 0.05);
 const BOX_FETCH_DROP = 1.15;
 /** AK-style magazine: hooked on its front lug with the base swung this far forward, then rocked home. */
 const ROCK_HOOK = 0.45;
+/**
+ * Core crystal: lifted this many crystal heights out of its open cage,
+ * drawn back clear of the swung lid and turned to the eye; a fresh one is
+ * brought in from outboard (metres) along the same path.
+ */
+const CRYSTAL_LIFT = 2.2;
+const CRYSTAL_BACK = 0.018;
+const CRYSTAL_TURN = 0.6;
+const CRYSTAL_OUTBOARD = 0.03;
+/** Styles whose every reload, tactical or empty, ends with the charge window (a crystal core re-energising). */
+const CHARGES_EVERY_RELOAD: ReadonlySet<ReloadStyle> = new Set(['crystal']);
 
 /** View-model parts the animator drives; any of them may be absent. */
 export interface ReloadParts {
@@ -103,6 +114,12 @@ export function poseDetachedMagazine(mag: THREE.Object3D, home: HomePose, config
       // Power cell rises out of its cage with a slow spin.
       mag.position.y += t * height * 1.5;
       mag.rotateY(t * 2.2);
+      break;
+    case 'crystal':
+      // Lifted out of the open cage, drawn back past the lid and turned to the eye.
+      mag.position.y += t * height * CRYSTAL_LIFT;
+      mag.position.z += ramp(t, 0.3, 1) * CRYSTAL_BACK;
+      mag.rotateZ(t * CRYSTAL_TURN);
       break;
     case 'drum':
     case 'rifle':
@@ -187,7 +204,7 @@ export class ReloadAnimator {
     this.cross(p, c.magDrop, 'magDrop');
     this.cross(p, c.magIn, 'magIn');
     this.cross(p, c.magSeat, 'magSeat');
-    if (empty && c.charge >= 0) {
+    if ((empty || CHARGES_EVERY_RELOAD.has(c.style)) && c.charge >= 0) {
       this.cross(p, c.charge, 'chargeStart');
       this.cross(p, this.actionHomeAt(), 'chargeEnd');
     }
@@ -330,6 +347,13 @@ export class ReloadAnimator {
         mag.position.y += inv * height * 1.5;
         mag.rotateY(t * 0.6);
         break;
+      case 'crystal':
+        // Brought in from outboard above the cage, levelled and lowered into it.
+        mag.position.y += inv * height * CRYSTAL_LIFT;
+        mag.position.x -= inv * CRYSTAL_OUTBOARD;
+        mag.position.z += inv * CRYSTAL_BACK;
+        mag.rotateZ(inv * CRYSTAL_TURN);
+        break;
       case 'bolt': {
         // The fresh magazine is held up with its rounds to the eye, then
         // aligned under the well and pushed straight up into it.
@@ -347,7 +371,8 @@ export class ReloadAnimator {
     // or pressed down into the cell's cage.
     if (t > 0.85) {
       const overshoot = Math.sin(((t - 0.85) / 0.15) * Math.PI) * 0.006;
-      mag.position.y += this.config.style === 'cell' ? -overshoot * 0.5 : overshoot;
+      const pressedDown = this.config.style === 'cell' || this.config.style === 'crystal';
+      mag.position.y += pressedDown ? -overshoot * 0.5 : overshoot;
     }
   }
 
@@ -491,7 +516,7 @@ export class ReloadAnimator {
     this.bodyShift.z += rack * rackPose.shift[2] + slam * 0.016 - pull * 0.012;
 
     const spinUp = c.charge >= 0 ? pulse(p, c.charge, c.chargeEnd) : 0;
-    if (c.style === 'cell') this.chargeGlow = spinUp;
+    if (c.style === 'cell' || c.style === 'crystal') this.chargeGlow = spinUp;
     else if (c.style === 'canister') {
       // The plasma dims while the canister is off and surges once it is locked on.
       const off = ramp(p, c.magOut, c.magDrop) * (1 - ramp(p, c.magIn, c.magSeat));

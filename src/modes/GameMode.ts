@@ -48,6 +48,8 @@ export interface ModeContext {
   getEquippedWeaponId(): WeaponId;
   /** Read by networked modes to publish aim/reload state; do not mutate. */
   getEquippedWeapon(): Weapon;
+  /** World position of the equipped weapon's muzzle (where a flame stream leaves the nozzle). */
+  getMuzzleWorldPosition(out: THREE.Vector3): THREE.Vector3;
   canRefillWeaponAmmo(id: WeaponId): boolean;
   refillWeaponAmmo(id: WeaponId): boolean;
   canRefillEquippedWeaponAmmo(): boolean;

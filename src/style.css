@@ -347,6 +347,26 @@ body {
 
 /* ---------- Zombies mode ---------- */
 
+#hud-objective {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top, 0px));
+  left: max(18px, env(safe-area-inset-left, 0px));
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 10px 13px;
+  border-left: 3px solid #ff4935;
+  background: #101413e8;
+  color: #fff0db;
+  font: 600 12px/1.5 'Consolas', 'SF Mono', monospace;
+  white-space: pre-line;
+  pointer-events: none;
+}
+
+html.touch-controls-enabled #hud-objective {
+  max-width: min(300px, calc(100vw - 190px));
+  font-size: 10px;
+  padding: 7px 9px;
+}
+
 /* Charred field notes: same red rail, mono kicker and Impact figures as the main menu. */
 #hud-zombies {
   right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));

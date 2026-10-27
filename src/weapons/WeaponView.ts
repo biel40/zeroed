@@ -15,6 +15,7 @@ import { buildVector } from './VectorViewModel';
 import { buildPPSH41 } from './PPSH41ViewModel';
 import { buildM60 } from './M60ViewModel';
 import { buildRayGun } from './RayGunViewModel';
+import { buildFakel } from './FakelViewModel';
 import { InspectAnimator } from './InspectAnimator';
 import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
@@ -168,6 +169,19 @@ export interface BuiltProcedural {
   slide?: THREE.Object3D;
   /** Open-bolt action: home is cocked at the rear, empty rests forward. */
   openBolt?: THREE.Object3D;
+  /** Weapon-specific moving parts the builder animates itself from the weapon state. */
+  liveParts?: ViewModelLiveParts;
+}
+
+/**
+ * Moving parts only one view model has (the ФАКЕЛ-33 nozzle petals, core
+ * crystal and gauge), driven every frame from the weapon state. Purely
+ * visual: they never feed back into the weapon logic.
+ */
+export interface ViewModelLiveParts {
+  /** `reloadGlow` is the reload animator's 0..1 energy spin-up. */
+  update(dt: number, weapon: Weapon, reloadGlow: number): void;
+  reset(): void;
 }
 
 /**
@@ -1123,6 +1137,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'ppsh41') return buildPPSH41(view);
   if (view.frame === 'l96') return buildL96(view);
   if (view.frame === 'barrett') return buildBarrett(view);
+  if (view.frame === 'fakel') return buildFakel(view);
   return buildProcedural(view);
 }
 
@@ -1217,6 +1232,7 @@ export class WeaponView {
   private openBoltHomeZ = 0;
   private openBoltCycle = 0;
   private boltEjected = false;
+  private liveParts: ViewModelLiveParts | null = null;
   /** Wired by Game: bolt-action weapons eject their case mid-cycle, not on the shot. */
   onBoltEject: (() => void) | null = null;
 
@@ -1256,6 +1272,7 @@ export class WeaponView {
         this.openBolt = built.openBolt;
         this.openBoltHomeZ = built.openBolt.position.z;
       }
+      this.liveParts = built.liveParts ?? null;
       reloadParts = built.reloadParts ?? {};
     }
     this.root.add(this.muzzle, this.ejectionPort);
@@ -1488,6 +1505,7 @@ export class WeaponView {
     this.openBoltCycle = 0;
     this.energySurge = 0;
     this.boltEjected = false;
+    this.liveParts?.reset();
     if (this.slide) this.slide.position.z = this.slideHomeZ;
     if (this.openBolt) this.openBolt.position.z = this.openBoltHomeZ;
     this.root.position.copy(this.hipPosition);
@@ -1553,6 +1571,7 @@ export class WeaponView {
     this.root.rotation.z += this.inspector.bodyRoll;
     this.root.rotation.y += this.inspector.bodyYaw;
     this.animator?.update(weapon);
+    this.liveParts?.update(dt, weapon, this.animator?.chargeGlow ?? 0);
     this.hands.update(weapon);
     this.barrelGlow?.update(weapon.heat.intensity);
     if (weapon.state !== 'cycling') this.boltEjected = false;

@@ -25,7 +25,8 @@ import { buildServicePassages } from './station33/ServicePassageBuilder';
 import { Station33Atmosphere } from './station33/Station33Atmosphere';
 import type { Station33BuildContext } from './station33/Station33BuildContext';
 import { Station33Lighting } from './station33/Station33Lighting';
-import { station33PowerLeverLook, station33RingLockerLook } from './station33/Station33Machines';
+import { station33PowerLeverLook, station33RingLockerLook, station33WeaponStationLook } from './station33/Station33Machines';
+import { WeaponStation } from './shared/WeaponStation';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
 import { buildVestibule } from './station33/VestibuleBuilder';
@@ -45,6 +46,7 @@ import {
   STATION33_PLAYER_SPAWN,
   STATION33_POWER_SWITCH,
   STATION33_RING_LOCKERS,
+  STATION33_WEAPON_STATIONS,
   STATION33_SPAWNS,
   STATION33_START_ZONE,
   STATION33_WALL_BUYS,
@@ -112,6 +114,7 @@ export class Station33Arena implements ZombieArena {
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly ringMachines: ReadonlyArray<ArenaRingMachine>;
+  readonly weaponStations: ReadonlyArray<WeaponStation>;
   readonly powerSwitch: PowerLever;
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
@@ -165,6 +168,8 @@ export class Station33Arena implements ZombieArena {
     const ringLockerLook = station33RingLockerLook(context);
     this.ringLockers = STATION33_RING_LOCKERS.map((locker) => new RingLocker(context, locker, ringLockerLook, this.power));
     this.ringMachines = this.ringLockers;
+    const weaponStationLook = station33WeaponStationLook(context);
+    this.weaponStations = STATION33_WEAPON_STATIONS.map((station) => new WeaponStation(context, station, weaponStationLook, this.power));
     this.powerSwitch = new PowerLever(context, STATION33_POWER_SWITCH, station33PowerLeverLook(context), () => this.switchOnPower());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
@@ -211,6 +216,7 @@ export class Station33Arena implements ZombieArena {
     }
     for (const view of this.doorViews) view.update(dt);
     for (const locker of this.ringLockers) locker.update(dt);
+    for (const station of this.weaponStations) station.update(dt);
     this.powerSwitch.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
     this.lighting.update(dt, observerPosition);
@@ -225,6 +231,7 @@ export class Station33Arena implements ZombieArena {
     this.power.reset();
     this.powerSwitch.reset();
     for (const locker of this.ringLockers) locker.reset();
+    for (const station of this.weaponStations) station.reset();
     this.introTime = null;
     this.ambientEvents.reset();
     this.lighting.reset();

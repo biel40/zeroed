@@ -60,7 +60,7 @@ bloquean hasta enfriarse. Un `audio.sampleFile` sustituye el disparo procedural 
 un MP3 de `public/assets/audio/` (el Barrett espera `barrett_shot.mp3`); sin
 el archivo suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
 anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
-del jugador (el Barrett, unos 11 cm por disparo). `muzzleSmoke` suelta nubes
+del jugador (el Barrett, unos 12 cm por disparo). `muzzleSmoke` suelta nubes
 de humo a ambos lados de la boca (fuera de la linea de mira), mas duraderas,
 y agranda las volutas de recalentamiento; el Barrett lo usa y su bloqueo dura
 unos 4 s.
@@ -69,6 +69,32 @@ las dos camaras del freno de boca: nucleo brillante, lenguas naranjas que se
 expanden y apagan en 0.14 s y un golpe de luz mas intenso sobre el entorno.
 El Barrett expulsa una vaina .50 propia (`shellCasing`), de unos 10 cm,
 con cuello hueco; cae de lado y permanece visible 4 s en el pool de casquillos.
+Un arma de llama (`flame` en la definicion, la ФАКЕЛ-33) no pasa por la
+balistica: cada disparo es un tick del chorro que `ZombiesFlames` resuelve en
+el modo. Quema a los zombis vivos de la planta del jugador dentro de su cono y
+alcance (`FlameTargeting`), con linea de vision (paredes y puertas cerradas lo
+cortan), y los deja ardiendo unos segundos (`ZombieBurns`: mordiscos cada
+0,25 s, se refresca sin acumularse y nunca muerde un cadaver). Cada ignicion
+nueva paga un impacto; bajas y dano son los del arma. Muere con su propio
+estilo (`burn`): se arana la cara en llamas, cae de rodillas y se desploma
+de bruces encogido como un cadaver calcinado; el fuego lo envuelve, la piel
+se carboniza a trozos hasta quedar negra con grietas de brasas que respiran
+y quemaduras en carne viva (`ZombieCharShader`, encadenado al shader de
+disolucion, sin recompilar), suben chispas y ceniza (las particulas de la
+Ray Gun en naranja) y un charco de sangre se extiende bajo el cuerpo
+(`ZombieBloodPool`). Quemarse vivo ya oscurece la piel. El chorro es una malla en el mundo (`FlameJet`: nucleo azul
+palido, cuerpo naranja con ruido que fluye y unas bocanadas al final, tres
+draw calls, sin luces nuevas: la luz de boca del shell parpadea como fuego) y
+cada cuerpo ardiendo lleva unas lenguas de fuego sobre sus articulaciones
+(`ZombieFlames`, un draw call por cuerpo, que siguen en el cadaver mientras
+dura la quemadura). El rugido es un bucle (`FlameStreamLoop`) con
+encendido, crepitacion escasa, corte y siseo de la boquilla caliente, que
+el shell alimenta solo con un arma de llama y silencia al pausar. Un
+`heat.warning` avisa antes del bloqueo (silbido) y anuncia cuando vuelve a
+poder disparar (`cooledDown`: chasquido y piloto que se reenciende); las
+demas armas con bloqueo no lo usan. La recarga `crystal` abre la jaula
+(`cover`), saca el cristal gastado (cae al mundo apagado), mete uno nuevo,
+cierra y reenergiza el nucleo en cada recarga, tactica o vacia.
 `BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
@@ -226,8 +252,14 @@ guardandose automaticamente al ajustarlos.
   entradas mas (postigo del germozatvor, rejilla y puerta de la subestacion)
   y la M60 (2500 / 1250) en pared. La Fase 4 es la sala de maquinas, tras una
   puerta de pago (1500) en el muro norte de las cocheras: galeria de servicio,
-  motor-generadores, transformadores, dos entradas mas y el interruptor
-  general (`PowerLever`, un `ArenaPowerSwitch`). Un unico rectangulo de
+  motor-generadores, transformadores, dos entradas mas, el interruptor
+  general (`PowerLever`, un `ArenaPowerSwitch`) y el armario de
+  descontaminacion de la ФАКЕЛ-33 en el muro sur (`WeaponStation`, un
+  `ArenaWeaponStation`): exige electricidad y recuperar el cristal de un
+  portador de la horda para habilitar la compra a 3500; despues repone
+  sus cristales a 1750; sin ella el aviso dice que falta la electricidad.
+  Es exclusiva del mapa: `ZombieMapDefinition.exclusiveWeapons` la precarga
+  solo aqui, fuera de la Mystery Box y del cooperativo. Un unico rectangulo de
   `playerBounds` y de navegacion cubre todas las salas: muros, trenes y
   puertas cerradas son lo que impide el paso, y la arena para al jugador en
   cada entrada de tipo puerta para que ningun pasadizo de spawn sea
@@ -258,7 +290,9 @@ guardandose automaticamente al ajustarlos.
 - Un mapa puede declarar una intro (`ArenaIntro`: planos de camara,
   duracion y presentacion del HUD). `ZombiesMode` la reproduce una sola vez
   al empezar la partida (no al reanudar ni reiniciar) con `IntroCinematic`,
-  cuya camara renderiza el shell sin arma ni brazos; la ronda no avanza hasta
+  cuya camara renderiza el shell sin ningun personaje jugador, arma ni
+  brazos durante todo el recorrido. El arma y los brazos de primera persona
+  aparecen al terminar o saltar la intro. La ronda no avanza hasta
   que termina, y el ultimo plano aterriza en los ojos del jugador. Se salta
   con cualquier tecla (tras 0.6 s), con el boton tactil o al pausar.
   La de Station 33 (8 s) arranca a oscuras con solo la luz de emergencia, un
@@ -415,7 +449,8 @@ prompt, la muerte y el reinicio.
   arma a la taquilla. El anillo comprado sigue funcionando sin corriente.
 - Las piezas del mundo son comunes a todos los mapas (`src/zombies/maps/shared/`):
   la taquilla de anillo (`RingLocker`), el banco de taquillas que le deja hueco
-  (`LockerBank`), el interruptor (`PowerLever`), la electricidad (`MapPower`)
+  (`LockerBank`), el armario de arma especial (`WeaponStation`), el
+  interruptor (`PowerLever`), la electricidad (`MapPower`)
   y los solidos de atrezo (`addSolidProxy`), todos sobre un `MapBuildKit`. Un
   mapa nuevo solo da su colocacion y su look (medidas, materiales, carteles);
   Station 33 lo hace en `station33/Station33Machines.ts`.

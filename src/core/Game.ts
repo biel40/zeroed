@@ -35,6 +35,9 @@ const MAX_DELTA = 0.05;
 const FLASH_LIGHT_DECAY = 26;
 /** Fast decay (~1–2 frames at 60 fps) so energy muzzle PointLights never saturate mobile/web GPUs. */
 const ENERGY_FLASH_LIGHT_DECAY = 160;
+/** A flame stream relights the muzzle light every tick; a slow decay turns that into a firelight flicker. */
+const FLAME_LIGHT_DECAY = 9;
+const FLAME_LIGHT = { color: 0xff8a3a, intensity: 6 } as const;
 const MAX_SPREAD_PIXELS = 130;
 /** A driver that never reports its programs ready must not hold the loading screen. */
 const SHADER_WARMUP_TIMEOUT_MS = 10000;
@@ -68,6 +71,8 @@ export class Game {
   private readonly hitColliders: THREE.Object3D[] = [];
   private readonly flashLight = new THREE.PointLight(0xffc27a, 0, 12, 1.6);
   private flashLightDecay = FLASH_LIGHT_DECAY;
+  /** A flame weapon drove the stream's audio loop last frame (it gets one last call to fall silent). */
+  private flameStreamDriven = false;
   /** Scales the drawing buffer below the profile's pixel ratio while frames run slow. */
   private readonly dynamicResolution = new DynamicResolution();
 
@@ -231,6 +236,7 @@ export class Game {
       hasWeapon: (id) => this.inventory.has(id),
       getEquippedWeaponId: () => this.inventory.currentWeapon,
       getEquippedWeapon: () => this.currentWeapon,
+      getMuzzleWorldPosition: (out) => this.currentView.getMuzzleWorldPosition(out),
       canRefillWeaponAmmo: (id) => {
         const entry = this.arsenal.get(id);
         return this.inventory.has(id) && !!entry && !entry.weapon.isAmmoFull;
@@ -445,6 +451,8 @@ export class Game {
     if (this.paused) return;
     this.paused = true;
     this.mode.onLocalPauseChanged?.(true);
+    // The frozen frame stops driving the stream, so its roar must stop here.
+    if (this.flameStreamDriven) this.audio.setFlameStream(false, 0);
     this.audio.pauseMusic();
     if (this.mode.id === 'zombies') this.audio.music.startMenuLoop();
     this.hud.showPauseMenu();
@@ -627,6 +635,7 @@ export class Game {
     const weapon = this.currentWeapon;
     const view = this.currentView;
     const energy = weapon.definition.energy;
+    const flame = weapon.definition.flame;
     this.stats.registerShot();
 
     this.player.camera.getWorldPosition(this.tmpOrigin);
@@ -640,13 +649,21 @@ export class Game {
       this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile, weapon);
     }
 
-    this.audio.playShot(weapon.definition.audio);
+    // A flame stream roars on its own loop (setFlameStream) instead of a report per tick.
+    if (!flame) this.audio.playShot(weapon.definition.audio);
     const { cameraJolt, playerPush } = weapon.definition.recoil;
     if (cameraJolt) this.player.playShotImpulse(cameraJolt);
     if (playerPush) this.player.applyShotPush(playerPush);
     view.onShot();
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
+    if (flame) {
+      // The scene's single muzzle light becomes the stream's firelight; no shells, no powder smoke.
+      this.flashLight.color.setHex(FLAME_LIGHT.color);
+      this.flashLight.intensity = FLAME_LIGHT.intensity * (0.75 + Math.random() * 0.5);
+      this.flashLightDecay = FLAME_LIGHT_DECAY;
+      return;
+    }
     this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
     this.flashLight.intensity = energy ? 10 : (weapon.definition.muzzleFlash?.lightIntensity ?? 9);
     this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
@@ -680,6 +697,12 @@ export class Game {
           break;
         case 'overheated':
           this.audio.playBarrelOverheat();
+          break;
+        case 'heatWarning':
+          this.audio.playFlameHeatWarning();
+          break;
+        case 'cooledDown':
+          this.audio.playFlameReady();
           break;
         case 'reloadStart':
           this.audio.playReloadStart(
@@ -793,14 +816,18 @@ export class Game {
       this.processWeaponEvents();
       this.ballistics.update(dt);
     }
+    // Only a flame weapon drives the stream's roar; a switch away gets one last call to silence it.
+    const flameWeapon = weapon.definition.flame !== undefined;
+    if (flameWeapon || this.flameStreamDriven) {
+      this.audio.setFlameStream(flameWeapon && weapon.isFiring, flameWeapon ? weapon.heat.level : 0);
+    }
+    this.flameStreamDriven = flameWeapon;
 
     this.mode.update(dt);
     const fallbackName = this.mode.getFallbackWeaponName?.() ?? null;
     const melee = this.mode.getMeleeArm?.() ?? null;
     // A cinematic camera films the world, not the first-person weapon and arms.
     const cinematicCamera = this.mode.getCinematicCamera?.() ?? null;
-    // ...and a collapsing body has dropped its weapon.
-    this.currentView.root.visible = fallbackName === null && cinematicCamera === null && !this.player.isDying;
     this.currentView.update(
       dt,
       weapon,
@@ -809,7 +836,10 @@ export class Game {
       this.input.mouseDeltaY,
       melee?.firearmLowering ?? 0,
     );
+    // WeaponView sets scope visibility in update; apply shell gates afterwards.
+    this.currentView.root.visible &&= fallbackName === null && cinematicCamera === null && !this.player.isDying;
     this.viewArms.update(dt, this.currentView, melee);
+    this.viewArms.root.visible = cinematicCamera === null;
     if (this.currentView.root.visible) {
       this.currentView.getMuzzleWorldPosition(this.tmpMuzzle);
       this.barrelSmoke.update(dt, this.tmpMuzzle, weapon.heat.intensity, weapon.definition.muzzleSmoke?.scale);

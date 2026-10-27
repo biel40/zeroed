@@ -214,7 +214,8 @@ export class ZombieManager {
   readonly group = new THREE.Group();
 
   /** `source` is undefined for unattributed damage (tests, tools). */
-  onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined) => void) | null = null;
+  onZombieKilled: ((zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined,
+    dropPosition: Readonly<{ x: number; y: number; z: number }>) => void) | null = null;
   /** Actual health removed, including direct, melee, splash and chain hits. */
   public onZombieDamaged: ((damage: number) => void) | null = null;
   public onPlayerAttack: ((damage: number, targetId: ZombieTargetId, attacker: Zombie) => void) | null = null;
@@ -2283,10 +2284,15 @@ export class ZombieManager {
   }
 
   private kill(zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined): void {
+    // A body killed while entering drops quest items on the playable side of its barrier.
+    const route = this.entryRoutes.get(zombie);
+    const dropPosition = route
+      ? { x: route.breachX, y: this.floorBaseY(zombie.floor), z: route.breachZ }
+      : { x: zombie.position.x, y: this.floorBaseY(zombie.floor), z: zombie.position.z };
     // Immediately detach hitboxes and all A* navigation/queue state on death.
     this.removeColliders(zombie);
     this.clearNavigationState(zombie);
-    this.onZombieKilled?.(zombie, headshot, source);
+    this.onZombieKilled?.(zombie, headshot, source, dropPosition);
   }
 
   private clearNavigationState(zombie: Zombie): void {

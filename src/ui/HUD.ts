@@ -203,6 +203,13 @@ export class HUD {
     this.root.classList.toggle('hidden', !visible);
   }
 
+  /** Persistent current objective; kept separate from temporary round announcements and USE prompts. */
+  public setObjective(text: string | null): void {
+    const element = mustGet('hud-objective');
+    if (element.textContent !== (text ?? '')) element.textContent = text ?? '';
+    element.classList.toggle('hidden', text === null);
+  }
+
   public showStartScreen(paused: boolean): void {
     if (!this.ready) return;
     this.startHint.textContent = t(paused ? 'start.pausedClick' : 'start.clickToStart');
@@ -424,6 +431,7 @@ export class HUD {
 
   public setZombiesPanelVisible(visible: boolean): void {
     this.zombiesPanel.classList.toggle('hidden', !visible);
+    this.setObjective(null);
   }
 
   /** Zombies panel; the whole block only re-renders when something changed. */

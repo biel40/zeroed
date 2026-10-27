@@ -139,6 +139,21 @@ codigo: actualiza la guia.
   con las cuchillas colgando abiertas y cubierto de telaranas; una cruza los
   contactos y otras van de las cuchillas a la placa. Sin corriente, la sala
   solo tiene el rojo de su baliza a bateria y un fluorescente agonizante.
+- En el muro sur, al este de la galeria, el armario de descontaminacion
+  («ФАКЕЛ-33 / ДЕЗАКТИВАЦИЯ», placa ocre de peligro): un armario de acero
+  abierto con la ФАКЕЛ-33 colgada de dos ganchos y tres cristales de repuesto
+  en su bandeja, el equipo experimental que nadie llego a retirar. Sin
+  electricidad esta muerto; con ella los cristales y su piloto laten en el
+  rojo del nucleo (material emisivo, nunca una luz). Para habilitarlo, cada
+  partida exige recuperar el cristal de arranque: con la red encendida un
+  walker de la horda se convierte en portador, marcado por un cristal rojo
+  sobre la cabeza, nucleo en el pecho y anillos de energia. Al morir deja un
+  cristal persistente que se recoge y se instala gratis en el armario. El HUD
+  mantiene el paso actual con flecha y distancia; las bajas en las entradas
+  dejan el cristal al lado jugable de la barricada. Vende el arma (3500) y
+  despues sus cristales (1750). Es la unica fuente de fuego del mapa: el
+  pilar de "nada de fuego" se refiere al escenario, no al arsenal del
+  jugador.
 - Accionarlo es gratis y una sola vez por partida: la palanca chirria, las
   cuchillas suben rompiendo las telaranas y cierran con un chispazo. En ese
   instante la estacion entera recupera la red: las luces se apagan y vuelven

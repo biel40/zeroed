@@ -1,4 +1,4 @@
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -62,6 +62,12 @@ export interface BarrelHeatConfig {
   readonly coolDelay?: number;
   /** A fully hot barrel locks the trigger until it has cooled completely. */
   readonly lockout?: boolean;
+  /**
+   * Heat level (0..1) whose crossing warns that the lockout is near
+   * (`heatWarning` event); a weapon that sets it also announces the moment
+   * its locked barrel frees the trigger again (`cooledDown`).
+   */
+  readonly warning?: number;
   /** Extra dispersion (radians) at full overheat. */
   readonly maxSpreadBonus: number;
   /**
@@ -162,6 +168,24 @@ export interface EnergyWeaponConfig {
   readonly color: number;
 }
 
+/**
+ * Continuous flame stream (ФАКЕЛ-33), Zombies mode only: every shot is one
+ * tick of the stream, which scorches every zombie in its cone and sets it
+ * burning for a while after it leaves the fire.
+ */
+export interface FlameWeaponConfig {
+  /** Reach of the stream in metres; walls cut it short. */
+  readonly range: number;
+  /** Half angle of the scorching cone, radians. */
+  readonly coneHalfAngle: number;
+  /** Zombies one tick can scorch, nearest first. */
+  readonly maxTargets: number;
+  /** Seconds a zombie keeps burning once out of the stream. */
+  readonly burnSeconds: number;
+  /** Burn damage per second while it lasts. */
+  readonly burnDamagePerSecond: number;
+}
+
 export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal' | 'drum';
 /**
  * irons: classic post+notch. scope: telescopic sight (L96). reddot: a
@@ -179,8 +203,11 @@ export type OpticStyle = 'irons' | 'scope' | 'reddot';
  * A 'canister' is never dropped: the support hand unscrews it, carries it off
  * screen to refill it and screws it back on between magDrop and magIn.
  * 'drum' swaps the PPSh magazine and cocks its open bolt onto the rear sear.
+ * 'crystal' opens a cage (the cover part), lifts the spent core crystal out,
+ * seats a fresh one, locks the cage and re-energises the core on every
+ * reload, tactical or empty.
  */
-export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'canister' | 'pistol' | 'drum';
+export type ReloadStyle = 'rifle' | 'rock' | 'belt' | 'bolt' | 'cell' | 'canister' | 'pistol' | 'drum' | 'crystal';
 
 /**
  * Whole-weapon pose layered on the view model during a reload stage:
@@ -361,9 +388,10 @@ export interface ViewModelConfig {
    * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
    * ("Super V" lower, full rail, folding sights); 'ppsh41' uses the wooden
    * stock, perforated jacket and drum-fed PPSh-41; 'barrett' builds the heavy
-   * semiautomatic .50 rifle with a ventilated shroud and muzzle brake. Default: generic long gun.
+   * semiautomatic .50 rifle with a ventilated shroud and muzzle brake; 'fakel' builds the
+   * ФАКЕЛ-33 flamethrower (caged red core crystal, fuel tank, petal nozzle). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'barrett' | 'mp5' | 'vector' | 'ppsh41';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'barrett' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
@@ -395,6 +423,8 @@ export interface WeaponDefinition {
   readonly damage: number;
   /** Energy projectile behaviour; absence means classic ballistics. */
   readonly energy?: EnergyWeaponConfig;
+  /** Continuous flame stream the mode resolves itself, instead of ballistics. */
+  readonly flame?: FlameWeaponConfig;
   readonly recoil: RecoilConfig;
   readonly spread: SpreadConfig;
   /** Full-auto barrel overheating; absence means the barrel never heats. */
@@ -415,6 +445,8 @@ export type WeaponEventType =
   | 'shot'
   | 'dryFire'
   | 'overheated'
+  | 'heatWarning'
+  | 'cooledDown'
   | 'reloadStart'
   | 'reloadEnd'
   | 'boltStart'

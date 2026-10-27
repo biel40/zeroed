@@ -222,7 +222,7 @@ describe('Ray Gun Vaporization / Dissolution Death & Cleanup', () => {
     expect(zombie.deathKind).toBe('raygun');
     // Colliders removed on the exact kill frame
     expect(hitColliders.length).toBe(0);
-    expect(onKilled).toHaveBeenCalledWith(zombie, false, 'raygun');
+    expect(onKilled).toHaveBeenCalledWith(zombie, false, 'raygun', { x: 2, y: 0, z: -4 });
 
     manager.dispose();
   });

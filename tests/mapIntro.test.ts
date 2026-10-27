@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { easeIntroTime, IntroCinematic, sampleIntroPath } from '../src/rendering/IntroCinematic';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
@@ -145,7 +145,7 @@ describe('ZombiesMode map intro', () => {
     return { ...base, ctx: { ...base.ctx, audio } };
   }
 
-  function startStation(): { mode: ZombiesMode; hud: ReturnType<typeof makeContext>['hud'] } {
+  function startStation() {
     const { ctx, hud } = silentContext();
     const mode = new ZombiesMode('station-33');
     mode.init(ctx);
@@ -174,6 +174,25 @@ describe('ZombiesMode map intro', () => {
     expect(mode.getCinematicCamera()).toBeNull();
   });
 
+  it('never loads or adds a player body during the cinematic', () => {
+    const { ctx } = silentContext();
+    const load = vi.fn(async () => undefined);
+    ctx.assets.loadPlayerModel = load;
+    const model = vi.spyOn(ctx.assets, 'getPlayerModel');
+    const mode = new ZombiesMode('station-33');
+    mode.init(ctx);
+    const world = [...ctx.scene.children];
+    mode.onGameplayStarted();
+    expect(ctx.scene.children).toEqual(world);
+    for (let frame = 0; frame <= STATION33_INTRO.duration / DT; frame++) {
+      mode.update(DT);
+      expect(ctx.scene.children).toEqual(world);
+    }
+    expect(load).not.toHaveBeenCalled();
+    expect(model).not.toHaveBeenCalled();
+    expect(mode.getCinematicCamera()).toBeNull();
+  });
+
   it('skips on a key press after the start guard, or when the run pauses', () => {
     const keyed = startStation();
     keyed.mode.onKeyInput('w');
@@ -194,6 +213,14 @@ describe('ZombiesMode map intro', () => {
     const { mode, hud } = startStation();
     const onSkip = hud.showIntro.mock.calls[0][2] as () => void;
     onSkip();
+    expect(mode.getCinematicCamera()).toBeNull();
+  });
+
+  it('hands control to the player when restarting during the intro', () => {
+    const { mode } = startStation();
+    mode.onRestartRequested();
+    expect(mode.getCinematicCamera()).toBeNull();
+    mode.onGameplayStarted();
     expect(mode.getCinematicCamera()).toBeNull();
   });
 
