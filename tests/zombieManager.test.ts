@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { describe, expect, it, vi } from 'vitest';
 import { EYE_HEIGHT } from '../src/player/PlayerController';
 import {
@@ -750,6 +751,38 @@ describe('ZombieManager damage', () => {
 
     expect(impact.hp).toBe(ZOMBIE_BASE_HP - 60);
     expect(chained.hp).toBe(ZOMBIE_BASE_HP - 20);
+  });
+});
+
+describe('Special weapons against late-round hordes', () => {
+  it.each([[1, 1], [20, 2], [30, 3]])('at round %i needs %i ZEUS torso shots to kill six clustered walkers', (round, shots) => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0.99);
+    manager.registerColliders([]);
+    for (let i = 0; i < 8; i++) expect(manager.spawnZombie(roundConfig(round), 0, 4, round)).toBe(true);
+    const zombies = [...manager.actives];
+    zombies.forEach((zombie, index) => zombie.position.set(index * 0.5, 0, -20));
+    const hp = zombies[7].hp;
+    for (let shot = 1; shot <= shots; shot++) {
+      const chain = manager.applyChainLightning(zombies[0], WEAPON_DEFINITIONS.tesla.damage);
+      expect(chain).toHaveLength(6);
+      expect(zombies.slice(0, 6).every(zombie => zombie.isAlive)).toBe(shot < shots);
+    }
+    expect(zombies[6].hp).toBe(hp);
+    expect(zombies[7].hp).toBe(hp);
+    manager.dispose();
+  });
+
+  it('lets a round-30 walker survive a point-blank Ray Gun torso hit plus full splash', () => {
+    const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0.99);
+    manager.registerColliders([]);
+    manager.spawnZombie(roundConfig(30), 0, 4, 30);
+    const zombie = [...manager.actives][0];
+    const raygun = WEAPON_DEFINITIONS.raygun;
+    manager.damageZombie(zombie, 'torso', raygun.damage, 'raygun');
+    manager.applySplash(zombie.position, raygun.energy!.splashRadius, raygun.energy!.splashDamage);
+    expect(zombie.isAlive).toBe(true);
+    expect(zombie.hp).toBe(zombie.maxHp - 1000);
+    manager.dispose();
   });
 });
 

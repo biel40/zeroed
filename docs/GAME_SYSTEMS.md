@@ -133,6 +133,12 @@ guardandose automaticamente al ajustarlos.
 
 ## Zombies
 
+- La vida conserva la curva de las rondas 1–5 y suma 35 HP por ronda desde
+  la 6, sin techo fijo; los multiplicadores de tipo siguen aplicandose.
+  ZEUS-77 descarga 450 de dano sobre hasta seis objetivos, con saltos de 5 m;
+  solo la cabeza del impacto directo multiplica el dano. Ray Gun hace 400
+  de dano directo y hasta 600 de area en 2,5 m con caida lineal. Individual
+  y cooperativo usan el mismo balance.
 - Rondas con descanso de 6 s; limite global de 24 activos. `normal` y `shiny`
   usan walker; `brute` usa un modelo derivado del walker, reserva maxima 2,
   mas salud, menor velocidad y muerte con impacto confirmado. Shiny anade diez
@@ -271,7 +277,10 @@ guardandose automaticamente al ajustarlos.
   portador de la horda para habilitar la compra a 3500; despues repone
   sus cristales a 1750; sin ella el aviso dice que falta la electricidad.
   Es exclusiva del mapa: `ZombieMapDefinition.exclusiveWeapons` la precarga
-  solo aqui, fuera de la Mystery Box y del cooperativo. Un unico rectangulo de
+  solo aqui, fuera de la Mystery Box y del cooperativo. Una puerta de 2000 en
+  el muro norte de electricidad abre el taller de mantenimiento: sala amarilla
+  con banco de trabajo, taquillas, el anillo de Tiro doble y una entrada propia
+  que solo genera zombis al abrir la zona. Un unico rectangulo de
   `playerBounds` y de navegacion cubre todas las salas: muros, trenes y
   puertas cerradas son lo que impide el paso, y la arena para al jugador en
   cada entrada de tipo puerta para que ningun pasadizo de spawn sea
@@ -359,7 +368,7 @@ guardandose automaticamente al ajustarlos.
   cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),
   con dano completo a cada uno; una pared la detiene;
   reutiliza la recarga de fusil y no necesita accionar el cerrojo entre disparos.
-  En Burned Mansion se garantiza la Ray Gun a 115 bajas; ZEUS-77 es una tirada
+  La Ray Gun se obtiene exclusivamente en la caja; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
   ajustado al tamano y orientacion de la caja, tanto en individual como en
@@ -369,13 +378,13 @@ guardandose automaticamente al ajustarlos.
   las velas se apagan, el circulo estalla en rojo y una aparicion emerge y se
   lanza contra la camara local antes de desaparecer de golpe. El sonido sigue
   los mismos tiempos (`RITUAL_SCARE_TIMELINE`); en individual el impacto
-  sacude la camara. Las vitrinas del bunker exigen bajas personales:
-  Ray Gun, 200 bajas y 6000 Points; ZEUS-77, 300 bajas y 10000 Points.
+  sacude la camara. La unica vitrina del bunker ofrece ZEUS-77 y exige
+  300 bajas personales y 10000 Points.
   Cada vitrina se compra una sola vez por run. El cierre se retrae con un pulso
   de energia al alcanzar el requisito; comprar eleva el cristal y el arma.
   El cooperativo valida las bajas y cobra al comprador en el anfitrion;
   cada cliente muestra su propio progreso y ambos ven la apertura compartida.
-  Se conservan la Mystery Box y la recompensa Ray Gun de 115 bajas.
+  La Ray Gun no tiene recompensa por bajas ni vitrina en el bunker.
   Easter egg del bunker: la ultima mascara de gas de la pared norte
   (`ArenaGasMaskRack`) se pone y se vuelve a colgar con USE. Es cosmetica y
   solo individual (`ZombiesGasMask`): la mano derecha la lleva a la cara como
@@ -453,6 +462,13 @@ prompt, la muerte y el reinicio.
   `PlayerHealth.setMaxHpScale`; al subir suma la vida ganada al momento, al
   reiniciar vuelve a la base). Se vende en el puesto de milicia de Station 33
   y necesita electricidad.
+- Tiro doble (indice, pasivo, amarillo): una compra por run, 3000, en el
+  taller al norte de la sala de electricidad de Station 33; necesita corriente.
+  Duplica la cadencia de cualquier arma equipada, incluido su ciclo de cerrojo,
+  y aumenta un 20 % el dano de balas, cadenas Tesla, Ray Gun y llama/quemaduras.
+  Conserva consumo por disparo, recargas y cuchillo; cambiar o adquirir armas
+  mantiene el efecto y reiniciar lo elimina. Se combina multiplicando con
+  el ajuste de dano de la consola de desarrollo.
 - Una maquina puede esperar a la electricidad del mapa
   (`ArenaRingMachine.powered`): hasta entonces esta apagada, no suena y su
   prompt solo avisa de que hay que encender la electricidad, sin cobrar. En

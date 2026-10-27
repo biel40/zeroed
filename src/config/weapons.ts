@@ -1,3 +1,4 @@
+import { CHAIN_ZAP_DAMAGE } from '../zombies/ZombieConfig';
 import type { WeaponDefinition, WeaponId } from '../weapons/WeaponTypes';
 
 /**
@@ -884,8 +885,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
-    damage: 600,
-    energy: { projectileSpeed: 48, splashRadius: 3.5, splashDamage: 1200, color: 0x5cff3a },
+    damage: 400,
+    energy: { projectileSpeed: 48, splashRadius: 2.5, splashDamage: 600, color: 0x5cff3a },
     recoil: {
       verticalKick: 0.012,
       horizontalKick: 0.004,
@@ -977,9 +978,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltAction: false,
     boltCycleTime: 0,
     scoped: false,
-    // The direct hit and every chained zap deal CHAIN_ZAP_DAMAGE via the
-    // mode; this base damage is what a NON-chained zombie would take.
-    damage: 750,
+    // Keep the definition and the authoritative chain damage in sync.
+    damage: CHAIN_ZAP_DAMAGE,
     // A visible arc bolt, fast but readable; the chain runs off the impact.
     energy: { projectileSpeed: 90, splashRadius: 0, splashDamage: 0, color: 0x7fd4ff },
     recoil: {
@@ -1166,11 +1166,11 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
- * pistol plus the whole Mystery Box pool and the Ray Gun milestone — so
- * rolls and unlocks never touch the network. This is NOT the slot list:
+ * pistol plus the whole Mystery Box pool — so
+ * rolls never touch the network. This is NOT the slot list:
  * the zombies inventory starts with the M1911 alone (see
  * ZombiesMode.startingInventory); both Wonder Weapons can come from the
- * Mystery Box, while the Ray Gun is also guaranteed at 115 kills in Burned Mansion. Map
+ * Mystery Box; the Ray Gun is exclusive to it. Map
  * exclusives (the ФАКЕЛ-33) are not here: the map registry adds them to
  * the preload of their own map only (`ZombieMapDefinition.exclusiveWeapons`).
  */

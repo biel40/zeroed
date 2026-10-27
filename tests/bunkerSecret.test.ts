@@ -123,7 +123,7 @@ describe('Burned Mansion secret bunker interaction', () => {
     expect(unlocks).toBe(1);
   });
 
-  it.each(['raygun', 'tesla'] as const)('grants %s when the bunker pickup is used', (weaponId) => {
+  it.each(['tesla'] as const)('grants %s when the bunker pickup is used', (weaponId) => {
     const mode = new ZombiesMode('burned-mansion');
     let claimed = false;
     const pickup: ArenaWeaponPickup = {
@@ -155,9 +155,6 @@ describe('Burned Mansion secret bunker interaction', () => {
 
     expect(grants).toEqual([weaponId]);
     expect(claimed).toBe(true);
-    if (weaponId === 'raygun') {
-      expect((mode as unknown as { rayGunUnlocked: boolean }).rayGunUnlocked).toBe(true);
-    }
   });
 
   it('shows 30000 points and rejects the ending without charging', () => {

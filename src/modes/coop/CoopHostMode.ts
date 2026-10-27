@@ -35,7 +35,7 @@ import { EnergyProjectiles } from '../../zombies/EnergyProjectiles';
 import { ChainLightning } from '../../zombies/ChainLightning';
 import type { Zombie } from '../../zombies/Zombie';
 import type { ZombieKillSource } from '../../zombies/ZombieDeath';
-import { CHAIN_ZAP_DAMAGE, PLAYER_MAX_HP, RAYGUN_UNLOCK_KILLS, ZOMBIE_TYPE_CONFIGS } from '../../zombies/ZombieConfig';
+import { CHAIN_ZAP_DAMAGE, PLAYER_MAX_HP, ZOMBIE_TYPE_CONFIGS } from '../../zombies/ZombieConfig';
 import type { EnergyWeaponConfig } from '../../weapons/WeaponTypes';
 import { ZombieManager, type ZombiePlayerTarget } from '../../zombies/ZombieManager';
 import { RoundManager } from '../../zombies/RoundManager';
@@ -155,7 +155,6 @@ export class CoopHostMode implements GameMode {
   private gameOverShown = false;
   private readonly activeRepair: Record<CoopPlayerId, WindowBarrier | null> = { host: null, guest: null };
   private lastGuestStateAt = -Infinity;
-  private readonly rayGunUnlocked: Record<CoopPlayerId, boolean> = { host: false, guest: false };
 
   public constructor(private readonly connection: CoopConnection) {}
 
@@ -723,21 +722,6 @@ export class CoopHostMode implements GameMode {
       type: 'zombieDeath', zombieId: this.zombies.networkIdOf(zombie), killer: shooter,
       style: zombie.deathStyle, impactX: quantize(zombie.impact.x), impactZ: quantize(zombie.impact.y),
     });
-    if (!this.rayGunUnlocked[shooter] && killer.kills >= RAYGUN_UNLOCK_KILLS) {
-      this.rayGunUnlocked[shooter] = true;
-      if (shooter === 'host') {
-        this.ctx.grantWeapon('raygun');
-        this.ctx.hud.showRoundBanner(t('banner.raygunUnlocked'), t('banner.kills', { kills: RAYGUN_UNLOCK_KILLS }));
-        this.ctx.audio.playMysteryBoxReveal(true);
-      } else {
-        if (this.guestState) {
-          const index = this.guestInventory.weapons.indexOf(this.guestState.weapon);
-          if (index >= 0) this.guestInventory.switchTo(index);
-        }
-        this.guestInventory.grant('raygun');
-        this.send({ type: 'milestoneWeapon', weapon: 'raygun' });
-      }
-    }
     this.sendMatchState();
   }
 
@@ -895,7 +879,6 @@ export class CoopHostMode implements GameMode {
         return;
       }
       pickup.claim();
-      if (pickup.weaponId === 'raygun') this.rayGunUnlocked[buyer] = true;
       if (remote) {
         this.guestInventory.switchTo(this.guestInventory.weapons.indexOf(equippedWeapon));
         this.guestInventory.grant(pickup.weaponId);
@@ -1082,8 +1065,6 @@ export class CoopHostMode implements GameMode {
     this.ctx.resetArsenal();
     this.box.reset();
     this.boxOwner = null;
-    this.rayGunUnlocked.host = false;
-    this.rayGunUnlocked.guest = false;
     this.guestInventory.reset(COOP_STARTING_WEAPONS);
     for (const validator of this.shots.values()) validator.reset();
     this.phase = 'waiting';

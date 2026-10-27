@@ -6,8 +6,8 @@
  *  1. zombie COUNT grows exponentially — this is the main difficulty driver,
  *  2. spawn interval shrinks towards a floor,
  *  3. movement speed grows slightly, hard-capped,
- *  4. health follows a saturating curve (asymptote at ×4) so high rounds
- *     never become absurd bullet-sponge fests.
+ *  4. health keeps the early curve and adds linear growth from round 6,
+ *     so special weapons lose their one-shot advantage in high rounds.
  */
 
 import { HEADSHOT_DAMAGE_MULTIPLIER } from '../game/CombatConfig';
@@ -199,19 +199,8 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   raygun: 160,
 };
 
-/**
- * Kills that auto-unlock the Ray Gun. Element 115 is the sole weapon milestone;
- * ZEUS-77 is instead a legendary Mystery Box pull.
- */
-export const RAYGUN_UNLOCK_KILLS = 115;
-
-/**
- * Maximum zombies one Tesla shot can electrocute, impact included. 20 out of
- * MAX_ALIVE (24) means a bullseye on a packed horde deletes most of it: the
- * ZEUS-77 is the capstone Wonder Weapon and must feel clearly above the
- * Ray Gun. The visual arc pool in ChainLightning derives from this value.
- */
-export const CHAIN_MAX_TARGETS = 20;
+/** Maximum zombies one Tesla shot can electrocute, impact included. */
+export const CHAIN_MAX_TARGETS = 6;
 /**
  * Seconds residual ZEUS-77 arcs keep crawling over a zapped body. It outlives
  * the shock death's convulsion so corpses still crackle on the floor.
@@ -224,18 +213,15 @@ export const ZOMBIE_ELECTRIFIED_DURATION = 2.8;
 export const ZEUS_MACHINE_CHARGE_SECONDS = 60;
 /** Metres from a ring machine within which a ZEUS-77 bolt's impact charges it. */
 export const ZEUS_MACHINE_CHARGE_REACH = 1;
-/**
- * Maximum hop distance between two zombies in the same chain, meters. 9 m
- * lets the arc walk through a whole horde without cutting early, while the
- * per-hop radius still stops it from crossing the map to a far straggler.
- */
-export const CHAIN_RADIUS = 9;
-/**
- * Damage per electrocuted zombie. Far above a walker's saturated HP (~4x
- * base): the Tesla is a horde DELETE button with scarce ammunition, not a
- * DPS tool.
- */
-export const CHAIN_ZAP_DAMAGE = 750;
+/** Maximum hop distance between two zombies in the same chain, meters. */
+export const CHAIN_RADIUS = 5;
+/** Damage per electrocuted zombie; only a direct headshot multiplies it. */
+export const CHAIN_ZAP_DAMAGE = 450;
+
+/** First round that adds linear health growth on top of the early curve. */
+export const ZOMBIE_LATE_ROUND_START = 6;
+/** Extra health per round starting at ZOMBIE_LATE_ROUND_START. */
+export const ZOMBIE_LATE_ROUND_HP_STEP = 35;
 
 /** Minimal zombie snapshot the chain selection needs (keeps it Three-free). */
 export interface ChainCandidate {
@@ -324,8 +310,9 @@ export function roundConfig(round: number): RoundConfig {
     maxAlive: MAX_ALIVE,
     // 2.1 s at round 1, shrinking ~10 %/round, floored so late rounds stay fair.
     spawnInterval: Math.max(0.35, 2.1 * Math.pow(0.9, r - 1)),
-    // Saturating curve: 1 → ~1.85 (R5) → ~2.6 (R10) → ~3.4 (R20) → asymptote 4.
-    healthMultiplier: 1 + 3 * (1 - Math.exp(-(r - 1) / 12)),
+    // Preserve rounds 1–5; add 35 HP at R6, then another 35 each round.
+    healthMultiplier: 1 + 3 * (1 - Math.exp(-(r - 1) / 12))
+      + Math.max(0, r - ZOMBIE_LATE_ROUND_START + 1) * ZOMBIE_LATE_ROUND_HP_STEP / ZOMBIE_BASE_HP,
     speedMultiplier: Math.min(1.8, 1 + 0.05 * (r - 1)),
   };
 }

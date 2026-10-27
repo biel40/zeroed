@@ -560,7 +560,7 @@ describe('Burned Mansion topology', () => {
     expect(MANSION_DOOR_COSTS.nuclearBunker).toBe(9999);
   });
 
-  it('centralizes the bunker cost and exposes both secret Wonder Weapons', () => {
+  it('centralizes the bunker cost and exposes only the ZEUS-77 secret reward', () => {
     const arena = makeArena();
     const secret = MANSION_SECRET_AREAS[0];
     const door = arena.doors.find((candidate) => candidate.id === secret.doorId)!;
@@ -570,15 +570,14 @@ describe('Burned Mansion topology', () => {
     expect(door.cost).toBe(9999);
     expect(door.prompt).toBe('door.openBunker');
     expect(door.requiredMessage).toBe('door.bunkerRequired');
-    expect(secret.rewards.map((reward) => reward.weaponId)).toEqual(['raygun', 'tesla']);
-    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([6000, 10000]);
-    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.requiredKills)).toEqual([200, 300]);
+    expect(secret.rewards.map((reward) => reward.weaponId)).toEqual(['tesla']);
+    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.cost)).toEqual([10000]);
+    expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.requiredKills)).toEqual([300]);
     expect(MANSION_SPECIAL_WEAPON_CASES.map((weaponCase) => weaponCase.interactionLabel)).toEqual([
-      'RAY GUN — 6000',
       'ZEUS-77 — 10000',
     ]);
-    expect(pickups.map((pickup) => pickup.weaponId)).toEqual(['raygun', 'tesla']);
-    expect(pickups.map((pickup) => pickup.cost)).toEqual([6000, 10000]);
+    expect(pickups.map((pickup) => pickup.weaponId)).toEqual(['tesla']);
+    expect(pickups.map((pickup) => pickup.cost)).toEqual([10000]);
     expect(pickups.every((pickup) => pickup.requiredDoorId === secret.doorId)).toBe(true);
     for (const pickup of pickups) {
       expect(pickup.available).toBe(true);
@@ -590,14 +589,14 @@ describe('Burned Mansion topology', () => {
     expect(arena.group.getObjectByName('bunker-zeus')?.userData.weaponId).toBe('tesla');
   });
 
-  it('presents both Wonder Weapons in separate reinforced glass cases without blocking bunker routes', () => {
+  it('presents only ZEUS-77 in a reinforced glass case without blocking bunker routes', () => {
     const arena = makeArena();
     const cases = arena.group.children.filter((child) => child.userData.mapRole === 'special-weapon-case');
-    expect(cases).toHaveLength(2);
+    expect(cases).toHaveLength(1);
     expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-glass'))).toBe(true);
     expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-frame'))).toBe(true);
     expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-weapon-display'))).toBe(true);
-    expect(cases[0].position.distanceTo(cases[1].position)).toBeGreaterThan(2.5);
+    expect(arena.group.getObjectByName('bunker-raygun-case')).toBeUndefined();
 
     unlock(arena, 'nuclear-bunker');
     const bunkerObstacles = arena.wallColliders;
@@ -607,7 +606,7 @@ describe('Burned Mansion topology', () => {
     }
   });
 
-  it.each([0, 1])('animates case %i unlocking, opening and resetting without moving its collider', (index) => {
+  it.each([0])('animates case %i unlocking, opening and resetting without moving its collider', (index) => {
     const arena = makeArena();
     const pickup = arena.weaponPickups[index];
     const required = pickup.requiredKills!;
@@ -747,7 +746,7 @@ describe('Burned Mansion topology', () => {
       return child.userData.mapRole === 'wall-buy' && child.userData.weaponId === weaponId;
     })!);
     // Far from the stairwell on each floor, plus one stair-strip object per floor.
-    const bunkerVisual = firstVisualMesh(arena.group.getObjectByName('bunker-raygun-case')!);
+    const bunkerVisual = firstVisualMesh(arena.group.getObjectByName('bunker-zeus-case')!);
     const groundVisual = wallBuyMesh('m1911');
     const bunkerStairStrip = wallBuyMesh('m60');
     const groundStairStrip = firstVisualMesh(arena.group.getObjectByName('soul-lamp:upper-stairs')!);
@@ -1072,18 +1071,18 @@ describe('Burned Mansion topology', () => {
     expect(wall.position.y).toBeCloseTo(MANSION_BUNKER_Y + 1.6);
   });
 
-  it('keeps clear walking routes from the stair landing to both Wonder Weapon stations', () => {
+  it('keeps clear walking routes from the stair landing to the ZEUS-77 case and the former Ray Gun space', () => {
     const arena = makeArena();
     const landing = [MANSION_STAIR_CENTER_X, -7.2] as const;
-    const rayGunApproach = [-1.2, -3] as const;
+    const emptyCaseSpace = [-1.2, -3] as const;
     const zeusApproach = [-0.8, -6.1] as const;
 
-    expect(canWalk(landing, rayGunApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    expect(canWalk(landing, emptyCaseSpace, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
     expect(canWalk(landing, zeusApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
-    expect(canWalk(rayGunApproach, zeusApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    expect(canWalk(emptyCaseSpace, zeusApproach, arena.wallColliders, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
   });
 
-  it('exposes the real Ray Gun and ZEUS pickups only after the nuclear door opens', () => {
+  it('exposes only the ZEUS pickup after the nuclear door opens', () => {
     const arena = makeArena();
     const mode = new ZombiesMode('burned-mansion');
     const player = {
@@ -1102,7 +1101,7 @@ describe('Burned Mansion topology', () => {
     expect(findPickup()).toBeNull();
 
     unlock(arena, 'nuclear-bunker');
-    expect(findPickup()?.id).toBe('bunker-raygun');
+    expect(findPickup()).toBeNull();
     player.rig.position.set(-1.7, MANSION_BUNKER_Y + EYE_HEIGHT, -4.8);
     expect(findPickup()?.id).toBe('bunker-zeus');
   });

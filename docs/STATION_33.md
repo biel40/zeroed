@@ -173,6 +173,18 @@ codigo: actualiza la guia.
   `machineGlowBoost` como las taquillas, y escribirse en `shared/` para que
   otros mapas la reutilicen (Station 33 es el mapa base).
 
+## El taller de mantenimiento
+
+- Ampliacion sencilla al norte de electricidad, por una puerta de chapa
+  de 2000 Points a la izquierda de los cuadros. Queda fuera del eje de la
+  escalera y del pasadizo del tunel de cables. Yeso amarillo envejecido,
+  baldosa de servicio, techo bajo, banco de trabajo y taquillas bajo una
+  placa «МАСТЕРСКАЯ». Luz ambar de orientacion y luz de red al encenderla.
+- Entre las taquillas espera Tiro doble: anillo amarillo en el indice,
+  compra unica de 3000 con corriente. Duplica la cadencia y suma un 20 %
+  de dano con armas. Una entrada de mantenimiento propia despierta al
+  abrir la puerta; el pasillo central permite a la horda seguir al jugador.
+
 ## El puesto de milicia
 
 - La comisaria de la estacion («МИЛИЦИЯ»): el sitio donde tendria sentido

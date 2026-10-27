@@ -56,28 +56,57 @@ export const RING_JINGLE_TUNES = {
     decay: 0.18,
     sampleFile: 'ring_armor_jingle.mp3',
   },
+  /** Double Tap: paired staccato notes over a brisk workshop rhythm. */
+  doubleTime: {
+    beat: 1 / 8,
+    melody: [64, 64, 0, 67, 67, 0, 71, 71, 72, 72, 0, 71, 69, 69, 67, 0,
+      64, 64, 0, 67, 67, 0, 71, 71, 69, 69, 67, 66, 64, 64, 0, 0],
+    bass: [40, 47, 45, 40, 40, 47, 45, 40],
+    bassEvery: 4,
+    decay: 0.14,
+    sampleFile: 'ring_double_tap_jingle.mp3',
+  },
 } as const satisfies Record<string, RingJingleTune>;
 
 export type RingJingleId = keyof typeof RING_JINGLE_TUNES;
 
-/** Renders one seamless loop of `tune` into a mono buffer (notes past the end wrap to the start). */
+/**
+ * Renders one seamless loop of `tune` into a mono buffer (notes past the end
+ * wrap to the start). It runs on the main thread the first time a machine is
+ * heard, so each partial is a rotating phasor and the decay a running
+ * product: no `Math.sin`/`Math.exp` per sample.
+ */
 export function renderRingJingle(ctx: BaseAudioContext, tune: RingJingleTune): AudioBuffer {
   const { beat, melody, bass, bassEvery, decay } = tune;
   const rate = ctx.sampleRate;
   const length = Math.round(melody.length * beat * rate);
   const buffer = ctx.createBuffer(1, length, rate);
   const data = buffer.getChannelData(0);
+  const attackSamples = 0.004 * rate;
   const note = (midi: number, start: number, noteDecay: number, level: number, bell: boolean): void => {
-    const frequency = 440 * 2 ** ((midi - 69) / 12);
+    const step = (2 * Math.PI * 440 * 2 ** ((midi - 69) / 12)) / rate;
     const tail = Math.round(noteDecay * 4 * rate);
+    const fall = Math.exp(-1 / (noteDecay * rate));
+    // sin/cos of the fundamental and of the 4.2x partial; the octave is 2·sin·cos.
+    const stepCos = Math.cos(step);
+    const stepSin = Math.sin(step);
+    const highCos = Math.cos(step * 4.2);
+    const highSin = Math.sin(step * 4.2);
+    let sin = 0;
+    let cos = 1;
+    let highSinValue = 0;
+    let highCosValue = 1;
+    let decayLevel = level;
     for (let index = 0; index < tail; index++) {
-      const time = index / rate;
-      const envelope = Math.min(1, time / 0.004) * Math.exp(-time / noteDecay);
-      const phase = 2 * Math.PI * frequency * time;
-      const tone = bell
-        ? Math.sin(phase) + 0.3 * Math.sin(phase * 2) + 0.12 * Math.sin(phase * 4.2)
-        : Math.sin(phase);
-      data[(start + index) % length] += tone * envelope * level;
+      const tone = bell ? sin + 0.6 * sin * cos + 0.12 * highSinValue : sin;
+      data[(start + index) % length] += tone * decayLevel * Math.min(1, index / attackSamples);
+      const nextSin = sin * stepCos + cos * stepSin;
+      cos = cos * stepCos - sin * stepSin;
+      sin = nextSin;
+      const nextHighSin = highSinValue * highCos + highCosValue * highSin;
+      highCosValue = highCosValue * highCos - highSinValue * highSin;
+      highSinValue = nextHighSin;
+      decayLevel *= fall;
     }
   };
   melody.forEach((midi, index) => {

@@ -31,6 +31,7 @@ import { WeaponStation } from './shared/WeaponStation';
 import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
+import { buildTaller } from './station33/TallerBuilder';
 import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
@@ -103,7 +104,8 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * machine room behind the third door: two more entrances and the main
  * switch, which powers the station for the rest of the run. The militia
  * post, the vestibule's third way out behind its dearest door, sells the
- * AK-47 and, once the power is on, the Armour ring.
+ * AK-47 and, once the power is on, the Armour ring. The yellow maintenance
+ * workshop beyond the substation sells Double Tap and has its own entrance.
  */
 export class Station33Arena implements ZombieArena {
   readonly id = 'station-33';
@@ -173,6 +175,7 @@ export class Station33Arena implements ZombieArena {
     buildConsigna(context);
     buildCocheras(context, this.lighting);
     buildSubestacion(context, this.lighting);
+    buildTaller(context, this.lighting);
     buildMilicia(context, this.lighting);
     this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST)];
     buildDoorFrames(context);

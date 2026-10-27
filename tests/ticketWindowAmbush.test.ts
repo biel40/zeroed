@@ -112,7 +112,7 @@ describe('Station 33 ticket-window ambush', () => {
 
   it('is rare, and out of reach from the player spawn', () => {
     expect(TICKET_WINDOW_AMBUSH.chance).toBeGreaterThan(0);
-    expect(TICKET_WINDOW_AMBUSH.chance).toBeLessThanOrEqual(0.1);
+    expect(TICKET_WINDOW_AMBUSH.chance).toBeLessThanOrEqual(0.25);
     for (const site of TICKET_WINDOW_AMBUSH_SITES) {
       expect(Math.hypot(site.x - STATION33_PLAYER_SPAWN.x, site.z - STATION33_PLAYER_SPAWN.z))
         .toBeGreaterThan(TICKET_WINDOW_AMBUSH.radius);

@@ -404,11 +404,6 @@ export class CoopGuestMode implements GameMode {
         this.ctx.grantWeapon(message.weapon);
         this.ctx.audio.playMysteryBoxPickup();
         break;
-      case 'milestoneWeapon':
-        this.ctx.grantWeapon(message.weapon);
-        this.ctx.hud.showRoundBanner(t('banner.raygunUnlocked'));
-        this.ctx.audio.playMysteryBoxReveal(true);
-        break;
       case 'boxFailed':
         this.boxPending = false;
         if (message.reason === 'insufficientPoints') {

@@ -53,17 +53,18 @@ describe('roundConfig', () => {
     expect(roundConfig(100).spawnInterval).toBe(0.35);
   });
 
-  it('scales health on a saturating curve with a hard asymptote', () => {
-    const r10 = roundConfig(10).healthMultiplier;
-    const r30 = roundConfig(30).healthMultiplier;
-    const r500 = roundConfig(500).healthMultiplier;
-    expect(r10).toBeGreaterThan(1.5);
-    expect(r10).toBeLessThan(3);
-    // Late rounds: still below 4x — no absurd bullet sponges.
-    expect(r30).toBeLessThan(4);
-    expect(r500).toBeLessThanOrEqual(4);
-    // A round-30 zombie is far from invincible.
-    expect(roundConfig(30).healthMultiplier * ZOMBIE_BASE_HP).toBeLessThan(400);
+  it('preserves rounds 1–5 and starts extra health at round 6', () => {
+    for (let round = 1; round <= 5; round++) {
+      expect(roundConfig(round).healthMultiplier).toBeCloseTo(1 + 3 * (1 - Math.exp(-(round - 1) / 12)));
+    }
+    const hp = (round: number) => roundConfig(round).healthMultiplier * ZOMBIE_BASE_HP;
+    const earlyHp = (round: number) => 100 * (1 + 3 * (1 - Math.exp(-(round - 1) / 12)));
+    expect(hp(6) - earlyHp(6)).toBeCloseTo(35);
+    expect(hp(7) - earlyHp(7)).toBeCloseTo(70);
+    expect(hp(20)).toBeCloseTo(863.41, 1);
+    expect(hp(30)).toBeCloseTo(1248.23, 1);
+    expect(hp(50)).toBeGreaterThan(hp(30));
+    expect(hp(100)).toBeGreaterThan(hp(50));
   });
 
   it('increases speed progressively and caps it at a fair late-round limit', () => {

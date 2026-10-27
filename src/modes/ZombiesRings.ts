@@ -42,13 +42,15 @@ export function protectionVignette(elapsed: number, remaining: number): number {
  * map's powered ring machines through the shared wallet, fires their
  * effects (a charged Resurrection ring takes the place of a death, a
  * Sleight of Hand ring speeds every reload, an Armour ring doubles the
- * max health), plays the hands putting a new ring on and keeps the
+ * max health, Double Tap speeds up fire and boosts weapon damage), plays
+ * the hands putting a new ring on and keeps the
  * first-person hand, the machines, the weapons, the health and the HUD in
  * step with the run's `PlayerRings`. `ZombiesMode` delegates every ring
  * concern here.
  */
 export class ZombiesRings {
   private readonly rings = new PlayerRings();
+  private damageMultiplier = 1;
   private readonly donning: RingDonning;
   private readonly forward = new THREE.Vector3();
   private readonly listener = new THREE.Vector3();
@@ -315,11 +317,25 @@ export class ZombiesRings {
     return scale;
   }
 
-  /** Hand, machines, HUD, max health and the weapons' reload speed read the current rings. */
+  /** Weapon damage multiplier; melee keeps its own balance. */
+  get damageScale(): number {
+    return this.damageMultiplier;
+  }
+
+  /** Hand, machines, HUD, health and weapon modifiers read the current rings. */
   private present(): void {
     this.ctx.setReloadTimeScale(this.reloadTimeScale());
     this.health.setMaxHpScale(this.maxHpScale());
     const worn = this.rings.worn;
+    let fireRateScale = 1;
+    this.damageMultiplier = 1;
+    for (const { ringId, charges } of worn) {
+      const { effect } = RING_DEFINITIONS[ringId];
+      if (effect.kind !== 'firePower' || charges <= 0) continue;
+      fireRateScale = Math.max(fireRateScale, effect.fireRateScale);
+      this.damageMultiplier = Math.max(this.damageMultiplier, effect.damageScale);
+    }
+    this.ctx.setFireRateScale(fireRateScale);
     for (const { ringId, finger, charges } of worn) {
       this.ctx.handRings.show(finger, charges > 0 ? 'charged' : 'spent', RING_DEFINITIONS[ringId].glowColor);
     }

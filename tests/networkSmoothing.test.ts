@@ -5,6 +5,7 @@ import { ShotValidator } from '../src/network/ShotValidator';
 import { RemotePlayer } from '../src/rendering/RemotePlayer';
 import type { RemoteAvatar, RemoteAvatarMotion } from '../src/rendering/RemotePlayerAvatar';
 import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
+import { CHAIN_MAX_TARGETS } from '../src/zombies/ZombieConfig';
 import * as THREE from 'three';
 
 interface Sample { readonly t: number; readonly x: number }
@@ -146,7 +147,7 @@ describe('protocol boundary', () => {
   });
 
   it('carries a full ZEUS-77 chain and its electrified zombies', () => {
-    const points = Array.from({ length: 21 }, (_, i) => ({ x: i, y: 1, z: 0 }));
+    const points = Array.from({ length: CHAIN_MAX_TARGETS + 1 }, (_, i) => ({ x: i, y: 1, z: 0 }));
     expect(parseHostMessage({ type: 'teslaChain', points, zombieIds: [3, 4] }))
       .toEqual({ type: 'teslaChain', points, zombieIds: [3, 4] });
     expect(parseHostMessage({ type: 'teslaChain', points: points.slice(0, 2) }))

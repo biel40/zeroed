@@ -28,7 +28,6 @@ import {
   PLAYER_MAX_HP,
   PLAYER_REGEN_DELAY,
   PLAYER_REGEN_RATE,
-  RAYGUN_UNLOCK_KILLS,
   ZOMBIE_ATTACK_DAMAGE,
   ZEUS_MACHINE_CHARGE_REACH,
   ZEUS_MACHINE_CHARGE_SECONDS,
@@ -129,7 +128,6 @@ export class ZombiesMode implements GameMode {
   private totalDamage = 0;
   private kills = 0;
   private headshots = 0;
-  private rayGunUnlocked = false;
   private godModeEnabled = false;
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private readonly developerCommands = new DeveloperConsoleCommands();
@@ -228,7 +226,7 @@ export class ZombiesMode implements GameMode {
       this.onEnergyImpact(point, config, object, distance);
     this.chain = new ChainLightning(ctx.scene);
     this.flames = new ZombiesFlames(ctx, this.zombies, this.economy, () => this.arena.colliders,
-      (id) => this.developerCommands.damageScale(id));
+      (id) => this.weaponDamageScale(id));
     this.footsteps = new ZombieFootsteps(ctx.scene, ctx.player.camera);
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyKnifeImpact();
@@ -353,7 +351,7 @@ export class ZombiesMode implements GameMode {
     const lethal = this.zombies.damageZombie(
       zombie,
       part,
-      weapon.definition.damage * this.developerCommands.damageScale(weapon.definition.id),
+      weapon.definition.damage * this.weaponDamageScale(weapon.definition.id),
       weapon.definition.id,
     );
     // A surviving headshot pays 150 here; lethal hits pay through the kill
@@ -559,7 +557,6 @@ export class ZombiesMode implements GameMode {
       }
       if (this.ctx.grantWeapon(pickup.weaponId)) {
         pickup.claim();
-        if (pickup.weaponId === 'raygun') this.rayGunUnlocked = true;
         this.ctx.audio.playMysteryBoxPickup();
         this.pushHudState();
       } else {
@@ -1097,26 +1094,10 @@ export class ZombiesMode implements GameMode {
     if (deathPosition && floor !== undefined && hasSoulRitual(this.arena)) {
       this.arena.captureSoul(deathPosition, floor);
     }
-    if (ZOMBIE_MAPS[this.mapId].rayGunKillMilestone && !this.rayGunUnlocked && this.kills >= RAYGUN_UNLOCK_KILLS) {
-      this.unlockRayGun();
-    }
   }
 
   private spatialCueFor(position: { readonly x: number; readonly y: number; readonly z: number }): SpatialCue {
     return cameraSpatialCue(this.ctx.player.camera, position);
-  }
-
-  /**
-   * 115-kill milestone: the Ray Gun is granted outright (the inventory's
-   * slot-cap rules apply), announced with the round banner and the box's
-   * Ray Gun reveal sting. The flag makes the handout fire exactly once per
-   * run; restart() re-arms it.
-   */
-  private unlockRayGun(): void {
-    this.rayGunUnlocked = true;
-    this.ctx.grantWeapon('raygun');
-    this.ctx.hud.showRoundBanner(t('banner.raygunUnlocked'), t('banner.kills', { kills: RAYGUN_UNLOCK_KILLS }));
-    this.ctx.audio.playMysteryBoxReveal(true);
   }
 
   public onKeyInput(key: string): void {
@@ -1129,7 +1110,6 @@ export class ZombiesMode implements GameMode {
 
   private activateGodMode(): void {
     this.godModeEnabled = true;
-    this.rayGunUnlocked = true;
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
     if (hasSoulRitual(this.arena)) this.arena.unlockSecretRoom();
@@ -1229,6 +1209,11 @@ export class ZombiesMode implements GameMode {
     return living.length > 0 ? living[Math.floor(Math.random() * living.length)] : null;
   }
 
+  /** All weapon damage paths share perks and developer tuning. */
+  private weaponDamageScale(id: WeaponId): number {
+    return this.developerCommands.damageScale(id) * (this.rings?.damageScale ?? 1);
+  }
+
   private onEnergyImpact(
     point: THREE.Vector3,
     config: EnergyWeaponConfig,
@@ -1249,7 +1234,7 @@ export class ZombiesMode implements GameMode {
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
       const chain = this.zombies.applyChainLightning(zombie,
-        CHAIN_ZAP_DAMAGE * this.developerCommands.damageScale('tesla'), part);
+        CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla'), part);
       if (headshot && zombie.isAlive) this.economy.awardHit(true);
       this.ctx.audio.playTeslaChain(chain.length);
       // Arc from the muzzle through each electrocuted zombie in order.
@@ -1287,13 +1272,13 @@ export class ZombiesMode implements GameMode {
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
       const lethal = this.zombies.damageZombie(zombie, part,
-        raygun.damage * this.developerCommands.damageScale('raygun'), 'raygun');
+        raygun.damage * this.weaponDamageScale('raygun'), 'raygun');
       if (!lethal) this.economy.awardHit(headshot);
     }
     // Splash includes the directly-hit zombie: the Ray Gun fantasy is that
     // a bullseye on a packed horde is devastating.
     this.zombies.applySplash(point, config.splashRadius,
-      config.splashDamage * this.developerCommands.damageScale('raygun'));
+      config.splashDamage * this.weaponDamageScale('raygun'));
   }
 
   /** Death: the body collapses in first person; the verdict waits for the fall to land. */
@@ -1332,7 +1317,6 @@ export class ZombiesMode implements GameMode {
     this.totalDamage = 0;
     this.kills = 0;
     this.headshots = 0;
-    this.rayGunUnlocked = false;
     this.godModeEnabled = false;
     this.developerCommands.reset();
     this.godModeCommand.reset();

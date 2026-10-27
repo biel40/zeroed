@@ -57,6 +57,8 @@ export interface ModeContext {
   setWeaponInfiniteReserve(id: WeaponId): boolean;
   /** Reload-duration multiplier for every weapon of the arsenal (1 = normal). */
   setReloadTimeScale(scale: number): void;
+  /** Fire-rate multiplier for every weapon of the arsenal (1 = normal). */
+  setFireRateScale(scale: number): void;
   /** Restores the starting inventory with fresh ammo (zombies restart). */
   resetArsenal(): void;
   /** Leaves the current run through the shell's established main-menu route. */

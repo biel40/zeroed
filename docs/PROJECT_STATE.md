@@ -52,9 +52,13 @@
   tambien exige electricidad y esta en el puesto de milicia, tercera salida
   del vestibulo (puerta de 3000), junto a la AK-47 en pared. Al comprar un
   anillo, las manos se lo ponen con una animacion.
+  El de Tiro doble (indice, amarillo, 3000) duplica la cadencia y aumenta
+  un 20 % el dano con cualquier arma; exige corriente y se vende en el nuevo
+  taller amarillo, tras una puerta de 2000 desde la sala de electricidad.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
-  melee validado, pasos 3D y ZEUS-77 legendaria. La Ray Gun se entrega a
-  115 bajas solo en Burned Mansion. En
+  melee validado, pasos 3D y ZEUS-77 legendaria. La vida tiene crecimiento
+  adicional desde la ronda 6 y las armas de energia tienen dano y area limitados.
+  La Ray Gun es exclusiva de la Mystery Box, sin recompensa por bajas ni vitrina. En
   Station 33 los walkers visten uniformes sovieticos (guerra y guerra fria) o
   ropa de evacuado mediante skins por mapa.
 - Burned Mansion con dos plantas, bunker, escalera continua, progresion pagada,

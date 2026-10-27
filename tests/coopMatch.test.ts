@@ -391,17 +391,18 @@ describe('co-op special weapons', () => {
     expect(guest(match).match?.stats.host.totalDamage).toBe(0);
   });
 
-  it('grants the 115-kill Ray Gun milestone only to the player who reached it', () => {
+  it.each(['host', 'guest'] as const)('never grants a Ray Gun at 115 kills to %s', (shooter) => {
     const match = startedMatch();
-    host(match).players.guest.kills = 114;
+    host(match).players[shooter].kills = 114;
     const zombie = spawnOne(match);
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     host(match).onEnergyImpact(zombie.position.clone().add(new THREE.Vector3(0, 1, 0)),
-      WEAPON_DEFINITIONS.raygun.energy!, object, 3, 'guest');
+      WEAPON_DEFINITIONS.raygun.energy!, object, 3, shooter);
     match.relay.flush();
-    expect(host(match).guestInventory.has('raygun')).toBe(true);
-    expect(match.guestSide.ctx.grantWeapon).toHaveBeenCalledWith('raygun');
+    expect(host(match).players[shooter].kills).toBe(115);
+    expect(host(match).guestInventory.has('raygun')).toBe(false);
+    expect(match.guestSide.ctx.grantWeapon).not.toHaveBeenCalledWith('raygun');
     expect(match.hostSide.ctx.grantWeapon).not.toHaveBeenCalledWith('raygun');
   });
 });
@@ -463,7 +464,7 @@ describe('co-op Burned Mansion interactions', () => {
     expect(host(match).players.host.economy.points).toBe(0);
   });
 
-  it.each([0, 1])('validates the guest own kills and wallet for special case %i', (index) => {
+  it.each([0])('validates the guest own kills and wallet for special case %i', (index) => {
     const match = startedMatch();
     const authority = host(match);
     const pickup = authority.world.arena.weaponPickups[index];

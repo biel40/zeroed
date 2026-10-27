@@ -44,6 +44,8 @@ import type {
  * - The militia post (`milicia`, built) is a side room behind the dearest
  *   paid door, in the vestibule's west wall: x < -7.3 and z >= 5.8, north
  *   of nothing but the vestibule service door's passage.
+ * - The maintenance workshop (`taller`) continues north of the substation,
+ *   west of the cable-tunnel spawn passage and clear of the escalator axis.
  * - Phase 5 opens the escalator: an incline from z = 0 down to the mezzanine
  *   (floor -1), joined with `floorTransitions` like the mansion stairs.
  * - Phase 6 is the central platform (floor -2) with tracks along Z further
@@ -123,7 +125,7 @@ export const TICKET_WINDOW_GLASS = { centerY: 1.53, height: 0.94 } as const;
  * once per approach, at most once per run.
  */
 export const TICKET_WINDOW_AMBUSH = {
-  chance: 0.05,
+  chance: 0.15,
   /** Approach distance from the facade in front of each window. */
   radius: 2.2,
   /** Where the zombie stands, out from the facade: clear of its collider by a body radius. */
@@ -169,7 +171,7 @@ export interface Station33Barrier {
   readonly zone: Station33ZoneId;
 }
 
-export type Station33ZoneId = 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia';
+export type Station33ZoneId = 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia' | 'taller';
 
 export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
 
@@ -245,6 +247,17 @@ export const SUBESTACION = {
 const SUBESTACION_NORTH_WALL_Z = SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS / 2;
 const SUBESTACION_EAST_WALL_X = SUBESTACION.hall.maxX + STATION33_WALL_THICKNESS / 2;
 
+/** Simple maintenance room beyond the substation's north-west door. */
+export const TALLER = {
+  hall: {
+    minX: SUBESTACION.hall.minX, maxX: 14.8,
+    minZ: -55.0, maxZ: SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS,
+  },
+  ceilingHeight: 3.4,
+  color: 0xd7b842,
+  lightColor: 0xffdf76,
+} as const;
+
 /**
  * Two tracks along Z. The west one hugs the wall and runs on into a
  * buried tunnel through `portal`; the east one ends at the blast gate.
@@ -319,6 +332,7 @@ export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   { id: 'subestacion-cable-tunnel', x: 18.4, z: SUBESTACION_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'subestacion' },
   // The post's own way up to the street, east of its holding cell.
   { id: 'milicia-back-door', x: -10.2, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'milicia' },
+  { id: 'taller-service-door', x: 11.8, z: TALLER.hall.minZ - STATION33_WALL_THICKNESS / 2, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'taller' },
 ];
 
 export interface Station33Door {
@@ -351,6 +365,7 @@ export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
     outwardX: 0, outwardZ: -1, cost: 1500, zone: 'subestacion', plate: 'substation',
   },
   { id: 'to-milicia', x: WEST_WALL_X, z: 9.45, outwardX: -1, outwardZ: 0, cost: 3000, zone: 'milicia', plate: 'militia' },
+  { id: 'to-taller', x: 5.8, z: SUBESTACION_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, cost: 2000, zone: 'taller', plate: 'maintenance' },
 ];
 
 /** Dead-end service passage behind every entrance, where its zombies appear. */
@@ -393,6 +408,7 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
   cocheras: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'cocheras').map(spawnBehind),
   subestacion: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'subestacion').map(spawnBehind),
   milicia: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'milicia').map(spawnBehind),
+  taller: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'taller').map(spawnBehind),
 };
 
 /** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
@@ -497,6 +513,10 @@ export const STATION33_RING_LOCKERS: ReadonlyArray<Station33RingLocker> = [
     id: 'milicia-armor', ringId: 'armor', zone: 'milicia',
     x: MILICIA.hall.minX + CONSIGNA_LOCKER.depth, z: 9.45, facingX: 1, facingZ: 0, requiresPower: true,
   },
+  {
+    id: 'taller-double-tap', ringId: 'doubleTap', zone: 'taller',
+    x: TALLER.hall.maxX - CONSIGNA_LOCKER.depth, z: -50.8, facingX: -1, facingZ: 0, requiresPower: true,
+  },
 ];
 
 /** The ring lockers of one room. */
@@ -530,7 +550,7 @@ export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as co
 export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
   minX: MILICIA.hall.minX + 0.4,
   maxX: CONSIGNA.hall.maxX - 0.4,
-  minZ: SUBESTACION.hall.minZ + 0.4,
+  minZ: TALLER.hall.minZ + 0.4,
   maxZ: VESTIBULE.maxZ - 0.4,
 };
 
@@ -540,7 +560,7 @@ export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
  * empty ground west of the train sheds stays walled off.
  */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -19.1, maxX: 27.8, minZ: -53.5, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: -19.1, maxX: 27.8, minZ: -62, maxZ: 24.7, baseY: 0 },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -628,6 +648,7 @@ export const STATION33_MAINS = {
  * luggage office and its west wall the militia post.
  */
 export function station33ZoneAt(x: number, z: number): Station33ZoneId {
+  if (z < SUBESTACION_NORTH_WALL_Z && x < TALLER.hall.maxX + STATION33_WALL_THICKNESS / 2) return 'taller';
   if (z < COCHERAS_NORTH_WALL_Z) return 'subestacion';
   if (z < NORTH_WALL_Z) return 'cocheras';
   if (x > EAST_WALL_X) return 'consigna';
@@ -673,6 +694,8 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: -16.4, y: 2.6, z: 16.4, color: EMERGENCY_COLOR, intensity: 2.6, distance: 4, circuit: 'emergency', zone: 'milicia' },
   // The ruby star over the Armour locker, fed by the substation like the locker itself.
   { x: MILICIA.hall.minX + 1.0, y: 2.9, z: 9.45, color: MILICIA_STAR_COLOR, intensity: 3, distance: 4.5, circuit: 'mains', zone: 'milicia' },
+  { x: 9.4, y: 3.0, z: -50.6, color: TALLER.lightColor, intensity: 7, distance: 10, circuit: 'mains', zone: 'taller' },
+  { x: 5.6, y: 2.5, z: -48.4, color: TALLER.lightColor, intensity: 2.5, distance: 5, circuit: 'amber', zone: 'taller' },
 ];
 
 /**
@@ -713,6 +736,7 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: -11.2, z: 14.4, circuit: 'mains' },
   { x: -14.4, z: 9.6, circuit: 'mains' },
   { x: -16.4, z: 16.2, circuit: 'dead' },
+  { x: 9.4, z: -50.6, circuit: 'mains' },
 ];
 
 /** A fitting mounted on a wall face at (x, z), `facing` into its room. */

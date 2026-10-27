@@ -33,6 +33,8 @@ export class Weapon {
    * it). Applies from the next reload; animation and sounds follow progress.
    */
   reloadTimeScale = 1;
+  /** Mode-provided fire-rate multiplier, independent of reload speed. */
+  fireRateScale = 1;
   /** Events produced during the last update; drain with clearEvents(). */
   readonly pendingEvents: WeaponEvent[] = [];
 
@@ -111,7 +113,16 @@ export class Weapon {
    * stream) reads it as "the stream is on".
    */
   get isFiring(): boolean {
-    return this.secondsSinceShot <= (60 / this.definition.rpm) * 1.5;
+    return this.secondsSinceShot <= this.shotInterval * 1.5;
+  }
+
+  get shotInterval(): number {
+    return 60 / (this.definition.rpm * this.fireRateScale);
+  }
+
+  /** Bolt animation and audio follow the same speed as the firing cycle. */
+  get boltCycleDuration(): number {
+    return this.definition.boltCycleTime / this.fireRateScale;
   }
 
   get currentBloom(): number {
@@ -124,7 +135,8 @@ export class Weapon {
   }
 
   update(dt: number, input: WeaponFrameInput): void {
-    this.cooldown = Math.max(0, this.cooldown - dt);
+    const continuingFire = this.weaponState === 'ready' && this.prevTrigger && !this.heat.overheated;
+    this.cooldown = continuingFire ? this.cooldown - dt : Math.max(0, this.cooldown - dt);
     this.secondsSinceShot += dt;
     this.recoil.update(dt);
     const wasLocked = this.heat.overheated;
@@ -144,12 +156,22 @@ export class Weapon {
       if (this.stateTimer <= 0) this.completeState();
     }
 
-    const triggerEdge = input.trigger && !this.prevTrigger;
+    let triggerEdge = input.trigger && !this.prevTrigger;
     this.prevTrigger = input.trigger;
 
     const repeatsWhileHeld = this.fireMode === 'auto' || input.repeatSemiAuto === true;
     const wantsFire = repeatsWhileHeld ? input.trigger : triggerEdge;
-    if (wantsFire) this.tryFire(triggerEdge);
+    if (!wantsFire) {
+      this.cooldown = Math.max(0, this.cooldown);
+      return;
+    }
+    if (!repeatsWhileHeld || !continuingFire) this.cooldown = Math.max(0, this.cooldown);
+    // Keep fractional frame time at high RPM; several rounds can fall in a
+    // mobile frame. Idle, reloads and blocked triggers never bank extra shots.
+    while (this.tryFire(triggerEdge)) {
+      if (!repeatsWhileHeld) break;
+      triggerEdge = false;
+    }
   }
 
   reload(): boolean {
@@ -232,22 +254,22 @@ export class Weapon {
     this.pendingEvents.length = 0;
   }
 
-  private tryFire(triggerEdge: boolean): void {
-    if (this.weaponState !== 'ready' || this.cooldown > 0) return;
+  private tryFire(triggerEdge: boolean): boolean {
+    if (this.weaponState !== 'ready' || this.cooldown > 1e-8) return false;
 
     if (this.heat.overheated) {
       if (triggerEdge) this.pendingEvents.push({ type: 'overheated' });
-      return;
+      return false;
     }
 
     if (this.ammoInMagazine <= 0) {
       // Dry fire clicks only on a fresh press so full-auto does not spam.
       if (triggerEdge) this.pendingEvents.push({ type: 'dryFire' });
-      return;
+      return false;
     }
 
     this.ammoInMagazine--;
-    this.cooldown = 60 / this.definition.rpm;
+    this.cooldown += this.shotInterval;
 
     const adsScale = lerp(1, this.definition.recoil.adsRecoilMultiplier, this.adsAlpha);
     this.recoil.kick(adsScale);
@@ -266,10 +288,11 @@ export class Weapon {
     if (this.heat.overheated) this.pendingEvents.push({ type: 'overheated' });
 
     if (this.definition.boltAction) {
-      this.enterState('cycling', this.definition.boltCycleTime, 'boltStart');
+      this.enterState('cycling', this.boltCycleDuration, 'boltStart');
     } else if (this.ammoInMagazine === 0) {
       this.reload();
     }
+    return true;
   }
 
   /** Advances the inspection; the trigger or the aim interrupt it so the shot is never delayed. */

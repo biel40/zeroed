@@ -1651,7 +1651,7 @@ export class WeaponView {
       if (weapon.state === 'reloading') {
         this.openBoltCycle = 0;
       } else {
-        this.openBoltCycle = Math.max(0, this.openBoltCycle - dt * this.definition.rpm / 60);
+        this.openBoltCycle = Math.max(0, this.openBoltCycle - dt / weapon.shotInterval);
         const forward = weapon.ammoInMagazine === 0 ? 1 : this.openBoltCycle;
         this.openBolt.position.z = this.openBoltHomeZ - forward * HANDLE_TRAVEL;
       }

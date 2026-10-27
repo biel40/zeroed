@@ -235,16 +235,6 @@ export const MANSION_BUNKER_ENDING = {
 
 export const MANSION_SPECIAL_WEAPON_CASES = [
   {
-    id: 'bunker-raygun',
-    weaponId: 'raygun' as const,
-    cost: 6000,
-    requiredKills: 200,
-    interactionLabel: 'RAY GUN — 6000',
-    position: { x: -2.2, y: MANSION_BUNKER_Y + 1.1, z: -2.35 },
-    useRange: 2,
-    lookDotMin: 0.42,
-  },
-  {
     id: 'bunker-zeus',
     weaponId: 'tesla' as const,
     cost: 10000,

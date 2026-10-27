@@ -38,14 +38,15 @@ export type SignId =
   | 'serve-the-people'
   | 'honour-board'
   | 'duty-roster'
-  | 'holding-cell';
+  | 'holding-cell'
+  | 'maintenance';
 
 const ATLAS_WIDTH = 1024;
 /**
  * Two 128 px rows below the original square (the machine room's plates, then
  * the militia post's), then a 384 px band of the post's red corner.
  */
-const ATLAS_HEIGHT = 1664;
+const ATLAS_HEIGHT = 1792;
 
 /** Atlas cells in canvas pixels: x, y, width, height. */
 const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
@@ -81,6 +82,7 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   'honour-board': [512, 1408, 512, 128],
   'duty-roster': [512, 1536, 256, 128],
   'holding-cell': [768, 1536, 256, 128],
+  maintenance: [0, 1664, 256, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -270,6 +272,7 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   paintTrainShedSigns(context, random);
   paintSubstationSigns(context, random);
   paintMilitiaSigns(context, random);
+  enamelPlate(context, 'maintenance', '#d7b842', '#302a16', '#302a16', ['МАСТЕРСКАЯ'], 30, random);
 }
 
 /**

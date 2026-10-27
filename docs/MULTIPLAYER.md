@@ -119,7 +119,8 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   muestra la misma tirada a ambos y reserva el resultado para ese comprador.
   L96 usa la balistica compartida. Ray Gun y ZEUS-77 muestran proyectiles en
   ambos clientes; el anfitrión resuelve impactos, splash y cadenas y atribuye
-  cada baja al tirador. El desbloqueo de Ray Gun a 115 bajas es individual.
+  cada baja al tirador. La Ray Gun solo se obtiene de la Mystery Box;
+  no hay recompensas por bajas.
 - Arsenal: ambos empiezan con la M1911 y pueden llevar dos armas. Las compras
   de pared de Burned Mansion (AK-47, Vector, M4A1 y M60) cuestan puntos individuales;
   el anfitrión valida la compra y confirma el arma al invitado. La munición
@@ -130,8 +131,8 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 - Burned Mansion: la reparación de barricadas se valida por alcance y premia
   al jugador que repara. Las lámparas, almas, pared secreta, ritual y vitrinas
   del búnker forman parte del estado compartido. Las vitrinas solo se compran
-  una vez y cobran al comprador: Ray Gun exige 200 bajas personales y 6000 Points;
-  ZEUS-77 exige 300 bajas personales y 10000 Points. El anfitrion valida ambos
+  una vez y cobran al comprador: solo queda ZEUS-77, que exige 300 bajas
+  personales y 10000 Points. El anfitrion valida ambos
   requisitos. El desbloqueo visual refleja las bajas locales y la apertura se
   replica para ambos. La recarga de munición es individual. El
   final de 30000 Points detiene la partida compartida y abre los créditos.

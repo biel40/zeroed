@@ -142,7 +142,6 @@ export type HostMessage =
   | { readonly type: 'wallBuyDelivered'; readonly weapon: WeaponId; readonly refill: boolean }
   | { readonly type: 'wallBuyFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'ammoFull' }
   | { readonly type: 'boxGranted'; readonly weapon: WeaponId }
-  | { readonly type: 'milestoneWeapon'; readonly weapon: WeaponId }
   | { readonly type: 'mapUsed'; readonly kind: 'lamp' | 'ritual' | 'pickup' | 'ammo'; readonly id: string;
     readonly buyer: CoopPlayerId; readonly weapon?: WeaponId }
   | { readonly type: 'mapUseFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'ammoFull' }
@@ -382,8 +381,6 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
         ? { type: 'wallBuyFailed', reason: raw.reason } : null;
     case 'boxGranted':
       return isWeaponId(raw.weapon) ? { type: 'boxGranted', weapon: raw.weapon } : null;
-    case 'milestoneWeapon':
-      return raw.weapon === 'raygun' ? { type: 'milestoneWeapon', weapon: raw.weapon } : null;
     case 'mapUsed':
       return (raw.kind === 'lamp' || raw.kind === 'ritual' || raw.kind === 'pickup' || raw.kind === 'ammo')
         && isId(raw.id) && isPlayerId(raw.buyer) && (raw.weapon === undefined || isWeaponId(raw.weapon))

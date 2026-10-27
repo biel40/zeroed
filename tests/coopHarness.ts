@@ -141,6 +141,7 @@ export function makeContext(): TestContext {
     refillEquippedWeaponAmmo: vi.fn(() => false),
     setWeaponInfiniteReserve: vi.fn(() => false),
     setReloadTimeScale: vi.fn(),
+    setFireRateScale: vi.fn((scale: number) => { weapon.fireRateScale = scale; }),
     resetArsenal: vi.fn(),
     returnToMainMenu: vi.fn(),
   } as unknown as ModeContext;

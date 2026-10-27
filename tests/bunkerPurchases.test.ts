@@ -43,10 +43,10 @@ function makeMode(points: number): {
 function weaponPickup(cost: number): ArenaWeaponPickup {
   let purchased = false;
   return {
-    id: 'test-raygun-case',
-    weaponId: 'raygun',
+    id: 'test-zeus-case',
+    weaponId: 'tesla',
     cost,
-    interactionLabel: 'RAY GUN — 2000',
+    interactionLabel: 'ZEUS-77 — 2000',
     position: { x: 0, y: -2, z: 0 },
     floor: -1,
     useRange: 2,
@@ -77,7 +77,6 @@ function ammoRefill(): ArenaAmmoRefill {
 
 describe('Burned Mansion purchases', () => {
   it.each([
-    ['raygun', 200, 6000],
     ['tesla', 300, 10000],
   ] as const)('requires personal kills and the exact price for %s', (weaponId, requiredKills, cost) => {
     const { mode, economy, calls } = makeMode(cost);
@@ -111,7 +110,7 @@ describe('Burned Mansion purchases', () => {
     mode.onInteract();
 
     expect(economy.points).toBe(1000);
-    expect(calls.grants).toEqual(['raygun']);
+    expect(calls.grants).toEqual(['tesla']);
     expect(pickup.available).toBe(false);
   });
 
@@ -173,9 +172,9 @@ describe('Burned Mansion purchases', () => {
     (mode as unknown as { findFacingWeaponPickup(): ArenaWeaponPickup | null }).findFacingWeaponPickup = () => pickup;
     (mode as unknown as { findFacingAmmoRefill(): ArenaAmmoRefill | null }).findFacingAmmoRefill = () => null;
 
-    expect(mode.getInteractPrompt()).toBe('RAY GUN — 2000\nPress E');
+    expect(mode.getInteractPrompt()).toBe('ZEUS-77 — 2000\nPress E');
     context.profile.useTouchControls = true;
-    expect(mode.getInteractPrompt()).toBe('RAY GUN — 2000\nTap USE');
+    expect(mode.getInteractPrompt()).toBe('ZEUS-77 — 2000\nTap USE');
 
     (mode as unknown as { findFacingWeaponPickup(): ArenaWeaponPickup | null }).findFacingWeaponPickup = () => null;
     (mode as unknown as { findFacingAmmoRefill(): ArenaAmmoRefill | null }).findFacingAmmoRefill = () => refill;

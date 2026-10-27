@@ -259,6 +259,9 @@ export class Game {
       setReloadTimeScale: (scale) => {
         for (const entry of this.arsenal.values()) entry.weapon.reloadTimeScale = scale;
       },
+      setFireRateScale: (scale) => {
+        for (const entry of this.arsenal.values()) entry.weapon.fireRateScale = scale;
+      },
       resetArsenal: () => this.resetArsenal(),
       returnToMainMenu: () => this.returnToMainMenu(),
     });
@@ -723,7 +726,7 @@ export class Game {
           );
           break;
         case 'boltStart':
-          this.audio.playBolt(weapon.definition.boltCycleTime);
+          this.audio.playBolt(weapon.boltCycleDuration);
           break;
         case 'fireModeChanged':
           this.audio.playFireMode();

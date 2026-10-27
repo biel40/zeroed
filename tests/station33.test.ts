@@ -33,6 +33,7 @@ import {
   STATION33_WALL_THICKNESS,
   STATION33_WEAPON_CHEST,
   SUBESTACION,
+  TALLER,
   POWER_LEVER,
   TRAIN_CAR,
   TURNSTILE_LINE,
@@ -51,7 +52,7 @@ vi.mock('../src/ui/CodeLockDialog', () => ({
 
 const DT = 1 / 60;
 const ZOMBIE_BAND = { bottom: 0.05, top: 1.8 } as const;
-const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall, MILICIA.hall] as const;
+const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall, MILICIA.hall, TALLER.hall] as const;
 
 let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
@@ -208,6 +209,7 @@ const DOORS_TO: Readonly<Record<Station33ZoneId, ReadonlyArray<Station33ZoneId>>
   cocheras: ['cocheras'],
   subestacion: ['cocheras', 'subestacion'],
   milicia: ['milicia'],
+  taller: ['cocheras', 'subestacion', 'taller'],
 };
 
 function openWayTo(arena: ZombieArena, zone: Station33ZoneId): void {
@@ -285,6 +287,7 @@ describe('Station 33 layout', () => {
     const arena: ZombieArena = makeArena();
     expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
       ['to-consigna', 750, true], ['to-cocheras', 1250, true], ['to-subestacion', 1500, true], ['to-milicia', 3000, true],
+      ['to-taller', 2000, true],
     ]);
     expect(arena.activateDoor('escalator')).toBe(false);
     expect(arena.completionInteraction).toBeUndefined();
@@ -474,7 +477,7 @@ describe('Station 33 luggage office', () => {
 
     openDoorTo(arena, 'cocheras');
     openDoorTo(arena, 'milicia');
-    expect(arena.ringMachines.map((machine) => machine.ringId)).toEqual(['resurrection', 'sleightOfHand', 'armor']);
+    expect(arena.ringMachines.map((machine) => machine.ringId)).toEqual(['resurrection', 'sleightOfHand', 'armor', 'doubleTap']);
     for (const config of STATION33_RING_LOCKERS) {
       const machine = arena.ringMachines.find((candidate) => candidate.id === config.id)!;
       expect(insideRoom(machine.position.x, machine.position.z), config.id).toBe(true);
@@ -665,6 +668,58 @@ describe('Station 33 machine room', () => {
     arena.switchOnPower();
     for (let step = 0; step < 20; step++) arena.update(0.5, new THREE.Vector3(11, 1.7, -40));
     expect(lamp()).toBeGreaterThan(0.2);
+  });
+});
+
+describe('Station 33 maintenance workshop', () => {
+  it('opens from the electricity room, activates its own entrance and closes again on reset', () => {
+    const arena = makeArena();
+    openWayTo(arena, 'subestacion');
+    const door = STATION33_DOORS.find((candidate) => candidate.zone === 'taller')!;
+    const approachZ = SUBESTACION.hall.minZ + 1.8;
+    expect(walk(arena, door.x, approachZ, FACE_NORTH, 2).z).toBeGreaterThan(door.z);
+    expect(arena.spawnPoints.some((point) => (point as ZombieSpawnPoint).barrierId === 'taller-service-door')).toBe(false);
+    openDoorTo(arena, 'taller');
+    expect(walk(arena, door.x, approachZ, FACE_NORTH, 2).z).toBeLessThan(TALLER.hall.maxZ - 1);
+    expect(arena.spawnPoints).toContain(STATION33_SPAWNS.taller[0]);
+    const gate = STATION33_BARRIERS.find((candidate) => candidate.zone === 'taller')!;
+    expect(walk(arena, gate.x, TALLER.hall.minZ + 1.8, FACE_NORTH, 2).z).toBeGreaterThan(TALLER.hall.minZ);
+    arena.reset();
+    expect(arena.doors.find((candidate) => candidate.id === door.id)!.isLocked).toBe(true);
+    expect(arena.spawnPoints).toEqual(STATION33_SPAWNS.vestibule);
+  });
+
+  it('has yellow walls, stays clear of other spawn passages and gives its lights priority inside', () => {
+    const arena = makeArena();
+    const room = new THREE.Box3(
+      new THREE.Vector3(TALLER.hall.minX, 0, TALLER.hall.minZ),
+      new THREE.Vector3(TALLER.hall.maxX, TALLER.ceilingHeight, TALLER.hall.maxZ),
+    );
+    for (const barrier of STATION33_BARRIERS.filter((candidate) => candidate.zone !== 'taller')) {
+      expect(room.intersectsBox(passageBox(barrier)), barrier.id).toBe(false);
+    }
+    let yellowWalls = 0;
+    arena.group.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      yellowWalls += materials.filter((material) => material.name === 'station33-workshop-yellow').length;
+    });
+    expect(yellowWalls).toBeGreaterThan(0);
+    arena.switchOnPower();
+    arena.update(3, new THREE.Vector3(9.4, EYE_HEIGHT, -50.6));
+    const light = arena.group.children.find((object) => object instanceof THREE.PointLight && object.position.x === 9.4 && object.position.z === -50.6) as THREE.PointLight;
+    expect(light.visible).toBe(true);
+    expect(light.color.getHex()).toBe(TALLER.lightColor);
+    expect(arena.pointLightCount).toBe(POINT_LIGHT_BUDGET[TEST_PROFILE.quality]);
+  });
+
+  it('lets the horde follow the player from electricity into the workshop', () => {
+    const arena = makeArena();
+    openWayTo(arena, 'taller');
+    const spawn = STATION33_SPAWNS.subestacion[0];
+    openBarrier(arena, spawn.barrierId!);
+    const { hit } = chaseUntilHit(arena, spawn, 10, -50, 60);
+    expect(hit).toBe(true);
   });
 });
 
