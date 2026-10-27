@@ -67,7 +67,7 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
   station33_theme: {
     name: 'station33_theme',
     path: ZOMBIES_MUSIC_PATHS.station33,
-    volume: 0.2,
+    volume: 0.15,
     loop: true,
   },
 };
