@@ -9,14 +9,15 @@ codigo: actualiza la guia.
 ## Que es
 
 - Estacion de metro sovietica profunda, abandonada tras una evacuacion que
-  fracaso. La salida a la superficie se hundio y nadie volvio: el lema del mapa
-  es "Nadie ha vuelto de la estacion".
+  fracaso. La salida a la superficie se hundio y nadie volvio. El lema del mapa
+  es "Antigua estación abandonada en la época de la Guerra Fría...pero que
+  esconde secretos que nunca deberían ser revelados."
 - Mapa premium y solo individual. Mientras no haya pagos, premium solo cambia la
   presentacion (tarjeta dorada, insignia, intro) y la beta cerrada lo juega
   completo. Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
-  cuatro entradas con chapas de acero, la AK-47 y la PPSh-41 (1250 / 625) en pared
+  cuatro entradas con chapas de acero, la PPSh-41 (1250 / 625) en pared
   y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera
   puerta de pago, la Fase 3 las cocheras tras la segunda y la Fase 4 la sala
   de maquinas (la subestacion) tras la tercera. La escalera mecanica sigue
@@ -149,7 +150,9 @@ codigo: actualiza la guia.
   walker de la horda se convierte en portador, marcado por un cristal rojo
   sobre la cabeza, nucleo en el pecho y anillos de energia. Al morir deja un
   cristal persistente que se recoge y se instala gratis en el armario. El HUD
-  mantiene el paso actual con flecha y distancia; las bajas en las entradas
+  mantiene el paso actual con flecha y distancia en una nota discreta de la
+  esquina, sin banners centrales; la confirmacion de desbloqueo permanece
+  hasta comprar el arma. Las bajas en las entradas
   dejan el cristal al lado jugable de la barricada. Vende el arma (3500) y
   despues sus cristales (1750). Es la unica fuente de fuego del mapa: el
   pilar de "nada de fuego" se refiere al escenario, no al arsenal del
@@ -173,15 +176,15 @@ codigo: actualiza la guia.
 ## El puesto de milicia
 
 - La comisaria de la estacion («МИЛИЦИЯ»): el sitio donde tendria sentido
-  guardar proteccion y armas, y por eso vende la Armadura y la M4A1. Es la
-  tercera salida del vestibulo, por su muro oeste, entre la AK-47 y la
-  taquilla de billetes y en linea con los tornos. La puerta (3000) da
+  guardar proteccion y armas, y por eso vende la Armadura y la AK-47. Es la
+  tercera salida del vestibulo, por su muro oeste y en linea con los tornos.
+  La puerta (3000) da
   directamente a la sala: comparte el muro del vestibulo, cubierto por su
   lado con yeso y el zocalo verde de oficina sovietica sobre metlaj.
 - Al fondo, en el eje de la puerta, las taquillas de pruebas bajo la placa
   «ВЕЩЕСТВЕННЫЕ ДОКАЗАТЕЛЬСТВА»; en medio, la taquilla abierta del anillo
   Armadura (rojo, 2500), que necesita electricidad como la de las cocheras.
-  La M4A1 (1500 / 750) esta en el muro norte, por encima del zocalo.
+  La AK-47 (1750 / 900) esta en el muro norte, por encima del zocalo.
 - La historia: la mesa del oficial de guardia con el telefono y el libro de
   guardia, su silla volcada y los partes por el suelo; la celda de detencion
   del rincon suroeste con la puerta de barrotes abierta de par en par; un

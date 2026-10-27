@@ -301,8 +301,7 @@ export interface Station33Door {
  * service door in the north wall east of the escalator, facing the cab of
  * the west train; the third opens the machine room's gallery between the
  * sheds' dead tunnel and blast gate. The militia post's door (3000), the
- * vestibule's third way out, sits in the west wall between the AK-47 and
- * the ticket office, in line with the turnstiles.
+ * vestibule's third way out, sits in the west wall, in line with the turnstiles.
  */
 export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
   { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna', plate: 'luggage-office' },
@@ -359,16 +358,6 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
 /** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
 export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   {
-    // A Soviet station keeps the rifle of the era by the turnstiles, clear of the militia door.
-    id: 'vestibule-ak47',
-    weaponId: 'ak47',
-    price: 1750,
-    ammoPrice: 900,
-    position: { x: WEST_WALL_X + 0.17, y: 1.45, z: 7.4 },
-    yaw: Math.PI / 2,
-    floor: 0,
-  },
-  {
     // The cheap automatic waits down the luggage-office corridor, clear of its blood stain.
     id: 'consigna-mp5',
     weaponId: 'mp5',
@@ -400,10 +389,10 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   },
   {
     // The post's confiscated rifle on its north wall, above the wainscot.
-    id: 'milicia-m4a1',
-    weaponId: 'm4a1',
-    price: 1500,
-    ammoPrice: 750,
+    id: 'milicia-ak47',
+    weaponId: 'ak47',
+    price: 1750,
+    ammoPrice: 900,
     position: { x: -11.0, y: 1.62, z: MILICIA.hall.minZ + 0.02 },
     yaw: 0,
     floor: 0,

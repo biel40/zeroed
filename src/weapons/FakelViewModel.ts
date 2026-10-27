@@ -18,7 +18,7 @@ import type { ViewModelConfig } from './WeaponTypes';
  */
 export const FAKEL_PROFILE = {
   boreY: 0.012,
-  muzzleZ: -0.6,
+  muzzleZ: -0.612,
   receiver: [
     [0.105, 0.028], [-0.125, 0.028], [-0.135, 0.01], [-0.125, -0.04], [0.105, -0.04],
   ] as readonly ProfilePoint[],
@@ -35,7 +35,7 @@ export const FAKEL_PROFILE = {
   crystal: { x: -0.04, y: 0.046, z: -0.03, radius: 0.016, length: 0.074 },
   cageRadius: 0.022,
   gauge: { x: -0.036, y: -0.012, z: -0.078, radius: 0.017 },
-  nozzle: { collarZ: -0.535, hingeZ: -0.55, hingeRadius: 0.032, petalLength: 0.05, petals: 6 },
+  nozzle: { collarZ: -0.535, hingeZ: -0.55, hingeRadius: 0.032, petalLength: 0.062, petalWidth: 0.031, petals: 6 },
   rearSightZ: 0.05,
   frontSightZ: -0.44,
 } as const;
@@ -55,6 +55,105 @@ const DULL_RED = new THREE.Color(0x6a0d02);
 const HOT_ORANGE = new THREE.Color(0xff6a1a);
 const THROAT_COLOR = new THREE.Color(0xffa040);
 const PILOT_COLOR = new THREE.Color(0x7fb2ff);
+
+const CRYSTAL_ENERGY_VERTEX = /* glsl */ `
+  varying vec3 vLocal;
+  varying float vFacing;
+  void main() {
+    vLocal = position;
+    vec4 view = modelViewMatrix * vec4(position, 1.0);
+    vFacing = abs(dot(normalize(normalMatrix * normal), normalize(-view.xyz)));
+    gl_Position = projectionMatrix * view;
+  }
+`;
+
+/**
+ * Power inside the core crystal: churning veins of red light flowing along
+ * it, white-hot where they thicken (core), or a soft glow hugging the
+ * crystal's silhouette (rim). `uGlow` follows the charge and the heat.
+ */
+const CRYSTAL_ENERGY_FRAGMENT = /* glsl */ `
+  uniform float uGlow;
+  uniform float uTime;
+  uniform float uRim;
+  varying vec3 vLocal;
+  varying float vFacing;
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  void main() {
+    float around = atan(vLocal.y, vLocal.x);
+    float veins = noise(vec2(vLocal.z * 80.0 - uTime * 2.6, around * 1.6)) * 0.6
+      + noise(vec2(vLocal.z * 190.0 + uTime * 4.1, around * 4.0 + 3.0)) * 0.4;
+    vec3 color;
+    float light;
+    if (uRim > 0.5) {
+      light = pow(1.0 - vFacing, 2.2) * 0.7;
+      color = vec3(1.0, 0.16, 0.08);
+    } else {
+      float thread = smoothstep(0.5, 0.9, veins);
+      light = pow(vFacing, 1.3) * (0.35 + 0.8 * veins);
+      color = mix(vec3(1.0, 0.1, 0.05), vec3(1.0, 0.78, 0.6), thread * smoothstep(0.4, 1.0, vFacing));
+    }
+    gl_FragColor = vec4(color * light * uGlow, 1.0);
+  }
+`;
+
+/**
+ * An elongated hexagonal crystal with pointed ends, cut a little unevenly
+ * (seeded) so its facets catch the light differently: flat-shaded faces,
+ * `length` along Z.
+ */
+function crystalGeometry(radius: number, length: number, seed: number): THREE.BufferGeometry {
+  const sides = 6;
+  let state = seed;
+  const jitter = (amount: number): number => {
+    state = (state * 1664525 + 1013904223) % 4294967296;
+    return 1 + (state / 4294967296 - 0.5) * amount;
+  };
+  const shoulder = length / 2 - radius * 0.85;
+  const ring = (z: number): THREE.Vector3[] => Array.from({ length: sides }, (_, side) => {
+    const angle = (side / sides) * Math.PI * 2 + 0.1 * (jitter(1) - 1);
+    const r = radius * jitter(0.22);
+    return new THREE.Vector3(Math.cos(angle) * r, Math.sin(angle) * r, z * jitter(0.08));
+  });
+  const back = ring(shoulder);
+  const front = ring(-shoulder);
+  const tipBack = new THREE.Vector3(radius * 0.12, -radius * 0.08, length / 2);
+  const tipFront = new THREE.Vector3(-radius * 0.1, radius * 0.1, -length / 2);
+  const positions: number[] = [];
+  const triangle = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): void => {
+    positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  };
+  for (let side = 0; side < sides; side++) {
+    const next = (side + 1) % sides;
+    triangle(back[side], front[side], front[next]);
+    triangle(back[side], front[next], back[next]);
+    triangle(tipBack, back[side], back[next]);
+    triangle(tipFront, front[next], front[side]);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function crystalEnergyMaterial(rim: boolean): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    name: rim ? 'fakel_crystal_rim' : 'fakel_crystal_energy',
+    uniforms: { uGlow: { value: 1.3 }, uTime: { value: 0 }, uRim: { value: rim ? 1 : 0 } },
+    vertexShader: CRYSTAL_ENERGY_VERTEX,
+    fragmentShader: CRYSTAL_ENERGY_FRAGMENT,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: rim ? THREE.BackSide : THREE.FrontSide,
+  });
+}
 
 /** Stencil atlas rows: the model name on the receiver, the flammable warning on the tank. */
 const STENCIL_ROWS = ['ФАКЕЛ-33  ОПЫТНЫЙ', 'ОГНЕОПАСНО'] as const;
@@ -106,7 +205,8 @@ interface FakelParts {
   readonly finHeat: THREE.MeshStandardMaterial;
   readonly throat: THREE.MeshBasicMaterial;
   readonly crystal: THREE.MeshStandardMaterial;
-  readonly crystalCore: THREE.MeshBasicMaterial;
+  /** Energy veins inside the crystal and the glow round its silhouette. */
+  readonly crystalEnergy: readonly THREE.ShaderMaterial[];
 }
 
 /**
@@ -154,7 +254,10 @@ class FakelLiveParts implements ViewModelLiveParts {
 
     const glow = this.crystalGlow(weapon, firing, flicker, heat, reloadGlow);
     parts.crystal.emissiveIntensity = glow * 0.9;
-    parts.crystalCore.color.copy(CRYSTAL_RED).multiplyScalar(glow * 0.85);
+    for (const material of parts.crystalEnergy) {
+      material.uniforms.uGlow.value = glow;
+      material.uniforms.uTime.value = this.time;
+    }
 
     const pilotLit = !locked && weapon.state !== 'equipping' && !this.coreOut(weapon);
     parts.pilot.visible = pilotLit;
@@ -176,7 +279,7 @@ class FakelLiveParts implements ViewModelLiveParts {
     this.heatGlow(parts.finHeat, 0, 0);
     parts.throat.color.copy(THROAT_COLOR).multiplyScalar(0.2);
     parts.crystal.emissiveIntensity = 1.4;
-    parts.crystalCore.color.copy(CRYSTAL_RED).multiplyScalar(1.3);
+    for (const material of parts.crystalEnergy) material.uniforms.uGlow.value = 1.3;
     // Lit by the next update of a weapon in hand; a stored or displayed one shows none.
     parts.pilot.visible = false;
   }
@@ -248,13 +351,13 @@ export function buildFakel(config: ViewModelConfig): BuiltProcedural {
   const nozzleHeat = new THREE.MeshStandardMaterial({ color: 0x1d1f21, roughness: 0.46, metalness: 0.82, roughnessMap: wear, emissive: 0x000000 });
   const finHeat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.5, metalness: 0.8, roughnessMap: wear, emissive: 0x000000 });
   const throat = new THREE.MeshBasicMaterial({ color: THROAT_COLOR.clone(), toneMapped: false });
-  const crystalMaterial = new THREE.MeshStandardMaterial({
-    color: 0x7a0a08, roughness: 0.12, metalness: 0.1, emissive: CRYSTAL_RED.clone(), emissiveIntensity: 1.4,
-    transparent: true, opacity: 0.82, flatShading: true,
+  // Deep red glass under a glossy clear coat: every facet throws its own highlight.
+  const crystalMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x5a0605, roughness: 0.06, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.04,
+    emissive: CRYSTAL_RED.clone(), emissiveIntensity: 1.4, transparent: true, opacity: 0.74, flatShading: true,
+    envMapIntensity: 1.8,
   });
-  const crystalCore = new THREE.MeshBasicMaterial({
-    color: CRYSTAL_RED.clone(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
-  });
+  const crystalEnergy = [crystalEnergyMaterial(false), crystalEnergyMaterial(true)];
   const pilotMaterial = new THREE.MeshBasicMaterial({
     color: PILOT_COLOR.clone(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     toneMapped: false, side: THREE.DoubleSide,
@@ -468,15 +571,15 @@ export function buildFakel(config: ViewModelConfig): BuiltProcedural {
   // Six petals hinged round the throat; each pivot opens about its own tangent.
   const petals: THREE.Object3D[] = [];
   // A tapered plate with a pressed stiffening rib and two rivets at its root.
-  const petalPlate = new THREE.BoxGeometry(0.026, 0.0026, P.nozzle.petalLength).translate(0, 0, -P.nozzle.petalLength / 2);
+  const petalPlate = new THREE.BoxGeometry(P.nozzle.petalWidth, 0.003, P.nozzle.petalLength).translate(0, 0, -P.nozzle.petalLength / 2);
   const plateTaper = petalPlate.getAttribute('position');
   for (let index = 0; index < plateTaper.count; index++) {
     plateTaper.setX(index, plateTaper.getX(index) * (1 + (plateTaper.getZ(index) / P.nozzle.petalLength) * 0.35));
   }
   const petalGeometry = mergeGeometries([
     petalPlate,
-    new THREE.BoxGeometry(0.004, 0.0024, P.nozzle.petalLength * 0.8).translate(0, 0.0024, -P.nozzle.petalLength * 0.45),
-    ...[-0.008, 0.008].map((x) => new THREE.CylinderGeometry(0.0022, 0.0022, 0.0018, 6).translate(x, 0.002, -0.006)),
+    new THREE.BoxGeometry(0.0045, 0.0026, P.nozzle.petalLength * 0.8).translate(0, 0.0026, -P.nozzle.petalLength * 0.45),
+    ...[-0.0095, 0.0095].map((x) => new THREE.CylinderGeometry(0.0022, 0.0022, 0.0018, 6).translate(x, 0.002, -0.006)),
   ].map((geometry) => (geometry.index ? geometry.toNonIndexed() : geometry)))!;
   for (let index = 0; index < P.nozzle.petals; index++) {
     const angle = (index / P.nozzle.petals) * Math.PI * 2 + Math.PI / 2;
@@ -521,13 +624,17 @@ export function buildFakel(config: ViewModelConfig): BuiltProcedural {
   crystal.name = 'fakel-core-crystal';
   crystal.position.set(C.x, C.y, C.z);
   group.add(crystal);
-  const body = C.length - 0.024;
-  add(crystal, 'crystal-body', new THREE.CylinderGeometry(C.radius, C.radius, body, 6).rotateX(Math.PI / 2), crystalMaterial);
+  const gem = crystalGeometry(C.radius, C.length, 33);
+  add(crystal, 'crystal-body', gem, crystalMaterial);
+  // The veins burn inside; the rim glow wraps the silhouette from just outside it.
+  add(crystal, 'crystal-energy', gem.clone().scale(0.62, 0.62, 0.86), crystalEnergy[0]);
+  add(crystal, 'crystal-rim', gem.clone().scale(1.12, 1.12, 1.05), crystalEnergy[1]);
+  // Brass contact bands where the cage's springs touch it, each with a contact pad.
   for (const end of [-1, 1]) {
-    add(crystal, 'crystal-tip', new THREE.ConeGeometry(C.radius, 0.012, 6).rotateX(end * Math.PI / 2), crystalMaterial, 0, 0, end * (body / 2 + 0.006));
-    add(crystal, 'crystal-ferrule', cylinderZ(C.radius + 0.0012, C.radius + 0.0012, 0.004, 6), brass, 0, 0, end * (body / 2 - 0.004));
+    const z = end * (C.length / 2 - C.radius * 1.4);
+    add(crystal, 'crystal-ferrule', cylinderZ(C.radius * 1.08, C.radius * 1.08, 0.0035, 6), brass, 0, 0, z);
+    add(crystal, 'crystal-contact', new THREE.BoxGeometry(0.004, 0.003, 0.006), brass, 0, -C.radius * 1.08, z);
   }
-  add(crystal, 'crystal-glow', new THREE.CylinderGeometry(C.radius * 0.55, C.radius * 0.55, body * 0.9, 6).rotateX(Math.PI / 2), crystalCore);
 
   // Pressure gauge on the left flank, face tipped up to the eye; the needle reads the heat.
   const gauge = assembly('gauge');
@@ -555,7 +662,7 @@ export function buildFakel(config: ViewModelConfig): BuiltProcedural {
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
   const liveParts = new FakelLiveParts({
-    petals, lever, needle, pilot, nozzleHeat, finHeat, throat, crystal: crystalMaterial, crystalCore,
+    petals, lever, needle, pilot, nozzleHeat, finHeat, throat, crystal: crystalMaterial, crystalEnergy,
   });
   return {
     group,

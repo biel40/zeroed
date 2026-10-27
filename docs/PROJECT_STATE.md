@@ -48,7 +48,7 @@
   maquinas la enciende, y un rayo de la ZEUS-77 contra la taquilla la
   alimenta 60 s. El de Armadura (corazon, rojo, vida maxima doble, 2500)
   tambien exige electricidad y esta en el puesto de milicia, tercera salida
-  del vestibulo (puerta de 3000), junto a la M4A1 en pared. Al comprar un
+  del vestibulo (puerta de 3000), junto a la AK-47 en pared. Al comprar un
   anillo, las manos se lo ponen con una animacion.
 - Zombies normal/shiny/brute con pool global 24, navegacion con A* y anti-stuck,
   melee validado, pasos 3D, Ray Gun a 115 bajas y ZEUS-77 legendaria. En

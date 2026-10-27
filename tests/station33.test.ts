@@ -281,7 +281,7 @@ describe('Station 33 layout', () => {
     openDoorTo(arena, 'consigna');
     openDoorTo(arena, 'cocheras');
     expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([
-      ['ak47', 1750, 900], ['mp5', 1000, 500], ['ppsh41', 1250, 625], ['m60', 2500, 1250], ['m4a1', 1500, 750],
+      ['mp5', 1000, 500], ['ppsh41', 1250, 625], ['m60', 2500, 1250], ['ak47', 1750, 900],
     ]);
     const ppshBuys = arena.wallBuys.filter((wallBuy) => wallBuy.weaponId === 'ppsh41');
     expect(ppshBuys).toHaveLength(1);

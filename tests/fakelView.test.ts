@@ -137,7 +137,7 @@ describe('ФАКЕЛ-33 view model', () => {
   it('stays within its draw budget and keeps the core, cage and gauge clear of the sight line', () => {
     const built = buildProceduralViewModel(definition.view);
     expect(built.group.name).toBe('fakel-root');
-    expect(meshCount(built.group)).toBeLessThanOrEqual(40);
+    expect(meshCount(built.group)).toBeLessThanOrEqual(42);
     built.group.updateMatrixWorld(true);
     const sightY = definition.view.sightHeight * definition.view.scale;
     for (const name of ['fakel-core-crystal', 'fakel-cage-lid', 'fakel-gauge', 'fakel-cage']) {

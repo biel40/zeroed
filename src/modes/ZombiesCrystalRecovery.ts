@@ -6,7 +6,7 @@ import type { Zombie } from '../zombies/Zombie';
 import type { ArenaWeaponStation } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 
-type RecoveryStage = 'inactive' | 'hunting' | 'dropped' | 'carrying' | 'installed';
+type RecoveryStage = 'inactive' | 'hunting' | 'dropped' | 'carrying' | 'installed' | 'complete';
 type Position = Readonly<{ x: number; y: number; z: number }>;
 const PICKUP_RANGE = 2;
 const DIRECTIONS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'] as const;
@@ -25,12 +25,12 @@ export class ZombiesCrystalRecovery {
     this.reset();
   }
 
-  get locked(): boolean { return this.stage !== 'installed'; }
+  get locked(): boolean { return this.stage !== 'installed' && this.stage !== 'complete'; }
 
   update(dt: number, zombies: ReadonlySet<Zombie>): void {
+    if (this.stage === 'installed' && this.ctx.hasWeapon(this.station.weaponId)) this.stage = 'complete';
     if (this.stage === 'inactive' && this.station.powered) {
       this.stage = 'hunting';
-      this.announce('crystal.started', 'crystal.hunt');
     }
     if (this.stage === 'hunting' && !this.carrier) {
       // Existing walkers keep round accounting and the population cap intact.
@@ -55,7 +55,6 @@ export class ZombiesCrystalRecovery {
     this.dropPosition = { ...dropPosition };
     this.dropFloor = zombie.floor;
     this.stage = 'dropped';
-    this.announce('crystal.dropped', 'crystal.collect');
     this.ctx.audio.playMysteryBoxPickup();
     this.view.update(0, this.dropPosition, null, false);
   }
@@ -70,7 +69,6 @@ export class ZombiesCrystalRecovery {
     if (!this.pickupPrompt()) return false;
     this.stage = 'carrying';
     this.view.hide();
-    this.announce('crystal.collected', 'crystal.return');
     this.ctx.audio.playMysteryBoxPickup();
     return true;
   }
@@ -83,10 +81,7 @@ export class ZombiesCrystalRecovery {
       this.station.setLocked?.(false);
       this.station.activate();
       this.view.hide();
-      this.announce('crystal.installed', 'crystal.buy');
       this.ctx.audio.playMysteryBoxPickup();
-    } else {
-      this.ctx.hud.showRoundBanner(this.stationPrompt());
     }
     return true;
   }
@@ -100,7 +95,10 @@ export class ZombiesCrystalRecovery {
   }
 
   objective(): string | null {
-    if (this.stage === 'inactive' || this.stage === 'installed') return null;
+    if (this.stage === 'inactive' || this.stage === 'complete') return null;
+    if (this.stage === 'installed') {
+      return `ФАКЕЛ-33 · ${t('crystal.buy', { cost: this.station.price })}`;
+    }
     const key: TranslationKey = this.stage === 'hunting' ? (this.carrier ? 'crystal.hunt' : 'crystal.wait')
       : this.stage === 'dropped' ? 'crystal.collect' : 'crystal.return';
     const target = this.targetPosition();
@@ -141,9 +139,5 @@ export class ZombiesCrystalRecovery {
     if (distance > PICKUP_RANGE) return false;
     player.camera.getWorldDirection(this.forward);
     return distance < 0.1 || (dx * this.forward.x + dz * this.forward.z) / distance >= 0.4;
-  }
-
-  private announce(title: TranslationKey, instruction: TranslationKey): void {
-    this.ctx.hud.showRoundBanner(t(title), t(instruction, { cost: this.station.price }));
   }
 }

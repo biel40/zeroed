@@ -49,7 +49,7 @@ describe('startup crystal recovery', () => {
     expect(ctx.scene.getObjectByName('startup-crystal-objective')?.visible).toBe(true);
     expect(ctx.scene.getObjectByName('startup-crystal-marker')).toBeDefined();
     recovery.update(1, zombies);
-    expect(hud.showRoundBanner).toHaveBeenCalledTimes(1);
+    expect(hud.showRoundBanner).not.toHaveBeenCalled();
   });
 
   it('waits for a normal arrival when there is no eligible horde and ignores other deaths', () => {
@@ -64,7 +64,7 @@ describe('startup crystal recovery', () => {
   });
 
   it('requires pickup and installation before unlocking, with no automatic purchase', () => {
-    const { station, recovery, carrier, zombies, player } = setup();
+    const { station, recovery, carrier, zombies, player, ctx, hud } = setup();
     station.powered = true;
     recovery.update(0, zombies);
     expect(recovery.interactAtStation()).toBe(true);
@@ -83,6 +83,15 @@ describe('startup crystal recovery', () => {
     expect(recovery.locked).toBe(false);
     expect(station.setLocked).toHaveBeenLastCalledWith(false);
     expect(station.activate).toHaveBeenCalledOnce();
+    expect(recovery.objective()).toContain(t('crystal.buy', { cost: 3500 }));
+    recovery.update(600, zombies);
+    expect(recovery.objective()).toContain(t('crystal.buy', { cost: 3500 }));
+    expect(hud.showRoundBanner).not.toHaveBeenCalled();
+    const owned = vi.spyOn(ctx, 'hasWeapon').mockReturnValue(true);
+    recovery.update(0, zombies);
+    expect(recovery.objective()).toBeNull();
+    owned.mockReturnValue(false);
+    recovery.update(0, zombies);
     expect(recovery.objective()).toBeNull();
     expect(recovery.interactAtStation()).toBe(false);
   });
@@ -162,11 +171,13 @@ describe('crystal drop and mode integration', () => {
     internals.findFacingWeaponStation = () => station;
     player.rig.position.set(0, 1.72, 0);
     mode.onInteract();
-    expect(hud.showRoundBanner).toHaveBeenLastCalledWith(t('crystal.needsPower'));
+    expect(mode.getInteractPrompt()).toBe(t('crystal.needsPower'));
+    expect(hud.showRoundBanner).not.toHaveBeenCalled();
     internals.arena.powerSwitch.activate();
     internals.arena.update(1);
     mode.onInteract();
-    expect(hud.showRoundBanner).toHaveBeenLastCalledWith(t('crystal.locked'));
+    expect(mode.getInteractPrompt()).toBe(t('crystal.locked'));
+    expect(hud.showRoundBanner).not.toHaveBeenCalled();
     expect(internals.crystalRecoveries).toHaveLength(1);
     const other = new ZombiesMode('burned-mansion');
     other.init(makeContext().ctx);

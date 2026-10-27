@@ -87,8 +87,8 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * `Station33Atmosphere` keep it alive, and gameplay objects come from the
  * shared barrier, door, wall-buy and Mystery Box systems.
  *
- * Phase 1 is the entrance vestibule with four entrances and the AK-47 and
- * Vector wall buys; the escalator north of it is the sealed frontier.
+ * Phase 1 is the entrance vestibule with four entrances and the PPSh-41
+ * wall buy; the escalator north of it is the sealed frontier.
  * Phase 2 is the luggage office behind the first paid door: two more
  * entrances, the MP5, the Mystery Box and the locker that sells the
  * Resurrection ring. Phase 3 is the train sheds behind the second door:
@@ -97,7 +97,7 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * machine room behind the third door: two more entrances and the main
  * switch, which powers the station for the rest of the run. The militia
  * post, the vestibule's third way out behind its dearest door, sells the
- * M4A1 and, once the power is on, the Armour ring.
+ * AK-47 and, once the power is on, the Armour ring.
  */
 export class Station33Arena implements ZombieArena {
   readonly id = 'station-33';

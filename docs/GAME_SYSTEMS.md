@@ -247,7 +247,7 @@ guardandose automaticamente al ajustarlos.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
-  puerta de servicio y dos rejillas), la AK-47 y la PPSh-41 (1250 / 625) en pared
+  puerta de servicio y dos rejillas), la PPSh-41 (1250 / 625) en pared
   y la escalera mecanica sellada. La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
   el muro este: dos entradas mas, que solo generan zombis con la puerta
   abierta, la MP5 (1000 / 500) en
