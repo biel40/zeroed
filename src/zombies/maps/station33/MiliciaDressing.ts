@@ -13,7 +13,8 @@ const HONOUR_BOARD = { z: 11.75, y: 1.88, width: 1.6, height: 1.05 } as const;
 
 /**
  * Story and wear of the militia post, all non-solid: the evidence plate
- * over the Armour locker, "wanted" bulletins stripped of their photos,
+ * over the Armour locker, propaganda posters, the red runner to it, the
+ * board of honour, the stopped clock, "wanted" bulletins stripped of their photos,
  * reports scattered off the desk, blood by the back door and seepage down
  * the plaster. Litter stays flat and away from the entrances.
  */

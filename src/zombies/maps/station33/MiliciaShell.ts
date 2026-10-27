@@ -31,9 +31,9 @@ export function miliciaWalls(): ReadonlyArray<StationWallLine> {
 }
 
 /**
- * Tiled floor, flat plaster ceiling and plaster walls over a green
- * wainscot, also painted over the back of the vestibule's marble wall.
- * The door frame comes from `DoorFrames`.
+ * Tiled floor, flat plaster ceiling under concrete beams and a cornice,
+ * and plaster walls over a green wainscot, also painted over the back of
+ * the vestibule's marble wall. The door frame comes from `DoorFrames`.
  */
 export function buildMiliciaShell(context: Station33BuildContext): void {
   const { structure, materials } = context;

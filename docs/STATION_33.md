@@ -180,19 +180,34 @@ codigo: actualiza la guia.
   tercera salida del vestibulo, por su muro oeste y en linea con los tornos.
   La puerta (3000) da
   directamente a la sala: comparte el muro del vestibulo, cubierto por su
-  lado con yeso y el zocalo verde de oficina sovietica sobre metlaj.
+  lado con yeso y el zocalo verde de oficina sovietica sobre metlaj. Es una
+  sala amplia (unos 11 x 12 m) con techo de 3,4 m bajo vigas de hormigon.
 - Al fondo, en el eje de la puerta, las taquillas de pruebas bajo la placa
   «ВЕЩЕСТВЕННЫЕ ДОКАЗАТЕЛЬСТВА»; en medio, la taquilla abierta del anillo
   Armadura (rojo, 2500), que necesita electricidad como la de las cocheras.
+  Una alfombra roja lleva de la puerta a ella, y sobre la placa hay una
+  estrella de rubi luminosa en el circuito `mains`: se enciende (con su luz
+  roja) al accionar el interruptor general, igual que la taquilla.
   La AK-47 (1750 / 900) esta en el muro norte, por encima del zocalo.
+- El rincon rojo, en el muro norte: pancarta «СЛУЖИМ НАРОДУ», estrella de
+  esmalte en relieve, mesa con pano rojo y libros de registro, y dos
+  banderas en sus pies. Solo estrellas y rotulos genericos, sin emblemas
+  reales ni retratos (como el resto de la cartelera).
 - La historia: la mesa del oficial de guardia con el telefono y el libro de
-  guardia, su silla volcada y los partes por el suelo; la celda de detencion
-  del rincon suroeste con la puerta de barrotes abierta de par en par; un
-  armero con cascos y escudos antidisturbios; un archivador con un cajon
-  fuera, y carteles de busca y captura a los que les arrancaron las fotos.
-- Fluorescente inestable sobre la mesa y la lampara roja a bateria sobre la
-  celda; el segundo tubo es de la red y solo se enciende con el interruptor
-  general. Los zombis entran por la puerta trasera del muro sur.
+  guardia, su silla volcada y los partes por el suelo; la mesa de
+  interrogatorios con maquina de escribir y cenicero bajo una lampara
+  colgante; la celda de detencion («КПЗ») del rincon suroeste con la puerta
+  de barrotes abierta de par en par, un jergon y un cubo; un armero con
+  cascos y escudos antidisturbios; dos archivadores, una caja fuerte junto
+  a la puerta, el tablon «ДОСКА ПОЧЁТА» con los marcos vacios sobre un
+  radiador, un reloj parado sobre la puerta, el cuadrante de guardias y
+  carteles («МИЛИЦИЯ — НА СТРАЖЕ ПОРЯДКА», «БУДЬ БДИТЕЛЕН!» y los de busca
+  y captura a los que les arrancaron las fotos).
+- Fluorescente inestable sobre la mesa de guardia, la lampara de
+  interrogatorio en un circuito que falla y la lampara roja a bateria sobre
+  la celda; los demas tubos son de la red y solo se encienden con el
+  interruptor general (uno de la celda esta roto). Los zombis entran por la
+  puerta trasera del muro sur.
 
 ## Anillos
 
