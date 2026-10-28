@@ -100,6 +100,7 @@ function vectorParam(key: string): number[] | null {
 
 function makeWeapon(ads: boolean): Weapon {
   const weapon = new Weapon(definition, () => 0.5);
+  if (params.get('ammo') === 'empty') weapon.ammoInMagazine = 0;
   if (ads) {
     // Drive the ADS blend to completion (speed ~8-12/s → well under 1.5 s).
     for (let index = 0; index < 90; index++) weapon.update(1 / 60, { trigger: false, ads: true });
@@ -172,7 +173,9 @@ if (mode === 'pov') {
   const progresses = params.has('play') ? [-1] : Number.isFinite(single) ? [single]
     : mapId ? [KNIFE_HIT_MOMENT / KNIFE_ATTACK_DURATION] : KNIFE_SAMPLES;
   for (const progress of progresses) {
-    const slot = makePovSlot(makeWeapon(false), 75, `${(progress * 100).toFixed(1)}%`);
+    const reloadProgress = Number(params.get('reload') ?? NaN);
+    const slot = makePovSlot(Number.isFinite(reloadProgress) ? makeReloading(Math.min(reloadProgress, 0.999))
+      : makeWeapon(false), 75, `${(progress * 100).toFixed(1)}%`);
     const knife = new Knife();
     knife.setEnabled(true);
     slot.camera.add(knife.root);
@@ -246,16 +249,17 @@ stats.style.cssText = 'position:fixed;right:6px;bottom:4px;color:#9fe;font:12px 
 document.body.appendChild(stats);
 renderer.info.autoReset = false;
 
-function poseKnife({ knife, progress }: NonNullable<Slot['knife']>): void {
+function poseKnife({ knife, progress }: NonNullable<Slot['knife']>): boolean {
   if (progress < 0) {
-    if (!knife.isAttacking) knife.trigger();
+    const started = !knife.isAttacking && knife.trigger();
     knife.update(1 / 60 / knifeSlowdown, false, 0);
-    return;
+    return started;
   }
   knife.reset();
   knife.setEnabled(true);
   knife.trigger();
   knife.update(progress * KNIFE_ATTACK_DURATION, false, 0);
+  return true;
 }
 
 function frame(): void {
@@ -263,7 +267,7 @@ function frame(): void {
   const height = window.innerHeight;
   for (const slot of slots) {
     arenas.get(slot.scene)?.update(1 / 60, slot.camera.position);
-    if (slot.knife) poseKnife(slot.knife);
+    if (slot.knife && poseKnife(slot.knife)) slot.weapon.cancelReload();
     const melee = slot.knife?.knife ?? null;
     slot.view.update(1 / 60, slot.weapon, 0, 0, 0, melee?.firearmLowering ?? 0);
     slot.arms?.update(1 / 60, slot.view, melee);

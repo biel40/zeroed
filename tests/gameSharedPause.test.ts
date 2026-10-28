@@ -1,7 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DynamicResolution } from '../src/core/DynamicResolution';
 import { Game } from '../src/core/Game';
 import { KNIFE_ATTACK_DURATION, Knife } from '../src/weapons/Knife';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
+import { Weapon } from '../src/weapons/Weapon';
+import { WeaponView } from '../src/weapons/WeaponView';
+import { installCanvasDocument } from './coopHarness';
+import * as THREE from 'three';
+
+let restoreDocument: () => void;
+beforeAll(() => { restoreDocument = installCanvasDocument(); });
+afterAll(() => restoreDocument());
 
 type Stub = Record<string, any>;
 const prototype = Game.prototype as unknown as Record<string, (this: Stub, ...args: unknown[]) => void>;
@@ -140,6 +149,71 @@ describe('weapon inspection input', () => {
 });
 
 describe('cinematic first-person visibility', () => {
+  it.each([[false, 0], [true, 0], [false, 3], [true, 3]] as const)(
+    'returns the M1911 after melee and auto-reloads only if empty (shared: %s, rounds: %s)', (shared, rounds) => {
+    const { game } = stubGame(shared, false);
+    const weapon = new Weapon(WEAPON_DEFINITIONS.m1911, () => 0.5);
+    const view = new WeaponView(weapon.definition, null);
+    const magazineHome = view.root.getObjectByName('m1911-magazine')!.position.clone();
+    const knife = new Knife();
+    weapon.ammoInMagazine = rounds;
+    const reserve = weapon.reserveAmmo;
+    weapon.reload();
+    weapon.update(weapon.definition.reloadTime * 0.5, { trigger: false, ads: false });
+    weapon.clearEvents();
+    view.update(0.016, weapon, 0, 0, 0);
+    game.arsenal.set('m1911', { weapon, view });
+    game.tmpMuzzle = new THREE.Vector3();
+    game.audio.playReloadStart = vi.fn();
+    game.audio.playReloadComplete = vi.fn();
+    game.input.leftButtonDown = false;
+    game.input.wasPressed = (code: string) => code === 'Digit3';
+    game.mode.usesFallbackAttack = () => knife.isAttacking;
+    game.mode.getMeleeArm = () => knife.enabled ? knife : null;
+    game.mode.update = (dt: number) => { knife.update(dt, false, 0); };
+    // A denied melee request leaves a legitimate reload running.
+    game.mode.onMeleeAttack = () => false;
+    prototype.frame.call(game);
+    expect(weapon.state).toBe('reloading');
+    game.mode.onMeleeAttack = (): boolean => { knife.setEnabled(true); return knife.trigger(); };
+    prototype.frame.call(game);
+    expect(weapon.state).toBe('ready');
+    expect(knife.isAttacking).toBe(true);
+    expect(weapon.ammoInMagazine).toBe(rounds);
+    expect(weapon.reserveAmmo).toBe(reserve);
+    game.input.wasPressed = (code: string) => code === 'KeyR';
+    prototype.frame.call(game);
+    expect(weapon.state).toBe('ready');
+    game.input.wasPressed = () => false;
+    for (let frame = 0; knife.isAttacking && frame < 80; frame++) prototype.frame.call(game);
+    expect(knife.isAttacking).toBe(false);
+    const magazine = view.root.getObjectByName('m1911-magazine')!;
+    const slide = view.root.getObjectByName('m1911-slide')!;
+    expect(magazine.visible).toBe(true);
+    expect(magazine.position.distanceTo(magazineHome)).toBeLessThan(1e-6);
+    expect(view.root.position.distanceTo(new THREE.Vector3(...weapon.definition.view.hip))).toBeLessThan(1e-6);
+    expect(Math.abs(view.root.rotation.x) + Math.abs(view.root.rotation.y) + Math.abs(view.root.rotation.z)).toBeLessThan(1e-5);
+    if (rounds === 0) expect(slide.position.z).toBeGreaterThan(0.03);
+    else expect(slide.position.z).toBeCloseTo(0, 6);
+    expect(weapon.ammoInMagazine).toBe(rounds);
+    expect(weapon.reserveAmmo).toBe(reserve);
+    // The next frame restarts the empty reload once the melee releases the weapon.
+    prototype.frame.call(game);
+    if (rounds > 0) {
+      expect(weapon.state).toBe('ready');
+      expect(weapon.ammoInMagazine).toBe(rounds);
+      expect(weapon.reserveAmmo).toBe(reserve);
+      return;
+    }
+    expect(weapon.state).toBe('reloading');
+    expect(weapon.ammoInMagazine).toBe(0);
+    expect(weapon.reserveAmmo).toBe(reserve);
+    for (let frame = 0; frame < 210; frame++) prototype.frame.call(game);
+    expect(weapon.state).toBe('ready');
+    expect(weapon.ammoInMagazine).toBe(weapon.definition.magazineSize);
+    expect(weapon.reserveAmmo).toBe(reserve! - weapon.definition.magazineSize);
+    expect(game.audio.playReloadComplete).toHaveBeenCalledOnce();
+  });
   it.each([
     [false, false], [false, true], [true, false], [true, true],
   ])('keeps the firearm visible through the smooth knife recovery (shared: %s, touch: %s)', (shared, touch) => {

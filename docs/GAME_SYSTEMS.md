@@ -15,7 +15,9 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 `Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. C alterna agachado/de pie y Z tumbado/de pie;
 los botones tactiles AGACHAR/TUMBAR usan las mismas acciones. Las posturas bajas
-reducen velocidad y altura de colision, con transicion suave de camara. Para
+reducen velocidad y altura de colision; la camara y el compañero aceleran y
+frenan gradualmente al cambiar de postura, conservando continuidad al invertir
+la transicion. Para
 levantarse debe caber el cuerpo bajo los obstaculos; Espacio desde una postura
 baja intenta levantarse sin saltar. No se cambia de postura en el aire, caido,
 muerto ni con los controles bloqueados. El comportamiento es compartido entre
@@ -208,7 +210,12 @@ existente a `MOTDRULES`.
   por delante y el golpe se resuelve
   cuando la hoja pasa por la mira. Al retirarse el cuchillo, el arma vuelve
   suavemente a su posicion durante la recuperacion, con las manos siguiendo
-  sus agarres, en individual y cooperativo. El barrido frontal abarca 100 grados y
+  sus agarres, en individual y cooperativo. Si el cuchillazo empieza durante
+  una recarga, la interrumpe y devuelve las piezas y la mano de apoyo al arma:
+  no modifica cargador ni reserva. Mientras dura el ataque no se inicia otra
+  recarga. Si el cargador estaba vacio, se inicia automaticamente al terminar
+  el cuchillazo; una recarga tactica se vuelve a solicitar con R.
+  El barrido frontal abarca 100 grados y
   alcanza 2.4 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
   un solo objetivo, priorizando la mira y despues la alineacion y proximidad;
   paredes y cuerpos interpuestos bloquean cada trayectoria. La seleccion y

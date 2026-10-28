@@ -51,6 +51,9 @@ describe.skipIf(!existsSync(path))('remote soldier asset contract', () => {
     };
     const standingY = settle();
     motion.stance = 'crouched';
+    avatar.update(1 / 60, motion);
+    avatar.group.updateMatrixWorld(true);
+    expect(standingY - avatar.group.getObjectByName('Head')!.getWorldPosition(new THREE.Vector3()).y).toBeLessThan(0.02);
     expect(settle()).toBeLessThan(standingY - 0.35);
     motion.stance = 'prone';
     expect(settle()).toBeLessThan(0.65);

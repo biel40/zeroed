@@ -9,6 +9,16 @@ const IDLE: RemoteAvatarMotion = {
 };
 
 describe('procedural co-op soldier', () => {
+  it('starts changing posture gently in the teammate view too', () => {
+    const avatar = createRemoteAvatar(null, false);
+    avatar.update(1, IDLE);
+    const before = new THREE.Box3().setFromObject(avatar.group).max.y;
+    avatar.update(1 / 60, { ...IDLE, stance: 'crouched' });
+    const after = new THREE.Box3().setFromObject(avatar.group).max.y;
+    expect(before - after).toBeGreaterThan(0);
+    expect(before - after).toBeLessThan(0.02);
+    avatar.dispose();
+  });
   it('lowers the crouched body and lays the prone body along the floor, then stands again', () => {
     const avatar = createRemoteAvatar(null, false);
     const bounds = (): THREE.Box3 => {

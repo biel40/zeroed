@@ -188,6 +188,20 @@ export class Weapon {
     return true;
   }
 
+  /** Interrupts an unfinished reload; ammunition changes only on completion. */
+  public cancelReload(): boolean {
+    if (this.weaponState !== 'reloading') return false;
+    this.weaponState = 'ready';
+    this.stateTimer = 0;
+    this.stateDuration = 0;
+    this.activeReloadType = null;
+    // Reload and melee can be requested in the same frame, before audio drains events.
+    for (let index = this.pendingEvents.length - 1; index >= 0; index--) {
+      if (this.pendingEvents[index].type === 'reloadStart') this.pendingEvents.splice(index, 1);
+    }
+    return true;
+  }
+
   equip(): void {
     this.activeReloadType = null;
     this.reloadAfterEquip =

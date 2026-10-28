@@ -7,6 +7,7 @@ import { getSettings } from '../core/PlayerSettings';
 import { blocksCircleMovement } from '../utils/collision';
 import { DEATH_FALL_DURATION, deathFallPose } from './DeathFall';
 import { requestedStance, STANCE, stanceEyeOffset, type PlayerStance } from './PlayerStance';
+import { StanceTransition } from './StanceTransition';
 
 const SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.02;
@@ -99,6 +100,7 @@ export class PlayerController {
   private deathFallElapsed: number | null = null;
   private cameraImpulse = 0;
   private currentStance: PlayerStance = 'standing';
+  private readonly stanceTransition = new StanceTransition();
   private deathStartY = 0;
 
   public get stance(): PlayerStance { return this.currentStance; }
@@ -149,6 +151,7 @@ export class PlayerController {
     this.currentFloor = floor;
     this.downedCamera = false;
     this.currentStance = 'standing';
+    this.stanceTransition.reset();
     this.deathFallElapsed = null;
     this.camera.position.set(0, 0, 0);
     if (bounds) this.bounds = bounds;
@@ -217,7 +220,9 @@ export class PlayerController {
       this.camera.rotation.set(weapon.recoil.pitch + this.cameraImpulse, weapon.recoil.yaw,
         this.downedCamera ? 0.06 : 0);
       const eyeOffset = stanceEyeOffset(this.currentStance);
-      this.camera.position.y = damp(this.camera.position.y, this.downedCamera ? -1.2 : eyeOffset, 12, dt);
+      const proneOffset = stanceEyeOffset('prone');
+      this.camera.position.y = proneOffset * this.stanceTransition.update(
+        (this.downedCamera ? -1.2 : eyeOffset) / proneOffset, dt);
     }
 
     // Digital keys plus the analog touch axes (virtual joystick); the clamp

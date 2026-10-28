@@ -66,6 +66,8 @@ export class Game {
   /** Every weapon the mode may use, preloaded once; the inventory picks slots. */
   private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
   private inventory!: WeaponInventory;
+  /** Empty firearm whose reload waits for the accepted melee to release the hands. */
+  private meleeReloadWeapon: Weapon | null = null;
   private readonly magazineDrops: MagazineDropPool;
   /** First-person arms and hands shared by every weapon view and the knife. */
   private readonly viewArms: ViewArms;
@@ -784,7 +786,8 @@ export class Game {
       // Selection is processed before actions, so reload/fire-mode apply to
       // the weapon visible in this frame rather than the stale pre-switch one.
       weapon = this.currentWeapon;
-      if (allowCombatInput && this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
+      if (allowCombatInput && !this.mode.usesFallbackAttack?.()
+        && this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
       if (allowCombatInput && this.input.wasPressed('KeyX')) weapon.cycleFireMode();
       // Inspecting is a desktop-only flourish: touch layouts get no button for it.
       if (allowCombatInput && !this.profile.useTouchControls && this.input.wasPressed('KeyF')) weapon.inspect();
@@ -795,7 +798,10 @@ export class Game {
         this.input.wasPressed('TouchKnife')
       )) {
         weapon.cancelInspect();
-        this.mode.onMeleeAttack?.();
+        if (this.mode.onMeleeAttack?.()) {
+          weapon.cancelReload();
+          this.meleeReloadWeapon = weapon.ammoInMagazine === 0 ? weapon : null;
+        }
       }
       allowGameplayInput =
         !this.paused &&
@@ -810,6 +816,13 @@ export class Game {
     if (!allowCombatInput) weapon.cancelInspect();
 
     const fallbackAttack = this.mode.usesFallbackAttack?.() ?? false;
+    if (this.meleeReloadWeapon) {
+      if (this.meleeReloadWeapon !== weapon || weapon.ammoInMagazine !== 0) this.meleeReloadWeapon = null;
+      else if (allowCombatInput && !fallbackAttack) {
+        this.meleeReloadWeapon = null;
+        if (weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
+      }
+    }
     if (!allowGameplayInput && !this.paused
       && (this.input.pointerLocked || this.profile.useTouchControls)
       && this.mode.isDownedLookEnabled?.()) {

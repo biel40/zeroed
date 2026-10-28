@@ -50,6 +50,8 @@ sufra tirones de compilacion de shaders.
   aplican la postura por separado. Cooperativo transmite `stance` y conserva esa
   misma ancla; el render remoto anima el cuerpo desde los pies y la autoridad
   ajusta el origen del cuchillo y la energia a la altura de la postura.
+  `StanceTransition` comparte la respuesta amortiguada entre la camara y las
+  vistas del compañero, sin depender de Three.js ni crear objetos por frame.
 - Las armas son datos (`WeaponDefinition`), no subclases. `Weapon` no importa
   Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`.
 - El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
@@ -58,6 +60,10 @@ sufra tirones de compilacion de shaders.
   la cuchillada sin convertirlo en un arma de proyectiles ficticia, y
   `getMeleeArm()` entrega el `Knife` como `MeleeArmDriver`: cuanto apartar el
   arma y cuanto de la mano derecha toma el tajo.
+  `onMeleeAttack()` confirma si el ataque se ha iniciado; solo entonces el
+  shell interrumpe la recarga mediante `Weapon.cancelReload()`, sin transferir
+  municion, y la vuelve a solicitar al terminar el melee si el arma sigue
+  equipada y vacia. Los modos no duplican la politica de interrupcion.
 - `ViewArms` es un servicio compartido de primera persona; `WeaponHands` adapta los agarres declarados por cada arma. Para sus restricciones visuales y motivos, consulta [agarres naturales](changes/natural-grips.md).
 - Logica determinista y vistas Three.js permanecen separadas para poder probar
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de

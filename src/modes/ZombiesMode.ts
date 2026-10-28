@@ -391,10 +391,10 @@ export class ZombiesMode implements GameMode {
     return (this.gasMask?.isAnimating ?? false) || (this.rings?.isDonning ?? false);
   }
 
-  public onMeleeAttack(): void {
-    if (!this.isGameplayInputEnabled() || this.handsBusy()) return;
+  public onMeleeAttack(): boolean {
+    if (!this.isGameplayInputEnabled() || this.handsBusy()) return false;
     this.knife.setEnabled(true);
-    this.knife.trigger();
+    return this.knife.trigger();
   }
 
   /** Resolve the visible slash against one unobstructed body in its frontal arc. */

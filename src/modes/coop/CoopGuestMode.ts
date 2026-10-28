@@ -285,10 +285,10 @@ export class CoopGuestMode implements GameMode {
       : this.match?.stats.host.reviver === 'guest' ? t('hud.reviving') : this.usesFallbackAttack() ? t('hud.knife') : null;
   }
 
-  public onMeleeAttack(): void {
-    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled()) return;
+  public onMeleeAttack(): boolean {
+    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled()) return false;
     this.knife.setEnabled(true);
-    this.knife.trigger();
+    return this.knife.trigger();
   }
 
   public getInteractPrompt(): string | null {

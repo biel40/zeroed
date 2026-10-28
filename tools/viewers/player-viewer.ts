@@ -40,6 +40,11 @@ const avatars = stances.map((stance, index) => {
 });
 document.getElementById('status')!.textContent = avatars.every(({ avatar }) => avatar.isSkinned) ? 'Soldado GLB · clips de postura activos' : 'Modelo procedural de reserva';
 document.getElementById('fire')!.onclick = (): void => { for (const { avatar } of avatars) avatar.playFire(); };
+document.getElementById('cycle-stance')!.onclick = (): void => {
+  const labels = { standing: 'De pie', crouched: 'Agachado', prone: 'Tumbado' };
+  for (const { motion } of avatars) motion.stance = stances[(stances.indexOf(motion.stance!) + 1) % stances.length];
+  document.getElementById('postures')!.textContent = avatars.map(({ motion }) => labels[motion.stance!]).join(' · ');
+};
 const moving = document.getElementById('moving') as HTMLInputElement;
 const aiming = document.getElementById('aiming') as HTMLInputElement;
 const reloading = document.getElementById('reloading') as HTMLInputElement;

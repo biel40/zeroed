@@ -12,6 +12,8 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m60&view=external`: muestra las siluetas hip y ADS desde fuera.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=ak47&view=closeup`: inspecciona el receptor y el cañón. Acepta `pose=ads`, `cam=x,y,z` y `look=x,y,z`.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m1911&view=knife`: fases del tajo del cuchillo con el arma bajando y la mira marcada. Acepta `t=0.3` (un fotograma, progreso 0..1) y `play=1&slow=4` (bucle ralentizado).
+  `ammo=empty` deja la corredera abierta; `reload=0.5` inicia la cuchillada a
+  mitad de una recarga vacia y aplica la misma cancelacion que el shell.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=ak47&view=reload`: fases de una recarga vacia con las dos manos. Acepta `t=0.5`.
 - `http://localhost:5173/tools/viewers/weapon-viewer.html?weapon=m4a1&view=rig`: el rig de primera persona visto desde fuera (alcance de los brazos, codos, plano cercano). Acepta `pose=ads`, `t=` (fotograma de una recarga vacia), `cam=`, `look=` y `fov=`; con `cam=0,0,0` y un `fov` cerrado sirve de lupa sobre una mano.
 - Las vistas en primera persona dibujan los brazos: `arms=0` los oculta y `detail=mobile|lowMemory` elige el nivel de detalle. La esquina inferior derecha muestra draw calls y triangulos del fotograma.
@@ -38,6 +40,7 @@ Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas
 de pie, agachado y tumbado, con movimiento, ADS, disparo y recarga. El enlace
 «Modelo de reserva» (`?fallback=1`) revisa las mismas posturas sin el GLB.
 La camara orbital permite comprobar silueta, suelo y orientacion del arma.
+«Cambiar posturas» permite revisar las transiciones y su inversion.
 
 ## Visor de mapas
 

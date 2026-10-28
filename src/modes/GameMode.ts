@@ -145,8 +145,8 @@ export interface GameMode {
   executeDeveloperCommand?(line: string): string;
   /** Interact key (E) pressed while gameplay input is active. */
   onInteract?(): void;
-  /** Dedicated quick-melee action; does not consume an inventory slot. */
-  onMeleeAttack?(): void;
+  /** True when a quick melee starts; the shell then cancels the equipped weapon's reload. */
+  onMeleeAttack?(): boolean;
   /**
    * The pause menu's RESTART action. The mode resets its own run state
    * (health, rounds, kills, economy, arsenal) and resumes play. Optional:

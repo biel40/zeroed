@@ -6,6 +6,7 @@ import { WEAPON_DEFINITIONS } from '../config/weapons';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import { buildWeaponDisplayModel } from '../weapons/WeaponView';
 import type { PlayerStance } from '../player/PlayerStance';
+import { StanceTransition } from '../player/StanceTransition';
 
 /**
  * Remote teammate body. The final look is a skinned, animated WWII infantry
@@ -184,6 +185,9 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
   private readonly reload: THREE.AnimationAction | null;
   private readonly death: THREE.AnimationAction | null;
   private readonly postureActions: readonly THREE.AnimationAction[];
+  private readonly standingTransition = new StanceTransition(1);
+  private readonly crouchTransition = new StanceTransition();
+  private readonly proneTransition = new StanceTransition();
   private readonly weaponGrip: THREE.Group;
   private readonly fallbackRifle: THREE.Object3D;
   private readonly weaponFacing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -325,24 +329,27 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
     const moving = motion.life === 'alive' && !motion.reviving && motion.speed > IDLE_THRESHOLD;
     const stance = motion.life === 'alive' ? motion.stance ?? 'standing' : 'standing';
     const standing = stance === 'standing';
+    const standingBlend = this.standingTransition.update(standing ? 1 : 0, dt);
+    const crouchBlend = this.crouchTransition.update(stance === 'crouched' ? 1 : 0, dt);
+    const proneBlend = this.proneTransition.update(stance === 'prone' ? 1 : 0, dt);
     const running = standing && !!this.run && motion.speed > RUN_THRESHOLD;
-    this.idleWeight = approach(this.idleWeight, standing && !moving ? 1 : 0, dt);
-    this.walkWeight = approach(this.walkWeight, standing && moving && !running ? 1 : 0, dt);
+    this.idleWeight = approach(this.idleWeight, !moving ? 1 : 0, dt);
+    this.walkWeight = approach(this.walkWeight, moving && !running ? 1 : 0, dt);
     this.runWeight = approach(this.runWeight, running ? 1 : 0, dt);
     this.aimWeight = approach(this.aimWeight, motion.aiming && !motion.reloading ? 1 : 0, dt);
     this.reloadWeight = approach(this.reloadWeight, motion.reloading ? 1 : 0, dt);
     const direction = motion.forwardSpeed < -0.3 ? -1 : 1;
-    const postureIndex = stance === 'crouched' ? (moving ? 1 : 0) : stance === 'prone' ? (moving ? 3 : 2) : -1;
     for (let index = 0; index < this.postureActions.length; index++) {
       const action = this.postureActions[index];
-      action.setEffectiveWeight(approach(action.getEffectiveWeight(), index === postureIndex ? 1 : 0, dt));
+      const stanceBlend = index < 2 ? crouchBlend : proneBlend;
+      action.setEffectiveWeight(stanceBlend * (index % 2 === 0 ? this.idleWeight : 1 - this.idleWeight));
       action.timeScale = index % 2 === 0 ? 1 : direction * THREE.MathUtils.clamp(motion.speed / (index === 1 ? 2.5 : 1.1), 0.4, 1.8);
     }
-    this.idle.setEffectiveWeight(this.idleWeight);
-    this.walk.setEffectiveWeight(this.walkWeight);
+    this.idle.setEffectiveWeight(this.idleWeight * standingBlend);
+    this.walk.setEffectiveWeight(this.walkWeight * standingBlend);
     this.walk.timeScale = direction * THREE.MathUtils.clamp(motion.speed / WALK_CLIP_SPEED, 0.6, 2.4);
     if (this.run) {
-      this.run.setEffectiveWeight(this.runWeight);
+      this.run.setEffectiveWeight(this.runWeight * standingBlend);
       this.run.timeScale = direction * THREE.MathUtils.clamp(motion.speed / RUN_CLIP_SPEED, 0.7, 1.6);
     }
     this.aim?.setEffectiveWeight(this.aimWeight);
@@ -404,6 +411,8 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
   private deathBlend = 0;
   private crouchBlend = 0;
   private proneBlend = 0;
+  private readonly crouchTransition = new StanceTransition();
+  private readonly proneTransition = new StanceTransition();
 
   public constructor(castShadow: boolean, getWeaponModel: (id: WeaponId) => THREE.Group | null) {
     // Parts were authored around the eye point; the body group lifts them onto the feet origin.
@@ -557,8 +566,8 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
 
   public update(dt: number, motion: Readonly<RemoteAvatarMotion>): void {
     const stance = motion.life === 'alive' ? motion.stance ?? 'standing' : 'standing';
-    this.crouchBlend = approach(this.crouchBlend, stance === 'crouched' ? 1 : 0, dt);
-    this.proneBlend = approach(this.proneBlend, stance === 'prone' ? 1 : 0, dt);
+    this.crouchBlend = this.crouchTransition.update(stance === 'crouched' ? 1 : 0, dt);
+    this.proneBlend = this.proneTransition.update(stance === 'prone' ? 1 : 0, dt);
     const moving = motion.life === 'alive' && !motion.reviving ? Math.min(1, motion.speed / 4.4) : 0;
     this.walkBlend = approach(this.walkBlend, moving, dt);
     const direction = motion.forwardSpeed < -0.3 ? -1 : 1;

@@ -59,6 +59,35 @@ describe('Weapon fire cadence', () => {
 });
 
 describe('Weapon ammo and reload', () => {
+  it.each([0, 3])('cancels a reload with %s rounds without granting ammo or keeping queued reload events', (rounds) => {
+    const weapon = makeWeapon('m1911');
+    weapon.ammoInMagazine = rounds;
+    const reserve = weapon.reserveAmmo;
+    weapon.reload();
+    weapon.update(weapon.definition.reloadTime * 0.5, IDLE);
+    expect(weapon.cancelReload()).toBe(true);
+    expect(weapon.state).toBe('ready');
+    expect(weapon.reloadType).toBeNull();
+    expect(weapon.pendingEvents.some((event) => event.type === 'reloadStart')).toBe(false);
+    step(weapon, weapon.definition.reloadTime + 1);
+    expect(weapon.ammoInMagazine).toBe(rounds);
+    expect(weapon.reserveAmmo).toBe(reserve);
+    expect(weapon.reload()).toBe(true);
+    step(weapon, weapon.definition.reloadTime + 1);
+    expect(weapon.ammoInMagazine).toBe(weapon.definition.magazineSize);
+    expect(weapon.reserveAmmo).toBe(reserve! - (weapon.definition.magazineSize - rounds));
+  });
+
+  it('does not cancel equipping or bolt cycling when no reload is active', () => {
+    const weapon = makeWeapon('l96');
+    weapon.equip();
+    expect(weapon.cancelReload()).toBe(false);
+    expect(weapon.state).toBe('equipping');
+    step(weapon, weapon.definition.equipTime + DT);
+    step(weapon, DT, { trigger: true, ads: false });
+    expect(weapon.cancelReload()).toBe(false);
+    expect(weapon.state).toBe('cycling');
+  });
   it('completes a tactical reload sooner than an empty reload', () => {
     const tactical = makeWeapon('m4a1');
     const empty = makeWeapon('m4a1');

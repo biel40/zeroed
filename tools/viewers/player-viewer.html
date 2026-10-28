@@ -13,12 +13,13 @@
   </head>
   <body>
     <div id="panel">
-      <p>De pie · Agachado · Tumbado</p>
+      <p id="postures">De pie · Agachado · Tumbado</p>
       <a href="?">Soldado GLB</a><a href="?fallback=1">Modelo de reserva</a>
       <label><input id="moving" type="checkbox" /> Movimiento</label>
       <label><input id="aiming" type="checkbox" /> Apuntar</label>
       <label><input id="reloading" type="checkbox" /> Recargar</label>
       <button id="fire">Disparar</button>
+      <button id="cycle-stance">Cambiar posturas</button>
       <p id="status">Cargando…</p>
     </div>
     <script type="module" src="./player-viewer.ts"></script>

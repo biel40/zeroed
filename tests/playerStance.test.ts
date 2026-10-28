@@ -23,6 +23,29 @@ function setup(): { player: PlayerController; input: InputState; tick: (frames?:
 }
 
 describe('shared player stances', () => {
+  it('eases into and out of a posture instead of starting with a large camera step', () => {
+    const { player, input, tick } = setup();
+    input.setKey('KeyZ', true);
+    tick();
+    const firstStep = -player.camera.position.y;
+    expect(firstStep).toBeLessThan(0.025);
+    let previous = player.camera.position.y;
+    let largestStep = firstStep;
+    for (let frame = 0; frame < 90; frame++) {
+      tick();
+      expect(player.camera.position.y).toBeLessThanOrEqual(previous);
+      largestStep = Math.max(largestStep, previous - player.camera.position.y);
+      previous = player.camera.position.y;
+    }
+    expect(largestStep).toBeLessThan(0.1);
+    expect(player.camera.position.y).toBeCloseTo(-1.25, 3);
+    input.setKey('KeyZ', false);
+    input.setKey('KeyZ', true);
+    tick();
+    expect(player.camera.position.y - previous).toBeLessThan(0.025);
+    tick(90);
+    expect(player.camera.position.y).toBeCloseTo(0, 3);
+  });
   it('toggles crouch/prone with a stable floor anchor and smooth eye height', () => {
     const { player, input, tick } = setup();
     input.setKey('KeyC', true);
