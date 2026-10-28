@@ -20,6 +20,7 @@ import {
 } from '../../network/Protocol';
 import { ShotValidator } from '../../network/ShotValidator';
 import { EYE_HEIGHT } from '../../player/PlayerController';
+import { stanceEyeOffset } from '../../player/PlayerStance';
 import { RemotePlayer } from '../../rendering/RemotePlayer';
 import { ReviveGesture } from '../../rendering/ReviveGesture';
 import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
@@ -437,7 +438,7 @@ export class CoopHostMode implements GameMode {
           const state = this.guestState;
           const length = Math.hypot(message.direction.x, message.direction.y, message.direction.z);
           if (config && state && length > 0.8 && length < 1.2) {
-            this.energy.fire(new THREE.Vector3(state.x, state.y, state.z),
+            this.energy.fire(new THREE.Vector3(state.x, state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance)), state.z),
               new THREE.Vector3(message.direction.x / length, message.direction.y / length,
                 message.direction.z / length), config, 1);
           }
@@ -565,7 +566,7 @@ export class CoopHostMode implements GameMode {
     const previous = this.guestState;
     if (this.players.guest.life.state !== 'alive' && previous) {
       state = { ...state, x: previous.x, y: previous.y, z: previous.z, floor: previous.floor,
-        repairBarrierId: null, ads: false, reloading: false };
+        repairBarrierId: null, ads: false, reloading: false, stance: 'standing', eyeOffsetY: 0 };
     }
     let accepted = state;
     if (previous) {
@@ -629,7 +630,7 @@ export class CoopHostMode implements GameMode {
     const zombie = this.zombies.findByNetworkId(zombieId);
     if (!zombie?.isAlive || zombie.floor !== state.floor) return;
     this.zombies.group.updateMatrixWorld(true);
-    this.knifeOrigin.set(state.x, state.y, state.z);
+    this.knifeOrigin.set(state.x, state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance)), state.z);
     this.tmpDirection.set(-Math.sin(state.yaw) * Math.cos(state.pitch), Math.sin(state.pitch),
       -Math.cos(state.yaw) * Math.cos(state.pitch));
     if (!this.knifeCombat.findImpact(this.knifeOrigin, this.tmpDirection, state.floor, this.ctx.hitColliders, zombie)) return;
@@ -681,7 +682,8 @@ export class CoopHostMode implements GameMode {
         const chain = this.zombies.applyChainLightning(zombie, CHAIN_ZAP_DAMAGE, part);
         if (part === 'head' && zombie.isAlive) this.players[shooter].economy.awardHit(true);
         const muzzle = shooter === 'host' ? this.ctx.player.camera.getWorldPosition(new THREE.Vector3())
-          : this.guestState ? new THREE.Vector3(this.guestState.x, this.guestState.y, this.guestState.z) : point.clone();
+          : this.guestState ? new THREE.Vector3(this.guestState.x,
+            this.guestState.y + (this.guestState.eyeOffsetY ?? stanceEyeOffset(this.guestState.stance)), this.guestState.z) : point.clone();
         const points = [muzzle, ...chain.map((entry) =>
           new THREE.Vector3(entry.position.x, entry.position.y + 1.1, entry.position.z))];
         this.chain.discharge(points);

@@ -845,8 +845,9 @@ export class Game {
       this.input.mouseDeltaY,
       melee?.firearmLowering ?? 0,
     );
-    // WeaponView sets scope visibility in update; apply shell gates afterwards.
-    this.currentView.root.visible &&= fallbackName === null && cinematicCamera === null && !this.player.isDying;
+    // Melee already animates the firearm down and back up; the HUD name must
+    // not hide that motion. Preserve scope visibility and cinematic/death gates.
+    this.currentView.root.visible &&= cinematicCamera === null && !this.player.isDying;
     this.viewArms.update(dt, this.currentView, melee);
     this.viewArms.root.visible = cinematicCamera === null;
     if (this.currentView.root.visible) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { stanceEyeOffset } from '../../player/PlayerStance';
 import { t } from '../../i18n/i18n';
 import { doorPrompt, wallBuyPrompt } from '../../ui/InteractionPrompts';
 import { defaultNow } from '../../network/Interpolation';
@@ -99,6 +100,8 @@ export class CoopWorld {
       yaw: player.rig.rotation.y,
       pitch: Math.asin(THREE.MathUtils.clamp(this.tmpDirection.y, -1, 1)),
       floor: player.floor,
+      stance: player.stance,
+      eyeOffsetY: THREE.MathUtils.clamp(player.camera.position.y, stanceEyeOffset('prone'), 0),
       weapon: weapon.definition.id,
       ads: weapon.adsAlpha > 0.5,
       reloading: weapon.state === 'reloading',

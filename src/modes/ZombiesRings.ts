@@ -6,6 +6,7 @@ import { PlayerRings } from '../game/rings/PlayerRings';
 import { RING_DEFINITIONS, type RingId } from '../game/rings/RingCatalog';
 import { t } from '../i18n/i18n';
 import { getUpPose } from '../player/ReviveGetUp';
+import { stanceEyeOffset } from '../player/PlayerStance';
 import { actionKey } from '../ui/InteractionPrompts';
 import { RingDonning } from '../weapons/RingDonning';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
@@ -170,8 +171,8 @@ export class ZombiesRings {
 
   /**
    * Plays the get-up on the camera. Runs after the player controller wrote
-   * its pose this frame: the drop replaces the eye height (which eases back
-   * on its own once standing) and the slump adds to the recoil rotation.
+   * its pose this frame: the drop stays below the chosen posture's eye height
+   * and the slump adds to the recoil rotation.
    */
   update(dt: number): void {
     this.donning.update(dt);
@@ -180,7 +181,7 @@ export class ZombiesRings {
     this.getUpElapsed += Math.max(0, dt);
     const pose = getUpPose(this.getUpElapsed, this.getUpDuration);
     const camera = this.ctx.player.camera;
-    camera.position.y = -pose.drop;
+    camera.position.y = Math.min(stanceEyeOffset(this.ctx.player.stance), -pose.drop);
     camera.rotation.x += pose.pitch;
     camera.rotation.z += pose.roll;
     if (this.getUpElapsed >= this.getUpDuration) this.getUpElapsed = null;

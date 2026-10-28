@@ -83,6 +83,10 @@ export const en = {
   'controls.interact': 'Interact',
   'controls.knife': 'Knife',
   'controls.jump': 'Jump',
+  'controls.crouch': 'Crouch / stand up',
+  'controls.prone': 'Go prone / stand up',
+  'touch.crouch': 'CROUCH',
+  'touch.prone': 'PRONE',
   'controls.slots': 'Weapon slots',
   'controls.release': 'Release mouse',
 

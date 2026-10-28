@@ -61,11 +61,11 @@ describe('mobile stylesheet cascade', () => {
     expect(html).not.toContain('id="btn-jump"');
     expect(html).not.toContain('id="btn-ads"');
     expect(html).not.toContain('id="btn-mode"');
-    for (const action of ['fire', 'knife', 'reload', 'interact', 'swap-weapon', 'pause']) {
+    for (const action of ['fire', 'knife', 'reload', 'interact', 'swap-weapon', 'pause', 'crouch', 'prone']) {
       expect(html).toContain(`data-action="${action}"`);
     }
     const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('</div>\n\n      <div id="hud-weapon"'));
-    expect(touchControls.match(/data-action=/g)).toHaveLength(6);
+    expect(touchControls.match(/data-action=/g)).toHaveLength(8);
     expect(touchControls).toContain('id="btn-knife"');
   });
 

@@ -49,7 +49,7 @@ test('private room connects two players, forwards peer messages and rejects a th
   third.send(JSON.stringify({ type: 'join', code: created.code }));
   assert.equal((await nextMessage(third)).type, 'error');
 
-  const state = { t: 1, x: 1, y: 1.7, z: 4, yaw: 0, pitch: 0, floor: 0, weapon: 'm1911', ads: false, reloading: false };
+  const state = { t: 1, x: 1, y: 1.7, z: 4, yaw: 0, pitch: 0, floor: 0, weapon: 'm1911', ads: false, reloading: false, stance: 'prone' };
   guest.send(JSON.stringify({ type: 'playerState', state }));
   assert.deepEqual(await nextMessage(host), { type: 'playerState', state });
   guest.send(JSON.stringify({ type: 'doorPurchase', doorId: 'to-dining' }));

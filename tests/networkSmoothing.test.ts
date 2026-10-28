@@ -17,6 +17,21 @@ function playerState(t: number, x: number, overrides: Partial<PlayerNetState> = 
 afterEach(() => { vi.useRealTimers(); });
 
 describe('snapshot interpolation', () => {
+  it('passes posture to the avatar without moving the feet anchor and defaults legacy snapshots to standing', () => {
+    const update = vi.fn();
+    const avatar: RemoteAvatar = { group: new THREE.Group(), isSkinned: false,
+      update, setWeapon: vi.fn(), playFire: vi.fn(), dispose: vi.fn() };
+    const remote = new RemotePlayer(avatar);
+    remote.push(playerState(1, 0, { stance: 'prone' }));
+    remote.update(1 / 60);
+    expect(update.mock.calls.at(-1)?.[1].stance).toBe('prone');
+    expect(remote.root.position.y).toBeCloseTo(0);
+    remote.clear();
+    remote.push(playerState(2, 0));
+    remote.update(1 / 60);
+    expect(update.mock.calls.at(-1)?.[1].stance).toBe('standing');
+    remote.dispose();
+  });
   it('brackets render time between samples and holds at the edges without extrapolating', () => {
     const buffer = new SnapshotBuffer<Sample>(4);
     const out: SampleBracket<Sample> = { from: null, to: null, alpha: 0 };

@@ -44,6 +44,12 @@ sufra tirones de compilacion de shaders.
 
 ## Contratos
 
+- `PlayerStance` concentra las posturas, alturas y multiplicadores de movimiento
+  sin depender de Three.js. `PlayerController.rig` conserva el ancla del ojo de
+  pie usada por mapas, plantas y navegacion; la camara y el volumen de colision
+  aplican la postura por separado. Cooperativo transmite `stance` y conserva esa
+  misma ancla; el render remoto anima el cuerpo desde los pies y la autoridad
+  ajusta el origen del cuchillo y la energia a la altura de la postura.
 - Las armas son datos (`WeaponDefinition`), no subclases. `Weapon` no importa
   Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`.
 - El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del

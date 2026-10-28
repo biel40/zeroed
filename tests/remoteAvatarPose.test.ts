@@ -9,6 +9,27 @@ const IDLE: RemoteAvatarMotion = {
 };
 
 describe('procedural co-op soldier', () => {
+  it('lowers the crouched body and lays the prone body along the floor, then stands again', () => {
+    const avatar = createRemoteAvatar(null, false);
+    const bounds = (): THREE.Box3 => {
+      avatar.group.updateMatrixWorld(true);
+      return new THREE.Box3().setFromObject(avatar.group);
+    };
+    avatar.update(1, IDLE);
+    const standing = bounds();
+    for (let i = 0; i < 90; i++) avatar.update(1 / 60, { ...IDLE, stance: 'crouched' });
+    const crouched = bounds();
+    expect(crouched.max.y).toBeLessThan(standing.max.y - 0.4);
+    expect(crouched.min.y).toBeGreaterThan(-0.1);
+    for (let i = 0; i < 90; i++) avatar.update(1 / 60, { ...IDLE, stance: 'prone', speed: 1 });
+    const prone = bounds();
+    expect(prone.max.y).toBeLessThan(0.8);
+    expect(prone.min.y).toBeGreaterThan(-0.1);
+    expect(prone.max.z - prone.min.z).toBeGreaterThan(1);
+    for (let i = 0; i < 90; i++) avatar.update(1 / 60, IDLE);
+    expect(bounds().max.y).toBeCloseTo(standing.max.y, 3);
+    avatar.dispose();
+  });
   it('keeps the pistol grip in the right hand and points the muzzle forward', () => {
     const avatar = createRemoteAvatar(null, false);
     avatar.update(1 / 30, IDLE);

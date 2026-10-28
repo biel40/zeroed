@@ -159,6 +159,16 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   visible sigue el ID del último estado del jugador y reutiliza los modelos
   de exhibición del arsenal; el arma de reserva aparece solo si el ID no se puede
   resolver. Ambos jugadores aparecen frente a frente en la sala inicial.
+- Las posturas voluntarias de pie, agachado y tumbado comparten controles y
+  colisiones con individual. `PlayerNetState.stance` se valida y replica en ambos
+  sentidos; su ausencia en snapshots antiguos significa de pie. `eyeOffsetY`
+  conserva la altura real del disparo y cuchillo durante la transicion suave.
+  El ancla de
+  posicion conserva la altura de pie para no alterar escaleras ni plantas.
+  El soldado GLB incluye idle y locomocion para las posturas bajas, y el cuerpo
+  procedural de reserva tambien las representa. Apuntar, disparar y recargar
+  siguen disponibles; estar tumbado no equivale al estado de salud `DOWNED`.
+  Es una ampliacion compatible del protocolo 6 y no requiere cambiar el relay.
 - La suite cubre dos modos reales conectados por un relay en memoria
   (`tests/coopMatch.test.ts`): rondas, combate, puertas, desconexión y
   reinicio. Sigue haciendo falta prueba manual con Pointer Lock real, latencia

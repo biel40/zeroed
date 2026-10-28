@@ -5,6 +5,7 @@ import type { WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxSnapshot } from '../zombies/MysteryBox';
 import { isZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from '../zombies/ZombieDeath';
 import type { SecretRoomSnapshot } from '../zombies/secret-room/SecretRoomSystem';
+import { isPlayerStance, stanceEyeOffset, type PlayerStance } from '../player/PlayerStance';
 
 /**
  * Wire contract of the two-player co-op. The relay only pairs sockets and
@@ -27,7 +28,7 @@ export interface Vec3 {
 /** Networked gameplay state of one player. `t` is the sender clock in seconds. */
 export interface PlayerNetState {
   readonly t: number;
-  /** Eye position (camera rig), not the feet. */
+  /** Standing eye anchor (camera rig), not the feet; stance lowers the view separately. */
   readonly x: number;
   readonly y: number;
   readonly z: number;
@@ -37,6 +38,10 @@ export interface PlayerNetState {
   readonly weapon: WeaponId;
   readonly ads: boolean;
   readonly reloading: boolean;
+  /** Omitted by older clients, interpreted as standing. */
+  readonly stance?: PlayerStance;
+  /** Actual view offset during the smooth transition; legacy snapshots use the stance height. */
+  readonly eyeOffsetY?: number;
   readonly repairBarrierId?: string | null;
 }
 
@@ -219,6 +224,9 @@ export function isPlayerNetState(value: unknown): value is PlayerNetState {
     && Number.isInteger(value.floor)
     && isWeaponId(value.weapon)
     && typeof value.ads === 'boolean' && typeof value.reloading === 'boolean'
+    && (value.stance === undefined || isPlayerStance(value.stance))
+    && (value.eyeOffsetY === undefined || (isFiniteNumber(value.eyeOffsetY)
+      && value.eyeOffsetY >= stanceEyeOffset('prone') && value.eyeOffsetY <= 0))
     && (value.repairBarrierId === undefined || value.repairBarrierId === null || isId(value.repairBarrierId));
 }
 

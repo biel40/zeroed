@@ -23,8 +23,12 @@ const CLIPS = {
   fire: 'Fire',
   reload: 'Reload',
   death: 'Death',
+  'crouch-idle': 'CrouchIdle',
+  'crouch-walk': 'CrouchWalk',
+  'prone-idle': 'ProneIdle',
+  'prone-crawl': 'ProneCrawl',
 };
-const REQUIRED = ['character', 'idle', 'walk'];
+const REQUIRED = ['character', 'idle', 'walk', 'crouch-idle', 'crouch-walk', 'prone-idle', 'prone-crawl'];
 const CONVERTER_ARGS = ['--anim-framerate', 'bake30', '--pbr-metallic-roughness'];
 
 async function toGlb(name, workDir) {

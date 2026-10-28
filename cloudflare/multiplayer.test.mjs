@@ -42,7 +42,7 @@ test('Durable Object room creates, joins, relays and closes with the host', asyn
   assert.deepEqual(await joinedHost, { type: 'peerJoined' });
 
   await assert.rejects(connect('guest', code));
-  const state = { t: 1, x: 1, y: 1.7, z: 4, yaw: 0, pitch: 0, floor: 0, weapon: 'm1911', ads: false, reloading: false };
+  const state = { t: 1, x: 1, y: 1.7, z: 4, yaw: 0, pitch: 0, floor: 0, weapon: 'm1911', ads: false, reloading: false, stance: 'prone' };
   guest.send(JSON.stringify({ type: 'playerState', state }));
   assert.deepEqual(await nextMessage(host, 'playerState'), { type: 'playerState', state });
   guest.send(JSON.stringify({ type: 'peerLeft' }));

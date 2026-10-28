@@ -5,6 +5,7 @@ import type { PlayerLifeState } from '../network/Protocol';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import { buildWeaponDisplayModel } from '../weapons/WeaponView';
+import type { PlayerStance } from '../player/PlayerStance';
 
 /**
  * Remote teammate body. The final look is a skinned, animated WWII infantry
@@ -31,6 +32,7 @@ export interface RemoteAvatarMotion {
   alive: boolean;
   life: PlayerLifeState;
   reviving: boolean;
+  stance?: PlayerStance;
 }
 
 /** World-space body only: no camera, input, HUD or first-person weapon. Origin at the feet, facing -Z. */
@@ -111,7 +113,8 @@ class RemoteWeaponMount {
   }
 }
 
-export type ClipRole = 'idle' | 'walk' | 'run' | 'aim' | 'fire' | 'reload' | 'death';
+export type ClipRole = 'idle' | 'walk' | 'run' | 'aim' | 'fire' | 'reload' | 'death'
+  | 'crouchIdle' | 'crouchWalk' | 'proneIdle' | 'proneCrawl';
 
 const CLIP_PATTERNS: Readonly<Record<ClipRole, RegExp>> = {
   idle: /idle/i,
@@ -121,6 +124,10 @@ const CLIP_PATTERNS: Readonly<Record<ClipRole, RegExp>> = {
   fire: /fire|shoot/i,
   reload: /reload/i,
   death: /death|die|dying/i,
+  crouchIdle: /^crouchidle$/i,
+  crouchWalk: /^crouchwalk$/i,
+  proneIdle: /^proneidle$/i,
+  proneCrawl: /^pronecrawl$/i,
 };
 /** Bones driven by aim/fire/reload layers; legs and hips stay on locomotion. Covers Mixamo and Quaternius rigs. */
 const UPPER_BODY_BONE = /spine|chest|torso|abdomen|neck|head|clavicle|shoulder|arm|elbow|wrist|hand|fist|palm|finger|thumb|index|middle|ring|pinky/i;
@@ -147,7 +154,8 @@ export function findClip<T extends { readonly name: string }>(clips: readonly T[
 
 function upperBodyClip(clip: THREE.AnimationClip): THREE.AnimationClip {
   const tracks = clip.tracks.filter((track) =>
-    UPPER_BODY_BONE.test(THREE.PropertyBinding.parseTrackName(track.name).nodeName));
+    UPPER_BODY_BONE.test(THREE.PropertyBinding.parseTrackName(track.name).nodeName))
+    .map((track) => track.clone());
   return new THREE.AnimationClip(`${clip.name}_upper`, clip.duration, tracks);
 }
 
@@ -175,6 +183,10 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
   private readonly fire: THREE.AnimationAction | null;
   private readonly reload: THREE.AnimationAction | null;
   private readonly death: THREE.AnimationAction | null;
+  private readonly postureActions: readonly THREE.AnimationAction[];
+  private readonly weaponGrip: THREE.Group;
+  private readonly fallbackRifle: THREE.Object3D;
+  private readonly weaponFacing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
   private readonly pitchBone: THREE.Bone | null;
   private readonly reachBone: THREE.Bone | null;
   private readonly reachBoneRest = new THREE.Quaternion();
@@ -195,6 +207,9 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
     const idleClip = findClip(source.clips, 'idle');
     const walkClip = findClip(source.clips, 'walk');
     if (!idleClip || !walkClip) throw new Error('Soldier GLB needs at least Idle and Walk clips');
+    const postureClips = (['crouchIdle', 'crouchWalk', 'proneIdle', 'proneCrawl'] as const)
+      .map((role) => findClip(source.clips, role));
+    if (postureClips.some((clip) => !clip)) throw new Error('Soldier GLB needs posture locomotion clips');
 
     this.model = cloneSkeleton(source.scene);
     this.model.updateMatrixWorld(true);
@@ -209,6 +224,8 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
     const fallbackRifle = this.model.getObjectByName('teammate-rifle');
     if (!fallbackRifle?.parent) throw new Error('Soldier GLB needs its weapon grip anchor');
     const weaponGrip = new THREE.Group();
+    this.weaponGrip = weaponGrip;
+    this.fallbackRifle = fallbackRifle;
     weaponGrip.name = 'remote-weapon-grip';
     weaponGrip.position.copy(fallbackRifle.position);
     weaponGrip.quaternion.copy(fallbackRifle.quaternion)
@@ -246,14 +263,15 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
     this.mixer = new THREE.AnimationMixer(this.model);
     this.idle = this.loop(idleClip, 1);
     this.walk = this.loop(walkClip, 0);
+    this.postureActions = postureClips.map((clip) => this.loop(clip as THREE.AnimationClip, 0));
     const runClip = findClip(source.clips, 'run');
     this.run = runClip ? this.loop(runClip, 0) : null;
     const aimClip = findClip(source.clips, 'aim');
-    this.aim = aimClip ? this.loop(upperBodyClip(aimClip), 0) : null;
+    this.aim = aimClip ? this.loop(THREE.AnimationUtils.makeClipAdditive(upperBodyClip(aimClip), 0, idleClip), 0) : null;
     const reloadClip = findClip(source.clips, 'reload');
-    this.reload = reloadClip ? this.loop(upperBodyClip(reloadClip), 0) : null;
+    this.reload = reloadClip ? this.loop(THREE.AnimationUtils.makeClipAdditive(upperBodyClip(reloadClip), 0, idleClip), 0) : null;
     const fireClip = findClip(source.clips, 'fire');
-    this.fire = fireClip ? this.once(upperBodyClip(fireClip), false) : null;
+    this.fire = fireClip ? this.once(THREE.AnimationUtils.makeClipAdditive(upperBodyClip(fireClip), 0, idleClip), false) : null;
     const deathClip = findClip(source.clips, 'death');
     this.death = deathClip ? this.once(deathClip, true) : null;
   }
@@ -268,10 +286,12 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
       this.dead = false;
       this.death?.stop();
       // A completed fade-out disables the action; reset() re-enables it.
-      for (const action of [this.idle, this.walk, this.run, this.aim, this.reload]) action?.reset().play();
+      for (const action of [this.idle, this.walk, this.run, this.aim, this.reload, ...this.postureActions]) action?.reset().play();
     }
     if (!this.dead) this.blendLocomotion(dt, motion);
     this.mixer.update(dt);
+    this.weaponGrip.position.copy(this.fallbackRifle.position);
+    this.weaponGrip.quaternion.copy(this.fallbackRifle.quaternion).multiply(this.weaponFacing);
     if (this.pitchBone && !this.dead) {
       if (!this.pitchBoneAnimated) this.pitchBone.quaternion.copy(this.pitchBoneRest);
       this.pitchBone.quaternion.multiply(this.tmpQuaternion.setFromAxisAngle(X_AXIS, -motion.pitch * PITCH_SHARE));
@@ -303,13 +323,21 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
 
   private blendLocomotion(dt: number, motion: Readonly<RemoteAvatarMotion>): void {
     const moving = motion.life === 'alive' && !motion.reviving && motion.speed > IDLE_THRESHOLD;
-    const running = !!this.run && motion.speed > RUN_THRESHOLD;
-    this.idleWeight = approach(this.idleWeight, moving ? 0 : 1, dt);
-    this.walkWeight = approach(this.walkWeight, moving && !running ? 1 : 0, dt);
+    const stance = motion.life === 'alive' ? motion.stance ?? 'standing' : 'standing';
+    const standing = stance === 'standing';
+    const running = standing && !!this.run && motion.speed > RUN_THRESHOLD;
+    this.idleWeight = approach(this.idleWeight, standing && !moving ? 1 : 0, dt);
+    this.walkWeight = approach(this.walkWeight, standing && moving && !running ? 1 : 0, dt);
     this.runWeight = approach(this.runWeight, running ? 1 : 0, dt);
-    this.aimWeight = approach(this.aimWeight, moving && motion.aiming && !motion.reloading ? 1 : 0, dt);
-    this.reloadWeight = approach(this.reloadWeight, moving && motion.reloading ? 1 : 0, dt);
+    this.aimWeight = approach(this.aimWeight, motion.aiming && !motion.reloading ? 1 : 0, dt);
+    this.reloadWeight = approach(this.reloadWeight, motion.reloading ? 1 : 0, dt);
     const direction = motion.forwardSpeed < -0.3 ? -1 : 1;
+    const postureIndex = stance === 'crouched' ? (moving ? 1 : 0) : stance === 'prone' ? (moving ? 3 : 2) : -1;
+    for (let index = 0; index < this.postureActions.length; index++) {
+      const action = this.postureActions[index];
+      action.setEffectiveWeight(approach(action.getEffectiveWeight(), index === postureIndex ? 1 : 0, dt));
+      action.timeScale = index % 2 === 0 ? 1 : direction * THREE.MathUtils.clamp(motion.speed / (index === 1 ? 2.5 : 1.1), 0.4, 1.8);
+    }
     this.idle.setEffectiveWeight(this.idleWeight);
     this.walk.setEffectiveWeight(this.walkWeight);
     this.walk.timeScale = direction * THREE.MathUtils.clamp(motion.speed / WALK_CLIP_SPEED, 0.6, 2.4);
@@ -324,7 +352,7 @@ class SkinnedSoldierAvatar implements RemoteAvatar {
   private enterDeath(): void {
     if (this.dead) return;
     this.dead = true;
-    for (const action of [this.idle, this.walk, this.run, this.aim, this.reload, this.fire]) action?.fadeOut(0.2);
+    for (const action of [this.idle, this.walk, this.run, this.aim, this.reload, this.fire, ...this.postureActions]) action?.fadeOut(0.2);
     this.death?.reset().setEffectiveWeight(1).fadeIn(0.15).play();
   }
 
@@ -354,7 +382,10 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
   public readonly isSkinned = false;
 
   private readonly body = new THREE.Group();
+  private readonly head = new THREE.Group();
   private readonly legs: [THREE.Group, THREE.Group];
+  private readonly knees: THREE.Group[] = [];
+  private readonly feet: THREE.Group[] = [];
   private readonly arms: [THREE.Group, THREE.Group];
   private readonly forearms: [THREE.Group, THREE.Group];
   private readonly pistol = new THREE.Group();
@@ -371,6 +402,8 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
   private fireKick = 0;
   private reloadBlend = 0;
   private deathBlend = 0;
+  private crouchBlend = 0;
+  private proneBlend = 0;
 
   public constructor(castShadow: boolean, getWeaponModel: (id: WeaponId) => THREE.Group | null) {
     // Parts were authored around the eye point; the body group lifts them onto the feet origin.
@@ -428,6 +461,14 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
       strap.rotation.z = side * 0.22;
     }
     add(root, new THREE.BoxGeometry(0.19, 0.018, 0.018), leather, 0, -0.344, -0.057);
+
+    // Give the head its own neck pivot so a prone soldier looks along the gun.
+    this.head.position.y = -0.27;
+    for (const part of [...root.children]) {
+      part.position.y += 0.27;
+      this.head.add(part);
+    }
+    root.add(this.head);
 
     add(root, new THREE.CylinderGeometry(0.222, 0.185, 0.52, 12), cloth, 0, -0.73, 0);
     oval(root, cloth, 0, -0.56, 0, 0.245, 0.12, 0.148);
@@ -495,44 +536,63 @@ class ProceduralSoldierAvatar implements RemoteAvatar {
       const hip = new THREE.Group();
       hip.position.set(side * 0.105, -1.025, 0);
       root.add(hip);
-      add(hip, new THREE.CylinderGeometry(0.11, 0.078, 0.56, 12), trousers, 0, -0.28, 0);
+      add(hip, new THREE.CylinderGeometry(0.11, 0.078, 0.36, 12), trousers, 0, -0.18, 0);
       add(hip, new THREE.BoxGeometry(0.09, 0.15, 0.025), clothDark, side * 0.065, -0.23, -0.053);
-      oval(hip, clothDark, 0, -0.495, -0.074, 0.082, 0.09, 0.035);
-      add(hip, new THREE.CylinderGeometry(0.082, 0.077, 0.15, 10), leather, 0, -0.59, 0);
-      oval(hip, leather, 0, -0.675, -0.045, 0.086, 0.045, 0.137);
-      add(hip, new THREE.BoxGeometry(0.11, 0.014, 0.18), clothDark, 0, -0.714, -0.055);
+      const knee = new THREE.Group();
+      knee.position.y = -0.36;
+      hip.add(knee);
+      this.knees.push(knee);
+      add(knee, new THREE.CylinderGeometry(0.078, 0.07, 0.21, 12), trousers, 0, -0.105, 0);
+      oval(knee, clothDark, 0, -0.135, -0.074, 0.082, 0.09, 0.035);
+      add(knee, new THREE.CylinderGeometry(0.082, 0.077, 0.15, 10), leather, 0, -0.23, 0);
+      const foot = new THREE.Group();
+      foot.position.y = -0.3;
+      knee.add(foot);
+      this.feet.push(foot);
+      oval(foot, leather, 0, -0.015, -0.045, 0.086, 0.045, 0.137);
+      add(foot, new THREE.BoxGeometry(0.11, 0.014, 0.18), clothDark, 0, -0.054, -0.055);
       return hip;
     }) as [THREE.Group, THREE.Group];
   }
 
   public update(dt: number, motion: Readonly<RemoteAvatarMotion>): void {
+    const stance = motion.life === 'alive' ? motion.stance ?? 'standing' : 'standing';
+    this.crouchBlend = approach(this.crouchBlend, stance === 'crouched' ? 1 : 0, dt);
+    this.proneBlend = approach(this.proneBlend, stance === 'prone' ? 1 : 0, dt);
     const moving = motion.life === 'alive' && !motion.reviving ? Math.min(1, motion.speed / 4.4) : 0;
     this.walkBlend = approach(this.walkBlend, moving, dt);
     const direction = motion.forwardSpeed < -0.3 ? -1 : 1;
     this.walkPhase += dt * direction * (4.5 + this.walkBlend * 5.5);
     const stride = Math.sin(this.walkPhase) * 0.47 * this.walkBlend;
-    this.legs[0].rotation.x = stride;
-    this.legs[1].rotation.x = -stride;
+    this.legs[0].rotation.x = stride + this.crouchBlend * 1.35;
+    this.legs[1].rotation.x = -stride + this.crouchBlend * 1.35;
+    for (const knee of this.knees) knee.rotation.x = -this.crouchBlend * 2.7;
+    for (const foot of this.feet) foot.rotation.x = this.crouchBlend * 1.35;
     this.fireKick = Math.max(0, this.fireKick - dt * 9);
     this.reloadBlend = approach(this.reloadBlend, motion.reloading ? 1 : 0, dt);
     const aim = THREE.MathUtils.clamp(motion.pitch, -0.45, 0.45);
     const lowered = motion.life !== 'alive' || motion.reviving;
-    const handY = lowered ? -1.06 : -0.83 + aim * 0.19 - this.reloadBlend * 0.1;
-    const handZ = lowered ? -0.18 : -0.46 + this.reloadBlend * 0.22 + this.fireKick * 0.065;
+    const handY = lowered ? -1.06 : THREE.MathUtils.lerp(-0.83, -0.1, this.proneBlend) + aim * 0.19 - this.reloadBlend * 0.1;
+    const handZ = lowered ? -0.18 : THREE.MathUtils.lerp(-0.46, 0.1, this.proneBlend) + this.reloadBlend * 0.22 + this.fireKick * 0.065;
     this.poseArm(0,
-      -0.26, -0.76, lowered ? -0.06 : -0.2,
+      -0.26, THREE.MathUtils.lerp(-0.76, -0.4, this.proneBlend), lowered ? -0.06 : THREE.MathUtils.lerp(-0.2, 0.1, this.proneBlend),
       lowered ? -0.31 : -0.035, lowered ? -1.04 : handY - 0.015,
       lowered ? -0.12 : handZ - 0.035);
     this.poseArm(1,
-      0.33, -0.73, lowered ? -0.06 : -0.21,
+      0.33, THREE.MathUtils.lerp(-0.73, -0.4, this.proneBlend), lowered ? -0.06 : THREE.MathUtils.lerp(-0.21, 0.1, this.proneBlend),
       lowered ? 0.3 : 0.085, handY, handZ);
     this.pistol.position.set(lowered ? 0.3 : 0.085, handY, handZ);
     this.pistol.rotation.x = lowered ? -0.5 : aim;
     this.weaponGrip.position.copy(this.pistol.position);
     this.weaponGrip.rotation.copy(this.pistol.rotation);
     this.deathBlend = approach(this.deathBlend, motion.life === 'alive' ? 0 : motion.life === 'downed' ? 0.72 : 1, dt * 0.5);
-    this.body.rotation.x = -this.deathBlend * Math.PI * 0.5;
-    this.body.position.y = EYE_HEIGHT - this.deathBlend * (EYE_HEIGHT - 0.25);
+    this.body.rotation.x = -(this.deathBlend + this.proneBlend) * Math.PI * 0.5;
+    this.head.rotation.x = this.proneBlend * Math.PI * 0.5;
+    this.body.position.y = EYE_HEIGHT - this.deathBlend * (EYE_HEIGHT - 0.25)
+      - this.crouchBlend * 0.5 - this.proneBlend * (EYE_HEIGHT - 0.3);
+    // Keep the prone muzzle horizontal while the torso lies along the floor.
+    this.pistol.rotation.x += this.proneBlend * Math.PI * 0.5;
+    this.weaponGrip.rotation.copy(this.pistol.rotation);
   }
 
   private poseArm(index: 0 | 1, elbowX: number, elbowY: number, elbowZ: number,

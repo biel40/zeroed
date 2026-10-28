@@ -13,7 +13,13 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 ## Shell compartido
 
 `Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
-movimiento, salto y colision opcional. `Weapon` gobierna cadencia, municion,
+movimiento, salto y colision opcional. C alterna agachado/de pie y Z tumbado/de pie;
+los botones tactiles AGACHAR/TUMBAR usan las mismas acciones. Las posturas bajas
+reducen velocidad y altura de colision, con transicion suave de camara. Para
+levantarse debe caber el cuerpo bajo los obstaculos; Espacio desde una postura
+baja intenta levantarse sin saltar. No se cambia de postura en el aire, caido,
+muerto ni con los controles bloqueados. El comportamiento es compartido entre
+individual y cooperativo. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga; `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
 `AudioSystem` sincroniza el foley. La palma y el pulgar de primera persona
 comparten una superficie cosida, continua al cambiar de agarre y nivel de detalle.
@@ -200,7 +206,9 @@ existente a `MOTDRULES`.
   sujeta por la mano izquierda, la derecha suelta la empunadura y vuelve con el
   cuchillo (que solo existe fuera de pantalla), cruza la pantalla con el filo
   por delante y el golpe se resuelve
-  cuando la hoja pasa por la mira. El barrido frontal abarca 100 grados y
+  cuando la hoja pasa por la mira. Al retirarse el cuchillo, el arma vuelve
+  suavemente a su posicion durante la recuperacion, con las manos siguiendo
+  sus agarres, en individual y cooperativo. El barrido frontal abarca 100 grados y
   alcanza 2.4 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
   un solo objetivo, priorizando la mira y despues la alineacion y proximidad;
   paredes y cuerpos interpuestos bloquean cada trayectoria. La seleccion y

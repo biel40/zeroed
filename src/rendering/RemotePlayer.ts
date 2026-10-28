@@ -24,7 +24,7 @@ export class RemotePlayer {
   private readonly bracket: SampleBracket<PlayerNetState> = { from: null, to: null, alpha: 0 };
   private readonly motion: RemoteAvatarMotion = {
     speed: 0, forwardSpeed: 0, pitch: 0, aiming: false, reloading: false, alive: true,
-    life: 'alive', reviving: false,
+    life: 'alive', reviving: false, stance: 'standing',
   };
   private hasPosition = false;
   private lastX = 0;
@@ -86,6 +86,7 @@ export class RemotePlayer {
     this.motion.pitch = from.pitch + (to.pitch - from.pitch) * alpha;
     this.motion.aiming = to.ads;
     this.motion.reloading = to.reloading;
+    this.motion.stance = to.stance ?? 'standing';
     this.avatar.update(dt, this.motion);
   }
 
@@ -99,6 +100,7 @@ export class RemotePlayer {
     this.motion.alive = true;
     this.motion.life = 'alive';
     this.motion.reviving = false;
+    this.motion.stance = 'standing';
     this.avatar.setWeapon(null);
     this.root.visible = false;
   }

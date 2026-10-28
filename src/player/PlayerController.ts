@@ -6,10 +6,11 @@ import type { PlayerBounds } from '../zombies/maps/ZombieArena';
 import { getSettings } from '../core/PlayerSettings';
 import { blocksCircleMovement } from '../utils/collision';
 import { DEATH_FALL_DURATION, deathFallPose } from './DeathFall';
+import { requestedStance, STANCE, stanceEyeOffset, type PlayerStance } from './PlayerStance';
 
 const SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.02;
-export const EYE_HEIGHT = 1.7;
+export const EYE_HEIGHT = STANCE.standing.eyeHeight;
 const WALK_SPEED = 4.6;
 const ACCELERATION = 14;
 const ADS_MOVE_PENALTY = 0.45;
@@ -97,6 +98,10 @@ export class PlayerController {
   /** Seconds into the death collapse; null while alive. */
   private deathFallElapsed: number | null = null;
   private cameraImpulse = 0;
+  private currentStance: PlayerStance = 'standing';
+  private deathStartY = 0;
+
+  public get stance(): PlayerStance { return this.currentStance; }
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(this.fov, aspect, 0.08, 700);
@@ -143,6 +148,7 @@ export class PlayerController {
     this.jumpVelocity = 0;
     this.currentFloor = floor;
     this.downedCamera = false;
+    this.currentStance = 'standing';
     this.deathFallElapsed = null;
     this.camera.position.set(0, 0, 0);
     if (bounds) this.bounds = bounds;
@@ -155,9 +161,15 @@ export class PlayerController {
   }
 
   /** Changes only the view height; the standing rig remains the network/collision anchor. */
-  public setDownedCamera(enabled: boolean): void { this.downedCamera = enabled; }
+  public setDownedCamera(enabled: boolean): void {
+    this.downedCamera = enabled;
+    if (enabled) this.currentStance = 'standing';
+  }
   /** Collapses the view to the floor; teleport() stands the player back up. */
-  public playDeathFall(): void { this.deathFallElapsed = 0; }
+  public playDeathFall(): void {
+    this.deathStartY = this.camera.position.y;
+    this.deathFallElapsed = 0;
+  }
   /** True from the death until the next teleport (the view model stays hidden). */
   get isDying(): boolean { return this.deathFallElapsed !== null; }
   get deathFallFinished(): boolean { return (this.deathFallElapsed ?? 0) >= DEATH_FALL_DURATION; }
@@ -174,13 +186,22 @@ export class PlayerController {
     this.deathFallElapsed = Math.min((this.deathFallElapsed ?? 0) + dt, DEATH_FALL_DURATION);
     this.pitch = damp(this.pitch, 0, 6, dt);
     this.pitchNode.rotation.x = this.pitch;
-    const pose = deathFallPose(this.deathFallElapsed);
+    const pose = deathFallPose(this.deathFallElapsed, -this.deathStartY);
     this.camera.rotation.set(pose.pitch, 0, pose.roll);
     this.camera.position.set(pose.sideShift, -pose.drop, 0);
   }
 
   update(dt: number, input: Input, weapon: Weapon, allowMovement = true, allowLook = allowMovement): void {
     const definition = weapon.definition;
+    const jumpPressed = allowMovement && input.wasPressed('Space');
+    const wasStanding = this.currentStance === 'standing';
+    if (allowMovement && !this.downedCamera && !this.isDying && this.jumpOffset === 0) {
+      const requested = requestedStance(this.currentStance, input.wasPressed('KeyC'), input.wasPressed('KeyZ'), jumpPressed);
+      if (STANCE[requested].eyeHeight <= STANCE[this.currentStance].eyeHeight
+        || !this.wouldIntersectWall(this.rig.position.x, this.rig.position.z, requested)) {
+        this.currentStance = requested;
+      }
+    }
 
     const settings = getSettings();
     const sensitivity = SENSITIVITY * settings.lookSensitivity
@@ -195,7 +216,8 @@ export class PlayerController {
     else {
       this.camera.rotation.set(weapon.recoil.pitch + this.cameraImpulse, weapon.recoil.yaw,
         this.downedCamera ? 0.06 : 0);
-      this.camera.position.y = damp(this.camera.position.y, this.downedCamera ? -1.2 : 0, 8, dt);
+      const eyeOffset = stanceEyeOffset(this.currentStance);
+      this.camera.position.y = damp(this.camera.position.y, this.downedCamera ? -1.2 : eyeOffset, 12, dt);
     }
 
     // Digital keys plus the analog touch axes (virtual joystick); the clamp
@@ -217,7 +239,7 @@ export class PlayerController {
     if (this.wish.lengthSq() > 1) this.wish.normalize();
 
     const speed =
-      WALK_SPEED * definition.moveSpeedMultiplier * (1 - ADS_MOVE_PENALTY * weapon.adsAlpha);
+      WALK_SPEED * STANCE[this.currentStance].speed * definition.moveSpeedMultiplier * (1 - ADS_MOVE_PENALTY * weapon.adsAlpha);
     this.wish.multiplyScalar(speed);
     this.velocity.x = damp(this.velocity.x, this.wish.x, ACCELERATION, dt);
     this.velocity.z = damp(this.velocity.z, this.wish.z, ACCELERATION, dt);
@@ -246,9 +268,10 @@ export class PlayerController {
     this.rig.position.x = nextX;
     this.rig.position.z = nextZ;
 
-    const ramp = this.floorTransitions
-      .map((zone) => zone.ramp)
-      .find((candidate) => candidate && this.containsXZ(candidate.box, nextX, nextZ));
+    let ramp: StairRamp | undefined;
+    for (const zone of this.floorTransitions) {
+      if (zone.ramp && this.containsXZ(zone.ramp.box, nextX, nextZ)) { ramp = zone.ramp; break; }
+    }
     if (ramp) {
       // The camera follows the physical slope exactly, so stopping or turning
       // on the stairs cannot produce delayed vertical motion or a snap.
@@ -268,7 +291,8 @@ export class PlayerController {
       }
     }
     if (!ramp) this.groundY = damp(this.groundY, this.targetY, FLOOR_BLEND_SPEED, dt);
-    if (allowMovement && input.wasPressed('Space') && this.jumpOffset === 0) this.jumpVelocity = JUMP_SPEED;
+    if (jumpPressed && wasStanding && this.currentStance === 'standing' && !this.downedCamera
+      && !this.isDying && this.jumpOffset === 0) this.jumpVelocity = JUMP_SPEED;
     if (this.jumpVelocity !== 0 || this.jumpOffset > 0) {
       this.jumpVelocity -= GRAVITY * dt;
       this.jumpOffset += this.jumpVelocity * dt;
@@ -293,9 +317,10 @@ export class PlayerController {
   }
 
   /** True if a body cylinder at (x,z) intersects any wall collider. */
-  private wouldIntersectWall(x: number, z: number): boolean {
+  private wouldIntersectWall(x: number, z: number, stance: PlayerStance = this.currentStance): boolean {
     const minY = Math.min(this.rig.position.y, this.groundY) - EYE_HEIGHT + 0.05;
-    const maxY = Math.max(this.rig.position.y, this.groundY) + 0.25;
+    const eyeOffset = Math.max(stanceEyeOffset(stance), this.camera.position.y);
+    const maxY = Math.max(this.rig.position.y, this.groundY) + eyeOffset + 0.25;
     this.tmpBox.min.set(x - PLAYER_BODY_RADIUS, minY, z - PLAYER_BODY_RADIUS);
     this.tmpBox.max.set(x + PLAYER_BODY_RADIUS, maxY, z + PLAYER_BODY_RADIUS);
     for (const wall of this.wallColliders) {
@@ -306,7 +331,7 @@ export class PlayerController {
 
   private wouldIntersectBody(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
     const bottom = this.rig.position.y - EYE_HEIGHT + 0.05;
-    const top = this.rig.position.y + 0.25;
+    const top = this.rig.position.y + stanceEyeOffset(this.currentStance) + 0.25;
     for (const body of this.bodyColliders) {
       if (!body.isAlive || body.position.y >= top || body.position.y + body.bodyHeight <= bottom) continue;
       if (blocksCircleMovement(fromX, fromZ, toX, toZ,

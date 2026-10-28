@@ -444,8 +444,60 @@ const death = clip('Death', 0.9, {
   UpperArmL: [[-0.12,0,-0.08],[-0.2,0,-0.2],[-0.4,0,-0.45],[-0.3,0,-0.5],[-0.3,0,-0.5]],
   UpperArmR: [[-0.12,0,0.08],[-0.2,0,0.2],[-0.4,0,0.45],[-0.3,0,0.5],[-0.3,0,0.5]],
 });
+// Postures animate the existing skeleton in place: feet stay on the ground,
+// and the prone weapon/hand contacts are solved in the tilted torso's space.
+function hipsPosition(animation, xyz) {
+  animation.tracks.push(new THREE.VectorKeyframeTrack('Hips.position', [0, animation.duration], [...xyz, ...xyz]));
+  return animation;
+}
+function crouchClip(name, moving) {
+  const stride = moving ? 0.18 : 0;
+  return hipsPosition(clip(name, 1.1, {
+    Hips: repeat([0, 0, 0]), Spine: repeat([0.18, 0, 0]), Head: repeat([-0.18, 0, 0]),
+    UpperLegL: swing(stride, stride, -1.06), UpperLegR: swing(-stride, -stride, -1.06),
+    LowerLegL: repeat([1.95, 0, 0]), LowerLegR: repeat([1.95, 0, 0]),
+    FootL: repeat([-0.89, 0, 0]), FootR: repeat([-0.89, 0, 0]),
+    UpperArmL: repeat(readyArms.L.upper), UpperArmR: repeat(readyArms.R.upper),
+    ForeArmL: repeat(readyArms.L.fore), ForeArmR: repeat(readyArms.R.fore),
+  }), [0, 0.55, 0]);
+}
+const crouchIdle = crouchClip('CrouchIdle', false);
+const crouchWalk = crouchClip('CrouchWalk', true);
+const standingArms = { ...readyArms };
+const proneTilt = Math.PI / 2 - 0.12;
+const proneForward = new THREE.Vector3(0, Math.sin(proneTilt), Math.cos(proneTilt));
+readyArm('R', [0.105, 0.59, -0.12], [1, -0.3, 0]);
+const proneGrip = readyArms.R.palm.clone();
+const proneSupport = proneGrip.clone().addScaledVector(proneForward, supportGripZ);
+const supportWrist = proneSupport.clone();
+for (let iteration = 0; iteration < 4; iteration++) {
+  readyArm('L', supportWrist.toArray(), [-1, -0.3, 0]);
+  supportWrist.add(proneSupport.clone().sub(readyArms.L.palm));
+}
+function proneClip(name, moving) {
+  const stride = moving ? 0.12 : 0;
+  const animation = hipsPosition(clip(name, 1.5, {
+    Hips: repeat([Math.PI / 2, 0, 0]), Spine: repeat([-0.12, 0, 0]), Head: repeat([-proneTilt, 0, 0]),
+    UpperLegL: swing(stride, stride, 0), UpperLegR: swing(-stride, -stride, 0),
+    LowerLegL: repeat([0.12, 0, 0]), LowerLegR: repeat([0.12, 0, 0]),
+    FootL: repeat([0.5, 0, 0]), FootR: repeat([0.5, 0, 0]),
+    UpperArmL: repeat(readyArms.L.upper), UpperArmR: repeat(readyArms.R.upper),
+    ForeArmL: repeat(readyArms.L.fore), ForeArmR: repeat(readyArms.R.fore),
+  }), [0, 0.29, 0]);
+  const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -proneTilt);
+  animation.tracks.push(new THREE.QuaternionKeyframeTrack('teammate-rifle.quaternion', [0, 1.5], [...rotation.toArray(), ...rotation.toArray()]));
+  animation.tracks.push(new THREE.VectorKeyframeTrack('teammate-rifle.position', [0, 1.5], [...proneGrip.toArray(), ...proneGrip.toArray()]));
+  return animation;
+}
+const proneIdle = proneClip('ProneIdle', false);
+const proneCrawl = proneClip('ProneCrawl', true);
+for (const tag of ['L', 'R']) {
+  bones[`UpperArm${tag}`].rotation.set(...standingArms[tag].upper);
+  bones[`ForeArm${tag}`].rotation.set(...standingArms[tag].fore);
+}
 const exporter = new GLTFExporter();
-const glb = await exporter.parseAsync(root, { binary: true, animations: [idle, walk, run, aim, fire, reload, death], onlyVisible: true });
+const glb = await exporter.parseAsync(root, { binary: true, animations: [idle, walk, run, aim, fire, reload, death,
+  crouchIdle, crouchWalk, proneIdle, proneCrawl], onlyVisible: true });
 // Embedded low-frequency dirt and weave break up the flat color under the
 // mansion lights without an external texture request or a large atlas.
 function crc32(bytes) {

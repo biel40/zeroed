@@ -66,6 +66,21 @@ function finishDeathFall({ internals, side }: { internals: ModeInternals; side: 
 }
 
 describe('Resurrection ring', () => {
+  it.each(['KeyC', 'KeyZ'])('preserves the low view through resurrection from %s', (key) => {
+    const run = startRun();
+    const { mode, internals, side } = run;
+    faceRingLocker(run);
+    fund(internals.economy, FIRST_PRICE);
+    mode.onInteract();
+    side.player.update(1, { ...IDLE_INPUT, wasPressed: (code: string) => code === key } as Input, side.weapon);
+    const before = side.player.camera.position.y;
+    internals.onPlayerHit(LETHAL);
+    internals.rings.update(0);
+    expect(side.player.camera.position.y).toBeLessThanOrEqual(before + 0.001);
+    internals.rings.update(GET_UP);
+    expect(side.player.camera.position.y).toBeCloseTo(before, 3);
+    expect(mode.isGameplayInputEnabled()).toBe(true);
+  });
   it('is sold at its locker for its price and worn on the ring finger', () => {
     const run = startRun();
     const { mode, internals, side } = run;

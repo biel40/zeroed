@@ -22,6 +22,7 @@ import type { CoopConnection } from '../src/network/CoopConnection';
 import { installCanvasDocument, makeContext, makeMatch, placePlayer, type CoopMatch } from './coopHarness';
 import { CodeLockDialog } from '../src/ui/CodeLockDialog';
 import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
+import type { RemotePlayer } from '../src/rendering/RemotePlayer';
 
 vi.mock('../src/ui/CodeLockDialog', () => ({
   CodeLockDialog: vi.fn(function () { return { dispose: vi.fn() }; }),
@@ -98,6 +99,25 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ['performance'] }); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('co-op session', () => {
+  it('replicates host crouch and guest prone through both real modes and resets posture on restart', () => {
+    const match = startedMatch();
+    for (const [side, key] of [[match.hostSide, 'KeyC'], [match.guestSide, 'KeyZ']] as const) {
+      side.player.update(1 / 60, { ...side.ctx.input, mouseDeltaX: 0, mouseDeltaY: 0,
+        moveAxisX: 0, moveAxisY: 0, wasPressed: (code: string) => code === key } as typeof side.ctx.input, side.weapon);
+      side.player.rig.updateMatrixWorld(true);
+    }
+    match.step(0.1, 5);
+    expect(host(match).guestState?.stance).toBe('prone');
+    expect(host(match).guestState?.eyeOffsetY).toBeCloseTo(match.guestSide.player.camera.position.y);
+    const remoteHost = (match.guest as unknown as { hostAvatar: RemotePlayer }).hostAvatar;
+    expect(remoteHost.latest?.stance).toBe('crouched');
+    expect(remoteHost.root.position.y).toBeCloseTo(match.hostSide.player.rig.position.y - 1.7);
+    match.host.onRestartRequested();
+    match.step(0.1, 3);
+    expect(match.hostSide.player.stance).toBe('standing');
+    expect(match.guestSide.player.stance).toBe('standing');
+    expect(remoteHost.latest?.stance).toBe('standing');
+  });
   it('validates and shares the Barrett code, grants once, and relocks on restart', () => {
     const match = startedMatch();
     const authority = host(match);

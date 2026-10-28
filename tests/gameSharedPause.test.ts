@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DynamicResolution } from '../src/core/DynamicResolution';
 import { Game } from '../src/core/Game';
+import { KNIFE_ATTACK_DURATION, Knife } from '../src/weapons/Knife';
 
 type Stub = Record<string, any>;
 const prototype = Game.prototype as unknown as Record<string, (this: Stub, ...args: unknown[]) => void>;
@@ -139,6 +140,37 @@ describe('weapon inspection input', () => {
 });
 
 describe('cinematic first-person visibility', () => {
+  it.each([
+    [false, false], [false, true], [true, false], [true, true],
+  ])('keeps the firearm visible through the smooth knife recovery (shared: %s, touch: %s)', (shared, touch) => {
+    const { game, weapon } = stubGame(shared, false);
+    game.profile.useTouchControls = touch;
+    const knife = new Knife();
+    knife.setEnabled(true);
+    knife.trigger();
+    game.mode.usesFallbackAttack = () => knife.isAttacking;
+    game.mode.getFallbackWeaponName = () => knife.isAttacking ? 'Knife' : null;
+    game.mode.getMeleeArm = () => knife.isAttacking ? knife : null;
+    game.mode.update = (dt: number): void => { knife.update(dt, false, 0); };
+    let previousLowering = 1;
+    let recoveryFrames = 0;
+    for (let elapsed = 0; elapsed <= KNIFE_ATTACK_DURATION + 0.016; elapsed += 0.016) {
+      const attacking = knife.isAttacking;
+      prototype.frame.call(game);
+      expect(game.currentView.root.visible).toBe(true);
+      if (attacking) expect(weapon.update).toHaveBeenLastCalledWith(0.016, expect.objectContaining({ trigger: false, ads: false }));
+      const lowering = game.currentView.update.mock.lastCall[5];
+      if (elapsed >= KNIFE_ATTACK_DURATION * 0.5) {
+        expect(lowering).toBeLessThanOrEqual(previousLowering);
+        if (lowering > 0 && lowering < 1) recoveryFrames++;
+        previousLowering = lowering;
+      }
+    }
+    expect(recoveryFrames).toBeGreaterThan(15);
+    expect(previousLowering).toBe(0);
+    expect(game.hud.update).toHaveBeenCalledWith(weapon, expect.any(Number), 'Knife');
+  });
+
   it.each([false, true])('hides weapons and both arms until handoff (touch: %s)', (touch) => {
     const { game } = stubGame(false, false);
     game.profile.useTouchControls = touch;

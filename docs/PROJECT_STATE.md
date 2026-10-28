@@ -5,6 +5,9 @@
 ## Funcional
 
 - Shell FPS para escritorio y tactil, selector de mapas, ajustes, audio y consola de desarrollo en individual. Consulta [shell y controles](GAME_SYSTEMS.md#shell-compartido) y [consola](GAME_SYSTEMS.md#consola-de-desarrollador).
+- Posturas de pie, agachado y tumbado en individual y cooperativo, con controles
+  tactiles y representacion del compañero. Consulta [controles](GAME_SYSTEMS.md#shell-compartido)
+  y [replica cooperativa](MULTIPLAYER.md#alcance-y-límites).
 - Burned Mansion admite individual y cooperativo; Station 33 es individual y premium, accesible durante la beta sin pagos. Consulta [mapas e interacciones](GAME_SYSTEMS.md#mapas-e-interacciones) y la [guia artistica de Station 33](STATION_33.md).
 - Combate, rondas, economia, progresion, enemigos y anillos estan disponibles en individual; el alcance cooperativo se detalla en [MULTIPLAYER.md](MULTIPLAYER.md#alcance-y-límites). Consulta [zombies](GAME_SYSTEMS.md#zombies) y [anillos](GAME_SYSTEMS.md#anillos).
 - PWA instalable y distribucion Android preparada; consulta [PWA](PWA.md) y [Android](ANDROID_DOCS.md).

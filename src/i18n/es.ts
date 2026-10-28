@@ -81,6 +81,10 @@ export const es: Record<TranslationKey, string> = {
   'controls.interact': 'Interactuar',
   'controls.knife': 'Cuchillo',
   'controls.jump': 'Saltar',
+  'controls.crouch': 'Agacharse / levantarse',
+  'controls.prone': 'Tumbarse / levantarse',
+  'touch.crouch': 'AGACHAR',
+  'touch.prone': 'TUMBAR',
   'controls.slots': 'Ranuras de arma',
   'controls.release': 'Liberar ratón',
 

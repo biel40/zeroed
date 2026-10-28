@@ -21,13 +21,13 @@ export interface DeathFallPose {
  * knees buckle first (slow start), the body tips over and hits the floor
  * with a short rebound. Clamped at both ends so callers can feed raw time.
  */
-export function deathFallPose(elapsed: number): DeathFallPose {
+export function deathFallPose(elapsed: number, startDrop = 0): DeathFallPose {
   const t = Math.min(Math.max(elapsed / DEATH_FALL_DURATION, 0), 1);
   const fall = t * t * (3 - 2 * t) * t;
   // A small bump once the head meets the floor sells the impact.
   const impact = t > 0.8 ? Math.sin(((t - 0.8) / 0.2) * Math.PI) * 0.06 : 0;
   return {
-    drop: FALL_DROP * fall - impact,
+    drop: startDrop + (FALL_DROP - startDrop) * fall - impact,
     sideShift: FALL_SIDE_SHIFT * fall,
     pitch: FALL_PITCH * fall,
     roll: FALL_ROLL * fall,

@@ -143,10 +143,11 @@ procedural de reserva.
   vuelve a mostrar el fusil de reserva si no puede resolver ese ID. Los modelos
   sustituidos se separan de la escena y se reutilizan al volver a equiparlos.
 - **Clips** (por nombre, sin distinguir mayúsculas): obligatorios `Idle` y
-  `Walk`; opcionales `Run`, `Aim`, `Fire`/`Shoot`, `Reload`, `Death`. `Aim`,
-  `Fire` y `Reload` se filtran a huesos de torso/brazos y se mezclan sobre la
-  locomoción.
-- **Coste**: ~6k triángulos, 59 meshes, 16 materiales y ~291 KiB.
+  `Walk`, `CrouchIdle`, `CrouchWalk`, `ProneIdle` y `ProneCrawl`; opcionales
+  `Run`, `Aim`, `Fire`/`Shoot`, `Reload`, `Death`. `Aim`, `Fire` y `Reload`
+  se filtran a huesos de torso/brazos y se aplican como capas aditivas sobre
+  la postura y locomocion. Un modelo sin clips de postura usa el cuerpo de reserva.
+- **Coste**: ~6k triángulos, 59 meshes, 16 materiales y ~314 KiB.
   La textura de desgaste está embebida. Se carga solo al abrir el lobby
   cooperativo. Los clips y geometría son originales.
 
@@ -157,7 +158,8 @@ procedural de reserva.
 2. Con ese personaje seleccionado, en *Animations* descarga cada clip con
    *Format* `FBX Binary`, *Skin* `Without Skin`, *Frames per Second* `30` y
    **In Place** marcado cuando exista. Nombres de archivo: `idle.fbx`,
-   `walk.fbx` (obligatorios), `run.fbx`, `aim.fbx`, `fire.fbx`, `reload.fbx`,
+   `walk.fbx`, `crouch-idle.fbx`, `crouch-walk.fbx`, `prone-idle.fbx`,
+   `prone-crawl.fbx` (obligatorios), `run.fbx`, `aim.fbx`, `fire.fbx`, `reload.fbx`,
    `death.fbx` (opcionales). Busca las versiones de pistola (M1911).
 3. Copia los FBX en `assets/players/mixamo/` y ejecuta
    `npm run build:player-asset`. El script convierte con FBX2glTF, une los clips

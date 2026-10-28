@@ -32,6 +32,13 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.
 
+## Visor del compañero
+
+`http://localhost:5173/tools/viewers/player-viewer.html` compara el soldado GLB
+de pie, agachado y tumbado, con movimiento, ADS, disparo y recarga. El enlace
+«Modelo de reserva» (`?fallback=1`) revisa las mismas posturas sin el GLB.
+La camara orbital permite comprobar silueta, suelo y orientacion del arma.
+
 ## Visor de mapas
 
 `map-viewer.html` construye un mapa de Zombies con el render del juego, abre todas las puertas de pago y lo muestra desde una cámara fija, con luces, parpadeos y polvo animados. Sirve para revisar una zona sin jugar hasta ella.

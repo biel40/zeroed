@@ -81,6 +81,10 @@ export const ca: Record<TranslationKey, string> = {
   'controls.interact': 'Interactuar',
   'controls.knife': 'Ganivet',
   'controls.jump': 'Saltar',
+  'controls.crouch': 'Ajupir-se / aixecar-se',
+  'controls.prone': 'Estirar-se / aixecar-se',
+  'touch.crouch': 'AJUPIR',
+  'touch.prone': 'ESTIRAR',
   'controls.slots': 'Ranures d’arma',
   'controls.release': 'Alliberar el ratolí',
 
