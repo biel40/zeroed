@@ -66,11 +66,18 @@ sufra tirones de compilacion de shaders.
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
   `ammoRefills`, `mysteryBoxPlacement`, `ringMachines`).
+  Los pickups con `codeLock` separan la validacion del codigo de la aplicacion
+  de una apertura autorizada; cooperativo replica las aperturas y recogidas
+  bajo autoridad del anfitrion, sin introducir dependencias de un mapa.
 - Los anillos llevados se ven en la mano derecha de `ViewArms`
   (`HandRings`), que el modo recibe en `ModeContext.handRings`.
   `HitTarget` desacopla balistica de blancos.
 - Pools y temporales reutilizables limitan allocations por frame. Los tipos
   zombie (`normal`, `shiny`, `brute`) pueden compartir modelo sin duplicar IA.
+- `ZombieManager` y `ZombieReplica` poseen cada uno el pool de sangre de su run
+  (`ZombieBlood`), separado de los cuerpos reciclables. `ZombieBleeding` resuelve
+  la intensidad de las heridas; `BloodDropMotion` comparte simulacion y manchas
+  con los restos del Barrett sin depender de objetos de escena.
 - La identificacion de impactos de energia por color es una [deuda de contrato](DECISIONS.md#deudas-de-contrato).
 
 ## Extension

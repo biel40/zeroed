@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CoopChestInteraction } from './CoopChestInteraction';
 import { t } from '../../i18n/i18n';
 import { actionKey, weaponCaseLocked, weaponCasePrompt } from '../../ui/InteractionPrompts';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
@@ -115,6 +116,7 @@ export class CoopHostMode implements GameMode {
   }
 
   private ctx!: ModeContext;
+  private readonly chestInteraction = new CoopChestInteraction();
   private world!: CoopWorld;
   private zombies!: ZombieManager;
   private energy!: EnergyProjectiles;
@@ -298,11 +300,11 @@ export class CoopHostMode implements GameMode {
   }
 
   public onPointerUnlock(): boolean {
-    return this.gameOverShown || this.phase === 'ending' || this.phase === 'credits';
+    return this.chestInteraction.active || this.gameOverShown || this.phase === 'ending' || this.phase === 'credits';
   }
 
   public isGameplayInputEnabled(): boolean {
-    return !this.hostPaused && (this.phase === 'waiting' || this.phase === 'playing')
+    return !this.chestInteraction.active && !this.hostPaused && (this.phase === 'waiting' || this.phase === 'playing')
       && this.players.host.life.state === 'alive';
   }
 
@@ -328,7 +330,11 @@ export class CoopHostMode implements GameMode {
     const wallBuy = this.world.findFacingWallBuy();
     if (wallBuy) { this.purchaseWallBuy('host', wallBuy.id, this.ctx.hasWeapon(wallBuy.weaponId)); return; }
     const pickup = this.world.findFacingPickup();
-    if (pickup) { this.useMap('host', 'pickup', pickup.id, equipped); return; }
+    if (pickup) {
+      if (this.chestInteraction.open(this.ctx, pickup, (code) => this.useMap('host', 'pickup', pickup.id, equipped, code))) return;
+      this.useMap('host', 'pickup', pickup.id, equipped);
+      return;
+    }
     const refill = this.world.findFacingAmmoRefill();
     if (refill) { this.useMap('host', 'ammo', refill.id, equipped); return; }
     const completion = this.world.findFacingCompletion();
@@ -381,6 +387,7 @@ export class CoopHostMode implements GameMode {
   }
 
   public onExit(): void {
+    this.chestInteraction.dispose();
     this.knife.reset();
     this.gesture.dispose();
     this.connection.dispose();
@@ -452,7 +459,7 @@ export class CoopHostMode implements GameMode {
         this.useBox('guest', message.action, message.equippedWeapon);
         break;
       case 'mapUse':
-        this.useMap('guest', message.kind, message.id, message.equippedWeapon);
+        this.useMap('guest', message.kind, message.id, message.equippedWeapon, message.code);
         break;
     }
   }
@@ -641,7 +648,7 @@ export class CoopHostMode implements GameMode {
     if (!lethal) this.players[shooter].economy.awardHit(false);
     if (!lethal) {
       this.send({ type: 'zombieHit', zombieId: this.zombies.networkIdOf(zombie), headshot: false,
-        amount: damage, fromX, fromZ });
+        amount: damage, fromX, fromZ, source: 'knife' });
     }
   }
 
@@ -656,6 +663,7 @@ export class CoopHostMode implements GameMode {
     this.players[shooter].economy.awardHit(headshot);
     this.send({
       type: 'zombieHit', zombieId: this.zombies.networkIdOf(zombie), headshot,
+      source: weapon.id,
       amount: damage, fromX: quantize(fromX), fromZ: quantize(fromZ),
     });
   }
@@ -697,6 +705,7 @@ export class CoopHostMode implements GameMode {
       if (target.isAlive && target.hp < hp) {
         this.send({ type: 'zombieHit', zombieId: this.zombies.networkIdOf(target),
           headshot: target === zombie && part === 'head', amount: hp - target.hp,
+          source: config === WEAPON_DEFINITIONS.tesla.energy ? 'tesla' : 'raygun',
           fromX: point.x, fromZ: point.z });
       }
     }
@@ -720,6 +729,7 @@ export class CoopHostMode implements GameMode {
     this.world.arena.captureSoul(zombie.position, zombie.floor);
     this.send({
       type: 'zombieDeath', zombieId: this.zombies.networkIdOf(zombie), killer: shooter,
+      ...(source ? { source } : {}),
       ...(headshot ? { headshot: true } : {}),
       style: zombie.deathStyle, impactX: quantize(zombie.impact.x), impactZ: quantize(zombie.impact.y),
     });
@@ -840,7 +850,7 @@ export class CoopHostMode implements GameMode {
   }
 
   private useMap(buyer: CoopPlayerId, kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'completion',
-    id: string, equippedWeapon: WeaponId): void {
+      id: string, equippedWeapon: WeaponId, code?: string): void {
     const remote = buyer === 'guest';
     const state = this.guestState;
     const record = this.players[buyer];
@@ -870,6 +880,12 @@ export class CoopHostMode implements GameMode {
     } else if (kind === 'pickup') {
       const pickup = this.world.arena.weaponPickups.find((entry) => entry.id === id)!;
       if (!pickup.available || (pickup.requiredDoorId && this.world.findDoor(pickup.requiredDoorId)?.isLocked)) return;
+      if (code !== undefined) {
+        if (pickup.codeLock?.unlock(code)) this.sendMatchState();
+        else if (remote) this.send({ type: 'mapUseFailed', reason: 'unavailable' });
+        return;
+      }
+      if (pickup.codeLock?.locked) return;
       if (weaponCaseLocked(pickup, record.kills)) {
         if (remote) this.send({ type: 'mapUseFailed', reason: 'unavailable' });
         else this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, record.kills, this.ctx.profile.useTouchControls));
@@ -1051,6 +1067,7 @@ export class CoopHostMode implements GameMode {
   }
 
   private resetMatch(): void {
+    this.chestInteraction.dispose();
     this.knife.reset();
     this.lastGuestKnife = -Infinity;
     this.rounds.reset();
@@ -1111,6 +1128,7 @@ export class CoopHostMode implements GameMode {
         box: { ...this.box.snapshot(), owner: this.boxOwner },
         secret: this.world.arena.secretSnapshot,
         claimedPickupIds: this.world.arena.weaponPickups.filter((pickup) => !pickup.available).map((pickup) => pickup.id),
+        unlockedPickupIds: this.world.arena.weaponPickups.filter((pickup) => pickup.codeLock && !pickup.codeLock.locked).map((pickup) => pickup.id),
       },
     });
   }

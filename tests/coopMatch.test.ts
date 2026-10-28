@@ -20,6 +20,12 @@ import type { RoundManager } from '../src/zombies/RoundManager';
 import { CoopGuestMode } from '../src/modes/coop/CoopGuestMode';
 import type { CoopConnection } from '../src/network/CoopConnection';
 import { installCanvasDocument, makeContext, makeMatch, placePlayer, type CoopMatch } from './coopHarness';
+import { CodeLockDialog } from '../src/ui/CodeLockDialog';
+import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
+
+vi.mock('../src/ui/CodeLockDialog', () => ({
+  CodeLockDialog: vi.fn(function () { return { dispose: vi.fn() }; }),
+}));
 
 interface Record_ {
   readonly health: PlayerHealth;
@@ -92,6 +98,82 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ['performance'] }); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('co-op session', () => {
+  it('validates and shares the Barrett code, grants once, and relocks on restart', () => {
+    const match = startedMatch();
+    const authority = host(match);
+    const pickup = authority.world.arena.weaponPickups.find((entry) => entry.weaponId === 'barrett')!;
+    const replica = guest(match).world.arena.weaponPickups.find((entry) => entry.id === pickup.id)!;
+    const request = { type: 'mapUse' as const, kind: 'pickup' as const, id: pickup.id, equippedWeapon: 'm1911' as const };
+    const send = (code?: string): void => {
+      match.relay.host.onMessage?.({ ...request, ...(code === undefined ? {} : { code }) });
+      match.relay.flush();
+    };
+    placePlayer(match.guestSide.player, pickup.position.x - 0.5, pickup.position.z);
+    match.guestSide.player.rig.rotation.y = -Math.PI / 2;
+    match.step(0.1, 3);
+    send(STATION33_WEAPON_CHEST.code);
+    expect(pickup.codeLock!.locked).toBe(true);
+    for (const id of ['to-dining', 'to-banquet']) authority.world.unlockDoor(authority.world.findDoor(id)!, () => true);
+    match.step(0.1, 3);
+    send();
+    send('0000');
+    send('19980');
+    expect(pickup.codeLock!.locked).toBe(true);
+    expect(authority.guestInventory.has('barrett')).toBe(false);
+    send(STATION33_WEAPON_CHEST.code);
+    expect(pickup.codeLock!.locked).toBe(false);
+    expect(replica.codeLock!.locked).toBe(false);
+    expect(pickup.available).toBe(true);
+    expect(authority.guestInventory.has('barrett')).toBe(false);
+    send();
+    expect(pickup.available).toBe(false);
+    expect(replica.available).toBe(false);
+    expect(authority.guestInventory.has('barrett')).toBe(true);
+    expect(match.guestSide.ctx.grantWeapon).toHaveBeenCalledWith('barrett');
+    const grants = vi.mocked(match.guestSide.ctx.grantWeapon).mock.calls.length;
+    send();
+    expect(vi.mocked(match.guestSide.ctx.grantWeapon).mock.calls).toHaveLength(grants);
+    match.host.onRestartRequested();
+    match.step(0.1, 3);
+    expect(pickup.codeLock!.locked).toBe(true);
+    expect(replica.codeLock!.locked).toBe(true);
+    expect(replica.available).toBe(true);
+  });
+
+  it.each(['host', 'guest'] as const)('opens the keypad for the %s without pausing the shared match', (buyer) => {
+    const match = startedMatch();
+    const authority = host(match);
+    for (const id of ['to-dining', 'to-banquet']) authority.world.unlockDoor(authority.world.findDoor(id)!, () => true);
+    match.step(0.1, 3);
+    const side = buyer === 'host' ? match.hostSide : match.guestSide;
+    Object.assign(side.ctx.input, { releaseAll: vi.fn() });
+    const mode = buyer === 'host' ? match.host : match.guest;
+    vi.mocked(match.hostSide.ctx.hasWeapon).mockReturnValue(true);
+    const pickup = authority.world.arena.weaponPickups.find((entry) => entry.weaponId === 'barrett')!;
+    placePlayer(side.player, pickup.position.x - 0.5, pickup.position.z);
+    side.player.rig.rotation.y = -Math.PI / 2;
+    side.player.rig.updateMatrixWorld(true);
+    match.step(0.1, 30);
+    expect((buyer === 'host' ? authority.world : guest(match).world).findFacingPickup()?.id).toBe(pickup.id);
+    const dialogs = vi.mocked(CodeLockDialog).mock.calls.length;
+    mode.onInteract();
+    expect(vi.mocked(CodeLockDialog).mock.calls).toHaveLength(dialogs + 1);
+    const [unlock, close] = vi.mocked(CodeLockDialog).mock.calls.at(-1)!;
+    expect(mode.onPointerUnlock()).toBe(true);
+    expect(mode.isGameplayInputEnabled()).toBe(false);
+    expect(mode.isSimulationPaused()).toBe(false);
+    expect(unlock('0000')).toBe(false);
+    expect(unlock(STATION33_WEAPON_CHEST.code)).toBe(true);
+    close();
+    match.relay.flush();
+    if (buyer === 'guest') {
+      expect(match.relay.sent('guest', 'mapUse').at(-1)).toMatchObject({ code: STATION33_WEAPON_CHEST.code });
+      expect(authority.world.isRemoteInReach(pickup, authority.guestState!)).toBe(true);
+    }
+    expect(pickup.codeLock!.locked).toBe(false);
+    expect(mode.isGameplayInputEnabled()).toBe(true);
+  });
+
   it('does not send periodic snapshots while a room has no guest', () => {
     const match = makeMatch();
     match.step(1 / 30, 60);
@@ -187,6 +269,10 @@ describe('co-op combat authority', () => {
     match.step();
     // The guest plays the same knife death the host resolved.
     expect(replica.deathStyle).toBe('slash');
+    const hostBlood = host(match).zombies.group.getObjectByName('zombie-blood') as THREE.InstancedMesh;
+    expect(hostBlood.count).toBe(60);
+    const guestBlood = replica.group.parent!.getObjectByName('zombie-blood') as THREE.InstancedMesh;
+    expect(guestBlood.count).toBe(hostBlood.count);
   });
 
   it('validates the guest slash direction and obstruction before accepting a side hit', () => {

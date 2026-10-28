@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ZombieBlood } from './ZombieBlood';
 import {
   EYE_HEIGHT,
   PLAYER_BODY_RADIUS,
@@ -227,6 +228,7 @@ export class ZombieManager {
   private readonly pool: ZombiePool;
   /** Wall set shared by every pooled zombie's gibs. */
   private readonly gibWalls: GibWalls = { boxes: [] };
+  private readonly blood = new ZombieBlood(this.gibWalls);
   private spawner: ZombieSpawner;
   private readonly rng: () => number;
   private colliders: THREE.Object3D[] = [];
@@ -303,6 +305,7 @@ export class ZombieManager {
     private readonly typeRng: () => number = rng,
   ) {
     this.rng = rng;
+    this.group.add(this.blood.group);
     this.spawner = new ZombieSpawner(rng, spawnPoints ?? undefined);
     this.pool = new ZombiePool(ZOMBIE_POOL_MODELS.length, (index) => {
       const modelId = ZOMBIE_POOL_MODELS[index];
@@ -311,6 +314,7 @@ export class ZombieManager {
       const zombie = new Zombie(
         new ZombieVisual(modelId, zombiePoolSource(sources, index), tint, castShadows),
         this.gibWalls,
+        this.blood,
       );
       this.zombieIds.set(zombie, this.nextZombieId++);
       zombie.onDeathFinished = () => this.finishDeath(zombie);
@@ -748,6 +752,7 @@ export class ZombieManager {
     hostAlive = true,
   ): void {
     this.otherPlayers = otherPlayers;
+    this.blood.update(dt);
     this.hostBodyActive = hostAlive;
     this.hostIgnoredFor = Math.max(0, this.hostIgnoredFor - dt);
     this.lastPlayerX = playerX;
@@ -872,6 +877,7 @@ export class ZombieManager {
   }
 
   reset(): void {
+    this.blood.reset();
     this.hostIgnoredFor = 0;
     for (const zombie of this.pool.actives) {
       zombie.group.visible = false;
@@ -2349,6 +2355,7 @@ export class ZombieManager {
 
   public dispose(): void {
     this.reset();
+    this.blood.dispose();
     for (const zombie of this.zombieIds.keys()) {
       zombie.dispose();
     }

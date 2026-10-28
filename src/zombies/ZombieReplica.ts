@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import { ZombieBlood } from './ZombieBlood';
 import type { ZombieNetState } from '../network/Protocol';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../network/Interpolation';
 import type { VaultOpening } from './barriers/WindowVault';
 import type { GibWalls } from './GibWalls';
 import { Zombie } from './Zombie';
 import { ZOMBIE_ATTACK_LUNGE, ZOMBIE_TYPE_CONFIGS, MAX_ALIVE } from './ZombieConfig';
-import type { ZombieDeathStyle } from './ZombieDeath';
+import type { ZombieDeathStyle, ZombieKillSource } from './ZombieDeath';
 import { ZOMBIE_POOL_MODELS, zombiePoolSource, type ZombieModelSources } from './ZombieManager';
 import { ZombiePool } from './ZombiePool';
 import { ZombieVisual, ZOMBIE_MODELS } from './ZombieVisual';
@@ -46,6 +47,7 @@ export class ZombieReplica {
   public readonly group = new THREE.Group();
 
   private readonly pool: ZombiePool;
+  private readonly bodies: Zombie[] = [];
   private readonly entries = new Map<number, ReplicaEntry>();
   private readonly ids = new Map<Zombie, number>();
   private readonly clock = new RemoteClock(INTERPOLATION_DELAY);
@@ -53,18 +55,21 @@ export class ZombieReplica {
   private generation = 0;
   /** Wall set shared by every pooled zombie's gibs. */
   private readonly gibWalls: GibWalls = { boxes: [] };
+  private readonly blood = new ZombieBlood(this.gibWalls);
 
   public constructor(
     sources: ZombieModelSources,
     castShadows: boolean,
     private readonly colliders: THREE.Object3D[],
   ) {
+    this.group.add(this.blood.group);
     this.pool = new ZombiePool(ZOMBIE_POOL_MODELS.length, (index) => {
       const modelId = ZOMBIE_POOL_MODELS[index];
       const model = ZOMBIE_MODELS[modelId];
       const zombie = new Zombie(new ZombieVisual(modelId, zombiePoolSource(sources, index),
-        model.tints[index % model.tints.length], castShadows), this.gibWalls);
+        model.tints[index % model.tints.length], castShadows), this.gibWalls, this.blood);
       zombie.onDeathFinished = () => this.release(zombie);
+      this.bodies.push(zombie);
       this.group.add(zombie.group);
       return zombie;
     }, MAX_ALIVE);
@@ -141,9 +146,9 @@ export class ZombieReplica {
     return zombie;
   }
 
-  public hit(id: number, headshot: boolean, amount: number, fromX: number, fromZ: number): void {
+  public hit(id: number, headshot: boolean, amount: number, fromX: number, fromZ: number, source?: ZombieKillSource): void {
     const entry = this.entries.get(id);
-    if (entry && !entry.dying) entry.zombie.playReplicatedHit(amount, headshot, fromX, fromZ);
+    if (entry && !entry.dying) entry.zombie.playReplicatedHit(amount, headshot, fromX, fromZ, source);
   }
 
   /** Host ZEUS-77 chain: residual arcs on every listed body, dying ones included. */
@@ -152,16 +157,17 @@ export class ZombieReplica {
   }
 
   /** Snapshot-detected deaths (no event) play the default fall. */
-  public kill(id: number, style?: ZombieDeathStyle, impactX?: number, impactZ?: number, headshot?: boolean): void {
+  public kill(id: number, style?: ZombieDeathStyle, impactX?: number, impactZ?: number, headshot?: boolean, source?: ZombieKillSource): void {
     const entry = this.entries.get(id);
     if (!entry || entry.dying) return;
     entry.dying = true;
     this.removeColliders(entry.zombie);
-    entry.zombie.playReplicatedDeath(style, impactX, impactZ, headshot);
+    entry.zombie.playReplicatedDeath(style, impactX, impactZ, headshot, source);
   }
 
   /** `openings`: the map's active barriers, so bodies climb through windows as on the host. */
   public update(dt: number, openings: ReadonlyArray<VaultOpening> = []): void {
+    this.blood.update(dt);
     const renderTime = this.clock.renderTime;
     for (const entry of this.entries.values()) {
       const zombie = entry.zombie;
@@ -186,8 +192,15 @@ export class ZombieReplica {
   }
 
   public reset(): void {
+    this.blood.reset();
     for (const entry of [...this.entries.values()]) this.release(entry.zombie);
     this.clock.reset();
+  }
+
+  public dispose(): void {
+    this.reset();
+    this.blood.dispose();
+    for (const zombie of this.bodies) zombie.dispose();
   }
 
   private sampleInto(entry: ReplicaEntry, renderTime: number): boolean {

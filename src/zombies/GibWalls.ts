@@ -26,9 +26,10 @@ export class GibWallFrame {
   private readonly inverse = new THREE.Matrix4();
   private readonly origin = new THREE.Vector3();
 
-  /** `frame` is the world-aligned gib group, with an up-to-date world matrix. */
-  capture(walls: GibWalls, frame: THREE.Object3D): void {
-    frame.getWorldPosition(this.origin);
+  /** `frame` defines simulation coordinates; `origin` optionally selects nearby walls at a wound. */
+  public capture(walls: GibWalls, frame: THREE.Object3D, origin?: THREE.Vector3): void {
+    if (origin) this.origin.copy(origin);
+    else frame.getWorldPosition(this.origin);
     this.inverse.copy(frame.matrixWorld).invert();
     this.count = 0;
     for (const wall of walls.boxes) {

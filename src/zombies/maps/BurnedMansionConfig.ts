@@ -4,6 +4,7 @@ import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import { NUCLEAR_ENDING_DURATION } from '../ZombiesRunFlow';
 import type { ArenaAmbience, ArenaEnding } from './ZombieArena';
+import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 
 /** Pure tuning constants for the Burned Mansion map. */
 
@@ -94,6 +95,14 @@ export const MANSION_BANQUET_HALL = {
    */
   chimney: { frontX: MANSION_BUNKER_DIVIDER_X - 0.55, z: -12, breadth: 2.3, surroundWidth: 1.7 },
 } as const;
+
+/** Same locked Barrett chest as Station 33, facing the room below the portrait. */
+export const MANSION_WEAPON_CHEST = {
+  id: 'mansion-barrett-chest', weaponId: 'barrett', code: BARRETT_CHEST_CODE,
+  x: MANSION_BANQUET_HALL.chimney.frontX - 0.98,
+  z: MANSION_BANQUET_HALL.chimney.z,
+  yaw: -Math.PI / 2, requiredDoorId: 'to-banquet',
+} as const satisfies CodeWeaponChestPlacement;
 
 /**
  * Easter egg for Pokémon's Burned Tower: opening the banquet door rarely

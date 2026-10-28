@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GibWallFrame, type GibWallContact, type GibWalls } from './GibWalls';
+import { stepBloodDrop, type BloodDrop } from './BloodDropMotion';
+import { bloodGeometry, bloodMaterial } from './ZombieBloodAssets';
 
 /** Upright body space, like ZombieDeathPose: +z forward, +x the zombie's left, metres on a walker. */
 type Vec3 = readonly [number, number, number];
@@ -48,10 +50,6 @@ const RADIAL_PUSH = 5;
 /** Tumble rate (rad/s) of body pieces and of the smaller scraps and drops. */
 const PIECE_SPIN = 20;
 const SCRAP_SPIN = 28;
-/** A landed drop spreads into a splat this many times its radius. */
-const SPLAT_SPREAD = 4.6;
-/** Splat thickness, as a fraction of the drop radius. */
-const SPLAT_THICKNESS = 0.12;
 /** Red spray clouds left hanging in the air where the body burst. */
 const MIST_CLOUDS = 12;
 const MIST_LIFE = 1.1;
@@ -83,7 +81,6 @@ const AIR_DRAG = 0.4;
 const SKIN_BASE = 0x9a9478;
 const CLOTH_BASE = 0x463d33;
 const GORE_COLOR = 0x5c0806;
-const BLOOD_COLOR = 0x420403;
 
 interface GibParticle {
   readonly mesh: THREE.Mesh;
@@ -97,6 +94,7 @@ interface GibParticle {
   resting: boolean;
   /** Drops flatten into a splat where they land. */
   readonly splats: boolean;
+  readonly blood: BloodDrop | null;
 }
 
 interface MistCloud {
@@ -112,7 +110,6 @@ let headGeometry: THREE.BufferGeometry | null = null;
 let limbGeometry: THREE.BufferGeometry | null = null;
 let poolGeometry: THREE.BufferGeometry | null = null;
 let goreMaterial: THREE.MeshStandardMaterial | null = null;
-let bloodMaterial: THREE.MeshStandardMaterial | null = null;
 let mistTexture: THREE.DataTexture | null = null;
 
 function shapeGeometry(shape: GibPieceSpec['shape']): THREE.BufferGeometry {
@@ -128,10 +125,6 @@ function sharedPoolGeometry(): THREE.BufferGeometry {
 
 function sharedGore(): THREE.MeshStandardMaterial {
   return (goreMaterial ??= new THREE.MeshStandardMaterial({ color: GORE_COLOR, roughness: 0.35, metalness: 0 }));
-}
-
-function sharedBlood(): THREE.MeshStandardMaterial {
-  return (bloodMaterial ??= new THREE.MeshStandardMaterial({ color: BLOOD_COLOR, roughness: 0.3, metalness: 0 }));
 }
 
 /** Soft white disc, opaque at the centre and fading to the rim; built from data so it needs no canvas. */
@@ -195,7 +188,7 @@ export class ZombieGibs {
     }
     for (let i = 0; i < BLOOD_DROPS; i++) {
       const size = 0.014 + Math.random() * 0.018;
-      this.addParticle(new THREE.Mesh(shapeGeometry('head'), sharedBlood()), new THREE.Vector3(size, size, size), true);
+      this.addParticle(new THREE.Mesh(bloodGeometry(), bloodMaterial()), new THREE.Vector3(size, size, size), true);
     }
     for (let i = 0; i < MIST_CLOUDS; i++) {
       const material = new THREE.SpriteMaterial({
@@ -211,7 +204,7 @@ export class ZombieGibs {
       this.ownMaterials.push(material);
       this.mist.push({ sprite, material, velocity: new THREE.Vector3(), size: MIST_SIZE });
     }
-    this.pool = new THREE.Mesh(sharedPoolGeometry(), sharedBlood());
+    this.pool = new THREE.Mesh(sharedPoolGeometry(), bloodMaterial());
     this.pool.position.y = 0.003;
     this.pool.visible = false;
     this.group.add(this.pool);
@@ -296,6 +289,21 @@ export class ZombieGibs {
   }
 
   private fly(particle: GibParticle, dt: number): void {
+    if (particle.blood) {
+      stepBloodDrop(particle.blood, dt, this.wallFrame, 0);
+      particle.resting = particle.blood.resting;
+      if (particle.resting) particle.mesh.rotation.set(0, 0, 0);
+      return;
+    }
+    let remaining = Math.max(0, dt);
+    while (remaining > 0 && !particle.resting) {
+      const step = Math.min(remaining, 1 / 120);
+      remaining -= step;
+      this.flyPiece(particle, step);
+    }
+  }
+
+  private flyPiece(particle: GibParticle, dt: number): void {
     const { mesh, velocity, spin } = particle;
     this.previous.copy(mesh.position);
     velocity.y -= GRAVITY * dt;
@@ -337,15 +345,19 @@ export class ZombieGibs {
     mesh.castShadow = false;
     mesh.scale.copy(size);
     this.group.add(mesh);
+    const baseScale = size.clone();
+    const velocity = new THREE.Vector3();
     this.particles.push({
       mesh,
-      velocity: new THREE.Vector3(),
+      velocity,
       spin: new THREE.Vector3(),
       size: size.clone(),
-      baseScale: size.clone(),
+      baseScale,
       rest: Math.min(size.x, size.y, size.z),
       resting: false,
       splats,
+      blood: splats ? { position: mesh.position, previous: new THREE.Vector3(), velocity,
+        scale: baseScale, radius: size.x, resting: false } : null,
     });
   }
 
@@ -363,20 +375,13 @@ export class ZombieGibs {
     baseScale.copy(size);
     particle.rest = Math.min(size.x, size.y, size.z);
     particle.resting = false;
+    if (particle.blood) particle.blood.resting = false;
   }
 
   /** Touchdown on the floor (`surface` 0) or on top of a wall box. */
   private land(particle: GibParticle, surface: number): void {
-    const { mesh, velocity, spin, size } = particle;
+    const { mesh, velocity, spin } = particle;
     mesh.position.y = surface + particle.rest;
-    if (particle.splats) {
-      // A drop flattens into a splat on the floor.
-      particle.baseScale.set(size.x * SPLAT_SPREAD, size.x * SPLAT_THICKNESS, size.x * SPLAT_SPREAD);
-      mesh.rotation.set(0, mesh.rotation.y, 0);
-      mesh.position.y = surface + 0.006;
-      particle.resting = true;
-      return;
-    }
     if (-velocity.y < SETTLE_SPEED) {
       particle.resting = true;
       return;
@@ -387,18 +392,9 @@ export class ZombieGibs {
     spin.multiplyScalar(0.5);
   }
 
-  /** A drop sticks to the wall as a flat splat; pieces bounce back off it. */
+  /** Solid body pieces bounce back off a wall; blood uses stepBloodDrop. */
   private hitWall(particle: GibParticle, contact: Exclude<GibWallContact, 'top'>): void {
-    const { mesh, velocity, spin, size } = particle;
-    if (particle.splats) {
-      const flat = size.x * SPLAT_THICKNESS;
-      const wide = size.x * SPLAT_SPREAD;
-      if (contact === 'x') particle.baseScale.set(flat, wide, wide);
-      else if (contact === 'z') particle.baseScale.set(wide, wide, flat);
-      mesh.rotation.set(0, 0, 0);
-      particle.resting = true;
-      return;
-    }
+    const { velocity, spin } = particle;
     if (contact === 'x') velocity.x = -velocity.x * WALL_BOUNCE;
     else if (contact === 'z') velocity.z = -velocity.z * WALL_BOUNCE;
     else velocity.x = velocity.z = 0;

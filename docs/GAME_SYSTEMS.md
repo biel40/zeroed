@@ -250,6 +250,17 @@ existente a `MOTDRULES`.
   cuerpo llega al suelo con impacto y, hasta aterrizar, nunca vuelve a subir
   (si las rodillas tocan el suelo lo sostienen hasta que se desploma). Al morir se retiran al instante los colliders y el estado A*/colas de barrera;
   el anfitrion replica estilo y lado del impacto.
+- Las cuchilladas producen salpicaduras abundantes en cada impacto, sea mortal
+  o no. Las balas tambien expulsan sangre; los impactos consecutivos sobre un
+  mismo zombi aumentan la cantidad mientras mantengan la cadencia. `ZombieBleeding`
+  decide la intensidad y `ZombieBlood` acumula las gotas y manchas fuera del
+  cuerpo: permanecen aunque el zombi avance, muera o se reutilice. Comparten
+  material, gotas, caida y contacto con superficies con el Barrett
+  (`BloodDropMotion`); su desmembramiento conserva su propio efecto.
+  Las manchas duran 45 s, se encogen al final y se reciclan al alcanzar el limite
+  de 1024 gotas/manchas, con un solo draw call. Se limpian al reiniciar la run.
+  Fuego y armas de energia conservan sus efectos propios. En cooperativo se
+  generan desde impactos y bajas confirmados por el anfitrion.
 - Cada zombie alcanzado por la cadena ZEUS-77 queda cargado 2.8 s
   (`ZombieElectricArcs`): rayos que saltan entre sus articulaciones y un
   destello azul en la piel, vivo o ya caido en el suelo. Es solo visual (un
@@ -386,11 +397,15 @@ existente a `MOTDRULES`.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega ninguna de las
   dos armas que lleva el comprador al activarla, en individual y cooperativo.
   La PPSh-41 forma parte del arsenal estandar de la caja; la Vector sigue disponible.
-  El Barrett .50 se obtiene en la caja y, en Station 33, gratis en el baul
-  con candado numerico del puesto de milicia (tras la puerta de 3000).
+  El Barrett .50 se obtiene en la caja y gratis en los baules con candado
+  numerico: el del puesto de milicia de Station 33 (tras la puerta de 3000)
+  y el de Burned Mansion, delante de la chimenea del gran comedor, bajo el
+  retrato que sigue al jugador. Ambos comparten el mismo codigo.
   `CodeWeaponChest` usa el contrato `ArenaWeaponPickup` con `codeLock` opcional:
   el teclado pausa la simulacion individual, abrir revela el arma y recogerla
   pasa por el inventario habitual; una entrega por partida, restaurada al reiniciar.
+  En cooperativo el teclado bloquea solo la entrada local, sin pausar la partida;
+  el anfitrion valida el codigo, comparte la apertura y concede una unica arma.
   Es un francotirador pesado semiautomatico,
   con mira telescopica, mayor dano y retroceso que la L96 y menor movilidad;
   cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),

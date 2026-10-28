@@ -9,6 +9,8 @@ import { createSkinnedWalkerSource } from '../../src/zombies/skins/ZombieSkinBui
 import { ZOMBIE_SKINS, type ZombieSkinId } from '../../src/zombies/skins/ZombieSkinCatalog';
 import { STATION33_ZOMBIE_EYES } from '../../src/zombies/maps/Station33Config';
 import { ZombieHat } from '../../src/zombies/skins/ZombieHat';
+import { ZombieBlood } from '../../src/zombies/ZombieBlood';
+import { ZombieBleeding } from '../../src/zombies/ZombieBleeding';
 
 // Development-only visual review, independent of the game entry/bundle.
 // /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?state=barrierAttack | ?close=1 | ?night=1
@@ -81,6 +83,17 @@ const deathStyles = new Map<ZombieVisual, ZombieFallStyle>();
 const deathClocks = new Map<ZombieVisual, number>();
 const hats = new Map<ZombieVisual, ZombieHat>();
 const hatClocks = new Map<ZombieVisual, number>();
+const bloodSource = params.get('blood') === 'knife' ? 'knife' : params.get('blood') === 'bullet' ? 'm4a1' : null;
+const bloodWall = new THREE.Box3(new THREE.Vector3(-12, 0, -1.6), new THREE.Vector3(12, 3, -1.4));
+const blood = bloodSource ? new ZombieBlood({ boxes: [bloodWall] }) : null;
+const woundPreviews = new Map<ZombieVisual, { bleeding: ZombieBleeding; untilHit: number }>();
+const bloodOrigin = new THREE.Vector3();
+if (blood) {
+  scene.add(blood.group);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(24, 3, 0.2), new THREE.MeshStandardMaterial({ color: 0x77746c }));
+  wall.position.set(0, 1.5, -1.5);
+  scene.add(wall);
+}
 const source = { scene: gltf.scene, clips: gltf.animations };
 const layout: readonly { yaw: number; style: ZombieFallStyle; skin: ZombieSkinId | null }[] = close
   ? [{ yaw: 0, style: deathStyle, skin: singleSkin }]
@@ -124,6 +137,7 @@ for (const [index, { yaw, style, skin }] of layout.entries()) {
   scene.add(placement);
   placements.push(placement);
   visuals.push(visual);
+  if (blood) woundPreviews.set(visual, { bleeding: new ZombieBleeding(), untilHit: 0.4 });
   if (params.has('hatshot')) {
     const hat = ZombieHat.create(visual.root, placement, { boxes: [] });
     if (hat) hats.set(visual, hat);
@@ -170,6 +184,28 @@ function advanceBody(visual: ZombieVisual, elapsed: number): void {
     remaining -= step;
     phase += step;
     if (phase >= cycleDuration) phase = 0;
+  }
+}
+
+function advanceBlood(elapsed: number): void {
+  if (!blood || !bloodSource) return;
+  let remaining = elapsed;
+  scene.updateMatrixWorld(true);
+  while (remaining > 0) {
+    const step = Math.min(remaining, 1 / 60);
+    remaining -= step;
+    for (const [visual, preview] of woundPreviews) {
+      preview.bleeding.update(step);
+      preview.untilHit -= step;
+      if (preview.untilHit <= 0) {
+        preview.untilHit += bloodSource === 'knife' ? 0.72 : 0.1;
+        visual.torsoAnchor.getWorldPosition(bloodOrigin);
+        bloodOrigin.y += 0.15;
+        blood.emit(bloodOrigin, 0, 0, -1, preview.bleeding.hit(bloodSource, false)!);
+        visual.hitFlash();
+      }
+    }
+    blood.update(step);
   }
 }
 /** Same entry as the game: a walking body is shot from the front, then falls. */
@@ -219,6 +255,7 @@ function resize(): void {
 resize();
 if (fixedTime !== null) {
   for (const visual of visuals) advanceVisual(visual, state === 'death' ? DEATH_LEAD + fixedTime : fixedTime);
+  advanceBlood(fixedTime);
 }
 const labelPoint = new THREE.Vector3();
 let previous = performance.now();
@@ -227,6 +264,7 @@ renderer.setAnimationLoop((now) => {
   previous = now;
   if (fixedTime === null) {
     for (const visual of visuals) advanceVisual(visual, dt);
+    advanceBlood(dt);
     cycleTime = (cycleTime + dt) % cycleDuration;
   }
   renderer.render(scene, camera);

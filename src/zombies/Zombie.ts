@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { ZombieBleeding } from './ZombieBleeding';
+import type { ZombieBlood } from './ZombieBlood';
 import { ZombieHat } from './skins/ZombieHat';
 import type { HitTarget, SurfaceType } from '../shooting/HitTarget';
 import type { WindowBarrier } from './barriers/WindowBarrier';
@@ -123,11 +125,13 @@ export class Zombie implements HitTarget {
   /** Blood under a body burnt to death; built on the first one. */
   private bloodPool: ZombieBloodPool | null = null;
   private readonly hat: ZombieHat | null;
+  private readonly bleeding = new ZombieBleeding();
+  private readonly bloodFloor = new THREE.Vector3();
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
   readonly impact = new THREE.Vector2();
 
   /** `gibWalls` is the map wall set shared by the pool; a shattered body's pieces bounce off it. */
-  constructor(visual?: ZombieVisual, private readonly gibWalls: GibWalls = { boxes: [] }) {
+  constructor(visual?: ZombieVisual, private readonly gibWalls: GibWalls = { boxes: [] }, private readonly blood?: ZombieBlood) {
     this.visual = visual ?? new ZombieVisual('walker', null, ZOMBIE_MODELS.walker.tints[0]);
 
     // Hitboxes are parented onto the animated rig (bones, or the procedural
@@ -211,6 +215,7 @@ export class Zombie implements HitTarget {
     this.gibs?.hide();
     this.bloodPool?.hide();
     this.hat?.reset();
+    this.bleeding.reset();
     this.visual.setState('spawn');
     this.group.visible = true;
   }
@@ -257,6 +262,7 @@ export class Zombie implements HitTarget {
     this.hp -= amount;
     this.visual.hitFlash();
     this.reactToDamage(amount, headshot, sourceX, sourceZ);
+    this.bleed(amount, headshot, source, this.hp <= 0);
     if (this.hp <= 0) {
       const killSource = source === 'normal' ? undefined : source;
       const style = resolveZombieDeathStyle(killSource, headshot, this.impact.y);
@@ -267,14 +273,15 @@ export class Zombie implements HitTarget {
   }
 
   /** Network replica: host-confirmed hit feedback; the replica never owns health. */
-  public playReplicatedHit(amount: number, headshot: boolean, sourceX: number, sourceZ: number): void {
+  public playReplicatedHit(amount: number, headshot: boolean, sourceX: number, sourceZ: number, source?: ZombieKillSource): void {
     if (!this.isAlive) return;
     this.visual.hitFlash();
     this.reactToDamage(amount, headshot, sourceX, sourceZ);
+    this.bleed(amount, headshot, source, false);
   }
 
   /** Network replica: the host decided this zombie died, how, and from which body-local side. */
-  public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1, headshot = style === 'headshot'): void {
+  public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1, headshot = style === 'headshot', source?: ZombieKillSource): void {
     if (!this.isAlive) return;
     this.impact.set(impactX, impactZ);
     if (headshot) {
@@ -284,6 +291,9 @@ export class Zombie implements HitTarget {
         this.position.z - (-impactX * Math.sin(yaw) + impactZ * Math.cos(yaw)),
       );
     }
+    const inferredSource = style === 'slash' ? 'knife' : style === 'shatter' ? 'barrett'
+      : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'raygun' : undefined;
+    this.bleed(1, headshot, source ?? inferredSource, true);
     this.enterDeath(style);
   }
 
@@ -315,6 +325,20 @@ export class Zombie implements HitTarget {
       this.impact.y,
       Math.min(0.3, 0.07 + amount / Math.max(1, this.maxHp) * 0.3 + (headshot ? 0.06 : 0)),
     );
+  }
+
+  private bleed(amount: number, headshot: boolean, source: ZombieKillSource | 'normal' | undefined, lethal: boolean): void {
+    if (amount <= 0 || !this.blood) return;
+    const profile = this.bleeding.hit(source, lethal);
+    if (!profile) return;
+    this.group.updateWorldMatrix(true, false);
+    this.group.updateMatrixWorld(true);
+    (headshot ? this.headHitbox : this.torsoHitbox).getWorldPosition(this.tmpImpactOrigin);
+    this.group.getWorldPosition(this.bloodFloor);
+    const yaw = this.group.rotation.y;
+    this.blood.emit(this.tmpImpactOrigin, this.bloodFloor.y,
+      this.impact.x * Math.cos(yaw) + this.impact.y * Math.sin(yaw),
+      -this.impact.x * Math.sin(yaw) + this.impact.y * Math.cos(yaw), profile);
   }
 
   /** Body-local unit direction the impact travels (x: its left, y: forward); unknown sources push from the front. */
@@ -449,6 +473,7 @@ export class Zombie implements HitTarget {
   update(dt: number, visualSpeed = this.speed): void {
     if (!this.group.visible) return;
     this.hat?.update(dt);
+    this.bleeding.update(dt);
     const yawDelta = Math.atan2(Math.sin(this.group.rotation.y - this.previousYaw), Math.cos(this.group.rotation.y - this.previousYaw));
     this.visual.setMotion(dt, visualSpeed, dt > 0 ? yawDelta / dt : 0);
     this.previousYaw = this.group.rotation.y;

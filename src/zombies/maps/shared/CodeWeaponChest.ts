@@ -5,37 +5,28 @@ import type { WeaponId } from '../../../weapons/WeaponTypes';
 import type { ArenaWeaponPickup } from '../ZombieArena';
 import type { MapBuildKit } from './MapBuildKit';
 import { addSolidProxy } from './SolidProxy';
-
-export interface CodeWeaponChestPlacement {
-  readonly id: string;
-  readonly weaponId: WeaponId;
-  readonly code: string;
-  readonly x: number;
-  readonly z: number;
-  readonly yaw: number;
-  readonly requiredDoorId: string;
-}
+import type { CodeWeaponChestPlacement } from './CodeWeaponChestConfig';
 
 /** Solid steel chest with an animated lid and a single free weapon per run. */
 export class CodeWeaponChest implements ArenaWeaponPickup {
-  readonly cost = 0;
-  readonly floor = 0;
-  readonly useRange = 2;
-  readonly lookDotMin = 0.65;
-  readonly id: string;
-  readonly weaponId: WeaponId;
-  readonly requiredDoorId: string;
-  readonly interactionLabel: string;
-  readonly position: { x: number; y: number; z: number };
-  get codeLock(): this { return this; }
-  get locked(): boolean { return !this.opened; }
+  public readonly cost = 0;
+  public readonly floor = 0;
+  public readonly useRange = 2;
+  public readonly lookDotMin = 0.65;
+  public readonly id: string;
+  public readonly weaponId: WeaponId;
+  public readonly requiredDoorId: string;
+  public readonly interactionLabel: string;
+  public readonly position: { x: number; y: number; z: number };
+  public get codeLock(): this { return this; }
+  public get locked(): boolean { return !this.opened; }
   private opened = false;
   private claimed = false;
   private readonly lid = new THREE.Group();
   private readonly padlock = new THREE.Group();
   private readonly weapon: THREE.Group;
 
-  constructor(kit: MapBuildKit, private readonly config: CodeWeaponChestPlacement) {
+  public constructor(kit: Pick<MapBuildKit, 'group' | 'structure' | 'collider'>, private readonly config: CodeWeaponChestPlacement) {
     this.id = config.id;
     this.weaponId = config.weaponId;
     this.requiredDoorId = config.requiredDoorId;
@@ -83,29 +74,37 @@ export class CodeWeaponChest implements ArenaWeaponPickup {
     this.reset();
   }
 
-  get available(): boolean { return !this.claimed; }
+  public get available(): boolean { return !this.claimed; }
 
-  unlock(code: string): boolean {
-    if (!this.available || code !== this.config.code) return false;
-    this.opened = true;
-    this.padlock.visible = false;
-    this.weapon.visible = true;
+  public acceptsCode(code: string): boolean {
+    return this.available && code === this.config.code;
+  }
+
+  public unlock(code: string): boolean {
+    if (!this.acceptsCode(code)) return false;
+    this.applyUnlocked();
     return true;
   }
 
-  claim(): boolean {
+  public applyUnlocked(): void {
+    this.opened = true;
+    this.padlock.visible = false;
+    this.weapon.visible = !this.claimed;
+  }
+
+  public claim(): boolean {
     if (!this.opened || this.claimed) return false;
     this.claimed = true;
     this.weapon.visible = false;
     return true;
   }
 
-  update(dt: number): void {
+  public update(dt: number): void {
     const target = this.opened ? -Math.PI * 0.62 : 0;
     this.lid.rotation.x += (target - this.lid.rotation.x) * (1 - Math.exp(-5 * Math.max(0, dt)));
   }
 
-  reset(): void {
+  public reset(): void {
     this.opened = false;
     this.claimed = false;
     this.lid.rotation.x = 0;

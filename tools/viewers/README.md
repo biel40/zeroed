@@ -28,6 +28,7 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?skin=all`: todas las skins del walker en fila. `skin=fieldOfficer` viste a los tres zombies con una sola; se combina con `close=1`, `state=`, `speed=0` (pose quieta) y `redEyes=1` (ojos rojos de Station 33).
 - Parámetros adicionales: `state=attack`, `time=0.475` y `close=1`.
 - `?skin=all&hatshot=1&redEyes=1`: los gorros caen en bucle; `time=1.5` congela la caida para revisar el contacto con el suelo.
+- `?blood=knife&speed=0` y `?blood=bullet&speed=0`: salpicaduras de cuchillo o rafaga contra una pared de prueba; `time=4` congela la acumulacion de manchas. Compatible con `skin=`.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.
 

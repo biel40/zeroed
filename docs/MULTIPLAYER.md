@@ -106,6 +106,10 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   únicos por spawn; los que refieren entidades desaparecidas se ignoran.
   `zombieDeath` incluye el estilo de muerte y el lado del impacto; si faltan
   o no son válidos, el invitado usa la caída por defecto.
+  `zombieHit` y `zombieDeath` incluyen opcionalmente el origen del dano para
+  reproducir la sangre de cuchillo y balas sin duplicar las salpicaduras del
+  Barrett ni añadirlas a fuego o energia. Las manchas son locales a cada vista
+  y no forman parte de las instantaneas para quienes se unen mas tarde.
   En espera, final y créditos se envían solo cambios puntuales; una sala sin
   invitado no envía estados periódicos al relay.
 - Combate: el anfitrión aplica todo el daño. Las balas del invitado vuelan en
@@ -136,6 +140,9 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   requisitos. El desbloqueo visual refleja las bajas locales y la apertura se
   replica para ambos. La recarga de munición es individual. El
   final de 30000 Points detiene la partida compartida y abre los créditos.
+  El cofre del Barrett bajo el retrato del comedor comparte apertura y recogida:
+  el anfitrion valida alcance, puerta y codigo, y solo entrega un arma por partida.
+  Su teclado bloquea los controles locales sin pausar la simulacion compartida.
 - La pausa del invitado solo abre su menú y libera el ratón; la partida sigue.
   La pausa del anfitrión detiene la simulación para ambos hasta que reanuda.
   Solo el anfitrión puede reiniciar;

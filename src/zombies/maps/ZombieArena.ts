@@ -31,7 +31,12 @@ export interface ArenaPlayerSpawn {
 
 export interface ArenaWeaponPickup {
   /** Optional combination lock; an unlocked pickup follows the normal grant path. */
-  readonly codeLock?: { readonly locked: boolean; unlock(code: string): boolean };
+  readonly codeLock?: {
+    readonly locked: boolean;
+    acceptsCode(code: string): boolean;
+    unlock(code: string): boolean;
+    applyUnlocked(): void;
+  };
   readonly id: string;
   readonly weaponId: WeaponId;
   readonly cost: number;

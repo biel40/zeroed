@@ -236,4 +236,25 @@ describe('Barrett shatter death', () => {
     expect(zombie.visual.root.visible).toBe(true);
     expect(gibsOf(zombie).visible).toBe(false);
   });
+
+  it('blocks fast remains at a thin wall even when frames take 200 ms', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      const wall = new THREE.Box3(new THREE.Vector3(-5, -1, 1.5), new THREE.Vector3(5, 4, 1.8));
+      const zombie = new Zombie(undefined, { boxes: [wall] });
+      zombie.spawn(0, 0, 100, 1);
+      zombie.skipSpawnRise();
+      zombie.applyDamage(1000, false, 0, -5, 'barrett');
+      for (let i = 0; i < 10; i++) zombie.update(0.2, 0);
+      const gibs = gibsOf(zombie);
+      gibs.updateWorldMatrix(true, true);
+      const point = new THREE.Vector3();
+      for (const piece of gibs.children) {
+        if (piece instanceof THREE.Mesh) expect(piece.getWorldPosition(point).z).toBeLessThan(1.5);
+      }
+      zombie.dispose();
+    } finally {
+      random.mockRestore();
+    }
+  });
 });

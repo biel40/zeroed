@@ -39,6 +39,7 @@ import { buildInteriorTrim, buildWindowCasings } from './burnedMansion/MansionIn
 import { buildLightFixture } from './burnedMansion/MansionLightFixtures';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
 import { ArenaStructure } from './shared/ArenaStructure';
+import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { projectWorldBoxUVs } from './shared/BoxUVs';
 import { POINT_LIGHT_BUDGET } from './shared/PointLightBudget';
 import {
@@ -76,6 +77,7 @@ import {
   MANSION_WALL_HEIGHT,
   MANSION_WALL_THICKNESS,
   MANSION_WINDOW_OPENING,
+  MANSION_WEAPON_CHEST,
   isOutsideMansion,
 } from './BurnedMansionConfig';
 
@@ -331,7 +333,11 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.buildStairs();
     this.buildProps();
     this.buildBunkerDetails();
-    this.weaponPickups = this.buildSecretPickups();
+    this.weaponPickups = [...this.buildSecretPickups(), new CodeWeaponChest({
+      group: this.group,
+      structure: this.structure,
+      collider: new THREE.MeshBasicMaterial({ visible: false }),
+    }, MANSION_WEAPON_CHEST)];
     this.ammoRefills = this.buildAmmoRefills();
     this.buildDamageDetails();
     buildInteriorTrim(dressing);

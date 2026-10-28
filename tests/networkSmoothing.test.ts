@@ -164,6 +164,15 @@ describe('protocol boundary', () => {
     expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'shatter', headshot: true }))
       .toEqual({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'shatter', headshot: true, impactX: 0, impactZ: -1 });
   });
+
+  it('validates optional wound sources without breaking older hit and death events', () => {
+    const hit = { type: 'zombieHit', zombieId: 4, headshot: false, amount: 20, fromX: 0, fromZ: -2 };
+    expect(parseHostMessage({ ...hit, source: 'knife' })).toEqual({ ...hit, source: 'knife' });
+    expect(parseHostMessage({ ...hit, source: 'unknown' })).toEqual(hit);
+    const death = { type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'headshot', impactX: 0, impactZ: -1 };
+    expect(parseHostMessage({ ...death, source: 'm4a1' })).toEqual({ ...death, source: 'm4a1' });
+    expect(parseHostMessage({ ...death, source: { weapon: 'knife' } })).toEqual(death);
+  });
 });
 
 describe('barrier replication', () => {

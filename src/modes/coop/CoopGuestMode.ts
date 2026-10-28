@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CoopChestInteraction } from './CoopChestInteraction';
 import { t } from '../../i18n/i18n';
 import { actionKey, weaponCaseLocked, weaponCasePrompt } from '../../ui/InteractionPrompts';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
@@ -55,6 +56,7 @@ export class CoopGuestMode implements GameMode {
   }
 
   private ctx!: ModeContext;
+  private readonly chestInteraction = new CoopChestInteraction();
   private world!: CoopWorld;
   private replica!: ZombieReplica;
   private energy!: EnergyProjectiles;
@@ -200,11 +202,11 @@ export class CoopGuestMode implements GameMode {
 
   /** The game-over panel owns the cursor; otherwise ESC opens the local menu. */
   public onPointerUnlock(): boolean {
-    return !this.hostLost && (this.gameOverShown || this.match?.phase === 'ending' || this.match?.phase === 'credits');
+    return this.chestInteraction.active || (!this.hostLost && (this.gameOverShown || this.match?.phase === 'ending' || this.match?.phase === 'credits'));
   }
 
   public isGameplayInputEnabled(): boolean {
-    return this.playing && !this.hostLost && !this.match?.hostPaused && this.match?.phase === 'playing'
+    return !this.chestInteraction.active && this.playing && !this.hostLost && !this.match?.hostPaused && this.match?.phase === 'playing'
       && this.match.stats.guest.life === 'alive';
   }
 
@@ -248,6 +250,9 @@ export class CoopGuestMode implements GameMode {
     }
     const pickup = this.world.findFacingPickup();
     if (pickup) {
+      if (this.chestInteraction.open(this.ctx, pickup, (code) => {
+        this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon, code });
+      })) return;
       const kills = this.match?.stats.guest.kills ?? 0;
       if (weaponCaseLocked(pickup, kills)) {
         this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, kills, this.ctx.profile.useTouchControls));
@@ -313,12 +318,13 @@ export class CoopGuestMode implements GameMode {
   }
 
   public onExit(): void {
+    this.chestInteraction.dispose();
     this.knife.reset();
     this.ctx.hud.setHostPauseVisible(false);
     this.gesture.dispose();
     this.connection.dispose();
     this.hostAvatar.dispose();
-    this.replica.reset();
+    this.replica.dispose();
     this.ctx.hud.clearCoopPresentation();
   }
 
@@ -363,10 +369,10 @@ export class CoopGuestMode implements GameMode {
         this.replicateAttack(message.zombieId, message.target);
         break;
       case 'zombieHit':
-        this.replica.hit(message.zombieId, message.headshot, message.amount, message.fromX, message.fromZ);
+        this.replica.hit(message.zombieId, message.headshot, message.amount, message.fromX, message.fromZ, message.source);
         break;
       case 'zombieDeath':
-        this.replica.kill(message.zombieId, message.style, message.impactX, message.impactZ, message.headshot);
+        this.replica.kill(message.zombieId, message.style, message.impactX, message.impactZ, message.headshot, message.source);
         break;
       case 'roundStart':
         this.round = message.round;
@@ -416,7 +422,9 @@ export class CoopGuestMode implements GameMode {
         if (message.kind === 'lamp') this.world.arena.soulLampInteractions.find((entry) => entry.id === message.id)?.activate();
         else if (message.kind === 'ritual') this.world.arena.ritualInteraction.activate();
         else if (message.kind === 'pickup') {
-          this.world.arena.weaponPickups.find((entry) => entry.id === message.id)?.claim();
+          const pickup = this.world.arena.weaponPickups.find((entry) => entry.id === message.id);
+          pickup?.codeLock?.applyUnlocked();
+          pickup?.claim();
           if (message.buyer === 'guest' && message.weapon) this.ctx.grantWeapon(message.weapon);
         } else if (message.kind === 'ammo') {
           this.world.arena.ammoRefills.find((entry) => entry.id === message.id)?.activate();
@@ -455,7 +463,12 @@ export class CoopGuestMode implements GameMode {
     this.world.applyOpenDoors(state.openDoorIds);
     this.world.applyBarrierStates(state.barriers, !firstSnapshot);
     this.world.arena.applySecretSnapshot(state.secret);
-    for (const id of state.claimedPickupIds) this.world.arena.weaponPickups.find((entry) => entry.id === id)?.claim();
+    for (const id of state.unlockedPickupIds ?? []) this.world.arena.weaponPickups.find((entry) => entry.id === id)?.codeLock?.applyUnlocked();
+    for (const id of state.claimedPickupIds) {
+      const pickup = this.world.arena.weaponPickups.find((entry) => entry.id === id);
+      pickup?.codeLock?.applyUnlocked();
+      pickup?.claim();
+    }
     this.box.applySnapshot(state.box);
     if (previousBox.phase !== state.box.phase) {
       this.boxPending = false;
@@ -491,6 +504,7 @@ export class CoopGuestMode implements GameMode {
   }
 
   private restartFromHost(): void {
+    this.chestInteraction.dispose();
     this.knife.reset();
     this.wallBuyPending = false;
     this.boxPending = false;

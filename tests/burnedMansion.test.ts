@@ -41,6 +41,7 @@ import {
   isOutsideMansion,
 } from '../src/zombies/maps/BurnedMansionConfig';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
+import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
 import { RITUAL_SCARE_TIMELINE } from '../src/zombies/secret-room/SecretRoomSystem';
 import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
 
@@ -168,6 +169,39 @@ const weaponStub = {
 } as unknown as Weapon;
 
 describe('Burned Mansion topology', () => {
+  it('places the shared Barrett chest below the watching portrait with an accessible solid body', () => {
+    const arena = makeArena();
+    unlock(arena, 'to-dining');
+    unlock(arena, 'to-banquet');
+    const chest = arena.weaponPickups.find((pickup) => pickup.weaponId === 'barrett')!;
+    expect(chest).toBeDefined();
+    expect(chest.cost).toBe(0);
+    expect(chest.requiredDoorId).toBe('to-banquet');
+    const model = arena.group.getObjectByName(`code-chest:${chest.id}`)!;
+    const { chimney } = MANSION_BANQUET_HALL;
+    expect(model.position.z).toBe(chimney.z);
+    expect(model.position.x).toBeLessThan(chimney.frontX);
+    expect(model.rotation.y).toBe(-Math.PI / 2);
+    const bounds = new THREE.Box3().setFromObject(arena.group.getObjectByName(chest.id)!);
+    expect(arena.wallColliders!.some((box) => box.equals(bounds))).toBe(true);
+    const standX = chest.position.x - 0.5;
+    const stand = new THREE.Box3(new THREE.Vector3(standX - 0.3, 0.05, chest.position.z - 0.3),
+      new THREE.Vector3(standX + 0.3, 1.8, chest.position.z + 0.3));
+    expect(arena.wallColliders!.some((box) => box.intersectsBox(stand))).toBe(false);
+    expect(canWalk([-3.5, -9.5], [standX, chest.position.z], arena.wallColliders!, MANSION_GROUND_BOUNDS)).toBe(true);
+    expect(chest.claim()).toBe(false);
+    expect(chest.codeLock!.unlock('0000')).toBe(false);
+    expect(chest.codeLock!.unlock(STATION33_WEAPON_CHEST.code)).toBe(true);
+    arena.update(1);
+    expect(model.getObjectByName('chest-lid')!.rotation.x).toBeLessThan(-1);
+    expect(chest.claim()).toBe(true);
+    expect(chest.claim()).toBe(false);
+    arena.reset();
+    expect(chest.codeLock!.locked).toBe(true);
+    expect(chest.available).toBe(true);
+    expect(model.getObjectByName('chest-weapon')!.visible).toBe(false);
+  });
+
   it('spawns the player clear of every wall collider', () => {
     const arena = makeArena();
     const body = new THREE.Box3(
@@ -564,7 +598,7 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     const secret = MANSION_SECRET_AREAS[0];
     const door = arena.doors.find((candidate) => candidate.id === secret.doorId)!;
-    const pickups = arena.weaponPickups;
+    const pickups = arena.weaponPickups.filter((pickup) => pickup.requiredDoorId === secret.doorId);
 
     expect(secret.unlockCost).toBe(9999);
     expect(door.cost).toBe(9999);
@@ -1184,8 +1218,8 @@ describe('Burned Mansion topology', () => {
     for (const piece of [table, sideboard, chinaCabinet]) expect(blocked(piece.x, piece.height / 2, piece.z)).toBe(true);
     expect(blocked(chimney.frontX + 0.2, 2.5, chimney.z)).toBe(true);
     // The hall keeps a walkable loop between both doors, both north windows and the fireplace.
-    const southDoorway = [-3.8, MANSION_BANQUET_HALL.southZ - 0.6] as const;
-    for (const target of [[1.9, -9], [-5.3, MANSION_BANQUET_HALL.northZ + 0.8], [2.4, MANSION_BANQUET_HALL.northZ + 0.8], [chimney.frontX - 0.8, chimney.z]] as const) {
+    const southDoorway = [-3.75, MANSION_BANQUET_HALL.southZ - 0.6] as const;
+    for (const target of [[1.9, -9], [-5.3, MANSION_BANQUET_HALL.northZ + 0.8], [2.4, MANSION_BANQUET_HALL.northZ + 0.8], [chimney.frontX - 1.88, chimney.z]] as const) {
       expect(canWalk(southDoorway, target, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
     }
   });

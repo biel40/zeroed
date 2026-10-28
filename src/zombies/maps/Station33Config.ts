@@ -3,7 +3,7 @@ import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { WeaponStationPlacement } from './shared/WeaponStation';
-import type { CodeWeaponChestPlacement } from './shared/CodeWeaponChest';
+import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import type { LockerSize } from './shared/LockerBank';
@@ -218,7 +218,7 @@ export const MILICIA = {
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
 /** Evidence chest against the south wall, beside the holding cell, facing the room. */
 export const STATION33_WEAPON_CHEST: CodeWeaponChestPlacement = {
-  id: 'milicia-barrett-chest', weaponId: 'barrett', code: '1998',
+  id: 'milicia-barrett-chest', weaponId: 'barrett', code: BARRETT_CHEST_CODE,
   x: -12.7, z: MILICIA.hall.maxZ - 0.6, yaw: Math.PI, requiredDoorId: 'to-milicia',
 };
 const EAST_WALL_X = VESTIBULE.maxX + STATION33_WALL_THICKNESS / 2;

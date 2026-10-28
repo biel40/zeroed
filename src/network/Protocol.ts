@@ -3,7 +3,7 @@ import { CHAIN_MAX_TARGETS, ZOMBIE_TYPE_CONFIGS, type ZombieTypeId } from '../zo
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxSnapshot } from '../zombies/MysteryBox';
-import { isZombieDeathStyle, type ZombieDeathStyle } from '../zombies/ZombieDeath';
+import { isZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from '../zombies/ZombieDeath';
 import type { SecretRoomSnapshot } from '../zombies/secret-room/SecretRoomSystem';
 
 /**
@@ -86,6 +86,7 @@ export interface MatchState {
   readonly box: MysteryBoxSnapshot & { readonly owner: CoopPlayerId | null };
   readonly secret: SecretRoomSnapshot;
   readonly claimedPickupIds: readonly string[];
+  readonly unlockedPickupIds?: readonly string[];
 }
 
 export type HitPart = 'head' | 'torso';
@@ -103,7 +104,7 @@ export type GuestMessage =
   | { readonly type: 'wallBuyPurchase'; readonly wallBuyId: string; readonly refill: boolean; readonly equippedWeapon: WeaponId }
   | { readonly type: 'boxUse'; readonly action: 'activate' | 'pickup'; readonly equippedWeapon: WeaponId }
   | { readonly type: 'mapUse'; readonly kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'completion'; readonly id: string;
-    readonly equippedWeapon: WeaponId };
+    readonly equippedWeapon: WeaponId; readonly code?: string };
 
 export type HostMessage =
   | { readonly type: 'matchState'; readonly state: MatchState }
@@ -120,6 +121,7 @@ export type HostMessage =
   | { readonly type: 'zombieAttack'; readonly zombieId: number; readonly target: CoopPlayerId }
   | {
     readonly type: 'zombieHit';
+    readonly source?: ZombieKillSource;
     readonly zombieId: number;
     readonly headshot: boolean;
     readonly amount: number;
@@ -128,6 +130,7 @@ export type HostMessage =
   }
   | {
     readonly type: 'zombieDeath';
+    readonly source?: ZombieKillSource;
     readonly zombieId: number;
     readonly killer: CoopPlayerId;
     readonly style: ZombieDeathStyle;
@@ -277,7 +280,8 @@ function isMatchState(value: unknown): value is MatchState {
     && Array.isArray(value.openDoorIds) && value.openDoorIds.every(isId)
     && Array.isArray(value.barriers) && value.barriers.every(isBarrierState)
     && isBoxState(value.box) && isSecretState(value.secret)
-    && Array.isArray(value.claimedPickupIds) && value.claimedPickupIds.every(isId);
+    && Array.isArray(value.claimedPickupIds) && value.claimedPickupIds.every(isId)
+    && (value.unlockedPickupIds === undefined || (Array.isArray(value.unlockedPickupIds) && value.unlockedPickupIds.every(isId)));
 }
 
 /** Host-side boundary: a guest payload is either a well-formed request or dropped. */
@@ -314,7 +318,9 @@ export function parseGuestMessage(message: IncomingMessage): GuestMessage | null
     case 'mapUse':
       return (raw.kind === 'lamp' || raw.kind === 'ritual' || raw.kind === 'pickup'
         || raw.kind === 'ammo' || raw.kind === 'completion') && isId(raw.id) && isWeaponId(raw.equippedWeapon)
-        ? { type: 'mapUse', kind: raw.kind, id: raw.id, equippedWeapon: raw.equippedWeapon } : null;
+        && (raw.code === undefined || (raw.kind === 'pickup' && typeof raw.code === 'string' && /^[0-9]{4}$/.test(raw.code)))
+        ? { type: 'mapUse', kind: raw.kind, id: raw.id, equippedWeapon: raw.equippedWeapon,
+          ...(raw.code === undefined ? {} : { code: raw.code as string }) } : null;
     default:
       return null;
   }
@@ -352,6 +358,7 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
         ? {
           type: 'zombieHit', zombieId: raw.zombieId as number, headshot: raw.headshot,
           amount: raw.amount, fromX: raw.fromX, fromZ: raw.fromZ,
+          ...(raw.source === 'knife' || isWeaponId(raw.source) ? { source: raw.source } : {}),
         }
         : null;
     case 'zombieDeath':
@@ -361,6 +368,7 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
           type: 'zombieDeath', zombieId: raw.zombieId as number, killer: raw.killer,
           style: isZombieDeathStyle(raw.style) ? raw.style : 'knockback',
           ...(raw.headshot === true ? { headshot: true } : {}),
+          ...(raw.source === 'knife' || isWeaponId(raw.source) ? { source: raw.source } : {}),
           impactX: isFiniteNumber(raw.impactX) ? Math.max(-1, Math.min(1, raw.impactX)) : 0,
           impactZ: isFiniteNumber(raw.impactZ) ? Math.max(-1, Math.min(1, raw.impactZ)) : -1,
         }
