@@ -200,6 +200,17 @@ export class HUD {
   }
 
   public setHudVisible(visible: boolean): void {
+    // The HUD survives map changes. Leaving CSS animations active under
+    // display:none would replay the old ring flash/banner in the next run.
+    if (!visible) {
+      this.roundBanner.classList.remove('active');
+      this.bannerTitle.textContent = '';
+      this.bannerSub.textContent = '';
+      this.ringFlash.classList.remove('active');
+      this.damageOverlay.classList.remove('active');
+      this.zPoints.classList.remove('denied');
+      this.setProtection(0);
+    }
     this.root.classList.toggle('hidden', !visible);
   }
 

@@ -1,3 +1,4 @@
+import { buildAmmoRefill } from './shared/AmmoRefill';
 import * as THREE from 'three';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import type { DeviceProfile } from '../../core/DeviceProfile';
@@ -36,6 +37,7 @@ import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
   STATION33_AMBIENCE,
+  STATION33_AMMO_REFILLS,
   STATION33_AMBIENT_EVENTS,
   STATION33_BARRIER_CONFIG,
   STATION33_BARRIERS,
@@ -64,7 +66,7 @@ import {
   type Station33ZoneId,
 } from './Station33Config';
 import { createStation33Materials } from './Station33Materials';
-import type { ArenaAmbientCue, ArenaAmbush, ArenaRingMachine, ZombieArena } from './ZombieArena';
+import type { ArenaAmmoRefill, ArenaAmbientCue, ArenaAmbush, ArenaRingMachine, ZombieArena } from './ZombieArena';
 
 /** Seconds the motor-generators shake the station as they spin up. */
 const MAINS_SPIN_UP = 2.5;
@@ -121,6 +123,7 @@ export class Station33Arena implements ZombieArena {
   readonly mysteryBoxPlacement = STATION33_BOX_PLACEMENT;
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;
+  public readonly ammoRefills: ReadonlyArray<ArenaAmmoRefill>;
   readonly ringMachines: ReadonlyArray<ArenaRingMachine>;
   readonly weaponStations: ReadonlyArray<WeaponStation>;
   readonly weaponPickups: ReadonlyArray<CodeWeaponChest>;
@@ -170,6 +173,7 @@ export class Station33Arena implements ZombieArena {
     this.lighting = new Station33Lighting(context);
     this.lighting.registerMaterial(context.signage.litMaterial, 'unstable');
     buildVestibule(context);
+    this.ammoRefills = STATION33_AMMO_REFILLS.map((config) => buildAmmoRefill(context, config, materials.paintedSteel, false));
     this.ticketShutters = new TicketWindowShutters(context);
     buildEscalatorHead(context, this.lighting);
     buildConsigna(context);
@@ -233,6 +237,7 @@ export class Station33Arena implements ZombieArena {
     for (const locker of this.ringLockers) locker.update(dt);
     for (const station of this.weaponStations) station.update(dt);
     for (const pickup of this.weaponPickups) pickup.update(dt);
+    for (const refill of this.ammoRefills) refill.update?.(dt);
     this.powerSwitch.update(dt);
     this.updateTicketAmbush(observerPosition);
     this.ticketShutters.update(dt);
@@ -246,6 +251,7 @@ export class Station33Arena implements ZombieArena {
     for (const view of this.barrierViews) view.reset();
     for (const door of this.doors) door.reset();
     for (const view of this.doorViews) view.reset();
+    for (const refill of this.ammoRefills) refill.reset();
     this.power.reset();
     this.powerSwitch.reset();
     for (const locker of this.ringLockers) locker.reset();

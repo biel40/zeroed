@@ -74,8 +74,8 @@ export const RING_DEFINITIONS: Readonly<Record<RingId, RingDefinition>> = {
     finger: 'ring',
     nameKey: 'ring.resurrection',
     descriptionKey: 'ring.resurrection.description',
-    // Doubles each time, three times a run (like a solo revive machine).
-    prices: [500, 1000, 2000],
+    // Initial purchase plus at most three recharges per run, doubling each time.
+    prices: [500, 1000, 2000, 4000],
     chargesPerPurchase: 1,
     glowColor: 0x3fd8c8,
     jingle: 'musicBox',

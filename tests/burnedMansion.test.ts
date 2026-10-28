@@ -169,6 +169,26 @@ const weaponStub = {
 } as unknown as Weapon;
 
 describe('Burned Mansion topology', () => {
+
+  it('offers resurrection beside the Mystery Box with access after the first door', () => {
+    const arena = makeArena();
+    expect(arena.ringMachines).toHaveLength(1);
+    const machine = arena.ringMachines[0];
+    expect(machine.ringId).toBe('resurrection');
+    expect(machine.powered).toBe(true);
+    const stand = [machine.position.x + 1, machine.position.z] as const;
+    const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
+    expect(canWalk(spawn, stand, arena.wallColliders)).toBe(false);
+    unlock(arena, 'to-dining');
+    expect(canWalk(spawn, stand, arena.wallColliders)).toBe(true);
+    expect(canWalk(stand, [MANSION_BOX_PLACEMENT.position.x + 1.2, MANSION_BOX_PLACEMENT.position.z], arena.wallColliders)).toBe(true);
+    expect(Math.hypot(machine.position.x - MANSION_BOX_PLACEMENT.position.x, machine.position.z - MANSION_BOX_PLACEMENT.position.z)).toBeLessThan(2.5);
+    machine.setDisplay('empty');
+    arena.reset();
+    const view = arena.group.getObjectByName('ring-locker:' + machine.id)!;
+    expect(view.getObjectByName('locker-ring')!.visible).toBe(true);
+  });
+
   it('places the shared Barrett chest below the watching portrait with an accessible solid body', () => {
     const arena = makeArena();
     unlock(arena, 'to-dining');

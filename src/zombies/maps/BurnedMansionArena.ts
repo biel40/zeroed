@@ -11,7 +11,6 @@ import { WallBuy } from '../wallbuys/WallBuy';
 import { WallBuyView } from '../wallbuys/WallBuyView';
 import { SecretRoomSystem, type SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
-import { t, type TranslationKey } from '../../i18n/i18n';
 import { buildWeaponDisplayModel } from '../../weapons/WeaponView';
 import type { WeaponId } from '../../weapons/WeaponTypes';
 import { CreepyAreaLights } from '../../rendering/CreepyAreaLights';
@@ -38,6 +37,11 @@ import { floorPartitionOf, isInStairRoom, type MansionFloor, type MansionFloorPa
 import { buildInteriorTrim, buildWindowCasings } from './burnedMansion/MansionInteriorTrim';
 import { buildLightFixture } from './burnedMansion/MansionLightFixtures';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
+import { buildAmmoRefill } from './shared/AmmoRefill';
+import { RingLocker } from './shared/RingLocker';
+import { MapPower } from './shared/MapPower';
+import { StaticMeshBatch } from './shared/StaticMeshBatch';
+import { addSolidProxy } from './shared/SolidProxy';
 import { ArenaStructure } from './shared/ArenaStructure';
 import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { projectWorldBoxUVs } from './shared/BoxUVs';
@@ -47,6 +51,7 @@ import {
   DEBUG_MAP_COLLIDERS,
   MANSION_AMBIENCE,
   MANSION_AMMO_REFILLS,
+  MANSION_RESURRECTION_LOCKER,
   MANSION_AREA_LIGHTS,
   MANSION_BANQUET_GHOST,
   MANSION_BANQUET_HALL,
@@ -214,48 +219,6 @@ class MansionWeaponPickup implements ArenaWeaponPickup {
   }
 }
 
-class MansionAmmoRefill implements ArenaAmmoRefill {
-  private feedbackTimer = 0;
-
-  constructor(
-    readonly id: string,
-    readonly cost: number,
-    private readonly labelKey: TranslationKey,
-    readonly position: { readonly x: number; readonly y: number; readonly z: number },
-    readonly floor: number,
-    readonly useRange: number,
-    readonly lookDotMin: number,
-    private readonly view: THREE.Group,
-    private readonly lid: THREE.Object3D,
-    private readonly glow: THREE.PointLight,
-  ) {}
-
-  get interactionLabel(): string {
-    return t(this.labelKey, { cost: this.cost });
-  }
-
-  activate(): void {
-    this.feedbackTimer = 0.45;
-    this.view.userData.activeFeedback = true;
-  }
-
-  update(dt: number): void {
-    if (this.feedbackTimer <= 0) return;
-    this.feedbackTimer = Math.max(0, this.feedbackTimer - dt);
-    const active = this.feedbackTimer > 0;
-    this.lid.rotation.x = active ? -0.16 : 0;
-    this.glow.intensity = active ? 1.4 : 0.35;
-    this.view.userData.activeFeedback = active;
-  }
-
-  reset(): void {
-    this.feedbackTimer = 0;
-    this.lid.rotation.x = 0;
-    this.glow.intensity = 0.35;
-    this.view.userData.activeFeedback = false;
-  }
-}
-
 /**
  * Compact mansion and hidden underground bunker made from explicit meshes and
  * player-collision list. Exterior walls are segmented around real window
@@ -291,6 +254,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly weaponPickups: ReadonlyArray<ArenaWeaponPickup>;
+  public readonly ringMachines: ReadonlyArray<RingLocker>;
   readonly ammoRefills: ReadonlyArray<ArenaAmmoRefill>;
   readonly soulLampInteractions: ReadonlyArray<ArenaSoulLampInteraction>;
   spawnPoints: ReadonlyArray<ZombieSpawnDefinition> = [];
@@ -338,7 +302,23 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       structure: this.structure,
       collider: new THREE.MeshBasicMaterial({ visible: false }),
     }, MANSION_WEAPON_CHEST)];
-    this.ammoRefills = this.buildAmmoRefills();
+    const machineKit = {
+      group: this.group, structure: this.structure,
+      collider: new THREE.MeshBasicMaterial({ visible: false }), batch: new StaticMeshBatch(),
+    };
+    this.ammoRefills = MANSION_AMMO_REFILLS.map((config) => buildAmmoRefill(machineKit, config, this.materials.bunkerPaint));
+    const locker = MANSION_RESURRECTION_LOCKER;
+    this.ringMachines = [new RingLocker(machineKit, locker, {
+      size: { depth: 0.6, height: 2.1, columnWidth: 0.5, rows: 3, ringLockerWidth: 0.7 },
+      materials: { greySteel: this.materials.metal, paintedSteel: this.materials.bunkerPaint, rubber: this.materials.rubber },
+      mainsGlowBoost: 1,
+    }, new MapPower())];
+    addSolidProxy(machineKit, locker.id + '-collider',
+      { x: locker.x - 0.6, y: 0, z: locker.z - 0.35 },
+      { x: locker.x, y: 2.1, z: locker.z + 0.35 }, 'metal');
+    for (const mesh of machineKit.batch.build(this.group, 'mansion-machines', { castShadow: false, receiveShadow: true })) {
+      mesh.userData.floorPartition = floorPartitionOf(new THREE.Box3().setFromObject(mesh));
+    }
     this.buildDamageDetails();
     buildInteriorTrim(dressing);
     buildWindowCasings(dressing);
@@ -455,6 +435,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.secretRoom.update(dt, observerPosition);
     for (const pickup of this.weaponPickups) pickup.update?.(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
+    for (const machine of this.ringMachines) machine.update(dt);
     for (const view of this.barrierViews) {
       if (view.group.visible) view.update(dt);
     }
@@ -483,6 +464,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     for (const view of this.doorViews) view.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
     for (const refill of this.ammoRefills) refill.reset();
+    for (const machine of this.ringMachines) machine.reset();
     this.secretRoom.reset();
     this.atmosphere.reset();
     this.banquetGhost.reset();
@@ -1084,67 +1066,6 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.group.add(phrase);
 
     return pickups;
-  }
-
-  private buildAmmoRefills(): ReadonlyArray<ArenaAmmoRefill> {
-    return MANSION_AMMO_REFILLS.map((config) => {
-      const group = new THREE.Group();
-      group.name = config.id;
-      group.position.set(config.position.x, 0, config.position.z);
-      group.userData.mapRole = 'ammo-refill';
-      group.userData.activeFeedback = false;
-
-      // Olive civil-defence ammo chest, the same paint as the bunker walls.
-      const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.58, 0.68), this.materials.bunkerPaint);
-      base.position.y = 0.29;
-      base.userData.surface = 'metal';
-      base.userData.mapRole = 'ammo-box-body';
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.12, 0.72), this.materials.bunkerPaint);
-      lid.position.set(0, 0.64, 0);
-      lid.userData.mapRole = 'ammo-box-lid';
-      const iconPlate = new THREE.Mesh(
-        new THREE.BoxGeometry(0.72, 0.015, 0.3),
-        new THREE.MeshBasicMaterial({ color: 0xd2bd3f }),
-      );
-      iconPlate.position.set(0, 0.705, 0);
-      iconPlate.userData.mapRole = 'ammo-box-marking';
-
-      const ammoIcon = new THREE.Group();
-      ammoIcon.position.y = 0.745;
-      ammoIcon.userData.mapRole = 'ammo-box-icon';
-      const casingMaterial = new THREE.MeshStandardMaterial({ color: 0xb8862d, metalness: 0.75, roughness: 0.28 });
-      const projectileMaterial = new THREE.MeshStandardMaterial({ color: 0x40362b, metalness: 0.45, roughness: 0.4 });
-      for (const x of [-0.2, 0, 0.2]) {
-        const casing = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.25, 10), casingMaterial);
-        casing.position.set(x, 0, 0.025);
-        casing.rotation.x = Math.PI / 2;
-        casing.userData.mapRole = 'ammo-icon-casing';
-        const projectile = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 10), projectileMaterial);
-        projectile.position.set(x, 0, -0.16);
-        projectile.rotation.x = -Math.PI / 2;
-        projectile.userData.mapRole = 'ammo-icon-projectile';
-        ammoIcon.add(casing, projectile);
-      }
-      const glow = new THREE.PointLight(0xe4cd4e, 0.35, 2.2, 2);
-      glow.position.set(0, 0.85, 0);
-      group.add(base, lid, iconPlate, ammoIcon, glow);
-      this.group.add(group);
-      this.structureMeshes.push(base);
-      this.playerWallMeshes.push(base);
-
-      return new MansionAmmoRefill(
-        config.id,
-        config.cost,
-        config.labelKey,
-        config.position,
-        config.floor,
-        config.useRange,
-        config.lookDotMin,
-        group,
-        lid,
-        glow,
-      );
-    });
   }
 
   private buildBunkerDetails(): void {

@@ -23,7 +23,7 @@ describe('Ring catalog', () => {
       expect(ring.chargesPerPurchase).toBeGreaterThan(0);
     }
     expect(RESURRECTION.finger).toBe('ring');
-    expect(RESURRECTION.prices).toEqual([500, 1000, 2000]);
+    expect(RESURRECTION.prices).toEqual([500, 1000, 2000, 4000]);
     expect(RESURRECTION.effect).toEqual({ kind: 'resurrection', reviveFraction: 0.5, getUp: 1.2, protection: 2.5 });
   });
 });
@@ -76,24 +76,24 @@ describe('PlayerRings', () => {
     expect(rings.pendingEvents).toHaveLength(0);
   });
 
-  it('doubles the price on every recharge and sells nothing after the third purchase', () => {
+  it('doubles the price on every recharge and sells nothing after three recharges', () => {
     const rings = new PlayerRings();
     const economy = wallet(10000);
     const paid: number[] = [];
     expect(rings.consumeCharge('resurrection')).toBe(false);
-    for (const type of ['purchased', 'recharged', 'recharged'] as const) {
+    for (const type of ['purchased', 'recharged', 'recharged', 'recharged'] as const) {
       const price = rings.priceOf('resurrection')!;
       expect(rings.buy('resurrection', (cost) => economy.spend(cost))).toBe(type);
       paid.push(price);
       expect(rings.consumeCharge('resurrection')).toBe(true);
       expect(rings.consumeCharge('resurrection')).toBe(false);
     }
-    expect(paid).toEqual([500, 1000, 2000]);
-    expect(economy.points).toBe(10000 - 3500);
+    expect(paid).toEqual([500, 1000, 2000, 4000]);
+    expect(economy.points).toBe(10000 - 7500);
     expect(rings.has('resurrection')).toBe(true);
     expect(rings.priceOf('resurrection')).toBeNull();
     expect(rings.buy('resurrection', (cost) => economy.spend(cost))).toBe('unavailable');
-    expect(economy.points).toBe(10000 - 3500);
+    expect(economy.points).toBe(10000 - 7500);
   });
 
   it('resets the run: no rings, free fingers, first price again, no events', () => {

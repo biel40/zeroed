@@ -1540,42 +1540,6 @@ html.coop-guest #pause-restart {
   outline-offset: 4px;
 }
 
-.map-card-art {
-  position: relative;
-  display: block;
-  aspect-ratio: 2 / 1;
-  /* The art is cropped (preserveAspectRatio slice), so capping it by height is safe. */
-  max-height: clamp(96px, 22dvh, 260px);
-  overflow: hidden;
-  background: #050607;
-}
-
-.map-card-art svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.map-card:hover .map-card-art svg,
-.map-card:focus-visible .map-card-art svg {
-  transform: scale(1.06);
-}
-
-/* The art melts into the card body so the title can overlap it. */
-.map-card-art::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 48%, rgba(11, 14, 14, 0.94) 100%);
-}
-
-.map-card[data-access='premium'] .map-card-art::after {
-  background:
-    linear-gradient(180deg, transparent 48%, rgba(10, 13, 13, 0.94) 100%),
-    radial-gradient(ellipse at 50% 120%, rgba(214, 160, 52, 0.16), transparent 60%);
-}
-
 .map-card-access {
   position: absolute;
   z-index: 2;
@@ -1698,40 +1662,9 @@ html.coop-guest #pause-restart {
   border: 0;
 }
 
-/* Living art: fire flicker, drifting smoke and rising embers. */
-.map-art-flicker { animation: map-art-flicker 3.4s steps(1) infinite; }
-.map-art-windows { animation: map-art-flicker 5.3s steps(1) 0.7s infinite; }
-.map-art-smoke { animation: map-art-drift 12s ease-in-out infinite alternate; }
-.map-art-embers circle { animation: map-art-ember 4.2s linear infinite; }
-.map-art-embers circle:nth-child(2) { animation-delay: -1.1s; }
-.map-art-embers circle:nth-child(3) { animation-delay: -2.3s; }
-.map-art-embers circle:nth-child(4) { animation-delay: -0.6s; }
-.map-art-embers circle:nth-child(5) { animation-delay: -3.2s; }
-.map-art-embers circle:nth-child(6) { animation-delay: -1.8s; }
 @keyframes map-card-glint {
   0%, 68% { transform: translateX(-120%); }
   100% { transform: translateX(120%); }
-}
-
-@keyframes map-art-flicker {
-  0%, 100% { opacity: 1; }
-  12% { opacity: 0.72; }
-  14% { opacity: 1; }
-  47% { opacity: 0.86; }
-  52% { opacity: 0.55; }
-  55% { opacity: 1; }
-  80% { opacity: 0.9; }
-}
-
-@keyframes map-art-drift {
-  from { transform: translateX(-14px); }
-  to { transform: translateX(14px); }
-}
-
-@keyframes map-art-ember {
-  0% { opacity: 0; transform: translate(0, 0); }
-  15% { opacity: 1; }
-  100% { opacity: 0; transform: translate(10px, -70px); }
 }
 
 .menu-footnote {

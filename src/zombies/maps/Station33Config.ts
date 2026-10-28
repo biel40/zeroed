@@ -1,3 +1,4 @@
+import type { AmmoRefillPlacement } from './shared/AmmoRefill';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
@@ -73,6 +74,12 @@ export const ESCALATOR_PORTAL = {
   width: 6.4,
   height: 3.0,
 } as const;
+
+/** Civil-defence ammunition beside the south wall, reachable from spawn. */
+export const STATION33_AMMO_REFILLS = [{
+  id: 'vestibule-ammo-refill', cost: 800, labelKey: 'arena.refillAmmo',
+  position: { x: 4.8, y: 0.45, z: 17.5 }, floor: 0, useRange: 1.9, lookDotMin: 0.4,
+}] as const satisfies ReadonlyArray<AmmoRefillPlacement>;
 
 /** Two rows of square marble columns flanking the central nave. */
 export const VESTIBULE_COLUMNS = {

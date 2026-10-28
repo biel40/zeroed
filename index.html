@@ -130,63 +130,10 @@
       <p class="mode-hint" data-i18n="menu.tagline"></p>
       <p class="map-select-kicker" data-i18n="menu.chooseMap"></p>
       <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false and fills the
-           data-map-* chips from the registry (players, access); the art is decorative inline SVG. -->
+           data-map-* chips from the registry (players, access); the card images are decorative. -->
       <div class="map-grid" role="group" data-i18n-aria-label="menu.chooseMap">
-        <button type="button" class="map-card" data-map="burned-mansion">
-          <span class="map-card-art" aria-hidden="true">
-            <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" focusable="false">
-              <defs>
-                <linearGradient id="bm-sky" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#0d0607" /><stop offset="0.62" stop-color="#2a0c0a" /><stop offset="1" stop-color="#521a10" />
-                </linearGradient>
-                <radialGradient id="bm-moon">
-                  <stop offset="0" stop-color="#f0cfa6" stop-opacity="0.9" /><stop offset="0.3" stop-color="#b8402a" stop-opacity="0.45" /><stop offset="1" stop-color="#b8402a" stop-opacity="0" />
-                </radialGradient>
-                <radialGradient id="bm-fire" cx="0.5" cy="1" r="0.85">
-                  <stop offset="0" stop-color="#ff7a2e" stop-opacity="0.8" /><stop offset="0.55" stop-color="#c2280f" stop-opacity="0.32" /><stop offset="1" stop-color="#c2280f" stop-opacity="0" />
-                </radialGradient>
-                <linearGradient id="bm-window" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#ffc06a" /><stop offset="1" stop-color="#d23a1a" />
-                </linearGradient>
-                <linearGradient id="bm-fog" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#3b1a14" stop-opacity="0" /><stop offset="1" stop-color="#2a1511" stop-opacity="0.85" />
-                </linearGradient>
-                <filter id="bm-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /></filter>
-              </defs>
-              <rect width="400" height="200" fill="url(#bm-sky)" />
-              <circle cx="322" cy="44" r="62" fill="url(#bm-moon)" />
-              <circle cx="322" cy="44" r="14" fill="#e6bd94" opacity="0.8" />
-              <g class="map-art-smoke" filter="url(#bm-blur)" fill="#2e2220">
-                <ellipse cx="182" cy="58" rx="46" ry="16" /><ellipse cx="214" cy="34" rx="62" ry="18" opacity="0.8" />
-                <ellipse cx="150" cy="20" rx="70" ry="14" opacity="0.6" /><ellipse cx="268" cy="72" rx="34" ry="12" opacity="0.7" />
-              </g>
-              <ellipse class="map-art-flicker" cx="200" cy="168" rx="170" ry="86" fill="url(#bm-fire)" />
-              <g fill="#060404">
-                <path d="M98 174V112l29-24 29 24v-12h22V72l22-22 22 22v28h22v12l17-15 7 8 9-12 11 15 10 4v62z" />
-                <rect x="134" y="76" width="8" height="24" /><path d="M252 100v-16l4-3 3 4v15z" />
-                <path d="M200 50l-3-10h6z" />
-                <path d="M0 174c18-4 30-14 30-14l-4-24 9 18 5-30 2 32c6-6 10-14 10-14l-6 22c12 4 20 10 20 10z" />
-                <path d="M348 176c4-12 10-18 10-18l-8-30 12 24 2-38 4 40 10-20-6 28c10 4 28 14 28 14z" />
-              </g>
-              <g class="map-art-windows" fill="url(#bm-window)">
-                <rect x="115" y="119" width="9" height="13" /><rect x="133" y="119" width="9" height="13" opacity="0.7" />
-                <path d="M193 92a7 7 0 0 1 14 0v14h-14z" />
-                <rect x="186" y="118" width="9" height="15" /><rect x="205" y="118" width="9" height="15" opacity="0.85" />
-                <rect x="258" y="121" width="9" height="13" opacity="0.6" />
-                <rect x="115" y="147" width="9" height="13" opacity="0.55" /><rect x="276" y="147" width="9" height="13" />
-                <rect x="195" y="148" width="10" height="26" opacity="0.9" />
-              </g>
-              <g stroke="#2b1d17" stroke-width="2">
-                <path d="M131 147l13 6M131 152l13-4M131 158l13 1" /><path d="M256 147l12 5M256 153l12-3M256 158l12 2" />
-              </g>
-              <path d="M0 174q200-14 400 0v26H0z" fill="#040303" />
-              <rect y="138" width="400" height="62" fill="url(#bm-fog)" />
-              <g class="map-art-embers" fill="#ff9a4a">
-                <circle cx="150" cy="150" r="1.2" /><circle cx="214" cy="140" r="1" /><circle cx="248" cy="156" r="1.4" />
-                <circle cx="178" cy="162" r="0.9" /><circle cx="286" cy="148" r="1" /><circle cx="122" cy="160" r="1.1" />
-              </g>
-            </svg>
-          </span>
+        <button type="button" class="map-card map-card--illustrated" data-map="burned-mansion">
+          <img class="map-card-image" src="./assets/maps/burned-mansion-menu.png" alt="" width="1448" height="1086" />
           <span class="map-card-access" data-map-access></span>
           <span class="map-card-body">
             <span class="map-card-mode" data-i18n="menu.zombies"></span>

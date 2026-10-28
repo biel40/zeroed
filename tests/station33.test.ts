@@ -271,6 +271,28 @@ const FACE_NORTH = 0;
 const FACE_WEST = Math.PI / 2;
 
 describe('Station 33 layout', () => {
+
+  it('offers reusable solid ammunition in the starting vestibule and resets feedback', () => {
+    const arena = makeArena();
+    expect(arena.ammoRefills).toHaveLength(1);
+    const refill = arena.ammoRefills[0];
+    expect(refill.cost).toBe(800);
+    expect(refill.floor).toBe(0);
+    expect(refill.position.x).toBeGreaterThan(VESTIBULE.minX);
+    expect(refill.position.x).toBeLessThan(VESTIBULE.maxX);
+    expect(solidBoxes(arena).some((box) => box.intersectsBox(bodyBox(refill.position.x, refill.position.z - 1, 0.3)))).toBe(false);
+    expect(arena.wallColliders.some((box) => box.containsPoint(new THREE.Vector3(refill.position.x, 0.3, refill.position.z)))).toBe(true);
+    const view = arena.group.getObjectByName(refill.id)!;
+    refill.activate();
+    arena.update(0.1);
+    expect(view.userData.activeFeedback).toBe(true);
+    arena.update(0.5);
+    expect(view.userData.activeFeedback).toBe(false);
+    refill.activate();
+    arena.reset();
+    expect(view.userData.activeFeedback).toBe(false);
+  });
+
   it('initializes and restarts single-player with the luggage-office Mystery Box', () => {
     const { ctx } = makeContext();
     const mode = new ZombiesMode('station-33');

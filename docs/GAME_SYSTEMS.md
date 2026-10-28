@@ -287,7 +287,7 @@ existente a `MOTDRULES`.
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
   unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
-  la Mystery Box, gran comedor (ala norte con la Vector en pared; mesa,
+  la Mystery Box y una taquilla de autorreanimacion a su lado, gran comedor (ala norte con la Vector en pared; mesa,
   aparador, vitrina y chimenea solidos, y sobre ella el retrato de un oficial
   aleman cuyas pupilas brillan en rojo y siguen suavemente al jugador local
   dentro de sus cuencas, tambien en cooperativo; easter egg de la Torre Quemada de
@@ -307,7 +307,9 @@ existente a `MOTDRULES`.
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
   puerta de servicio y dos rejillas), la PPSh-41 (1250 / 625) en pared
-  y la escalera mecanica sellada. Easter egg del vestibulo: al acercarse a
+  y la escalera mecanica sellada. Junto al muro sur hay una caja de municion
+  reutilizable por 800 Points, con la misma compra y feedback que la de
+  Burned Mansion (`shared/AmmoRefill`). Easter egg del vestibulo: al acercarse a
   la ventanilla de billetes, con una probabilidad baja por acercamiento (una
   vez por partida), una ventana se abre de golpe y sale un zombi de la ronda
   que se puede matar; consume un spawn pendiente, asi que no cambia el total
@@ -478,8 +480,8 @@ mantiene en sintonia mano, maquinas y HUD; `ZombiesMode` solo le delega la
 interaccion (tras las recargas de municion y antes del final y la caja), el
 prompt, la muerte y el reinicio.
 
-- Resurreccion (anular, 1 carga): tres compras por run a precio doble cada vez
-  (500, 1000 y 2000; las recargas cuentan), despues la taquilla queda vacia.
+- Resurreccion (anular, 1 carga): compra inicial de 500 puntos y hasta tres
+  recargas por run (1000, 2000 y 4000), despues la taquilla queda vacia.
   Un golpe letal con carga gasta el anillo en lugar de terminar la run:
   devuelve el 50 % de la vida, sacude la camara, destella la pantalla en frio
   y suena un latido. El jugador cae de rodillas y tarda 1,2 s en levantarse
@@ -599,6 +601,9 @@ muerte (`rendering/FadeMaterials.ts`); `Game.prepare` precompila esa variante.
 Asi una horda solapada en la escalera conserva el descarte por profundidad.
 
 ## HUD y estadisticas de partida
+
+Al volver al menu se limpian los anuncios, destellos y la proteccion azul del
+HUD compartido para que no reaparezcan al empezar otro mapa.
 
 Los avisos de interaccion comparten una tarjeta oscura de alto contraste, con
 accion, tecla o boton tactil y coste separados. La entrada despliega el marco

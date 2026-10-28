@@ -14,7 +14,7 @@ import { installCanvasDocument, makeContext, type TestContext } from './coopHarn
 
 const RESURRECTION = RING_DEFINITIONS.resurrection;
 const EFFECT = RESURRECTION.effect as Extract<RingEffect, { kind: 'resurrection' }>;
-const [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE] = RESURRECTION.prices;
+const [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE, FOURTH_PRICE] = RESURRECTION.prices;
 const { getUp: GET_UP, protection: PROTECTION } = EFFECT;
 /** Protected (invulnerable and ignored) while getting up and for the ring's protection after. */
 const PROTECTED_FOR = GET_UP + PROTECTION;
@@ -264,7 +264,7 @@ describe('Resurrection ring', () => {
     expect(side.hud.setProtection).toHaveBeenLastCalledWith(0);
   });
 
-  it('sells three purchases a run at doubling prices, then the locker stays empty', () => {
+  it('sells an initial purchase and three recharges a run at doubling prices, then the locker stays empty', () => {
     const run = startRun();
     const { mode, internals, side } = run;
     faceRingLocker(run);
@@ -274,14 +274,14 @@ describe('Resurrection ring', () => {
       internals.rings.update(GET_UP);
       internals.health.update(PROTECTED_FOR + 0.1);
     };
-    for (const price of [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE]) {
+    for (const price of [FIRST_PRICE, SECOND_PRICE, THIRD_PRICE, FOURTH_PRICE]) {
       expect(mode.getInteractPrompt()).toContain(`${price}`);
       fund(internals.economy, price);
       mode.onInteract();
       expect(internals.economy.points).toBe(0);
       dieAndStandUp();
     }
-    expect([FIRST_PRICE, SECOND_PRICE, THIRD_PRICE]).toEqual([500, 1000, 2000]);
+    expect([FIRST_PRICE, SECOND_PRICE, THIRD_PRICE, FOURTH_PRICE]).toEqual([500, 1000, 2000, 4000]);
     expect(mode.getInteractPrompt()).toBeNull();
     expect(internals.arena.group.getObjectByName('locker-ring')!.visible).toBe(false);
     expect(side.hud.updateRings).toHaveBeenLastCalledWith([expect.objectContaining({ charged: false })]);

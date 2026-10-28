@@ -1,3 +1,4 @@
+import type { RingLockerPlacement } from './shared/RingLocker';
 import type { TranslationKey } from '../../i18n/i18n';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
@@ -440,6 +441,12 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
     },
   ],
 };
+
+/** Resurrection cabinet beside the Mystery Box, available without mains power. */
+export const MANSION_RESURRECTION_LOCKER = {
+  id: 'mansion-resurrection', ringId: 'resurrection', requiresPower: false,
+  x: -3.5, z: -3.8, facingX: 1, facingZ: 0,
+} as const satisfies RingLockerPlacement;
 
 /** Mystery Box in the room immediately behind the first paid door. */
 export const MANSION_BOX_PLACEMENT = {
