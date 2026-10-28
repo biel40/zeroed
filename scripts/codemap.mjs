@@ -5,7 +5,7 @@
 // navegacion para agentes: barato de regenerar (`npm run codemap`) y no se
 // versiona. Si un simbolo no esta donde indica, busca con grep.
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -235,6 +235,45 @@ function renderDoc(file) {
   return `- \`${file}\`${title ? ` — **${clean(title)}**` : ''}${summary ? `: ${clip(clean(summary), 140)}` : ''}`;
 }
 
+function parseArgs(args) {
+  const options = {};
+  for (let i = 0; i < args.length; i++) {
+    const flag = args[i];
+    if (!['--area', '--query'].includes(flag) || options[flag] || !args[i + 1] || args[i + 1].startsWith('--')) {
+      throw new Error('Uso: npm run codemap -- [--area <ruta>] [--query <texto>]');
+    }
+    options[flag] = args[++i];
+  }
+  if (options['--area']) {
+    const area = options['--area'];
+    const resolved = path.resolve(root, area);
+    const relative = path.relative(root, resolved);
+    if (path.isAbsolute(area) || relative === '..' || relative.startsWith('..' + path.sep)) throw new Error('El area debe ser una ruta relativa dentro del repositorio.');
+    try { statSync(resolved); } catch { throw new Error('El area no existe: ' + area); }
+    options.area = relative.split(path.sep).join('/');
+  }
+  return options;
+}
+
+let options;
+try { options = parseArgs(process.argv.slice(2)); }
+catch (error) { console.error(error.message); process.exit(1); }
+if (options['--area'] || options['--query']) {
+  const query = options['--query']?.toLowerCase();
+  const matches = files.filter((file) => !options.area || file === options.area || file.startsWith(options.area + '/'))
+    .map((file) => {
+      const rendered = languageOf(file) ? renderFile(file) : null;
+      if (!query || file.toLowerCase().includes(query)) return rendered ?? '### ' + file;
+      if (!rendered) return null;
+      const lines = rendered.split('\n');
+      const matching = lines.slice(2).filter((line) => line.toLowerCase().includes(query));
+      return matching.length ? [lines[0], ...matching].join('\n') : null;
+    }).filter(Boolean);
+  if (!matches.length) { console.error('No se encontraron resultados.'); process.exit(1); }
+  console.log(matches.join('\n\n'));
+  process.exit(0);
+}
+
 const sourceFiles = files.filter(languageOf);
 const mainSources = sourceFiles.filter((file) => !isTest(file)).map(renderFile).filter(Boolean);
 const testSources = sourceFiles.filter(isTest).map(renderFile).filter(Boolean);
@@ -247,6 +286,8 @@ const markdown = [
   '',
   'Navigation aid: grep this file for a path (`### src/...`), a symbol or a method before exploring the repo.',
   'Built from `git ls-files` plus untracked, non-ignored files, with grep-style patterns: if something is not where it says, grep the code.',
+  '',
+  'Indice: [Docs](#docs) · [Tree](#tree) · [Files](#files) · [Tests](#tests)',
   '',
   '## Docs',
   '',

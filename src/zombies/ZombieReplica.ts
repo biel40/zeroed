@@ -152,12 +152,12 @@ export class ZombieReplica {
   }
 
   /** Snapshot-detected deaths (no event) play the default fall. */
-  public kill(id: number, style?: ZombieDeathStyle, impactX?: number, impactZ?: number): void {
+  public kill(id: number, style?: ZombieDeathStyle, impactX?: number, impactZ?: number, headshot?: boolean): void {
     const entry = this.entries.get(id);
     if (!entry || entry.dying) return;
     entry.dying = true;
     this.removeColliders(entry.zombie);
-    entry.zombie.playReplicatedDeath(style, impactX, impactZ);
+    entry.zombie.playReplicatedDeath(style, impactX, impactZ, headshot);
   }
 
   /** `openings`: the map's active barriers, so bodies climb through windows as on the host. */

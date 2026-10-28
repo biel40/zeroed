@@ -16,12 +16,7 @@ main.ts -> PWA + DeviceProfile + AssetManager + selector de mapa
         -> vistas, audio, HUD, efectos y render
 ```
 
-`Game.frame()` procesa input, jugador, arma, impactos, arena, modo, vistas,
-efectos, HUD y render. El `dt` se limita a 50 ms. `paused` es el estado del
-menu local: en individual congela la simulacion y conserva el frame visible;
-un modo con `sharedSimulation` (cooperativo) sigue simulando y el menu solo
-retira el input de ese jugador. `Game.dispose()` libera loop, listeners,
-contexto WebGL, canvas y AudioContext; volver al menu no recarga la pagina.
+El loop y la pausa pertenecen a `Game`; la pausa compartida depende de la autoridad del modo. Consulta el [comportamiento cooperativo](MULTIPLAYER.md#alcance-y-límites). `Game.dispose()` libera los servicios y vuelve al menu sin recargar.
 El loop no arranca en el constructor: `Game.prepare()` compila todos los
 materiales (incluidos pools ocultos), sube sus texturas y dibuja un frame
 mientras `#map-loading` cubre la pantalla, para que la entrada al mapa no
@@ -57,18 +52,7 @@ sufra tirones de compilacion de shaders.
   la cuchillada sin convertirlo en un arma de proyectiles ficticia, y
   `getMeleeArm()` entrega el `Knife` como `MeleeArmDriver`: cuanto apartar el
   arma y cuanto de la mano derecha toma el tajo.
-- Los brazos en primera persona (`ViewArms`) son un servicio de `Game` en la
-  camara, unico para todas las armas y el cuchillo. Cada arma declara en
-  `view.hands` sus puntos de agarre (centro de la pieza, eje del pulgar,
-  normal de la palma y pose de dedos, mas la seccion de la pieza sujetada y
-  el gatillo) en el espacio de su raiz; `WeaponHands` cierra una vez los
-  dedos sobre esa pieza (`fitHandPose`), sin subirlos nunca a menos de 1 cm
-  de la linea de mira en los agarres de reposo, y los convierte en objetivos que
-  siguen balanceo, retroceso, ADS, equipamiento, recargas y bajada del arma
-  sin duplicar esas capas. El antebrazo continua la mano y el hombro es un
-  ancla virtual fuera de pantalla, asi que la orientacion de cada agarre
-  decide tambien la del brazo. Una corredera o manivela con muelle se suelta al
-  final de su recorrido: la mano se abre alli y el muelle la devuelve sola.
+- `ViewArms` es un servicio compartido de primera persona; `WeaponHands` adapta los agarres declarados por cada arma. Para sus restricciones visuales y motivos, consulta [agarres naturales](changes/natural-grips.md).
 - Logica determinista y vistas Three.js permanecen separadas para poder probar
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
   municion la decide el modo.
@@ -87,8 +71,7 @@ sufra tirones de compilacion de shaders.
   `HitTarget` desacopla balistica de blancos.
 - Pools y temporales reutilizables limitan allocations por frame. Los tipos
   zombie (`normal`, `shiny`, `brute`) pueden compartir modelo sin duplicar IA.
-- Las armas de energia usan `EnergyProjectiles`; identificar impactos por color
-  no es extensible y debe sustituirse antes de una tercera arma.
+- La identificacion de impactos de energia por color es una [deuda de contrato](DECISIONS.md#deudas-de-contrato).
 
 ## Extension
 

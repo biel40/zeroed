@@ -175,15 +175,24 @@ codigo: actualiza la guia.
 
 ## El taller de mantenimiento
 
-- Ampliacion sencilla al norte de electricidad, por una puerta de chapa
-  de 2000 Points a la izquierda de los cuadros. Queda fuera del eje de la
-  escalera y del pasadizo del tunel de cables. Yeso amarillo envejecido,
-  baldosa de servicio, techo bajo, banco de trabajo y taquillas bajo una
-  placa «МАСТЕРСКАЯ». Luz ambar de orientacion y luz de red al encenderla.
+- Nave de reparaciones al norte de electricidad (unos 12 x 12 m, techo de
+  4,2 m), por una puerta de chapa de 2000 Points a la izquierda de los
+  cuadros. Queda fuera del eje de la escalera y su muro este no toca el
+  pasadizo del tunel de cables. Yeso amarillo con zocalo gris rematado en
+  franja de peligro, suelo de hormigon manchado de aceite.
+- En el centro, un bogie de recambio calzado sobre un tramo de via bajo un
+  puente grua aparcado, cuyo gancho se balancea (`Station33Atmosphere`);
+  lineas de peligro marcan la zona. A cada lado queda un carril de al menos
+  3 m para la horda. Contra los muros: banco con tornillo, caja de
+  herramientas, flexo ambar y tablero de herramientas con siluetas vacias;
+  taladro de columna; estanteria de piezas; carro de soldadura y bidones.
+  Polvo, goteras, cable colgante, telaranas, sangre desde la entrada de
+  servicio y una baliza roja junto a ella. Luz ambar de orientacion y del
+  banco; fluorescentes y luz de red al encender la corriente.
 - Entre las taquillas espera Tiro doble: anillo amarillo en el indice,
   compra unica de 3000 con corriente. Duplica la cadencia y suma un 20 %
   de dano con armas. Una entrada de mantenimiento propia despierta al
-  abrir la puerta; el pasillo central permite a la horda seguir al jugador.
+  abrir la puerta, bajo la placa «МАСТЕРСКАЯ» sobre las taquillas.
 
 ## El puesto de milicia
 

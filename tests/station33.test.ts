@@ -721,6 +721,30 @@ describe('Station 33 maintenance workshop', () => {
     const { hit } = chaseUntilHit(arena, spawn, 10, -50, 60);
     expect(hit).toBe(true);
   });
+
+  it('lets its own horde round the crane bay to the player at the substation door', () => {
+    const arena = makeArena();
+    openWayTo(arena, 'taller');
+    const spawn = STATION33_SPAWNS.taller[0];
+    openBarrier(arena, spawn.barrierId!);
+    const { hit } = chaseUntilHit(arena, spawn, 6.2, TALLER.hall.maxZ - 0.8, 60);
+    expect(hit).toBe(true);
+  });
+
+  it('keeps the bigger workshop clear of the cable-tunnel passage and swings its crane hook', () => {
+    const arena = makeArena();
+    const tunnel = STATION33_BARRIERS.find((candidate) => candidate.id === 'subestacion-cable-tunnel')!;
+    const room = new THREE.Box3(
+      new THREE.Vector3(TALLER.hall.minX - STATION33_WALL_THICKNESS, 0, TALLER.hall.minZ),
+      new THREE.Vector3(TALLER.hall.maxX + STATION33_WALL_THICKNESS, TALLER.ceilingHeight, TALLER.hall.maxZ),
+    );
+    expect(room.intersectsBox(passageBox(tunnel))).toBe(false);
+    const hook = arena.group.getObjectByName('workshop-crane-hook')!;
+    arena.update(1.3);
+    const first = hook.rotation.z;
+    arena.update(1.1);
+    expect(hook.rotation.z).not.toBe(first);
+  });
 });
 
 describe('Station 33 main switch', () => {

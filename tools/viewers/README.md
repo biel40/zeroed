@@ -27,6 +27,7 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?state=death&death=all`: los siete estilos de muerte en fila, en bucle (andar, caer, cadáver). `death=slash` muestra uno solo desde tres ángulos y `time=0.6` congela ese instante de la caída; admite `model=brute`. `electric=1` mantiene los rayos residuales de la ZEUS-77 sobre los cuerpos (la muerte `shock` siempre los lleva).
 - `http://localhost:5173/tools/viewers/zombie-viewer.html?skin=all`: todas las skins del walker en fila. `skin=fieldOfficer` viste a los tres zombies con una sola; se combina con `close=1`, `state=`, `speed=0` (pose quieta) y `redEyes=1` (ojos rojos de Station 33).
 - Parámetros adicionales: `state=attack`, `time=0.475` y `close=1`.
+- `?skin=all&hatshot=1&redEyes=1`: los gorros caen en bucle; `time=1.5` congela la caida para revisar el contacto con el suelo.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.
 

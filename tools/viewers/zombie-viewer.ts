@@ -8,6 +8,7 @@ import { ZOMBIE_FALL_STYLES, type ZombieFallStyle } from '../../src/zombies/Zomb
 import { createSkinnedWalkerSource } from '../../src/zombies/skins/ZombieSkinBuilder';
 import { ZOMBIE_SKINS, type ZombieSkinId } from '../../src/zombies/skins/ZombieSkinCatalog';
 import { STATION33_ZOMBIE_EYES } from '../../src/zombies/maps/Station33Config';
+import { ZombieHat } from '../../src/zombies/skins/ZombieHat';
 
 // Development-only visual review, independent of the game entry/bundle.
 // /tools/viewers/zombie-viewer.html?time=0.3 | ?state=attack&time=0.475 | ?state=barrierAttack | ?close=1 | ?night=1
@@ -78,6 +79,8 @@ const labels: HTMLElement[] = [];
 const referenceMixers = new Map<ZombieVisual, THREE.AnimationMixer>();
 const deathStyles = new Map<ZombieVisual, ZombieFallStyle>();
 const deathClocks = new Map<ZombieVisual, number>();
+const hats = new Map<ZombieVisual, ZombieHat>();
+const hatClocks = new Map<ZombieVisual, number>();
 const source = { scene: gltf.scene, clips: gltf.animations };
 const layout: readonly { yaw: number; style: ZombieFallStyle; skin: ZombieSkinId | null }[] = close
   ? [{ yaw: 0, style: deathStyle, skin: singleSkin }]
@@ -121,13 +124,32 @@ for (const [index, { yaw, style, skin }] of layout.entries()) {
   scene.add(placement);
   placements.push(placement);
   visuals.push(visual);
-  if (fixedTime !== null) advanceVisual(visual, state === 'death' ? DEATH_LEAD + fixedTime : fixedTime);
+  if (params.has('hatshot')) {
+    const hat = ZombieHat.create(visual.root, placement, { boxes: [] });
+    if (hat) hats.set(visual, hat);
+  }
 }
 function zombieType(index: number): 'brute' | 'shiny' | 'normal' {
   if (modelId === 'brute') return 'brute';
   return params.has('shiny') || (params.has('compare') && index === 0) ? 'shiny' : 'normal';
 }
 function advanceVisual(visual: ZombieVisual, elapsed: number): void {
+  const hat = hats.get(visual);
+  if (!hat) { advanceBody(visual, elapsed); return; }
+  let clock = hatClocks.get(visual) ?? 0;
+  let remaining = elapsed;
+  while (remaining > 0) {
+    const step = Math.min(remaining, 1 / 60);
+    advanceBody(visual, step);
+    if (clock < DEATH_LEAD && clock + step >= DEATH_LEAD) hat.detach();
+    hat.update(step);
+    remaining -= step;
+    clock += step;
+    if (clock >= DEATH_CYCLE) { clock = 0; hat.reset(); }
+  }
+  hatClocks.set(visual, clock);
+}
+function advanceBody(visual: ZombieVisual, elapsed: number): void {
   const reference = referenceMixers.get(visual);
   if (reference) { reference.update(elapsed); return; }
   if (electric && state !== 'death') visual.electrify(1);
@@ -195,6 +217,9 @@ function resize(): void {
   renderer.setSize(innerWidth, innerHeight);
 }
 resize();
+if (fixedTime !== null) {
+  for (const visual of visuals) advanceVisual(visual, state === 'death' ? DEATH_LEAD + fixedTime : fixedTime);
+}
 const labelPoint = new THREE.Vector3();
 let previous = performance.now();
 renderer.setAnimationLoop((now) => {

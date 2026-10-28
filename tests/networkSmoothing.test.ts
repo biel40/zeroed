@@ -161,6 +161,8 @@ describe('protocol boundary', () => {
     expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'ragdoll' }))
       .toEqual({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'knockback', impactX: 0, impactZ: -1 });
     expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'nobody', style: 'slash' })).toBeNull();
+    expect(parseHostMessage({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'shatter', headshot: true }))
+      .toEqual({ type: 'zombieDeath', zombieId: 4, killer: 'host', style: 'shatter', headshot: true, impactX: 0, impactZ: -1 });
   });
 });
 

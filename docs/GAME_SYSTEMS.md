@@ -131,6 +131,28 @@ Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 «Guardar» confirma los valores actuales y cierra el panel; los cambios siguen
 guardandose automaticamente al ajustarlos.
 
+### Consola de desarrollador
+
+El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
+en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
+restaura el cierre y el inventario inicial.
+Tras activarlo, F2 abre una consola local de desarrollador que pausa la
+partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
+El panel ofrece selectores de armas y anillos, botones de municion y
+proteccion, y un multiplicador de dano con restauracion. Cada accion
+explica su efecto y muestra el resultado; la escritura de comandos queda
+en un desplegable avanzado y utiliza la misma validacion.
+`help`, `weapons` y `rings` muestran la ayuda y los catalogos actuales.
+`weapon <id>` equipa incluso con las ranuras fijadas por modo Dios;
+`ring <id>` (alias `drink`) concede o recarga los anillos sin consumir
+compras ni exigir maquinas del mapa. `ammo full|infinite` afecta al arma
+equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
+Ray Gun y cadenas ZEUS) y `invincible on|off` permite probar salud y
+resurreccion. No es un sistema de mejora comprable: son ajustes temporales
+de prueba, reiniciados con la run. Historial con arriba/abajo y `clear`
+para limpiar la salida. Solo individual, disponible con el mismo acceso
+existente a `MOTDRULES`.
+
 ## Zombies
 
 - La vida conserva la curva de las rondas 1–5 y suma 35 HP por ronda desde
@@ -152,6 +174,12 @@ guardandose automaticamente al ajustarlos.
   la misma malla, pesados a un solo hueso: sigue siendo un draw call, no hay
   texturas nuevas y la altura de contrato no cambia. Se construyen una vez por
   walker cargado. Solo apariencia: tipo, hitboxes y animacion son los del walker.
+  El primer impacto en la cabeza desprende gorras, ushankas y cascos completos,
+  con sus insignias; las capuchas y el resto del equipo siguen puestos. El gorro
+  cae desde la pose actual, gira, rebota y queda en el suelo o sobre los solidos
+  cercanos usando las colisiones de restos existentes. Se conserva hasta retirar
+  ese cuerpo del pool y vuelve a colocarse al reutilizarlo. El invitado cooperativo
+  reproduce el efecto tambien en las bajas de un disparo.
   `ZombieArena.zombieEyes` cambia el color de ojos de todos los modelos del mapa
   (`ZombieModelSource.eyes`); sin el, cada modelo usa el suyo.
 - Las rondas 1–5 aplican una rampa de velocidad progresiva (65 %, 72 %, 80 %,
@@ -390,25 +418,6 @@ guardandose automaticamente al ajustarlos.
   solo individual (`ZombiesGasMask`): la mano derecha la lleva a la cara como
   un `MeleeArmDriver`, el arma baja y no dispara durante la animacion, y el
   visor SVG del HUD cierra la vista con vaho al respirar.
-  El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
-  en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
-  restaura el cierre y el inventario inicial.
-  Tras activarlo, F2 abre una consola local de desarrollador que pausa la
-  partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
-  El panel ofrece selectores de armas y anillos, botones de municion y
-  proteccion, y un multiplicador de dano con restauracion. Cada accion
-  explica su efecto y muestra el resultado; la escritura de comandos queda
-  en un desplegable avanzado y utiliza la misma validacion.
-  `help`, `weapons` y `rings` muestran la ayuda y los catalogos actuales.
-  `weapon <id>` equipa incluso con las ranuras fijadas por modo Dios;
-  `ring <id>` (alias `drink`) concede o recarga los anillos sin consumir
-  compras ni exigir maquinas del mapa. `ammo full|infinite` afecta al arma
-  equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
-  Ray Gun y cadenas ZEUS) y `invincible on|off` permite probar salud y
-  resurreccion. No es un sistema de mejora comprable: son ajustes temporales
-  de prueba, reiniciados con la run. Historial con arriba/abajo y `clear`
-  para limpiar la salida. Solo individual, disponible con el mismo acceso
-  existente a `MOTDRULES`.
   El final de 30000 Points es el que declara la mansion (`MANSION_NUCLEAR_ENDING`) y pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
   La secuencia nuclear dura 25 s y es CSS puro (transform/opacity, sin bordes
@@ -508,24 +517,12 @@ prompt, la muerte y el reinicio.
   la compra. Recargar no repite la animacion. `Game.prepare` los muestra todos para compilar sus shaders.
 - El HUD muestra iconos compactos por anillo (tambien en movil) y la pausa,
   nombre, dedo y estado; un anillo gastado se atenua.
-- `MOTDRULES` no concede anillos: con invencibilidad nunca se gastarian. Con
-  sus compras ilimitadas se pueden comprar gratis y reiniciar los retira.
+- Activar `MOTDRULES` no concede anillos automaticamente; la consola permite concederlos. Reiniciar los retira.
 - Solo individual: el cooperativo no los usa.
 
 ## Cooperativo
 
-`CoopHostMode` es la unica autoridad: rondas, spawns, IA y objetivo de los
-zombis, daño, muertes, salud, Points, puertas, Mystery Box, reparaciones,
-secretos y compras. `CoopGuestMode` solo simula su
-propio jugador y arma; recibe `matchState` a 15 Hz y eventos puntuales
-(`zombieSpawn/Attack/Hit/Death`, `roundStart/End`, `doorOpened`...).
-`ZombieReplica` interpola los zombis en una linea temporal retrasada y nunca
-ejecuta IA. Los impactos del invitado son reclamaciones que el anfitrion
-valida (`ShotValidator`) y aplica una sola vez; el cuchillo usa el mismo ataque
-local que individual y daño autorizado por el anfitrion. Ray Gun y ZEUS-77
-dibujan proyectiles en ambos clientes; el anfitrion aplica splash y cadenas.
-`CoopWorld` comparte mapa, puertas, tablas, objetivos y final entre ambos roles. El menu de pausa es local y
-no detiene la partida. `MULTIPLAYER.md` define el alcance y los limites.
+El alcance, la autoridad, el combate, la pausa y los limites de red se describen en [cooperativo](MULTIPLAYER.md#alcance-y-límites). Las fronteras de los modos estan en [arquitectura](ARCHITECTURE.md#responsabilidades).
 
 ## Rendimiento
 

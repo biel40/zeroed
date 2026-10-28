@@ -9,6 +9,7 @@ import { STATION33_ZOMBIE_EYES, STATION33_ZOMBIE_SKINS } from '../src/zombies/ma
 import { createSkinnedWalkerSource, dressZombieSources } from '../src/zombies/skins/ZombieSkinBuilder';
 import { ZOMBIE_SKINS, type ZombieSkinId } from '../src/zombies/skins/ZombieSkinCatalog';
 import { walkerBandAt, walkerSkinRegion } from '../src/zombies/skins/ZombieSkinRegions';
+import { Zombie } from '../src/zombies/Zombie';
 
 const WALKER_GLB = fileURLToPath(new URL('../public/assets/zombies/zombie_walker.glb', import.meta.url));
 const SKIN_IDS = Object.keys(ZOMBIE_SKINS) as ZombieSkinId[];
@@ -121,6 +122,69 @@ describe('walker skins', async () => {
 
   it('builds each skin once per loaded walker', () => {
     expect(createSkinnedWalkerSource(walker, 'rifleman')).toBe(createSkinnedWalkerSource(walker, 'rifleman'));
+  });
+
+  it('drops the complete hat once on a head hit, independently of the moving body, and restores it on reuse', () => {
+    const source = createSkinnedWalkerSource(walker, 'winterVeteran');
+    const zombie = new Zombie(new ZombieVisual('walker', source, ZOMBIE_MODELS.walker.tints[0], false));
+    zombie.spawn(2, 3, 1000, 1, 3);
+    zombie.skipSpawnRise();
+    zombie.update(0);
+    const mesh = skinnedMeshOf({ scene: zombie.visual.root, clips: [] });
+    const original = mesh.geometry;
+    zombie.applyDamage(10, false, 2, 0);
+    expect(mesh.geometry).toBe(original);
+    zombie.applyDamage(10, true, 2, 0);
+    expect(mesh.geometry.drawRange.count).toBeLessThan(original.getAttribute('position').count);
+    const hat = zombie.group.getObjectByName('fallen-zombie-hat') as Mesh;
+    expect(hat.visible).toBe(true);
+    zombie.group.updateMatrixWorld(true);
+    expect(hat.getWorldPosition(new Vector3()).distanceTo(zombie.visual.headAnchor.getWorldPosition(new Vector3()))).toBeLessThan(0.4);
+    const positions = hat.geometry.getAttribute('position').array.slice();
+    zombie.applyDamage(10, true, 2, 0);
+    expect(hat.geometry.getAttribute('position').array).toEqual(positions);
+    zombie.position.x += 5;
+    for (let i = 0; i < 240; i++) zombie.update(1 / 60);
+    zombie.group.updateMatrixWorld(true);
+    expect(hat.getWorldPosition(new Vector3()).x).toBeLessThan(4);
+    expect(new Box3().setFromObject(hat).min.y).toBeCloseTo(3.01, 2);
+    zombie.spawn(0, 0, 100, 1);
+    expect(mesh.geometry).toBe(original);
+    expect(hat.visible).toBe(false);
+    zombie.dispose();
+  });
+
+  it('also drops hats for lethal and replicated head hits without changing another pooled body', () => {
+    const source = createSkinnedWalkerSource(walker, 'fieldOfficer');
+    const first = new Zombie(new ZombieVisual('walker', source, 0xffffff, false));
+    const second = new Zombie(new ZombieVisual('walker', source, 0xffffff, false));
+    for (const zombie of [first, second]) { zombie.spawn(0, 0, 100, 1); zombie.skipSpawnRise(); zombie.update(0); }
+    first.applyDamage(200, true, 0, -2);
+    expect(first.group.getObjectByName('fallen-zombie-hat')?.visible).toBe(true);
+    expect(skinnedMeshOf({ scene: second.visual.root, clips: [] }).geometry.drawRange.count).toBe(Infinity);
+    second.playReplicatedHit(20, true, 0, -2);
+    expect(second.group.getObjectByName('fallen-zombie-hat')?.visible).toBe(true);
+    second.spawn(0, 0, 100, 1);
+    second.skipSpawnRise();
+    second.update(0);
+    second.playReplicatedDeath('shatter', 0, -1, true);
+    expect(second.group.getObjectByName('fallen-zombie-hat')?.visible).toBe(true);
+    first.dispose(); second.dispose();
+  });
+
+  it('rests on furniture using the existing map collision boxes', () => {
+    const source = createSkinnedWalkerSource(walker, 'helmetTrooper');
+    const table = new Box3(new Vector3(-2, 0, -2), new Vector3(2, 0.7, 3));
+    const zombie = new Zombie(new ZombieVisual('walker', source, 0xffffff, false), { boxes: [table] });
+    zombie.spawn(0, 0, 100, 1);
+    zombie.skipSpawnRise();
+    zombie.update(0);
+    zombie.applyDamage(10, true, 0, -2);
+    for (let i = 0; i < 180; i++) zombie.update(1 / 60);
+    zombie.group.updateMatrixWorld(true);
+    const hat = zombie.group.getObjectByName('fallen-zombie-hat')!;
+    expect(new Box3().setFromObject(hat).min.y).toBeCloseTo(0.71, 2);
+    zombie.dispose();
   });
 
   it('deals map looks in turn across the walker reserve and leaves Brutus alone', () => {

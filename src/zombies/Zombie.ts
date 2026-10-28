@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ZombieHat } from './skins/ZombieHat';
 import type { HitTarget, SurfaceType } from '../shooting/HitTarget';
 import type { WindowBarrier } from './barriers/WindowBarrier';
 import { findVaultStart, openingDepth, vaultProgress, WINDOW_VAULT, type VaultOpening } from './barriers/WindowVault';
@@ -121,6 +122,7 @@ export class Zombie implements HitTarget {
   private gibs: ZombieGibs | null = null;
   /** Blood under a body burnt to death; built on the first one. */
   private bloodPool: ZombieBloodPool | null = null;
+  private readonly hat: ZombieHat | null;
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
   readonly impact = new THREE.Vector2();
 
@@ -138,6 +140,7 @@ export class Zombie implements HitTarget {
     this.headHitbox = new THREE.Mesh(getHeadGeometry(), getHitboxMaterial());
 
     this.group.add(this.visual.root);
+    this.hat = ZombieHat.create(this.visual.root, this.group, this.gibWalls);
     this.visual.attachHitboxes(this.torsoHitbox, this.headHitbox);
     this.torsoBaseScale.copy(this.torsoHitbox.scale);
     this.headBaseScale.copy(this.headHitbox.scale);
@@ -207,6 +210,7 @@ export class Zombie implements HitTarget {
     this.visual.root.visible = true;
     this.gibs?.hide();
     this.bloodPool?.hide();
+    this.hat?.reset();
     this.visual.setState('spawn');
     this.group.visible = true;
   }
@@ -270,9 +274,16 @@ export class Zombie implements HitTarget {
   }
 
   /** Network replica: the host decided this zombie died, how, and from which body-local side. */
-  public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1): void {
+  public playReplicatedDeath(style: ZombieDeathStyle = 'knockback', impactX = 0, impactZ = -1, headshot = style === 'headshot'): void {
     if (!this.isAlive) return;
     this.impact.set(impactX, impactZ);
+    if (headshot) {
+      const yaw = this.group.rotation.y;
+      this.hat?.detach(
+        this.position.x - (impactX * Math.cos(yaw) + impactZ * Math.sin(yaw)),
+        this.position.z - (-impactX * Math.sin(yaw) + impactZ * Math.cos(yaw)),
+      );
+    }
     this.enterDeath(style);
   }
 
@@ -298,6 +309,7 @@ export class Zombie implements HitTarget {
 
   private reactToDamage(amount: number, headshot: boolean, sourceX?: number, sourceZ?: number): void {
     this.updateImpact(sourceX, sourceZ);
+    if (headshot && amount > 0) this.hat?.detach(sourceX, sourceZ);
     this.visual.reactToHit(
       this.impact.x,
       this.impact.y,
@@ -436,6 +448,7 @@ export class Zombie implements HitTarget {
 
   update(dt: number, visualSpeed = this.speed): void {
     if (!this.group.visible) return;
+    this.hat?.update(dt);
     const yawDelta = Math.atan2(Math.sin(this.group.rotation.y - this.previousYaw), Math.cos(this.group.rotation.y - this.previousYaw));
     this.visual.setMotion(dt, visualSpeed, dt > 0 ? yawDelta / dt : 0);
     this.previousYaw = this.group.rotation.y;
@@ -527,6 +540,7 @@ export class Zombie implements HitTarget {
   }
 
   public dispose(): void {
+    this.hat?.dispose();
     this.visual.dispose();
     this.bloodPool?.dispose();
     this.gibs?.dispose();

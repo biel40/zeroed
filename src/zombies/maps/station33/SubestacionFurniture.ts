@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { placement } from '../shared/StaticMeshBatch';
 import { addSolidProxy } from '../shared/SolidProxy';
 import { POWER_LEVER, SUBESTACION } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
+import { addOilDrums } from './OilDrums';
 
 const { hall } = SUBESTACION;
 /**
@@ -29,6 +29,7 @@ export function switchboardLayout(side: -1 | 1): { readonly minX: number; readon
   const panelXs = Array.from({ length: panels }, (_, panel) => minX + panelWidth * (panel + 0.5));
   return { minX, maxX, front: hall.minZ + depth, panelXs };
 }
+/** Three rusty oil drums huddled in the south-west corner, one dented and leaning. */
 const OIL_DRUMS: ReadonlyArray<readonly [number, number]> = [[4.75, -35.0], [5.45, -35.15], [4.95, -35.75]];
 
 /**
@@ -44,7 +45,7 @@ export function buildSubestacionFurniture(context: Station33BuildContext, lighti
     { x: TRANSFORMERS.x - TRANSFORMERS.width / 2 - 0.25, y: 0, z: Math.min(...TRANSFORMERS.zs) - TRANSFORMERS.depth / 2 },
     { x: hall.maxX, y: TRANSFORMERS.height + 0.8, z: Math.max(...TRANSFORMERS.zs) + TRANSFORMERS.depth / 2 }, 'metal');
   for (const side of [-1, 1] as const) addSwitchboard(context, lighting, side);
-  addOilDrums(context);
+  addOilDrums(context, 'oil-drums', OIL_DRUMS);
 }
 
 /**
@@ -132,18 +133,4 @@ function addSwitchboard(context: Station33BuildContext, lighting: Station33Light
     batch.add(lamp, lighting.circuitMaterial('mains'));
   });
   addSolidProxy(context, 'switchboard', { x: minX, y: 0, z: hall.minZ }, { x: maxX, y: height, z: front + 0.05 }, 'metal');
-}
-
-/** Three rusty oil drums huddled in the south-west corner, one dented and leaning. */
-function addOilDrums(context: Station33BuildContext): void {
-  const { batch, materials } = context;
-  OIL_DRUMS.forEach(([x, z], index) => {
-    const lean = index === 2 ? 0.12 : 0;
-    const drum = new THREE.CylinderGeometry(0.3, 0.3, 0.88, 16);
-    batch.add(drum, index === 1 ? materials.paintedSteel : materials.greySteel, placement(x, 0.44, z, lean, index * 0.7, 0));
-    for (const y of [0.25, 0.63]) {
-      batch.add(new THREE.TorusGeometry(0.3, 0.015, 4, 20).rotateX(Math.PI / 2), materials.greySteel, placement(x, y, z, lean, 0, 0));
-    }
-  });
-  addSolidProxy(context, 'oil-drums', { x: 4.4, y: 0, z: -36.1 }, { x: 5.8, y: 0.9, z: -34.65 }, 'metal');
 }

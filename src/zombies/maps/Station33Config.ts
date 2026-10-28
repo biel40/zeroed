@@ -247,16 +247,33 @@ export const SUBESTACION = {
 const SUBESTACION_NORTH_WALL_Z = SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS / 2;
 const SUBESTACION_EAST_WALL_X = SUBESTACION.hall.maxX + STATION33_WALL_THICKNESS / 2;
 
-/** Simple maintenance room beyond the substation's north-west door. */
+/**
+ * Maintenance workshop beyond the substation's north-west door: the depot's
+ * repair bay, high enough for an overhead crane. Its east wall stays west of
+ * the substation's cable-tunnel passage.
+ */
 export const TALLER = {
   hall: {
-    minX: SUBESTACION.hall.minX, maxX: 14.8,
-    minZ: -55.0, maxZ: SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS,
+    minX: SUBESTACION.hall.minX, maxX: 16.6,
+    minZ: -59.0, maxZ: SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS,
   },
-  ceilingHeight: 3.4,
+  ceilingHeight: 4.2,
   color: 0xd7b842,
   lightColor: 0xffdf76,
 } as const;
+
+/**
+ * Spare metro bogie on a short rail stub in the middle of the workshop,
+ * its axles along X, leaving wide lanes on both sides for the horde.
+ */
+export const TALLER_BOGIE = { x: 11.4, z: -54.6, length: 2.8, width: 2.1, height: 1.15 } as const;
+
+/**
+ * Overhead travelling crane: runway beams along both side walls, the bridge
+ * parked across the hall over the bogie, and its hook swinging on a chain
+ * from the hoist (`hoistY`, under the bridge) down to `hookY`, above it.
+ */
+export const TALLER_CRANE = { runwayY: 3.7, bridgeZ: TALLER_BOGIE.z, hoistX: TALLER_BOGIE.x, hoistY: 3.3, hookY: 2.25 } as const;
 
 /**
  * Two tracks along Z. The west one hugs the wall and runs on into a
@@ -560,7 +577,7 @@ export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
  * empty ground west of the train sheds stays walled off.
  */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -19.1, maxX: 27.8, minZ: -62, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: -19.1, maxX: 27.8, minZ: -66, maxZ: 24.7, baseY: 0 },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -695,6 +712,11 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   // The ruby star over the Armour locker, fed by the substation like the locker itself.
   { x: MILICIA.hall.minX + 1.0, y: 2.9, z: 9.45, color: MILICIA_STAR_COLOR, intensity: 3, distance: 4.5, circuit: 'mains', zone: 'milicia' },
   { x: 9.4, y: 3.0, z: -50.6, color: TALLER.lightColor, intensity: 7, distance: 10, circuit: 'mains', zone: 'taller' },
+  // The workbench's own lamp keeps a pool of warm light before the power comes back.
+  { x: TALLER.hall.minX + 0.6, y: 1.75, z: -51.6, color: AMBER_LAMP_COLOR, intensity: 2.6, distance: 4, circuit: 'amber', zone: 'taller' },
+  { x: 9.4, y: 3.6, z: -56.6, color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing', zone: 'taller' },
+  { x: 13.6, y: TALLER.ceilingHeight - 0.8, z: TALLER.hall.minZ + 0.6, color: EMERGENCY_COLOR, intensity: 3, distance: 6, circuit: 'emergency', zone: 'taller' },
+  { x: 13.8, y: 3.6, z: -56.6, color: TALLER.lightColor, intensity: 6, distance: 9, circuit: 'mains', zone: 'taller' },
   { x: 5.6, y: 2.5, z: -48.4, color: TALLER.lightColor, intensity: 2.5, distance: 5, circuit: 'amber', zone: 'taller' },
 ];
 
@@ -737,6 +759,9 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: -14.4, z: 9.6, circuit: 'mains' },
   { x: -16.4, z: 16.2, circuit: 'dead' },
   { x: 9.4, z: -50.6, circuit: 'mains' },
+  { x: 13.8, z: -50.6, circuit: 'dead' },
+  { x: 9.4, z: -56.6, circuit: 'failing' },
+  { x: 13.8, z: -56.6, circuit: 'mains' },
 ];
 
 /** A fitting mounted on a wall face at (x, z), `facing` into its room. */
@@ -760,15 +785,19 @@ export const STATION33_WALL_LAMPS: ReadonlyArray<Station33WallFitting & { readon
   { x: SUBESTACION.hall.minX, z: -35.8, facingX: 1, facingZ: 0, circuit: 'mains' },
   { x: SUBESTACION.hall.maxX, z: -35.4, facingX: -1, facingZ: 0, circuit: 'mains' },
   { x: 6.2, z: SUBESTACION.hall.maxZ, facingX: 0, facingZ: -1, circuit: 'dead' },
+  { x: TALLER.hall.minX, z: -57.0, facingX: 1, facingZ: 0, circuit: 'amber' },
+  { x: TALLER.hall.maxX, z: -57.0, facingX: -1, facingZ: 0, circuit: 'dead' },
 ];
 
 /**
  * Red battery beacons at 3.4 m: over the sheds' blast gate, beside the
- * wicket the horde breaks through, and over the machine room's main switch.
+ * wicket the horde breaks through, over the machine room's main switch and
+ * beside the workshop's service door.
  */
 export const STATION33_BEACONS: ReadonlyArray<Station33WallFitting> = [
   { x: 13.0, z: COCHERAS.hall.minZ, facingX: 0, facingZ: 1 },
   { x: POWER_LEVER.x, z: SUBESTACION.hall.minZ, facingX: 0, facingZ: 1 },
+  { x: 13.6, z: TALLER.hall.minZ, facingX: 0, facingZ: 1 },
 ];
 
 /** Amber glass sconces on the side walls; `yaw` faces the hall. */

@@ -41,10 +41,13 @@ export function buildSkinnedWalkerGeometry(
 ): THREE.BufferGeometry {
   const base = geometry.index ? geometry.toNonIndexed() : geometry;
   const body = new ZombieBodyFrame(base, boneNames, ZOMBIE_MODELS.walker.height);
-  const parts = buildAccessoryParts(skin.accessories, body).map((part) => {
+  // Keep detachable hats at the end so a shared attribute view can omit them.
+  const parts = buildAccessoryParts(skin.accessories, body)
+    .sort((a, b) => Number(a.detachableHat) - Number(b.detachableHat)).map((part) => {
     const placed = part.geometry.clone().applyMatrix4(body.toGeometry);
     placed.computeVertexNormals();
-    return { geometry: placed, tint: tintFor(part.color, ACCESSORY_BAND), bone: body.boneIndex(part.bone) };
+    part.geometry.dispose();
+    return { geometry: placed, tint: tintFor(part.color, ACCESSORY_BAND), bone: body.boneIndex(part.bone), hat: part.detachableHat };
   });
 
   const baseCount = base.getAttribute('position').count;
@@ -84,7 +87,9 @@ export function buildSkinnedWalkerGeometry(
   }
 
   let offset = baseCount;
+  let hatStart = total;
   for (const part of parts) {
+    if (part.hat) hatStart = Math.min(hatStart, offset);
     write(position, 3, offset, part.geometry.getAttribute('position'));
     write(normal, 3, offset, part.geometry.getAttribute('normal'));
     const count = part.geometry.getAttribute('position').count;
@@ -100,6 +105,7 @@ export function buildSkinnedWalkerGeometry(
   if (base !== geometry) base.dispose();
 
   const result = new THREE.BufferGeometry();
+  if (hatStart < total) result.userData.hatStart = hatStart;
   result.setAttribute('position', new THREE.BufferAttribute(position, 3));
   result.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
   result.setAttribute('uv', new THREE.BufferAttribute(uv, 2));

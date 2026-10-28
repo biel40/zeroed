@@ -131,6 +131,8 @@ export type HostMessage =
     readonly zombieId: number;
     readonly killer: CoopPlayerId;
     readonly style: ZombieDeathStyle;
+    /** Cosmetic headwear reaction, including deaths whose style is shatter or shock. */
+    readonly headshot?: boolean;
     /** Body-local unit direction of the killing impact (x: its left, z: forward). */
     readonly impactX: number;
     readonly impactZ: number;
@@ -358,6 +360,7 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
         ? {
           type: 'zombieDeath', zombieId: raw.zombieId as number, killer: raw.killer,
           style: isZombieDeathStyle(raw.style) ? raw.style : 'knockback',
+          ...(raw.headshot === true ? { headshot: true } : {}),
           impactX: isFiniteNumber(raw.impactX) ? Math.max(-1, Math.min(1, raw.impactX)) : 0,
           impactZ: isFiniteNumber(raw.impactZ) ? Math.max(-1, Math.min(1, raw.impactZ)) : -1,
         }

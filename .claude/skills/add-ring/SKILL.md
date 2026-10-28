@@ -20,20 +20,9 @@ Lee "Anillos" en `docs/GAME_SYSTEMS.md` y `docs/STATION_33.md`.
 
 ## 0. Antes de empezar
 
-- `npm run codemap` y busca con grep en `CODEMAP.md`: `Ring`, `ZombiesRings`, y el sistema
+- Usa `npm run codemap -- --query <texto>`: `Ring`, `ZombiesRings`, y el sistema
   al que afecta el efecto (`PlayerHealth`, `Weapon`, `PlayerController`...).
-- Catalogo previsto (`docs/STATION_33.md`); respetalo salvo que el usuario
-  decida otra cosa:
-
-  | Dedo | Anillo | Efecto |
-  |---|---|---|
-  | anular | Resurreccion | salva una muerte (ya existe) |
-  | corazon | Vitalidad | vida maxima |
-  | indice | Doble impacto | dano y cadencia |
-  | menique | Cadencia | recarga |
-  | pulgar | utilidad | p. ej. tercera arma |
-
-  Un dedo, un anillo: no reutilices un dedo ocupado.
+- Consulta el catalogo actual en `src/game/rings/RingCatalog.ts`; no reutilices un dedo ocupado.
 - Decide con el usuario si el efecto es:
   - consumible: se gasta al dispararse, como Resurreccion;
   - pasivo: esta activo mientras se lleva y nada llama a `consumeCharge`, asi
@@ -48,7 +37,7 @@ Lee "Anillos" en `docs/GAME_SYSTEMS.md` y `docs/STATION_33.md`.
 | `src/modes/ZombiesMode.ts` | Una llamada a ese hook en el punto exacto del sistema afectado, sin logica del anillo dentro del modo. |
 | `src/i18n/en.ts`, `es.ts`, `ca.ts` | `ring.<id>` (nombre en mayusculas) y `ring.<id>.description`, en los tres idiomas. |
 | `src/zombies/maps/<Mapa>Config.ts` | La maquina en el mapa que lo venda (en Station 33, una entrada en `STATION33_RING_LOCKERS`). |
-| `docs/GAME_SYSTEMS.md` (Anillos) y `docs/STATION_33.md` | Que hace el anillo, precios y donde se compra; actualiza el catalogo previsto. |
+| `docs/GAME_SYSTEMS.md` (Anillos) | Comportamiento relevante; actualiza la guia del mapa solo si cambian sus directrices. |
 
 Sin cambios, porque se derivan del catalogo:
 - `PlayerRings`: compra, cargas, precios crecientes y dedos;
@@ -78,7 +67,6 @@ Sin cambios, porque se derivan del catalogo:
 - **Solo individual:** el cooperativo no tiene anillos. No los anadas ahi sin
   que el usuario lo pida: haria falta replicarlos en `Protocol.ts` y validarlos
   en el anfitrion.
-- **`MOTDRULES` no concede anillos.**
 - **Reiniciar la run** quita todos los anillos (`PlayerRings.reset`) y
   restablece el efecto: cualquier estado que anada el hook se limpia en
   `ZombiesRings.reset`.

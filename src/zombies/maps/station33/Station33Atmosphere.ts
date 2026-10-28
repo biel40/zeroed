@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { COCHERAS, CONSIGNA, MILICIA, SUBESTACION, VESTIBULE } from '../Station33Config';
+import { COCHERAS, CONSIGNA, MILICIA, SUBESTACION, TALLER, TALLER_CRANE, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { ceilingHeightAt, VESTIBULE_VAULT } from './VaultProfile';
@@ -15,20 +15,21 @@ interface DustVolume {
   readonly seed: number;
 }
 
-/** Motes over the vestibule, the luggage-office hall, the train sheds, the machine room and the militia post. */
+/** Motes over the vestibule, the luggage-office hall, the train sheds, the machine room, the militia post and the workshop. */
 const DUST_VOLUMES: ReadonlyArray<DustVolume> = [
   { room: VESTIBULE, count: { low: 30, medium: 60, high: 90 }, ceiling: 4.1, seed: 3407 },
   { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
   { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60 }, ceiling: 4.1, seed: 3419 },
   { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: 4.1, seed: 3421 },
   { room: MILICIA.hall, count: { low: 8, medium: 16, high: 24 }, ceiling: MILICIA.ceilingHeight - 0.2, seed: 3423 },
+  { room: TALLER.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: TALLER.ceilingHeight - 0.2, seed: 3427 },
 ];
 const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5 };
 /**
  * Seepage points in the ceilings; the third one is the hole the vault
  * plaster fell from, the next two soak the luggage office, three drip from
  * the joints of the train sheds' iron rings, two leak onto the machine-room
- * floor and the last one into the substation gallery.
+ * floor, one into the substation gallery and the last two into the workshop.
  */
 const DRIP_SOURCES = [
   { x: -1.2, z: 7.3, interval: 2.3 },
@@ -42,6 +43,8 @@ const DRIP_SOURCES = [
   { x: 9.2, z: -36.5, interval: 2.4 },
   { x: 16.9, z: -38.6, interval: 1.8 },
   { x: 12.7, z: -30.4, interval: 2.2 },
+  { x: 7.6, z: -57.2, interval: 2.0 },
+  { x: 14.2, z: -51.4, interval: 2.7 },
 ] as const;
 /** Severed cables hanging out of the ceilings: anchor, length and sway phase. */
 const HANGING_CABLES = [
@@ -53,6 +56,7 @@ const HANGING_CABLES = [
   { x: 18.6, z: -18.4, length: 1.5, phase: 3.6 },
   { x: 12.0, z: -44.2, length: 1.3, phase: 0.9 },
   { x: 9.3, z: -31.6, length: 0.7, phase: 2.7 },
+  { x: 7.2, z: -53.6, length: 1.0, phase: 1.7 },
 ] as const;
 /** The fluorescent fixture that tore loose from its slot and hangs by one chain. */
 const DANGLING_FIXTURE = { x: 2, z: 6.75, chain: 0.9 } as const;
@@ -163,6 +167,7 @@ export class Station33Atmosphere {
 
     for (const cable of HANGING_CABLES) this.addCable(cable.x, cable.z, cable.length, cable.phase);
     this.addDanglingFixture(lighting);
+    this.addCraneHook();
     this.addSteam(spot, STEAM_PUFFS[quality], random);
     this.update(0);
   }
@@ -284,6 +289,26 @@ export class Station33Atmosphere {
     pivot.name = 'dangling-fixture';
     this.context.group.add(pivot);
     this.swinging.push({ pivot, phase: 1.3, amplitude: 0.05, frequency: 0.8 });
+  }
+
+  /** The workshop crane's chain and hook, swinging slowly under the parked hoist. */
+  private addCraneHook(): void {
+    const { materials } = this.context;
+    const { hoistX, hoistY, hookY, bridgeZ } = TALLER_CRANE;
+    const pivot = new THREE.Group();
+    pivot.position.set(hoistX, hoistY, bridgeZ);
+    const chainLength = hoistY - hookY - 0.25;
+    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, chainLength, 6), materials.greySteel);
+    chain.position.y = -chainLength / 2;
+    const block = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), materials.hazardPaint);
+    block.position.y = -chainLength - 0.08;
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.02, 6, 14, Math.PI * 1.5), materials.greySteel);
+    hook.position.y = -(hoistY - hookY) + 0.07;
+    hook.rotation.z = Math.PI * 0.75;
+    pivot.add(chain, block, hook);
+    pivot.name = 'workshop-crane-hook';
+    this.context.group.add(pivot);
+    this.swinging.push({ pivot, phase: 0.6, amplitude: 0.035, frequency: 0.7 });
   }
 
   /** Pipe along the east wall with a cracked joint venting faint steam. */

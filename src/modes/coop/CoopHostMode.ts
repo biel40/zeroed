@@ -720,6 +720,7 @@ export class CoopHostMode implements GameMode {
     this.world.arena.captureSoul(zombie.position, zombie.floor);
     this.send({
       type: 'zombieDeath', zombieId: this.zombies.networkIdOf(zombie), killer: shooter,
+      ...(headshot ? { headshot: true } : {}),
       style: zombie.deathStyle, impactX: quantize(zombie.impact.x), impactZ: quantize(zombie.impact.y),
     });
     this.sendMatchState();

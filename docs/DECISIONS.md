@@ -3,22 +3,7 @@
 - **Shell comun y modos aislados.** `Game` posee servicios compartidos; cada
   `GameMode` recibe un `ModeContext`. Individual y cooperativo comparten loop
   sin compartir estado de run.
-- **Mapas por registro.** Burned Mansion y Station 33 son los mapas jugables;
-  Station 33 es solo individual, sera de pago y se construye por fases (el
-  vestibulo, la consigna, las cocheras y la sala de maquinas), cada una
-  jugable y sin puertas hacia el vacio. `zombieMaps.ts`
-  declara por mapa visibilidad, nombre i18n, soporte cooperativo, si es premium
-  y factoria de arena; los modos la resuelven por `mapId`. Mientras no exista
-  un sistema de pagos, `premium` solo cambia la presentacion: la beta cerrada
-  juega todos los mapas visibles. Cada mapa fija su ambiente, incluida la luz
-  de entorno que deja pasar. `ZombieArena` mantiene geometria,
-  colliders, spawns, barreras, puertas, ambiente, musica y final fuera de la
-  logica de la run; lo exclusivo de un mapa (almas, faroles, ritual y sala
-  secreta de la mansion) es una capacidad opcional consultada con type guard;
-  lo que cualquier mapa puede ofrecer (caja, maquinas de anillos) es un campo
-  opcional.
-  El cooperativo usa un unico mapa (`COOP_ZOMBIE_MAP_ID`) sin negociarlo en el
-  protocolo. El campo de tiro/Classic se retira por decision del usuario.
+- **Mapas por registro.** La run y los modos no dependen de un mapa concreto: el registro y `ZombieArena` separan seleccion, capacidades y geometria. Classic se retiro por decision del usuario. El cooperativo usa un mapa fijo sin negociacion; el acceso premium es presentacion mientras no haya pagos. Contratos en [arquitectura](ARCHITECTURE.md#contratos) y estado en [mapas](GAME_SYSTEMS.md#mapas-e-interacciones).
 - **Logica separada de vistas.** Armas, economia, rondas, salud, Mystery Box,
   barreras, puertas, anillos, trayectorias y cadena Tesla son testeables sin
   Three.js.
@@ -27,17 +12,7 @@
   mano en primera persona como senal principal (el HUD solo apoya). Su efecto
   es dato en la definicion mas un gancho en el modo; no hay un framework de
   modificadores. Las maquinas son una capacidad opcional del mapa.
-- **Station 33 es el mapa base.** Lo que un mapa ofrece al jugador (anillos
-  y sus maquinas, electricidad e interruptor, puertas de pago, wall buys,
-  caja, bancos de taquillas, solidos de atrezo) se construye una vez y lo
-  reutilizan todos los mapas: la logica vive detras de los contratos de
-  `ZombieArena` y en el modo, las piezas del mundo en
-  `src/zombies/maps/shared/` (`MapBuildKit`, `MapPower`, `RingLocker`,
-  `PowerLever`, `LockerBank`, `SolidProxy`, `Cobwebs`), y cada mapa solo
-  aporta datos de colocacion y su "look" (medidas, materiales con los nombres
-  que piden las piezas, carteles). Una pieza nueva que hoy solo use un mapa
-  se escribe ya sin depender de el; si algo nace atado a un mapa y otro lo
-  necesita, se mueve a `shared/` en lugar de copiarse.
+- **Station 33 es el mapa base.** Las piezas y capacidades reutilizables se comparten entre mapas para evitar copias y dependencia de una arena. Las fronteras estan en [arquitectura](ARCHITECTURE.md#contratos); la intencion visual, en [Station 33](STATION_33.md).
 - **Armas declarativas.** `WeaponDefinition` concentra cadencia, dano, recoil,
   municion, ADS, proyectil y presentacion; no hay subclases por arma.
 - **Economia por autoridad.** `PlayerEconomy` centraliza Points; el modo decide
@@ -56,14 +31,12 @@
   bajo demanda; navegador actualiza al entrar y standalone espera a selector o
   pausa.
 - **Burned Mansion fisico.** La escalera es una pendiente continua; colliders de
-  puertas y paredes permanecen hasta que la animacion termina.
+  el bunker conserva su collider hasta terminar la apertura; las puertas normales abren la topologia al comprarse.
 - **Sala secreta desacoplada.** `ZombiesMode` envia muertes; el estado puro
   gobierna progreso y el sistema del mapa posee vistas, pool, pared y reset.
 - **Cooperativo con autoridad unica del anfitrion.** `CoopHostMode` simula todo
   el estado compartido; `CoopGuestMode` replica e interpola. El relay solo
-  empareja y reenvia (nunca mensajes reservados del propio relay). La pausa
-  multijugador es local (`sharedSimulation`). `ZombiesMode` sigue local y no
-  necesita red.
+  empareja y reenvia mensajes. La pausa del anfitrion detiene la simulacion compartida; la del invitado es local. `ZombiesMode` no necesita red. Ver [cooperativo](MULTIPLAYER.md#alcance-y-límites).
 - **Idioma solo desde el menu principal.** Espanol, ingles y catalan viven en
   `src/i18n/`; `en.ts` define las claves y los demas diccionarios deben
   cubrirlas. El HTML declara textos con `data-i18n`, el codigo usa `t()` al

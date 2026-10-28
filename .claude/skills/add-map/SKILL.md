@@ -15,7 +15,7 @@ vuelve.
 
 ## 0. Antes de empezar
 
-- `npm run codemap` y busca con grep en `CODEMAP.md`: `ZombieArena`, `Station33`, `zombieMaps`.
+- Usa `npm run codemap -- --query <texto>`: `ZombieArena`, `Station33`, `zombieMaps`.
 - Lee `docs/STATION_33.md` y la seccion "Mapas e interacciones" de
   `docs/GAME_SYSTEMS.md`.
 - Pregunta al usuario lo que no se deduce y cambia el diseno:
@@ -83,7 +83,6 @@ Opcional, solo si el mapa lo tiene:
 | `src/style.css` | Estilos y animaciones del arte de la tarjeta, si los necesita. |
 | `src/i18n/en.ts`, `es.ts`, `ca.ts` | `map.<clave>` y `map.<clave>.tagline` en los tres idiomas (`tests/i18n.test.ts` exige las mismas claves). |
 | `src/audio/MusicManager.ts` | Si tiene musica propia: `MusicTrackName`, `ZOMBIES_MUSIC_PATHS`, `MUSIC_TRACKS`; el arena la elige en `ambience.musicTrack`. El MP3 va a `public/assets/audio/` y su licencia a `ASSETS.md`. |
-| `AGENTS.md` | La linea que lista los mapas jugables y sus modos. |
 
 Intro opcional:
 - `ArenaIntro` en el config;
@@ -125,5 +124,4 @@ Un final opcional sigue el mismo patron con `EndingPresentationId`.
 
 - `docs/<MAPA>.md`: direccion de arte, paleta, fases y directrices, como
   `docs/STATION_33.md`.
-- `docs/GAME_SYSTEMS.md` ("Mapas e interacciones") y `docs/PROJECT_STATE.md`:
-  que existe del mapa.
+- Actualiza [sistemas](../../../docs/GAME_SYSTEMS.md#mapas-e-interacciones) si cambia el comportamiento y [estado](../../../docs/PROJECT_STATE.md) si cambia una capacidad o limitacion relevante.

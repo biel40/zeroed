@@ -10,7 +10,7 @@ Sigue AGENTS.md; ningun modo depende de un arma concreta.
 
 ## 1. Investigar
 
-- `npm run codemap` y busca con grep en `CODEMAP.md` los archivos de la tabla
+- Usa `npm run codemap -- --query <texto>` los archivos de la tabla
   del paso 2, en lugar de explorar el repo.
 - Busca en internet las especificaciones reales: calibre, cadencia (rpm),
   capacidad, velocidad de boca, longitud total, longitud de cañon y variante.
@@ -75,7 +75,7 @@ tocar.
 ## 3b. Recalentamiento (obligatorio en automaticas)
 
 Toda arma con `'auto'` en `fireModes` lleva `heat: BarrelHeatConfig`; las
-semiautomaticas y de energia no (lo exige `tests/barrelHeat.test.ts`). Con el
+semiautomaticas pueden definirlo cuando su diseño lo requiera, como Barrett; consulta los tests actuales. Con el
 dato basta: `BarrelHeat` (en `Weapon`) suma la dispersion, `BarrelGlow` pinta
 la punta del cañon de rojo a naranja y `BarrelSmoke` (en `Game`) anade humo.
 No hay que tocar el modelo.

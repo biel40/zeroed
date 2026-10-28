@@ -366,7 +366,7 @@ export class CoopGuestMode implements GameMode {
         this.replica.hit(message.zombieId, message.headshot, message.amount, message.fromX, message.fromZ);
         break;
       case 'zombieDeath':
-        this.replica.kill(message.zombieId, message.style, message.impactX, message.impactZ);
+        this.replica.kill(message.zombieId, message.style, message.impactX, message.impactZ, message.headshot);
         break;
       case 'roundStart':
         this.round = message.round;

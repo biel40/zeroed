@@ -8,6 +8,8 @@ export interface AccessoryPart {
   readonly geometry: THREE.BufferGeometry;
   readonly color: number;
   readonly bone: string;
+  /** A complete loose hat, including its badge; hoods stay sewn to the coat. */
+  readonly detachableHat?: boolean;
 }
 
 /** Elliptical cross-section of a body part at a height (body frame, meters). */
@@ -350,5 +352,9 @@ function partsOf<K extends ZombieAccessory['kind']>(accessory: AccessoryOf<K>, m
 export function buildAccessoryParts(accessories: readonly ZombieAccessory[], body: ZombieBodyFrame): AccessoryPart[] {
   if (accessories.length === 0) return [];
   const measures = measure(body);
-  return accessories.flatMap((accessory) => partsOf(accessory, measures));
+  return accessories.flatMap((accessory) => {
+    const detachableHat = accessory.kind === 'sideCap' || accessory.kind === 'peakedCap'
+      || accessory.kind === 'helmet' || accessory.kind === 'furHat';
+    return partsOf(accessory, measures).map((part) => ({ ...part, detachableHat }));
+  });
 }
