@@ -2,6 +2,7 @@ import {
   MANSION_BANQUET_HALL,
   MANSION_BARRIERS,
   MANSION_BLAST_DOOR_ID,
+  MANSION_BOX_ROOM,
   MANSION_BUNKER_CEILING_Y,
   MANSION_BUNKER_DIVIDER_X,
   MANSION_BUNKER_Y,
@@ -44,6 +45,10 @@ export interface MansionWallFace {
 
 const HALF = MANSION_WALL_THICKNESS / 2;
 const WEST_FACE_X = -7.15 + HALF;
+const BOX_WEST_FACE_X = MANSION_BOX_ROOM.westWallX + HALF;
+const BOX_EAST_FACE_X = MANSION_BOX_ROOM.eastWallX - HALF;
+const BOX_NORTH_FACE_Z = MANSION_BOX_ROOM.northWallZ + HALF;
+const BOX_SOUTH_FACE_Z = MANSION_BOX_ROOM.southWallZ - HALF;
 const EAST_FACE_X = MANSION_EAST_WALL_X - HALF;
 const NORTH_FACE_Z = MANSION_BANQUET_HALL.southZ + HALF;
 const SOUTH_FACE_Z = 10.15 - HALF;
@@ -103,10 +108,11 @@ export const MANSION_GROUND_FACES: ReadonlyArray<MansionWallFace> = [
   groundFace('start-north', 'x', DIVIDER_Z + HALF, 1, WEST_FACE_X, EAST_FACE_X),
   groundFace('start-west', 'z', WEST_FACE_X, 1, DIVIDER_Z + HALF, SOUTH_FACE_Z),
   groundFace('start-east', 'z', EAST_FACE_X, -1, DIVIDER_Z + HALF, SOUTH_FACE_Z),
-  groundFace('box-north', 'x', NORTH_FACE_Z, 1, WEST_FACE_X, -HALF),
-  groundFace('box-south', 'x', DIVIDER_Z - HALF, -1, WEST_FACE_X, -HALF),
-  groundFace('box-west', 'z', WEST_FACE_X, 1, NORTH_FACE_Z, DIVIDER_Z - HALF),
-  groundFace('box-east', 'z', -HALF, -1, NORTH_FACE_Z, DIVIDER_Z - HALF),
+  groundFace('box-north', 'x', BOX_NORTH_FACE_Z, 1, BOX_WEST_FACE_X, BOX_EAST_FACE_X),
+  // The west end is the new return wall overlooking the garden beside the start room.
+  groundFace('box-south', 'x', BOX_SOUTH_FACE_Z, -1, BOX_WEST_FACE_X, BOX_EAST_FACE_X),
+  groundFace('box-west', 'z', BOX_WEST_FACE_X, 1, BOX_NORTH_FACE_Z, BOX_SOUTH_FACE_Z),
+  groundFace('box-east', 'z', BOX_EAST_FACE_X, -1, BOX_NORTH_FACE_Z, BOX_SOUTH_FACE_Z),
   groundFace('banquet-south', 'x', BANQUET_SOUTH_FACE_Z, -1, BANQUET_WEST_FACE_X, BANQUET_EAST_FACE_X),
   groundFace('banquet-north', 'x', BANQUET_NORTH_FACE_Z, 1, BANQUET_WEST_FACE_X, BANQUET_EAST_FACE_X),
   groundFace('banquet-west', 'z', BANQUET_WEST_FACE_X, 1, BANQUET_NORTH_FACE_Z, BANQUET_SOUTH_FACE_Z),

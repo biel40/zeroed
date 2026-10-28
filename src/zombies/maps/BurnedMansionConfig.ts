@@ -1,4 +1,5 @@
 import type { RingLockerPlacement } from './shared/RingLocker';
+import type { LockerSize } from './shared/LockerBank';
 import type { TranslationKey } from '../../i18n/i18n';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
@@ -97,6 +98,14 @@ export const MANSION_BANQUET_HALL = {
   chimney: { frontX: MANSION_BUNKER_DIVIDER_X - 0.55, z: -12, breadth: 2.3, surroundWidth: 1.7 },
 } as const;
 
+/** Wall centre lines of the box room, widened west without changing adjacent rooms. */
+export const MANSION_BOX_ROOM = {
+  westWallX: -9.15,
+  eastWallX: 0,
+  northWallZ: MANSION_BANQUET_HALL.southZ,
+  southWallZ: 2,
+} as const;
+
 /** Same locked Barrett chest as Station 33, facing the room below the portrait. */
 export const MANSION_WEAPON_CHEST = {
   id: 'mansion-barrett-chest', weaponId: 'barrett', code: BARRETT_CHEST_CODE,
@@ -121,7 +130,7 @@ export const MANSION_BANQUET_GHOST = {
 
 /** Ground-floor movement bounds. */
 export const MANSION_GROUND_BOUNDS = {
-  minX: -6.6,
+  minX: MANSION_BOX_ROOM.westWallX + 0.55,
   maxX: MANSION_EAST_WALL_X - 0.55,
   minZ: MANSION_BANQUET_HALL.northZ + 0.7,
   maxZ: 9.6,
@@ -132,7 +141,9 @@ export function isOutsideMansion(x: number, z: number): boolean {
   const outsideMain = x < -7.45 || x > MANSION_EAST_WALL_X + 0.3 || z < -8.45 || z > 10.45;
   const insideBanquet = x > MANSION_BANQUET_HALL.minX - 0.3 && x < MANSION_BANQUET_HALL.maxX + 0.3
     && z > MANSION_BANQUET_HALL.northZ - 0.3 && z < MANSION_BANQUET_HALL.southZ;
-  return outsideMain && !insideBanquet;
+  const insideBoxRoom = x > MANSION_BOX_ROOM.westWallX - 0.3 && x < MANSION_BOX_ROOM.eastWallX + 0.3
+    && z > MANSION_BOX_ROOM.northWallZ - 0.3 && z < MANSION_BOX_ROOM.southWallZ + 0.3;
+  return outsideMain && !insideBanquet && !insideBoxRoom;
 }
 
 export const MANSION_SECRET_ROOM = {
@@ -292,8 +303,8 @@ export const MANSION_BARRIERS: ReadonlyArray<{
   { id: 'start-west-b', x: -7.15, z: 3.2, outwardX: -1, outwardZ: 0, zone: 'start' },
   { id: 'start-south', x: -3.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
   { id: 'start-south-west', x: -5.5, z: 10.15, outwardX: 0, outwardZ: 1, zone: 'start' },
-  { id: 'box-west', x: -7.15, z: -3.2, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
-  { id: 'box-west-south', x: -7.15, z: 0.3, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
+  { id: 'box-west', x: MANSION_BOX_ROOM.westWallX, z: -3.2, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
+  { id: 'box-west-south', x: MANSION_BOX_ROOM.westWallX, z: 0.3, outwardX: -1, outwardZ: 0, zone: 'to-dining' },
   { id: 'banquet-north-west', x: -5.3, z: MANSION_BANQUET_HALL.northZ, outwardX: 0, outwardZ: -1, zone: 'to-banquet' },
   { id: 'banquet-north-east', x: 2.4, z: MANSION_BANQUET_HALL.northZ, outwardX: 0, outwardZ: -1, zone: 'to-banquet' },
   { id: 'banquet-east', x: MANSION_BANQUET_HALL.maxX, z: MANSION_BANQUET_HALL.eastWindowZ, outwardX: 1, outwardZ: 0, zone: 'to-banquet' },
@@ -360,7 +371,7 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     weaponId: 'ak47',
     price: 1750,
     ammoPrice: 900,
-    position: { x: -6.98, y: 1.45, z: -5.4 },
+    position: { x: MANSION_BOX_ROOM.westWallX + 0.17, y: 1.45, z: -5.4 },
     yaw: Math.PI / 2,
     floor: 0,
   },
@@ -410,8 +421,8 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
     { x: -5.5, z: 18, barrierId: 'start-south-west', approachX: -5.5, approachZ: 11.05, breachX: -5.5, breachZ: 9.55, exterior: true },
   ],
   'to-dining': [
-    { x: -14, z: -3.2, barrierId: 'box-west', approachX: -8.05, approachZ: -3.2, breachX: -6.55, breachZ: -3.2, exterior: true },
-    { x: -14, z: 0.3, barrierId: 'box-west-south', approachX: -8.05, approachZ: 0.3, breachX: -6.55, breachZ: 0.3, exterior: true },
+    { x: -14, z: -3.2, barrierId: 'box-west', approachX: MANSION_BOX_ROOM.westWallX - 0.9, approachZ: -3.2, breachX: MANSION_BOX_ROOM.westWallX + 0.6, breachZ: -3.2, exterior: true },
+    { x: -14, z: 0.3, barrierId: 'box-west-south', approachX: MANSION_BOX_ROOM.westWallX - 0.9, approachZ: 0.3, breachX: MANSION_BOX_ROOM.westWallX + 0.6, breachZ: 0.3, exterior: true },
   ],
   // The east hall has no outer wall left: its zombies come in through the banquet hall.
   'to-banquet': [
@@ -442,15 +453,21 @@ export const MANSION_SPAWNS: Readonly<Record<string, ReadonlyArray<ZombieSpawnPo
   ],
 };
 
-/** Resurrection cabinet beside the Mystery Box, available without mains power. */
+export const MANSION_RING_LOCKER_SIZE = {
+  depth: 0.6, height: 2.1, columnWidth: 0.5, rows: 3, ringLockerWidth: 0.7,
+} as const satisfies LockerSize;
+
+/** Cabinet backed against the north wall, with clearance for the panelling and box. */
 export const MANSION_RESURRECTION_LOCKER = {
   id: 'mansion-resurrection', ringId: 'resurrection', requiresPower: false,
-  x: -3.5, z: -3.8, facingX: 1, facingZ: 0,
+  x: MANSION_BOX_ROOM.westWallX + 3.5,
+  z: MANSION_BOX_ROOM.northWallZ + MANSION_WALL_THICKNESS / 2 + 0.1 + MANSION_RING_LOCKER_SIZE.depth,
+  facingX: 0, facingZ: 1,
 } as const satisfies RingLockerPlacement;
 
 /** Mystery Box in the room immediately behind the first paid door. */
 export const MANSION_BOX_PLACEMENT = {
-  position: { x: -5.2, y: 0, z: -5.6 },
+  position: { x: MANSION_BOX_ROOM.westWallX + 1.95, y: 0, z: -5.6 },
   yaw: -Math.PI / 2,
   useRange: 2.2,
   lookDotMin: 0.5,

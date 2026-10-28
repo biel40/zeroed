@@ -52,6 +52,7 @@ import {
   MANSION_AMBIENCE,
   MANSION_AMMO_REFILLS,
   MANSION_RESURRECTION_LOCKER,
+  MANSION_RING_LOCKER_SIZE,
   MANSION_AREA_LIGHTS,
   MANSION_BANQUET_GHOST,
   MANSION_BANQUET_HALL,
@@ -62,6 +63,7 @@ import {
   MANSION_BUNKER_ENDING,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
+  MANSION_BOX_ROOM,
   MANSION_DOOR_OPENING,
   MANSION_DOORS,
   MANSION_EAST_WALL_X,
@@ -88,6 +90,14 @@ import {
 
 const STAIR_APERTURE_MIN_Z = MANSION_STAIR_BOTTOM_Z - 0.15;
 const STAIR_APERTURE_MAX_Z = MANSION_STAIR_TOP_Z - 0.15;
+
+/** The wider room bounds must not expose the starting room's window openings to the player. */
+const START_WEST_WINDOW_STOPS = MANSION_BARRIERS
+  .filter((barrier) => barrier.zone === 'start' && barrier.outwardX === -1)
+  .map((barrier) => new THREE.Box3(
+    new THREE.Vector3(barrier.x - MANSION_WALL_THICKNESS / 2, 0, barrier.z - MANSION_WINDOW_OPENING.width / 2),
+    new THREE.Vector3(barrier.x + MANSION_WALL_THICKNESS / 2, MANSION_WALL_HEIGHT, barrier.z + MANSION_WINDOW_OPENING.width / 2),
+  ));
 
 /** Score bonus that keeps an active light until a rival is clearly better. */
 const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
@@ -309,13 +319,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.ammoRefills = MANSION_AMMO_REFILLS.map((config) => buildAmmoRefill(machineKit, config, this.materials.bunkerPaint));
     const locker = MANSION_RESURRECTION_LOCKER;
     this.ringMachines = [new RingLocker(machineKit, locker, {
-      size: { depth: 0.6, height: 2.1, columnWidth: 0.5, rows: 3, ringLockerWidth: 0.7 },
+      size: MANSION_RING_LOCKER_SIZE,
       materials: { greySteel: this.materials.metal, paintedSteel: this.materials.bunkerPaint, rubber: this.materials.rubber },
       mainsGlowBoost: 1,
     }, new MapPower())];
+    const halfLockerWidth = MANSION_RING_LOCKER_SIZE.ringLockerWidth / 2;
     addSolidProxy(machineKit, locker.id + '-collider',
-      { x: locker.x - 0.6, y: 0, z: locker.z - 0.35 },
-      { x: locker.x, y: 2.1, z: locker.z + 0.35 }, 'metal');
+      { x: locker.x - halfLockerWidth, y: 0, z: locker.z - MANSION_RING_LOCKER_SIZE.depth },
+      { x: locker.x + halfLockerWidth, y: MANSION_RING_LOCKER_SIZE.height, z: locker.z }, 'metal');
     for (const mesh of machineKit.batch.build(this.group, 'mansion-machines', { castShadow: false, receiveShadow: true })) {
       mesh.userData.floorPartition = floorPartitionOf(new THREE.Box3().setFromObject(mesh));
     }
@@ -579,6 +590,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
 
   private collectPlayerWallColliders(): ReadonlyArray<THREE.Box3> {
     const boxes = this.playerWallMeshes.map((mesh) => new THREE.Box3().setFromObject(mesh));
+    boxes.push(...START_WEST_WINDOW_STOPS);
     boxes.push(mysteryBoxFootprint(this.mysteryBoxPlacement));
     if (!this.secretRoom.isDoorOpen) boxes.push(new THREE.Box3().setFromObject(this.secretWallCollider));
     for (let i = 0; i < this.doors.length; i++) {
@@ -601,7 +613,18 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       10 - STAIR_APERTURE_MAX_Z, this.materials.parquet,
     );
 
-    this.addWindowedWall('z', -7.15, -8, 10);
+    const halfWall = MANSION_WALL_THICKNESS / 2;
+    const boxWestFace = MANSION_BOX_ROOM.westWallX + halfWall;
+    const extensionWidth = -7 - boxWestFace;
+    const extensionDepth = MANSION_BOX_ROOM.southWallZ - (MANSION_BOX_ROOM.northWallZ + halfWall);
+    this.addSlab('box-room-west-floor', boxWestFace + extensionWidth / 2, -0.08,
+      MANSION_BOX_ROOM.southWallZ - extensionDepth / 2, extensionWidth, 0.16, extensionDepth, this.materials.parquet);
+    this.addSlab('box-room-west-roof', MANSION_BOX_ROOM.westWallX - halfWall + extensionWidth / 2, 3.28,
+      (MANSION_BOX_ROOM.northWallZ + MANSION_BOX_ROOM.southWallZ) / 2,
+      extensionWidth, 0.16, MANSION_BOX_ROOM.southWallZ - MANSION_BOX_ROOM.northWallZ + MANSION_WALL_THICKNESS,
+      this.materials.ceilingBurned);
+    this.addWindowedWall('z', -7.15, MANSION_BOX_ROOM.southWallZ, 10);
+    this.addWindowedWall('z', MANSION_BOX_ROOM.westWallX, MANSION_BOX_ROOM.northWallZ + halfWall, MANSION_BOX_ROOM.southWallZ);
     this.addWindowedWall('z', MANSION_EAST_WALL_X, -8, 10);
     // North and south walls reach the outer face of the widened east wall so
     // the east-wing corners stay closed. West of the bunker divider the old
@@ -776,13 +799,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
 
   private buildInterior(): void {
     // Starting room -> box room. The opening is exactly occupied by to-dining.
-    this.addDoorWall('x', 2, -7, 0, -3.5, 0);
+    this.addDoorWall('x', MANSION_BOX_ROOM.southWallZ,
+      MANSION_BOX_ROOM.westWallX - MANSION_WALL_THICKNESS / 2, 0, -3.5, 0);
     this.addWall(4.5, MANSION_WALL_HEIGHT / 2, 2, 9, MANSION_WALL_HEIGHT, MANSION_WALL_THICKNESS);
 
     // The Mystery Box room and the east hall only meet through the banquet hall.
     this.addWall(0, MANSION_WALL_HEIGHT / 2, -3, MANSION_WALL_THICKNESS, MANSION_WALL_HEIGHT, 10);
     const southZ = MANSION_BANQUET_HALL.southZ;
-    this.addDoorWall('x', southZ, -7, 0, doorAlong('to-banquet'), 0);
+    this.addDoorWall('x', southZ, MANSION_BOX_ROOM.westWallX - MANSION_WALL_THICKNESS / 2, 0, doorAlong('to-banquet'), 0);
     this.addDoorWall('x', southZ, 0, MANSION_BUNKER_DIVIDER_X, doorAlong('to-east-hall'), 0);
 
     // The east hall is the last room between the banquet hall and the sealed bunker.
@@ -1133,7 +1157,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       { x: -0.165, y: 1.45, z: -5.9, width: 1.1, height: 1.8, rotationY: Math.PI / 2, material: this.materials.damp, role: 'damp-stain' },
       { x: MANSION_BUNKER_DIVIDER_X - 0.165, y: 1.25, z: -6.15, width: 1.3, height: 1.3, rotationY: Math.PI / 2, material: this.materials.bloodSmear, role: 'blood-stain' },
       { x: -7.0, y: 2.42, z: 5.4, width: 1.7, height: 1.35, rotationY: Math.PI / 2, material: this.materials.sootHeavy, role: 'soot-detail' },
-      { x: -7.0, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
+      { x: MANSION_BOX_ROOM.westWallX + MANSION_WALL_THICKNESS / 2, y: 2.4, z: -3.2, width: 1.85, height: 1.25, rotationY: Math.PI / 2, material: this.materials.sootSoft, role: 'soot-detail' },
       { x: -3.5, y: 2.42, z: 10.0, width: 2, height: 1.3, rotationY: Math.PI, material: this.materials.sootHeavy, role: 'soot-detail' },
       { x: -3.8, y: 2.6, z: -7.985, width: 1.8, height: 1.0, rotationY: 0, material: this.materials.sootSoft, role: 'soot-detail' },
       // Banquet hall: smoke over its windows and the wall buy.

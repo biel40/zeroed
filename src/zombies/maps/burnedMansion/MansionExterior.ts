@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { MANSION_EAST_WALL_X, MANSION_WALL_THICKNESS } from '../BurnedMansionConfig';
+import { MANSION_BOX_ROOM, MANSION_EAST_WALL_X, MANSION_WALL_THICKNESS } from '../BurnedMansionConfig';
 import type { MansionBuildContext } from './MansionBuildContext';
 
 /**
@@ -14,6 +14,11 @@ import type { MansionBuildContext } from './MansionBuildContext';
 const HALF_WALL = MANSION_WALL_THICKNESS / 2;
 /** Outer faces of the walls: the lawn stops here so the stairwell stays open. */
 const FOOTPRINT = { minX: -7.15 - HALF_WALL, maxX: MANSION_EAST_WALL_X + HALF_WALL, minZ: -8.15 - HALF_WALL, maxZ: 10.15 + HALF_WALL } as const;
+const BOX_ROOM_FOOTPRINT = {
+  minX: MANSION_BOX_ROOM.westWallX - HALF_WALL,
+  minZ: MANSION_BOX_ROOM.northWallZ - HALF_WALL,
+  maxZ: MANSION_BOX_ROOM.southWallZ + HALF_WALL,
+} as const;
 const GROUNDS_HALF_EXTENT = 46;
 const LAWN_TOP_Y = -0.006;
 const FENCE = { halfX: 25, halfZ: 28, height: 1.75, picketSpacing: 0.32, postSpacing: 3 } as const;
@@ -39,7 +44,10 @@ function addLawn(context: MansionBuildContext): void {
   const { lawn } = context.materials;
   const far = GROUNDS_HALF_EXTENT;
   const strips: ReadonlyArray<readonly [number, number, number, number]> = [
-    [-far, FOOTPRINT.minX, -far, far],
+    // The box room projects west; lawn still reaches the original wall of the start room.
+    [-far, BOX_ROOM_FOOTPRINT.minX, -far, far],
+    [BOX_ROOM_FOOTPRINT.minX, FOOTPRINT.minX, -far, BOX_ROOM_FOOTPRINT.minZ],
+    [BOX_ROOM_FOOTPRINT.minX, FOOTPRINT.minX, BOX_ROOM_FOOTPRINT.maxZ, far],
     [FOOTPRINT.maxX, far, -far, far],
     [FOOTPRINT.minX, FOOTPRINT.maxX, -far, FOOTPRINT.minZ],
     [FOOTPRINT.minX, FOOTPRINT.maxX, FOOTPRINT.maxZ, far],

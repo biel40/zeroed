@@ -11,6 +11,7 @@
 - Declara explicitamente la visibilidad de los miembros de las clases y el tipo de retorno. Mantén el estado interno privado y la API publica minima; usa `static` solo cuando no dependa de la instancia.
 - Todo script o codigo fuente generado debe ser escalable, legible y mantenible: nombres claros, responsabilidades acotadas, modulos pequeños y cohesionados, contratos explicitos y sin logica oculta ni dependencias implicitas.
 - Elimina codigo muerto o duplicado derivado de tus cambios. Ejecuta `npm run typecheck` y `npm run test`, ademas de las validaciones pertinentes al area, y revisa regresiones antes de finalizar.
+- La validacion visual en el navegador la realiza siempre el usuario manualmente. No automatices ni controles el navegador para esta validacion; completa las comprobaciones automaticas e indica que debe revisar el usuario.
 - La documentacion describe el codigo; no debe sustituirlo ni repetir detalles faciles de obtener al leerlo. Actualiza las fuentes afectadas segun el apartado de documentacion; no inventes estado ni declares resuelta una limitacion sin evidencia.
 - Durante la beta cerrada, para probar produccion (https://zeroed.es) accede con `bielet40@gmail.com`.
 - Trabaja directamente en el checkout principal. No crees ni uses worktrees salvo peticion explicita del usuario.

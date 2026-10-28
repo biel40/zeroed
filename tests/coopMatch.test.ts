@@ -234,8 +234,11 @@ describe('co-op combat authority', () => {
   it('charges the guest for a wall weapon and validates its own shot damage', () => {
     const match = startedMatch();
     earn(host(match).players.guest.economy, 1750);
-    placePlayer(match.guestSide.player, -5.8, -5.4);
-    match.guestSide.player.rig.rotation.y = Math.PI / 2;
+    const wallBuy = host(match).world.arena.wallBuys.find((buy) => buy.id === 'box-ak47')!;
+    placePlayer(match.guestSide.player,
+      wallBuy.position.x + Math.sin(wallBuy.config.yaw) * 0.8,
+      wallBuy.position.z + Math.cos(wallBuy.config.yaw) * 0.8, wallBuy.floor);
+    match.guestSide.player.rig.rotation.y = wallBuy.config.yaw;
     match.step(0.1, 2);
     match.relay.host.onMessage?.({ type: 'wallBuyPurchase', wallBuyId: 'box-ak47', refill: false, equippedWeapon: 'm1911' });
     match.relay.flush();
@@ -257,8 +260,11 @@ describe('co-op combat authority', () => {
   it('replaces the guest weapon selected at purchase time when both slots are full', () => {
     const match = startedMatch();
     earn(host(match).players.guest.economy, 3250);
-    placePlayer(match.guestSide.player, -5.8, -5.4);
-    match.guestSide.player.rig.rotation.y = Math.PI / 2;
+    const wallBuy = host(match).world.arena.wallBuys.find((buy) => buy.id === 'box-ak47')!;
+    placePlayer(match.guestSide.player,
+      wallBuy.position.x + Math.sin(wallBuy.config.yaw) * 0.8,
+      wallBuy.position.z + Math.cos(wallBuy.config.yaw) * 0.8, wallBuy.floor);
+    match.guestSide.player.rig.rotation.y = wallBuy.config.yaw;
     match.step(0.1, 2);
     match.relay.host.onMessage?.({ type: 'wallBuyPurchase', wallBuyId: 'box-ak47', refill: false, equippedWeapon: 'm1911' });
     match.relay.flush();

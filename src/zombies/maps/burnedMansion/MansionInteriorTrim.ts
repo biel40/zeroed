@@ -5,6 +5,7 @@ import {
   MANSION_AREA_LIGHTS,
   MANSION_BANQUET_HALL,
   MANSION_BARRIERS,
+  MANSION_BOX_ROOM,
   MANSION_BUNKER_CEILING_Y,
   MANSION_BUNKER_DIVIDER_X,
   MANSION_BUNKER_Y,
@@ -240,7 +241,7 @@ function addGroundJoists(context: MansionBuildContext): void {
   // Mystery Box room, east hall and stair room: joists run east-west.
   const eastFaceX = MANSION_EAST_WALL_X - half;
   for (let z = -7.4; z <= 1.5; z += JOIST.spacing) {
-    joistAlongX(-7 + half, -half, z);
+    joistAlongX(MANSION_BOX_ROOM.westWallX + MANSION_WALL_THICKNESS / 2 + half, MANSION_BOX_ROOM.eastWallX - half, z);
     joistAlongX(half, MANSION_BUNKER_DIVIDER_X - half, z);
     // Over the stairwell the shaft walls carry the joists.
     const overShaft = z < MANSION_STAIR_TOP_Z && z > MANSION_STAIR_BOTTOM_Z;

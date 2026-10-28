@@ -27,6 +27,7 @@ import {
   MANSION_EAST_WALL_X,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
+  MANSION_RESURRECTION_LOCKER,
   MANSION_RITUAL_CIRCLE,
   MANSION_SPAWNS,
   MANSION_STAIR_BOTTOM_Z,
@@ -176,7 +177,10 @@ describe('Burned Mansion topology', () => {
     const machine = arena.ringMachines[0];
     expect(machine.ringId).toBe('resurrection');
     expect(machine.powered).toBe(true);
-    const stand = [machine.position.x + 1, machine.position.z] as const;
+    const stand = [
+      machine.position.x + MANSION_RESURRECTION_LOCKER.facingX,
+      machine.position.z + MANSION_RESURRECTION_LOCKER.facingZ,
+    ] as const;
     const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
     expect(canWalk(spawn, stand, arena.wallColliders)).toBe(false);
     unlock(arena, 'to-dining');
@@ -187,6 +191,65 @@ describe('Burned Mansion topology', () => {
     arena.reset();
     const view = arena.group.getObjectByName('ring-locker:' + machine.id)!;
     expect(view.getObjectByName('locker-ring')!.visible).toBe(true);
+  });
+
+  it('backs the resurrection cabinet against the north wall, clear of the box and door', () => {
+    const arena = makeArena();
+    const locker = MANSION_RESURRECTION_LOCKER;
+    expect(locker.facingX).toBe(0);
+    expect(locker.facingZ).toBe(1);
+    const body = arena.group.getObjectByName(locker.id + '-collider')!;
+    const bounds = new THREE.Box3().setFromObject(body);
+    // Its back sits just in front of the north wall's wood panelling.
+    expect(bounds.min.z).toBeCloseTo(-7.9);
+    expect(bounds.max.z).toBeCloseTo(locker.z);
+    const stand = new THREE.Box3(
+      new THREE.Vector3(locker.x - 0.35, 0.05, locker.z + 0.65),
+      new THREE.Vector3(locker.x + 0.35, 1.95, locker.z + 1.35),
+    );
+    expect(arena.wallColliders.some((solid) => solid.intersectsBox(stand))).toBe(false);
+    const crate = new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(MANSION_BOX_PLACEMENT.position.x, 0.7, MANSION_BOX_PLACEMENT.position.z),
+      new THREE.Vector3(1.2, 1.4, 2.9),
+    );
+    expect(bounds.intersectsBox(crate)).toBe(false);
+    expect(crate.intersectsBox(stand)).toBe(false);
+  });
+
+  it('widens only the box room westwards, with a floor, roof and closed returns', () => {
+    const arena = makeArena();
+    const extension = [-8.2, -4] as const;
+    const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
+    expect(canWalk(spawn, extension, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(false);
+    unlock(arena, 'to-dining');
+    expect(canWalk(spawn, extension, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
+    const wallAt = (x: number, z: number): boolean =>
+      arena.wallColliders.some((solid) => solid.containsPoint(new THREE.Vector3(x, 1.2, z)));
+    expect(wallAt(-9.15, -5)).toBe(true);
+    expect(wallAt(-8.2, -8.15)).toBe(true);
+    expect(wallAt(-8.2, 2)).toBe(true);
+    expect(wallAt(-7.15, 6)).toBe(true);
+    const solids = arena.colliders.map((solid) => new THREE.Box3().setFromObject(solid));
+    for (const height of [-0.05, 3.28]) {
+      expect(solids.some((solid) => solid.containsPoint(new THREE.Vector3(extension[0], height, extension[1])))).toBe(true);
+    }
+    expect(isOutsideMansion(...extension)).toBe(false);
+    expect(isOutsideMansion(-8.2, 6)).toBe(true);
+  });
+
+  it.each(['start-west-a', 'start-west-b'])('keeps a crouching player inside the original %s window', (id) => {
+    const arena = makeArena();
+    const barrier = MANSION_BARRIERS.find((candidate) => candidate.id === id)!;
+    const player = new PlayerController(1);
+    player.setWallColliders(arena.wallColliders);
+    player.teleport(barrier.x + 1, EYE_HEIGHT, barrier.z, 0, arena.playerBounds);
+    for (let frame = 0; frame < 90; frame++) {
+      const input = movementInput('KeyA');
+      input.wasPressed = (code: string): boolean => code === 'KeyC' && frame === 0;
+      player.update(1 / 60, input, weaponStub);
+    }
+    expect(player.stance).toBe('crouched');
+    expect(player.rig.position.x).toBeGreaterThan(barrier.x + 0.4);
   });
 
   it('places the shared Barrett chest below the watching portrait with an accessible solid body', () => {
@@ -315,10 +378,10 @@ describe('Burned Mansion topology', () => {
   });
 
   it.each([
-    { side: 'front', x: -3.2, z: -5.6, key: 'KeyA' as const, axis: 'x' as const, sign: 1, halfExtent: 0.55 },
-    { side: 'back', x: -6.5, z: -5.6, key: 'KeyD' as const, axis: 'x' as const, sign: -1, halfExtent: 0.55 },
-    { side: 'south', x: -5.2, z: -3.6, key: 'KeyW' as const, axis: 'z' as const, sign: 1, halfExtent: 1.04 },
-    { side: 'north', x: -5.2, z: -7.5, key: 'KeyS' as const, axis: 'z' as const, sign: -1, halfExtent: 1.04 },
+    { side: 'front', x: MANSION_BOX_PLACEMENT.position.x + 2, z: MANSION_BOX_PLACEMENT.position.z, key: 'KeyA' as const, axis: 'x' as const, sign: 1, halfExtent: 0.55 },
+    { side: 'back', x: MANSION_BOX_PLACEMENT.position.x - 1.3, z: MANSION_BOX_PLACEMENT.position.z, key: 'KeyD' as const, axis: 'x' as const, sign: -1, halfExtent: 0.55 },
+    { side: 'south', x: MANSION_BOX_PLACEMENT.position.x, z: MANSION_BOX_PLACEMENT.position.z + 2, key: 'KeyW' as const, axis: 'z' as const, sign: 1, halfExtent: 1.04 },
+    { side: 'north', x: MANSION_BOX_PLACEMENT.position.x, z: MANSION_BOX_PLACEMENT.position.z - 1.9, key: 'KeyS' as const, axis: 'z' as const, sign: -1, halfExtent: 1.04 },
   ])('blocks the player at the Mystery Box $side while keeping it within use range', ({ x, z, key, axis, sign, halfExtent }) => {
     const arena = makeArena();
     const player = new PlayerController(1);
@@ -342,13 +405,13 @@ describe('Burned Mansion topology', () => {
     unlock(arena, 'to-east-hall');
     const player = new PlayerController(1);
     player.setWallColliders(arena.wallColliders);
-    player.teleport(-4.2, EYE_HEIGHT, -5.6, 0, arena.playerBounds);
+    player.teleport(MANSION_BOX_PLACEMENT.position.x + 1, EYE_HEIGHT, MANSION_BOX_PLACEMENT.position.z, 0, arena.playerBounds);
 
     for (let frame = 0; frame < 90; frame++) {
       const input = movementInput('KeyA');
       input.wasPressed = (code: string): boolean => code === 'Space' && frame === 0;
       player.update(1 / 60, input, weaponStub);
-      expect(player.rig.position.x).toBeGreaterThanOrEqual(-5.2 + 0.55 + 0.35);
+      expect(player.rig.position.x).toBeGreaterThanOrEqual(MANSION_BOX_PLACEMENT.position.x + 0.55 + 0.35);
     }
   });
 
@@ -356,11 +419,12 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     const player = new PlayerController(1);
     player.setWallColliders(arena.wallColliders);
-    player.teleport(-4.2, MANSION_BUNKER_Y + EYE_HEIGHT, -5.6, -1, MANSION_BUNKER_BOUNDS);
+    player.teleport(MANSION_BOX_PLACEMENT.position.x + 1, MANSION_BUNKER_Y + EYE_HEIGHT,
+      MANSION_BOX_PLACEMENT.position.z, -1, MANSION_BUNKER_BOUNDS);
 
     for (let frame = 0; frame < 30; frame++) player.update(1 / 60, movementInput('KeyA'), weaponStub);
 
-    expect(player.rig.position.x).toBeLessThan(MANSION_BOX_PLACEMENT.position.x);
+    expect(player.rig.position.x).toBeLessThan(MANSION_BOX_PLACEMENT.position.x + 0.55 + 0.35);
   });
 
   it('builds a large enclosed underground bunker with an open stairwell', () => {

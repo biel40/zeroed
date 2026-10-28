@@ -130,10 +130,12 @@
       <p class="mode-hint" data-i18n="menu.tagline"></p>
       <p class="map-select-kicker" data-i18n="menu.chooseMap"></p>
       <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false and fills the
-           data-map-* chips from the registry (players, access); the card images are decorative. -->
+           data-map-* chips from the registry (players, access); the shared SVG viewport crops out the frames and copy baked into the decorative images. -->
       <div class="map-grid" role="group" data-i18n-aria-label="menu.chooseMap">
-        <button type="button" class="map-card map-card--illustrated" data-map="burned-mansion">
-          <img class="map-card-image" src="./assets/maps/burned-mansion-menu.png" alt="" width="1448" height="1086" />
+        <button type="button" class="map-card" data-map="burned-mansion">
+          <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+            <image class="map-card-image" href="./assets/maps/burned-mansion-menu.png" width="1448" height="1086" />
+          </svg>
           <span class="map-card-access" data-map-access></span>
           <span class="map-card-body">
             <span class="map-card-mode" data-i18n="menu.zombies"></span>
@@ -144,8 +146,10 @@
             </span>
           </span>
         </button>
-        <button type="button" class="map-card map-card--illustrated" data-map="station-33">
-          <img class="map-card-image" src="./assets/maps/station-33-menu.png" alt="" width="1448" height="1086" />
+        <button type="button" class="map-card" data-map="station-33">
+          <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+            <image class="map-card-image" href="./assets/maps/station-33-menu.png" width="1448" height="1086" />
+          </svg>
           <span class="map-card-access" data-map-access></span>
           <span class="map-card-body">
             <span class="map-card-mode" data-i18n="menu.zombies"></span>

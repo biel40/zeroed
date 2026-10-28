@@ -287,7 +287,8 @@ existente a `MOTDRULES`.
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
   unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
-  la Mystery Box y una taquilla de autorreanimacion a su lado, gran comedor (ala norte con la Vector en pared; mesa,
+  la Mystery Box (salon ampliado al oeste, con la taquilla de autorreanimacion
+  apoyada en la pared norte junto a la caja), gran comedor (ala norte con la Vector en pared; mesa,
   aparador, vitrina y chimenea solidos, y sobre ella el retrato de un oficial
   aleman cuyas pupilas brillan en rojo y siguen suavemente al jugador local
   dentro de sus cuencas, tambien en cooperativo; easter egg de la Torre Quemada de
@@ -375,10 +376,13 @@ existente a `MOTDRULES`.
   La de Station 33 (8 s) arranca a oscuras con solo la luz de emergencia, un
   tren hace temblar la boveda, los circuitos se encienden uno a uno y la grua
   recorre la nave mientras aparece el titulo premium dorado.
-- El menu principal muestra una tarjeta por mapa con arte SVG animado, nombre,
-  lema, jugadores y acceso (incluido o premium, con brillo dorado y aviso de
-  acceso anticipado); `HUD` rellena jugadores y acceso desde el registro. La
-  pantalla de carga y la pausa nombran el mapa elegido. `?map=<id>` sigue
+- El menu principal muestra una tarjeta ilustrada por mapa, con realce al pasar
+  el cursor o enfocar con teclado. Ambas usan la misma estructura y efectos,
+  con acento rojo para el mapa incluido y dorado para el premium. Las imagenes
+  se recortan a la ilustracion; nombres y lemas se traducen y `HUD` rellena
+  las etiquetas visibles de jugadores y acceso desde el registro. Solo el panel
+  de contenido admite scroll cuando no cabe en pantalla; la niebla queda recortada.
+  La pantalla de carga y la pausa nombran el mapa elegido. `?map=<id>` sigue
   disponible como atajo de pruebas.
 - Las luminarias ambientales de Burned Mansion emiten rojo y sufren parpadeos
   electricos irregulares y desfasados; las luces funcionales de armas,
