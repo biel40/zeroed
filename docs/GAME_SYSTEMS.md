@@ -655,7 +655,8 @@ Los avisos de interaccion comparten una tarjeta oscura de alto contraste, con
 accion, tecla o boton tactil y coste separados. La entrada despliega el marco
 y un reflejo breve, seguido de dos pulsos en la tecla; se omiten con movimiento
 reducido. Los requisitos bloqueados conservan su texto sin ofrecer una tecla.
-En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
+En tactil, tocar la tarjeta equivale a pulsar USAR, incluidas las acciones
+mantenidas. En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
 guarda y se aplica al instante, sin desactivar las interacciones del juego.
 
 El HUD y la pausa consumen la misma instantanea por jugador. La cartera separa

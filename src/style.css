@@ -3646,6 +3646,16 @@ html.touch-controls-enabled #touch-controls {
   display: block;
 }
 
+/* Tapping the prompt presses USE, so it must receive touches on mobile. */
+html.touch-controls-enabled #interact-prompt {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+html.touch-controls-enabled #interact-prompt:active {
+  filter: brightness(1.15);
+}
+
 html.touch-controls-enabled #hud-weapon {
   left: calc(10px + env(safe-area-inset-left, 0px));
   top: calc(10px + env(safe-area-inset-top, 0px));

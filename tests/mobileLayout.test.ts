@@ -64,9 +64,17 @@ describe('mobile stylesheet cascade', () => {
     for (const action of ['fire', 'knife', 'reload', 'interact', 'swap-weapon', 'pause', 'crouch', 'prone']) {
       expect(html).toContain(`data-action="${action}"`);
     }
-    const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('</div>\n\n      <div id="hud-weapon"'));
+    const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('<div id="hud-weapon"'));
     expect(touchControls.match(/data-action=/g)).toHaveLength(8);
     expect(touchControls).toContain('id="btn-knife"');
+  });
+
+  it('lets a tap on the interaction prompt press USE only on touch profiles', () => {
+    expect(html).toMatch(/<div id="interact-prompt"[^>]*data-action="interact"/);
+    expect(css).toMatch(/\n#interact-prompt \{[^}]*pointer-events: none/);
+    expect(css).toMatch(
+      /html\.touch-controls-enabled #interact-prompt \{[^}]*pointer-events: auto;[^}]*touch-action: none/,
+    );
   });
 
   it('keeps comfortable secondary targets and a dominant square fire button', () => {

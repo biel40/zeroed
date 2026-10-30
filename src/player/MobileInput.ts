@@ -84,10 +84,12 @@ export class MobileInput {
     this.listeners.length = 0;
   }
 
+  /** Touch buttons plus the interaction prompt, which doubles as a larger USE button. */
   private bindActionButtons(): void {
-    const root = document.getElementById('touch-controls');
-    if (!root) return;
-    for (const control of root.querySelectorAll<HTMLElement>('[data-action]')) {
+    const controls = document.querySelectorAll<HTMLElement>(
+      '#touch-controls [data-action], #interact-prompt[data-action]',
+    );
+    for (const control of controls) {
       const action = control.dataset.action;
       if (!action) continue;
 
