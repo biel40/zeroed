@@ -8,6 +8,7 @@ import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { mysteryBoxFootprint } from '../src/zombies/MysteryBoxFootprint';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
+import { ZombieNavigationService } from '../src/zombies/navigation/ZombieNavigationService';
 import type { ZombieSpawnPoint } from '../src/zombies/ZombieSpawner';
 import { t } from '../src/i18n/i18n';
 import { actionKey } from '../src/ui/InteractionPrompts';
@@ -694,6 +695,23 @@ describe('Station 33 machine room', () => {
 });
 
 describe('Station 33 maintenance workshop', () => {
+  it('routes the horde from every window of the open station to the deepest ring lockers', () => {
+    const arena = makeArena();
+    for (const zone of ['consigna', 'milicia', 'cocheras', 'subestacion', 'taller'] as const) openDoorTo(arena, zone);
+    const navigation = new ZombieNavigationService(0.35, 0.42);
+    const volumes = arena.colliders.map((collider) => new THREE.Box3().setFromObject(collider))
+      .map(({ min, max }) => ({ minX: min.x, minY: min.y, minZ: min.z, maxX: max.x, maxY: max.y, maxZ: max.z }));
+    navigation.rebuild(arena.navigationBounds.map((bounds) => ({ floor: bounds.floor, bounds, baseY: bounds.baseY })), volumes);
+    for (const locker of STATION33_RING_LOCKERS.filter((candidate) => candidate.zone === 'consigna' || candidate.zone === 'taller')) {
+      const front = { x: locker.x + locker.facingX * 1.2, z: locker.z + locker.facingZ * 1.2 };
+      for (const spawn of arena.spawnPoints as ReadonlyArray<ZombieSpawnPoint>) {
+        const from = { x: spawn.breachX ?? spawn.x, z: spawn.breachZ ?? spawn.z };
+        if (!navigation.contains(0, from.x, from.z)) continue;
+        expect(navigation.findPath(0, from.x, from.z, front.x, front.z), `${spawn.barrierId} -> ${locker.id}`).not.toBeNull();
+      }
+    }
+  });
+
   it('opens from the electricity room, activates its own entrance and closes again on reset', () => {
     const arena = makeArena();
     openWayTo(arena, 'subestacion');

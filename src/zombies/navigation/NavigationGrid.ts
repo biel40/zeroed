@@ -45,6 +45,13 @@ const DIRECTIONS: ReadonlyArray<readonly [number, number, number]> = [
   [-1, -1, Math.SQRT2],
 ];
 
+/**
+ * Smallest g improvement (cell units) worth reopening a cell. An 8-way grid
+ * has countless equal-cost routes whose sums of 1 and √2 differ only by
+ * rounding; treating those as improvements re-expanded each cell dozens of
+ * times on map-sized grids.
+ */
+const G_EPSILON = 1e-3;
 /** Farthest cells a smoothing probe may look ahead of the current anchor. */
 const SMOOTH_WINDOW = 48;
 /** Ring-search radius (cells) when snapping unwalkable endpoints. */
@@ -74,6 +81,7 @@ function pointToSegmentDistanceSquared(
   return dx * dx + dz * dz;
 }
 
+/** Slab clipping of the segment against the rect; allocation free (runs per frame). */
 function segmentIntersectsRect(
   fromX: number,
   fromZ: number,
@@ -83,17 +91,21 @@ function segmentIntersectsRect(
 ): boolean {
   let near = 0;
   let far = 1;
-  const clipAxis = (start: number, delta: number, min: number, max: number): boolean => {
-    if (Math.abs(delta) <= 1e-12) return start >= min && start <= max;
-    let entry = (min - start) / delta;
-    let exit = (max - start) / delta;
-    if (entry > exit) [entry, exit] = [exit, entry];
-    near = Math.max(near, entry);
-    far = Math.min(far, exit);
-    return near <= far;
-  };
-  return clipAxis(fromX, toX - fromX, rect.minX, rect.maxX) &&
-    clipAxis(fromZ, toZ - fromZ, rect.minZ, rect.maxZ);
+  const deltaX = toX - fromX;
+  if (Math.abs(deltaX) <= 1e-12) {
+    if (fromX < rect.minX || fromX > rect.maxX) return false;
+  } else {
+    const entry = (rect.minX - fromX) / deltaX;
+    const exit = (rect.maxX - fromX) / deltaX;
+    near = Math.max(near, Math.min(entry, exit));
+    far = Math.min(far, Math.max(entry, exit));
+    if (near > far) return false;
+  }
+  const deltaZ = toZ - fromZ;
+  if (Math.abs(deltaZ) <= 1e-12) return fromZ >= rect.minZ && fromZ <= rect.maxZ;
+  const entry = (rect.minZ - fromZ) / deltaZ;
+  const exit = (rect.maxZ - fromZ) / deltaZ;
+  return Math.max(near, Math.min(entry, exit)) <= Math.min(far, Math.max(entry, exit));
 }
 
 function segmentClearsRect(
@@ -105,21 +117,14 @@ function segmentClearsRect(
   radiusSquared: number,
 ): boolean {
   if (segmentIntersectsRect(fromX, fromZ, toX, toZ, rect)) return false;
-  let distanceSquared = Math.min(
+  const distanceSquared = Math.min(
     pointToRectDistanceSquared(fromX, fromZ, rect),
     pointToRectDistanceSquared(toX, toZ, rect),
+    pointToSegmentDistanceSquared(rect.minX, rect.minZ, fromX, fromZ, toX, toZ),
+    pointToSegmentDistanceSquared(rect.minX, rect.maxZ, fromX, fromZ, toX, toZ),
+    pointToSegmentDistanceSquared(rect.maxX, rect.minZ, fromX, fromZ, toX, toZ),
+    pointToSegmentDistanceSquared(rect.maxX, rect.maxZ, fromX, fromZ, toX, toZ),
   );
-  for (const [x, z] of [
-    [rect.minX, rect.minZ],
-    [rect.minX, rect.maxZ],
-    [rect.maxX, rect.minZ],
-    [rect.maxX, rect.maxZ],
-  ]) {
-    distanceSquared = Math.min(
-      distanceSquared,
-      pointToSegmentDistanceSquared(x, z, fromX, fromZ, toX, toZ),
-    );
-  }
   return distanceSquared >= radiusSquared;
 }
 
@@ -132,6 +137,7 @@ export class NavigationGrid {
   private readonly gScore: Float32Array;
   private readonly parent: Int32Array;
   private readonly visitStamp: Int32Array;
+  private readonly closedStamp: Int32Array;
   private readonly heap: Int32Array;
   private readonly heapScore: Float32Array;
   private generation = 0;
@@ -151,10 +157,12 @@ export class NavigationGrid {
     this.gScore = new Float32Array(cellCount);
     this.parent = new Int32Array(cellCount);
     this.visitStamp = new Int32Array(cellCount);
-    // A node is re-pushed only when its g improves; twice the cell count is
-    // a generous capacity for a consistent heuristic on an 8-way grid.
-    this.heap = new Int32Array(cellCount * 2 + 16);
-    this.heapScore = new Float32Array(cellCount * 2 + 16);
+    this.closedStamp = new Int32Array(cellCount);
+    // Every cell expands once and pushes each neighbour at most once, so the
+    // open list can never outgrow one entry per directed edge (plus the start).
+    const heapCapacity = cellCount * DIRECTIONS.length + 1;
+    this.heap = new Int32Array(heapCapacity);
+    this.heapScore = new Float32Array(heapCapacity);
   }
 
   public contains(x: number, z: number): boolean {
@@ -245,7 +253,11 @@ export class NavigationGrid {
     return null;
   }
 
-  /** Forward cell path (start..goal) via lazy-deletion A*; [] when none. */
+  /**
+   * Forward cell path (start..goal) via lazy-deletion A*; [] when none. The
+   * heuristic is consistent, so a cell's first pop is final: later stale
+   * entries are skipped and closed cells are never reopened.
+   */
   private astar(start: number, goal: number): number[] {
     this.generation++;
     const stamp = this.generation;
@@ -257,6 +269,8 @@ export class NavigationGrid {
 
     while (this.heapLength > 0) {
       const current = this.pop();
+      if (this.closedStamp[current] === stamp) continue;
+      this.closedStamp[current] = stamp;
       if (current === goal) return this.reconstruct(start, goal);
       const col = current % this.cols;
       const row = Math.floor(current / this.cols);
@@ -265,7 +279,7 @@ export class NavigationGrid {
         const nextRow = row + rowStep;
         if (nextCol < 0 || nextCol >= this.cols || nextRow < 0 || nextRow >= this.rows) continue;
         const next = nextRow * this.cols + nextCol;
-        if (this.walkable[next] !== 1) continue;
+        if (this.walkable[next] !== 1 || this.closedStamp[next] === stamp) continue;
         if (
           columnStep !== 0 &&
           rowStep !== 0 &&
@@ -276,7 +290,7 @@ export class NavigationGrid {
           continue;
         }
         const g = this.gScore[current] + cost;
-        if (this.visitStamp[next] === stamp && g >= this.gScore[next]) continue;
+        if (this.visitStamp[next] === stamp && g >= this.gScore[next] - G_EPSILON) continue;
         this.visitStamp[next] = stamp;
         this.gScore[next] = g;
         this.parent[next] = current;
