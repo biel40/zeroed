@@ -230,7 +230,7 @@ existente a `MOTDRULES`.
   recarga. Si el cargador estaba vacio, se inicia automaticamente al terminar
   el cuchillazo; una recarga tactica se vuelve a solicitar con R.
   El barrido frontal abarca 100 grados y
-  alcanza 2.4 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
+  alcanza 2 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
   un solo objetivo, priorizando la mira y despues la alineacion y proximidad;
   paredes y cuerpos interpuestos bloquean cada trayectoria. La seleccion y
   validacion del invitado comparten estas reglas. Conserva dano por ronda,

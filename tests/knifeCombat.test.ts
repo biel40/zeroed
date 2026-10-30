@@ -31,12 +31,18 @@ describe('KnifeCombat', () => {
     }
   });
 
-  it('extends useful reach beyond the previous 2.05 m without reaching past the new limit', () => {
+  it.each([0, 40])('limits contact to 2 m at %i degrees, including guest claims', (angle) => {
     const combat = new KnifeCombat();
-    expect(KNIFE_RANGE).toBe(2.4);
-    const reachable = body(0, -2.5);
-    expect(combat.findImpact(ORIGIN, FORWARD, 0, [reachable])?.distance).toBeCloseTo(2.25);
-    expect(combat.findImpact(ORIGIN, FORWARD, 0, [body(0, -KNIFE_RANGE - 0.3)])).toBeNull();
+    expect(KNIFE_RANGE).toBe(2);
+    const yaw = THREE.MathUtils.degToRad(angle);
+    const reachable = body(Math.sin(yaw) * 2.2, -Math.cos(yaw) * 2.2);
+    const outOfReach = body(Math.sin(yaw) * 2.3, -Math.cos(yaw) * 2.3);
+    for (const claimed of [false, true]) {
+      expect(combat.findImpact(ORIGIN, FORWARD, 0, [reachable], claimed ? reachable.userData.zombie : undefined)?.object)
+        .toBe(reachable);
+      expect(combat.findImpact(ORIGIN, FORWARD, 0, [outOfReach], claimed ? outOfReach.userData.zombie : undefined))
+        .toBeNull();
+    }
   });
 
   it('prefers the aimed body over a closer body to one side', () => {
