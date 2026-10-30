@@ -23,11 +23,13 @@ import {
   MANSION_BUNKER_ENDING,
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
+  MANSION_BOX_ROOM,
   MANSION_DOOR_COSTS,
   MANSION_EAST_WALL_X,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_RESURRECTION_LOCKER,
+  MANSION_RING_LOCKER_SIZE,
   MANSION_RITUAL_CIRCLE,
   MANSION_SPAWNS,
   MANSION_STAIR_BOTTOM_Z,
@@ -171,7 +173,7 @@ const weaponStub = {
 
 describe('Burned Mansion topology', () => {
 
-  it('offers resurrection beside the Mystery Box with access after the first door', () => {
+  it('offers resurrection across the room from the Mystery Box after the first door', () => {
     const arena = makeArena();
     expect(arena.ringMachines).toHaveLength(1);
     const machine = arena.ringMachines[0];
@@ -186,26 +188,29 @@ describe('Burned Mansion topology', () => {
     unlock(arena, 'to-dining');
     expect(canWalk(spawn, stand, arena.wallColliders)).toBe(true);
     expect(canWalk(stand, [MANSION_BOX_PLACEMENT.position.x + 1.2, MANSION_BOX_PLACEMENT.position.z], arena.wallColliders)).toBe(true);
-    expect(Math.hypot(machine.position.x - MANSION_BOX_PLACEMENT.position.x, machine.position.z - MANSION_BOX_PLACEMENT.position.z)).toBeLessThan(2.5);
+    expect(Math.hypot(machine.position.x - MANSION_BOX_PLACEMENT.position.x, machine.position.z - MANSION_BOX_PLACEMENT.position.z)).toBeGreaterThan(5);
     machine.setDisplay('empty');
     arena.reset();
     const view = arena.group.getObjectByName('ring-locker:' + machine.id)!;
     expect(view.getObjectByName('locker-ring')!.visible).toBe(true);
   });
 
-  it('backs the resurrection cabinet against the north wall, clear of the box and door', () => {
+  it('backs the resurrection cabinet against the south wall, clear of the box and door', () => {
     const arena = makeArena();
     const locker = MANSION_RESURRECTION_LOCKER;
     expect(locker.facingX).toBe(0);
-    expect(locker.facingZ).toBe(1);
+    expect(locker.facingZ).toBe(-1);
     const body = arena.group.getObjectByName(locker.id + '-collider')!;
     const bounds = new THREE.Box3().setFromObject(body);
-    // Its back sits just in front of the north wall's wood panelling.
-    expect(bounds.min.z).toBeCloseTo(-7.9);
-    expect(bounds.max.z).toBeCloseTo(locker.z);
+    // Its back sits just in front of the south wall's wood panelling.
+    expect(bounds.max.z).toBeCloseTo(MANSION_BOX_ROOM.southWallZ - 0.25);
+    expect(bounds.min.z).toBeCloseTo(locker.z);
+    expect(bounds.max.z - bounds.min.z).toBeCloseTo(MANSION_RING_LOCKER_SIZE.depth);
+    const view = arena.group.getObjectByName('ring-locker:' + locker.id)!;
+    expect(view.rotation.y).toBeCloseTo(Math.PI);
     const stand = new THREE.Box3(
-      new THREE.Vector3(locker.x - 0.35, 0.05, locker.z + 0.65),
-      new THREE.Vector3(locker.x + 0.35, 1.95, locker.z + 1.35),
+      new THREE.Vector3(locker.x - 0.35, 0.05, locker.z - 1.35),
+      new THREE.Vector3(locker.x + 0.35, 1.95, locker.z - 0.65),
     );
     expect(arena.wallColliders.some((solid) => solid.intersectsBox(stand))).toBe(false);
     const crate = new THREE.Box3().setFromCenterAndSize(
@@ -214,6 +219,35 @@ describe('Burned Mansion topology', () => {
     );
     expect(bounds.intersectsBox(crate)).toBe(false);
     expect(crate.intersectsBox(stand)).toBe(false);
+  });
+
+  it('separates the three purchases while keeping the central route and window breaches clear', () => {
+    const arena = makeArena();
+    const ak47 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'ak47')!;
+    expect(ak47.position.x).toBeCloseTo(MANSION_BOX_ROOM.eastWallX - 0.17);
+    expect(ak47.yaw).toBe(-Math.PI / 2);
+    const purchases = [MANSION_BOX_PLACEMENT.position, MANSION_RESURRECTION_LOCKER, ak47.position];
+    for (let i = 0; i < purchases.length; i++) {
+      for (let j = i + 1; j < purchases.length; j++) {
+        expect(Math.hypot(purchases[i].x - purchases[j].x, purchases[i].z - purchases[j].z)).toBeGreaterThan(5);
+      }
+    }
+    const targets: ReadonlyArray<readonly [number, number]> = [
+      [MANSION_BOX_PLACEMENT.position.x + 1.2, MANSION_BOX_PLACEMENT.position.z],
+      [MANSION_RESURRECTION_LOCKER.x, MANSION_RESURRECTION_LOCKER.z - 1],
+      [ak47.position.x - 1, ak47.position.z],
+    ];
+    const spawn = [MANSION_PLAYER_SPAWN.x, MANSION_PLAYER_SPAWN.z] as const;
+    for (const target of targets) expect(canWalk(spawn, target, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(false);
+    unlock(arena, 'to-dining');
+    for (const target of targets) expect(canWalk(spawn, target, arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
+    const centralRoute = new THREE.Box3(new THREE.Vector3(-5, 0.05, -7), new THREE.Vector3(-2, 1.95, 1));
+    expect(arena.wallColliders.some((solid) => solid.intersectsBox(centralRoute))).toBe(false);
+    for (const point of MANSION_SPAWNS['to-dining']) {
+      expect(canWalk([point.breachX!, point.breachZ!], targets[0], arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
+    }
+    unlock(arena, 'to-banquet');
+    for (const target of targets) expect(canWalk(target, [-3.8, -9], arena.wallColliders, MANSION_GROUND_BOUNDS)).toBe(true);
   });
 
   it('widens only the box room westwards, with a floor, roof and closed returns', () => {

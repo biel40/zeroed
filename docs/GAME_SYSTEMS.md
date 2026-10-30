@@ -287,8 +287,9 @@ existente a `MOTDRULES`.
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
   unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
-  la Mystery Box (salon ampliado al oeste, con la taquilla de autorreanimacion
-  apoyada en la pared norte junto a la caja), gran comedor (ala norte con la Vector en pared; mesa,
+  la Mystery Box (salon ampliado al oeste, con la caja en el lateral oeste,
+  la taquilla de autorreanimacion en la pared sur y la AK-47 en la pared este,
+  dejando libre el paso central), gran comedor (ala norte con la Vector en pared; mesa,
   aparador, vitrina y chimenea solidos, y sobre ella el retrato de un oficial
   aleman cuyas pupilas brillan en rojo y siguen suavemente al jugador local
   dentro de sus cuencas, tambien en cooperativo; easter egg de la Torre Quemada de

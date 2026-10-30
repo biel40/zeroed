@@ -367,12 +367,13 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
   {
+    // Opposite the box, on the clear eastern wall of the expanded room.
     id: 'box-ak47',
     weaponId: 'ak47',
     price: 1750,
     ammoPrice: 900,
-    position: { x: MANSION_BOX_ROOM.westWallX + 0.17, y: 1.45, z: -5.4 },
-    yaw: Math.PI / 2,
+    position: { x: MANSION_BOX_ROOM.eastWallX - 0.17, y: 1.45, z: -3.8 },
+    yaw: -Math.PI / 2,
     floor: 0,
   },
   {
@@ -457,15 +458,15 @@ export const MANSION_RING_LOCKER_SIZE = {
   depth: 0.6, height: 2.1, columnWidth: 0.5, rows: 3, ringLockerWidth: 0.7,
 } as const satisfies LockerSize;
 
-/** Cabinet backed against the north wall, with clearance for the panelling and box. */
+/** South-wall cabinet west of the entrance, facing into the room and clear of its door. */
 export const MANSION_RESURRECTION_LOCKER = {
   id: 'mansion-resurrection', ringId: 'resurrection', requiresPower: false,
-  x: MANSION_BOX_ROOM.westWallX + 3.5,
-  z: MANSION_BOX_ROOM.northWallZ + MANSION_WALL_THICKNESS / 2 + 0.1 + MANSION_RING_LOCKER_SIZE.depth,
-  facingX: 0, facingZ: 1,
+  x: MANSION_BOX_ROOM.westWallX + 2.75,
+  z: MANSION_BOX_ROOM.southWallZ - MANSION_WALL_THICKNESS / 2 - 0.1 - MANSION_RING_LOCKER_SIZE.depth,
+  facingX: 0, facingZ: -1,
 } as const satisfies RingLockerPlacement;
 
-/** Mystery Box in the room immediately behind the first paid door. */
+/** Western Mystery Box corner; the central route, south locker and eastern AK stay separate. */
 export const MANSION_BOX_PLACEMENT = {
   position: { x: MANSION_BOX_ROOM.westWallX + 1.95, y: 0, z: -5.6 },
   yaw: -Math.PI / 2,

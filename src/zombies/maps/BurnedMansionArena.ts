@@ -324,9 +324,14 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       mainsGlowBoost: 1,
     }, new MapPower())];
     const halfLockerWidth = MANSION_RING_LOCKER_SIZE.ringLockerWidth / 2;
+    const lockerBounds = new THREE.Box3(
+      new THREE.Vector3(-halfLockerWidth, 0, -MANSION_RING_LOCKER_SIZE.depth),
+      new THREE.Vector3(halfLockerWidth, MANSION_RING_LOCKER_SIZE.height, 0),
+    ).applyMatrix4(new THREE.Matrix4()
+      .makeRotationY(Math.atan2(locker.facingX, locker.facingZ))
+      .setPosition(locker.x, 0, locker.z));
     addSolidProxy(machineKit, locker.id + '-collider',
-      { x: locker.x - halfLockerWidth, y: 0, z: locker.z - MANSION_RING_LOCKER_SIZE.depth },
-      { x: locker.x + halfLockerWidth, y: MANSION_RING_LOCKER_SIZE.height, z: locker.z }, 'metal');
+      lockerBounds.min, lockerBounds.max, 'metal');
     for (const mesh of machineKit.batch.build(this.group, 'mansion-machines', { castShadow: false, receiveShadow: true })) {
       mesh.userData.floorPartition = floorPartitionOf(new THREE.Box3().setFromObject(mesh));
     }
