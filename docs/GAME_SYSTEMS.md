@@ -421,9 +421,9 @@ existente a `MOTDRULES`.
   mapa incluido y dorado para el premium; un mapa bloqueado oscurece su arte
   bajo un candado. Las imagenes se recortan a la ilustracion y se acortan en
   ventanas bajas; nombres y lemas se traducen y `HUD` rellena desde el registro
-  las etiquetas de jugadores, acceso y accion (jugar o desbloquear). Solo el
-  panel de contenido admite scroll cuando no cabe en pantalla; la niebla queda
-  recortada.
+  las etiquetas de jugadores, acceso y accion (jugar o desbloquear). En
+  pantallas bajas el menu se compacta; si aun no cabe, se desplaza la capa
+  completa (nunca el panel) y la niebla queda fija detras.
   La pantalla de carga y la pausa nombran el mapa elegido. `?map=<id>` sigue
   disponible como atajo de pruebas.
 - Las luminarias ambientales de Burned Mansion emiten rojo y sufren parpadeos

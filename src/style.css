@@ -923,13 +923,13 @@ html.touch-controls-enabled #hud-objective {
 }
 
 #map-select {
-  --menu-inset-top: max(24px, env(safe-area-inset-top, 0px));
-  --menu-inset-bottom: max(24px, env(safe-area-inset-bottom, 0px));
   isolation: isolate;
-  /* Clip the drifting fog; only the content panel may scroll. */
-  overflow: clip;
-  padding: var(--menu-inset-top) max(24px, env(safe-area-inset-right, 0px))
-    var(--menu-inset-bottom) max(24px, env(safe-area-inset-left, 0px));
+  /* When the panel does not fit, the whole layer scrolls vertically (never the
+     panel itself); the fog and vignette stay fixed behind it. */
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: max(24px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px))
+    max(24px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px));
   background:
     radial-gradient(circle at 76% 38%, rgba(105, 15, 12, 0.2), transparent 30%),
     radial-gradient(ellipse at 50% 115%, rgba(83, 91, 78, 0.18), transparent 48%),
@@ -1378,7 +1378,8 @@ html.coop-guest #pause-restart {
 #map-select::before,
 #map-select::after {
   content: '';
-  position: absolute;
+  /* Fixed: they neither scroll with the panel nor add scrollable overflow. */
+  position: fixed;
   pointer-events: none;
 }
 
@@ -1406,13 +1407,15 @@ html.coop-guest #pause-restart {
 
 #map-select .start-panel {
   position: relative;
+  flex-shrink: 0;
   width: min(1120px, 100%);
+  /* Auto margins centre the panel but collapse to 0 when it overflows, so its top is never cut off. */
+  margin: auto;
   padding: clamp(18px, min(4vw, 4dvh), 48px) clamp(20px, 5vw, 64px);
   text-align: left;
-  max-height: calc(100dvh - var(--menu-inset-top) - var(--menu-inset-bottom));
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
   border: 0;
   border-top: 1px solid rgba(164, 172, 157, 0.2);
   border-bottom: 1px solid rgba(164, 172, 157, 0.13);
@@ -3666,11 +3669,6 @@ html.touch-controls-enabled #map-select::before {
   animation: none;
 }
 
-html.touch-controls-enabled #map-select .start-panel {
-  max-width: 100%;
-  max-height: calc(100dvh - var(--menu-inset-top) - var(--menu-inset-bottom));
-}
-
 html.touch-controls-enabled .start-panel {
   padding: 24px 22px;
   max-width: 92vw;
@@ -3701,21 +3699,8 @@ html.touch-controls-enabled .start-panel {
 }
 
 @media (orientation: landscape) and (max-height: 480px) {
-  html.touch-controls-enabled #map-select .start-panel { padding: 20px 42px; }
   html.touch-controls-enabled .menu-kicker { margin-bottom: 4px; }
-  html.touch-controls-enabled .zeroed-title { font-size: clamp(44px, 15vh, 70px); }
   html.touch-controls-enabled .mode-hint { margin: 8px 0 14px; }
-  html.touch-controls-enabled .map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  html.touch-controls-enabled .map-card-art { aspect-ratio: 3 / 1; }
-  html.touch-controls-enabled .map-select-kicker,
-  html.touch-controls-enabled .map-card-mode,
-  html.touch-controls-enabled .map-card-tagline { display: none; }
-  html.touch-controls-enabled .map-card-body { margin-top: -20px; padding-bottom: 12px; }
-  html.touch-controls-enabled .map-card-lock-icon { width: 42px; height: 42px; padding: 10px; }
-  html.touch-controls-enabled .menu-header { margin-bottom: 12px; }
-  html.touch-controls-enabled #map-select .mode-hint { margin-top: 6px; }
-  html.touch-controls-enabled .menu-action { min-height: 46px; }
-  html.touch-controls-enabled .menu-footnote { margin-top: 12px; }
   html.touch-controls-enabled .pwa-actions { min-height: 24px; margin-top: 8px; }
   html.touch-controls-enabled .hud-panel { padding: 4px 7px; }
   html.touch-controls-enabled .hud-row-secondary { display: none; }
@@ -3724,6 +3709,32 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled #joystick { width: 96px; height: 96px; }
   html.touch-controls-enabled #joystick-knob { width: 42px; height: 42px; }
   html.touch-controls-enabled #banner-title { font-size: 24px; }
+}
+
+/* Main menu on short screens (laptops, landscape phones and tablets), on any
+   input: compact it so it fits; whatever is left scrolls the whole layer. */
+@media (max-height: 760px) {
+  .menu-header { margin-bottom: 14px; }
+  .map-select-kicker { margin-bottom: 10px; }
+  .map-card-tagline { min-height: 0; }
+  .menu-action { min-height: 48px; }
+  .menu-footer { margin-top: 14px; }
+}
+
+@media (max-height: 560px) {
+  #map-select .start-panel { padding: 16px clamp(20px, 5vw, 42px); }
+  #map-select .mode-hint { margin-top: 6px; }
+  .menu-header { margin-bottom: 12px; }
+  .map-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+  .map-card-art { aspect-ratio: 3 / 1; }
+  .map-select-kicker,
+  .map-card-mode,
+  .map-card-tagline { display: none; }
+  .map-card-body { margin-top: -20px; padding-bottom: 12px; }
+  .map-card-lock { gap: 6px; }
+  .map-card-lock-icon { width: 42px; height: 42px; padding: 10px; }
+  .menu-actions { margin-top: 12px; }
+  .menu-action { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
