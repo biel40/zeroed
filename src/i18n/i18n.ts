@@ -72,6 +72,13 @@ export function formatNumber(value: number): string {
   return value.toLocaleString(NUMBER_LOCALES[current]);
 }
 
+/** Text chosen at runtime that `applyDocumentTranslations` keeps in the active language. */
+export function setTranslatedText(element: HTMLElement | null, key: TranslationKey): void {
+  if (!element) return;
+  element.dataset.i18n = key;
+  element.textContent = t(key);
+}
+
 /**
  * Static markup declares its texts with `data-i18n` (text content) and
  * `data-i18n-<attribute>` (e.g. `data-i18n-aria-label`).

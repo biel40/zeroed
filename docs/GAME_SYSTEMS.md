@@ -311,10 +311,10 @@ existente a `MOTDRULES`.
 
 ## Mapas e interacciones
 
-- Burned Mansion sigue publico. Station 33 requiere temporalmente introducir
-  un correo autorizado de beta en el menu para mostrar su tarjeta y abrirlo.
-  Los enlaces directos respetan el mismo permiso; detalles y limites en
-  [acceso de beta](../public/beta/README.md).
+- Burned Mansion sigue publico. Station 33 aparece en el menu con candado y
+  requiere temporalmente un correo autorizado de beta para abrirlo; tras el
+  agradecimiento al tester empieza la partida. Los enlaces directos respetan el
+  mismo permiso; detalles y limites en [acceso de beta](../public/beta/README.md).
 
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
@@ -414,12 +414,16 @@ existente a `MOTDRULES`.
   La de Station 33 (8 s) arranca a oscuras con solo la luz de emergencia, un
   tren hace temblar la boveda, los circuitos se encienden uno a uno y la grua
   recorre la nave mientras aparece el titulo premium dorado.
-- El menu principal muestra una tarjeta ilustrada por mapa, con realce al pasar
-  el cursor o enfocar con teclado. Ambas usan la misma estructura y efectos,
-  con acento rojo para el mapa incluido y dorado para el premium. Las imagenes
-  se recortan a la ilustracion; nombres y lemas se traducen y `HUD` rellena
-  las etiquetas visibles de jugadores y acceso desde el registro. Solo el panel
-  de contenido admite scroll cuando no cabe en pantalla; la niebla queda recortada.
+- El menu principal ordena cabecera (titulo e idioma), tarjetas de mapa,
+  accesos a multijugador y ajustes, y un pie con creditos y privacidad. Cada
+  mapa tiene una tarjeta ilustrada con realce al pasar el cursor o enfocar con
+  teclado. Ambas usan la misma estructura y efectos, con acento rojo para el
+  mapa incluido y dorado para el premium; un mapa bloqueado oscurece su arte
+  bajo un candado. Las imagenes se recortan a la ilustracion y se acortan en
+  ventanas bajas; nombres y lemas se traducen y `HUD` rellena desde el registro
+  las etiquetas de jugadores, acceso y accion (jugar o desbloquear). Solo el
+  panel de contenido admite scroll cuando no cabe en pantalla; la niebla queda
+  recortada.
   La pantalla de carga y la pausa nombran el mapa elegido. `?map=<id>` sigue
   disponible como atajo de pruebas.
 - Las luminarias ambientales de Burned Mansion emiten rojo y sufren parpadeos

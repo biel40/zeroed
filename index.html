@@ -110,32 +110,43 @@
 
   <div id="map-select" class="hidden">
     <div class="start-panel">
-      <!-- Flags are inline SVG: Windows has no emoji flags. LanguagePicker copies the active one into the toggle. -->
-      <div id="language-select" class="language-picker">
-        <button type="button" id="language-toggle" class="language-toggle" aria-haspopup="true" aria-expanded="false"
-          aria-controls="language-options" data-i18n-aria-label="menu.language"></button>
-        <div id="language-options" class="language-options" role="group" data-i18n-aria-label="menu.language" hidden>
-          <button type="button" data-language="es" lang="es">
-            <svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#aa151b" /><rect y="0.5" width="3" height="1" fill="#f1bf00" /></svg>Español
-          </button>
-          <button type="button" data-language="en" lang="en">
-            <svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" stroke-width="2" /><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10" /><path d="M30,0 v30 M0,15 h60" stroke="#c8102e" stroke-width="6" /></svg>English
-          </button>
-          <button type="button" data-language="ca" lang="ca">
-            <svg class="flag" viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#fcdd09" /><path d="M0,1h9M0,2.333h9M0,3.667h9M0,5h9" stroke="#da121a" stroke-width="0.667" /></svg>Català
-          </button>
+      <header class="menu-header">
+        <div class="menu-brand">
+          <h1 class="zeroed-title">ZEROED</h1>
+          <p class="mode-hint" data-i18n="menu.tagline"></p>
         </div>
-      </div>
-      <h1 class="zeroed-title">ZEROED</h1>
-      <p class="mode-hint" data-i18n="menu.tagline"></p>
-      <p class="map-select-kicker" data-i18n="menu.chooseMap"></p>
-      <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false and fills the
-           data-map-* chips from the registry (players, access); the shared SVG viewport crops out the frames and copy baked into the decorative images. -->
-      <div class="map-grid" role="group" data-i18n-aria-label="menu.chooseMap">
+        <!-- Flags are inline SVG: Windows has no emoji flags. LanguagePicker copies the active one into the toggle. -->
+        <div id="language-select" class="language-picker">
+          <button type="button" id="language-toggle" class="language-toggle" aria-haspopup="true" aria-expanded="false"
+            aria-controls="language-options" data-i18n-aria-label="menu.language"></button>
+          <div id="language-options" class="language-options" role="group" data-i18n-aria-label="menu.language" hidden>
+            <button type="button" data-language="es" lang="es">
+              <svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#aa151b" /><rect y="0.5" width="3" height="1" fill="#f1bf00" /></svg>Español
+            </button>
+            <button type="button" data-language="en" lang="en">
+              <svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" stroke-width="2" /><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10" /><path d="M30,0 v30 M0,15 h60" stroke="#c8102e" stroke-width="6" /></svg>English
+            </button>
+            <button type="button" data-language="ca" lang="ca">
+              <svg class="flag" viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#fcdd09" /><path d="M0,1h9M0,2.333h9M0,3.667h9M0,5h9" stroke="#da121a" stroke-width="0.667" /></svg>Català
+            </button>
+          </div>
+        </div>
+      </header>
+      <h2 id="map-select-kicker" class="map-select-kicker" data-i18n="menu.chooseMap"></h2>
+      <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false, locks the ones the
+           player cannot access yet and fills the data-map-* labels from the registry (players, access, action).
+           The shared SVG viewport crops out the frames and copy baked into the decorative images. -->
+      <div class="map-grid" role="group" aria-labelledby="map-select-kicker">
         <button type="button" class="map-card" data-map="burned-mansion">
-          <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-            <image class="map-card-image" href="./assets/maps/burned-mansion-menu.png" width="1448" height="1086" />
-          </svg>
+          <span class="map-card-media">
+            <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+              <image class="map-card-image" href="./assets/maps/burned-mansion-menu.png" width="1448" height="1086" />
+            </svg>
+            <span class="map-card-lock">
+              <svg class="map-card-lock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="1.5" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7M12 14.6v2.2" /></svg>
+              <span data-i18n="map.locked"></span>
+            </span>
+          </span>
           <span class="map-card-access" data-map-access></span>
           <span class="map-card-body">
             <span class="map-card-mode" data-i18n="menu.zombies"></span>
@@ -143,13 +154,20 @@
             <span class="map-card-tagline" data-i18n="map.burnedMansion.tagline"></span>
             <span class="map-card-meta">
               <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-action" data-map-action></span>
             </span>
           </span>
         </button>
-        <button type="button" class="map-card hidden" data-map="station-33">
-          <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-            <image class="map-card-image" href="./assets/maps/station-33-menu.png" width="1448" height="1086" />
-          </svg>
+        <button type="button" class="map-card" data-map="station-33">
+          <span class="map-card-media">
+            <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+              <image class="map-card-image" href="./assets/maps/station-33-menu.png" width="1448" height="1086" />
+            </svg>
+            <span class="map-card-lock">
+              <svg class="map-card-lock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="1.5" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7M12 14.6v2.2" /></svg>
+              <span data-i18n="map.locked"></span>
+            </span>
+          </span>
           <span class="map-card-access" data-map-access></span>
           <span class="map-card-body">
             <span class="map-card-mode" data-i18n="menu.zombies"></span>
@@ -157,18 +175,11 @@
             <span class="map-card-tagline" data-i18n="map.station33.tagline"></span>
             <span class="map-card-meta">
               <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-action" data-map-action></span>
             </span>
           </span>
         </button>
       </div>
-      <form id="beta-access-form" class="beta-access-form hidden">
-        <label for="beta-email" data-i18n="beta.email"></label>
-        <div class="beta-access-fields">
-          <input id="beta-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="beta-message" />
-          <button type="submit" data-i18n="beta.submit"></button>
-        </div>
-        <p id="beta-message" role="status" aria-live="polite"></p>
-      </form>
       <div class="menu-actions">
         <button type="button" id="coop-select" class="menu-action">
           <svg class="menu-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -184,10 +195,14 @@
           <span data-i18n="menu.settings"></span>
         </button>
       </div>
-      <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
-      <!-- CC BY 3.0 requires visible attribution; Brutus is a modified walker. -->
-      <p class="asset-attribution"><span data-i18n="menu.attribution"></span> <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · Quaternius · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></p>
-      <p class="asset-attribution">Station 33 · <a href="https://pixabay.com/music/ambient-creepy-halloween-music-413493/" target="_blank" rel="noopener noreferrer">«Creepy Halloween Music»</a> · Tunetank · Pixabay</p>
+      <footer class="menu-footer">
+        <div class="menu-credits">
+          <!-- CC BY 3.0 requires visible attribution; Brutus is a modified walker. -->
+          <p class="asset-attribution"><span data-i18n="menu.attribution"></span> <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · Quaternius · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></p>
+          <p class="asset-attribution">Station 33 · <a href="https://pixabay.com/music/ambient-creepy-halloween-music-413493/" target="_blank" rel="noopener noreferrer">«Creepy Halloween Music»</a> · Tunetank · Pixabay</p>
+        </div>
+        <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
+      </footer>
       <div class="pwa-actions" aria-live="polite">
         <button type="button" id="pwa-install" class="pwa-action hidden" data-i18n="menu.install"></button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden" data-i18n="menu.update"></button>
@@ -195,6 +210,25 @@
       <p id="ios-install-hint" class="ios-install-hint hidden" data-i18n="menu.iosHint"></p>
     </div>
   </div>
+
+  <!-- Opened from a locked map card; BetaUnlockDialog names the map and checks the email. -->
+  <dialog id="beta-unlock" class="beta-unlock" aria-labelledby="beta-unlock-map" aria-describedby="beta-unlock-hint">
+    <form id="beta-access-form" class="beta-unlock-form">
+      <p class="beta-unlock-kicker">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="1.5" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7M12 14.6v2.2" /></svg>
+        <span data-i18n="map.locked"></span>
+      </p>
+      <h2 id="beta-unlock-map" class="beta-unlock-map"></h2>
+      <p id="beta-unlock-hint" class="beta-unlock-hint" data-i18n="beta.unlockHint"></p>
+      <label for="beta-email" data-i18n="beta.email"></label>
+      <input id="beta-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="beta-message" />
+      <p id="beta-message" role="status" aria-live="polite"></p>
+      <div class="beta-unlock-actions">
+        <button type="button" id="beta-unlock-cancel" data-i18n="beta.cancel"></button>
+        <button type="submit" id="beta-unlock-submit" data-i18n="menu.unlock"></button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="beta-thanks" class="beta-thanks" aria-labelledby="beta-thanks-title">
     <div class="beta-thanks-slides" aria-hidden="true">

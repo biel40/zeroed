@@ -13,9 +13,9 @@ codigo: actualiza la guia.
   es "Antigua estación abandonada en la época de la Guerra Fría...pero que
   esconde secretos que nunca deberían ser revelados."
 - Mapa premium y solo individual. Mientras no haya pagos, premium solo cambia la
-  presentacion (tarjeta dorada, insignia, intro). Temporalmente requiere un
-  correo de beta para aparecer y abrirse, tambien con `?map=station-33` y en
-  desarrollo; consulta [acceso de beta](../public/beta/README.md).
+  presentacion (tarjeta dorada, insignia, intro). Aparece bloqueado y
+  temporalmente requiere un correo de beta para abrirse, tambien con
+  `?map=station-33` y en desarrollo; consulta [acceso de beta](../public/beta/README.md).
   Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:

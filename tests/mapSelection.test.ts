@@ -48,6 +48,25 @@ class FakeElement {
   }
 }
 
+/** Native dialogs fire `close` asynchronously; the views only rely on it firing after `close()`. */
+class FakeDialog extends FakeElement {
+  public open = false;
+  private readonly closeListeners: (() => void)[] = [];
+
+  public override addEventListener(_type?: string, listener?: () => void): void {
+    if (listener) this.closeListeners.push(listener);
+  }
+
+  public showModal(): void {
+    this.open = true;
+  }
+
+  public close(): void {
+    this.open = false;
+    for (const listener of this.closeListeners) listener();
+  }
+}
+
 describe('Zombies map selection flow', () => {
   it('declares one translated menu button per registered map', () => {
     for (const map of Object.values(ZOMBIE_MAPS)) {
@@ -61,11 +80,15 @@ describe('Zombies map selection flow', () => {
     expect(html.match(/data-i18n="map.[a-zA-Z0-9]+.tagline"/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
     expect(html.match(/data-map-players/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
     expect(html.match(/data-map-access/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    expect(html.match(/data-map-action/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    // Every card shares the padlock HUD reveals while its map is locked.
+    expect(html.match(/class="map-card-lock"/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    expect(css).toMatch(/\.map-card\[data-locked='true'\] \.map-card-lock \{\s*display: flex;/);
   });
 
-  it('lists Burned Mansion for everyone and Station 33 as a single-player premium map', () => {
-    expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true, premium: false });
-    expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, coop: false, premium: true });
+  it('lists Burned Mansion for everyone and Station 33 as a locked single-player premium map', () => {
+    expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, betaOnly: false, coop: true, premium: false });
+    expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, betaOnly: true, coop: false, premium: true });
     expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
     expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);
@@ -77,42 +100,41 @@ describe('Zombies map selection flow', () => {
     );
   });
 
-  it('labels the cards from the registry and handles them again after reopening the picker', () => {
+  it('labels the cards from the registry, locks beta maps and handles them again after reopening the picker', () => {
     const card = (mapId: string): FakeElement => {
       const element = new FakeElement();
       element.dataset.map = mapId;
       element.slots['[data-map-access]'] = new FakeElement();
       element.slots['[data-map-players]'] = new FakeElement();
+      element.slots['[data-map-action]'] = new FakeElement();
       return element;
     };
     const mansion = card('burned-mansion');
     const station = card('station-33');
     const mapSelect = new FakeElement([mansion, station]);
     const startScreen = new FakeElement();
-    const loadingBar = new FakeElement([new FakeElement()]);
-    const betaForm = new FakeElement();
-    const betaEmail = new FakeElement();
-    const betaMessage = new FakeElement();
+    const elements: Record<string, FakeElement> = {
+      'map-select': mapSelect,
+      'start-screen': startScreen,
+      'loading-bar': new FakeElement([new FakeElement()]),
+      'beta-unlock': new FakeDialog(),
+      'beta-access-form': new FakeElement(),
+      'beta-email': new FakeElement(),
+      'beta-message': new FakeElement(),
+      'beta-unlock-map': new FakeElement(),
+      'beta-thanks': new FakeDialog(),
+      'beta-thanks-email': new FakeElement(),
+      'beta-thanks-close': new FakeElement(),
+    };
+    const unlockDialog = elements['beta-unlock'] as FakeDialog;
+    const thanksDialog = elements['beta-thanks'] as FakeDialog;
     const generic = new FakeElement();
     const previousDocument = globalThis.document;
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
       value: {
         addEventListener: () => undefined,
-        getElementById: (id: string) =>
-          id === 'map-select'
-            ? mapSelect
-            : id === 'start-screen'
-              ? startScreen
-              : id === 'loading-bar'
-                ? loadingBar
-                : id === 'beta-access-form'
-                  ? betaForm
-                  : id === 'beta-email'
-                    ? betaEmail
-                    : id === 'beta-message'
-                      ? betaMessage
-                      : generic,
+        getElementById: (id: string) => elements[id] ?? generic,
       },
     });
 
@@ -130,54 +152,60 @@ describe('Zombies map selection flow', () => {
       expect(startScreen.classList.contains('leaving')).toBe(false);
       expect(mansion.classList.contains('hidden')).toBe(false);
       expect(station.classList.contains('hidden')).toBe(false);
-      expect(betaForm.classList.contains('hidden')).toBe(true);
       expect(mansion.focused).toBe(true);
       expect(mansion.dataset.access).toBe('free');
+      expect(mansion.dataset.locked).toBe('false');
       expect(mansion.slots['[data-map-access]'].dataset.i18n).toBe('map.access.free');
       expect(mansion.slots['[data-map-players]'].textContent).toBe('1–2 PLAYERS');
+      expect(mansion.slots['[data-map-action]'].textContent).toBe('PLAY');
       expect(station.dataset.access).toBe('premium');
+      expect(station.dataset.locked).toBe('false');
       expect(station.slots['[data-map-access]'].textContent).toBe('PREMIUM');
       expect(station.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion']);
+      expect(mapSelect.classList.contains('hidden')).toBe(true);
 
-      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
-      expect(station.classList.contains('hidden')).toBe(false);
-
-      // Without an allowed beta session the card and its click handler disappear.
-      ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), false);
-      expect(station.classList.contains('hidden')).toBe(true);
-      expect(betaForm.classList.contains('hidden')).toBe(false);
-      expect(station.onclick).toBeNull();
-      expect(mansion.classList.contains('hidden')).toBe(false);
       ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
-      ui.showMapSelect(() => undefined, false);
-      const acceptEmail = vi.fn(() => false);
+      // Without an allowed beta session the card stays listed but locked behind the email prompt.
+      mansion.focused = false;
+      const acceptEmail = vi.fn((email: string) => email === 'bielet40@gmail.com');
       ui.setBetaAccessHandler(acceptEmail);
-      betaEmail.value = 'unlisted@example.com';
-      const preventDefault = vi.fn();
-      betaForm.onsubmit?.({ preventDefault });
-      expect(preventDefault).toHaveBeenCalledOnce();
-      expect(acceptEmail).toHaveBeenCalledWith('unlisted@example.com');
-      expect(betaMessage.dataset.i18n).toBe('beta.denied');
-      expect(betaForm.classList.contains('hidden')).toBe(false);
-      expect(station.classList.contains('hidden')).toBe(true);
+      ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), false);
+      expect(station.classList.contains('hidden')).toBe(false);
+      expect(station.dataset.locked).toBe('true');
+      expect(station.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
+      expect(mansion.dataset.locked).toBe('false');
+      expect(mansion.focused).toBe(true);
+      station.onclick?.();
+      expect(unlockDialog.open).toBe(true);
+      expect(elements['beta-unlock-map'].textContent).toBe('STATION 33');
+      expect(mapSelect.classList.contains('hidden')).toBe(false);
 
-      acceptEmail.mockImplementation(() => { throw new Error('Storage disabled'); });
-      betaForm.onsubmit?.({ preventDefault });
-      expect(betaMessage.dataset.i18n).toBe('beta.unavailable');
-      expect(betaForm.classList.contains('hidden')).toBe(false);
+      const submit = (email: string): void => {
+        elements['beta-email'].value = email;
+        elements['beta-access-form'].onsubmit?.({ preventDefault: () => undefined });
+      };
+      submit('unlisted@example.com');
+      expect(elements['beta-message'].dataset.i18n).toBe('beta.denied');
+      expect(unlockDialog.open).toBe(true);
+      expect(thanksDialog.open).toBe(false);
 
-      acceptEmail.mockImplementation(() => true);
-      betaEmail.value = 'bielet40@gmail.com';
-      betaForm.onsubmit?.({ preventDefault });
-      expect(betaForm.classList.contains('hidden')).toBe(true);
-      expect(betaEmail.value).toBe('');
-      expect(betaMessage.textContent).toBe('');
-      expect(betaMessage.dataset.i18n).toBeUndefined();
+      // The thanks card appears first; the map opens when the tester leaves it.
+      submit('bielet40@gmail.com');
+      expect(acceptEmail).toHaveBeenLastCalledWith('bielet40@gmail.com');
+      expect(unlockDialog.open).toBe(false);
+      expect(thanksDialog.open).toBe(true);
+      expect(elements['beta-thanks-email'].textContent).toBe('bielet40@gmail.com');
+      expect(selected).toEqual(['burned-mansion', 'again:station-33']);
+      elements['beta-thanks-close'].onclick?.();
+      expect(thanksDialog.open).toBe(false);
+      expect(selected).toEqual(['burned-mansion', 'again:station-33', 'tester:station-33']);
+      expect(mapSelect.classList.contains('hidden')).toBe(true);
+      expect(station.onclick).toBeNull();
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();

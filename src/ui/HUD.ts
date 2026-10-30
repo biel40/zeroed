@@ -1,10 +1,11 @@
 import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
-import { formatNumber, onLanguageChange, t, type TranslationKey } from '../i18n/i18n';
+import { formatNumber, onLanguageChange, setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { BetaThanksScreen } from './BetaThanksScreen';
+import { BetaUnlockDialog } from './BetaUnlockDialog';
 import { LanguagePicker } from './LanguagePicker';
 import { bindInteractionPromptVisibility, renderInteractionPrompt } from './InteractionPromptView';
 import { SettingsPanel } from './SettingsPanel';
@@ -51,13 +52,6 @@ function mustGet(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing HUD element #${id}`);
   return element;
-}
-
-/** Text chosen at runtime that `applyDocumentTranslations` keeps in the active language. */
-function setTranslatedText(element: HTMLElement | null, key: TranslationKey): void {
-  if (!element) return;
-  element.dataset.i18n = key;
-  element.textContent = t(key);
 }
 
 /**
@@ -125,6 +119,9 @@ export class HUD {
   private readonly settings: SettingsPanel;
   private readonly betaThanks = new BetaThanksScreen(mustGet('beta-thanks') as HTMLDialogElement,
     mustGet('beta-thanks-email'), mustGet('beta-thanks-close'));
+  private readonly betaUnlock = new BetaUnlockDialog(mustGet('beta-unlock') as HTMLDialogElement,
+    mustGet('beta-access-form') as HTMLFormElement, mustGet('beta-email') as HTMLInputElement,
+    mustGet('beta-message'), mustGet('beta-unlock-map'), mustGet('beta-unlock-cancel'));
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -257,65 +254,53 @@ export class HUD {
     };
   }
 
-  /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
+  /**
+   * Initial picker: Zombies is the only mode, so the player chooses its arena
+   * directly. Maps the player cannot access yet stay listed but locked; their
+   * card asks for a closed-beta email, thanks the tester and then opens the map.
+   */
   public showMapSelect(onSelect: (mapId: ZombieMapId) => void, betaAccess: boolean): void {
     this.fadeOutStartScreen();
     this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
-    mustGet('beta-access-form').classList.toggle('hidden', betaAccess);
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
-    let firstVisibleButton: HTMLButtonElement | null = null;
+    let firstPlayableButton: HTMLButtonElement | null = null;
     for (const button of buttons) {
       const map = getZombieMapDefinition(button.dataset.map);
-      const listed = !!map?.visible && canAccessZombieMap(map.id, betaAccess);
+      const listed = !!map?.visible;
       button.classList.toggle('hidden', !listed);
       if (!map || !listed) {
         button.onclick = null;
         continue;
       }
-      if (!firstVisibleButton) firstVisibleButton = button;
-      // The registry, not the markup, decides each card's players and access labels.
+      const locked = !canAccessZombieMap(map.id, betaAccess);
+      if (!locked && !firstPlayableButton) firstPlayableButton = button;
+      // The registry, not the markup, decides each card's players, access and action labels.
       button.dataset.access = map.premium ? 'premium' : 'free';
+      button.dataset.locked = String(locked);
       setTranslatedText(button.querySelector('[data-map-access]'), map.premium ? 'map.access.premium' : 'map.access.free');
       setTranslatedText(button.querySelector('[data-map-players]'), map.coop ? 'map.players.coop' : 'map.players.solo');
-      // Assignment replaces a previous handler if this menu is shown again.
-      button.onclick = () => {
+      setTranslatedText(button.querySelector('[data-map-action]'), locked ? 'menu.unlock' : 'menu.play');
+      const select = (): void => {
         for (const mapButton of buttons) mapButton.onclick = null;
         this.mapSelect.classList.add('hidden');
         onSelect(map.id);
       };
+      // Assignment replaces a previous handler if this menu is shown again.
+      button.onclick = locked
+        ? () => this.betaUnlock.open(map.nameKey, (email) => this.betaThanks.show(email, select))
+        : select;
     }
-    firstVisibleButton?.focus();
+    firstPlayableButton?.focus();
   }
 
   public setCoopSelectHandler(handler: () => void): void {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
   }
 
+  /** Closed-beta email check used by locked map cards; it may throw when access cannot be saved. */
   public setBetaAccessHandler(acceptEmail: (email: string) => boolean): void {
-    const form = mustGet('beta-access-form') as HTMLFormElement;
-    const email = mustGet('beta-email') as HTMLInputElement;
-    const message = mustGet('beta-message');
-    form.onsubmit = (event) => {
-      event.preventDefault();
-      try {
-        if (!acceptEmail(email.value)) {
-          setTranslatedText(message, 'beta.denied');
-          return;
-        }
-        email.value = '';
-        delete message.dataset.i18n;
-        message.textContent = '';
-        form.classList.add('hidden');
-      } catch {
-        setTranslatedText(message, 'beta.unavailable');
-      }
-    };
-  }
-
-  /** Thanks an accepted closed-beta tester; `onClose` runs when they continue. */
-  public showBetaThanks(email: string, onClose: () => void): void {
-    this.betaThanks.show(email, onClose);
+    this.betaUnlock.setAcceptEmail(acceptEmail);
   }
 
   /** Settings quality buttons (main menu only); the choice applies from the next match. */

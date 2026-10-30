@@ -198,12 +198,8 @@ class ZeroedBoot {
       // AssetManager, so loading always completes.
       await this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total));
       this.hud.setReady();
-      this.hud.setBetaAccessHandler((email) => {
-        if (!this.betaAccess.acceptBetaEmail(email)) return false;
-        // The requested map (possibly Station 33) only opens once the tester leaves the thanks card.
-        this.hud.showBetaThanks(email, () => this.openRequestedMap());
-        return true;
-      });
+      // Locked cards open their map through the regular selection, which startGame rechecks.
+      this.hud.setBetaAccessHandler((email) => this.betaAccess.acceptBetaEmail(email));
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
       this.hud.setQualitySelect(this.profile.quality, (quality) => {
         setQualityPreference(quality);

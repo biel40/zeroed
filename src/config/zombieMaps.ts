@@ -10,9 +10,9 @@ export type ZombieArenaFactory = (scene: THREE.Scene, profile: DeviceProfile) =>
 
 export interface ZombieMapDefinition {
   readonly id: string;
-  /** Listed in the map menu when the player also has access. */
+  /** Listed in the map menu; maps the player cannot access yet appear locked. */
   readonly visible: boolean;
-  /** Requires an allowed beta email in both the menu and direct links. */
+  /** Requires an allowed beta email to play, from its locked menu card or a direct link. */
   readonly betaOnly: boolean;
   readonly nameKey: TranslationKey;
   /** Playable in the co-op modes. */

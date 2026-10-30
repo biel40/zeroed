@@ -8,7 +8,7 @@
 - Posturas de pie, agachado y tumbado en individual y cooperativo, con controles
   tactiles y representacion del compañero. Consulta [controles](GAME_SYSTEMS.md#shell-compartido)
   y [replica cooperativa](MULTIPLAYER.md#alcance-y-límites).
-- Burned Mansion tiene acceso publico individual y cooperativo. Station 33 es individual y premium de presentacion; temporalmente requiere un correo de la lista de beta para aparecer y abrirse, tambien por enlace directo. El permiso es local y no verifica la titularidad del correo: consulta [acceso de beta](../public/beta/README.md). Direccion artistica en [Station 33](STATION_33.md).
+- Burned Mansion tiene acceso publico individual y cooperativo. Station 33 es individual y premium de presentacion; aparece bloqueado en el menu y temporalmente requiere un correo de la lista de beta para abrirse, tambien por enlace directo. El permiso es local y no verifica la titularidad del correo: consulta [acceso de beta](../public/beta/README.md). Direccion artistica en [Station 33](STATION_33.md).
 - Combate, rondas, economia, progresion, enemigos y anillos estan disponibles en individual; el alcance cooperativo se detalla en [MULTIPLAYER.md](MULTIPLAYER.md#alcance-y-límites). Consulta [zombies](GAME_SYSTEMS.md#zombies) y [anillos](GAME_SYSTEMS.md#anillos).
 - PWA instalable y distribucion Android preparada; consulta [PWA](PWA.md) y [Android](ANDROID_DOCS.md).
 - El relay cooperativo local y el Worker de Cloudflare estan preparados; consulta [despliegue](MULTIPLAYER.md#despliegue-gratuito-vercel--cloudflare).

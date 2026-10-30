@@ -45,10 +45,13 @@ sufra tirones de compilacion de shaders.
 ## Contratos
 
 - `ZombieMapDefinition.betaOnly` y `canAccessZombieMap` comparten la regla de
-  acceso entre el selector y el arranque, incluidos enlaces directos.
-  `public/beta/access.js` conserva la lista y sesion de beta; `HUD` recoge el
-  correo y `main.ts` orquesta la apertura. Es una comprobacion de cliente,
-  con los limites descritos en [acceso de beta](../public/beta/README.md).
+  acceso entre el selector y el arranque, incluidos enlaces directos; el
+  selector lista bloqueados los mapas sin permiso. `public/beta/access.js`
+  conserva la lista y sesion de beta y `main.ts` la inyecta en `HUD`, cuyo
+  `BetaUnlockDialog` recoge el correo; tras el agradecimiento, la seleccion
+  normal abre el mapa y `main.ts` vuelve a comprobar el permiso. Es una
+  comprobacion de cliente, con los limites descritos en
+  [acceso de beta](../public/beta/README.md).
 
 - `PlayerStance` concentra las posturas, alturas y multiplicadores de movimiento
   sin depender de Three.js. `PlayerController.rig` conserva el ancla del ojo de

@@ -79,7 +79,7 @@ Opcional, solo si el mapa lo tiene:
 | Archivo | Que anadir |
 |---|---|
 | `src/config/zombieMaps.ts` | Entrada en `ZOMBIE_MAPS`: `id`, `visible`, `nameKey`, `coop`, `premium`, `createArena`. |
-| `index.html` | Tarjeta `<button class="map-card" data-map="<id>">` copiando la estructura de las existentes: arte SVG animado propio, `data-map-access`, `data-map-players`, nombre y lema con `data-i18n`. |
+| `index.html` | Tarjeta `<button class="map-card" data-map="<id>">` copiando la estructura de las existentes: arte SVG propio dentro de `.map-card-media` con su `.map-card-lock`, `data-map-access`, `data-map-players`, `data-map-action`, nombre y lema con `data-i18n`. |
 | `src/style.css` | Estilos y animaciones del arte de la tarjeta, si los necesita. |
 | `src/i18n/en.ts`, `es.ts`, `ca.ts` | `map.<clave>` y `map.<clave>.tagline` en los tres idiomas (`tests/i18n.test.ts` exige las mismas claves). |
 | `src/audio/MusicManager.ts` | Si tiene musica propia: `MusicTrackName`, `ZOMBIES_MUSIC_PATHS`, `MUSIC_TRACKS`; el arena la elige en `ambience.musicTrack`. El MP3 va a `public/assets/audio/` y su licencia a `ASSETS.md`. |
