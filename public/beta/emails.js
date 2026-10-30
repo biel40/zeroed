@@ -1,5 +1,6 @@
 export const BETA_EMAILS = [
   'anavilmoy@gmail.com',
+  'arxeus99@gmail.com',
   'biel40aws@gmail.com',
   'bielet40@gmail.com',
   'delta.centauri.k@gmail.com',
@@ -16,7 +17,7 @@ export const BETA_EMAILS = [
   'toni.bgae@gmail.com',
 ];
 
-/** Developers: besides the beta, they see maps still hidden from testers in the menu. */
+/** Legacy developer list; current beta map access uses BETA_EMAILS for everyone. */
 export const DEVELOPER_EMAILS = [
   'bielet40@gmail.com',
   'biel40aws@gmail.com',

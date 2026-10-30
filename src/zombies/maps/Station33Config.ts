@@ -595,6 +595,7 @@ export const STATION33_AMBIENCE = {
   // Underground: almost no sky-like fill, the fluorescents and lamps do the lighting.
   environmentIntensity: { intensity: 0.1, reducedIntensity: 0.12 },
   musicTrack: 'station33_theme',
+  ambientBed: 'mains-hum',
 } as const satisfies ArenaAmbience;
 
 /**
@@ -860,6 +861,30 @@ export const STATION33_AMBIENT_EVENTS: ReadonlyArray<Station33AmbientEvent> = [
     initialDelay: 75,
     minInterval: 90,
     maxInterval: 170,
+  },
+  {
+    id: 'tunnel-strike',
+    sound: 'metal-echo',
+    position: { x: 0, y: 1, z: -62 },
+    effect: 'none',
+    duration: 0,
+    initialDelay: 35,
+    minInterval: 60,
+    maxInterval: 130,
+  },
+  {
+    id: 'substation-machinery',
+    sound: 'machinery',
+    position: {
+      x: (SUBESTACION.hall.minX + SUBESTACION.hall.maxX) / 2,
+      y: 1.5,
+      z: (SUBESTACION.hall.minZ + SUBESTACION.hall.maxZ) / 2,
+    },
+    effect: 'none',
+    duration: 0,
+    initialDelay: 55,
+    minInterval: 80,
+    maxInterval: 160,
   },
 ];
 

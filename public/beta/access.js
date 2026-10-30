@@ -1,13 +1,9 @@
-import { BETA_EMAILS, DEVELOPER_EMAILS } from './emails.js';
+import { BETA_EMAILS } from './emails.js';
+
 const ACCESS_KEY = 'zeroed.betaAccess';
 
 export function hasBetaAccess() {
   try { return BETA_EMAILS.includes(sessionStorage.getItem(ACCESS_KEY)); }
-  catch { return false; }
-}
-
-export function hasDeveloperAccess() {
-  try { return DEVELOPER_EMAILS.includes(sessionStorage.getItem(ACCESS_KEY)); }
   catch { return false; }
 }
 

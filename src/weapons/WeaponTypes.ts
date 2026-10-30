@@ -1,3 +1,5 @@
+import type { ShotVariation } from '../audio/ShotVariation';
+
 export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
 
 export type FireMode = 'auto' | 'semi';
@@ -149,6 +151,8 @@ export interface WeaponAudioConfig {
    * procedural shot.
    */
   readonly sampleFile?: string;
+  /** Optional subtle pitch and gain jitter per shot of `sampleFile`; omitted plays it verbatim. */
+  readonly variation?: ShotVariation;
   /**
    * Energy weapons get a sci-fi synth shot instead of a powder report; the
    * value picks the voice: the Ray Gun's warbling zap or the arc weapon's.

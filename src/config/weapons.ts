@@ -49,7 +49,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 260, gravity: 9.8, maxDistance: 200, drag: 0.08 },
     moveSpeedMultiplier: 1.04,
     equipTime: 0.28,
-    audio: { volume: 0.45, duration: 0.07, lowpass: 4200, thump: 210 },
+    audio: {
+      volume: 0.45, duration: 0.07, lowpass: 4200, thump: 210,
+      sampleFile: 'm1911_shot.mp3', variation: { pitch: 0.03, volume: 0.05 },
+    },
     view: {
       // No GLB: dedicated procedural pistol builder (see WeaponView).
       frame: 'pistol',

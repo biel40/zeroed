@@ -2,7 +2,7 @@ import './style.css';
 import type * as BetaAccess from '../public/beta/access.js';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { MusicManager } from './audio/MusicManager';
-import { COOP_ZOMBIE_MAP_ID, isZombieMapId, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
+import { canAccessZombieMap, COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
@@ -26,8 +26,7 @@ class ZeroedBoot {
   private coopConnection: CoopConnection | null = null;
   private game: Game | null = null;
 
-  /** @param developerAccess Lists the developer-only maps in the menu. */
-  public constructor(private readonly developerAccess: boolean) {
+  public constructor(private readonly betaAccess: typeof BetaAccess) {
     const container = document.getElementById('app');
     if (!container) throw new Error('Missing #app container');
 
@@ -56,6 +55,10 @@ class ZeroedBoot {
   }
 
   private async startGame(mode: GameMode, mapId: ZombieMapId): Promise<void> {
+    if (!canAccessZombieMap(mapId, this.betaAccess.hasBetaAccess())) {
+      this.showMapMenu();
+      return;
+    }
     this.hud.hideCoopLobby();
     this.game?.dispose();
     this.game = null;
@@ -93,7 +96,16 @@ class ZeroedBoot {
   }
 
   private showMapMenu(): void {
-    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId), this.developerAccess);
+    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId), this.betaAccess.hasBetaAccess());
+  }
+
+  private openRequestedMap(): void {
+    const requestedMap = new URLSearchParams(window.location.search).get('map');
+    if (canAccessZombieMap(requestedMap, this.betaAccess.hasBetaAccess())) {
+      void this.startGame(new ZombiesMode(requestedMap), requestedMap);
+    } else {
+      this.showMapMenu();
+    }
   }
 
   private showCoopLobby(): void {
@@ -186,19 +198,19 @@ class ZeroedBoot {
       // AssetManager, so loading always completes.
       await this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total));
       this.hud.setReady();
+      this.hud.setBetaAccessHandler((email) => {
+        if (!this.betaAccess.acceptBetaEmail(email)) return false;
+        // The requested map (possibly Station 33) only opens once the tester leaves the thanks card.
+        this.hud.showBetaThanks(email, () => this.openRequestedMap());
+        return true;
+      });
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
       this.hud.setQualitySelect(this.profile.quality, (quality) => {
         setQualityPreference(quality);
         this.profile = getDeviceProfile(undefined, quality);
       });
 
-      const requestedMap = new URLSearchParams(window.location.search).get('map');
-      if (isZombieMapId(requestedMap)) {
-        // Direct link for testing, including maps the menu hides.
-        void this.startGame(new ZombiesMode(requestedMap), requestedMap);
-      } else {
-        this.showMapMenu();
-      }
+      this.openRequestedMap();
     } catch (error: unknown) {
       this.hud.setError(error instanceof Error ? t('start.initFailed', { message: error.message }) : t('start.initFailedGeneric'));
     }
@@ -210,22 +222,20 @@ class ZeroedBoot {
 }
 
 applyDocumentTranslations();
-// Static file in public/, also loaded directly by the beta pages; it must not be bundled.
-const BETA_ACCESS_URL = new URL('/beta/access.js', window.location.origin).href;
-
 async function boot(): Promise<void> {
-  // Builds without the beta gate are developer builds.
-  let developerAccess = true;
-  if (import.meta.env.VITE_BETA_ENABLED === 'true') {
-    const { hasBetaAccess, hasDeveloperAccess } = (await import(/* @vite-ignore */ BETA_ACCESS_URL)) as typeof BetaAccess;
-    if (!hasBetaAccess()) {
-      window.location.replace(`/beta/index.html${window.location.search}`);
-      return;
-    }
-    developerAccess = hasDeveloperAccess();
-  } else {
-    setupPWA();
+  setupPWA();
+  // Shared static module: keep the existing beta list and session contract.
+  const accessUrl = new URL(`${import.meta.env.BASE_URL}beta/access.js`, window.location.href).href;
+  let betaAccess: typeof BetaAccess;
+  try {
+    betaAccess = await import(/* @vite-ignore */ accessUrl) as typeof BetaAccess;
+  } catch {
+    // A missing beta module must neither expose restricted maps nor block the public game.
+    betaAccess = {
+      hasBetaAccess: () => false,
+      acceptBetaEmail: () => { throw new Error('Beta access unavailable'); },
+    };
   }
-  await new ZeroedBoot(developerAccess).run();
+  await new ZeroedBoot(betaAccess).run();
 }
 void boot();

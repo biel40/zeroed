@@ -40,9 +40,15 @@ sufra tirones de compilacion de shaders.
 | `src/game/` | Inventario, salud, economia, anillos y estadisticas puras |
 | `src/pwa.ts` | Service Worker, instalacion y actualizaciones |
 | `src/i18n/` | Diccionarios es/en/ca, `t()` e idioma activo |
-| `public/beta/` | Pantalla y filtro temporal de acceso; conectado al arranque desde `src/main.ts` |
+| `src/main.ts` | Arranque publico y comprobacion de acceso a mapas; contrato temporal en `public/beta/README.md` |
 
 ## Contratos
+
+- `ZombieMapDefinition.betaOnly` y `canAccessZombieMap` comparten la regla de
+  acceso entre el selector y el arranque, incluidos enlaces directos.
+  `public/beta/access.js` conserva la lista y sesion de beta; `HUD` recoge el
+  correo y `main.ts` orquesta la apertura. Es una comprobacion de cliente,
+  con los limites descritos en [acceso de beta](../public/beta/README.md).
 
 - `PlayerStance` concentra las posturas, alturas y multiplicadores de movimiento
   sin depender de Three.js. `PlayerController.rig` conserva el ancla del ojo de
@@ -70,8 +76,8 @@ sufra tirones de compilacion de shaders.
   municion la decide el modo.
 - `ZombieArena` separa la run de la geometria del mapa. La arena declara spawn y
   limites del jugador, ambiente (fondo, niebla, luz hemisferica, musica y, si
-  quiere, la intensidad de la luz de entorno), sonidos ambientales opcionales
-  (`onAmbientCue`, que el modo reproduce), su
+  quiere, la intensidad de la luz de entorno y un fondo sonoro `ambientBed`),
+  sonidos ambientales opcionales (`onAmbientCue`, que el modo reproduce), su
   intro opcional (planos de camara y presentacion), su
   final (cinematica, audio y duracion) y avisa con `onTopologyChanged` cuando
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
@@ -90,6 +96,16 @@ sufra tirones de compilacion de shaders.
   (`ZombieBlood`), separado de los cuerpos reciclables. `ZombieBleeding` resuelve
   la intensidad de las heridas; `BloodDropMotion` comparte simulacion y manchas
   con los restos del Barrett sin depender de objetos de escena.
+  `GibWalls` toma las superficies de `ZombieArena.colliders` al cambiar la
+  topologia; los bloqueos exclusivos del jugador en `wallColliders` no son
+  superficies para sangre ni restos.
+  `GibWallFrame` ajusta la huella completa de las manchas a la cara contactada,
+  antes de que sangre instanciada o restos del Barrett escriban su transformacion.
+  Cada colisionador declara en `userData.stainFaces` (`StainFaces`, via
+  `ArenaBoxOptions` o `addSolidProxy`) que caras coinciden con su geometria
+  visible: `all` por defecto en cajas dibujadas, `top` por defecto en proxies de
+  atrezo y `none` en siluetas irregulares. `tests/bloodSurfaces.test.ts` lo
+  comprueba con raycasts para cada mapa registrado.
 - La identificacion de impactos de energia por color es una [deuda de contrato](DECISIONS.md#deudas-de-contrato).
 
 ## Extension

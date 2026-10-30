@@ -39,7 +39,7 @@ const BODY_PIECES: readonly GibPieceSpec[] = [
 /** Loose flesh scraps thrown from the torso. */
 const GORE_BITS = 34;
 /** Blood drops that splat flat where they land, on the floor or on a wall. */
-const BLOOD_DROPS = 70;
+const BLOOD_DROPS = 36;
 /** Height the body bursts from: pieces fly away from this point. */
 const BURST_CENTER_Y = 1.1;
 /** Speed (m/s) the round throws the remains along its path: a minimum plus a random extra. */
@@ -51,12 +51,12 @@ const RADIAL_PUSH = 5;
 const PIECE_SPIN = 20;
 const SCRAP_SPIN = 28;
 /** Red spray clouds left hanging in the air where the body burst. */
-const MIST_CLOUDS = 12;
-const MIST_LIFE = 1.1;
-const MIST_SIZE = 0.45;
+const MIST_CLOUDS = 6;
+const MIST_LIFE = 0.65;
+const MIST_SIZE = 0.22;
 /** A cloud grows to this many times its starting size as it thins out. */
-const MIST_GROWTH = 2.8;
-const MIST_OPACITY = 0.85;
+const MIST_GROWTH = 2;
+const MIST_OPACITY = 0.35;
 /** Drift (m/s) of the clouds along the shot; air slows it down. */
 const MIST_DRIFT = 2.2;
 const MIST_DRAG = 2;
@@ -66,7 +66,7 @@ const MIST_COLOR = 0x7a0706;
 /** Side of the generated soft round mist texture, in texels. */
 const MIST_TEXTURE_SIZE = 32;
 /** Blood pool spreading on the floor where the zombie stood. */
-const POOL_RADIUS = 0.6;
+const POOL_RADIUS = 0.4;
 const POOL_GROW_TIME = 0.8;
 const GRAVITY = 9.8;
 /** Landing speed below which a piece stops bouncing and lies still. */
@@ -187,7 +187,7 @@ export class ZombieGibs {
       this.addParticle(new THREE.Mesh(shapeGeometry('chunk'), sharedGore()), new THREE.Vector3(size, size * 0.7, size), false);
     }
     for (let i = 0; i < BLOOD_DROPS; i++) {
-      const size = 0.014 + Math.random() * 0.018;
+      const size = 0.008 + Math.random() * 0.010;
       this.addParticle(new THREE.Mesh(bloodGeometry(), bloodMaterial()), new THREE.Vector3(size, size, size), true);
     }
     for (let i = 0; i < MIST_CLOUDS; i++) {

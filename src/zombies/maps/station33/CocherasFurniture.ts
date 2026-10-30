@@ -66,7 +66,7 @@ function addCableDrum(context: Station33BuildContext): void {
     new THREE.Vector3(x + 1.6, 0.03, z + 1.5),
   ]);
   batch.add(new THREE.TubeGeometry(tail, 16, 0.03, 5), materials.rubber);
-  addSolidProxy(context, 'cable-drum', { x: x - width / 2, y: 0, z: z - radius }, { x: x + width / 2, y: radius * 2, z: z + radius }, 'wood');
+  addSolidProxy(context, 'cable-drum', { x: x - width / 2, y: 0, z: z - radius }, { x: x + width / 2, y: radius * 2, z: z + radius }, 'wood', 'none');
 }
 
 /**
@@ -94,7 +94,7 @@ function addSandbags(context: Station33BuildContext): void {
   slumped.rotateY(0.5).translate(x + length / 2 + 0.25, 0, z + 0.3);
   batch.add(slumped, materials.burlap);
   const top = (courses - 1) * pitch + height;
-  addSolidProxy(context, 'sandbags', { x: x - length / 2, y: 0, z: z - depth / 2 }, { x: x + length / 2, y: top, z: z + depth / 2 }, 'concrete');
+  addSolidProxy(context, 'sandbags', { x: x - length / 2, y: 0, z: z - depth / 2 }, { x: x + length / 2, y: top, z: z + depth / 2 }, 'concrete', 'none');
 }
 
 /**

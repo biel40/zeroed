@@ -35,7 +35,7 @@ import {
   type ZombieModelId,
   type ZombieTypeId,
 } from './ZombieConfig';
-import type { GibWalls } from './GibWalls';
+import { refreshGibWalls, type GibWalls } from './GibWalls';
 import { Zombie } from './Zombie';
 import type { ZombieKillSource } from './ZombieDeath';
 export type { ZombieKillSource } from './ZombieDeath';
@@ -342,9 +342,9 @@ export class ZombieManager {
     this.rebuildNavigation();
   }
 
-  /** Map wall boxes the remains of a shattered zombie bounce off; refresh on topology changes. */
-  setWallColliders(walls: ReadonlyArray<THREE.Box3>): void {
-    this.gibWalls.boxes = walls;
+  /** Static map surfaces for blood and remains; refresh on topology changes. */
+  public setEffectColliders(colliders: ReadonlyArray<THREE.Object3D>): void {
+    refreshGibWalls(this.gibWalls, colliders);
   }
 
   /** Replace spawn points when a new zone is unlocked. */

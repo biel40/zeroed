@@ -54,7 +54,11 @@ export function buildTrainCar(context: Station33BuildContext, lighting: Station3
     (bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, (bounds.min.z + bounds.max.z) / 2,
     bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, bounds.max.z - bounds.min.z,
     context.materials.collider,
-    { name: `train-${car.id}`, surface: 'metal', mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true },
+    {
+      name: `train-${car.id}`, surface: 'metal', mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true,
+      // Couplers and steps pad the sides; a derailed car's tilted roof leaves the AABB top in the air.
+      stainFaces: car.yaw === 0 && car.roll === 0 ? 'top' : 'none',
+    },
   );
 }
 

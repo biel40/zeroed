@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import type { AmbientBedId } from '../../audio/AmbientBed';
 import type { AmbientCuePlayback } from '../../audio/AudioSystem';
 import type { EndingAudioId, MusicTrackName } from '../../audio/MusicManager';
 import type { RingId } from '../../game/rings/RingCatalog';
@@ -261,6 +262,8 @@ export interface ArenaAmbience {
   readonly environmentIntensity?: { readonly intensity: number; readonly reducedIntensity: number };
   /** Looping bed while the match is running. */
   readonly musicTrack: MusicTrackName;
+  /** Optional: procedural sound bed under the music (wind, machinery hum); omitted plays none. */
+  readonly ambientBed?: AmbientBedId;
 }
 
 /**

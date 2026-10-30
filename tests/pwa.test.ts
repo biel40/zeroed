@@ -12,6 +12,23 @@ function pngSize(fileName: string): readonly [number, number] {
 }
 
 describe('PWA contract', () => {
+  it('starts the public game with PWA support and loads the optional beta access module', () => {
+    const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+    expect(main).not.toContain('VITE_BETA_ENABLED');
+    expect(main).toContain('new ZeroedBoot(betaAccess).run()');
+    expect(main).toContain('beta/access.js');
+    expect(main).not.toContain('location.replace');
+    expect(main.indexOf('setupPWA();')).toBeLessThan(main.indexOf('new ZeroedBoot('));
+    expect(config).not.toContain('BETA_ENABLED');
+  });
+
+  it('keeps beta scripts out of the legacy page redirects', () => {
+    const hosting = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+    expect(hosting.redirects.map((rule: { source: string }) => rule.source)).toEqual([
+      '/beta', '/beta/', '/beta/index.html', '/beta/welcome.html',
+    ]);
+  });
+
   it('declares an installable landscape manifest for the production root', () => {
     expect(config).toContain("name: 'Zeroed'");
     expect(config).toContain("short_name: 'Zeroed'");

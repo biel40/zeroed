@@ -39,6 +39,7 @@ function addGate(context: Station33BuildContext): void {
   const z = VESTIBULE.minZ - STATION33_WALL_THICKNESS / 2;
   structure.addBox(ESCALATOR_PORTAL.centerX, ESCALATOR_PORTAL.height / 2, z, ESCALATOR_PORTAL.width, ESCALATOR_PORTAL.height, STATION33_WALL_THICKNESS, materials.collider, {
     name: 'escalator-gate', surface: 'metal', mapRole: 'sealed-frontier', castShadow: false, uvSeed: 0, blocksPlayer: true,
+    stainFaces: 'none',
   });
   const latticeZ = VESTIBULE.minZ - 0.08;
   const bars = 34;

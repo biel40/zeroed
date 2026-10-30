@@ -29,6 +29,7 @@ import { ZombieReplica } from '../../zombies/ZombieReplica';
 import type { GameMode, ModeContext } from '../GameMode';
 import type { MusicTrackName } from '../../audio/MusicManager';
 import { voicePoint } from '../../audio/SpatialCue';
+import { RoundCueGate } from '../../audio/RoundCueGate';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { isDownedBodyInRange } from './CoopRevive';
@@ -68,6 +69,7 @@ export class CoopGuestMode implements GameMode {
   private match: MatchState | null = null;
   /** Host round as last announced (event) or snapshotted; the guest never advances it. */
   private round = 0;
+  private readonly roundCues = new RoundCueGate();
   private playing = false;
   private hostLost = false;
   private gameOverShown = false;
@@ -94,8 +96,8 @@ export class CoopGuestMode implements GameMode {
     this.world.placeLocalPlayer('guest');
     const castShadows = !ctx.profile.useReducedEffects;
     this.replica = new ZombieReplica(ctx.assets.getZombieModels(), castShadows, ctx.hitColliders);
-    this.replica.setWallColliders(this.world.arena.wallColliders);
-    this.world.onTopologyChanged = () => this.replica.setWallColliders(this.world.arena.wallColliders);
+    this.replica.setEffectColliders(this.world.arena.colliders);
+    this.world.onTopologyChanged = () => this.replica.setEffectColliders(this.world.arena.colliders);
     ctx.player.setBodyColliders(this.replica.actives);
     ctx.scene.add(this.replica.group);
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
@@ -350,6 +352,7 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'playerShoot':
         this.hostAvatar.playFire();
+        this.ctx.audio.playRemoteShot(WEAPON_DEFINITIONS[message.weapon].audio, this.world.spatialCueFor(message.origin));
         if (WEAPON_DEFINITIONS[message.weapon].energy) {
           this.energy.fire(new THREE.Vector3(message.origin.x, message.origin.y, message.origin.z),
             new THREE.Vector3(message.direction.x, message.direction.y, message.direction.z),
@@ -377,10 +380,11 @@ export class CoopGuestMode implements GameMode {
       case 'roundStart':
         this.round = message.round;
         this.ctx.hud.showRoundBanner(t('banner.round', { round: message.round }));
-        this.ctx.audio.playRoundSting();
+        if (this.roundCues.claim('start', message.round)) this.ctx.audio.playRoundStartCue();
         break;
       case 'roundEnd':
         this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: message.round }));
+        if (this.roundCues.claim('end', message.round)) this.ctx.audio.playRoundEndCue();
         break;
       case 'doorOpened': {
         const door = this.world.findDoor(message.doorId);
@@ -483,7 +487,7 @@ export class CoopGuestMode implements GameMode {
     else if (previousPhase !== state.phase && state.phase === 'ending') {
       const ending = this.world.arena.completionInteraction.ending;
       this.ctx.audio.stopMusic();
-      this.ctx.audio.stopWind();
+      this.ctx.audio.setAmbientBed(null);
       this.ctx.audio.startEndingAudio(ending.audio);
       this.ctx.hud.showEnding(state.round, ending.presentation);
       this.ctx.unlockPointer();
@@ -504,6 +508,7 @@ export class CoopGuestMode implements GameMode {
   }
 
   private restartFromHost(): void {
+    this.roundCues.reset();
     this.chestInteraction.dispose();
     this.knife.reset();
     this.wallBuyPending = false;

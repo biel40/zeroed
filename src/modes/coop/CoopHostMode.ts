@@ -46,6 +46,7 @@ import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
 import type { GameMode, ModeContext } from '../GameMode';
 import type { MusicTrackName } from '../../audio/MusicManager';
 import { voicePoint } from '../../audio/SpatialCue';
+import { RoundCueGate } from '../../audio/RoundCueGate';
 import { CoopWorld } from './CoopWorld';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { CoopRevive, isDownedBodyInRange, REVIVE_DURATION, REVIVE_HEALTH_PERCENT } from './CoopRevive';
@@ -138,6 +139,7 @@ export class CoopHostMode implements GameMode {
     id, new ShotValidator(WEAPON_DEFINITIONS[id].magazineSize + 1, WEAPON_DEFINITIONS[id].rpm / 60),
   ]));
   private readonly targets: ZombiePlayerTarget[] = [];
+  private readonly roundCues = new RoundCueGate();
   private readonly guestTarget = { id: 'guest' as const, x: 0, y: EYE_HEIGHT, z: 0, floor: 0 };
   private readonly tmpDirection = new THREE.Vector3();
   private readonly knife = new Knife();
@@ -175,12 +177,12 @@ export class CoopHostMode implements GameMode {
     this.zombies.setBodyObstacles([mysteryBoxFootprint(arena.mysteryBoxPlacement)]);
     ctx.player.setBodyColliders(this.zombies.actives);
     this.zombies.registerColliders(ctx.hitColliders);
-    this.zombies.setWallColliders(arena.wallColliders);
+    this.zombies.setEffectColliders(arena.colliders);
     this.world.onTopologyChanged = () => {
       this.zombies.setSpawnPoints(arena.spawnPoints);
       this.zombies.setBarriers(arena.barriers);
       this.zombies.registerColliders(ctx.hitColliders);
-      this.zombies.setWallColliders(arena.wallColliders);
+      this.zombies.setEffectColliders(arena.colliders);
     };
     this.zombies.onZombieSpawned = (zombie) => {
       this.send({ type: 'zombieSpawn', zombie: this.zombieState(zombie) });
@@ -436,9 +438,13 @@ export class CoopHostMode implements GameMode {
           this.guestAvatar.playFire();
           const config = WEAPON_DEFINITIONS[message.weapon].energy;
           const state = this.guestState;
+          if (!state) break;
+          // The guest's eyes, not its claimed origin: the host trusts its own replica.
+          const eye = { x: state.x, y: state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance)), z: state.z };
+          this.ctx.audio.playRemoteShot(WEAPON_DEFINITIONS[message.weapon].audio, this.world.spatialCueFor(eye));
           const length = Math.hypot(message.direction.x, message.direction.y, message.direction.z);
-          if (config && state && length > 0.8 && length < 1.2) {
-            this.energy.fire(new THREE.Vector3(state.x, state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance)), state.z),
+          if (config && length > 0.8 && length < 1.2) {
+            this.energy.fire(new THREE.Vector3(eye.x, eye.y, eye.z),
               new THREE.Vector3(message.direction.x / length, message.direction.y / length,
                 message.direction.z / length), config, 1);
           }
@@ -533,13 +539,14 @@ export class CoopHostMode implements GameMode {
       if (event.type === 'roundStarted') {
         for (const barrier of this.world.arena.barriers) barrier.resetRoundCap();
         this.ctx.hud.showRoundBanner(t('banner.round', { round: event.round }));
-        this.ctx.audio.playRoundSting();
+        if (this.roundCues.claim('start', event.round)) this.ctx.audio.playRoundStartCue();
         this.send({ type: 'roundStart', round: event.round });
       } else if (event.type === 'spawnDue') {
         const anchor = this.spawnAnchor();
         if (!this.zombies.spawnZombie(event.config, anchor.x, anchor.z, event.round)) this.rounds.requeueSpawn();
       } else if (event.type === 'roundComplete') {
         this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: event.round }));
+        if (this.roundCues.claim('end', event.round)) this.ctx.audio.playRoundEndCue();
         this.send({ type: 'roundEnd', round: event.round });
       }
     }
@@ -1060,7 +1067,7 @@ export class CoopHostMode implements GameMode {
     this.zombies.reset();
     this.energy.reset();
     this.ctx.audio.stopMusic?.();
-    this.ctx.audio.stopWind?.();
+    this.ctx.audio.setAmbientBed(null);
     this.ctx.audio.startEndingAudio(ending.audio);
     this.ctx.hud.setInteractionPrompt(null);
     this.ctx.hud.showEnding(this.rounds.round, ending.presentation);
@@ -1073,6 +1080,7 @@ export class CoopHostMode implements GameMode {
     this.knife.reset();
     this.lastGuestKnife = -Infinity;
     this.rounds.reset();
+    this.roundCues.reset();
     this.runFlow.reset();
     this.zombies.reset();
     this.energy.reset();

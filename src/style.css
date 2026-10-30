@@ -1472,6 +1472,235 @@ html.coop-guest #pause-restart {
   text-indent: 0.42em;
 }
 
+.beta-access-form {
+  margin-top: 22px;
+  text-align: left;
+  color: #b8c0ca;
+  font: 14px/1.5 'Segoe UI', system-ui, sans-serif;
+}
+
+.beta-access-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.beta-access-fields input,
+.beta-access-fields button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #56606b;
+  border-radius: 2px;
+  background: #141a20;
+  color: #e3e4dd;
+  font: inherit;
+}
+
+.beta-access-fields input { flex: 1 1 180px; min-width: 0; }
+.beta-access-fields button { cursor: pointer; }
+.beta-access-fields :focus-visible { outline: 2px solid #e3b552; outline-offset: 3px; }
+#beta-message { margin: 8px 0 0; color: #e9aa9f; }
+
+/* Closed-beta thank-you card over a slow crossfade of in-game screenshots. */
+.beta-thanks {
+  --thanks-gold: #e3b552;
+  --thanks-red: #c9433a;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  border: 0;
+  background: #050607;
+  color: #d8dad3;
+  overflow: hidden auto;
+  font: 15px/1.6 'Segoe UI', system-ui, sans-serif;
+}
+
+.beta-thanks[open] {
+  display: grid;
+  place-items: center;
+  animation: beta-thanks-in 0.9s ease-out both;
+}
+
+.beta-thanks::backdrop { background: #000; }
+
+.beta-thanks-slides,
+.beta-thanks-shade {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.beta-thanks-slides img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: saturate(0.85) contrast(1.05);
+  animation: beta-thanks-slide 42s linear infinite;
+}
+
+.beta-thanks-slides img:nth-child(2) { animation-delay: 7s; }
+.beta-thanks-slides img:nth-child(3) { animation-delay: 14s; }
+.beta-thanks-slides img:nth-child(4) { animation-delay: 21s; }
+.beta-thanks-slides img:nth-child(5) { animation-delay: 28s; }
+.beta-thanks-slides img:nth-child(6) { animation-delay: 35s; }
+
+.beta-thanks-shade {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(5, 6, 7, 0.35) 0%, rgba(5, 6, 7, 0.82) 62%, #050607 100%),
+    linear-gradient(180deg, rgba(90, 12, 10, 0.28), transparent 40%, rgba(0, 0, 0, 0.6));
+}
+
+.beta-thanks-card {
+  position: relative;
+  width: min(100%, 580px);
+  padding: clamp(24px, 5vmin, 44px) clamp(20px, 5vmin, 44px) clamp(22px, 4vmin, 36px);
+  border: 1px solid rgba(227, 181, 82, 0.22);
+  border-left: 3px solid var(--thanks-red);
+  background: rgba(9, 11, 13, 0.74);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 120px rgba(123, 17, 13, 0.25);
+  backdrop-filter: blur(6px);
+}
+
+.beta-thanks-card > * {
+  margin: 0 0 14px;
+  animation: beta-thanks-rise 0.8s ease-out both;
+}
+
+.beta-thanks-card > :nth-child(3) { animation-delay: 0.25s; }
+.beta-thanks-card > :nth-child(4) { animation-delay: 0.55s; }
+.beta-thanks-card > :nth-child(5) { animation-delay: 0.8s; }
+.beta-thanks-card > :nth-child(6) { animation-delay: 1s; }
+.beta-thanks-card > :nth-child(7) { animation-delay: 1.2s; }
+.beta-thanks-card > :nth-child(8) { animation-delay: 1.45s; }
+.beta-thanks-card > :nth-child(9) { animation-delay: 1.7s; }
+
+.beta-thanks-kicker {
+  /* Leaves room for the stamp in the top-right corner. */
+  padding-right: 110px;
+  color: var(--thanks-red);
+  font: 700 11px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.34em;
+}
+
+.beta-thanks-title {
+  color: #efe9dc;
+  font: 900 clamp(52px, min(14vw, 14dvh), 108px) Impact, 'Arial Narrow', sans-serif;
+  line-height: 0.9;
+  letter-spacing: 0.08em;
+  text-shadow: 3px 4px 0 rgba(0, 0, 0, 0.7), 0 0 48px rgba(201, 67, 58, 0.45);
+  animation: beta-thanks-title 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s both;
+}
+
+.beta-thanks-tester {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  max-width: 100%;
+  padding: 6px 12px;
+  border: 1px solid rgba(227, 181, 82, 0.35);
+  background: rgba(227, 181, 82, 0.08);
+  color: #9a9483;
+  font: 700 11px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.24em;
+}
+
+.beta-thanks-tester strong {
+  color: var(--thanks-gold);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.beta-thanks-lead {
+  color: #f1ece2;
+  font-size: clamp(18px, 2.6vmin, 21px);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.beta-thanks-card p:not([class]) { color: #b9bdb4; }
+
+.beta-thanks-signature {
+  color: var(--thanks-gold);
+  font-style: italic;
+}
+
+#beta-thanks-close {
+  min-height: 48px;
+  margin: 8px 0 0;
+  padding: 12px 26px;
+  border: 1px solid var(--thanks-gold);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e8c063, #b98a2c);
+  color: #17120a;
+  font: 800 13px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.22em;
+  cursor: pointer;
+  box-shadow: 0 0 28px rgba(227, 181, 82, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#beta-thanks-close:hover { transform: translateY(-1px); box-shadow: 0 0 38px rgba(227, 181, 82, 0.45); }
+#beta-thanks-close:focus-visible { outline: 2px solid #f6ead0; outline-offset: 4px; }
+
+.beta-thanks-stamp {
+  position: absolute;
+  top: clamp(14px, 3vmin, 26px);
+  right: clamp(12px, 3vmin, 24px);
+  padding: 5px 10px;
+  border: 3px double var(--thanks-red);
+  color: var(--thanks-red);
+  font: 900 14px Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.18em;
+  opacity: 0.85;
+  transform: rotate(-9deg);
+  animation: beta-thanks-stamp 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) 1.9s both;
+}
+
+@keyframes beta-thanks-in { from { opacity: 0; } }
+
+/* Each screenshot fades in, drifts while zooming out and fades over the next one. */
+@keyframes beta-thanks-slide {
+  0% { opacity: 0; transform: scale(1.14) translateX(1.5%); }
+  4% { opacity: 1; }
+  17% { opacity: 1; }
+  21% { opacity: 0; transform: scale(1.02) translateX(-1.5%); }
+  100% { opacity: 0; }
+}
+
+@keyframes beta-thanks-rise { from { opacity: 0; transform: translateY(14px); } }
+
+@keyframes beta-thanks-title {
+  from { opacity: 0; letter-spacing: 0.5em; filter: blur(10px); }
+}
+
+@keyframes beta-thanks-stamp {
+  from { opacity: 0; transform: rotate(-9deg) scale(2.4); }
+}
+
+@media (max-height: 520px) {
+  .beta-thanks[open] { place-items: start center; }
+  .beta-thanks-card > * { margin-bottom: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beta-thanks[open],
+  .beta-thanks-card > *,
+  .beta-thanks-title,
+  .beta-thanks-stamp { animation: none; }
+  .beta-thanks-slides img { animation: none; }
+  .beta-thanks-slides img:first-child { opacity: 1; }
+}
+
 /* Map cards: art on top, copy below. Registry flags set data-access (free/premium). */
 .map-grid {
   display: grid;

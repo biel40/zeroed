@@ -58,7 +58,7 @@ export class ZombieBlood {
       slot.position.z += (this.rng() - 0.5) * 0.18;
       const force = profile.force * (0.65 + this.rng() * 0.7);
       slot.velocity.set(directionX / length * force + (this.rng() - 0.5) * profile.spread * 2,
-        0.5 + this.rng() * 3.5, directionZ / length * force + (this.rng() - 0.5) * profile.spread * 2);
+        0.25 + this.rng() * 1.5, directionZ / length * force + (this.rng() - 0.5) * profile.spread * 2);
       slot.radius = profile.radius * (0.65 + this.rng() * 0.7);
       slot.scale.setScalar(slot.radius);
       slot.floor = floor - this.group.matrixWorld.elements[13];

@@ -7,7 +7,9 @@ Sobrevive a las rondas, consigue armas y descubre los secretos de cada mapa.
 | --- | --- | --- |
 | Burned Mansion y Station 33* | Hasta 2 jugadores en Burned Mansion | Navegador, PWA y Android |
 
-\* Station 33 está disponible en acceso beta y solo para un jugador.
+\* Station 33 es solo individual y sigue en desarrollo: temporalmente requiere
+un correo de la lista de beta, también con `?map=station-33`. Burned Mansion
+sigue abierto. Consulta [acceso de beta](public/beta/README.md).
 
 ## 🚀 Empezar
 

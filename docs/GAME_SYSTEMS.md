@@ -65,7 +65,8 @@ todo (evento `overheated`: siseo y chasquido en cada intento); `heat.coolDelay`
 retiene el calor entre disparos para que un semiautomatico lo acumule. El
 Barrett lo usa: cuatro disparos seguidos (menos de 0.6 s entre ellos) lo
 bloquean hasta enfriarse. Un `audio.sampleFile` sustituye el disparo procedural por
-un MP3 de `public/assets/audio/` (el Barrett espera `barrett_shot.mp3`); sin
+un MP3 de `public/assets/audio/` (el Barrett usa `barrett_shot.mp3` y la M1911 `m1911_shot.mp3`, con
+`audio.variation`: tono ±3 % y ganancia 95–100 % por disparo); sin
 el archivo suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
 anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
 del jugador (el Barrett, unos 12 cm por disparo). `muzzleSmoke` suelta nubes
@@ -125,6 +126,19 @@ La música usa en bucle durante la partida la pista que declara el mapa y compar
 otra entre el menú principal y la pausa. Al pausar se conserva la posición de la pista de
 partida; al reanudar continúa desde ese punto. El inicio de ronda se reproduce
 como cue independiente sobre la música de fondo.
+
+Bajo la música, cada mapa puede declarar un fondo procedural
+(`ArenaAmbience.ambientBed`: viento en Burned Mansion, zumbido de red a 50 Hz y
+rumor de tuneles en Station 33) que entra y sale con fundido. Fondo y eventos
+ambientales del mapa pasan por un bus propio de `AudioSystem`: al morir el
+ultimo zombi suena un toque de campana grave y el ambiente baja a un silencio
+tenso durante el descanso; el sting de la ronda siguiente lo devuelve
+gradualmente. `RoundCueGate` garantiza un unico cue de inicio y de fin por ronda
+en individual y en ambos clientes cooperativos, y se reinicia con la partida.
+La pausa silencia el bus y ocultar la pagina (cambio de pestaña o de app)
+suspende el contexto de efectos hasta volver. Los gemidos de zombi (aparicion y
+ambientales) comparten un cupo de voces simultaneas con huecos reservados para
+los cercanos, de modo que una horda no apila decenas de gruñidos.
 Station 33 usa «Creepy Halloween Music», de Tunetank (Pixabay), como pista propia;
 Burned Mansion conserva su música de partida. Los créditos y el origen del asset
 se recogen en `ASSETS.md`.
@@ -233,7 +247,10 @@ existente a `MOTDRULES`.
   ambientales (siempre de un zombie vivo) suenan desde su origen. Las fuentes a la
   espalda o en otra planta pasan por un paso bajo que las apaga, tambien en
   los pasos, para distinguir delante/detras y arriba/abajo. En cooperativo el
-  invitado reproduce las mismas señales a partir de los eventos del anfitrion.
+  invitado reproduce las mismas señales a partir de los eventos del anfitrion,
+  y cada cliente oye los disparos del compañero desde su posicion
+  (`playRemoteShot`: solo la detonacion, sin mecanismo ni cola de sala), a partir
+  del `playerShoot` que ya se enviaba.
 - Animacion: aparicion y marcha son los clips originales del GLB; el idle
   tecnico y las muertes se hornean por codigo sobre el mismo rig una vez por
   modelo (`ZombieMotionClips`). El mixer sincroniza la marcha con la velocidad
@@ -257,7 +274,7 @@ existente a `MOTDRULES`.
   incluso en headshot: el cuerpo desaparece y `ZombieGibs` lanza sus pedazos con
   munones rojos, restos y gotas de sangre varios metros en la direccion del
   disparo, con una nube de sangre que queda un instante en el aire;
-  rebotan en las paredes del mapa (`wallColliders`, via `GibWalls`), donde la
+  rebotan en los solidos del mapa (`colliders`, via `GibWalls`), donde la
   sangre queda pegada, y caen al suelo o encima de muebles; un charco se
   extiende bajo el cuerpo; reposan el tiempo del cadaver y se encogen). Un disparo por la espalda lo
   tumba hacia delante y los impactos laterales giran la caida hacia el empuje.
@@ -265,13 +282,23 @@ existente a `MOTDRULES`.
   cuerpo llega al suelo con impacto y, hasta aterrizar, nunca vuelve a subir
   (si las rodillas tocan el suelo lo sostienen hasta que se desploma). Al morir se retiran al instante los colliders y el estado A*/colas de barrera;
   el anfitrion replica estilo y lado del impacto.
-- Las cuchilladas producen salpicaduras abundantes en cada impacto, sea mortal
+- Las cuchilladas producen salpicaduras contenidas en cada impacto, sea mortal
   o no. Las balas tambien expulsan sangre; los impactos consecutivos sobre un
   mismo zombi aumentan la cantidad mientras mantengan la cadencia. `ZombieBleeding`
   decide la intensidad y `ZombieBlood` acumula las gotas y manchas fuera del
   cuerpo: permanecen aunque el zombi avance, muera o se reutilice. Comparten
   material, gotas, caida y contacto con superficies con el Barrett
   (`BloodDropMotion`); su desmembramiento conserva su propio efecto.
+  Las gotas atraviesan los huecos de ventanas y entradas de barricadas:
+  los bloqueos invisibles que frenan al jugador no reciben manchas.
+  Al adherirse, toda la mancha se ajusta a la cara solida que la sostiene;
+  los impactos en bordes no sobresalen hacia el hueco de una ventana.
+  Las gotas son pequenas y de dispersion limitada; las manchas quedan finas,
+  con contorno irregular, un rojo oscuro con brillo humedo y sombreado plano (sin el borde iluminado de una esfera aplastada).
+  Solo se pegan donde hay una superficie visible: en el lateral acolchado de un
+  mueble la gota resbala hasta el suelo y sobre un mueble irregular (bancos,
+  carros, bidones) desaparece sin mancha. El Barrett conserva su desmembramiento
+  con una nube mas breve y tenue, menos gotas y un charco de menor tamano.
   Las manchas duran 45 s, se encogen al final y se reciclan al alcanzar el limite
   de 1024 gotas/manchas, con un solo draw call. Se limpian al reiniciar la run.
   Fuego y armas de energia conservan sus efectos propios. En cooperativo se
@@ -283,6 +310,11 @@ existente a `MOTDRULES`.
   alcanzados en `teslaChain`.
 
 ## Mapas e interacciones
+
+- Burned Mansion sigue publico. Station 33 requiere temporalmente introducir
+  un correo autorizado de beta en el menu para mostrar su tarjeta y abrirlo.
+  Los enlaces directos respetan el mismo permiso; detalles y limites en
+  [acceso de beta](../public/beta/README.md).
 
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
@@ -364,8 +396,13 @@ existente a `MOTDRULES`.
 - Los fluorescentes de Station 33 parpadean por circuitos desfasados (colores
   de materiales compartidos, sin luces nuevas). Megafonia, tren lejano y
   apagon son eventos de datos del mapa con temporizador
-  (`AmbientEventScheduler`) y voz procedural en `AudioSystem`; un `sampleFile`
-  en el evento la sustituye por un MP3 de `public/assets/audio/`.
+  (`AmbientEventScheduler`) y voz procedural en `AudioSystem`, junto a un golpe
+  metalico con eco en el tunel y maquinaria lejana en la subestacion; un
+  `sampleFile` en el evento la sustituye por un MP3 de `public/assets/audio/`.
+  Burned Mansion programa igual crujidos de vigas, golpes en el bunker, rafagas
+  de viento, brasas en la chimenea del banquete y un aullido lejano
+  (`MANSION_AMBIENT_EVENTS`), separados por silencios largos y reproducidos
+  localmente en cada cliente cooperativo.
 - Un mapa puede declarar una intro (`ArenaIntro`: planos de camara,
   duracion y presentacion del HUD). `ZombiesMode` la reproduce una sola vez
   al empezar la partida (no al reanudar ni reiniciar) con `IntroCinematic`,

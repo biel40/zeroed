@@ -8,18 +8,12 @@
 - Posturas de pie, agachado y tumbado en individual y cooperativo, con controles
   tactiles y representacion del compañero. Consulta [controles](GAME_SYSTEMS.md#shell-compartido)
   y [replica cooperativa](MULTIPLAYER.md#alcance-y-límites).
-- Burned Mansion admite individual y cooperativo; Station 33 es individual y premium, accesible durante la beta sin pagos. Consulta [mapas e interacciones](GAME_SYSTEMS.md#mapas-e-interacciones) y la [guia artistica de Station 33](STATION_33.md).
+- Burned Mansion tiene acceso publico individual y cooperativo. Station 33 es individual y premium de presentacion; temporalmente requiere un correo de la lista de beta para aparecer y abrirse, tambien por enlace directo. El permiso es local y no verifica la titularidad del correo: consulta [acceso de beta](../public/beta/README.md). Direccion artistica en [Station 33](STATION_33.md).
 - Combate, rondas, economia, progresion, enemigos y anillos estan disponibles en individual; el alcance cooperativo se detalla en [MULTIPLAYER.md](MULTIPLAYER.md#alcance-y-límites). Consulta [zombies](GAME_SYSTEMS.md#zombies) y [anillos](GAME_SYSTEMS.md#anillos).
 - PWA instalable y distribucion Android preparada; consulta [PWA](PWA.md) y [Android](ANDROID_DOCS.md).
 - El relay cooperativo local y el Worker de Cloudflare estan preparados; consulta [despliegue](MULTIPLAYER.md#despliegue-gratuito-vercel--cloudflare).
 
 ## Limitaciones y bugs abiertos
-
-- Acceso temporal de beta en el navegador: los correos autorizados de `public/beta/emails.js` entran directamente,
-  sin API ni verificacion por correo. Es un filtro visual, no autenticacion.
-  Codigo y guia de retirada en `public/beta/`.
-  Tras introducir un correo autorizado se muestra una bienvenida cinematica
-  saltable, con agradecimiento, feedback por correo y opcion de compartir.
 
 - No hay pruebas de WebGL, DOM real, Pointer Lock, fullscreen, audio real ni
   flujo end-to-end. PWA y offline requieren validacion manual en HTTPS.

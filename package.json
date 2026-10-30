@@ -6,7 +6,6 @@
   "description": "Browser Zombies FPS in Burned Mansion, built with Three.js and TypeScript",
   "scripts": {
     "dev": "vite",
-    "beta:dev": "vite --mode beta --host localhost --port 5174 --strictPort --open /beta/index.html",
     "start": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

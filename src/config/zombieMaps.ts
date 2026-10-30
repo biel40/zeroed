@@ -10,14 +10,14 @@ export type ZombieArenaFactory = (scene: THREE.Scene, profile: DeviceProfile) =>
 
 export interface ZombieMapDefinition {
   readonly id: string;
-  /** Listed in the map menu; hidden maps still start through `?map=`. */
+  /** Listed in the map menu when the player also has access. */
   readonly visible: boolean;
-  /** Listed in the menu only for developers; every map still starts through `?map=`. */
-  readonly developerOnly: boolean;
+  /** Requires an allowed beta email in both the menu and direct links. */
+  readonly betaOnly: boolean;
   readonly nameKey: TranslationKey;
   /** Playable in the co-op modes. */
   readonly coop: boolean;
-  /** Sold separately once payments exist; the closed beta unlocks it for testers. */
+  /** Presentation only until payments exist; does not enforce access. */
   readonly premium: boolean;
   /**
    * Weapons only this map hands out (sold by its own stations). They are
@@ -33,7 +33,7 @@ export const ZOMBIE_MAPS = {
   'burned-mansion': {
     id: 'burned-mansion',
     visible: true,
-    developerOnly: false,
+    betaOnly: false,
     nameKey: 'map.burnedMansion',
     coop: true,
     premium: false,
@@ -43,7 +43,7 @@ export const ZOMBIE_MAPS = {
   'station-33': {
     id: 'station-33',
     visible: true,
-    developerOnly: true,
+    betaOnly: true,
     nameKey: 'map.station33',
     coop: false,
     premium: true,
@@ -59,6 +59,11 @@ export const COOP_ZOMBIE_MAP_ID: ZombieMapId = 'burned-mansion';
 
 export function isZombieMapId(value: string | null | undefined): value is ZombieMapId {
   return value != null && Object.hasOwn(ZOMBIE_MAPS, value);
+}
+
+/** Shared by menu visibility and every match entry point, including `?map=`. */
+export function canAccessZombieMap(value: string | null | undefined, betaAccess: boolean): value is ZombieMapId {
+  return isZombieMapId(value) && (!ZOMBIE_MAPS[value].betaOnly || betaAccess);
 }
 
 export function getZombieMapDefinition(

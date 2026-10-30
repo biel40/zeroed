@@ -13,8 +13,10 @@ codigo: actualiza la guia.
   es "Antigua estación abandonada en la época de la Guerra Fría...pero que
   esconde secretos que nunca deberían ser revelados."
 - Mapa premium y solo individual. Mientras no haya pagos, premium solo cambia la
-  presentacion (tarjeta dorada, insignia, intro) y la beta cerrada lo juega
-  completo. Debe notarse superior a Burned Mansion desde el primer segundo, sin
+  presentacion (tarjeta dorada, insignia, intro). Temporalmente requiere un
+  correo de beta para aparecer y abrirse, tambien con `?map=station-33` y en
+  desarrollo; consulta [acceso de beta](../public/beta/README.md).
+  Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
   cuatro entradas con chapas de acero, la PPSh-41 (1250 / 625) en pared
@@ -320,7 +322,9 @@ codigo: actualiza la guia.
   de las demas completan); el resto brilla con materiales emisivos que siguen a
   su circuito. Un numero fijo de luces visibles evita recompilar shaders.
 - La geometria estatica se agrupa en un unico batch; cada mueble solido tiene
-  un proxy AABB simple que para balas, zombies y jugador.
+  un proxy AABB simple que para balas, zombies y jugador; las columnas usan dos
+  (zocalo y fuste) para que impactos y sangre queden sobre el marmol visible.
+  Cada proxy declara que caras admiten sangre (`stainFaces`).
 - La decoracion del suelo queda por debajo de la altura de obstaculo de los
   zombies y lejos de las entradas; los pasadizos de spawn quedan libres.
 - Los perfiles de efectos reducidos (movil) recortan sombras, particulas y

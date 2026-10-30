@@ -1,9 +1,10 @@
-import { getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
+import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
 import { formatNumber, onLanguageChange, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
+import { BetaThanksScreen } from './BetaThanksScreen';
 import { LanguagePicker } from './LanguagePicker';
 import { bindInteractionPromptVisibility, renderInteractionPrompt } from './InteractionPromptView';
 import { SettingsPanel } from './SettingsPanel';
@@ -122,6 +123,8 @@ export class HUD {
   private mapLoadingTimer = 0;
   private startScreenTimer = 0;
   private readonly settings: SettingsPanel;
+  private readonly betaThanks = new BetaThanksScreen(mustGet('beta-thanks') as HTMLDialogElement,
+    mustGet('beta-thanks-email'), mustGet('beta-thanks-close'));
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -255,15 +258,16 @@ export class HUD {
   }
 
   /** Initial picker: Zombies is the only mode, so the player chooses its arena directly. */
-  public showMapSelect(onSelect: (mapId: ZombieMapId) => void, showDeveloperMaps: boolean): void {
+  public showMapSelect(onSelect: (mapId: ZombieMapId) => void, betaAccess: boolean): void {
     this.fadeOutStartScreen();
     this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
+    mustGet('beta-access-form').classList.toggle('hidden', betaAccess);
     const buttons = this.mapSelect.querySelectorAll<HTMLButtonElement>('[data-map]');
     let firstVisibleButton: HTMLButtonElement | null = null;
     for (const button of buttons) {
       const map = getZombieMapDefinition(button.dataset.map);
-      const listed = !!map?.visible && (showDeveloperMaps || !map.developerOnly);
+      const listed = !!map?.visible && canAccessZombieMap(map.id, betaAccess);
       button.classList.toggle('hidden', !listed);
       if (!map || !listed) {
         button.onclick = null;
@@ -286,6 +290,32 @@ export class HUD {
 
   public setCoopSelectHandler(handler: () => void): void {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
+  }
+
+  public setBetaAccessHandler(acceptEmail: (email: string) => boolean): void {
+    const form = mustGet('beta-access-form') as HTMLFormElement;
+    const email = mustGet('beta-email') as HTMLInputElement;
+    const message = mustGet('beta-message');
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      try {
+        if (!acceptEmail(email.value)) {
+          setTranslatedText(message, 'beta.denied');
+          return;
+        }
+        email.value = '';
+        delete message.dataset.i18n;
+        message.textContent = '';
+        form.classList.add('hidden');
+      } catch {
+        setTranslatedText(message, 'beta.unavailable');
+      }
+    };
+  }
+
+  /** Thanks an accepted closed-beta tester; `onClose` runs when they continue. */
+  public showBetaThanks(email: string, onClose: () => void): void {
+    this.betaThanks.show(email, onClose);
   }
 
   /** Settings quality buttons (main menu only); the choice applies from the next match. */

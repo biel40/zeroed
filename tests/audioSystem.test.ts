@@ -24,7 +24,7 @@ describe('MusicManager', () => {
       player: { rig: { position: { x: 0, z: 0 } } },
       hud: { showRoundBanner: vi.fn() },
       audio: {
-        playRoundSting: vi.fn(),
+        playRoundStartCue: vi.fn(),
         music: { playRoundStartOnce },
       },
     };
@@ -35,7 +35,7 @@ describe('MusicManager', () => {
 
     mode['processRoundEvents']();
 
-    expect(mode.ctx.audio.playRoundSting).toHaveBeenCalledTimes(1);
+    expect(mode.ctx.audio.playRoundStartCue).toHaveBeenCalledTimes(1);
     expect(playRoundStartOnce).toHaveBeenCalledTimes(1);
   });
 
@@ -219,6 +219,7 @@ describe('Game pause resume', () => {
       resume: vi.fn(),
       music: { stopMenuLoop: vi.fn(), startGameplayLoop: vi.fn() },
       resumeMusic: vi.fn(),
+      setAmbienceSuspended: vi.fn(),
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
@@ -268,6 +269,7 @@ describe('Game pause resume', () => {
     game.mode = { id: 'zombies', gameplayMusic: 'background_music_theme' };
     game.audio = { music: { stopMenuLoop: vi.fn(), startGameplayLoop: vi.fn() } };
     game.audio.resumeMusic = vi.fn();
+    game.audio.setAmbienceSuspended = vi.fn();
     game.hud = {
       hidePauseMenu: vi.fn(),
       hideStartScreen: vi.fn(),
@@ -285,6 +287,7 @@ describe('Game pause resume', () => {
     expect(game.pointerLockRequested).toBe(false);
     expect(game.audio.music.stopMenuLoop).toHaveBeenCalledOnce();
     expect(game.audio.resumeMusic).toHaveBeenCalledOnce();
+    expect(game.audio.setAmbienceSuspended).toHaveBeenCalledExactlyOnceWith(false);
     expect(game.audio.music.startGameplayLoop).toHaveBeenCalledExactlyOnceWith('background_music_theme');
     expect(game.hud.hidePauseMenu).toHaveBeenCalledOnce();
   });
@@ -296,6 +299,7 @@ describe('Game pause resume', () => {
     game.mode = { id: 'zombies' };
     game.audio = {
       pauseMusic: vi.fn(),
+      setAmbienceSuspended: vi.fn(),
       music: { startMenuLoop: vi.fn() },
     };
     game.hud = { showPauseMenu: vi.fn() };
@@ -303,6 +307,7 @@ describe('Game pause resume', () => {
     (Game as any).prototype.pause.call(game);
 
     expect(game.audio.pauseMusic).toHaveBeenCalledOnce();
+    expect(game.audio.setAmbienceSuspended).toHaveBeenCalledExactlyOnceWith(true);
     expect(game.audio.music.startMenuLoop).toHaveBeenCalledOnce();
     expect(game.hud.showPauseMenu).toHaveBeenCalledOnce();
   });
@@ -522,7 +527,8 @@ describe('AudioSystem zombie impact sounds', () => {
     expect(tickSpy.mock.calls[2][1]).toBeGreaterThan(tickSpy.mock.calls[0][1] as number);
   });
 
-  it.each(['pa-crackle', 'distant-train', 'power-dip'] as const)('voices the %s map ambience procedurally from its position', (sound) => {
+  it.each(['pa-crackle', 'distant-train', 'power-dip', 'metal-echo', 'machinery', 'wood-creak', 'distant-knock',
+    'wind-gust', 'ember-crackle', 'distant-howl'] as const)('voices the %s map ambience procedurally from its position', (sound) => {
     const audio = new AudioSystem() as any;
     const formant = { type: '', frequency: { value: 0 }, Q: { value: 0 }, connect: vi.fn() };
     audio.context = vi.fn(() => ({ ctx: { currentTime: 0, createBiquadFilter: () => formant }, master: {}, noise: {} }));

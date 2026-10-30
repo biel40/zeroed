@@ -45,7 +45,7 @@ Reutiliza lo compartido antes de crear algo: `WindowBarrier`, `PointDoor` /
 - `PointLightBudget`, `AmbientEventScheduler` y `ArenaAmbience`;
 - `BloodDecalTexture` y `ProceduralNoise`;
 - `MapBuildKit`, que el `<Mapa>BuildContext` extiende (grupo, estructura, lote y material de colision);
-- `addSolidProxy` (colisionador de atrezo), `Cobwebs`, y `LockerBank` / `WallFrame` (bancos de taquillas);
+- `addSolidProxy` (colisionador de atrezo; su ultimo argumento declara las caras con sangre: `top` por defecto, `none` si la tapa no coincide con el modelo, `all` si la caja lo ajusta), `Cobwebs`, y `LockerBank` / `WallFrame` (bancos de taquillas);
 - `RingLocker` (maquina de anillos), `MapPower` y `PowerLever` (electricidad e interruptor, para `ringMachines` y `powerSwitch`).
 
 Cada pieza pide sus materiales por nombre (`greySteel`, `paintedSteel`...):

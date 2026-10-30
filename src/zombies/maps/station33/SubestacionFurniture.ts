@@ -43,7 +43,7 @@ export function buildSubestacionFurniture(context: Station33BuildContext, lighti
   for (const z of TRANSFORMERS.zs) addTransformer(context, z);
   addSolidProxy(context, 'transformers',
     { x: TRANSFORMERS.x - TRANSFORMERS.width / 2 - 0.25, y: 0, z: Math.min(...TRANSFORMERS.zs) - TRANSFORMERS.depth / 2 },
-    { x: hall.maxX, y: TRANSFORMERS.height + 0.8, z: Math.max(...TRANSFORMERS.zs) + TRANSFORMERS.depth / 2 }, 'metal');
+    { x: hall.maxX, y: TRANSFORMERS.height + 0.8, z: Math.max(...TRANSFORMERS.zs) + TRANSFORMERS.depth / 2 }, 'metal', 'none');
   for (const side of [-1, 1] as const) addSwitchboard(context, lighting, side);
   addOilDrums(context, 'oil-drums', OIL_DRUMS);
 }
@@ -83,7 +83,7 @@ function addMotorGenerator(context: Station33BuildContext, x: number, z: number)
   batch.add(new THREE.TubeGeometry(feed, 10, 0.05, 6), materials.rubber);
   addSolidProxy(context, 'motor-generator',
     { x: x - plinthWidth / 2, y: 0, z: z - plinthLength / 2 },
-    { x: x + plinthWidth / 2, y: shaftY + 1.25, z: z + plinthLength / 2 }, 'metal');
+    { x: x + plinthWidth / 2, y: shaftY + 1.25, z: z + plinthLength / 2 }, 'metal', 'none');
 }
 
 /** Grey tank with radiator fins on its open sides, an oil conservator and porcelain bushings on top. */

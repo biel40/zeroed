@@ -170,7 +170,7 @@ export class PowerLever implements ArenaPowerSwitch {
     const centerZ = config.z + config.facingZ * PROXY_DEPTH / 2;
     const halfX = alongX ? halfAlong : PROXY_DEPTH / 2;
     const halfZ = alongX ? PROXY_DEPTH / 2 : halfAlong;
-    addSolidProxy(kit, 'power-lever', { x: centerX - halfX, y: 0, z: centerZ - halfZ }, { x: centerX + halfX, y: top, z: centerZ + halfZ }, 'metal');
+    addSolidProxy(kit, 'power-lever', { x: centerX - halfX, y: 0, z: centerZ - halfZ }, { x: centerX + halfX, y: top, z: centerZ + halfZ }, 'metal', 'none');
   }
 
   /**

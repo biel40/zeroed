@@ -60,6 +60,9 @@ export class CoopWorld {
     this.arena = createCoopArena(ctx);
     this.arena.init();
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
+    // Map ambience is local mood, scheduled on each client and never sent over the network.
+    this.arena.onAmbientCue = (cue) => ctx.audio.playAmbientCue(cue, this.spatialCueFor(cue.position));
+    ctx.audio.setAmbientBed(this.arena.ambience.ambientBed ?? null);
     this.arena.onSoulAbsorbed = (position) => ctx.audio.playSoulAbsorb(this.spatialCueFor(position));
     this.arena.onSoulLampCompleted = (position) => ctx.audio.playSoulLampComplete(this.spatialCueFor(position));
     this.arena.onSecretRoomUnlocked = (position) => ctx.audio.playSecretRoomUnlock(this.spatialCueFor(position));

@@ -184,8 +184,7 @@ try {
       .replace(/versionName "[^"]+"/, `versionName "${next.name}"`),
   );
 
-  // La puerta de la beta solo aplica a la web; nunca debe entrar en la app.
-  const webEnv = { BETA_ENABLED: 'false', VITE_COOP_SERVER_URL: coopServerUrl };
+  const webEnv = { VITE_COOP_SERVER_URL: coopServerUrl };
   run('npx', ['tsc', '--noEmit']);
   run('npx', ['vite', 'build', '--mode', 'android'], { env: webEnv });
   checkWebBundle(coopServerUrl);

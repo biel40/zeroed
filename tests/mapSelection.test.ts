@@ -23,6 +23,8 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   readonly style = { setProperty: () => undefined };
   onclick: (() => void) | null = null;
+  public onsubmit: ((event: { preventDefault: () => void }) => void) | null = null;
+  public value = '';
   textContent = '';
   focused = false;
 
@@ -88,6 +90,9 @@ describe('Zombies map selection flow', () => {
     const mapSelect = new FakeElement([mansion, station]);
     const startScreen = new FakeElement();
     const loadingBar = new FakeElement([new FakeElement()]);
+    const betaForm = new FakeElement();
+    const betaEmail = new FakeElement();
+    const betaMessage = new FakeElement();
     const generic = new FakeElement();
     const previousDocument = globalThis.document;
     Object.defineProperty(globalThis, 'document', {
@@ -101,7 +106,13 @@ describe('Zombies map selection flow', () => {
               ? startScreen
               : id === 'loading-bar'
                 ? loadingBar
-                : generic,
+                : id === 'beta-access-form'
+                  ? betaForm
+                  : id === 'beta-email'
+                    ? betaEmail
+                    : id === 'beta-message'
+                      ? betaMessage
+                      : generic,
       },
     });
 
@@ -119,6 +130,7 @@ describe('Zombies map selection flow', () => {
       expect(startScreen.classList.contains('leaving')).toBe(false);
       expect(mansion.classList.contains('hidden')).toBe(false);
       expect(station.classList.contains('hidden')).toBe(false);
+      expect(betaForm.classList.contains('hidden')).toBe(true);
       expect(mansion.focused).toBe(true);
       expect(mansion.dataset.access).toBe('free');
       expect(mansion.slots['[data-map-access]'].dataset.i18n).toBe('map.access.free');
@@ -132,14 +144,40 @@ describe('Zombies map selection flow', () => {
       ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
       expect(station.classList.contains('hidden')).toBe(false);
 
-      // Testers do not see developer-only maps; `?map=` still reaches them.
+      // Without an allowed beta session the card and its click handler disappear.
       ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), false);
       expect(station.classList.contains('hidden')).toBe(true);
+      expect(betaForm.classList.contains('hidden')).toBe(false);
       expect(station.onclick).toBeNull();
       expect(mansion.classList.contains('hidden')).toBe(false);
       ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
+
+      ui.showMapSelect(() => undefined, false);
+      const acceptEmail = vi.fn(() => false);
+      ui.setBetaAccessHandler(acceptEmail);
+      betaEmail.value = 'unlisted@example.com';
+      const preventDefault = vi.fn();
+      betaForm.onsubmit?.({ preventDefault });
+      expect(preventDefault).toHaveBeenCalledOnce();
+      expect(acceptEmail).toHaveBeenCalledWith('unlisted@example.com');
+      expect(betaMessage.dataset.i18n).toBe('beta.denied');
+      expect(betaForm.classList.contains('hidden')).toBe(false);
+      expect(station.classList.contains('hidden')).toBe(true);
+
+      acceptEmail.mockImplementation(() => { throw new Error('Storage disabled'); });
+      betaForm.onsubmit?.({ preventDefault });
+      expect(betaMessage.dataset.i18n).toBe('beta.unavailable');
+      expect(betaForm.classList.contains('hidden')).toBe(false);
+
+      acceptEmail.mockImplementation(() => true);
+      betaEmail.value = 'bielet40@gmail.com';
+      betaForm.onsubmit?.({ preventDefault });
+      expect(betaForm.classList.contains('hidden')).toBe(true);
+      expect(betaEmail.value).toBe('');
+      expect(betaMessage.textContent).toBe('');
+      expect(betaMessage.dataset.i18n).toBeUndefined();
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();
@@ -153,8 +191,10 @@ describe('Zombies map selection flow', () => {
   it('forwards the selected id to Zombies game initialization', () => {
     expect(main).toContain('hud.showMapSelect((mapId) =>');
     expect(main).toContain('startGame(new ZombiesMode(mapId), mapId)');
-    // ?map= keeps working as a testing shortcut, hidden maps included.
+    // Direct links use the same beta access rule as the menu, and startGame rechecks it.
     expect(main).toContain('startGame(new ZombiesMode(requestedMap), requestedMap)');
+    expect(main).toContain('canAccessZombieMap(requestedMap, this.betaAccess.hasBetaAccess())');
+    expect(main).toContain('if (!canAccessZombieMap(mapId, this.betaAccess.hasBetaAccess()))');
     expect(main).not.toContain('showModeSelect');
     expect(main).not.toContain('ClassicMode');
   });

@@ -12,6 +12,7 @@ import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
 import type { Zombie } from '../src/zombies/Zombie';
 import { roundConfig } from '../src/zombies/ZombieConfig';
+import { ZombieBleeding } from '../src/zombies/ZombieBleeding';
 import { parseHostMessage } from '../src/network/Protocol';
 import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
 import type { ZombieManager, ZombiePlayerTarget } from '../src/zombies/ZombieManager';
@@ -21,6 +22,7 @@ import { CoopGuestMode } from '../src/modes/coop/CoopGuestMode';
 import type { CoopConnection } from '../src/network/CoopConnection';
 import { installCanvasDocument, makeContext, makeMatch, placePlayer, type CoopMatch } from './coopHarness';
 import { CodeLockDialog } from '../src/ui/CodeLockDialog';
+import { cameraSpatialCue } from '../src/audio/SpatialCue';
 import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
 import type { RemotePlayer } from '../src/rendering/RemotePlayer';
 
@@ -228,6 +230,48 @@ describe('co-op session', () => {
     expect(match.relay.sent('host', 'roundStart').map((message) => (message as { round: number }).round))
       .toEqual([1, 2, 3]);
   });
+
+  it('plays each round transition cue once per client, even for a repeated message', () => {
+    const match = startedMatch();
+    const rounds = host(match).rounds;
+    for (let frame = 0; frame < 2400 && rounds.round < 3; frame++) {
+      match.step(0.05);
+      for (const zombie of [...host(match).zombies.actives]) {
+        if (!zombie.isAlive) continue;
+        zombie.hp = 1;
+        match.host.onTargetHit(zombie, 5, ORIGIN, NORMAL, zombie.torsoHitbox, match.hostSide.weapon);
+      }
+    }
+    const hostAudio = match.hostSide.ctx.audio as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    const guestAudio = match.guestSide.ctx.audio as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    expect(hostAudio.playRoundStartCue).toHaveBeenCalledTimes(3);
+    expect(hostAudio.playRoundEndCue).toHaveBeenCalledTimes(2);
+    expect(guestAudio.playRoundStartCue).toHaveBeenCalledTimes(3);
+    expect(guestAudio.playRoundEndCue).toHaveBeenCalledTimes(2);
+
+    // A message delivered twice (reconnect, relay retry) never stacks a second sting.
+    match.relay.guest.onMessage?.({ type: 'roundStart', round: 3 });
+    match.relay.guest.onMessage?.({ type: 'roundEnd', round: 2 });
+    expect(guestAudio.playRoundStartCue).toHaveBeenCalledTimes(3);
+    expect(guestAudio.playRoundEndCue).toHaveBeenCalledTimes(2);
+  });
+
+  it('plays the partner\'s gunfire from where they stand', () => {
+    const match = startedMatch();
+    placePlayer(match.hostSide.player, 0, 0);
+    placePlayer(match.guestSide.player, 4, 0);
+    match.step(0.05, 4);
+    const origin = { x: -6, y: 1.7, z: 0 };
+    match.relay.guest.onMessage?.({ type: 'playerShoot', weapon: 'm1911', origin, direction: { x: 0, y: 0, z: -1 } });
+    const guestAudio = match.guestSide.ctx.audio as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    expect(guestAudio.playRemoteShot).toHaveBeenCalledOnce();
+    const [config, cue] = guestAudio.playRemoteShot.mock.calls[0];
+    expect(config).toBe(WEAPON_DEFINITIONS.m1911.audio);
+    // Ten meters to the side: clearly panned and quieter than at arm's length.
+    expect(cue).toEqual(cameraSpatialCue(match.guestSide.player.camera, origin));
+    expect(Math.abs(cue.pan)).toBeGreaterThan(0.5);
+    expect(cue.attenuation).toBeLessThan(1);
+  });
 });
 
 describe('co-op combat authority', () => {
@@ -296,7 +340,7 @@ describe('co-op combat authority', () => {
     // The guest plays the same knife death the host resolved.
     expect(replica.deathStyle).toBe('slash');
     const hostBlood = host(match).zombies.group.getObjectByName('zombie-blood') as THREE.InstancedMesh;
-    expect(hostBlood.count).toBe(60);
+    expect(hostBlood.count).toBe(new ZombieBleeding().hit('knife', false)!.drops);
     const guestBlood = replica.group.parent!.getObjectByName('zombie-blood') as THREE.InstancedMesh;
     expect(guestBlood.count).toBe(hostBlood.count);
   });

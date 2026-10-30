@@ -194,7 +194,16 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
+| `m1911_shot.mp3` | Disparo de la M1911: mono, 44,1 kHz, 96 kbps, ~1,2 s con cola (con fallback procedural) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |
+
+Los fondos ambientales, los eventos de mapa y los cues de fin de ronda son
+sintesis Web Audio propia, sin archivos. Cualquier evento ambiental admite un
+MP3 opcional mediante su `sampleFile` (en `Station33Config.ts` o
+`BurnedMansionConfig.ts`); hoy ninguno lo declara. El candidato mas claro es la
+megafonia de Station 33 (`pa-announcement`): una grabacion original de un
+anuncio soviético distorsionado, mono, corta y comprimida, sustituiria la voz
+procedural. Sin el archivo el juego sigue usando la sintesis.
 
 ### Música de Station 33
 

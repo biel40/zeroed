@@ -948,7 +948,8 @@ describe('Station 33 lights and ambience', () => {
       }
     }
     expect(dimmedOnDip).toBe(true);
-    expect(new Set(cues.map((cue) => cue.sound))).toEqual(new Set(['pa-crackle', 'distant-train', 'power-dip']));
+    expect(new Set(cues.map((cue) => cue.sound)))
+      .toEqual(new Set(['pa-crackle', 'distant-train', 'power-dip', 'metal-echo', 'machinery']));
     for (const cue of cues) expect(Number.isFinite(cue.position.x + cue.position.y + cue.position.z)).toBe(true);
   });
 

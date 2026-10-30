@@ -59,6 +59,7 @@ import { ZombiesRings } from './ZombiesRings';
 import { ZombiesFlames } from './ZombiesFlames';
 import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
+import { RoundCueGate } from '../audio/RoundCueGate';
 import { IntroCinematic } from '../rendering/IntroCinematic';
 import { CodeLockDialog } from '../ui/CodeLockDialog';
 
@@ -143,6 +144,7 @@ export class ZombiesMode implements GameMode {
   private trauma = 0;
   private shakeSeed = 0;
   private moanTimer = MOAN_MIN_DELAY;
+  private readonly roundCues = new RoundCueGate();
   /** Barrier the player is currently repairing, if any. */
   private activeRepairBarrier: WindowBarrier | null = null;
   /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
@@ -188,7 +190,7 @@ export class ZombiesMode implements GameMode {
     const boxPlacement = this.arena.mysteryBoxPlacement;
     this.zombies.setBodyObstacles(boxPlacement ? [mysteryBoxFootprint(boxPlacement)] : []);
     this.zombies.registerColliders(ctx.hitColliders);
-    this.zombies.setWallColliders(this.arena.wallColliders ?? []);
+    this.zombies.setEffectColliders(this.arena.colliders);
     this.zombies.onZombieKilled = (zombie, headshot, source, dropPosition) => {
       for (const recovery of this.crystalRecoveries) recovery.onKilled(zombie, dropPosition);
       this.onZombieKilled(
@@ -206,7 +208,11 @@ export class ZombiesMode implements GameMode {
       this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
     );
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
-    this.arena.onAmbientCue = (cue) => ctx.audio.playAmbientCue(cue, this.spatialCueFor(cue.position));
+    this.arena.onAmbientCue = (cue) => {
+      // The ending cinematic owns the soundtrack; the map's life goes quiet.
+      if (this.runFlow.state !== 'ENDING') ctx.audio.playAmbientCue(cue, this.spatialCueFor(cue.position));
+    };
+    ctx.audio.setAmbientBed(this.arena.ambience.ambientBed ?? null);
     this.arena.onAmbush = (ambush) => this.spawnAmbush(ambush);
     ctx.scene.add(this.zombies.group);
     this.arena.onTopologyChanged = () => this.syncArenaTopology();
@@ -1038,7 +1044,7 @@ export class ZombiesMode implements GameMode {
     this.zombies.setSpawnPoints(this.arena.spawnPoints);
     this.zombies.setBarriers(this.arena.barriers);
     this.zombies.registerColliders(this.ctx.hitColliders);
-    this.zombies.setWallColliders(this.arena.wallColliders ?? []);
+    this.zombies.setEffectColliders(this.arena.colliders);
   }
 
   private processRoundEvents(): void {
@@ -1047,8 +1053,10 @@ export class ZombiesMode implements GameMode {
       switch (event.type) {
         case 'roundStarted':
           this.ctx.hud.showRoundBanner(t('banner.round', { round: event.round }));
-          this.ctx.audio.playRoundSting();
-          this.ctx.audio.music.playRoundStartOnce();
+          if (this.roundCues.claim('start', event.round)) {
+            this.ctx.audio.playRoundStartCue();
+            this.ctx.audio.music.playRoundStartOnce();
+          }
           if (this.arena) {
             for (const barrier of this.arena.barriers) barrier.resetRoundCap();
           }
@@ -1065,6 +1073,7 @@ export class ZombiesMode implements GameMode {
           break;
         case 'roundComplete':
           this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: event.round }));
+          if (this.roundCues.claim('end', event.round)) this.ctx.audio.playRoundEndCue();
           break;
       }
     }
@@ -1325,6 +1334,7 @@ export class ZombiesMode implements GameMode {
     this.rings?.reset();
     this.gasMask?.reset();
     this.rounds.reset();
+    this.roundCues.reset();
     this.energy?.reset();
     this.flames?.reset();
     for (const recovery of this.crystalRecoveries) recovery.reset();
@@ -1380,7 +1390,7 @@ export class ZombiesMode implements GameMode {
     this.zombies.reset();
     if (typeof this.ctx.audio.stopMusic === 'function') this.ctx.audio.stopMusic();
     else this.ctx.audio.music?.stop?.();
-    this.ctx.audio.stopWind?.();
+    this.ctx.audio.setAmbientBed(null);
     this.ctx.audio.startEndingAudio(ending.audio);
     this.ctx.hud.setInteractionPrompt(null);
     this.pushHudState();

@@ -7,12 +7,12 @@ export interface BloodBurstProfile {
   readonly spread: number;
 }
 
-const KNIFE_BURST: BloodBurstProfile = { drops: 60, radius: 0.035, force: 5.5, spread: 4 };
+const KNIFE_BURST: BloodBurstProfile = { drops: 30, radius: 0.017, force: 3.8, spread: 1.6 };
 const BULLET_BURSTS: readonly BloodBurstProfile[] = [
-  { drops: 10, radius: 0.023, force: 8, spread: 2 },
-  { drops: 16, radius: 0.026, force: 8.5, spread: 2.4 },
-  { drops: 24, radius: 0.029, force: 9, spread: 2.8 },
-  { drops: 32, radius: 0.032, force: 9.5, spread: 3.2 },
+  { drops: 9, radius: 0.012, force: 5.5, spread: 0.8 },
+  { drops: 12, radius: 0.013, force: 5.8, spread: 1 },
+  { drops: 16, radius: 0.014, force: 6.2, spread: 1.2 },
+  { drops: 20, radius: 0.015, force: 6.5, spread: 1.4 },
 ];
 const RAPID_HIT_WINDOW = 0.45;
 

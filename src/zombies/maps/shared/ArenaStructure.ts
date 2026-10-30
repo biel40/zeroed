@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SurfaceType } from '../../../shooting/HitTarget';
+import type { StainFaces } from '../../GibWalls';
 import { projectBoxUVs, projectWorldBoxUVs } from './BoxUVs';
 
 export type WallAxis = 'x' | 'z';
@@ -18,6 +19,8 @@ export interface ArenaBoxOptions {
   readonly worldUVs?: boolean;
   /** Also stops the player through the arena's AABB wall collision. */
   readonly blocksPlayer: boolean;
+  /** Faces that match the visible surface and keep blood; omitted means all (a drawn box). */
+  readonly stainFaces?: StainFaces;
 }
 
 /** A hole in a wall line: `center` runs along the wall axis, heights are relative to its base. */
@@ -92,6 +95,7 @@ export class ArenaStructure {
     mesh.receiveShadow = true;
     mesh.userData.surface = options.surface;
     mesh.userData.mapRole = options.mapRole;
+    if (options.stainFaces) mesh.userData.stainFaces = options.stainFaces;
     this.addSolid(mesh, options.blocksPlayer);
     this.group.add(mesh);
     return mesh;

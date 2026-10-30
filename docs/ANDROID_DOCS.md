@@ -74,7 +74,7 @@ de la cuenta no esta confirmada. No asumir que tiene acceso a produccion.
    tambien un APK firmado instalable a mano). El script comprueba SDK, JDK,
    firma y relay; ejecuta `npm test`; incrementa `versionCode` y el patch de
    `versionName` (`-- --version X.Y.Z` lo fija); compila la web con
-   `--mode android` y la beta desactivada; sincroniza; firma con Gradle,
+   `--mode android`; el acceso temporal a mapas de beta sigue la [misma regla](../public/beta/README.md); sincroniza; firma con Gradle,
    verifica la firma y deja `releases/zeroed-<versionName>-<versionCode>.aab`.
    `-- --dry-run` solo comprueba y `-- --skip-tests` omite los tests. Si falla,
    restaura `build.gradle`. El relay cooperativo de la app sale de `.env.android`.

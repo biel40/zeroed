@@ -92,7 +92,7 @@ function addDrillPress(context: Station33BuildContext): void {
     batch.add(new THREE.CylinderGeometry(0.01, 0.01, 0.3, 5), materials.greySteel, placement(x + 0.05, height - 0.32, z + 0.22, angle, 0, 0));
   }
   addSolidProxy(context, 'taller-drill-press',
-    { x: hall.minX, y: 0, z: z - size / 2 }, { x: x + size / 2, y: height, z: z + size / 2 }, 'metal');
+    { x: hall.minX, y: 0, z: z - size / 2 }, { x: x + size / 2, y: height, z: z + size / 2 }, 'metal', 'none');
 }
 
 /** Bolted steel shelving full of crates, part boxes and coiled cable. */
@@ -176,7 +176,7 @@ function addBogie(context: Station33BuildContext): void {
   batch.add(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14).translate(x, height + 0.03, z), materials.greySteel);
   batch.add(new THREE.CylinderGeometry(0.28, 0.28, 0.8, 16).rotateZ(Math.PI / 2).translate(x - 0.15, axleY + 0.05, z - 0.05), materials.greySteel);
   addSolidProxy(context, 'taller-bogie',
-    { x: x - width / 2, y: 0, z: z - length / 2 - 0.05 }, { x: x + width / 2, y: height + 0.08, z: z + length / 2 + 0.05 }, 'metal');
+    { x: x - width / 2, y: 0, z: z - length / 2 - 0.05 }, { x: x + width / 2, y: height + 0.08, z: z + length / 2 + 0.05 }, 'metal', 'none');
 }
 
 /** Two-wheeled trolley with oxygen and acetylene bottles and their coiled hoses. */
@@ -197,5 +197,5 @@ function addWeldingCart(context: Station33BuildContext): void {
   const hose = new THREE.TorusGeometry(0.16, 0.018, 5, 18).rotateY(Math.PI / 2).translate(x + 0.29, 1.05, z);
   batch.add(hose, materials.rubber);
   addSolidProxy(context, 'taller-welding-cart',
-    { x: x - 0.2, y: 0, z: z - 0.42 }, { x: hall.maxX, y: 1.5, z: z + 0.42 }, 'metal');
+    { x: x - 0.2, y: 0, z: z - 0.42 }, { x: hall.maxX, y: 1.5, z: z + 0.42 }, 'metal', 'none');
 }

@@ -76,7 +76,7 @@ function addDutyDesk(context: Station33BuildContext): void {
   part(new THREE.BoxGeometry(0.42, 0.42, 0.04), 0, 0.23, -0.21);
   for (const side of [-1, 1]) part(new THREE.BoxGeometry(0.035, 0.035, 0.44), side * 0.18, 0.44, 0.02);
   const bounds = new THREE.Box3(new THREE.Vector3(-0.22, 0, -0.24), new THREE.Vector3(0.22, 0.46, 0.25)).applyMatrix4(world);
-  addSolidProxy(context, 'duty-chair', bounds.min, bounds.max, 'wood');
+  addSolidProxy(context, 'duty-chair', bounds.min, bounds.max, 'wood', 'none');
 }
 
 /** Barred front and side, the cell door swung open along the side, and a plank bench inside. */
@@ -102,7 +102,7 @@ function addHoldingCell(context: Station33BuildContext): void {
       context, 'cell-bars',
       axis === 'x' ? { x: from, y: 0, z: fixed - half } : { x: fixed - half, y: 0, z: from },
       axis === 'x' ? { x: to, y: barHeight, z: fixed + half } : { x: fixed + half, y: barHeight, z: to },
-      'metal',
+      'metal', 'none',
     );
   };
   bars('x', frontZ, hall.minX, doorMinX);
@@ -121,7 +121,7 @@ function addHoldingCell(context: Station33BuildContext): void {
   const bucketX = sideX - 0.4;
   const bucketZ = hall.maxZ - 0.35;
   batch.add(new THREE.CylinderGeometry(0.15, 0.12, 0.3, 12).translate(bucketX, 0.15, bucketZ), materials.greySteel);
-  addSolidProxy(context, 'cell-bucket', { x: bucketX - 0.15, y: 0, z: bucketZ - 0.15 }, { x: bucketX + 0.15, y: 0.3, z: bucketZ + 0.15 }, 'metal');
+  addSolidProxy(context, 'cell-bucket', { x: bucketX - 0.15, y: 0, z: bucketZ - 0.15 }, { x: bucketX + 0.15, y: 0.3, z: bucketZ + 0.15 }, 'metal', 'none');
 }
 
 /** Steel shelving with helmets on the shelves and riot shields leaning against its foot. */
@@ -145,7 +145,7 @@ function addRiotRack(context: Station33BuildContext): void {
   for (const [z, lean] of [[minZ + 0.6, 0.18], [minZ + 1.3, 0.22], [maxZ - 0.55, 0.16]] as const) {
     batch.addBox(materials.windowGlass, back - depth - 0.06, 0.55, z, 0.02, 1.0, 0.5, 0, 0, -lean);
   }
-  addSolidProxy(context, 'riot-rack', { x: back - depth - 0.2, y: 0, z: minZ - 0.03 }, { x: back, y: height, z: maxZ + 0.03 }, 'metal');
+  addSolidProxy(context, 'riot-rack', { x: back - depth - 0.2, y: 0, z: minZ - 0.03 }, { x: back, y: height, z: maxZ + 0.03 }, 'metal', 'none');
 }
 
 /** Four-drawer steel filing cabinets in the corner by the evidence lockers; the first has its top drawer pulled out. */
@@ -167,7 +167,7 @@ function addFilingCabinets(context: Station33BuildContext): void {
   batch.addBox(materials.paper, FILING_CABINETS[1] + width / 2, height + 0.04, hall.minZ + depth / 2, 0.32, 0.08, 0.24, 0, 0.2, 0);
   const minX = FILING_CABINETS[0];
   const maxX = FILING_CABINETS[1] + width;
-  addSolidProxy(context, 'filing-cabinets', { x: minX, y: 0, z: hall.minZ }, { x: maxX, y: height, z: front + 0.35 }, 'metal');
+  addSolidProxy(context, 'filing-cabinets', { x: minX, y: 0, z: hall.minZ }, { x: maxX, y: height, z: front + 0.35 }, 'metal', 'none');
 }
 
 /**

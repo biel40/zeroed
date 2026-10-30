@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SurfaceType } from '../../../shooting/HitTarget';
+import type { StainFaces } from '../../GibWalls';
 import { placement } from '../shared/StaticMeshBatch';
 import {
   TICKET_OFFICE,
@@ -36,9 +37,10 @@ function addProxy(
   center: THREE.Vector3Like,
   size: THREE.Vector3Like,
   surface: SurfaceType,
+  stainFaces: StainFaces,
 ): void {
   context.structure.addBox(center.x, center.y, center.z, size.x, size.y, size.z, context.materials.collider, {
-    name, surface, mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true,
+    name, surface, mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true, stainFaces,
   });
 }
 
@@ -58,7 +60,11 @@ function addColumn(context: Station33BuildContext, x: number, z: number): void {
   capital.computeVertexNormals();
   capital.translate(x, SHAFT_TOP + 0.08 + capitalHeight / 2, z);
   batch.add(capital, materials.stucco);
-  addProxy(context, 'column', { x, y: capitalTop / 2, z }, { x: size + 0.16, y: capitalTop, z: size + 0.16 }, 'concrete');
+  // Two proxies hug the plinth and the marble shaft, so bullet holes and blood
+  // land on the visible faces; the plinth keeps the player's footprint.
+  addProxy(context, 'column-plinth', { x, y: PLINTH_HEIGHT / 2, z }, { x: size + 0.16, y: PLINTH_HEIGHT, z: size + 0.16 }, 'concrete', 'all');
+  const shaftHeight = capitalTop - PLINTH_HEIGHT;
+  addProxy(context, 'column', { x, y: PLINTH_HEIGHT + shaftHeight / 2, z }, { x: size, y: shaftHeight, z: size }, 'concrete', 'all');
 }
 
 /** Turnstile cabinet with a rubber top and its paddles folded open. */
@@ -71,7 +77,7 @@ function addTurnstile(context: Station33BuildContext, x: number): void {
   for (const side of [-1, 1]) {
     batch.addBox(materials.bronze, x + side * (width / 2 + 0.03), 0.78, z - length * 0.25, 0.04, 0.08, 0.42, 0, side * 0.12, 0);
   }
-  addProxy(context, 'turnstile', { x, y: height / 2, z }, { x: width + 0.08, y: height + 0.04, z: length + 0.08 }, 'metal');
+  addProxy(context, 'turnstile', { x, y: height / 2, z }, { x: width + 0.08, y: height + 0.04, z: length + 0.08 }, 'metal', 'top');
 }
 
 /** Ticket-office facade: wooden panelling, granite counter and the frames of three windows. */
@@ -102,7 +108,7 @@ function addTicketOffice(context: Station33BuildContext): void {
   plate.rotation.y = Math.PI / 2;
   plate.userData.mapRole = 'sign';
   group.add(plate);
-  addProxy(context, 'ticket-office', { x: centerX, y: height / 2, z: centerZ }, { x: depth, y: height, z: length }, 'wood');
+  addProxy(context, 'ticket-office', { x: centerX, y: height / 2, z: centerZ }, { x: depth, y: height, z: length }, 'wood', 'top');
 }
 
 /**
@@ -137,7 +143,7 @@ function addBench(context: Station33BuildContext, name: string, x: number, z: nu
   size.y = Math.max(size.y, 0.6);
   const center = bounds.getCenter(new THREE.Vector3());
   center.y = size.y / 2;
-  addProxy(context, name, center, size, 'wood');
+  addProxy(context, name, center, size, 'wood', 'none');
 }
 
 /** Double-sided direction board over the turnstiles, hung on two rods. */

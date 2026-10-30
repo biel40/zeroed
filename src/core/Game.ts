@@ -391,6 +391,7 @@ export class Game {
       this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
+      this.audio.setAmbienceSuspended(false);
       this.startGameplayMusic();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
@@ -424,6 +425,7 @@ export class Game {
       this.mode?.onGameplayStarted?.();
       this.audio.music.stopMenuLoop();
       this.audio.resumeMusic();
+      this.audio.setAmbienceSuspended(false);
       this.startGameplayMusic();
       this.hud.hidePauseMenu();
       this.hud.hideStartScreen();
@@ -461,6 +463,7 @@ export class Game {
     // The frozen frame stops driving the stream, so its roar must stop here.
     if (this.flameStreamDriven) this.audio.setFlameStream(false, 0);
     this.audio.pauseMusic();
+    this.audio.setAmbienceSuspended(true);
     if (this.mode.id === 'zombies') this.audio.music.startMenuLoop();
     this.hud.showPauseMenu();
     // Release the pointer so the cursor can click the menu (desktop).

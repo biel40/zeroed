@@ -146,7 +146,7 @@
             </span>
           </span>
         </button>
-        <button type="button" class="map-card" data-map="station-33">
+        <button type="button" class="map-card hidden" data-map="station-33">
           <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
             <image class="map-card-image" href="./assets/maps/station-33-menu.png" width="1448" height="1086" />
           </svg>
@@ -161,6 +161,14 @@
           </span>
         </button>
       </div>
+      <form id="beta-access-form" class="beta-access-form hidden">
+        <label for="beta-email" data-i18n="beta.email"></label>
+        <div class="beta-access-fields">
+          <input id="beta-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="beta-message" />
+          <button type="submit" data-i18n="beta.submit"></button>
+        </div>
+        <p id="beta-message" role="status" aria-live="polite"></p>
+      </form>
       <div class="menu-actions">
         <button type="button" id="coop-select" class="menu-action">
           <svg class="menu-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -187,6 +195,29 @@
       <p id="ios-install-hint" class="ios-install-hint hidden" data-i18n="menu.iosHint"></p>
     </div>
   </div>
+
+  <dialog id="beta-thanks" class="beta-thanks" aria-labelledby="beta-thanks-title">
+    <div class="beta-thanks-slides" aria-hidden="true">
+      <img src="./assets/beta/thanks-1.webp" alt="" loading="lazy" decoding="async" />
+      <img src="./assets/beta/thanks-2.webp" alt="" loading="lazy" decoding="async" />
+      <img src="./assets/beta/thanks-3.webp" alt="" loading="lazy" decoding="async" />
+      <img src="./assets/beta/thanks-4.webp" alt="" loading="lazy" decoding="async" />
+      <img src="./assets/beta/thanks-5.webp" alt="" loading="lazy" decoding="async" />
+      <img src="./assets/beta/thanks-6.webp" alt="" loading="lazy" decoding="async" />
+    </div>
+    <div class="beta-thanks-shade" aria-hidden="true"></div>
+    <article class="beta-thanks-card">
+      <span class="beta-thanks-stamp" aria-hidden="true" data-i18n="betaThanks.stamp"></span>
+      <p class="beta-thanks-kicker" data-i18n="betaThanks.kicker"></p>
+      <h2 id="beta-thanks-title" class="beta-thanks-title" data-i18n="betaThanks.title"></h2>
+      <p class="beta-thanks-tester"><span data-i18n="betaThanks.tester"></span><strong id="beta-thanks-email"></strong></p>
+      <p class="beta-thanks-lead" data-i18n="betaThanks.lead"></p>
+      <p data-i18n="betaThanks.body"></p>
+      <p data-i18n="betaThanks.closing"></p>
+      <p class="beta-thanks-signature" data-i18n="betaThanks.signature"></p>
+      <button type="button" id="beta-thanks-close" data-i18n="betaThanks.continue"></button>
+    </article>
+  </dialog>
 
   <dialog id="privacy-dialog" aria-labelledby="privacy-title">
     <div class="privacy-dialog-header">

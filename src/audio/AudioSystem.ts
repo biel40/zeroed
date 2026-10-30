@@ -6,6 +6,9 @@ import { FlameStreamLoop } from './FlameStreamLoop';
 import { MusicManager, type EndingAudioId } from './MusicManager';
 import { RING_JINGLE_TUNES, renderRingJingle, type RingJingleId } from './RingJingleTunes';
 import { muffleCutoff, type SpatialCue } from './SpatialCue';
+import { AmbientBed, type AmbientBedId } from './AmbientBed';
+import { VoiceLimiter } from './VoiceLimiter';
+import { shotGainScale, shotPlaybackRate } from './ShotVariation';
 
 const PING_THROTTLE = 0.045;
 // Reload foley was hard to hear over gunfire/music; boost it above the raw profile values.
@@ -147,7 +150,9 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
 };
 
 /** Map ambience with a procedural voice in this class. */
-export type AmbientCueSound = 'pa-crackle' | 'distant-train' | 'power-dip';
+export type AmbientCueSound =
+  | 'pa-crackle' | 'distant-train' | 'power-dip' | 'metal-echo' | 'machinery'
+  | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl';
 
 /** What to play for a map ambient event; `sampleFile` (in `assets/audio/`) replaces the procedural sound. */
 export interface AmbientCuePlayback {
@@ -157,6 +162,28 @@ export interface AmbientCuePlayback {
 
 /** Ambient cues set the mood of the whole map, so distance never buries them. */
 const AMBIENT_CUE_MIN_ATTENUATION = 0.35;
+/**
+ * Ambience mix (bed and map cues) between rounds: the last kill opens a
+ * quiet breath, the next round's sting builds it back up.
+ */
+const AMBIENCE_BREAK_LEVEL = 0.3;
+const AMBIENCE_BREAK_FADE = 1.5;
+const AMBIENCE_ROUND_SWELL = 6;
+/** Pausing hushes the ambience quickly; resuming brings it back gently. */
+const AMBIENCE_PAUSE_FADE = 0.3;
+const AMBIENCE_RESUME_FADE = 1;
+/**
+ * Zombie voices (spawn groans, distant moans) that may overlap; voices at
+ * least this loud (nearby) may use the reserved slots.
+ */
+const ZOMBIE_VOICE_CAPACITY = 3;
+const ZOMBIE_VOICE_RESERVE = 2;
+const NEARBY_VOICE_ATTENUATION = 0.6;
+const SPAWN_VOICE_SECONDS = 0.85;
+const MOAN_VOICE_SECONDS = 1.5;
+/** A teammate's gunfire sits under the player's own and never vanishes across the map. */
+const REMOTE_SHOT_GAIN = 0.7;
+const REMOTE_SHOT_MIN_ATTENUATION = 0.12;
 /** Loudest the ring-machine jingle gets, standing at the machine: background, never over the fight. */
 const RING_JINGLE_GAIN = 0.16;
 /** Smallest change worth a new automation event on the jingle's nodes. */
@@ -186,6 +213,8 @@ export interface RitualScareBeats {
 interface AudioContextParts {
   ctx: AudioContext;
   master: GainNode;
+  /** Bus of the map ambience (bed and cues), ducked by round transitions and pauses. */
+  ambience: GainNode;
   noise: AudioBuffer;
 }
 
@@ -207,9 +236,17 @@ export class AudioSystem {
   }
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private ambienceBus: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private lastPingTime: number = -1;
-  private wind: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
+  /** The map's bed: requested before the first gesture, built once the graph exists. */
+  private requestedBed: AmbientBedId | null = null;
+  private ambientBed: AmbientBed | null = null;
+  private ambienceLevel = 1;
+  private ambienceSuspended = false;
+  /** True while this class suspended the context because the page went to the background. */
+  private suspendedWhileHidden = false;
+  private readonly zombieVoices = new VoiceLimiter(ZOMBIE_VOICE_CAPACITY, ZOMBIE_VOICE_RESERVE);
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private dryFireBuffer: AudioBuffer | null = null;
   private doorPurchaseBuffer: AudioBuffer | null = null;
@@ -234,22 +271,14 @@ export class AudioSystem {
     this.stopSettingsListener = onSettingsChange(() => {
       if (this.ctx && this.master) this.master.gain.setTargetAtTime(masterGain(), this.ctx.currentTime, 0.02);
     });
+    pageDocument()?.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
   /** Must be called from a user gesture before any sound can play. */
   public resume(): void {
-    if (!this.ctx) {
-      this.ctx = new AudioContext();
-      this.master = this.ctx.createGain();
-      this.master.gain.value = masterGain();
-      this.master.connect(this.ctx.destination);
-
-      const length: number = this.ctx.sampleRate;
-      this.noiseBuffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
-      const data: Float32Array = this.noiseBuffer.getChannelData(0);
-      for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
-    }
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    const ctx = this.ensureGraph();
+    if (ctx.state === 'suspended') void ctx.resume();
+    this.suspendedWhileHidden = false;
     this.music.preload();
   }
 
@@ -276,15 +305,18 @@ export class AudioSystem {
   /** Closes this run's AudioContext; the shared MusicManager keeps the menu theme. */
   public dispose(): void {
     this.stopSettingsListener();
+    pageDocument()?.removeEventListener('visibilitychange', this.handleVisibilityChange);
     this.stopEndingAudio();
-    this.stopWind();
+    this.setAmbientBed(null);
     this.stopRingJingle();
     this.flameLoop?.stop();
     this.flameLoop = null;
     this.flameOn = false;
+    this.zombieVoices.reset();
     const ctx = this.ctx;
     this.ctx = null;
     this.master = null;
+    this.ambienceBus = null;
     this.noiseBuffer = null;
     if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => undefined);
   }
@@ -302,10 +334,45 @@ export class AudioSystem {
     if (!audio) return;
     const sample = config.sampleFile ? this.optionalSample(config.sampleFile) : null;
     if (sample) {
-      this.playSample(audio, sample, config.volume);
+      this.playSampledShot(audio, sample, config, config.volume, audio.master);
       return;
     }
-    const { ctx, master, noise } = audio;
+    this.playReport(audio, config, 1, audio.master);
+    if (config.tail) this.playShotTail(config.volume, config.tail);
+    // Gas-operated actions: the carrier rides back and slams into battery.
+    if (config.mechanism) {
+      this.metalClang(0.038, 1250, config.mechanism, 0.05);
+      this.tick(0.052, 430, config.mechanism * 0.8, 3, 0.06);
+    }
+  }
+
+  /**
+   * A teammate's shot heard from where they stand: the report alone, without
+   * the mechanism foley or room tail that belong to the player's own gun.
+   */
+  public playRemoteShot(config: WeaponAudioConfig, cue: SpatialCue): void {
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue, REMOTE_SHOT_MIN_ATTENUATION);
+    const volume = config.volume * REMOTE_SHOT_GAIN;
+    if (config.energy) {
+      const t = audio.ctx.currentTime;
+      this.sweep(0, 'sawtooth', 950, 170, volume * 0.45, 0.16, t, output);
+      this.tick(0, 3900, volume * 0.18, 6, 0.05, output);
+      return;
+    }
+    const sample = config.sampleFile ? this.optionalSample(config.sampleFile) : null;
+    if (sample) this.playSampledShot(audio, sample, config, volume, output);
+    else this.playReport(audio, config, REMOTE_SHOT_GAIN, output);
+  }
+
+  /**
+   * Procedural powder report: a filtered noise burst over a low thump; a
+   * full-power rifle's supersonic crack leads it. `scale` sets its loudness.
+   */
+  private playReport(audio: AudioContextParts, config: WeaponAudioConfig, scale: number, output: AudioNode): void {
+    const { ctx, noise } = audio;
+    const volume: number = config.volume * scale;
     const t: number = ctx.currentTime;
     const duration: number = config.duration;
 
@@ -316,11 +383,11 @@ export class AudioSystem {
     filter.frequency.setValueAtTime(config.lowpass, t);
     filter.frequency.exponentialRampToValueAtTime(Math.max(200, config.lowpass * 0.3), t + duration);
     const gain: GainNode = ctx.createGain();
-    gain.gain.setValueAtTime(config.volume, t);
+    gain.gain.setValueAtTime(volume, t);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration * 1.7);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(master);
+    gain.connect(output);
     source.start(t);
     source.stop(t + duration * 1.8);
 
@@ -329,22 +396,14 @@ export class AudioSystem {
     osc.frequency.setValueAtTime(config.thump, t);
     osc.frequency.exponentialRampToValueAtTime(Math.max(30, config.thump * 0.45), t + 0.08);
     const oscGain: GainNode = ctx.createGain();
-    oscGain.gain.setValueAtTime(config.volume * 0.7, t);
+    oscGain.gain.setValueAtTime(volume * 0.7, t);
     oscGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
     osc.connect(oscGain);
-    oscGain.connect(master);
+    oscGain.connect(output);
     osc.start(t);
     osc.stop(t + 0.11);
 
-    // Full-power rifle layers: the supersonic crack leads the report and
-    // the room keeps rumbling after it.
-    if (config.crack) this.tick(0, 4600, config.crack, 0.7, 0.028);
-    if (config.tail) this.playShotTail(config.volume, config.tail);
-    // Gas-operated actions: the carrier rides back and slams into battery.
-    if (config.mechanism) {
-      this.metalClang(0.038, 1250, config.mechanism, 0.05);
-      this.tick(0.052, 430, config.mechanism * 0.8, 3, 0.06);
-    }
+    if (config.crack) this.tick(0, 4600, config.crack * scale, 0.7, 0.028, output);
   }
 
   /** Starts decoding a weapon's optional shot MP3 so the first trigger pull already uses it. */
@@ -1248,7 +1307,7 @@ export class AudioSystem {
    */
   public playZombieSpawn(cue: SpatialCue): void {
     const audio = this.context();
-    if (!audio) return;
+    if (!audio || !this.claimZombieVoice(audio, cue, SPAWN_VOICE_SECONDS)) return;
     const output = this.spatialBus(audio, cue);
     const t = audio.ctx.currentTime;
     this.tick(0, 120, 0.3, 0.8, 0.32, output);
@@ -1257,52 +1316,26 @@ export class AudioSystem {
   }
 
   /**
-   * Zombies-mode ambience: an endless filtered-noise wind bed with a slow
-   * LFO on the gain. Quiet on purpose — gunshots must stay in charge.
+   * The map's looping bed (null silences it). Safe before the first user
+   * gesture: the bed starts as soon as the audio graph exists, fading in
+   * and out instead of clicking.
    */
-  public startWind(): void {
-    const audio: AudioContextParts | null = this.context();
-    if (!audio || this.wind) return;
-    const { ctx, master, noise } = audio;
-    const source: AudioBufferSourceNode = ctx.createBufferSource();
-    source.buffer = noise;
-    source.loop = true;
-    const filter: BiquadFilterNode = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 240;
-    filter.Q.value = 0.6;
-    const gain: GainNode = ctx.createGain();
-    gain.gain.value = 0.045;
-    // Slow swell so the wind breathes instead of hissing flatly.
-    const lfo: OscillatorNode = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.09;
-    const lfoGain: GainNode = ctx.createGain();
-    lfoGain.gain.value = 0.02;
-    lfo.connect(lfoGain);
-    lfoGain.connect(gain.gain);
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(master);
-    source.start();
-    lfo.start();
-    this.wind = { source, gain };
+  public setAmbientBed(bed: AmbientBedId | null): void {
+    this.requestedBed = bed;
+    this.syncAmbientBed();
   }
 
-  public stopWind(): void {
-    if (!this.wind) return;
-    try {
-      this.wind.source.stop();
-    } catch {
-      // Already stopped; safe to ignore.
-    }
-    this.wind = null;
+  /** Pause menu: the ambience hushes with the music and returns on resume. */
+  public setAmbienceSuspended(suspended: boolean): void {
+    if (this.ambienceSuspended === suspended) return;
+    this.ambienceSuspended = suspended;
+    this.applyAmbienceLevel(suspended ? AMBIENCE_PAUSE_FADE : AMBIENCE_RESUME_FADE);
   }
 
   /** Low, slow groan from a living zombie, quiet enough to be half-imagined. */
   public playDistantMoan(cue: SpatialCue): void {
     const audio: AudioContextParts | null = this.context();
-    if (!audio) return;
+    if (!audio || !this.claimZombieVoice(audio, cue, MOAN_VOICE_SECONDS)) return;
     const output = this.spatialBus(audio, cue);
     const t: number = audio.ctx.currentTime;
     const base: number = 65 + Math.random() * 40;
@@ -1317,7 +1350,7 @@ export class AudioSystem {
   public playAmbientCue(cue: AmbientCuePlayback, spatial: SpatialCue): void {
     const audio = this.context();
     if (!audio) return;
-    const output = this.spatialBus(audio, spatial, AMBIENT_CUE_MIN_ATTENUATION);
+    const output = this.spatialBus(audio, spatial, AMBIENT_CUE_MIN_ATTENUATION, audio.ambience);
     const sample = cue.sampleFile ? this.optionalSample(cue.sampleFile) : null;
     if (sample) {
       const source = audio.ctx.createBufferSource();
@@ -1327,9 +1360,18 @@ export class AudioSystem {
       return;
     }
     const t = audio.ctx.currentTime;
-    if (cue.sound === 'pa-crackle') this.playPaCrackle(audio, output, t);
-    else if (cue.sound === 'distant-train') this.playDistantTrain(output, t);
-    else this.playPowerDip(audio, output, t);
+    switch (cue.sound) {
+      case 'pa-crackle': this.playPaCrackle(audio, output, t); break;
+      case 'distant-train': this.playDistantTrain(output, t); break;
+      case 'power-dip': this.playPowerDip(audio, output, t); break;
+      case 'metal-echo': this.playMetalEcho(output); break;
+      case 'machinery': this.playMachinery(output, t); break;
+      case 'wood-creak': this.playWoodCreak(output, t); break;
+      case 'distant-knock': this.playDistantKnock(output); break;
+      case 'wind-gust': this.playWindGust(output, t); break;
+      case 'ember-crackle': this.playEmberCrackle(output); break;
+      case 'distant-howl': this.playDistantHowl(output, t); break;
+    }
   }
 
   /** Optional ambience and weapon files load on first use; null until (or unless) they decode. */
@@ -1384,13 +1426,94 @@ export class AudioSystem {
     for (const offset of [1.12, 1.24, 1.31, 1.47]) this.tick(offset, 3300, 0.12, 9, 0.02, output);
   }
 
-  /** Two-note ominous sting when a new round begins. */
-  public playRoundSting(): void {
+  /** A far-off tunnel strike ringing down the vaults: one clang and its fading echoes. */
+  private playMetalEcho(output: AudioNode): void {
+    for (let echo = 0; echo < 5; echo++) {
+      const level = Math.pow(0.55, echo);
+      this.tick(echo * 0.32, 1150, 0.16 * level, 18, 0.18, output);
+      this.tick(echo * 0.32 + 0.006, 2100, 0.06 * level, 22, 0.1, output);
+    }
+  }
+
+  /** Something still running deep in the depot: slow pump strokes, a ratchet and a motor drone. */
+  private playMachinery(output: AudioNode, t: number): void {
+    for (let stroke = 0; stroke < 6; stroke++) {
+      this.tick(stroke * 0.55, 90, 0.18, 1, 0.25, output);
+      this.tick(stroke * 0.55 + 0.27, 1700, 0.03, 8, 0.04, output);
+    }
+    this.sweep(0, 'sawtooth', 62, 58, 0.03, 3.2, t, output);
+  }
+
+  /** Burnt timber taking a weight: stick-slip chatter rising in pitch under a dull groan. */
+  private playWoodCreak(output: AudioNode, t: number): void {
+    for (let slip = 0; slip < 14; slip++) {
+      this.tick(slip * 0.045 + Math.random() * 0.015, 380 + slip * 12, 0.05, 9, 0.03, output);
+    }
+    this.sweep(0, 'triangle', 190, 240, 0.03, 0.7, t, output);
+  }
+
+  /** Three or four dull knocks somewhere in the house, never quite in rhythm. */
+  private playDistantKnock(output: AudioNode): void {
+    const knocks = 3 + Math.floor(Math.random() * 2);
+    for (let knock = 0; knock < knocks; knock++) {
+      const at = knock * 0.42 + Math.random() * 0.08;
+      this.tick(at, 140, 0.3, 1.2, 0.12, output);
+      this.tick(at + 0.01, 600, 0.06, 2, 0.04, output);
+    }
+  }
+
+  /** Wind forcing through the gutted walls: overlapping noise swells and a thin whistle. */
+  private playWindGust(output: AudioNode, t: number): void {
+    this.tick(0, 300, 0.05, 0.8, 1.6, output);
+    this.tick(0.5, 520, 0.07, 0.9, 1.8, output);
+    this.tick(1.1, 380, 0.05, 0.8, 1.6, output);
+    this.sweep(0.3, 'sine', 700, 980, 0.012, 2, t + 0.3, output);
+  }
+
+  /** The smouldering ruin spitting: scattered pops over a faint hiss. */
+  private playEmberCrackle(output: AudioNode): void {
+    this.tick(0, 2600, 0.02, 0.7, 1.4, output);
+    for (let pop = 0; pop < 10; pop++) {
+      this.tick(Math.random() * 1.6, 1400 + Math.random() * 2600, 0.03 + Math.random() * 0.04, 3, 0.025, output);
+    }
+  }
+
+  /** Something screaming far outside: a rising howl that breaks and falls away. */
+  private playDistantHowl(output: AudioNode, t: number): void {
+    this.sweep(0, 'sawtooth', 230, 480, 0.06, 0.9, t, output);
+    this.sweep(0, 'triangle', 345, 720, 0.03, 0.9, t, output);
+    this.sweep(0.85, 'sawtooth', 480, 190, 0.05, 1.3, t + 0.85, output);
+  }
+
+  /**
+   * A new round begins: two-note ominous sting over a sub drop; the
+   * ambience hushed by the last round builds back up under it.
+   */
+  public playRoundStartCue(): void {
+    this.setAmbienceLevel(1, AMBIENCE_ROUND_SWELL);
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     const t: number = audio.ctx.currentTime;
+    this.sweep(0, 'sine', 72, 40, 0.26, 0.9, t);
     this.tone(t, 'square', 220, 0.12, 0.14);
     this.tone(t + 0.16, 'square', 277, 0.14, 0.2);
+  }
+
+  /**
+   * The last zombie of the round fell: a slow, falling bell toll with
+   * inharmonic partials, then the ambience drops into a tense quiet.
+   */
+  public playRoundEndCue(): void {
+    this.setAmbienceLevel(AMBIENCE_BREAK_LEVEL, AMBIENCE_BREAK_FADE);
+    const audio: AudioContextParts | null = this.context();
+    if (!audio) return;
+    const t: number = audio.ctx.currentTime;
+    for (const [at, root, volume] of [[0, 98, 0.2], [1.1, 82.4, 0.15]] as const) {
+      this.tone(t + at, 'sine', root, volume, 2.8);
+      this.tone(t + at, 'sine', root * 2.76, volume * 0.35, 1.6);
+      this.tone(t + at, 'sine', root * 5.4, volume * 0.15, 0.9);
+    }
+    this.sweep(0.15, 'triangle', 147, 92, 0.06, 2.4, t + 0.15);
   }
 
   /**
@@ -1641,10 +1764,15 @@ export class AudioSystem {
    * Per-cue chain: [panner] -> low-pass (muffle) -> gain -> master.
    * `minAttenuation` keeps critical warnings audible across the map.
    */
-  private spatialBus(audio: AudioContextParts, cue: SpatialCue, minAttenuation: number = 0): AudioNode {
+  private spatialBus(
+    audio: AudioContextParts,
+    cue: SpatialCue,
+    minAttenuation: number = 0,
+    destination: AudioNode = audio.master,
+  ): AudioNode {
     const gain = audio.ctx.createGain();
     gain.gain.value = clamp(Math.max(minAttenuation, cue.attenuation), 0, 1);
-    gain.connect(audio.master);
+    gain.connect(destination);
     let input: AudioNode = gain;
     if (cue.muffle > 0) {
       const lowpass = audio.ctx.createBiquadFilter();
@@ -1707,19 +1835,7 @@ export class AudioSystem {
 
   /** Decodes an optional MP3; null keeps the caller on its procedural fallback. */
   private async loadSample(url: string): Promise<AudioBuffer | null> {
-    const ctx: AudioContext = this.ctx ?? new AudioContext();
-    this.ctx = ctx;
-    if (!this.master) {
-      this.master = ctx.createGain();
-      this.master.gain.value = masterGain();
-      this.master.connect(ctx.destination);
-
-      const length: number = ctx.sampleRate;
-      this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
-      const data: Float32Array = this.noiseBuffer.getChannelData(0);
-      for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
-    }
-
+    const ctx: AudioContext = this.ensureGraph();
     try {
       const response: Response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1734,25 +1850,119 @@ export class AudioSystem {
    * `lead` starts the sample slightly in the past to compensate for browser
    * scheduling latency, so it lands on the moment the player pressed USE.
    */
-  private playSample(audio: AudioContextParts, buffer: AudioBuffer, volume: number, lead: number = 0): void {
+  /**
+   * A decoded gunshot recording: a fresh one-shot source per trigger pull,
+   * so rapid fire overlaps the earlier tails instead of cutting them.
+   */
+  private playSampledShot(
+    audio: AudioContextParts,
+    sample: AudioBuffer,
+    config: WeaponAudioConfig,
+    volume: number,
+    output: AudioNode,
+  ): void {
+    const gain = volume * shotGainScale(config.variation);
+    this.playSample(audio, sample, gain, 0, output, shotPlaybackRate(config.variation));
+  }
+
+  private playSample(
+    audio: AudioContextParts,
+    buffer: AudioBuffer,
+    volume: number,
+    lead: number = 0,
+    output: AudioNode = audio.master,
+    playbackRate: number = 1,
+  ): void {
     const source: AudioBufferSourceNode = audio.ctx.createBufferSource();
     const gain: GainNode = audio.ctx.createGain();
     source.buffer = buffer;
+    if (playbackRate !== 1) source.playbackRate.value = playbackRate;
     gain.gain.value = volume;
     source.connect(gain);
-    gain.connect(audio.master);
+    gain.connect(output);
     source.start(Math.max(0, audio.ctx.currentTime - lead));
   }
 
+  /** One context per run: master and ambience buses, the shared noise buffer and any pending bed. */
+  private ensureGraph(): AudioContext {
+    if (this.ctx && this.master && this.ambienceBus && this.noiseBuffer) return this.ctx;
+    const ctx: AudioContext = this.ctx ?? new AudioContext();
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = masterGain();
+    this.master.connect(ctx.destination);
+    this.ambienceBus = ctx.createGain();
+    this.ambienceBus.gain.value = this.ambienceSuspended ? 0 : this.ambienceLevel;
+    this.ambienceBus.connect(this.master);
+
+    const length: number = ctx.sampleRate;
+    this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data: Float32Array = this.noiseBuffer.getChannelData(0);
+    for (let i: number = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    this.syncAmbientBed();
+    return ctx;
+  }
+
+  /** Builds, swaps or fades out the bed to match the requested one; nothing before the graph exists. */
+  private syncAmbientBed(): void {
+    if (this.ambientBed?.id === this.requestedBed) return;
+    this.ambientBed?.stop();
+    this.ambientBed = null;
+    if (!this.requestedBed || !this.ctx || !this.ambienceBus || !this.noiseBuffer) return;
+    this.ambientBed = new AmbientBed(this.ctx, this.ambienceBus, this.noiseBuffer, this.requestedBed);
+  }
+
+  private setAmbienceLevel(level: number, seconds: number): void {
+    this.ambienceLevel = level;
+    this.applyAmbienceLevel(seconds);
+  }
+
+  /** Glides the ambience bus to its level (zero while paused) over roughly `seconds`. */
+  private applyAmbienceLevel(seconds: number): void {
+    if (!this.ctx || !this.ambienceBus) return;
+    const target = this.ambienceSuspended ? 0 : this.ambienceLevel;
+    const gain = this.ambienceBus.gain;
+    gain.cancelScheduledValues(this.ctx.currentTime);
+    gain.setTargetAtTime(target, this.ctx.currentTime, seconds / 3);
+  }
+
+  /** A horde never stacks a wall of groans: only a few voices overlap, nearby ones first. */
+  private claimZombieVoice(audio: AudioContextParts, cue: SpatialCue, seconds: number): boolean {
+    return this.zombieVoices.tryStart(audio.ctx.currentTime, seconds, cue.attenuation >= NEARBY_VOICE_ATTENUATION);
+  }
+
+  /**
+   * Backgrounding (tab switch, Android app switch) suspends the effects
+   * context so no loop keeps running unseen; returning resumes only what
+   * this handler suspended. Music elements follow the shell's own pause.
+   */
+  private readonly handleVisibilityChange = (): void => {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state === 'closed') return;
+    if (document.visibilityState === 'hidden') {
+      if (ctx.state !== 'running') return;
+      this.suspendedWhileHidden = true;
+      void ctx.suspend().catch(() => undefined);
+    } else if (this.suspendedWhileHidden) {
+      this.suspendedWhileHidden = false;
+      void ctx.resume().catch(() => undefined);
+    }
+  };
+
   private context(): AudioContextParts | null {
-    if (!this.ctx || !this.master || !this.noiseBuffer) return null;
+    if (!this.ctx || !this.master || !this.ambienceBus || !this.noiseBuffer) return null;
     if (this.ctx.state !== 'running') return null;
-    return { ctx: this.ctx, master: this.master, noise: this.noiseBuffer };
+    return { ctx: this.ctx, master: this.master, ambience: this.ambienceBus, noise: this.noiseBuffer };
   }
 }
 
 function masterGain(): number {
   return EFFECTS_MIX * effectsGain();
+}
+
+/** The page document when it can report visibility; null in workers and headless runs. */
+function pageDocument(): Document | null {
+  return typeof document !== 'undefined' && typeof document.addEventListener === 'function' ? document : null;
 }
 
 function clamp(value: number, min: number, max: number): number {

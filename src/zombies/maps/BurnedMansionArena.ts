@@ -16,6 +16,7 @@ import type { WeaponId } from '../../weapons/WeaponTypes';
 import { CreepyAreaLights } from '../../rendering/CreepyAreaLights';
 import { mysteryBoxFootprint } from '../MysteryBoxFootprint';
 import type {
+  ArenaAmbientCue,
   ArenaAmmoRefill,
   ArenaCompletionInteraction,
   ArenaGasMaskRack,
@@ -37,11 +38,13 @@ import { floorPartitionOf, isInStairRoom, type MansionFloor, type MansionFloorPa
 import { buildInteriorTrim, buildWindowCasings } from './burnedMansion/MansionInteriorTrim';
 import { buildLightFixture } from './burnedMansion/MansionLightFixtures';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
+import { AmbientEventScheduler } from './shared/AmbientEventScheduler';
 import { buildAmmoRefill } from './shared/AmmoRefill';
 import { RingLocker } from './shared/RingLocker';
 import { MapPower } from './shared/MapPower';
 import { StaticMeshBatch } from './shared/StaticMeshBatch';
 import { addSolidProxy } from './shared/SolidProxy';
+import type { StainFaces } from '../GibWalls';
 import { ArenaStructure } from './shared/ArenaStructure';
 import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { projectWorldBoxUVs } from './shared/BoxUVs';
@@ -50,6 +53,7 @@ import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
   MANSION_AMBIENCE,
+  MANSION_AMBIENT_EVENTS,
   MANSION_AMMO_REFILLS,
   MANSION_RESURRECTION_LOCKER,
   MANSION_RING_LOCKER_SIZE,
@@ -257,6 +261,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   onSecretRoomUnlocked: ((position: THREE.Vector3) => void) | null = null;
   onRitualScare: ((position: THREE.Vector3) => void) | null = null;
   onRitualImpact: (() => void) | null = null;
+  onAmbientCue: ((cue: ArenaAmbientCue) => void) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -283,6 +288,9 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   private secretWall!: THREE.Mesh;
   private secretWallCollider!: THREE.Mesh;
   private readonly areaLights = new CreepyAreaLights();
+  private readonly ambientEvents = new AmbientEventScheduler(MANSION_AMBIENT_EVENTS);
+  /** Bound once: the scheduler calls it from the frame loop. */
+  private readonly playAmbientEvent = (cue: ArenaAmbientCue): void => this.onAmbientCue?.(cue);
   private readonly atmosphere: MansionAtmosphere;
   private readonly banquetGhost: MansionBanquetGhost;
   private readonly watchingPortrait: MansionWatchingPortrait;
@@ -465,6 +473,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     }
     this.areaLights.update(dt);
     this.atmosphere.update(dt);
+    this.ambientEvents.update(dt, this.playAmbientEvent);
     this.banquetGhost.update(dt);
     this.watchingPortrait.update(dt, observerPosition);
     if (observerPosition) {
@@ -483,6 +492,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     for (const machine of this.ringMachines) machine.reset();
     this.secretRoom.reset();
     this.atmosphere.reset();
+    this.ambientEvents.reset();
     this.banquetGhost.reset();
     this.watchingPortrait.reset();
     this.activeSpawnZones.clear();
@@ -907,6 +917,8 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     ramp.userData.surface = 'metal';
     ramp.userData.mapRole = 'walkable-stair-ramp';
     ramp.userData.walkableSurface = true;
+    // The tilted ramp's AABB floats over the treads.
+    ramp.userData.stainFaces = 'none' satisfies StainFaces;
     this.structureMeshes.push(ramp);
     this.group.add(ramp);
 
@@ -928,14 +940,16 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
     this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
     // The banquet furniture is dressing; these invisible volumes make it solid.
-    this.addFurnitureCollider('banquet-table-collider', MANSION_BANQUET_HALL.table);
-    this.addFurnitureCollider('banquet-sideboard-collider', MANSION_BANQUET_HALL.sideboard);
-    this.addFurnitureCollider('banquet-china-cabinet-collider', MANSION_BANQUET_HALL.chinaCabinet);
+    // The table box also covers its chairs; the sideboard box rises above its top.
+    this.addFurnitureCollider('banquet-table-collider', MANSION_BANQUET_HALL.table, 'none');
+    this.addFurnitureCollider('banquet-sideboard-collider', MANSION_BANQUET_HALL.sideboard, 'none');
+    this.addFurnitureCollider('banquet-china-cabinet-collider', MANSION_BANQUET_HALL.chinaCabinet, 'all');
   }
 
   private addFurnitureCollider(
     name: string,
     footprint: { readonly x: number; readonly z: number; readonly width: number; readonly depth: number; readonly height: number },
+    stainFaces: StainFaces,
   ): void {
     const collider = new THREE.Mesh(
       new THREE.BoxGeometry(footprint.width, footprint.height, footprint.depth),
@@ -945,6 +959,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     collider.name = name;
     collider.userData.surface = 'wood';
     collider.userData.mapRole = 'furniture-collider';
+    collider.userData.stainFaces = stainFaces;
     this.structure.addSolid(collider, true);
     this.group.add(collider);
   }
@@ -990,6 +1005,8 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       caseCollider.name = `${reward.id}-case-collider`;
       caseCollider.userData.surface = 'metal';
       caseCollider.userData.mapRole = 'case-collider';
+      // Only the cap is solid on the outside: the sides are glass and posts.
+      caseCollider.userData.stainFaces = 'top' satisfies StainFaces;
       caseGroup.add(caseCollider);
       this.structureMeshes.push(caseCollider);
       this.playerWallMeshes.push(caseCollider);

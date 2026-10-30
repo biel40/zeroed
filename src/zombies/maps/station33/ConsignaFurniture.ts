@@ -53,7 +53,7 @@ function addCounter(context: Station33BuildContext): void {
   plate.rotation.y = Math.PI;
   plate.userData.mapRole = 'sign';
   group.add(plate);
-  addSolidProxy(context, 'luggage-counter', { x: minX - 0.03, y: 0, z: z - depth / 2 - 0.08 }, { x: maxX + 0.03, y: height, z: hall.maxZ }, 'wood');
+  addSolidProxy(context, 'luggage-counter', { x: minX - 0.03, y: 0, z: z - depth / 2 - 0.08 }, { x: maxX + 0.03, y: height, z: hall.maxZ }, 'wood', 'none');
 }
 
 /** Porter's flatbed cart left in the hall with two suitcases still strapped on. */
@@ -75,5 +75,5 @@ function addCart(context: Station33BuildContext): void {
   part(new THREE.BoxGeometry(0.62, 0.2, 0.42), materials.luggage[1], 0.12, 0.42, 0.02);
   part(new THREE.BoxGeometry(0.5, 0.18, 0.36), materials.luggage[2], 0.18, 0.61, -0.03);
   const bounds = new THREE.Box3(new THREE.Vector3(-length / 2, 0, -width / 2 - 0.05), new THREE.Vector3(length / 2, 1.05, width / 2 + 0.05)).applyMatrix4(world);
-  addSolidProxy(context, 'luggage-cart', bounds.min, bounds.max, 'metal');
+  addSolidProxy(context, 'luggage-cart', bounds.min, bounds.max, 'metal', 'none');
 }

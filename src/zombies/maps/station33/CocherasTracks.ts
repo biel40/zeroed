@@ -85,6 +85,6 @@ function addBufferStop(context: Station33BuildContext, lighting: Station33Lighti
   batch.add(lamp, lighting.circuitMaterial('emergency'));
   // Reaches from the buffer heads back over the braces.
   structure.addBox(x, height / 2, z + 0.15, width, height, depth, materials.collider, {
-    name: 'buffer-stop', surface: 'metal', mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true,
+    name: 'buffer-stop', surface: 'metal', mapRole: 'solid-prop', castShadow: false, uvSeed: 0, blocksPlayer: true, stainFaces: 'none',
   });
 }

@@ -3,7 +3,7 @@ import { ZombieBlood } from './ZombieBlood';
 import type { ZombieNetState } from '../network/Protocol';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../network/Interpolation';
 import type { VaultOpening } from './barriers/WindowVault';
-import type { GibWalls } from './GibWalls';
+import { refreshGibWalls, type GibWalls } from './GibWalls';
 import { Zombie } from './Zombie';
 import { ZOMBIE_ATTACK_LUNGE, ZOMBIE_TYPE_CONFIGS, MAX_ALIVE } from './ZombieConfig';
 import type { ZombieDeathStyle, ZombieKillSource } from './ZombieDeath';
@@ -75,9 +75,9 @@ export class ZombieReplica {
     }, MAX_ALIVE);
   }
 
-  /** Map wall boxes the remains of a shattered zombie bounce off; refresh on topology changes. */
-  public setWallColliders(walls: ReadonlyArray<THREE.Box3>): void {
-    this.gibWalls.boxes = walls;
+  /** Static map surfaces for blood and remains; refresh on topology changes. */
+  public setEffectColliders(colliders: ReadonlyArray<THREE.Object3D>): void {
+    refreshGibWalls(this.gibWalls, colliders);
   }
 
   public get aliveCount(): number {

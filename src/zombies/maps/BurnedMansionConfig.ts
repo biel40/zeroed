@@ -5,7 +5,8 @@ import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import { NUCLEAR_ENDING_DURATION } from '../ZombiesRunFlow';
-import type { ArenaAmbience, ArenaEnding } from './ZombieArena';
+import type { ArenaAmbience, ArenaAmbientCue, ArenaEnding } from './ZombieArena';
+import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 
 /** Pure tuning constants for the Burned Mansion map. */
@@ -22,7 +23,26 @@ export const MANSION_AMBIENCE = {
   hemisphereLight: { skyColor: 0x34465e, groundColor: 0x110d0a, intensity: 0.25, reducedIntensity: 0.18 },
   environmentIntensity: { intensity: 0.34, reducedIntensity: 0.3 },
   musicTrack: 'background_music_theme',
+  ambientBed: 'wind',
 } as const satisfies ArenaAmbience;
+
+/**
+ * Sounds of the gutted house between the fights, each from its own corner
+ * and separated by long silences. Procedural voices; a `sampleFile` in
+ * `public/assets/audio/` replaces one.
+ */
+export const MANSION_AMBIENT_EVENTS: ReadonlyArray<AmbientEventTiming & ArenaAmbientCue> = [
+  // Charred joists over the start room settling under their own weight.
+  { sound: 'wood-creak', position: { x: -2, y: 3.1, z: 4.5 }, initialDelay: 25, minInterval: 40, maxInterval: 85 },
+  // Knocking from the sealed bunker below.
+  { sound: 'distant-knock', position: { x: 0, y: -3, z: -4 }, initialDelay: 60, minInterval: 75, maxInterval: 150 },
+  // Gusts through the broken east windows.
+  { sound: 'wind-gust', position: { x: 11, y: 2, z: 0 }, initialDelay: 35, minInterval: 50, maxInterval: 110 },
+  // The banquet fireplace logs still smoulder.
+  { sound: 'ember-crackle', position: { x: 3.6, y: 0.4, z: -12 }, initialDelay: 15, minInterval: 30, maxInterval: 70 },
+  // Something screaming far out in the grounds.
+  { sound: 'distant-howl', position: { x: -30, y: 2, z: 30 }, initialDelay: 90, minInterval: 110, maxInterval: 220 },
+];
 
 /** The bunker's warhead: nuclear cinematic, alarm and fallout audio. */
 export const MANSION_NUCLEAR_ENDING = {

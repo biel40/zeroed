@@ -1,11 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
-import { loadEnv } from 'vite';
 
-export default defineConfig(({ mode }) => ({
-  define: {
-    'import.meta.env.VITE_BETA_ENABLED': JSON.stringify(process.env.BETA_ENABLED ?? loadEnv(mode, process.cwd(), 'BETA_').BETA_ENABLED ?? 'false'),
-  },
+export default defineConfig({
   base: './',
   plugins: [
     VitePWA({
@@ -117,4 +113,4 @@ export default defineConfig(({ mode }) => ({
     // total suite time with the slowest test around 3-4 s.
     maxWorkers: '50%',
   },
-}));
+});

@@ -24,5 +24,5 @@ export function addOilDrums(context: Station33BuildContext, name: string, drums:
   const zs = drums.map(([, z]) => z);
   addSolidProxy(context, name,
     { x: Math.min(...xs) - RADIUS - 0.05, y: 0, z: Math.min(...zs) - RADIUS - 0.05 },
-    { x: Math.max(...xs) + RADIUS + 0.05, y: HEIGHT + 0.02, z: Math.max(...zs) + RADIUS + 0.05 }, 'metal');
+    { x: Math.max(...xs) + RADIUS + 0.05, y: HEIGHT + 0.02, z: Math.max(...zs) + RADIUS + 0.05 }, 'metal', 'none');
 }

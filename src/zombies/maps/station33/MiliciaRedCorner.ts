@@ -94,7 +94,7 @@ function addFlag(context: Station33BuildContext, x: number, side: number): void 
   batch.add(new THREE.BoxGeometry(clothWidth, clothHeight, 0.008), materials.redCloth, clothCenter);
   const starAt = new THREE.Matrix4().makeTranslation(-side * (clothWidth / 2 - 0.13), clothHeight / 2 - 0.13, 0.005).premultiply(clothCenter);
   batch.add(starGeometry(0.07, 0.004), materials.bronze, starAt);
-  addSolidProxy(context, 'flag-stand', { x: x - 0.17, y: 0, z: baseZ - 0.17 }, { x: x + 0.17, y: 0.6, z: baseZ + 0.17 }, 'metal');
+  addSolidProxy(context, 'flag-stand', { x: x - 0.17, y: 0, z: baseZ - 0.17 }, { x: x + 0.17, y: 0.6, z: baseZ + 0.17 }, 'metal', 'none');
 }
 
 /**
