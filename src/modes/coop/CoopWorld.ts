@@ -109,6 +109,7 @@ export class CoopWorld {
       ads: weapon.adsAlpha > 0.5,
       reloading: weapon.state === 'reloading',
       repairBarrierId: this.ctx.input.isDown('KeyE') && !this.ctx.input.leftButtonDown
+        && !this.ctx.input.wasPressed('GamepadSwap')
         ? this.findRepairableBarrier()?.id ?? null : null,
     };
   }

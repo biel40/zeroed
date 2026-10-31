@@ -1,9 +1,11 @@
-import { STATION33_BARRIERS, STATION33_OPENINGS, STATION33_WALL_THICKNESS, TALLER } from '../Station33Config';
+import { PROTOCOL33_BLAST_DOOR, STATION33_BARRIERS, STATION33_OPENINGS, STATION33_WALL_THICKNESS, TALLER } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import { stationWallLine } from './WallOpenings';
 
 const { hall, ceilingHeight } = TALLER;
 const HALF_THICKNESS = STATION33_WALL_THICKNESS / 2;
+/** Protocol 33's blast door, cut in the north wall like the paid doors. */
+const BLAST_DOOR_OPENING = { center: PROTOCOL33_BLAST_DOOR.x, width: PROTOCOL33_BLAST_DOOR.width, bottom: 0, top: PROTOCOL33_BLAST_DOOR.height } as const;
 
 /** Oil-stained concrete floor, flat ceiling and the yellow plaster walls of the workshop. */
 export function buildTallerShell(context: Station33BuildContext): void {
@@ -25,7 +27,7 @@ export function buildTallerShell(context: Station33BuildContext): void {
   }
   // The south wall and doorway already belong to the substation.
   const walls = [
-    stationWallLine('x', hall.minZ - HALF_THICKNESS, hall.minX - STATION33_WALL_THICKNESS, hall.maxX + STATION33_WALL_THICKNESS, 1),
+    stationWallLine('x', hall.minZ - HALF_THICKNESS, hall.minX - STATION33_WALL_THICKNESS, hall.maxX + STATION33_WALL_THICKNESS, 1, [BLAST_DOOR_OPENING]),
     stationWallLine('z', hall.minX - HALF_THICKNESS, hall.minZ, hall.maxZ, 1),
     stationWallLine('z', hall.maxX + HALF_THICKNESS, hall.minZ, hall.maxZ, -1),
   ];
@@ -42,17 +44,20 @@ const DADO_HEIGHT = 1.1;
 
 /**
  * Grey dado along the foot of the walls, where trolleys and boots scuffed
- * the paint, capped by a hazard-striped band. It stops at the service door.
+ * the paint, capped by a hazard-striped band. It stops at the service door
+ * and the blast door.
  */
 function addDado(context: Station33BuildContext): void {
   const { batch, materials } = context;
   const gate = STATION33_BARRIERS.find((barrier) => barrier.id === 'taller-service-door')!;
   const halfGate = STATION33_OPENINGS.gate.width / 2;
+  const halfBlastDoor = BLAST_DOOR_OPENING.width / 2;
   const runs: ReadonlyArray<{ readonly axis: 'x' | 'z'; readonly fixed: number; readonly min: number; readonly max: number }> = [
     { axis: 'z', fixed: hall.minX + 0.006, min: hall.minZ, max: hall.maxZ },
     { axis: 'z', fixed: hall.maxX - 0.006, min: hall.minZ, max: hall.maxZ },
     { axis: 'x', fixed: hall.minZ + 0.006, min: hall.minX, max: gate.x - halfGate },
-    { axis: 'x', fixed: hall.minZ + 0.006, min: gate.x + halfGate, max: hall.maxX },
+    { axis: 'x', fixed: hall.minZ + 0.006, min: gate.x + halfGate, max: BLAST_DOOR_OPENING.center - halfBlastDoor },
+    { axis: 'x', fixed: hall.minZ + 0.006, min: BLAST_DOOR_OPENING.center + halfBlastDoor, max: hall.maxX },
   ];
   for (const run of runs) {
     const middle = (run.min + run.max) / 2;

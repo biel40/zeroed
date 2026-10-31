@@ -172,7 +172,7 @@ function addDecal(context: Station33BuildContext, material: THREE.Material, x: n
 /** Oil under the bogie, the drill and the drums, seepage down the plaster and the horde's trail from the service door. */
 function addDecals(context: Station33BuildContext): void {
   const { materials } = context;
-  for (const [x, z, size] of [[TALLER_BOGIE.x, TALLER_BOGIE.z, 2.6], [5.2, -55.3, 1.2], [5.4, -51.4, 1.4], [15.5, -58.0, 1.5], [8.4, -49.2, 1.1]] as const) {
+  for (const [x, z, size] of [[TALLER_BOGIE.x, TALLER_BOGIE.z, 2.6], [5.2, -55.3, 1.2], [5.4, -51.4, 1.4], [15.8, -47.4, 1.5], [8.4, -49.2, 1.1]] as const) {
     addDecal(context, materials.floorGrime, x, 0.004, z, size, size * 0.7, 'floor');
   }
   addDecal(context, materials.bloodSmear, SERVICE_DOOR.x + 0.1, 0.008, hall.minZ + 1.3, 1.7, 0.8, 'floor');
@@ -181,7 +181,8 @@ function addDecals(context: Station33BuildContext): void {
   const streakY = ceilingHeight - 1.0;
   addDecal(context, materials.waterStreak, 6.4, streakY, hall.minZ + 0.035, 1.2, 1.8, 0);
   addDecal(context, materials.waterStreak, hall.minX + 0.035, streakY, -48.4, 1.0, 1.6, Math.PI / 2);
-  addDecal(context, materials.waterStreak, hall.maxX - 0.035, streakY, -58.0, 1.1, 1.8, -Math.PI / 2);
+  // Clear of Protocol 33's panel, its lightbox and beacon in the north-east corner.
+  addDecal(context, materials.waterStreak, hall.maxX - 0.035, streakY, -55.4, 1.1, 1.8, -Math.PI / 2);
 }
 
 /** Web planes as in the other rooms: `yaw` turns the plane, the anchor corner sits at (x, y, z). */

@@ -210,8 +210,13 @@ export class PlayerController {
     const sensitivity = SENSITIVITY * settings.lookSensitivity
       * lerp(1, definition.ads.sensitivity * settings.adsSensitivity, weapon.adsAlpha);
     const pitchSign = settings.invertY ? -1 : 1;
-    this.yaw -= (allowLook ? input.mouseDeltaX : 0) * sensitivity;
-    this.pitch = clamp(this.pitch - (allowLook ? input.mouseDeltaY : 0) * sensitivity * pitchSign, -PITCH_LIMIT, PITCH_LIMIT);
+    const controllerAds = lerp(1, definition.ads.sensitivity * settings.gamepadAdsSensitivity, weapon.adsAlpha);
+    const controllerScale = Math.PI / 180 * dt * controllerAds;
+    this.yaw -= allowLook ? input.mouseDeltaX * sensitivity
+      + (input.gamepadLookX ?? 0) * settings.gamepadLookHorizontal * controllerScale : 0;
+    this.pitch = clamp(this.pitch - (allowLook ? input.mouseDeltaY * sensitivity * pitchSign
+      + (input.gamepadLookY ?? 0) * settings.gamepadLookVertical * controllerScale * (settings.gamepadInvertY ? -1 : 1) : 0),
+    -PITCH_LIMIT, PITCH_LIMIT);
     this.rig.rotation.y = this.yaw;
     this.pitchNode.rotation.x = this.pitch;
     this.cameraImpulse *= Math.exp(-18 * dt);

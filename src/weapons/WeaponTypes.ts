@@ -392,10 +392,11 @@ export interface ViewModelConfig {
    * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
    * ("Super V" lower, full rail, folding sights); 'ppsh41' uses the wooden
    * stock, perforated jacket and drum-fed PPSh-41; 'barrett' builds the heavy
-   * semiautomatic .50 rifle with a ventilated shroud and muzzle brake; 'fakel' builds the
+   * semiautomatic .50 rifle with a ventilated shroud and muzzle brake; 'ptrs41' builds
+   * its Station 33 look, the Soviet PTRS-41 (long bare barrel, wooden stock, box brake); 'fakel' builds the
    * ФАКЕЛ-33 flamethrower (caged red core crystal, fuel tank, petal nozzle). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'barrett' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
@@ -444,6 +445,9 @@ export interface WeaponDefinition {
   readonly audio: WeaponAudioConfig;
   readonly view: ViewModelConfig;
 }
+
+/** Every weapon as one map presents it: shared ids and gameplay, map-specific names and looks. */
+export type WeaponCatalog = Readonly<Record<WeaponId, WeaponDefinition>>;
 
 export type WeaponEventType =
   | 'shot'

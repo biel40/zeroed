@@ -4,7 +4,9 @@ import type { TranslationKey } from '../i18n/i18n';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { Station33Arena } from '../zombies/maps/Station33Arena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
-import type { WeaponId } from '../weapons/WeaponTypes';
+import { STATION33_WEAPONS } from '../zombies/maps/Station33Config';
+import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
+import { WEAPON_DEFINITIONS } from './weapons';
 
 export type ZombieArenaFactory = (scene: THREE.Scene, profile: DeviceProfile) => ZombieArena;
 
@@ -25,6 +27,8 @@ export interface ZombieMapDefinition {
    * reachable on another map or in co-op.
    */
   readonly exclusiveWeapons: readonly WeaponId[];
+  /** How this map names and draws every weapon; gameplay always stays the shared definition's. */
+  readonly weapons: WeaponCatalog;
   readonly createArena: ZombieArenaFactory;
 }
 
@@ -38,6 +42,7 @@ export const ZOMBIE_MAPS = {
     coop: true,
     premium: false,
     exclusiveWeapons: [],
+    weapons: WEAPON_DEFINITIONS,
     createArena: (scene, profile) => new BurnedMansionArena(scene, profile),
   },
   'station-33': {
@@ -48,6 +53,7 @@ export const ZOMBIE_MAPS = {
     coop: false,
     premium: true,
     exclusiveWeapons: ['fakel'],
+    weapons: STATION33_WEAPONS,
     createArena: (scene, profile) => new Station33Arena(scene, profile),
   },
 } as const satisfies Record<string, ZombieMapDefinition>;

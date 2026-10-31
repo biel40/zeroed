@@ -1,9 +1,12 @@
+import type { TranslationKey } from '../../i18n/i18n';
+import type { EvacuationRules } from '../evacuation/EvacuationProtocol';
 import type { AmmoRefillPlacement } from './shared/AmmoRefill';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { WeaponStationPlacement } from './shared/WeaponStation';
+import { PTRS41_RESKIN, reskinWeapons } from '../../config/weaponReskins';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
@@ -14,6 +17,7 @@ import type { SignId } from './station33/Station33Signage';
 import type {
   ArenaAmbience,
   ArenaAmbientCue,
+  ArenaEnding,
   ArenaIntro,
   MysteryBoxPlacement,
   PlayerBounds,
@@ -51,6 +55,10 @@ import type {
  *   (floor -1), joined with `floorTransitions` like the mansion stairs.
  * - Phase 6 is the central platform (floor -2) with tracks along Z further
  *   north; tunnels, service level and bunker follow beyond it.
+ * - Protocol 33's escape (built) leaves the workshop through a blast door
+ *   in its north wall, east of the escalator axis: a corridor and one
+ *   flight climbing north to the surface (floor 1, y = PROTOCOL33_SURFACE_Y),
+ *   a fenced yard north of everything underground.
  * Zombie spawn passages run 6 m outward from each entrance at y = 0 (see
  * SERVICE_PASSAGE); later zones must leave those footprints free.
  */
@@ -178,7 +186,13 @@ export interface Station33Barrier {
   readonly zone: Station33ZoneId;
 }
 
-export type Station33ZoneId = 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia' | 'taller';
+/**
+ * Rooms of the station. `evacuacion` (the escape corridor and stair) and
+ * `superficie` (the yard above) open with Protocol 33's blast door, not
+ * with a paid door, and have no entrances of their own.
+ */
+export type Station33ZoneId =
+  | 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia' | 'taller' | 'evacuacion' | 'superficie';
 
 export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
 
@@ -223,6 +237,9 @@ export const MILICIA = {
 } as const;
 
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
+/** Station 33 presents the Barrett .50 as the Soviet PTRS-41 everywhere: box, chest, HUD and prompts. */
+export const STATION33_WEAPONS = reskinWeapons({ barrett: PTRS41_RESKIN });
+
 /** Evidence chest against the south wall, beside the holding cell, facing the room. */
 export const STATION33_WEAPON_CHEST: CodeWeaponChestPlacement = {
   id: 'milicia-barrett-chest', weaponId: 'barrett', code: BARRETT_CHEST_CODE,
@@ -433,6 +450,9 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
   subestacion: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'subestacion').map(spawnBehind),
   milicia: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'milicia').map(spawnBehind),
   taller: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'taller').map(spawnBehind),
+  // The horde follows the players up from the station.
+  evacuacion: [],
+  superficie: [],
 };
 
 /** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
@@ -561,6 +581,111 @@ export const STATION33_WEAPON_STATIONS: ReadonlyArray<WeaponStationPlacement> = 
   },
 ];
 
+/**
+ * Protocol 33, the station's way out (built by `Protocol33`): with the power
+ * on, two auxiliary systems are restored at their switches, the evacuation
+ * is started at the workshop's control panel, the panel is defended while
+ * the blast door beside it unlocks, and the players climb the emergency
+ * stair to the surface and board the waiting truck before time runs out.
+ */
+const TALLER_NORTH_WALL_Z = TALLER.hall.minZ - STATION33_WALL_THICKNESS / 2;
+
+/** The sealed blast door in the workshop's north wall, between its service door and the east wall. */
+export const PROTOCOL33_BLAST_DOOR = { x: 15.0, z: TALLER_NORTH_WALL_Z, width: 1.8, height: 2.4 } as const;
+
+/**
+ * The evacuation panel against the workshop's east wall, beside the blast
+ * door, facing west; the door keeps unlocking while a living player stands
+ * within `defenseRadius` of it.
+ */
+export const PROTOCOL33_PANEL = { x: TALLER.hall.maxX, z: -58.0, width: 1.2, depth: 0.42, height: 1.9, defenseRadius: 6.5 } as const;
+
+/** One auxiliary system: the shared knife switch under its own plate. */
+export interface Protocol33Switch extends PowerLeverPlacement {
+  readonly plate: SignId;
+  readonly labelKey: TranslationKey;
+  /** A wall fan over the switch spins up once it is restored. */
+  readonly fan: boolean;
+}
+
+/**
+ * The auxiliary systems: the ventilation breaker on the machine room's
+ * south wall, west of the gallery, and the security relay on the train
+ * sheds' north wall, east of the blast gate the east track runs into.
+ */
+export const PROTOCOL33_SWITCHES: ReadonlyArray<Protocol33Switch> = [
+  {
+    id: 'protocol33-ventilation', x: 7.3, z: SUBESTACION.hall.maxZ, facingX: 0, facingZ: -1,
+    plate: 'ventilation', labelKey: 'evacuation.ventilation', fan: true,
+  },
+  {
+    id: 'protocol33-security', x: 18.6, z: COCHERAS.hall.minZ, facingX: 0, facingZ: 1,
+    plate: 'security', labelKey: 'evacuation.security', fan: false,
+  },
+];
+
+/** Exactly 10000 Points to start it, 120 s of defended unlocking, 60 s to get out. */
+export const PROTOCOL33_RULES: EvacuationRules = {
+  switchIds: PROTOCOL33_SWITCHES.map((entry) => entry.id),
+  cost: 10000,
+  defenseSeconds: 120,
+  escapeSeconds: 60,
+};
+
+/** Ground level of the surface (floor 1), above every ceiling of the station. */
+export const PROTOCOL33_SURFACE_Y = 7;
+
+/**
+ * The emergency maintenance corridor behind the blast door, then one
+ * straight flight climbing north from its floor (y 0) to the surface.
+ * Interior faces; `height` is the headroom over the corridor and every step.
+ */
+export const PROTOCOL33_ESCAPE = {
+  minX: 13.8,
+  maxX: 16.2,
+  corridorMaxZ: TALLER.hall.minZ - STATION33_WALL_THICKNESS,
+  stairBottomZ: -65,
+  stairTopZ: -78,
+  height: 3,
+  steps: 40,
+} as const;
+
+/**
+ * The yard at the top of the stair: a fenced concrete apron (interior faces
+ * of the fence) in front of the stairhead kiosk, whose doorway is the end
+ * of the stair. Its exterior faces close the yard's south fence.
+ */
+export const PROTOCOL33_SURFACE = {
+  yard: { minX: 4, maxX: 27, minZ: -100, maxZ: -78.6 },
+  kiosk: { minX: 13.5, maxX: 16.5, minZ: -78.6, maxZ: -72.25, height: 4.2, doorHeight: 2.6 },
+  fenceHeight: 2.5,
+} as const;
+
+/**
+ * The evacuation truck, nose to the yard's gate (north), its box body open
+ * towards the stairhead; `cabOffset` is the cab's centre behind the nose.
+ */
+export const PROTOCOL33_TRUCK = { x: 20.4, z: -92.5, length: 7.2, width: 2.5, height: 3, cabOffset: 1.75 } as const;
+
+/**
+ * Open-air mood of the surface: a cold blue-grey night haze, thinner than
+ * the station's air so the dead tower blocks show as silhouettes, and a
+ * pale sky fill. The scene blends to it as the observer's eyes climb from
+ * `blend.from` to `blend.to` on the flight's upper half.
+ */
+export const PROTOCOL33_SURFACE_AMBIENCE = {
+  backgroundColor: 0x0d1216,
+  fog: { color: 0x0d1216, density: 0.024 },
+  hemisphereLight: { skyColor: 0x5a6a7c, groundColor: 0x1a1714, intensity: 1.1, reducedIntensity: 1.3 },
+  blend: { from: 4.5, to: 8.2 },
+} as const;
+
+/** How boarding the truck ends the run: the escape card, the last radio call, then the credits. */
+export const PROTOCOL33_ENDING: ArenaEnding = { presentation: 'evacuation', audio: 'evacuation', duration: 13 };
+
+/** While the protocol runs, the horde only comes through the entrances around the workshop. */
+export const PROTOCOL33_HORDE_ZONES: ReadonlyArray<Station33ZoneId> = ['cocheras', 'subestacion', 'taller'];
+
 export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as const;
 
 /**
@@ -569,22 +694,40 @@ export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as co
  * locked rooms (and out of the gaps between rooms) until they are bought,
  * and the arena stops the player at every walk-through gate (the sheds'
  * blast gate now lies inside the rectangle) so no spawn passage is ever
- * walkable.
+ * walkable. It reaches the stair's top landing, behind the blast door.
  */
 export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
   minX: MILICIA.hall.minX + 0.4,
   maxX: CONSIGNA.hall.maxX - 0.4,
-  minZ: TALLER.hall.minZ + 0.4,
+  minZ: PROTOCOL33_SURFACE.yard.maxZ,
   maxZ: VESTIBULE.maxZ - 0.4,
 };
 
+/** Movement on the surface (floor 1): the yard, and the stair back down to the corridor. */
+export const PROTOCOL33_SURFACE_BOUNDS: PlayerBounds = {
+  minX: PROTOCOL33_SURFACE.yard.minX + 0.4,
+  maxX: PROTOCOL33_SURFACE.yard.maxX - 0.4,
+  minZ: PROTOCOL33_SURFACE.yard.minZ + 0.4,
+  maxZ: PROTOCOL33_ESCAPE.stairBottomZ + 0.25,
+};
+
 /**
- * Every room plus every entrance passage on the vestibule level. Walls
- * longer than the zombie obstacle limit (20 m) are built in pieces, so the
- * empty ground west of the train sheds stays walled off.
+ * Every room plus every entrance passage on the vestibule level, out to
+ * the stairhead's doorway (no further: the yard is floor 1); then the
+ * surface yard and the stair it reaches. Walls longer than the zombie
+ * obstacle limit (20 m) are built in pieces, so the empty ground west of
+ * the train sheds stays walled off.
  */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -19.1, maxX: 27.8, minZ: -66, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: -19.1, maxX: 27.8, minZ: PROTOCOL33_SURFACE.yard.maxZ, maxZ: 24.7, baseY: 0 },
+  {
+    floor: 1,
+    minX: PROTOCOL33_SURFACE.yard.minX - 0.3,
+    maxX: PROTOCOL33_SURFACE.yard.maxX + 0.3,
+    minZ: PROTOCOL33_SURFACE.yard.minZ - 0.3,
+    maxZ: PROTOCOL33_ESCAPE.stairBottomZ + 0.5,
+    baseY: PROTOCOL33_SURFACE_Y,
+  },
 ];
 
 /** Cold, damp underground air: green-grey haze, nothing of the mansion's smoke. */
@@ -640,6 +783,8 @@ export const AMBER_LAMP_COLOR = 0xffa65a;
 export const EMERGENCY_COLOR = 0xff2a12;
 /** Ruby glass of the militia post's lit star. */
 export const MILICIA_STAR_COLOR = 0xff3a26;
+/** Cold mercury floodlight over the stairhead on the surface. */
+export const SURFACE_FLOOD_COLOR = 0xbfd2e2;
 
 /**
  * The station's main switch: a knife-switch lever on the machine room's
@@ -668,11 +813,13 @@ export const STATION33_MAINS = {
 } as const;
 
 /**
- * Zone holding a floor point: the sheds' north wall separates the machine
- * room, the vestibule's north wall the train sheds, its east wall the
- * luggage office and its west wall the militia post.
+ * Zone holding a floor point: the workshop's north wall separates the
+ * escape (and, past the stairhead, the surface), the sheds' north wall the
+ * machine room, the vestibule's north wall the train sheds, its east wall
+ * the luggage office and its west wall the militia post.
  */
 export function station33ZoneAt(x: number, z: number): Station33ZoneId {
+  if (z < TALLER_NORTH_WALL_Z) return z < PROTOCOL33_SURFACE.yard.maxZ ? 'superficie' : 'evacuacion';
   if (z < SUBESTACION_NORTH_WALL_Z && x < TALLER.hall.maxX + STATION33_WALL_THICKNESS / 2) return 'taller';
   if (z < COCHERAS_NORTH_WALL_Z) return 'subestacion';
   if (z < NORTH_WALL_Z) return 'cocheras';
@@ -726,6 +873,16 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   { x: 13.6, y: TALLER.ceilingHeight - 0.8, z: TALLER.hall.minZ + 0.6, color: EMERGENCY_COLOR, intensity: 3, distance: 6, circuit: 'emergency', zone: 'taller' },
   { x: 13.8, y: 3.6, z: -56.6, color: TALLER.lightColor, intensity: 6, distance: 9, circuit: 'mains', zone: 'taller' },
   { x: 5.6, y: 2.5, z: -48.4, color: TALLER.lightColor, intensity: 2.5, distance: 5, circuit: 'amber', zone: 'taller' },
+  // The escape only has its battery lamps: red down the corridor and up the flight.
+  { x: 15, y: 2.6, z: -62.4, color: EMERGENCY_COLOR, intensity: 4, distance: 7, circuit: 'emergency', zone: 'evacuacion' },
+  { x: 15, y: 6.4, z: -72.6, color: EMERGENCY_COLOR, intensity: 4, distance: 8, circuit: 'emergency', zone: 'evacuacion' },
+  // The surface: the truck's beacon, the stairhead's floodlight and one sodium lamp left burning.
+  {
+    x: PROTOCOL33_TRUCK.x, y: PROTOCOL33_SURFACE_Y + 2.9, z: PROTOCOL33_TRUCK.z - PROTOCOL33_TRUCK.length / 2 + PROTOCOL33_TRUCK.cabOffset,
+    color: EMERGENCY_COLOR, intensity: 6, distance: 13, circuit: 'emergency', zone: 'superficie',
+  },
+  { x: 15, y: PROTOCOL33_SURFACE_Y + 3.1, z: -79.3, color: SURFACE_FLOOD_COLOR, intensity: 7, distance: 15, circuit: 'steady', zone: 'superficie' },
+  { x: 6.2, y: PROTOCOL33_SURFACE_Y + 5.4, z: -94.5, color: AMBER_LAMP_COLOR, intensity: 6, distance: 16, circuit: 'amber', zone: 'superficie' },
 ];
 
 /**
@@ -795,17 +952,20 @@ export const STATION33_WALL_LAMPS: ReadonlyArray<Station33WallFitting & { readon
   { x: 6.2, z: SUBESTACION.hall.maxZ, facingX: 0, facingZ: -1, circuit: 'dead' },
   { x: TALLER.hall.minX, z: -57.0, facingX: 1, facingZ: 0, circuit: 'amber' },
   { x: TALLER.hall.maxX, z: -57.0, facingX: -1, facingZ: 0, circuit: 'dead' },
+  { x: PROTOCOL33_ESCAPE.minX, z: -62.4, facingX: 1, facingZ: 0, circuit: 'emergency' },
 ];
 
 /**
  * Red battery beacons at 3.4 m: over the sheds' blast gate, beside the
- * wicket the horde breaks through, over the machine room's main switch and
- * beside the workshop's service door.
+ * wicket the horde breaks through, over the machine room's main switch,
+ * beside the workshop's service door (and the blast door) and over the
+ * evacuation panel.
  */
 export const STATION33_BEACONS: ReadonlyArray<Station33WallFitting> = [
   { x: 13.0, z: COCHERAS.hall.minZ, facingX: 0, facingZ: 1 },
   { x: POWER_LEVER.x, z: SUBESTACION.hall.minZ, facingX: 0, facingZ: 1 },
   { x: 13.6, z: TALLER.hall.minZ, facingX: 0, facingZ: 1 },
+  { x: PROTOCOL33_PANEL.x, z: PROTOCOL33_PANEL.z, facingX: -1, facingZ: 0 },
 ];
 
 /** Amber glass sconces on the side walls; `yaw` faces the hall. */

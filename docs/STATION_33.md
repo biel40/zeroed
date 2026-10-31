@@ -196,6 +196,38 @@ codigo: actualiza la guia.
   de dano con armas. Una entrada de mantenimiento propia despierta al
   abrir la puerta, bajo la placa «МАСТЕРСКАЯ» sobre las taquillas.
 
+## Protocolo 33 (la salida)
+
+- La evacuacion que fracaso tenia un plan de emergencia que nadie llego a
+  ejecutar: el «ПРОТОКОЛ 33». En la esquina noreste del taller, junto a la
+  entrada de servicio, una compuerta blindada («АВАРИЙНЫЙ ВЫХОД») con franjas
+  de peligro y, en el muro este, el armario del panel de evacuacion bajo su
+  caja de luz roja y una baliza. Sin corriente esta muerto; con ella, la caja
+  de luz respira en rojo, el piloto de red se pone verde y los de los dos
+  sistemas auxiliares quedan en rojo. Los bidones del taller pasaron a la
+  esquina sureste para dejarle sitio.
+- Los sistemas auxiliares son interruptores de cuchillas como el general,
+  cada uno bajo su placa: «ВЕНТИЛЯЦИЯ ПОДСТАНЦИИ» en el muro sur de la sala de
+  maquinas, con un ventilador mural que arranca al cerrarlo, y «ОХРАННАЯ
+  СИГНАЛИЗАЦИЯ» en el muro norte de las cocheras, junto al germozatvor donde
+  muere la via este. Un piloto encima de cada uno pasa de rojo a verde.
+- Iniciar el protocolo es el momento mas ruidoso del mapa: sirena
+  electromecanica, megafonia y todas las luces de bateria destellando como
+  balizas giratorias mientras la red cae. La compuerta sube despacio hacia el
+  dintel al terminar el desbloqueo.
+- Detras, un pasillo de hormigon desnudo y un unico tramo de escalera bajo un
+  techo que sube con ella, con barandillas, bandeja de cables, la placa de
+  salida al pie, pilotos rojos y la mano ensangrentada de alguien que no
+  llego. Arriba, una caseta de hormigon con dintel y marquesina se abre al
+  patio.
+- La superficie es una noche fria y muerta, no una ciudad jugable: un patio de
+  losas cercado por valla prefabricada de hormigon con espino, la puerta de
+  acero cerrada, un camion militar verde oliva con caja de furgon abierta y
+  su baliza, una farola de sodio que sigue encendida y bloques de hormigon.
+  Mas alla, bloques de viviendas brutalistas y un mastil con su luz de
+  aviso, solo siluetas en una bruma azulada mas fina que el aire de la
+  estacion. Sin emblemas ni rotulos reales.
+
 ## El puesto de milicia
 
 - La comisaria de la estacion («МИЛИЦИЯ»): el sitio donde tendria sentido
@@ -339,7 +371,9 @@ codigo: actualiza la guia.
   propios: amplialos, no los dupliques.
 - Respeta el plan de ejes: lo existente no se mueve; las zonas nuevas se abren
   con puertas de pago o la escalera, y dejan libres los pasadizos de spawn.
-- La Mystery Box vive en la consigna. Aun no hay final.
+- La Mystery Box vive en la consigna. El final es la evacuacion del
+  Protocolo 33; la superficie queda al norte de todo lo subterraneo, en la
+  planta 1, y no debe crecer hasta parecer una ciudad jugable.
 - Nada de recursos que rompan el tono: fuego, colores saturados, humor,
   señaletica traducida o UI que explique lo que el escenario puede mostrar.
 - Ningun solido puede superar 20 m de planta (el filtro de obstaculos de los

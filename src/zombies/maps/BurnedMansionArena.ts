@@ -315,11 +315,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     this.buildStairs();
     this.buildProps();
     this.buildBunkerDetails();
-    this.weaponPickups = [...this.buildSecretPickups(), new CodeWeaponChest({
-      group: this.group,
-      structure: this.structure,
-      collider: new THREE.MeshBasicMaterial({ visible: false }),
-    }, MANSION_WEAPON_CHEST)];
+    this.weaponPickups = [...this.buildSecretPickups(), this.buildBunkerChest()];
     const machineKit = {
       group: this.group, structure: this.structure,
       collider: new THREE.MeshBasicMaterial({ visible: false }), batch: new StaticMeshBatch(),
@@ -962,6 +958,27 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     collider.userData.stainFaces = stainFaces;
     this.structure.addSolid(collider, true);
     this.group.add(collider);
+  }
+
+  private buildBunkerChest(): ArenaWeaponPickup {
+    const chest = new CodeWeaponChest({
+      group: this.group, structure: this.structure,
+      collider: new THREE.MeshBasicMaterial({ visible: false }),
+    }, MANSION_WEAPON_CHEST, WEAPON_DEFINITIONS);
+    // The shared chest is ground-floor based; keep the underground adaptation map-local.
+    this.group.getObjectByName(`code-chest:${chest.id}`)!.position.y += MANSION_BUNKER_Y;
+    this.group.getObjectByName(chest.id)!.position.y += MANSION_BUNKER_Y;
+    return {
+      id: chest.id, weaponId: chest.weaponId, cost: chest.cost,
+      requiredDoorId: chest.requiredDoorId, interactionLabel: chest.interactionLabel,
+      position: { ...chest.position, y: chest.position.y + MANSION_BUNKER_Y },
+      floor: -1, useRange: chest.useRange, lookDotMin: chest.lookDotMin,
+      codeLock: chest.codeLock,
+      get available(): boolean { return chest.available; },
+      claim: (): boolean => chest.claim(),
+      update: (dt: number): void => chest.update(dt),
+      reset: (): void => chest.reset(),
+    };
   }
 
   private buildSecretPickups(): ReadonlyArray<ArenaWeaponPickup> {

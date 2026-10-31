@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { COCHERAS, CONSIGNA, MILICIA, station33ZoneAt, SUBESTACION, TALLER, VESTIBULE } from '../Station33Config';
+import {
+  COCHERAS, CONSIGNA, MILICIA, PROTOCOL33_ESCAPE, PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, station33ZoneAt, SUBESTACION, TALLER, VESTIBULE,
+} from '../Station33Config';
 
 /**
  * Shallow segmental barrel vault spanning a hall across X and running
@@ -50,6 +52,8 @@ export function ceilingHeightAt(x: number, z: number): number {
     case 'consigna': return CONSIGNA.ceilingHeight;
     case 'milicia': return MILICIA.ceilingHeight;
     case 'taller': return TALLER.ceilingHeight;
+    case 'evacuacion': return PROTOCOL33_ESCAPE.height;
+    case 'superficie': return PROTOCOL33_SURFACE_Y + PROTOCOL33_SURFACE.kiosk.height;
     case 'subestacion': return z > SUBESTACION.hall.maxZ ? SUBESTACION.galleryHeight : SUBESTACION.hallHeight;
     case 'cocheras': return COCHERAS_VAULT.heightAt(x);
     default: return VESTIBULE_VAULT.heightAt(x);

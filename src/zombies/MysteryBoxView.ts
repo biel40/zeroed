@@ -3,7 +3,7 @@ import type { AssetManager } from '../assets/AssetManager';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import { damp } from '../utils/math';
 import { buildWeaponDisplayModel } from '../weapons/WeaponView';
-import type { WeaponId } from '../weapons/WeaponTypes';
+import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxEntry, MysteryBoxMachine, MysteryBoxPhase } from './MysteryBox';
 import { MYSTERY_BOX_SIZE } from './MysteryBox';
 
@@ -59,6 +59,8 @@ export class MysteryBoxView {
     assets: AssetManager,
     placement: { x: number; y: number; z: number; yaw?: number },
     pool: readonly MysteryBoxEntry[],
+    /** The map's weapons, so the roulette shows its own names and looks. */
+    weapons: WeaponCatalog,
   ) {
     this.group.position.set(placement.x, placement.y, placement.z);
     this.group.rotation.y = placement.yaw ?? 0;
@@ -265,7 +267,7 @@ export class MysteryBoxView {
     for (const entry of pool) {
       this.rarityByWeapon.set(entry.weaponId, entry.rarity);
       const display = buildWeaponDisplayModel(
-        WEAPON_DEFINITIONS[entry.weaponId],
+        weapons[entry.weaponId],
         assets.getWeaponModel(entry.weaponId),
       );
       display.visible = false;

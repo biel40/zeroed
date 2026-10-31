@@ -39,14 +39,19 @@ export type SignId =
   | 'honour-board'
   | 'duty-roster'
   | 'holding-cell'
-  | 'maintenance';
+  | 'maintenance'
+  | 'ventilation'
+  | 'security'
+  | 'protocol-33'
+  | 'emergency-exit';
 
 const ATLAS_WIDTH = 1024;
 /**
  * Two 128 px rows below the original square (the machine room's plates, then
- * the militia post's), then a 384 px band of the post's red corner.
+ * the militia post's), a 384 px band of the post's red corner, then a row of
+ * Protocol 33's lightboxes.
  */
-const ATLAS_HEIGHT = 1792;
+const ATLAS_HEIGHT = 1920;
 
 /** Atlas cells in canvas pixels: x, y, width, height. */
 const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
@@ -83,6 +88,10 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   'duty-roster': [512, 1536, 256, 128],
   'holding-cell': [768, 1536, 256, 128],
   maintenance: [0, 1664, 256, 128],
+  ventilation: [256, 1664, 256, 128],
+  security: [512, 1664, 256, 128],
+  'protocol-33': [0, 1792, 512, 128],
+  'emergency-exit': [512, 1792, 512, 128],
 };
 
 /** Grid of enamel number tags for the luggage lockers: bank letter and number. */
@@ -273,6 +282,24 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   paintSubstationSigns(context, random);
   paintMilitiaSigns(context, random);
   enamelPlate(context, 'maintenance', '#d7b842', '#302a16', '#302a16', ['МАСТЕРСКАЯ'], 30, random);
+  paintProtocolSigns(context, random);
+}
+
+/**
+ * Protocol 33: the plates over its two auxiliary switches, and the
+ * lightboxes over its panel and blast door. Lightbox letters are painted
+ * pale so their material's red decides how they glow.
+ */
+function paintProtocolSigns(context: CanvasRenderingContext2D, random: () => number): void {
+  enamelPlate(context, 'ventilation', '#e4e0d4', '#a3241a', '#1c2a3a', ['ВЕНТИЛЯЦИЯ', 'ПОДСТАНЦИИ'], 30, random);
+  enamelPlate(context, 'security', '#e4e0d4', '#a3241a', '#1c2a3a', ['ОХРАННАЯ', 'СИГНАЛИЗАЦИЯ'], 30, random);
+  for (const [id, text, size] of [['protocol-33', 'ПРОТОКОЛ 33', 78], ['emergency-exit', 'АВАРИЙНЫЙ ВЫХОД', 58]] as const) {
+    const [x, y, width, height] = SIGN_REGIONS[id];
+    context.fillStyle = '#0d0f0e';
+    context.fillRect(x, y, width, height);
+    lettering(context, text, x + width / 2, y + height / 2 + 2, size, '#ffe2dc');
+    weather(context, x, y, width, height, random, 20);
+  }
 }
 
 /**

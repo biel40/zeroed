@@ -90,7 +90,7 @@ export class CoopGuestMode implements GameMode {
   public init(ctx: ModeContext): void {
     this.ctx = ctx;
     this.world = new CoopWorld(ctx);
-    this.boxView = new MysteryBoxView(ctx.assets, this.world.arena.mysteryBoxPlacement.position, MYSTERY_BOX_POOL);
+    this.boxView = new MysteryBoxView(ctx.assets, this.world.arena.mysteryBoxPlacement.position, MYSTERY_BOX_POOL, WEAPON_DEFINITIONS);
     this.boxView.group.rotation.y = this.world.arena.mysteryBoxPlacement.yaw;
     ctx.scene.add(this.boxView.group);
     this.world.placeLocalPlayer('guest');

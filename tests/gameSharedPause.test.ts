@@ -7,6 +7,8 @@ import { Weapon } from '../src/weapons/Weapon';
 import { WeaponView } from '../src/weapons/WeaponView';
 import { installCanvasDocument } from './coopHarness';
 import * as THREE from 'three';
+import { GamepadInput } from '../src/player/GamepadInput';
+import { DEFAULT_SETTINGS } from '../src/core/PlayerSettings';
 
 let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
@@ -41,6 +43,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     scene: {},
     player: { camera: { fov: 75 }, update: vi.fn(), speed01: 0 },
     input: {
+      updateGamepad: vi.fn(), suppressGamepad: vi.fn(), blockingMenu: false,
       endFrame: vi.fn(), pointerLocked: true, wasPressed: () => false,
       leftButtonDown: true, rightButtonDown: false, repeatSemiAuto: false, mouseDeltaX: 0, mouseDeltaY: 0,
     },
@@ -68,6 +71,35 @@ afterEach(() => {
 });
 
 describe('local pause vs shared simulation', () => {
+  it('polls the controller while the simulation is paused', () => {
+    const { game } = stubGame(false, true);
+    game.gameplayStarted = true;
+    prototype.frame.call(game);
+    expect(game.input.updateGamepad).toHaveBeenCalledWith(0.016, false);
+  });
+
+  it.each([false, true])('accepts controller gameplay without pointer lock (shared: %s)', shared => {
+    const { game, weapon } = stubGame(shared, false);
+    game.input.pointerLocked = false;
+    game.controllerSession = true;
+    prototype.frame.call(game);
+    expect(game.player.update).toHaveBeenCalledWith(0.016, game.input, weapon, true);
+    expect(weapon.update).toHaveBeenCalledWith(0.016, expect.objectContaining({ trigger: true }));
+  });
+
+  it.each([false, true])('gates all gameplay behind a blocking modal (shared: %s)', shared => {
+    const { game, weapon } = stubGame(shared, false);
+    game.input.blockingMenu = true;
+    game.input.wasPressed = () => true;
+    game.mode.onInteract = vi.fn();
+    game.mode.onMeleeAttack = vi.fn();
+    prototype.frame.call(game);
+    expect(game.player.update).toHaveBeenCalledWith(0.016, game.input, weapon, false);
+    expect(game.mode.onInteract).not.toHaveBeenCalled();
+    expect(game.mode.onMeleeAttack).not.toHaveBeenCalled();
+    if (shared) expect(weapon.update).toHaveBeenCalledWith(0.016, expect.objectContaining({ trigger: false, ads: false }));
+  });
+
   it('halts the whole simulation behind the single-player pause menu', () => {
     const { game, weapon } = stubGame(false, true);
     prototype.frame.call(game);
@@ -114,6 +146,32 @@ describe('local pause vs shared simulation', () => {
     game.paused = true;
     prototype.handlePointerLockChange.call(game, true);
     expect(exitPointerLock).toHaveBeenCalledOnce();
+  });
+});
+
+describe('controller shell actions', () => {
+  it.each([false, true])('routes edges into the existing handlers exactly once (shared: %s)', shared => {
+    const { game, weapon } = stubGame(shared, false);
+    const pad = { index: 0, id: 'test', connected: true, mapping: 'standard', axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) } as unknown as Gamepad;
+    const adapter = new GamepadInput(() => [pad]);
+    game.input.updateGamepad = (): void => { adapter.poll(DEFAULT_SETTINGS); adapter.applyGameplay(true); };
+    game.input.wasPressed = (code: string): boolean => adapter.state.wasPressed(code);
+    game.cycleWeapon = vi.fn();
+    game.mode.onInteract = vi.fn();
+    game.mode.onMeleeAttack = vi.fn(() => false);
+    game.mode.onWeaponReloaded = vi.fn();
+    weapon.reload = vi.fn(() => true);
+    weapon.cycleFireMode = vi.fn();
+    for (const button of [2, 3, 4, 5, 8, 11]) Object.assign(pad.buttons[button], { pressed: true, value: 1 });
+    for (let i = 0; i < 10; i++) prototype.frame.call(game);
+    expect(weapon.reload).toHaveBeenCalledOnce();
+    expect(weapon.cycleFireMode).toHaveBeenCalledOnce();
+    expect(weapon.inspect).toHaveBeenCalledOnce();
+    expect(game.mode.onInteract).toHaveBeenCalledOnce();
+    expect(game.mode.onMeleeAttack).toHaveBeenCalledOnce();
+    expect(game.mode.onWeaponReloaded).toHaveBeenCalledOnce();
+    expect(game.cycleWeapon).toHaveBeenCalledOnce();
   });
 });
 

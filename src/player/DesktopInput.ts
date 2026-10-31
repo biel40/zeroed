@@ -11,6 +11,7 @@ export class DesktopInput {
     private readonly state: InputState,
     private readonly onLockChange: (locked: boolean) => void,
     private readonly onKeyInput: (key: string) => void = () => undefined,
+    private readonly onUnlockedPointerDown: () => void = () => undefined,
   ) {
     this.add(document, 'keydown', (event) => {
       const keyboardEvent = event as KeyboardEvent;
@@ -29,7 +30,10 @@ export class DesktopInput {
       this.state.mouseDeltaY += mouseEvent.movementY;
     });
     this.add(document, 'mousedown', (event) => {
-      if (!this.state.pointerLocked) return;
+      if (!this.state.pointerLocked) {
+        if (event.target === this.lockElement && (event as MouseEvent).button === 0) this.onUnlockedPointerDown();
+        return;
+      }
       const button = (event as MouseEvent).button;
       if (button === 0) this.state.leftButtonDown = true;
       if (button === 2) this.state.rightButtonDown = true;

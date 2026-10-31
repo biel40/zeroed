@@ -78,7 +78,8 @@ describe('PWA contract', () => {
     expect(pwa).toContain('this.reloadPending = true');
     expect(pwa).toContain("!this.mapSelect.classList.contains('hidden')");
     expect(pwa).toContain("!this.pauseMenu.classList.contains('hidden')");
-    expect(pwa).toContain("window.confirm(t('menu.updateConfirm'))");
+    expect(pwa).toContain('await confirmDialog(dialog)');
+    expect(html).toContain('id="pwa-update-confirm"');
     expect(pwa).toContain('await this.updateSW()');
   });
 

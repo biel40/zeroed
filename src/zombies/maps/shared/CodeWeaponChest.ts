@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { WEAPON_DEFINITIONS } from '../../../config/weapons';
 import { buildWeaponDisplayModel } from '../../../weapons/WeaponView';
-import type { WeaponId } from '../../../weapons/WeaponTypes';
+import type { WeaponCatalog, WeaponId } from '../../../weapons/WeaponTypes';
 import type { ArenaWeaponPickup } from '../ZombieArena';
 import type { MapBuildKit } from './MapBuildKit';
 import { addSolidProxy } from './SolidProxy';
@@ -26,11 +25,15 @@ export class CodeWeaponChest implements ArenaWeaponPickup {
   private readonly padlock = new THREE.Group();
   private readonly weapon: THREE.Group;
 
-  public constructor(kit: Pick<MapBuildKit, 'group' | 'structure' | 'collider'>, private readonly config: CodeWeaponChestPlacement) {
+  public constructor(
+    kit: Pick<MapBuildKit, 'group' | 'structure' | 'collider'>,
+    private readonly config: CodeWeaponChestPlacement,
+    weapons: WeaponCatalog,
+  ) {
     this.id = config.id;
     this.weaponId = config.weaponId;
     this.requiredDoorId = config.requiredDoorId;
-    this.interactionLabel = WEAPON_DEFINITIONS[config.weaponId].name;
+    this.interactionLabel = weapons[config.weaponId].name;
     this.position = { x: config.x + Math.sin(config.yaw) * 0.4, y: 0.8, z: config.z + Math.cos(config.yaw) * 0.4 };
     const group = new THREE.Group();
     group.name = `code-chest:${this.id}`;
@@ -63,7 +66,7 @@ export class CodeWeaponChest implements ArenaWeaponPickup {
     shackle.position.y = 0.06;
     this.padlock.add(shackle);
     for (let digit = 0; digit < 4; digit++) box(this.padlock, lining, -0.06 + digit * 0.04, -0.04, 0.045, 0.025, 0.06, 0.012);
-    this.weapon = buildWeaponDisplayModel(WEAPON_DEFINITIONS[this.weaponId], null, 1.65);
+    this.weapon = buildWeaponDisplayModel(weapons[this.weaponId], null, 1.65);
     this.weapon.name = 'chest-weapon';
     this.weapon.rotation.y = Math.PI / 2;
     this.weapon.position.set(0, 0.58, 0);

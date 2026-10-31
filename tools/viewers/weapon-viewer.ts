@@ -31,8 +31,9 @@ import type { WeaponId } from '../../src/weapons/WeaponTypes';
 const params = new URLSearchParams(location.search);
 const weaponId = (params.get('weapon') ?? 'ak47') as WeaponId;
 const mode = params.get('view') ?? 'pov';
-const definition = WEAPON_DEFINITIONS[weaponId];
 const requestedMap = params.get('map');
+// The map's own look of the weapon in every view (barrett + station-33 = PTRS-41).
+const definition = (isZombieMapId(requestedMap) ? ZOMBIE_MAPS[requestedMap].weapons : WEAPON_DEFINITIONS)[weaponId];
 const mapId = isZombieMapId(requestedMap) && ['pov', 'reload', 'knife'].includes(mode) ? requestedMap : null;
 const arenas = new Map<THREE.Scene, ZombieArena>();
 

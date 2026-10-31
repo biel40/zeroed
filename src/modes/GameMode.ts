@@ -10,7 +10,7 @@ import type { Effects } from '../rendering/Effects';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { HUD } from '../ui/HUD';
 import type { Weapon } from '../weapons/Weapon';
-import type { WeaponId } from '../weapons/WeaponTypes';
+import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { HandRings } from '../weapons/HandRings';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
 
@@ -74,6 +74,8 @@ export interface GameMode {
   readonly id: 'zombies';
   /** Weapons instantiated and preloaded for this mode (no runtime loads). */
   readonly weaponIds: readonly WeaponId[];
+  /** Names and looks of those weapons on this mode's map; absent uses the shared definitions. */
+  readonly weaponDefinitions?: WeaponCatalog;
   /**
    * Loadout the player starts with. Zombies starts with the M1911 alone.
    */

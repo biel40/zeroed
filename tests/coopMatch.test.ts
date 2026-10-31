@@ -24,6 +24,7 @@ import { installCanvasDocument, makeContext, makeMatch, placePlayer, type CoopMa
 import { CodeLockDialog } from '../src/ui/CodeLockDialog';
 import { cameraSpatialCue } from '../src/audio/SpatialCue';
 import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
+import { MANSION_BUNKER_Y } from '../src/zombies/maps/BurnedMansionConfig';
 import type { RemotePlayer } from '../src/rendering/RemotePlayer';
 
 vi.mock('../src/ui/CodeLockDialog', () => ({
@@ -130,13 +131,13 @@ describe('co-op session', () => {
       match.relay.host.onMessage?.({ ...request, ...(code === undefined ? {} : { code }) });
       match.relay.flush();
     };
-    placePlayer(match.guestSide.player, pickup.position.x - 0.5, pickup.position.z);
-    match.guestSide.player.rig.rotation.y = -Math.PI / 2;
+    placePlayer(match.guestSide.player, pickup.position.x + 0.5, pickup.position.z, -1, MANSION_BUNKER_Y);
+    match.guestSide.player.rig.rotation.y = Math.PI / 2;
     match.step(0.1, 3);
     send(STATION33_WEAPON_CHEST.code);
     expect(pickup.codeLock!.locked).toBe(true);
-    for (const id of ['to-dining', 'to-banquet']) authority.world.unlockDoor(authority.world.findDoor(id)!, () => true);
-    match.step(0.1, 3);
+    for (const id of ['to-dining', 'to-banquet', 'to-east-hall', 'nuclear-bunker']) authority.world.unlockDoor(authority.world.findDoor(id)!, () => true);
+    match.step(0.1, 31);
     send();
     send('0000');
     send('19980');
@@ -165,15 +166,15 @@ describe('co-op session', () => {
   it.each(['host', 'guest'] as const)('opens the keypad for the %s without pausing the shared match', (buyer) => {
     const match = startedMatch();
     const authority = host(match);
-    for (const id of ['to-dining', 'to-banquet']) authority.world.unlockDoor(authority.world.findDoor(id)!, () => true);
-    match.step(0.1, 3);
+    for (const id of ['to-dining', 'to-banquet', 'to-east-hall', 'nuclear-bunker']) authority.world.unlockDoor(authority.world.findDoor(id)!, () => true);
+    match.step(0.1, 31);
     const side = buyer === 'host' ? match.hostSide : match.guestSide;
     Object.assign(side.ctx.input, { releaseAll: vi.fn() });
     const mode = buyer === 'host' ? match.host : match.guest;
     vi.mocked(match.hostSide.ctx.hasWeapon).mockReturnValue(true);
     const pickup = authority.world.arena.weaponPickups.find((entry) => entry.weaponId === 'barrett')!;
-    placePlayer(side.player, pickup.position.x - 0.5, pickup.position.z);
-    side.player.rig.rotation.y = -Math.PI / 2;
+    placePlayer(side.player, pickup.position.x + 0.5, pickup.position.z, -1, MANSION_BUNKER_Y);
+    side.player.rig.rotation.y = Math.PI / 2;
     side.player.rig.updateMatrixWorld(true);
     match.step(0.1, 30);
     expect((buyer === 'host' ? authority.world : guest(match).world).findFacingPickup()?.id).toBe(pickup.id);

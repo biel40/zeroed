@@ -9,6 +9,8 @@ import { BetaUnlockDialog } from './BetaUnlockDialog';
 import { LanguagePicker } from './LanguagePicker';
 import { bindInteractionPromptVisibility, renderInteractionPrompt } from './InteractionPromptView';
 import { SettingsPanel } from './SettingsPanel';
+import { getControllerFamily, getInputDevice, onInputDeviceChange } from '../player/InputPresentation';
+import { gamepadMenuButtonLabel } from '../player/GamepadBindings';
 import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
@@ -31,13 +33,17 @@ export interface GameOverStats {
   readonly headshots: number;
 }
 
+/** The run's record an ending can show next to its final round. */
+export type EndingRecord = Pick<GameOverStats, 'kills' | 'headshots'>;
+
 /** Keep in sync with the #map-loading opacity transition in style.css. */
 /** Ending cinematics a map can request through `ArenaEnding.presentation`. */
-export type EndingPresentationId = 'nuclear';
+export type EndingPresentationId = 'nuclear' | 'evacuation';
 
-/** Seconds into each cinematic when its impact flash lands (CSS `--detonation`). */
+/** Seconds into each cinematic when its impact flash lands (CSS `--detonation`); the escape has none. */
 const ENDING_DETONATION_TIME: Record<EndingPresentationId, number> = {
   nuclear: NUCLEAR_DETONATION_TIME,
+  evacuation: 0,
 };
 
 /** Opening cinematics a map can request through `ArenaIntro.presentation`. */
@@ -101,6 +107,8 @@ export class HUD {
   private readonly hostPauseStatus: HTMLElement = mustGet('host-pause-status');
   private readonly endingScreen: HTMLElement = mustGet('ending-screen');
   private readonly endingRound: HTMLElement = mustGet('ending-round');
+  private readonly endingKills: HTMLElement = mustGet('ending-kills');
+  private readonly endingHeadshots: HTMLElement = mustGet('ending-headshots');
   private readonly introScreen: HTMLElement = mustGet('intro-screen');
 
   private lastWeapon: string = '';
@@ -112,6 +120,7 @@ export class HUD {
   private lastRings = '';
   private lastPrompt: string | null = null;
   private ready: boolean = false;
+  private startPaused = false;
   private readonly mapLoading: HTMLElement = mustGet('map-loading');
   private mapLoadingShownAt = 0;
   private mapLoadingTimer = 0;
@@ -139,6 +148,7 @@ export class HUD {
     this.settings = new SettingsPanel(mustGet('settings-dialog') as HTMLDialogElement,
       mustGet('menu-settings'), mustGet('pause-settings'));
     bindInteractionPromptVisibility(this.interactPrompt);
+    onInputDeviceChange(() => this.refreshStartHint());
 
     // The language is only chosen from the main menu; in-game texts read it when rendered.
     new LanguagePicker(mustGet('language-select'), mustGet('language-toggle'), mustGet('language-options'));
@@ -147,6 +157,7 @@ export class HUD {
       this.lastWeapon = this.lastAmmo = this.lastMode = this.lastZombies = this.lastLamps = this.lastRings = '';
       this.lastRound = -1;
       this.lastPrompt = null;
+      this.refreshStartHint();
     });
   }
 
@@ -161,7 +172,7 @@ export class HUD {
     this.ready = true;
     this.startScreen.classList.add('ready');
     this.loadingBar.classList.add('hidden');
-    this.startHint.textContent = t('start.clickToStart');
+    this.refreshStartHint();
   }
 
   public setError(message: string): void {
@@ -214,17 +225,30 @@ export class HUD {
     this.root.classList.toggle('hidden', !visible);
   }
 
-  /** Persistent current objective; kept separate from temporary round announcements and USE prompts. */
-  public setObjective(text: string | null): void {
+  /**
+   * Persistent current objective; kept separate from temporary round
+   * announcements and USE prompts. An `urgent` one (a timed event) stands out.
+   */
+  public setObjective(text: string | null, urgent = false): void {
     const element = mustGet('hud-objective');
     if (element.textContent !== (text ?? '')) element.textContent = text ?? '';
     element.classList.toggle('hidden', text === null);
+    element.classList.toggle('urgent', urgent && text !== null);
   }
 
   public showStartScreen(paused: boolean): void {
     if (!this.ready) return;
-    this.startHint.textContent = t(paused ? 'start.pausedClick' : 'start.clickToStart');
+    this.startPaused = paused;
+    this.refreshStartHint();
     this.revealStartScreen();
+  }
+
+  private refreshStartHint(): void {
+    if (!this.ready) return;
+    this.startHint.textContent = getInputDevice() === 'gamepad'
+      ? t(this.startPaused ? 'start.gamepadResume' : 'start.gamepadStart',
+        { button: gamepadMenuButtonLabel('confirm', getControllerFamily()) })
+      : t(this.startPaused ? 'start.pausedClick' : 'start.clickToStart');
   }
 
   public hideStartScreen(): void {
@@ -251,6 +275,12 @@ export class HUD {
     this.startScreen.onclick = () => {
       if (this.ready && !(document.documentElement.classList.contains('touch-controls-enabled') &&
         window.matchMedia('(orientation: portrait)').matches)) handler();
+    };
+    this.startScreen.onkeydown = (event) => {
+      if ((event.code === 'Enter' || event.code === 'Space') && !event.repeat) {
+        event.preventDefault();
+        this.startScreen.click();
+      }
     };
   }
 
@@ -590,11 +620,15 @@ export class HUD {
     mustGet('go-main-menu').onclick = handlers.onMainMenu;
   }
 
-  public showEnding(round: number, presentation: EndingPresentationId): void {
+  /** The map's ending cinematic, then its credits; `record` fills the escape's kills and headshots. */
+  public showEnding(round: number, presentation: EndingPresentationId, record?: EndingRecord): void {
     this.root.classList.add('hidden');
     this.setInteractionPrompt(null);
+    this.endingScreen.dataset.presentation = presentation;
     this.endingScreen.style.setProperty('--detonation', `${ENDING_DETONATION_TIME[presentation]}s`);
     this.endingRound.textContent = `${round}`;
+    this.endingKills.textContent = `${record?.kills ?? 0}`;
+    this.endingHeadshots.textContent = `${record?.headshots ?? 0}`;
     this.endingScreen.classList.remove('hidden', 'credits');
     this.endingScreen.classList.add('ending');
   }

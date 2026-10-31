@@ -2,6 +2,8 @@ import { isTranslationKey, t } from '../i18n/i18n';
 import type { PointDoor } from '../zombies/doors/PointDoor';
 import type { TranslationKey } from '../i18n/i18n';
 import type { ArenaWeaponPickup } from '../zombies/maps/ZombieArena';
+import { getControllerFamily, getInputDevice } from '../player/InputPresentation';
+import { gamepadButtonLabel } from '../player/GamepadBindings';
 
 export function weaponCaseLocked(pickup: ArenaWeaponPickup, kills: number): boolean {
   return kills < (pickup.requiredKills ?? 0);
@@ -16,6 +18,10 @@ export function weaponCasePrompt(pickup: ArenaWeaponPickup, kills: number, touch
 
 /** Device-specific action hint used inside interaction prompts ("Press E", "Hold USE"). */
 export function actionKey(touch: boolean, hold = false): string {
+  const device = getInputDevice(touch ? 'touch' : 'keyboard');
+  if (device === 'gamepad') return t(hold ? 'prompt.gamepadHold' : 'prompt.gamepadPress',
+    { button: gamepadButtonLabel('interact', getControllerFamily()) });
+  touch = device === 'touch';
   if (hold) return t(touch ? 'prompt.holdTouch' : 'prompt.hold');
   return t(touch ? 'prompt.pressTouch' : 'prompt.press');
 }

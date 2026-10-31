@@ -34,6 +34,11 @@
   el bunker conserva su collider hasta terminar la apertura; las puertas normales abren la topologia al comprarse.
 - **Sala secreta desacoplada.** `ZombiesMode` envia muertes; el estado puro
   gobierna progreso y el sistema del mapa posee vistas, pool, pared y reset.
+- **Evacuacion como run, no como mapa.** Coste, temporizadores, horda y
+  desenlace de una evacuacion (`ArenaEvacuation`) son estado de la run:
+  los decide el modo con un estado puro, de modo que una autoridad futura
+  pueda replicarlo; el mapa solo aporta datos y presentacion. El Protocolo 33
+  es solo individual porque Station 33 lo es.
 - **Cooperativo con autoridad unica del anfitrion.** `CoopHostMode` simula todo
   el estado compartido; `CoopGuestMode` replica e interpola. El relay solo
   empareja y reenvia mensajes. La pausa del anfitrion detiene la simulacion compartida; la del invitado es local. `ZombiesMode` no necesita red. Ver [cooperativo](MULTIPLAYER.md#alcance-y-límites).
@@ -54,11 +59,26 @@
   y el idioma siguen siendo solo del menu principal: el idioma, en un
   desplegable con banderas en la esquina del panel.
 
+- **Mando nativo antes de la frontera de gameplay.** Gamepad API estandar,
+  estado separado por adaptador y acciones compartidas; sin dependencias ni
+  mensajes de red nuevos. Se rechazan layouts desconocidos para evitar
+  acciones accidentales. Recarga e interaccion tienen botones distintos:
+  los prompts pueden describir requisitos pendientes y reparar usa una accion
+  mantenida; no sirven para decidir si debe recargarse un arma. Contratos en
+  [arquitectura](ARCHITECTURE.md#contratos) y motivos de la asignacion en
+  [la nota de cambio](changes/native-gamepad.md).
+
 - **Armas exclusivas de mapa como dato del registro.** Un mapa declara en
   `ZombieMapDefinition.exclusiveWeapons` las armas que solo el reparte (la
   ФАКЕЛ-33 en Station 33); `ZombiesMode` las precarga solo en ese mapa y las
   vende su `ArenaWeaponStation`. Nunca entran en la Mystery Box, en
   `ZOMBIES_WEAPON_PRELOAD` ni en el cooperativo, y el modo no conoce el mapa.
+- **Variantes de arma por mapa como reskin, no como arma nueva.** Un mapa
+  puede cambiar el nombre y el modelo de un arma compartida
+  (`ZombieMapDefinition.weapons`, construido con `reskinWeapons`; el PTRS-41
+  sustituye al Barrett en Station 33) conservando su `WeaponId`. Asi
+  inventario, Mystery Box, baules, red y efectos ligados al id siguen
+  intactos y el equilibrio no se duplica.
 
 ## Deudas de contrato
 

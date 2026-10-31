@@ -1,5 +1,6 @@
 import { getSettings, onSettingsChange } from '../core/PlayerSettings';
 import { t } from '../i18n/i18n';
+import { actionKey } from './InteractionPrompts';
 
 /** Keep the preference independent from the current target's `.hidden` state. */
 export function bindInteractionPromptVisibility(element: HTMLElement): () => void {
@@ -16,8 +17,8 @@ export function interactionPromptContent(text: string): {
 } {
   const [title, ...lines] = text.split('\n');
   const detail = lines.join('\n').trim();
-  for (const key of ['prompt.press', 'prompt.hold', 'prompt.pressTouch', 'prompt.holdTouch'] as const) {
-    const hint = t(key);
+  const hints = [t('prompt.press'), t('prompt.hold'), t('prompt.pressTouch'), t('prompt.holdTouch'), actionKey(false), actionKey(false, true)];
+  for (const hint of hints) {
     // Match whole hints, so item names and locked-state text stay literal.
     if (detail !== hint && !detail.startsWith(`${hint} — `)) continue;
     const separator = hint.lastIndexOf(' ');

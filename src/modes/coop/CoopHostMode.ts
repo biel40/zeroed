@@ -166,7 +166,7 @@ export class CoopHostMode implements GameMode {
   public init(ctx: ModeContext): void {
     this.ctx = ctx;
     this.world = new CoopWorld(ctx);
-    this.boxView = new MysteryBoxView(ctx.assets, this.world.arena.mysteryBoxPlacement.position, MYSTERY_BOX_POOL);
+    this.boxView = new MysteryBoxView(ctx.assets, this.world.arena.mysteryBoxPlacement.position, MYSTERY_BOX_POOL, WEAPON_DEFINITIONS);
     this.boxView.group.rotation.y = this.world.arena.mysteryBoxPlacement.yaw;
     ctx.scene.add(this.boxView.group);
     this.world.placeLocalPlayer('host');
@@ -513,6 +513,7 @@ export class CoopHostMode implements GameMode {
     const input = this.ctx.input;
     const hostBarrier = input.isDown('KeyE') && !input.leftButtonDown
       && !input.wasPressed('Digit1') && !input.wasPressed('Digit2')
+      && !input.wasPressed('GamepadSwap')
       && !input.wasPressed('TouchFire') && this.players.host.life.state === 'alive' && this.isCombatInputEnabled()
       ? this.world.findRepairableBarrier() : null;
     this.repairFor('host', hostBarrier, dt);

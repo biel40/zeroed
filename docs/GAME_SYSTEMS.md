@@ -12,7 +12,7 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 
 ## Shell compartido
 
-`Input` unifica desktop y tactil. `PlayerController` gestiona camara, recoil,
+`Input` unifica desktop, tactil y mando estandar del navegador. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. C alterna agachado/de pie y Z tumbado/de pie;
 los botones tactiles AGACHAR/TUMBAR usan las mismas acciones. Las posturas bajas
 reducen velocidad y altura de colision; la camara y el compañero aceleran y
@@ -152,6 +152,36 @@ propia de cada arma y el campo de visión solo cambia la vista sin apuntar.
 Mientras el diálogo está abierto, ESC lo cierra sin reanudar la partida.
 «Guardar» confirma los valores actuales y cierra el panel; los cambios siguen
 guardandose automaticamente al ajustarlos.
+
+### Mandos
+
+Los sticks ofrecen movimiento analogico y camara con velocidad angular basada
+en delta, sin exigir Pointer Lock. Los ajustes de mando son independientes de
+raton/tactil y se guardan en `PlayerSettings`; incluyen activacion, velocidad
+horizontal/vertical, zonas muertas radiales, inversion vertical y multiplicador
+ADS. Las acciones usan los mismos handlers y validaciones del shell y los modos.
+Las asignaciones se mantienen en
+[GamepadBindings](../src/player/GamepadBindings.ts): X/□ recarga y LB/L1
+interactua. Tienen botones separados para conservar la reparacion mantenida y la
+reanimacion existentes. No hay sprint ni granadas en el juego.
+
+Cruceta o stick izquierdo recorren los controles visibles del menu o dialogo
+activo; confirmar activa el control nativo, volver cancela el dialogo o regresa
+al menu anterior, e izquierda/derecha ajustan los deslizadores. Los campos de
+texto conservan la entrada nativa. Los prompts cambian segun la ultima entrada
+significativa y muestran etiquetas PlayStation/Xbox si el identificador permite
+reconocer la familia, o numeros de boton genericos. La conexion por si sola no
+cambia el dispositivo de presentacion. Menu/Options en otro mando estandar
+selecciona ese dispositivo local.
+
+Desconectar libera solo el estado del mando; sin Pointer Lock ni controles
+tactiles, abre la pausa local. Perder foco o visibilidad tambien pausa la partida local. Los
+botones mantenidos al cerrar menus o recuperar foco necesitan soltarse; los
+sticks deben volver al centro. Los layouts no estandar no generan acciones y
+se indican en Ajustes. Las pruebas automatizadas usan snapshots simulados;
+compatibilidad fisica, audio y experiencia en navegador siguen pendientes de
+validacion manual. Detalles de entrega y comprobacion en
+[soporte nativo de mando](changes/native-gamepad.md).
 
 ### Consola de desarrollador
 
@@ -376,7 +406,8 @@ existente a `MOTDRULES`.
   cada entrada de tipo puerta para que ningun pasadizo de spawn sea
   transitable; los muros de mas de 20 m se parten porque el filtro de
   obstaculos de los zombis ignora los solidos mayores. Reiniciar cierra las
-  puertas y duerme sus zonas. Aun no tiene final. La arena solo
+  puertas y duerme sus zonas. Su final es la evacuacion del Protocolo 33
+  (ver la evacuacion de un mapa, abajo). La arena solo
   orquesta: cada zona tiene su builder en `station33/`, y la luz y la
   atmosfera son sistemas propios. Direccion de arte y directrices del mapa:
   `STATION_33.md`.
@@ -390,6 +421,33 @@ existente a `MOTDRULES`.
   hasta entonces), sube relleno y entorno, aclara la niebla, hace temblar la
   estacion y las taquillas se ven mucho mas brillantes. Factores en
   `STATION33_MAINS`; reiniciar lo devuelve todo a oscuras.
+- Evacuacion de un mapa (`ArenaEvacuation`, opcional; el Protocolo 33 de
+  Station 33, solo individual): el modo la ejecuta con `ZombiesEvacuation`
+  sobre el estado puro `EvacuationProtocol`
+  (`locked -> exploration -> ready -> defending -> escaping -> completed | failed`)
+  y el mapa solo la presenta. Sin electricidad el panel y los interruptores
+  avisan de que falta y no hacen nada. Con ella, USE en el panel del taller
+  explica que faltan dos sistemas auxiliares (ventilacion, en la sala de
+  maquinas, y seguridad, junto al germozatvor de las cocheras) y abre una nota
+  en la esquina del HUD; cada uno es un `PowerLever` que se acciona una vez
+  por partida con su sonido, su piloto verde y, la ventilacion, su ventilador.
+  Con los dos, el panel ofrece iniciar el protocolo por exactamente 10000
+  Points: se comprueba el saldo, el protocolo acepta el inicio una sola vez y
+  solo entonces se cobra. Arranca la sirena, la megafonia y la alarma (las
+  luces de bateria de toda la estacion destellan en rojo y la red cae), la
+  nota pasa a modo urgente y las rondas se suspenden: `EvacuationHorde` genera
+  zombis de la ronda actual cada vez mas rapido y con mas limite simultaneo
+  (menor en efectos reducidos), solo por las entradas de las cocheras, la sala
+  de maquinas y el taller. La compuerta acumula 120 s de desbloqueo mientras el
+  jugador siga a menos de `defenseRadius` del panel; fuera se pausa sin perder
+  progreso, con cartel, nota y el indicador del panel parpadeando. Los zombis
+  no atacan el panel. Al completarse la compuerta sube (deja de ser solida al
+  instante) y empiezan 60 s para subir por el pasillo y la escalera (planta 1,
+  `escapeStairTransitions`) al patio de la superficie, que los zombis tambien
+  recorren, y usar el camion. Lo logrado lleva al final del mapa; si se acaba
+  el tiempo, cartel y la derrota normal. Al subir, `SurfaceMood` mezcla la
+  niebla, el fondo y la hemisferica del mapa con los de la superficie.
+  Reiniciar lo devuelve todo al estado inicial.
 - Puertas de pago de Station 33: la misma `PointDoorView`/`BuyableDoorVisual`
   que la mansion con chapas de acero en lugar de tablones y superficie de
   impacto metalica.
@@ -415,7 +473,8 @@ existente a `MOTDRULES`.
   tren hace temblar la boveda, los circuitos se encienden uno a uno y la grua
   recorre la nave mientras aparece el titulo premium dorado.
 - El menu principal ordena cabecera (titulo e idioma), tarjetas de mapa,
-  accesos a multijugador y ajustes, y un pie con creditos y privacidad. Cada
+  accesos a multijugador y ajustes, y un pie con creditos, privacidad y un enlace
+  a la [web principal](https://zeroed-web.com) que abre en otra pestaña. Cada
   mapa tiene una tarjeta ilustrada con realce al pasar el cursor o enfocar con
   teclado. Ambas usan la misma estructura y efectos, con acento rojo para el
   mapa incluido y dorado para el premium; un mapa bloqueado oscurece su arte
@@ -462,8 +521,11 @@ existente a `MOTDRULES`.
   La PPSh-41 forma parte del arsenal estandar de la caja; la Vector sigue disponible.
   El Barrett .50 se obtiene en la caja y gratis en los baules con candado
   numerico: el del puesto de milicia de Station 33 (tras la puerta de 3000)
-  y el de Burned Mansion, delante de la chimenea del gran comedor, bajo el
-  retrato que sigue al jugador. Ambos comparten el mismo codigo.
+  y el de Burned Mansion, junto a la pared oeste del bunker, orientado hacia
+  el interior. Ambos comparten el mismo codigo. En Station 33 el Barrett se
+  presenta como el PTRS-41 sovietico (nombre y modelo en caja, baul, HUD,
+  avisos y primera persona) con exactamente las mismas estadisticas, sonido,
+  efectos y animaciones; Burned Mansion y el cooperativo conservan el Barrett.
   `CodeWeaponChest` usa el contrato `ArenaWeaponPickup` con `codeLock` opcional:
   el teclado pausa la simulacion individual, abrir revela el arma y recogerla
   pasa por el inventario habitual; una entrega por partida, restaurada al reiniciar.
@@ -513,6 +575,11 @@ existente a `MOTDRULES`.
   de un asset no bloquea el final ni las otras capas. Para incorporar los
   sonidos basta con colocar los MP3 en `public/assets/audio/` y reconstruir
   (en Android, `npm run android:sync`).
+  El final de la evacuacion de Station 33 (`PROTOCOL33_ENDING`, presentacion y
+  audio `evacuation`) reutiliza la misma pantalla: fundido a negro, la tarjeta
+  «STATION 33 — ESCAPE SUCCESSFUL» con el ultimo mensaje de radio
+  (procedural en `AudioSystem`, sobre `radioactivity.mp3`) y despues los
+  creditos con la ronda, las bajas y los disparos a la cabeza.
 
 ## Anillos
 

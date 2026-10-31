@@ -14,6 +14,7 @@ import { CoopHostMode } from './modes/coop/CoopHostMode';
 import { CoopConnection } from './network/CoopConnection';
 import { applyDocumentTranslations, t } from './i18n/i18n';
 import { HUD } from './ui/HUD';
+import { GamepadControls } from './player/GamepadControls';
 
 class ZeroedBoot {
   private readonly container: HTMLElement;
@@ -25,6 +26,9 @@ class ZeroedBoot {
   /** Lobby-owned socket; ownership moves to the co-op mode once a match starts. */
   private coopConnection: CoopConnection | null = null;
   private game: Game | null = null;
+  private readonly gamepad = new GamepadControls();
+  private menuFrame = 0;
+  private lastMenuTime = 0;
 
   public constructor(private readonly betaAccess: typeof BetaAccess) {
     const container = document.getElementById('app');
@@ -34,6 +38,7 @@ class ZeroedBoot {
     this.profile = getDeviceProfile(undefined, getQualityPreference());
     this.hud = new HUD();
     this.assets = new AssetManager(this.profile.anisotropyLimit);
+    this.startMenuLoop();
     this.music.setEnabled(true);
     this.music.startMenuLoop();
 
@@ -68,7 +73,7 @@ class ZeroedBoot {
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     try {
       const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode, this.music,
-        () => this.onGameExited(game));
+        () => this.onGameExited(game), this.gamepad);
       this.game = game;
       await game.prepare();
       // A co-op partner may have ended the match while the GPU warmed up.
@@ -83,7 +88,21 @@ class ZeroedBoot {
   private onGameExited(game: Game): void {
     if (this.game === game) this.game = null;
     this.showMapMenu();
+    this.startMenuLoop();
   }
+
+  /** There is no renderer loop on the main menu. Stop this pump as soon as Game takes over. */
+  private startMenuLoop(): void {
+    if (!this.menuFrame) this.menuFrame = requestAnimationFrame(this.tickMenu);
+  }
+
+  private readonly tickMenu = (time: number): void => {
+    this.menuFrame = 0;
+    if (this.game) return;
+    this.gamepad.update(Math.min(0.05, (time - this.lastMenuTime) / 1000), false);
+    this.lastMenuTime = time;
+    if (!this.game) this.startMenuLoop();
+  };
 
   private startCoopGame(role: 'host' | 'guest', connection: CoopConnection): void {
     if (this.coopConnection !== connection) return;

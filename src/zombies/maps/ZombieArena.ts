@@ -14,6 +14,7 @@ import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import type { WeaponId } from '../../weapons/WeaponTypes';
 import type { TranslationKey } from '../../i18n/i18n';
+import type { EvacuationRules, EvacuationStage } from '../evacuation/EvacuationProtocol';
 
 export interface MysteryBoxPlacement {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -143,6 +144,47 @@ export interface ArenaPowerSwitch {
   readonly isOn: boolean;
   /** Throws the switch; false when it already is. */
   activate(): boolean;
+}
+
+/** A spot the player uses by standing close and roughly facing it. */
+export interface ArenaUsePoint {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+}
+
+/** One auxiliary system of an evacuation: its switch and what the prompts call it. */
+export interface ArenaEvacuationSwitch {
+  readonly labelKey: TranslationKey;
+  /** Thrown once per run (the lever plays itself); its id is one of the rules' `switchIds`. */
+  readonly lever: ArenaPowerSwitch;
+}
+
+/**
+ * Optional evacuation easter egg. Once the map's power is on, its
+ * auxiliary switches are thrown, the protocol is bought at `panel`, the
+ * panel is defended while the exit unlocks, and the players reach
+ * `extraction` before the clock runs out; boarding there ends the run with
+ * `ending`. The mode runs the protocol (`EvacuationProtocol`): it charges,
+ * times, spawns and decides; the map only presents each step.
+ */
+export interface ArenaEvacuation {
+  readonly rules: EvacuationRules;
+  /** True once the map's power is on: the protocol unlocks with it. */
+  readonly powered: boolean;
+  readonly panel: ArenaUsePoint;
+  /** Unlocking advances while a living player stands this close to the panel, on its floor. */
+  readonly defenseRadius: number;
+  readonly switches: ReadonlyArray<ArenaEvacuationSwitch>;
+  /** Where the exit's door stands, for the sound of it opening. */
+  readonly exitPosition: { readonly x: number; readonly y: number; readonly z: number };
+  readonly extraction: ArenaUsePoint;
+  readonly ending: ArenaEnding;
+  /** The protocol reached `stage` (alarm, horde routing, the exit opening); called once per change. */
+  showStage(stage: EvacuationStage): void;
+  /** Unlocking progress (0..1) and whether anyone defends the panel, every frame while defending. */
+  showDefense(progress: number, defended: boolean): void;
 }
 
 /** How a map closes its run: the HUD cinematic, its audio and how long it lasts. */
@@ -297,6 +339,8 @@ export interface ZombieArena {
   readonly powerSwitch?: ArenaPowerSwitch;
   /** Paid interaction that ends the run with the map's own ending. */
   readonly completionInteraction?: ArenaCompletionInteraction;
+  /** Optional evacuation easter egg that ends the run when the players escape. */
+  readonly evacuation?: ArenaEvacuation;
   /** Opening cinematic; omitted when the map starts straight into play. */
   readonly intro?: ArenaIntro;
   /** Omitted when the currently playable map has no Mystery Box. */

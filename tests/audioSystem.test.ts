@@ -227,7 +227,7 @@ describe('Game pause resume', () => {
     };
     game.profile = { isMobile: true, useTouchControls: true };
     game.arsenal = new Map();
-    game.input = { requestPointerLock: vi.fn() };
+    game.input = { requestPointerLock: vi.fn(), suppressGamepad: vi.fn() };
     game.hud = { hidePauseMenu: vi.fn(), hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
 
     game.start();
@@ -297,6 +297,7 @@ describe('Game pause resume', () => {
     const game: any = Object.create((Game as any).prototype);
     game.paused = false;
     game.mode = { id: 'zombies' };
+    game.input = { suppressGamepad: vi.fn() };
     game.audio = {
       pauseMusic: vi.fn(),
       setAmbienceSuspended: vi.fn(),

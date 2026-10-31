@@ -211,6 +211,9 @@ const DOORS_TO: Readonly<Record<Station33ZoneId, ReadonlyArray<Station33ZoneId>>
   subestacion: ['cocheras', 'subestacion'],
   milicia: ['milicia'],
   taller: ['cocheras', 'subestacion', 'taller'],
+  // Behind Protocol 33's blast door, not a paid door.
+  evacuacion: ['cocheras', 'subestacion', 'taller'],
+  superficie: ['cocheras', 'subestacion', 'taller'],
 };
 
 function openWayTo(arena: ZombieArena, zone: Station33ZoneId): void {
@@ -961,7 +964,8 @@ describe('Station 33 lights and ambience', () => {
     for (let step = 0; step < 800; step++) {
       const before = cues.length;
       arena.update(0.25);
-      if (cues.length > before && cues[cues.length - 1].sound === 'power-dip') {
+      // Another event may fire in the same step, after the dip.
+      if (cues.slice(before).some((cue) => cue.sound === 'power-dip')) {
         dimmedOnDip ||= fluorescents.every((light) => light.intensity < 1);
       }
     }

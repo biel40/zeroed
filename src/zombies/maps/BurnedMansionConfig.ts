@@ -126,12 +126,12 @@ export const MANSION_BOX_ROOM = {
   southWallZ: 2,
 } as const;
 
-/** Same locked Barrett chest as Station 33, facing the room below the portrait. */
+/** Same locked Barrett chest as Station 33, facing east from the bunker's west wall. */
 export const MANSION_WEAPON_CHEST = {
   id: 'mansion-barrett-chest', weaponId: 'barrett', code: BARRETT_CHEST_CODE,
-  x: MANSION_BANQUET_HALL.chimney.frontX - 0.98,
-  z: MANSION_BANQUET_HALL.chimney.z,
-  yaw: -Math.PI / 2, requiredDoorId: 'to-banquet',
+  x: -6.2,
+  z: -7.6,
+  yaw: Math.PI / 2, requiredDoorId: 'nuclear-bunker',
 } as const satisfies CodeWeaponChestPlacement;
 
 /**

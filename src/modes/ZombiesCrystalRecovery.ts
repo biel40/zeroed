@@ -5,11 +5,11 @@ import { StartupCrystalView } from '../zombies/StartupCrystalView';
 import type { Zombie } from '../zombies/Zombie';
 import type { ArenaWeaponStation } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
+import { bearingArrow } from './ObjectiveBearing';
 
 type RecoveryStage = 'inactive' | 'hunting' | 'dropped' | 'carrying' | 'installed' | 'complete';
 type Position = Readonly<{ x: number; y: number; z: number }>;
 const PICKUP_RANGE = 2;
-const DIRECTIONS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'] as const;
 
 /** Run-local unlock for any station requesting a startup crystal; the normal horde supplies its carrier. */
 export class ZombiesCrystalRecovery {
@@ -107,9 +107,7 @@ export class ZombiesCrystalRecovery {
     const dx = target.x - player.rig.position.x;
     const dz = target.z - player.rig.position.z;
     player.camera.getWorldDirection(this.forward);
-    const angle = Math.atan2(this.forward.x * dz - this.forward.z * dx,
-      this.forward.x * dx + this.forward.z * dz);
-    const arrow = DIRECTIONS[(Math.round(angle / (Math.PI / 4)) + 8) % 8];
+    const arrow = bearingArrow(this.forward.x, this.forward.z, dx, dz);
     return `ФАКЕЛ-33 · ${t(key)}\n${arrow} ${Math.ceil(Math.hypot(dx, dz))} m`;
   }
 

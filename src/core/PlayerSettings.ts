@@ -13,6 +13,14 @@ export interface PlayerSettings {
   /** Extra multiplier over each weapon's own aiming sensitivity. */
   readonly adsSensitivity: number;
   readonly invertY: boolean;
+  readonly gamepadEnabled: boolean;
+  /** Angular speed in degrees per second at full stick deflection. */
+  readonly gamepadLookHorizontal: number;
+  readonly gamepadLookVertical: number;
+  readonly gamepadMoveDeadZone: number;
+  readonly gamepadLookDeadZone: number;
+  readonly gamepadInvertY: boolean;
+  readonly gamepadAdsSensitivity: number;
   /** Contextual action hints only; hiding them never disables interactions. */
   readonly showInteractionPrompts: boolean;
   /** Hip-fire vertical field of view in degrees; aiming keeps each weapon's zoom. */
@@ -27,7 +35,7 @@ export type BooleanSetting = {
   [K in keyof PlayerSettings]: PlayerSettings[K] extends boolean ? K : never;
 }[keyof PlayerSettings];
 
-export const BOOLEAN_SETTINGS: readonly BooleanSetting[] = ['invertY', 'showInteractionPrompts'];
+export const BOOLEAN_SETTINGS: readonly BooleanSetting[] = ['invertY', 'showInteractionPrompts', 'gamepadEnabled', 'gamepadInvertY'];
 
 export interface SettingRange {
   readonly min: number;
@@ -42,6 +50,11 @@ export const SETTING_RANGES: Readonly<Record<NumericSetting, SettingRange>> = {
   lookSensitivity: { min: 0.1, max: 3, step: 0.05 },
   adsSensitivity: { min: 0.1, max: 2, step: 0.05 },
   fieldOfView: { min: 65, max: 95, step: 1 },
+  gamepadLookHorizontal: { min: 30, max: 360, step: 5 },
+  gamepadLookVertical: { min: 30, max: 270, step: 5 },
+  gamepadMoveDeadZone: { min: 0.05, max: 0.5, step: 0.01 },
+  gamepadLookDeadZone: { min: 0.05, max: 0.5, step: 0.01 },
+  gamepadAdsSensitivity: { min: 0.1, max: 2, step: 0.05 },
 };
 
 export const DEFAULT_SETTINGS: PlayerSettings = {
@@ -51,6 +64,13 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   lookSensitivity: 1,
   adsSensitivity: 1,
   invertY: false,
+  gamepadEnabled: true,
+  gamepadLookHorizontal: 180,
+  gamepadLookVertical: 120,
+  gamepadMoveDeadZone: 0.15,
+  gamepadLookDeadZone: 0.12,
+  gamepadInvertY: false,
+  gamepadAdsSensitivity: 1,
   showInteractionPrompts: true,
   fieldOfView: 75,
 };

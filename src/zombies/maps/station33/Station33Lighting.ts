@@ -58,6 +58,11 @@ const FIXTURE_DROP = 0.25;
 const ZONE_SWITCH_MARGIN = 0.6;
 const ZONE_SWITCH_PROBES: ReadonlyArray<readonly [number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const TUBE_LENGTH = 1.55;
+/**
+ * Evacuation alarm: the battery circuit sweeps like a rotating beacon
+ * (sharp flashes over a dim floor) and the mains sag so the red takes over.
+ */
+const ALARM = { rate: 6.5, floor: 0.12, peak: 1.6, mainsLevel: 0.55 } as const;
 
 function hash(value: number): number {
   const s = Math.sin(value * 127.1 + 311.7) * 43758.5453;
@@ -115,6 +120,8 @@ export class Station33Lighting {
   private powerUpElapsed: number | null = null;
   /** The main switch has been thrown this run. */
   private mainsRestored = false;
+  /** The evacuation alarm is sounding. */
+  private alarm = false;
 
   constructor(private readonly context: Station33BuildContext) {
     for (const circuit of CIRCUITS) {
@@ -186,6 +193,11 @@ export class Station33Lighting {
     this.tremorRemaining = Math.max(this.tremorRemaining, duration);
   }
 
+  /** Every battery lamp flashes like a rotating beacon and the mains sag, for the rest of the run. */
+  public soundAlarm(): void {
+    this.alarm = true;
+  }
+
   /** Animates every circuit; with an observer, the real lights follow them between rooms. */
   update(dt: number, observer?: THREE.Vector3): void {
     if (observer) this.followObserver(observer);
@@ -196,11 +208,11 @@ export class Station33Lighting {
       this.powerUpElapsed += Math.max(0, dt);
       if (this.powerUpElapsed >= POWER_UP_END) this.powerUpElapsed = null;
     }
-    const mains = this.mainsLevel();
+    const mains = this.mainsLevel() * (this.alarm ? ALARM.mainsLevel : 1);
     const boost = this.mainsRestored ? STATION33_MAINS.lightBoost : 1;
     for (const circuit of CIRCUITS) {
       const level = circuitLevel(circuit, this.time, CIRCUIT_PHASES[circuit], this.mainsRestored);
-      if (circuit === 'emergency') this.levels.set(circuit, level);
+      if (circuit === 'emergency') this.levels.set(circuit, this.alarm ? this.alarmLevel() : level);
       else if (circuit === 'mains' && !this.mainsRestored) this.levels.set(circuit, 0);
       else this.levels.set(circuit, level * mains * this.powerUpLevel(circuit) * boost);
     }
@@ -221,7 +233,13 @@ export class Station33Lighting {
     this.tremorRemaining = 0;
     this.powerUpElapsed = null;
     this.mainsRestored = false;
+    this.alarm = false;
     this.update(0);
+  }
+
+  private alarmLevel(): number {
+    const sweep = 0.5 + 0.5 * Math.sin(this.time * ALARM.rate);
+    return ALARM.floor + (ALARM.peak - ALARM.floor) * sweep ** 4;
   }
 
   /**

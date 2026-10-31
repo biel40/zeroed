@@ -56,6 +56,12 @@ npx pwa-assets-generator --preset minimal-2023 public/favicon.svg
 
 Android usa Capacitor; ver `ANDROID_DOCS.md`.
 
+La confirmacion de actualizacion desde pausa usa un dialogo HTML para que el
+polling de mando siga activo mientras se decide. En web/PWA el mando depende
+de la Gamepad API y del mapeo estandar que exponga el navegador; comprobarlo
+manualmente tambien en standalone. El dialogo de instalacion del navegador
+sigue siendo UI del sistema.
+
 ## Avatar para Instagram
 
 El [PNG de perfil](../output/instagram/zeroed-profile.png) es una exportacion

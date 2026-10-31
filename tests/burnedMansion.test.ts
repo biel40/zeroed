@@ -47,6 +47,14 @@ import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
 import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
 import { RITUAL_SCARE_TIMELINE } from '../src/zombies/secret-room/SecretRoomSystem';
 import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
+import { makeContext } from './coopHarness';
+import { CodeLockDialog } from '../src/ui/CodeLockDialog';
+import { t } from '../src/i18n/i18n';
+import { actionKey } from '../src/ui/InteractionPrompts';
+
+vi.mock('../src/ui/CodeLockDialog', () => ({
+  CodeLockDialog: vi.fn(function () { return { dispose: vi.fn() }; }),
+}));
 
 const profile: DeviceProfile = {
   isMobile: false,
@@ -173,6 +181,40 @@ const weaponStub = {
 
 describe('Burned Mansion topology', () => {
 
+  it.each([false, true])('opens and claims the bunker Barrett through normal interaction (touch: %s)', (touch) => {
+    const side = makeContext();
+    const mode = new ZombiesMode('burned-mansion');
+    mode.init({ ...side.ctx, profile: { ...side.ctx.profile, useTouchControls: touch, isMobile: touch, isTouch: touch } });
+    const arena = (mode as unknown as { arena: BurnedMansionArena }).arena;
+    const chest = arena.weaponPickups.find((pickup) => pickup.weaponId === 'barrett')!;
+    side.player.teleport(chest.position.x + 0.5, EYE_HEIGHT, chest.position.z, 0);
+    side.player.face(Math.PI / 2);
+    side.player.rig.updateMatrixWorld(true);
+    expect(mode.getInteractPrompt()).toBeNull();
+    for (const id of ['to-dining', 'to-banquet', 'to-east-hall', 'nuclear-bunker']) unlock(arena, id);
+    expect(mode.getInteractPrompt()).toBeNull();
+    side.player.teleport(chest.position.x + 0.5, MANSION_BUNKER_Y + EYE_HEIGHT, chest.position.z, -1, MANSION_BUNKER_BOUNDS);
+    side.player.rig.updateMatrixWorld(true);
+    expect(mode.getInteractPrompt()).toBe(t('prompt.codeChest', { key: actionKey(touch) }));
+    side.ctx.input.releaseAll = vi.fn();
+    mode.onInteract();
+    const [unlockCode, close] = vi.mocked(CodeLockDialog).mock.calls.at(-1)!;
+    expect(mode.isSimulationPaused()).toBe(true);
+    expect(unlockCode('0000')).toBe(false);
+    expect(unlockCode(STATION33_WEAPON_CHEST.code)).toBe(true);
+    close();
+    vi.mocked(side.ctx.canGrantWeapon).mockReturnValue(true);
+    vi.mocked(side.ctx.grantWeapon).mockReturnValue(true);
+    mode.onInteract();
+    expect(side.ctx.grantWeapon).toHaveBeenCalledExactlyOnceWith('barrett');
+    expect(chest.available).toBe(false);
+    mode.onInteract();
+    expect(side.ctx.grantWeapon).toHaveBeenCalledTimes(1);
+    mode.onRestartRequested();
+    expect(chest.codeLock!.locked).toBe(true);
+    expect(chest.available).toBe(true);
+  });
+
   it('offers resurrection across the room from the Mystery Box after the first door', () => {
     const arena = makeArena();
     expect(arena.ringMachines).toHaveLength(1);
@@ -286,26 +328,38 @@ describe('Burned Mansion topology', () => {
     expect(player.rig.position.x).toBeGreaterThan(barrier.x + 0.4);
   });
 
-  it('places the shared Barrett chest below the watching portrait with an accessible solid body', () => {
+  it('places exactly one shared Barrett chest against the bunker west wall with an accessible solid body', () => {
     const arena = makeArena();
     unlock(arena, 'to-dining');
     unlock(arena, 'to-banquet');
     const chest = arena.weaponPickups.find((pickup) => pickup.weaponId === 'barrett')!;
     expect(chest).toBeDefined();
     expect(chest.cost).toBe(0);
-    expect(chest.requiredDoorId).toBe('to-banquet');
+    expect(chest.requiredDoorId).toBe('nuclear-bunker');
+    expect(chest.floor).toBe(-1);
+    expect(arena.weaponPickups.filter((pickup) => pickup.weaponId === 'barrett')).toHaveLength(1);
+    unlock(arena, 'to-east-hall');
+    unlock(arena, 'nuclear-bunker');
     const model = arena.group.getObjectByName(`code-chest:${chest.id}`)!;
-    const { chimney } = MANSION_BANQUET_HALL;
-    expect(model.position.z).toBe(chimney.z);
-    expect(model.position.x).toBeLessThan(chimney.frontX);
-    expect(model.rotation.y).toBe(-Math.PI / 2);
+    expect(model.position.y).toBe(MANSION_BUNKER_Y);
+    expect(model.position.x).toBe(-6.2);
+    expect(model.position.z).toBe(-7.6);
+    expect(model.rotation.y).toBe(Math.PI / 2);
+    const models: THREE.Object3D[] = [];
+    arena.group.traverse((object) => { if (object.name === `code-chest:${chest.id}`) models.push(object); });
+    expect(models).toHaveLength(1);
     const bounds = new THREE.Box3().setFromObject(arena.group.getObjectByName(chest.id)!);
     expect(arena.wallColliders!.some((box) => box.equals(bounds))).toBe(true);
-    const standX = chest.position.x - 0.5;
-    const stand = new THREE.Box3(new THREE.Vector3(standX - 0.3, 0.05, chest.position.z - 0.3),
-      new THREE.Vector3(standX + 0.3, 1.8, chest.position.z + 0.3));
+    expect(bounds.min.y).toBeCloseTo(MANSION_BUNKER_Y);
+    expect(bounds.min.x).toBeGreaterThan(MANSION_SECRET_ROOM.entranceX + 0.15);
+    const standX = chest.position.x + 0.5;
+    const stand = new THREE.Box3(new THREE.Vector3(standX - 0.3, MANSION_BUNKER_Y + 0.05, chest.position.z - 0.3),
+      new THREE.Vector3(standX + 0.3, MANSION_BUNKER_Y + 1.8, chest.position.z + 0.3));
     expect(arena.wallColliders!.some((box) => box.intersectsBox(stand))).toBe(false);
-    expect(canWalk([-3.5, -9.5], [standX, chest.position.z], arena.wallColliders!, MANSION_GROUND_BOUNDS)).toBe(true);
+    expect(canWalk([MANSION_STAIR_CENTER_X, -7.5], [standX, chest.position.z], arena.wallColliders!, MANSION_BUNKER_BOUNDS, MANSION_BUNKER_Y)).toBe(true);
+    expect(bounds.max.y).toBeLessThan(0);
+    arena.refreshColliders();
+    expect(arena.wallColliders.some((box) => box.equals(bounds))).toBe(true);
     expect(chest.claim()).toBe(false);
     expect(chest.codeLock!.unlock('0000')).toBe(false);
     expect(chest.codeLock!.unlock(STATION33_WEAPON_CHEST.code)).toBe(true);
@@ -716,7 +770,7 @@ describe('Burned Mansion topology', () => {
     const arena = makeArena();
     const secret = MANSION_SECRET_AREAS[0];
     const door = arena.doors.find((candidate) => candidate.id === secret.doorId)!;
-    const pickups = arena.weaponPickups.filter((pickup) => pickup.requiredDoorId === secret.doorId);
+    const pickups = arena.weaponPickups.filter((pickup) => MANSION_SPECIAL_WEAPON_CASES.some((weaponCase) => weaponCase.id === pickup.id));
 
     expect(secret.unlockCost).toBe(9999);
     expect(door.cost).toBe(9999);

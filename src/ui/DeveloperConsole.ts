@@ -31,6 +31,7 @@ export class DeveloperConsole {
     title.textContent = t('dev.title');
     const close = document.createElement('button');
     close.type = 'button';
+    close.dataset.gamepadBack = '';
     close.textContent = t('dev.close');
     close.addEventListener('click', () => this.close());
     header.append(title, close);

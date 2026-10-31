@@ -162,6 +162,15 @@ export interface AmbientCuePlayback {
 
 /** Ambient cues set the mood of the whole map, so distance never buries them. */
 const AMBIENT_CUE_MIN_ATTENUATION = 0.35;
+/** The evacuation siren fills the whole station. */
+const SIREN_MIN_ATTENUATION = 0.55;
+/** The siren's pitch, in Hz at seconds from its start: wind-up, two wails, run-down. */
+const SIREN_PITCH: ReadonlyArray<readonly [number, number]> = [
+  [0, 90], [2.2, 640], [3.4, 560], [4.8, 660], [6.2, 545], [7.4, 650], [9.5, 120],
+];
+const SIREN_DURATION = 9.5;
+/** Seconds into each ending before its last radio call crackles in; endings without one are absent. */
+const ENDING_RADIO_DELAY: Partial<Record<EndingAudioId, number>> = { evacuation: 2.2 };
 /**
  * Ambience mix (bed and map cues) between rounds: the last kill opens a
  * quiet breath, the next round's sting builds it back up.
@@ -296,6 +305,8 @@ export class AudioSystem {
 
   public startEndingAudio(id: EndingAudioId): void {
     this.music.startEndingAudio(id);
+    const radioDelay = ENDING_RADIO_DELAY[id];
+    if (radioDelay !== undefined) this.playRadioSignOff(radioDelay);
   }
 
   public stopEndingAudio(): void {
@@ -875,6 +886,90 @@ export class AudioSystem {
     this.tick(0.5, 5200, 0.35);
     this.sweep(0, 'sawtooth', 28, 100, 0.2, 3.6, t + 0.7);
     this.sweep(0, 'square', 25, 50, 0.08, 4.2, t + 0.9);
+  }
+
+  /**
+   * An evacuation alarm: an electro-mechanical siren winding up from a
+   * growl, wailing twice through its horn and running down, heard across
+   * the whole station.
+   */
+  public playEvacuationSiren(cue: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    const { ctx } = audio;
+    const t = ctx.currentTime;
+    const horn = ctx.createBiquadFilter();
+    horn.type = 'bandpass';
+    horn.frequency.value = 720;
+    horn.Q.value = 0.9;
+    horn.connect(this.spatialBus(audio, cue, SIREN_MIN_ATTENUATION));
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.24, t + 1.2);
+    gain.gain.setValueAtTime(0.24, t + SIREN_DURATION - 2);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + SIREN_DURATION);
+    gain.connect(horn);
+    // The rotor's buzz and a slightly detuned body under it.
+    for (const [type, ratio] of [['sawtooth', 1], ['triangle', 1.012]] as const) {
+      const rotor = ctx.createOscillator();
+      rotor.type = type;
+      rotor.frequency.setValueAtTime(SIREN_PITCH[0][1] * ratio, t);
+      for (const [time, pitch] of SIREN_PITCH.slice(1)) rotor.frequency.linearRampToValueAtTime(pitch * ratio, t + time);
+      rotor.connect(gain);
+      rotor.start(t);
+      rotor.stop(t + SIREN_DURATION + 0.05);
+    }
+  }
+
+  /** The station's intercom reading an order: the PA horn's chime and garbled voice, over every other sound. */
+  public playIntercomAnnouncement(cue: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    this.playPaCrackle(audio, this.spatialBus(audio, cue, AMBIENT_CUE_MIN_ATTENUATION), audio.ctx.currentTime);
+  }
+
+  /**
+   * A blast door breaking its seals and grinding up into its lintel: the
+   * bolts withdraw, the seals hiss, a motor strains, the leaf scrapes up in
+   * jolts and stops with a clang.
+   */
+  public playBlastDoorOpen(cue: SpatialCue): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue, AMBIENT_CUE_MIN_ATTENUATION);
+    const t = audio.ctx.currentTime;
+    for (const offset of [0, 0.18, 0.34]) this.tick(offset, 140, 0.5, 1.2, 0.25, output);
+    this.tick(0.1, 5200, 0.12, 0.7, 0.9, output);
+    this.sweep(0, 'sawtooth', 38, 64, 0.16, 3.4, t + 0.35, output);
+    for (let jolt = 0; jolt < 7; jolt++) this.tick(0.4 + jolt * 0.42, 320 + jolt * 15, 0.12, 2.5, 0.38, output);
+    this.tick(3.6, 90, 0.6, 1, 0.5, output);
+    this.tick(3.62, 1250, 0.18, 14, 0.4, output);
+  }
+
+  /**
+   * The last call from the surface over a dying radio: a squelch, three
+   * garbled phrases (the ending card prints their words) through a narrow
+   * band, then the carrier drops into static.
+   */
+  private playRadioSignOff(delay: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime + delay;
+    const radio = audio.ctx.createBiquadFilter();
+    radio.type = 'bandpass';
+    radio.frequency.value = 1400;
+    radio.Q.value = 1.1;
+    radio.connect(audio.master);
+    this.tick(delay, 2600, 0.05, 0.6, 5.2, radio);
+    this.tick(delay, 3800, 0.22, 4, 0.04, radio);
+    for (const [start, syllables] of [[0.35, 7], [1.95, 4], [3.0, 7]] as const) {
+      for (let syllable = 0; syllable < syllables; syllable++) {
+        const pitch = 110 + Math.random() * 40;
+        this.sweep(0, 'sawtooth', pitch, pitch * 0.82, 0.12, 0.12, t + start + syllable * 0.17 + Math.random() * 0.04, radio);
+      }
+    }
+    this.sweep(0, 'sine', 1150, 380, 0.05, 0.9, t + 4.6, radio);
+    this.tick(delay + 4.6, 3000, 0.08, 0.5, 2.4, audio.master);
   }
 
   /**

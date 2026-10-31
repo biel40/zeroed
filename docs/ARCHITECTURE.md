@@ -44,6 +44,15 @@ sufra tirones de compilacion de shaders.
 
 ## Contratos
 
+- `Input` combina el estado desktop/tactil con el estado aislado de
+  `GamepadInput`; el adaptador solo acepta el mapeo estandar del navegador y
+  reutiliza las acciones existentes. `GamepadControls` vive durante el arranque
+  publico y se presta a cada partida: `Game.frame` lo sondea antes de la pausa,
+  y el menu usa su propio pump solo mientras no hay `Game`. La navegacion DOM
+  pertenece a `GamepadMenuNavigation`, la presentacion a `InputPresentation` y
+  la persistencia sigue en `PlayerSettings`. No cambia la frontera de red.
+  Mapeo central en [GamepadBindings](../src/player/GamepadBindings.ts).
+
 - `ZombieMapDefinition.betaOnly` y `canAccessZombieMap` comparten la regla de
   acceso entre el selector y el arranque, incluidos enlaces directos; el
   selector lista bloqueados los mapas sin permiso. `public/beta/access.js`
@@ -52,6 +61,12 @@ sufra tirones de compilacion de shaders.
   normal abre el mapa y `main.ts` vuelve a comprobar el permiso. Es una
   comprobacion de cliente, con los limites descritos en
   [acceso de beta](../public/beta/README.md).
+
+- `ZombieMapDefinition.weapons` es el `WeaponCatalog` con que el mapa nombra y
+  dibuja las armas ([reskins](../src/config/weaponReskins.ts)). `ZombiesMode`
+  lo expone como `GameMode.weaponDefinitions`, que `Game` usa al crear el
+  arsenal; prompts, `MysteryBoxView` y `CodeWeaponChest` lo reciben en vez de
+  leer `WEAPON_DEFINITIONS`. Sin catalogo se usan las definiciones compartidas.
 
 - `PlayerStance` concentra las posturas, alturas y multiplicadores de movimiento
   sin depender de Three.js. `PlayerController.rig` conserva el ancla del ojo de
@@ -86,7 +101,14 @@ sufra tirones de compilacion de shaders.
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
-  `ammoRefills`, `mysteryBoxPlacement`, `ringMachines`).
+  `ammoRefills`, `mysteryBoxPlacement`, `ringMachines`, `evacuation`).
+  `ArenaEvacuation` (el Protocolo 33 de Station 33) declara reglas, puntos de
+  uso, interruptores (`ArenaPowerSwitch`) y final; `ZombiesEvacuation`
+  ejecuta el estado puro `EvacuationProtocol` y el ritmo de `EvacuationHorde`
+  (`src/zombies/evacuation/`), cobra con `PlayerEconomy`, suspende las rondas
+  y termina la run por el final o la derrota existentes. El mapa solo presenta
+  (`showStage`, `showDefense`) y avisa con `onTopologyChanged` al cambiar
+  spawns o abrir la compuerta.
   Los pickups con `codeLock` separan la validacion del codigo de la aplicacion
   de una apertura autorizada; cooperativo replica las aperturas y recogidas
   bajo autoridad del anfitrion, sin introducir dependencias de un mapa.

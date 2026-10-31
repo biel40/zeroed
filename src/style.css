@@ -368,6 +368,20 @@ html.touch-controls-enabled #hud-objective {
   padding: 5px 7px;
 }
 
+/* A timed event (Protocol 33): larger, red rail, the clock in tabular figures. */
+#hud-objective.urgent {
+  border-left-color: #ff3a24;
+  background: linear-gradient(90deg, #2a0c09cc, #10141330);
+  color: #f1e3d2;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 2px 0 12px -6px #ff3a24;
+}
+
+html.touch-controls-enabled #hud-objective.urgent {
+  font-size: 11px;
+}
+
 /* Charred field notes: same red rail, mono kicker and Impact figures as the main menu. */
 #hud-zombies {
   right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));
@@ -2038,7 +2052,7 @@ html.coop-guest #pause-restart {
   letter-spacing: 0.31em;
 }
 
-/* Legal line under the menu: credits on the left, privacy on the right. */
+/* Menu footer: credits and links to the main website and privacy policy. */
 .menu-footer {
   display: flex;
   flex-wrap: wrap;
@@ -2054,8 +2068,15 @@ html.coop-guest #pause-restart {
   min-width: 0;
 }
 
-.privacy-link {
-  margin: 0 -10px 0 auto;
+.menu-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+}
+
+.menu-footer-link {
+  margin: 0;
   padding: 8px 10px;
   border: 0;
   background: transparent;
@@ -2080,7 +2101,7 @@ html.coop-guest #pause-restart {
   font-size: 13px;
 }
 
-.privacy-link:focus-visible,
+.menu-footer-link:focus-visible,
 #privacy-close:focus-visible {
   outline: 2px solid #93c5fd;
   outline-offset: 3px;
@@ -3093,6 +3114,107 @@ html.touch-controls-enabled #intro-skip small {
   visibility: hidden;
 }
 
+/*
+ * Evacuation ending (Station 33's escape): the yard fades to black, the
+ * escape card prints the last radio call, then the credits with the run's
+ * record. Same rule as the nuclear layers: base styles are the final frame.
+ */
+.evacuation-card,
+.credits-panel .credits-outcome,
+.credits-panel .credits-record {
+  display: none;
+}
+
+#ending-screen[data-presentation='evacuation'] .ending-cinematic,
+#ending-screen[data-presentation='evacuation'] .nuclear-alert {
+  display: none;
+}
+
+#ending-screen[data-presentation='evacuation'] .evacuation-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.2vmin;
+  width: min(90vw, 760px);
+  text-align: center;
+  opacity: 0;
+}
+
+.evacuation-kicker {
+  margin: 0;
+  color: #ff5a3c;
+  font: 700 clamp(11px, 1.7vw, 15px) 'Consolas', monospace;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  text-shadow: 0 0 14px rgba(255, 60, 30, 0.6);
+}
+
+.evacuation-card h2 {
+  margin: 0;
+  color: #f5dfb2;
+  font: 700 clamp(20px, 4.4vw, 42px) 'Consolas', monospace;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  text-shadow: 0 2px 6px #000;
+}
+
+.evacuation-radio {
+  margin: 0;
+  color: #a9c2b4;
+  font: 400 clamp(13px, 2vw, 18px) 'Consolas', monospace;
+  letter-spacing: 0.08em;
+  opacity: 0;
+}
+
+#ending-screen.ending[data-presentation='evacuation'] .evacuation-card {
+  animation: evacuation-card 8.6s ease-out both;
+}
+
+#ending-screen.ending[data-presentation='evacuation'] .evacuation-radio {
+  animation: evacuation-radio 6s linear 2.4s both;
+}
+
+#ending-screen.ending[data-presentation='evacuation'] .credits-panel,
+#ending-screen.ending[data-presentation='evacuation'] .credits-panel h1 {
+  animation-delay: 8.4s;
+}
+
+#ending-screen[data-presentation='evacuation'] .credits-outcome {
+  display: block;
+  margin: -6px 0 22px;
+  color: #ff7a5c;
+  font: 700 clamp(13px, 2.4vw, 18px) 'Consolas', monospace;
+  letter-spacing: 0.16em;
+}
+
+#ending-screen[data-presentation='evacuation'] .credits-record {
+  display: block;
+  margin: -28px 0 34px;
+  color: #c9b793;
+  font: 14px 'Consolas', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@keyframes evacuation-card {
+  0% { opacity: 0; transform: translateY(10px); }
+  10% { opacity: 1; transform: none; }
+  88% { opacity: 1; }
+}
+
+/* The radio line crackles in and stutters once as the signal dies. */
+@keyframes evacuation-radio {
+  0% { opacity: 0; }
+  4% { opacity: 0.9; }
+  7% { opacity: 0.15; }
+  10% { opacity: 1; }
+  70% { opacity: 1; }
+  72% { opacity: 0.2; }
+  75% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
 @keyframes ending-fade-in { from { opacity: 0; } }
 @keyframes ending-push-in { from { scale: 1; } }
 
@@ -3626,6 +3748,16 @@ html.touch-controls-enabled #intro-skip small {
   color: #b9c4cf;
 }
 
+.gamepad-controls { display: none; }
+html[data-input-device='gamepad'] .keyboard-controls { display: none; }
+html[data-input-device='gamepad'] .gamepad-controls { display: grid; }
+html[data-input-device='gamepad'] #touch-controls { display: none; }
+html[data-input-device='gamepad'] #pause-menu #pause-resume::before { content: attr(data-gamepad-label); }
+html[data-input-device='gamepad'] :focus {
+  outline: 2px solid #e3b552;
+  outline-offset: 4px;
+}
+
 kbd {
   display: inline-block;
   padding: 2px 7px;
@@ -3843,6 +3975,11 @@ html.touch-controls-enabled .start-panel {
   background: linear-gradient(100deg, #090c0cfa, #0d1110f2); box-shadow: 0 34px 90px #000b;
 }
 #settings-dialog::backdrop { background: rgba(3, 4, 4, 0.72); }
+.confirm-dialog {
+  margin: auto; width: min(420px, calc(100vw - 32px)); padding: 24px;
+  color: #e3dccb; border: 0; border-left: 3px solid #7e1713; background: #0d1110;
+}
+.confirm-dialog::backdrop { background: rgba(3, 4, 4, 0.72); }
 .settings-form { padding: 24px 28px 22px; }
 .settings-form h2 {
   margin: 0 0 14px; color: #dedfd8; font: 900 34px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .075em;

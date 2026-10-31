@@ -10,7 +10,7 @@ import { DeveloperCommand } from '../game/DeveloperCommand';
 import { DeveloperConsoleCommands } from '../game/DeveloperConsoleCommands';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
-import type { EnergyWeaponConfig, WeaponId } from '../weapons/WeaponTypes';
+import type { EnergyWeaponConfig, WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import { Knife, knifeDamageForRound } from '../weapons/Knife';
 import { KnifeCombat } from '../weapons/KnifeCombat';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
@@ -32,6 +32,7 @@ import {
   ZEUS_MACHINE_CHARGE_REACH,
   ZEUS_MACHINE_CHARGE_SECONDS,
   ZOMBIES_RESERVE_AMMO,
+  roundConfig,
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
 import { ZombieManager } from '../zombies/ZombieManager';
@@ -58,6 +59,7 @@ import { ZombiesPowerSwitch } from './ZombiesPowerSwitch';
 import { ZombiesRings } from './ZombiesRings';
 import { ZombiesFlames } from './ZombiesFlames';
 import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
+import { ZombiesEvacuation } from './ZombiesEvacuation';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { RoundCueGate } from '../audio/RoundCueGate';
 import { IntroCinematic } from '../rendering/IntroCinematic';
@@ -75,6 +77,12 @@ const MOAN_SPREAD = 9;
 /** A key still held from starting the run must not also skip its intro. */
 const INTRO_SKIP_GUARD = 0.6;
 
+/** Two objective notes sharing the corner, a blank line apart. */
+function joinNotes(first: string | null, second: string | null): string | null {
+  if (first === null || second === null) return first ?? second;
+  return `${first}\n\n${second}`;
+}
+
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
  * brief post-hit invulnerability, game over / restart, and the mode-only
@@ -86,6 +94,8 @@ export class ZombiesMode implements GameMode {
   readonly id = 'zombies' as const;
   /** Every handout the mode can give is preloaded, the map's exclusives included: no loads mid-game. */
   readonly weaponIds: readonly WeaponId[];
+  /** The map's names and looks: Station 33 shows the Barrett as the PTRS-41. */
+  readonly weaponDefinitions: WeaponCatalog;
   /** Zombies starts with the M1911 alone; better guns come from the box. */
   readonly startingInventory: readonly WeaponId[] = ['m1911'];
   /** Two-weapon carry limit, enforced by the shared inventory. */
@@ -117,6 +127,8 @@ export class ZombiesMode implements GameMode {
   private powerSwitch: ZombiesPowerSwitch | null = null;
   private codeLockDialog: CodeLockDialog | null = null;
   private crystalRecoveries: ZombiesCrystalRecovery[] = [];
+  /** The map's evacuation easter egg; null on maps without one. */
+  private evacuation: ZombiesEvacuation | null = null;
   private readonly rounds = new RoundManager();
   private readonly health = new PlayerHealth(
     PLAYER_MAX_HP,
@@ -155,6 +167,7 @@ export class ZombiesMode implements GameMode {
 
   constructor(readonly mapId: ZombieMapId = 'burned-mansion') {
     this.weaponIds = [...ZOMBIES_WEAPON_PRELOAD, ...ZOMBIE_MAPS[mapId].exclusiveWeapons];
+    this.weaponDefinitions = ZOMBIE_MAPS[mapId].weapons;
   }
 
   /** The map's gameplay bed; Game starts it once the match begins. */
@@ -244,10 +257,20 @@ export class ZombiesMode implements GameMode {
     this.crystalRecoveries = (this.arena.weaponStations ?? [])
       .filter((station) => station.requiresStartupCrystal)
       .map((station) => new ZombiesCrystalRecovery(ctx, station));
+    this.evacuation = this.arena.evacuation
+      ? new ZombiesEvacuation(ctx, this.arena.evacuation, {
+        economy: this.economy,
+        round: () => this.rounds.round,
+        aliveZombies: () => this.zombies.aliveCount,
+        spawnZombie: () => this.spawnRoundZombie(),
+        escaped: (ending) => this.escape(ending),
+        failed: () => this.endGame(),
+      })
+      : null;
 
     if (boxPlacement) {
       this.box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
-      this.boxView = new MysteryBoxView(ctx.assets, boxPlacement.position, MYSTERY_BOX_POOL);
+      this.boxView = new MysteryBoxView(ctx.assets, boxPlacement.position, MYSTERY_BOX_POOL, this.weaponDefinitions);
       this.boxView.group.rotation.y = boxPlacement.yaw;
       ctx.scene.add(this.boxView.group);
     }
@@ -285,8 +308,12 @@ export class ZombiesMode implements GameMode {
     // hurt anyone anymore.
     if (this.runAcceptsInput()) {
       this.health.update(dt);
-      this.rounds.update(dt, this.zombies.aliveCount);
-      this.processRoundEvents();
+      // A running evacuation replaces the rounds with its own horde until the run ends.
+      if (!this.evacuation?.isActive) {
+        this.rounds.update(dt, this.zombies.aliveCount);
+        this.processRoundEvents();
+      }
+      this.evacuation?.update(dt);
       this.updateRepair(dt);
       this.updateAmbience(dt);
     }
@@ -315,13 +342,18 @@ export class ZombiesMode implements GameMode {
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
     this.arena.update(dt, playerPos);
     let objective: string | null = null;
+    const urgent = this.runAcceptsInput() && (this.evacuation?.isActive ?? false);
     if (this.runAcceptsInput()) {
+      let crystal: string | null = null;
       for (const recovery of this.crystalRecoveries) {
-        objective = recovery.objective();
-        if (objective !== null) break;
+        crystal = recovery.objective();
+        if (crystal !== null) break;
       }
+      // A running evacuation is the only note; otherwise both quests share the corner.
+      const evacuation = this.evacuation?.objective() ?? null;
+      objective = urgent ? evacuation : joinNotes(crystal, evacuation);
     }
-    this.ctx.hud.setObjective?.(objective);
+    this.ctx.hud.setObjective?.(objective, urgent);
     if (this.box && this.boxView) {
       this.box.update(dt);
       this.boxView.update(dt, this.box);
@@ -477,7 +509,7 @@ export class ZombiesMode implements GameMode {
     return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
   }
 
-  /** E pressed: door unlock > barrier repair > soul lamp > ritual > gas mask > power switch > purchases (rings among them). */
+  /** E pressed: door unlock > barrier repair > soul lamp > ritual > gas mask > power switch > evacuation > purchases (rings among them). */
   onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
 
@@ -518,6 +550,7 @@ export class ZombiesMode implements GameMode {
       for (const recovery of this.crystalRecoveries) recovery.update(0, this.zombies.actives);
       return;
     }
+    if (this.evacuation?.interact()) return;
     for (const recovery of this.crystalRecoveries) if (recovery.pickUp()) return;
 
     const wallBuy = this.findFacingWallBuy();
@@ -636,6 +669,8 @@ export class ZombiesMode implements GameMode {
 
     const powerSwitchPrompt = this.powerSwitch?.prompt();
     if (powerSwitchPrompt) return powerSwitchPrompt;
+    const evacuationPrompt = this.evacuation?.prompt();
+    if (evacuationPrompt) return evacuationPrompt;
     for (const recovery of this.crystalRecoveries) {
       const prompt = recovery.pickupPrompt();
       if (prompt) return prompt;
@@ -643,14 +678,14 @@ export class ZombiesMode implements GameMode {
 
     const wallBuy = this.findFacingWallBuy();
     if (wallBuy) {
-      return wallBuyPrompt(WEAPON_DEFINITIONS[wallBuy.weaponId].name, this.ctx.hasWeapon(wallBuy.weaponId), wallBuy, touch);
+      return wallBuyPrompt(this.weaponDefinitions[wallBuy.weaponId].name, this.ctx.hasWeapon(wallBuy.weaponId), wallBuy, touch);
     }
 
     const station = this.findFacingWeaponStation();
     if (station) {
       const recovery = this.crystalRecoveries.find((entry) => entry.station.id === station.id);
       if (recovery?.locked) return recovery.stationPrompt();
-      const weapon = WEAPON_DEFINITIONS[station.weaponId].name;
+      const weapon = this.weaponDefinitions[station.weaponId].name;
       return station.powered
         ? wallBuyPrompt(weapon, this.ctx.hasWeapon(station.weaponId), station, touch, station.ammoPromptKey)
         : t('prompt.weaponNeedsPower', { weapon });
@@ -676,7 +711,7 @@ export class ZombiesMode implements GameMode {
           : t('prompt.mysteryBox', { key });
       case 'awaitingPickup': {
         const result = this.box.result;
-        return result ? t('prompt.takeWeapon', { key, weapon: WEAPON_DEFINITIONS[result].name }) : null;
+        return result ? t('prompt.takeWeapon', { key, weapon: this.weaponDefinitions[result].name }) : null;
       }
       default:
         return null;
@@ -924,7 +959,7 @@ export class ZombiesMode implements GameMode {
       throw new Error(`Weapon offer "${offer.id}" references a weapon that is not preloaded`);
     }
     if (owned && !this.ctx.canRefillWeaponAmmo(offer.weaponId)) {
-      this.ctx.hud.showRoundBanner(t('banner.ammoFull'), WEAPON_DEFINITIONS[offer.weaponId].name);
+      this.ctx.hud.showRoundBanner(t('banner.ammoFull'), this.weaponDefinitions[offer.weaponId].name);
       return false;
     }
     const cost = owned ? offer.ammoPrice : offer.price;
@@ -994,6 +1029,7 @@ export class ZombiesMode implements GameMode {
       input.leftButtonDown ||
       input.wasPressed('Digit1') ||
       input.wasPressed('Digit2') ||
+      input.wasPressed('GamepadSwap') ||
       input.wasPressed('TouchFire');
 
     if (cancel) {
@@ -1338,6 +1374,7 @@ export class ZombiesMode implements GameMode {
     this.energy?.reset();
     this.flames?.reset();
     for (const recovery of this.crystalRecoveries) recovery.reset();
+    this.evacuation?.reset();
     this.ctx.hud.setObjective?.(null);
     if (this.zombies) this.zombies.reset();
     this.footsteps?.reset();
@@ -1394,8 +1431,20 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.startEndingAudio(ending.audio);
     this.ctx.hud.setInteractionPrompt(null);
     this.pushHudState();
-    this.ctx.hud.showEnding(this.rounds.round, ending.presentation);
+    this.ctx.hud.showEnding(this.rounds.round, ending.presentation, { kills: this.kills, headshots: this.headshots });
     this.ctx.unlockPointer();
+  }
+
+  /** The players escaped through the map's evacuation: its ending, like a bought one. */
+  private escape(ending: ArenaEnding): void {
+    if (this.runFlow.beginEnding(ending.duration)) this.beginEnding(ending);
+  }
+
+  /** One zombie with the current round's stats, outside the round's count (the evacuation's horde). */
+  private spawnRoundZombie(): boolean {
+    const player = this.ctx.player.rig.position;
+    const round = Math.max(1, this.rounds.round);
+    return this.zombies.spawnZombie(roundConfig(round), player.x, player.z, round);
   }
 
   private finishRun(): void {

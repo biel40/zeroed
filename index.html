@@ -201,7 +201,10 @@
           <p class="asset-attribution"><span data-i18n="menu.attribution"></span> <a href="https://poly.pizza/m/jkrEvQZb8J" target="_blank" rel="noopener noreferrer">«Animated Zombie»</a> · Quaternius · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></p>
           <p class="asset-attribution">Station 33 · <a href="https://pixabay.com/music/ambient-creepy-halloween-music-413493/" target="_blank" rel="noopener noreferrer">«Creepy Halloween Music»</a> · Tunetank · Pixabay</p>
         </div>
-        <button type="button" id="privacy-open" class="privacy-link" data-i18n="menu.privacy"></button>
+        <div class="menu-footer-links">
+          <a class="menu-footer-link" href="https://zeroed-web.com" target="_blank" rel="noopener noreferrer" data-i18n="menu.website"></a>
+          <button type="button" id="privacy-open" class="menu-footer-link" data-i18n="menu.privacy"></button>
+        </div>
       </footer>
       <div class="pwa-actions" aria-live="polite">
         <button type="button" id="pwa-install" class="pwa-action hidden" data-i18n="menu.install"></button>
@@ -262,6 +265,16 @@
   </dialog>
 
   <!-- Live player settings: open from the main menu or the pause menu. -->
+  <dialog id="pwa-update-confirm" class="confirm-dialog" aria-describedby="pwa-update-confirm-message" data-i18n-aria-label="menu.update">
+    <form method="dialog">
+      <p id="pwa-update-confirm-message" data-i18n="menu.updateConfirm"></p>
+      <div class="settings-actions">
+        <button type="submit" value="cancel" autofocus data-i18n="beta.cancel"></button>
+        <button type="submit" value="accept" data-i18n="menu.update"></button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form method="dialog" class="settings-form">
       <h2 id="settings-title" data-i18n="menu.settings"></h2>
@@ -282,6 +295,27 @@
           <input id="setting-adsSensitivity" type="range" data-setting="adsSensitivity" /><output for="setting-adsSensitivity"></output></div>
         <div class="settings-row settings-toggle"><label for="setting-invertY" data-i18n="settings.invertY"></label>
           <input id="setting-invertY" type="checkbox" data-setting="invertY" /></div>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="settings.gamepad"></legend>
+        <p id="gamepad-status" class="settings-help" role="status" data-i18n="gamepad.waiting"></p>
+        <div class="settings-row settings-toggle"><label for="setting-gamepadEnabled" data-i18n="settings.gamepadEnabled"></label>
+          <input id="setting-gamepadEnabled" type="checkbox" data-setting="gamepadEnabled" /></div>
+        <div class="settings-row"><label for="setting-gamepadLookHorizontal" data-i18n="settings.gamepadLookHorizontal"></label>
+          <input id="setting-gamepadLookHorizontal" type="range" data-setting="gamepadLookHorizontal" /><output for="setting-gamepadLookHorizontal"></output></div>
+        <div class="settings-row"><label for="setting-gamepadLookVertical" data-i18n="settings.gamepadLookVertical"></label>
+          <input id="setting-gamepadLookVertical" type="range" data-setting="gamepadLookVertical" /><output for="setting-gamepadLookVertical"></output></div>
+        <div class="settings-row"><label for="setting-gamepadMoveDeadZone" data-i18n="settings.gamepadMoveDeadZone"></label>
+          <input id="setting-gamepadMoveDeadZone" type="range" data-setting="gamepadMoveDeadZone" /><output for="setting-gamepadMoveDeadZone"></output></div>
+        <div class="settings-row"><label for="setting-gamepadLookDeadZone" data-i18n="settings.gamepadLookDeadZone"></label>
+          <input id="setting-gamepadLookDeadZone" type="range" data-setting="gamepadLookDeadZone" /><output for="setting-gamepadLookDeadZone"></output></div>
+        <div class="settings-row settings-toggle"><label for="setting-gamepadInvertY" data-i18n="settings.gamepadInvertY"></label>
+          <input id="setting-gamepadInvertY" type="checkbox" data-setting="gamepadInvertY" /></div>
+        <div class="settings-row"><label for="setting-gamepadAdsSensitivity" data-i18n="settings.gamepadAdsSensitivity"></label>
+          <input id="setting-gamepadAdsSensitivity" type="range" data-setting="gamepadAdsSensitivity" /><output for="setting-gamepadAdsSensitivity"></output></div>
+        <p id="gamepad-menu-help" class="settings-help" data-i18n="gamepad.menuHelp"></p>
+        <p class="settings-help"><kbd data-gamepad-binding="interact"></kbd> <span data-i18n="gamepad.bindingHelp"></span> ·
+          <kbd data-gamepad-binding="reload"></kbd> <span data-i18n="controls.reload"></span></p>
       </fieldset>
       <fieldset>
         <legend data-i18n="settings.display"></legend>
@@ -449,9 +483,16 @@
       <p data-i18n="ending.nuclear"></p>
       <div class="nuclear-countdown" aria-hidden="true"><span>3</span><span>2</span><span>1</span></div>
     </div>
+    <div class="evacuation-card">
+      <p class="evacuation-kicker" aria-hidden="true">ПРОТОКОЛ 33 · АВАРИЙНЫЙ ВЫХОД</p>
+      <h2 data-i18n="ending.evacuationTitle"></h2>
+      <p class="evacuation-radio" data-i18n="ending.evacuationRadio"></p>
+    </div>
     <div class="credits-panel">
       <h1>ZEROED</h1>
+      <p class="credits-outcome" data-i18n="ending.evacuationTitle"></p>
       <p class="credits-round"><span data-i18n="ending.round"></span> <span id="ending-round">1</span></p>
+      <p class="credits-record"><span data-i18n="gameOver.kills"></span> <span id="ending-kills">0</span> · <span data-i18n="gameOver.headshots"></span> <span id="ending-headshots">0</span></p>
       <p class="credits-role" data-i18n="ending.designedBy"></p>
       <p>Gabriel Borràs (Biel40)</p>
       <p class="credits-role" data-i18n="ending.betaTesters"></p>
@@ -468,7 +509,7 @@
     </div>
   </div>
 
-  <div id="start-screen">
+  <div id="start-screen" role="button" tabindex="0" data-i18n-aria-label="start.clickToStart">
     <div id="rotate-prompt" role="status" data-i18n-aria-label="start.rotateLabel">
       <div class="rotate-art" aria-hidden="true">
         <span class="rotate-orbit"></span>
@@ -480,7 +521,7 @@
       <h1>Zeroed</h1>
       <p id="start-hint" data-i18n="start.loading"></p>
       <div id="loading-bar"><span></span></div>
-      <div class="controls-grid">
+      <div class="controls-grid keyboard-controls">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span data-i18n="controls.move"></span>
         <span><kbd data-i18n="controls.mouse"></kbd></span><span data-i18n="controls.aim"></span>
         <span><kbd data-i18n="controls.lmb"></kbd></span><span data-i18n="controls.fire"></span>
@@ -495,6 +536,22 @@
         <span><kbd>Z</kbd></span><span data-i18n="controls.prone"></span>
         <span><kbd>1</kbd>–<kbd>2</kbd></span><span data-i18n="controls.slots"></span>
         <span><kbd>ESC</kbd></span><span data-i18n="controls.release"></span>
+      </div>
+      <div class="controls-grid gamepad-controls">
+        <span><kbd>LS</kbd></span><span data-i18n="controls.move"></span>
+        <span><kbd>RS</kbd></span><span data-i18n="controls.aim"></span>
+        <span><kbd data-gamepad-binding="fire"></kbd></span><span data-i18n="controls.fire"></span>
+        <span><kbd data-gamepad-binding="aim"></kbd></span><span data-i18n="controls.ads"></span>
+        <span><kbd data-gamepad-binding="reload"></kbd></span><span data-i18n="controls.reload"></span>
+        <span><kbd data-gamepad-binding="interact"></kbd></span><span data-i18n="controls.interact"></span>
+        <span><kbd data-gamepad-binding="swap"></kbd></span><span data-i18n="touch.weaponLabel"></span>
+        <span><kbd data-gamepad-binding="jump"></kbd></span><span data-i18n="controls.jump"></span>
+        <span><kbd data-gamepad-binding="crouch"></kbd></span><span data-i18n="controls.crouch"></span>
+        <span><kbd data-gamepad-binding="prone"></kbd></span><span data-i18n="controls.prone"></span>
+        <span><kbd data-gamepad-binding="knife"></kbd></span><span data-i18n="controls.knife"></span>
+        <span><kbd data-gamepad-binding="fireMode"></kbd></span><span data-i18n="controls.fireMode"></span>
+        <span><kbd data-gamepad-binding="inspect"></kbd></span><span data-i18n="controls.inspect"></span>
+        <span><kbd data-gamepad-binding="pause"></kbd></span><span data-i18n="touch.pauseLabel"></span>
       </div>
     </div>
   </div>

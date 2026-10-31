@@ -10,6 +10,7 @@ import { Stats } from '../game/Stats';
 import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
 import { Input } from '../player/Input';
+import type { GamepadControls } from '../player/GamepadControls';
 import { PlayerController } from '../player/PlayerController';
 import { BarrelSmoke } from '../rendering/BarrelSmoke';
 import { Effects } from '../rendering/Effects';
@@ -91,6 +92,7 @@ export class Game {
    * authority has explicitly paused the shared match.
    */
   private paused = true;
+  private controllerSession = false;
   /** Desktop lock requests only complete after the browser confirms the canvas. */
   private pointerLockRequested = false;
   private gameplayStarted = false;
@@ -120,6 +122,7 @@ export class Game {
     private readonly mode: GameMode,
     music: MusicManager = new MusicManager(),
     private readonly onExitToMenu: () => void = () => undefined,
+    gamepad?: GamepadControls,
   ) {
     this.audio = new AudioSystem(music);
     const rendererOptions = {
@@ -155,7 +158,7 @@ export class Game {
     this.scene.environmentIntensity = this.profile.useReducedEffects ? 0.3 : 0.45;
     pmrem.dispose();
 
-    this.input = new Input(this.renderer.domElement, this.profile);
+    this.input = new Input(this.renderer.domElement, this.profile, gamepad);
     this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
     this.scene.add(this.player.rig);
 
@@ -194,12 +197,13 @@ export class Game {
       }
     };
 
+    const definitions = this.mode.weaponDefinitions ?? WEAPON_DEFINITIONS;
     for (const id of this.mode.weaponIds) {
       // The mode decides the starting reserve. When it defines reserveAmmoFor, its return value
       // wins over the shared definition — see Weapon's reserveOverride.
       const weapon = this.mode.reserveAmmoFor
-        ? new Weapon(WEAPON_DEFINITIONS[id], Math.random, this.mode.reserveAmmoFor(id))
-        : new Weapon(WEAPON_DEFINITIONS[id]);
+        ? new Weapon(definitions[id], Math.random, this.mode.reserveAmmoFor(id))
+        : new Weapon(definitions[id]);
       const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops);
       const reloadAnim = weapon.definition.view.reloadAnim;
       view.onReloadPhase = (phase) =>
@@ -280,6 +284,16 @@ export class Game {
     this.input.onPauseRequest = () => {
       if (this.paused) this.resume();
       else this.pause();
+    };
+    this.input.onControllerUnavailable = () => {
+      if (this.controllerSession && !this.input.pointerLocked && !this.profile.useTouchControls
+        && this.gameplayStarted && !this.mode.onPointerUnlock?.()) this.pause();
+    };
+    this.input.onFocusLost = () => {
+      if (this.gameplayStarted && !this.mode.onPointerUnlock?.()) this.pause();
+    };
+    this.input.onPointerLockRequest = () => {
+      if (this.controllerSession && !this.paused) this.start();
     };
     this.hud.setPauseHandlers({
       onResume: () => this.resume(),
@@ -368,7 +382,7 @@ export class Game {
     this.renderer.setAnimationLoop(this.tick);
   }
 
-  /** Entry point for the first user gesture: resumes audio, locks the pointer. */
+  /** Starts/resumes through the current device, requesting a real lock only for desktop mouse. */
   start(): void {
     if (
       this.profile.isMobile &&
@@ -384,18 +398,11 @@ export class Game {
     void this.audio.loadDryFireAsset();
     for (const { weapon } of this.arsenal.values()) this.audio.preloadShotSample(weapon.definition.audio);
     void this.audio.loadDoorPurchaseAsset();
-    if (this.profile.useTouchControls) {
-      this.gameplayStarted = true;
-      this.paused = false;
-      this.mode?.onLocalPauseChanged?.(false);
-      this.mode?.onGameplayStarted?.();
-      this.audio.music.stopMenuLoop();
-      this.audio.resumeMusic();
-      this.audio.setAmbienceSuspended(false);
-      this.startGameplayMusic();
-      this.hud.hidePauseMenu();
-      this.hud.hideStartScreen();
-      this.hud.setHudVisible(true);
+    if (this.profile.useTouchControls || (this.input.usingGamepad && this.input.gamepadConnected)) {
+      this.controllerSession = this.input.usingGamepad && this.input.gamepadConnected;
+      this.pointerLockRequested = false;
+      this.input.suppressGamepad();
+      this.beginGameplay();
       return;
     }
     if (this.gameplayStarted) {
@@ -404,6 +411,20 @@ export class Game {
     }
     this.pointerLockRequested = true;
     this.input.requestPointerLock();
+  }
+
+  private beginGameplay(): void {
+    this.gameplayStarted = true;
+    this.paused = false;
+    this.mode?.onLocalPauseChanged?.(false);
+    this.mode?.onGameplayStarted?.();
+    this.audio.music.stopMenuLoop();
+    this.audio.resumeMusic();
+    this.audio.setAmbienceSuspended(false);
+    this.startGameplayMusic();
+    this.hud.hidePauseMenu();
+    this.hud.hideStartScreen();
+    this.hud.setHudVisible(true);
   }
 
   private handlePointerLockChange(locked: boolean): void {
@@ -419,17 +440,8 @@ export class Game {
         return;
       }
       this.pointerLockRequested = false;
-      this.gameplayStarted = true;
-      this.paused = false;
-      this.mode?.onLocalPauseChanged?.(false);
-      this.mode?.onGameplayStarted?.();
-      this.audio.music.stopMenuLoop();
-      this.audio.resumeMusic();
-      this.audio.setAmbienceSuspended(false);
-      this.startGameplayMusic();
-      this.hud.hidePauseMenu();
-      this.hud.hideStartScreen();
-      this.hud.setHudVisible(true);
+      this.controllerSession = false;
+      this.beginGameplay();
       return;
     }
 
@@ -459,6 +471,7 @@ export class Game {
   private pause(): void {
     if (this.paused) return;
     this.paused = true;
+    this.input.suppressGamepad();
     this.mode.onLocalPauseChanged?.(true);
     // The frozen frame stops driving the stream, so its roar must stop here.
     if (this.flameStreamDriven) this.audio.setFlameStream(false, 0);
@@ -531,7 +544,11 @@ export class Game {
 
   private readonly handleEscapeKey = (event: KeyboardEvent): void => {
     // The settings dialog closes itself on ESC; the match stays paused behind it.
-    if (this.hud.settingsOpen) return;
+    if (this.hud.settingsOpen || document.querySelector('dialog[open]')) return;
+    if (event.code === 'Escape' && this.controllerSession && !this.paused && !this.input.blockingMenu) {
+      this.pause();
+      return;
+    }
     if (event.code === 'Escape' && this.paused && this.gameplayStarted) this.resume();
   };
 
@@ -581,7 +598,7 @@ export class Game {
     this.currentWeapon.equip();
   }
 
-  /** Cycles to the next carried weapon (touch swap button). */
+  /** Cycles to the next carried weapon for touch and controller actions. */
   private cycleWeapon(): void {
     const count = this.inventory.weapons.length;
     if (count < 2) return;
@@ -762,13 +779,17 @@ export class Game {
   private readonly tick = (): void => this.frame();
 
   private frame(): void {
+    if (this.disposed) return;
     // Always consume the clock delta so resuming never sees a huge dt spike.
     const dt = Math.min(this.clock.getDelta(), MAX_DELTA);
+    this.input.updateGamepad(dt, this.gameplayStarted && !this.paused);
+    if (this.disposed) return;
 
     // Single player on a menu: render the frozen frame and nothing else. No
     // player, weapon, ballistics, mode, effects or timers advance. A shared
     // (networked) match never halts here; the menu only gates local input.
     if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
+      this.input.suppressGamepad();
       this.renderer.render(this.scene, this.player.camera);
       this.input.endFrame();
       this.dynamicResolution.resetWindow();
@@ -778,11 +799,13 @@ export class Game {
     let weapon = this.currentWeapon;
     let allowGameplayInput =
       !this.paused &&
-      (this.input.pointerLocked || this.profile.useTouchControls) &&
+      (this.input.pointerLocked || this.profile.useTouchControls || this.controllerSession) &&
+      !this.input.blockingMenu &&
       (this.mode.isGameplayInputEnabled?.() ?? true);
     let allowCombatInput = allowGameplayInput && (this.mode.isCombatInputEnabled?.() ?? true);
 
     if (allowGameplayInput) {
+      if (allowCombatInput && this.input.wasPressed('GamepadSwap')) this.cycleWeapon();
       for (let i = 0; i < this.inventory.weapons.length && allowCombatInput; i++) {
         if (this.input.wasPressed(`Digit${i + 1}`)) this.switchWeapon(i);
       }
@@ -792,8 +815,9 @@ export class Game {
       if (allowCombatInput && !this.mode.usesFallbackAttack?.()
         && this.input.wasPressed('KeyR') && weapon.reload()) this.mode.onWeaponReloaded?.(weapon);
       if (allowCombatInput && this.input.wasPressed('KeyX')) weapon.cycleFireMode();
-      // Inspecting is a desktop-only flourish: touch layouts get no button for it.
-      if (allowCombatInput && !this.profile.useTouchControls && this.input.wasPressed('KeyF')) weapon.inspect();
+      // Touch layouts have no inspect button; physical controllers share desktop inspection.
+      if (allowCombatInput && (!this.profile.useTouchControls || this.input.usingGamepad)
+        && this.input.wasPressed('KeyF')) weapon.inspect();
       if (this.input.wasPressed('KeyE')) this.mode.onInteract?.();
       if (allowCombatInput && (
         this.input.wasPressed('Digit3') ||
@@ -808,7 +832,8 @@ export class Game {
       }
       allowGameplayInput =
         !this.paused &&
-        (this.input.pointerLocked || this.profile.useTouchControls) &&
+        (this.input.pointerLocked || this.profile.useTouchControls || this.controllerSession) &&
+        !this.input.blockingMenu &&
         (this.mode.isGameplayInputEnabled?.() ?? true);
       allowCombatInput = allowGameplayInput && (this.mode.isCombatInputEnabled?.() ?? true);
     }
@@ -827,7 +852,8 @@ export class Game {
       }
     }
     if (!allowGameplayInput && !this.paused
-      && (this.input.pointerLocked || this.profile.useTouchControls)
+      && (this.input.pointerLocked || this.profile.useTouchControls || this.controllerSession)
+      && !this.input.blockingMenu
       && this.mode.isDownedLookEnabled?.()) {
       this.player.update(dt, this.input, weapon, false, true);
     } else this.player.update(dt, this.input, weapon, allowGameplayInput);

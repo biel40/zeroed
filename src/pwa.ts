@@ -1,6 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
 import { getDeviceProfile } from './core/DeviceProfile';
-import { t } from './i18n/i18n';
+import { confirmDialog } from './ui/ConfirmDialog';
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -34,6 +34,7 @@ export class PwaLifecycle {
   private installPrompt: InstallPromptEvent | null = null;
   private updateAvailable: boolean = false;
   private applyingUpdate: boolean = false;
+  private confirmingUpdate = false;
   private reloadPending: boolean = false;
   private reloadStarted: boolean = false;
   private updateSW: () => Promise<void> = async () => { };
@@ -114,15 +115,16 @@ export class PwaLifecycle {
   }
 
   private async _applyUpdate(): Promise<void> {
-    if (!this.updateAvailable || this.applyingUpdate) return;
+    if (!this.updateAvailable || this.applyingUpdate || this.confirmingUpdate) return;
 
     const safeMenuVisible = !this.mapSelect.classList.contains('hidden') || !this.pauseMenu.classList.contains('hidden');
     if (!safeMenuVisible) return;
-    if (
-      !this.pauseMenu.classList.contains('hidden') &&
-      !window.confirm(t('menu.updateConfirm'))
-    ) {
-      return;
+    if (!this.pauseMenu.classList.contains('hidden')) {
+      const dialog = document.getElementById('pwa-update-confirm') as HTMLDialogElement;
+      this.confirmingUpdate = true;
+      try { if (!await confirmDialog(dialog)) return; }
+      finally { this.confirmingUpdate = false; }
+      if (this.mapSelect.classList.contains('hidden') && this.pauseMenu.classList.contains('hidden')) return;
     }
 
     if (this.reloadPending) {

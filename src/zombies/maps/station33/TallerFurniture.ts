@@ -18,7 +18,8 @@ const DRILL_PRESS = { x: hall.minX + 0.4, z: -55.4, size: 0.75, height: 1.85 } a
 const PARTS_RACK = { minX: hall.minX + 0.1, maxX: 8.6, depth: 0.55, height: 2.4, shelves: [0.12, 0.72, 1.32, 1.92] } as const;
 /** Gas-welding trolley parked by the east wall, north of the lockers. */
 const WELDING_CART = { x: 15.95, z: -56.4 } as const;
-const OIL_DRUMS: ReadonlyArray<readonly [number, number]> = [[15.95, -58.45], [15.3, -58.6], [15.8, -57.8]];
+/** Drums in the south-east corner, south of the lockers: the north-east one is Protocol 33's (blast door and panel). */
+const OIL_DRUMS: ReadonlyArray<readonly [number, number]> = [[16.2, -47.1], [15.55, -47.05], [16.0, -47.7]];
 /** Rails of the bogie's stub, `gauge` apart along Z under it. */
 const RAIL_STUB = { gauge: 1.52, minZ: TALLER_BOGIE.z - 2.9, maxZ: TALLER_BOGIE.z + 2.9, railTop: 0.15 } as const;
 const WHEEL_RADIUS = 0.43;

@@ -78,21 +78,23 @@ const NUCLEAR_EXPLOSION_ONSET = 0.5;
 export const NUCLEAR_EXPLOSION_AUDIO_DELAY = NUCLEAR_DETONATION_TIME - NUCLEAR_EXPLOSION_ONSET;
 
 /** Audio sets a map ending can request through `ArenaEnding.audio`. */
-export type EndingAudioId = 'nuclear';
+export type EndingAudioId = 'nuclear' | 'evacuation';
 
 interface EndingAudioDef {
   /** Every track of the ending; all are created up front so they buffer together. */
   readonly tracks: readonly MusicTrackName[];
-  /** One-shot held back so its hit lands on a beat of the cinematic. */
-  readonly delayed: MusicTrackName;
-  readonly delaySeconds: number;
+  /** One-shot held back so its hit lands on a beat of the cinematic; omitted when every track starts at once. */
+  readonly delayed?: { readonly track: MusicTrackName; readonly seconds: number };
 }
 
 const ENDING_AUDIO: Record<EndingAudioId, EndingAudioDef> = {
   nuclear: {
     tracks: ['nuclear_alarm', 'nuclear_explosion', 'radioactivity'],
-    delayed: 'nuclear_explosion',
-    delaySeconds: NUCLEAR_EXPLOSION_AUDIO_DELAY,
+    delayed: { track: 'nuclear_explosion', seconds: NUCLEAR_EXPLOSION_AUDIO_DELAY },
+  },
+  // Station 33's escape: only the crackle of an unknown surface under the last radio call.
+  evacuation: {
+    tracks: ['radioactivity'],
   },
 };
 const ENDING_TRACKS: readonly MusicTrackName[] = Object.values(ENDING_AUDIO).flatMap((ending) => ending.tracks);
@@ -197,18 +199,19 @@ export class MusicManager {
     if (!this.enabled || this.endingAudioStarted) return;
     this.stop();
     this.endingAudioStarted = true;
-    const ending = ENDING_AUDIO[id];
-    for (const name of ending.tracks) {
+    const { tracks, delayed } = ENDING_AUDIO[id];
+    for (const name of tracks) {
       // The delayed element is still created now so it buffers meanwhile.
       const player = this.getPlayer(name);
-      if (player && name !== ending.delayed) void player.play().catch(() => undefined);
+      if (player && name !== delayed?.track) void player.play().catch(() => undefined);
     }
+    if (!delayed) return;
     this.explosionTimer = setTimeout(() => {
       this.explosionTimer = null;
       if (!this.endingAudioStarted) return;
-      const player = this.getPlayer(ending.delayed);
+      const player = this.getPlayer(delayed.track);
       if (player) void player.play().catch(() => undefined);
-    }, ending.delaySeconds * 1000);
+    }, delayed.seconds * 1000);
   }
 
   stopEndingAudio(): void {

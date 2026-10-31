@@ -19,7 +19,8 @@ function isBooleanSetting(value: string | undefined): value is BooleanSetting {
 
 function formatSetting(key: NumericSetting, value: number): string {
   if (key === 'fieldOfView') return `${value}°`;
-  if (key === 'lookSensitivity' || key === 'adsSensitivity') return `${value.toFixed(2)}×`;
+  if (key === 'gamepadLookHorizontal' || key === 'gamepadLookVertical') return `${value}°/s`;
+  if (key === 'lookSensitivity' || key === 'adsSensitivity' || key === 'gamepadAdsSensitivity') return `${value.toFixed(2)}×`;
   return `${Math.round(value * 100)} %`;
 }
 

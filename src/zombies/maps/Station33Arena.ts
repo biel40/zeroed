@@ -1,6 +1,5 @@
 import { buildAmmoRefill } from './shared/AmmoRefill';
 import * as THREE from 'three';
-import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
@@ -22,7 +21,9 @@ import { buildCocheras } from './station33/CocherasBuilder';
 import { buildConsigna } from './station33/ConsignaBuilder';
 import { buildDoorFrames } from './station33/DoorFrames';
 import { buildEscalatorHead } from './station33/EscalatorHeadBuilder';
+import { buildEscapeRoute, escapeStairTransitions } from './station33/EscapeRouteBuilder';
 import { buildMilicia } from './station33/MiliciaBuilder';
+import { Protocol33 } from './station33/Protocol33';
 import { buildServicePassages } from './station33/ServicePassageBuilder';
 import { Station33Atmosphere } from './station33/Station33Atmosphere';
 import type { Station33BuildContext } from './station33/Station33BuildContext';
@@ -32,10 +33,13 @@ import { WeaponStation } from './shared/WeaponStation';
 import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
+import { buildSurface } from './station33/SurfaceBuilder';
+import { SurfaceMood } from './station33/SurfaceMood';
 import { buildTaller } from './station33/TallerBuilder';
 import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
+  PROTOCOL33_HORDE_ZONES,
   STATION33_AMBIENCE,
   STATION33_AMMO_REFILLS,
   STATION33_AMBIENT_EVENTS,
@@ -54,6 +58,7 @@ import {
   STATION33_RING_LOCKERS,
   STATION33_WEAPON_STATIONS,
   STATION33_WEAPON_CHEST,
+  STATION33_WEAPONS,
   STATION33_SPAWNS,
   STATION33_START_ZONE,
   STATION33_WALL_BUYS,
@@ -108,6 +113,8 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * post, the vestibule's third way out behind its dearest door, sells the
  * AK-47 and, once the power is on, the Armour ring. The yellow maintenance
  * workshop beyond the substation sells Double Tap and has its own entrance.
+ * Its blast door is the way out: Protocol 33 (`evacuation`), once the
+ * power is on, leads up the emergency stair to the surface yard (floor 1).
  */
 export class Station33Arena implements ZombieArena {
   readonly id = 'station-33';
@@ -128,6 +135,8 @@ export class Station33Arena implements ZombieArena {
   readonly weaponStations: ReadonlyArray<WeaponStation>;
   readonly weaponPickups: ReadonlyArray<CodeWeaponChest>;
   readonly powerSwitch: PowerLever;
+  public readonly evacuation: Protocol33;
+  public readonly floorTransitions = escapeStairTransitions();
   onTopologyChanged: (() => void) | null = null;
   onBarrierBoardRebuilt: (() => void) | null = null;
   onAmbientCue: ((cue: ArenaAmbientCue) => void) | null = null;
@@ -151,6 +160,7 @@ export class Station33Arena implements ZombieArena {
   private readonly ticketShutters: TicketWindowShutters;
   private readonly ticketAmbush = new AmbushTrigger(TICKET_WINDOW_AMBUSH_SITES, TICKET_WINDOW_AMBUSH);
   private readonly hemisphere: THREE.HemisphereLight;
+  private readonly surfaceMood: SurfaceMood;
   /** Seconds into the intro while its cues are pending, else null. */
   private introTime: number | null = null;
   private nextIntroCue = 0;
@@ -181,7 +191,7 @@ export class Station33Arena implements ZombieArena {
     buildSubestacion(context, this.lighting);
     buildTaller(context, this.lighting);
     buildMilicia(context, this.lighting);
-    this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST)];
+    this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST, STATION33_WEAPONS)];
     buildDoorFrames(context);
     buildServicePassages(context, this.lighting, STATION33_BARRIERS);
     const ringLockerLook = station33RingLockerLook(context);
@@ -190,10 +200,14 @@ export class Station33Arena implements ZombieArena {
     const weaponStationLook = station33WeaponStationLook(context);
     this.weaponStations = STATION33_WEAPON_STATIONS.map((station) => new WeaponStation(context, station, weaponStationLook, this.power));
     this.powerSwitch = new PowerLever(context, STATION33_POWER_SWITCH, station33PowerLeverLook(context), () => this.switchOnPower());
+    buildEscapeRoute(context, this.lighting);
+    buildSurface(context, this.lighting);
+    this.evacuation = new Protocol33(context, this.lighting, this.power, () => this.onEvacuationLayout());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
     this.hemisphere = createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects);
     this.group.add(this.hemisphere);
+    this.surfaceMood = new SurfaceMood(scene, this.hemisphere, profile.useReducedEffects);
 
     this.allBarriers = STATION33_BARRIERS.map((barrier) =>
       new WindowBarrier(barrier.id, barrier.x, barrier.z, barrier.outwardX, barrier.outwardZ, {
@@ -219,7 +233,7 @@ export class Station33Arena implements ZombieArena {
     });
 
     this.wallBuys = STATION33_WALL_BUYS.map((config) => new WallBuy(config));
-    for (const wallBuy of this.wallBuys) new WallBuyView(wallBuy, WEAPON_DEFINITIONS[wallBuy.weaponId], this.group);
+    for (const wallBuy of this.wallBuys) new WallBuyView(wallBuy, STATION33_WEAPONS[wallBuy.weaponId], this.group);
 
     this.refreshZones();
   }
@@ -239,11 +253,13 @@ export class Station33Arena implements ZombieArena {
     for (const pickup of this.weaponPickups) pickup.update(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
     this.powerSwitch.update(dt);
+    this.evacuation.update(dt);
     this.updateTicketAmbush(observerPosition);
     this.ticketShutters.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
     this.lighting.update(dt, observerPosition);
     this.atmosphere.update(dt);
+    this.surfaceMood.update(observerPosition?.y);
   }
 
   reset(): void {
@@ -254,6 +270,7 @@ export class Station33Arena implements ZombieArena {
     for (const refill of this.ammoRefills) refill.reset();
     this.power.reset();
     this.powerSwitch.reset();
+    this.evacuation.reset();
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
@@ -263,6 +280,7 @@ export class Station33Arena implements ZombieArena {
     this.ambientEvents.reset();
     this.lighting.reset();
     this.atmosphere.reset();
+    this.surfaceMood.reset();
     this.applyAmbience();
     this.activeZones.clear();
     this.activeZones.add(STATION33_START_ZONE);
@@ -312,8 +330,11 @@ export class Station33Arena implements ZombieArena {
     return true;
   }
 
+  /** The open zones' entrances; while Protocol 33 runs, only those around the workshop. */
   refreshSpawnPoints(): void {
-    this.spawnPoints = [...this.activeZones].flatMap((zone) => STATION33_SPAWNS[zone]);
+    const zones = [...this.activeZones];
+    const converging = this.evacuation.hordeConverging ? zones.filter((zone) => PROTOCOL33_HORDE_ZONES.includes(zone)) : [];
+    this.spawnPoints = (converging.length > 0 ? converging : zones).flatMap((zone) => STATION33_SPAWNS[zone]);
   }
 
   refreshColliders(): void {
@@ -321,6 +342,8 @@ export class Station33Arena implements ZombieArena {
     const closedDoors = this.doorViews
       .filter((_, index) => !this.activeZones.has(STATION33_DOORS[index].zone))
       .map((view) => view.collider);
+    const blastDoor = this.evacuation.blastDoorCollider;
+    if (blastDoor) closedDoors.push(blastDoor);
     this.colliders = [...this.structure.solids, ...closedDoors];
     this.wallColliders = [
       ...this.structure.playerWallBoxes(),
@@ -341,10 +364,18 @@ export class Station33Arena implements ZombieArena {
     applySceneAmbience(this.scene, this.ambience, reduced);
     const { intensity, reducedIntensity } = this.ambience.hemisphereLight;
     this.hemisphere.intensity = reduced ? reducedIntensity : intensity;
-    if (!this.power.on) return;
-    this.hemisphere.intensity *= STATION33_MAINS.hemisphereBoost;
-    this.scene.environmentIntensity *= STATION33_MAINS.environmentBoost;
-    (this.scene.fog as THREE.FogExp2).density *= STATION33_MAINS.fogDensityScale;
+    if (this.power.on) {
+      this.hemisphere.intensity *= STATION33_MAINS.hemisphereBoost;
+      this.scene.environmentIntensity *= STATION33_MAINS.environmentBoost;
+      (this.scene.fog as THREE.FogExp2).density *= STATION33_MAINS.fogDensityScale;
+    }
+    this.surfaceMood.capture();
+  }
+
+  /** Protocol 33 changed the layout: the horde's entrances, or the blast door opening. */
+  private onEvacuationLayout(): void {
+    this.refreshZones();
+    this.onTopologyChanged?.();
   }
 
   private refreshZones(): void {
