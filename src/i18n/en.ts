@@ -370,6 +370,7 @@ export const en = {
   'evacuation.objectiveHold': "Stay by the control panel.",
   'evacuation.objectivePaused': "⚠ PAUSED — nobody is defending the control panel!",
   'evacuation.objectiveEscape': "REACH THE SURFACE",
+  'evacuation.developerExitPrompt': "ESCAPE NOW (DEVELOPER)\n{key} — {cost} PTS",
   'ending.evacuationTitle': "STATION 33 — ESCAPE SUCCESSFUL",
   'ending.evacuationRadio': "“Station 33 evacuated. Signal lost. Surface status unknown.”",
   'intro.skip': 'SKIP',

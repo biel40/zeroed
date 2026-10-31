@@ -1158,6 +1158,7 @@ export class ZombiesMode implements GameMode {
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
     if (hasSoulRitual(this.arena)) this.arena.unlockSecretRoom();
+    this.evacuation?.enableDeveloperExit();
     this.ctx.grantWeapon('raygun');
     this.ctx.setWeaponInfiniteReserve('raygun');
     this.ctx.grantWeapon('tesla');

@@ -47,6 +47,8 @@ export class ZombiesEvacuation {
   /** Bearing (eighths of a turn) and whole metres to the extraction point, measured each frame while escaping. */
   private extractionBearing = 0;
   private extractionMetres = 0;
+  /** God mode (MOTDRULES): the panel sells the way out directly, skipping every step. */
+  private developerExit = false;
 
   public constructor(
     private readonly ctx: ModeContext,
@@ -60,6 +62,11 @@ export class ZombiesEvacuation {
   /** The defence or the escape is under way: the normal rounds wait. */
   public get isActive(): boolean {
     return this.protocol.active;
+  }
+
+  /** The developer command is on: the panel offers to escape at once, for the protocol's price. */
+  public enableDeveloperExit(): void {
+    this.developerExit = true;
   }
 
   public update(dt: number): void {
@@ -86,6 +93,7 @@ export class ZombiesEvacuation {
       return powered ? t('evacuation.restorePrompt', { system, key }) : t('evacuation.switchNeedsPower', { system });
     }
     if (this.facing(this.evacuation.panel)) {
+      if (this.canSkip()) return t('evacuation.developerExitPrompt', { key, cost: this.evacuation.rules.cost });
       if (!powered) return t('evacuation.panelNeedsPower');
       switch (this.protocol.stage) {
         case 'exploration':
@@ -123,6 +131,7 @@ export class ZombiesEvacuation {
     this.horde.reset();
     this.objectiveText = null;
     this.objectiveSignature = Number.NaN;
+    this.developerExit = false;
   }
 
   /** The protocol unlocks the moment the map's power is on. */
@@ -145,9 +154,22 @@ export class ZombiesEvacuation {
     return false;
   }
 
+  private canSkip(): boolean {
+    return this.developerExit && this.protocol.stage !== 'completed' && this.protocol.stage !== 'failed';
+  }
+
   private useControlPanel(): boolean {
-    if (!this.evacuation.powered) return true;
     const { cost } = this.evacuation.rules;
+    if (this.canSkip()) {
+      // Charged like the real start, once: the skip only succeeds before the run's end.
+      if (!this.run.economy.canAfford(cost)) {
+        this.ctx.hud.flashNotEnoughPoints();
+        return true;
+      }
+      if (this.protocol.skipToExtraction() && !this.run.economy.spend(cost)) throw new Error('Evacuation became unaffordable after validation');
+      return true;
+    }
+    if (!this.evacuation.powered) return true;
     switch (this.protocol.stage) {
       case 'exploration':
         this.protocol.brief();

@@ -158,6 +158,17 @@ export class EvacuationProtocol {
     return true;
   }
 
+  /**
+   * Developer shortcut: from any unfinished stage straight to a successful
+   * extraction, skipping power, switches, defence and escape. Once per run.
+   */
+  public skipToExtraction(): boolean {
+    if (this.current === 'completed' || this.current === 'failed') return false;
+    this.current = 'completed';
+    this.pendingEvents.push({ type: 'extracted' });
+    return true;
+  }
+
   public clearEvents(): void {
     this.pendingEvents.length = 0;
   }

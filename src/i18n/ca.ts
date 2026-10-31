@@ -368,6 +368,7 @@ export const ca: Record<TranslationKey, string> = {
   'evacuation.objectiveHold': "Queda't vora el panell de control.",
   'evacuation.objectivePaused': "⚠ EN PAUSA: ningú defensa el panell de control!",
   'evacuation.objectiveEscape': "ARRIBA A LA SUPERFÍCIE",
+  'evacuation.developerExitPrompt': "ESCAPAR JA (DESENVOLUPADOR)\n{key} — {cost} PTS",
   'ending.evacuationTitle': "STATION 33 — FUITA ACONSEGUIDA",
   'ending.evacuationRadio': "«Estació 33 evacuada. Senyal perdut. Estat de la superfície: desconegut.»",
   'intro.skip': 'SALTA',

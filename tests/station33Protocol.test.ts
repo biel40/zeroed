@@ -270,6 +270,23 @@ describe('Protocol 33 through the mode', () => {
     expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.not.stringContaining('ФАКЕЛ-33'), true);
   });
 
+  it('lets MOTDRULES skip everything and escape at the panel for the protocol\'s price, until a restart', () => {
+    const run = startRun();
+    atPanel(run);
+    expect(run.mode.getInteractPrompt()).toBe(t('evacuation.panelNeedsPower'));
+    for (const key of 'MOTDRULES') run.mode.onKeyInput(key);
+    expect(run.mode.getInteractPrompt()).toBe(t('evacuation.developerExitPrompt', { key: KEY, cost: COST }));
+    run.mode.onInteract();
+    expect(run.side.hud.showEnding).toHaveBeenCalledWith(run.internals.rounds.round, 'evacuation', { kills: 0, headshots: 0 });
+    expect(run.side.ctx.audio.startEndingAudio).toHaveBeenCalledWith('evacuation');
+    run.mode.onInteract();
+    expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
+
+    run.mode.onRestartRequested();
+    atPanel(run);
+    expect(run.mode.getInteractPrompt()).toBe(t('evacuation.panelNeedsPower'));
+  });
+
   it('leaves Burned Mansion without any evacuation', () => {
     const side = makeContext();
     const mode = new ZombiesMode('burned-mansion');

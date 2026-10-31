@@ -130,6 +130,19 @@ describe('Evacuation protocol', () => {
     expect(drain(protocol)).toEqual(['extracted']);
   });
 
+  it('lets the developer shortcut skip straight to a successful extraction, once', () => {
+    const protocol = new EvacuationProtocol(RULES);
+    expect(protocol.skipToExtraction()).toBe(true);
+    expect(protocol.stage).toBe('completed');
+    expect(protocol.skipToExtraction()).toBe(false);
+    expect(drain(protocol)).toEqual(['extracted']);
+    const failed = readyProtocol();
+    failed.initiate();
+    run(failed, 180, true);
+    expect(failed.stage).toBe('failed');
+    expect(failed.skipToExtraction()).toBe(false);
+  });
+
   it('resets every stage, switch, timer and event for a new run', () => {
     const protocol = readyProtocol();
     protocol.initiate();

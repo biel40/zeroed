@@ -187,7 +187,10 @@ validacion manual. Detalles de entrega y comprobacion en
 
 El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
 en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
-restaura el cierre y el inventario inicial.
+restaura el cierre y el inventario inicial. En Station 33, el panel del
+Protocolo 33 ofrece ademas escapar al momento por su precio (10000), sin
+electricidad, interruptores, defensa ni huida, y lleva al final de la
+evacuacion (`EvacuationProtocol.skipToExtraction`).
 Tras activarlo, F2 abre una consola local de desarrollador que pausa la
 partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
 El panel ofrece selectores de armas y anillos, botones de municion y
