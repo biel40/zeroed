@@ -22,6 +22,7 @@ import { ShotValidator } from '../../network/ShotValidator';
 import { EYE_HEIGHT } from '../../player/PlayerController';
 import { stanceEyeOffset } from '../../player/PlayerStance';
 import { RemotePlayer } from '../../rendering/RemotePlayer';
+import { CoopSpectator } from '../../rendering/CoopSpectator';
 import { ReviveGesture } from '../../rendering/ReviveGesture';
 import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
@@ -124,6 +125,7 @@ export class CoopHostMode implements GameMode {
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
   private guestAvatar!: RemotePlayer;
+  private readonly spectator = new CoopSpectator();
   private gesture!: ReviveGesture;
   private readonly box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
   private boxView!: MysteryBoxView;
@@ -160,12 +162,13 @@ export class CoopHostMode implements GameMode {
   private gameOverShown = false;
   private readonly activeRepair: Record<CoopPlayerId, WindowBarrier | null> = { host: null, guest: null };
   private lastGuestStateAt = -Infinity;
+  private awaitingGuestRespawn = false;
 
   public constructor(private readonly connection: CoopConnection) {}
 
   public init(ctx: ModeContext): void {
     this.ctx = ctx;
-    this.world = new CoopWorld(ctx);
+    this.world = new CoopWorld(ctx, () => this.getCinematicCamera());
     this.boxView = new MysteryBoxView(ctx.assets, this.world.arena.mysteryBoxPlacement.position, MYSTERY_BOX_POOL, WEAPON_DEFINITIONS);
     this.boxView.group.rotation.y = this.world.arena.mysteryBoxPlacement.yaw;
     ctx.scene.add(this.boxView.group);
@@ -226,7 +229,6 @@ export class CoopHostMode implements GameMode {
     this.knife.setEnabled(this.knife.isAttacking);
     this.knife.update(dt, false, this.ctx.player.speed01);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
-    this.world.update(dt);
     this.box.update(dt);
     this.boxView.update(dt, this.box);
     this.processBoxEvents();
@@ -247,6 +249,10 @@ export class CoopHostMode implements GameMode {
     this.chain.update(dt);
     this.guestAvatar.setLife(this.players.guest.life.state, this.players.guest.life.reviver !== null);
     this.guestAvatar.update(dt);
+    this.spectator.update(this.guestAvatar,
+      this.phase === 'playing' && this.guestConnected && this.players.host.life.state === 'dead',
+      this.players.guest.life.state);
+    this.world.update(dt);
     const hostLife = this.players.host.life;
     const guestLife = this.players.guest.life;
     this.gesture.update(dt, guestLife.reviver === 'host' ? 'reviver'
@@ -313,6 +319,11 @@ export class CoopHostMode implements GameMode {
 
   public isCombatInputEnabled(): boolean { return this.players.guest.life.reviver !== 'host'; }
   public isDownedLookEnabled(): boolean { return this.players.host.life.state === 'downed'; }
+
+  public getCinematicCamera(): THREE.Camera | null {
+    return this.phase === 'playing' && this.guestConnected && this.players.host.life.state === 'dead'
+      ? this.spectator.getCamera(this.ctx.player.camera) : null;
+  }
 
   public onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
@@ -411,7 +422,9 @@ export class CoopHostMode implements GameMode {
     if (!this.guestConnected) return;
     const message = parseGuestMessage(raw);
     if (!message) return;
-    if (this.hostPaused && message.type !== 'ready') return;
+    if (this.awaitingGuestRespawn && message.type !== 'playerState' && message.type !== 'ready') return;
+    if (this.hostPaused && message.type !== 'ready'
+      && !(this.awaitingGuestRespawn && message.type === 'playerState')) return;
     if (this.players.host.life.reviver === 'guest'
       && message.type !== 'playerState' && message.type !== 'reviveCancel' && message.type !== 'ready') return;
     switch (message.type) {
@@ -490,6 +503,11 @@ export class CoopHostMode implements GameMode {
         this.sendMatchState();
       } else if (result === 'dead') this.sendMatchState();
     }
+    // A wipe takes priority over a round boundary crossed in this same tick.
+    if (host.life.state === 'dead' && (guest.life.state === 'dead' || !this.guestConnected)) {
+      this.endMatch();
+      return;
+    }
     this.rounds.update(dt, this.zombies.aliveCount);
     this.processRounds();
 
@@ -506,7 +524,6 @@ export class CoopHostMode implements GameMode {
     this.zombies.update(dt, position.x, position.z, this.ctx.player.floor, position.y,
       this.tmpDirection.x, this.tmpDirection.z, this.targets, host.life.state === 'alive');
 
-    if (host.life.state === 'dead' && (guest.life.state === 'dead' || !this.guestConnected)) this.endMatch();
   }
 
   private updateRepairs(dt: number): void {
@@ -538,6 +555,7 @@ export class CoopHostMode implements GameMode {
   private processRounds(): void {
     for (const event of this.rounds.pendingEvents) {
       if (event.type === 'roundStarted') {
+        this.respawnDeadPlayers();
         for (const barrier of this.world.arena.barriers) barrier.resetRoundCap();
         this.ctx.hud.showRoundBanner(t('banner.round', { round: event.round }));
         if (this.roundCues.claim('start', event.round)) this.ctx.audio.playRoundStartCue();
@@ -554,6 +572,32 @@ export class CoopHostMode implements GameMode {
     this.rounds.clearEvents();
   }
 
+  private respawnDeadPlayers(): void {
+    let respawned = false;
+    const host = this.players.host;
+    if (host.life.state === 'dead') {
+      host.life.reset();
+      host.health.reset();
+      this.world.placeLocalPlayer('host');
+      this.ctx.resetArsenal();
+      respawned = true;
+    }
+    const guest = this.players.guest;
+    if (this.guestConnected && guest.life.state === 'dead') {
+      guest.life.reset();
+      guest.health.reset();
+      this.guestInventory.reset(COOP_STARTING_WEAPONS);
+      for (const validator of this.shots.values()) validator.reset();
+      this.lastGuestKnife = -Infinity;
+      this.guestState = null;
+      this.lastGuestStateAt = -Infinity;
+      this.guestAvatar.clear();
+      this.awaitingGuestRespawn = true;
+      respawned = true;
+    }
+    if (respawned) this.sendMatchState();
+  }
+
   /** Spawns alternate between living players so both see pressure. */
   private spawnAnchor(): { readonly x: number; readonly z: number } {
     this.spawnAnchorGuest = !this.spawnAnchorGuest;
@@ -565,6 +609,12 @@ export class CoopHostMode implements GameMode {
   }
 
   private acceptGuestState(state: PlayerNetState): void {
+    if (this.awaitingGuestRespawn) {
+      // Ignore in-flight corpse poses until the guest confirms its spawn.
+      const spawn = this.world.playerSpawn('guest');
+      if (state.floor !== spawn.floor || Math.hypot(state.x - spawn.x, state.z - spawn.z) > 0.01
+        || Math.abs(state.y - spawn.y) > 0.01 || state.weapon !== COOP_STARTING_WEAPONS[0]) return;
+    }
     const bounds = this.world.arena.navigationBounds.find((entry) => entry.floor === state.floor);
     if (!bounds || !this.guestInventory.has(state.weapon)) return;
     const baseY = bounds.baseY ?? 0;
@@ -590,6 +640,7 @@ export class CoopHostMode implements GameMode {
       }
     }
     this.guestState = accepted;
+    this.awaitingGuestRespawn = false;
     this.lastGuestStateAt = defaultNow();
     const index = this.guestInventory.weapons.indexOf(state.weapon);
     if (index >= 0) this.guestInventory.switchTo(index);
@@ -1021,6 +1072,7 @@ export class CoopHostMode implements GameMode {
   }
 
   private onGuestJoined(): void {
+    this.awaitingGuestRespawn = false;
     this.guestConnected = true;
     this.guestReady = false;
     this.guestState = null;
@@ -1036,6 +1088,7 @@ export class CoopHostMode implements GameMode {
 
   /** Zombies retarget on their next update: the guest is no longer a candidate. */
   private onGuestLeft(): void {
+    this.awaitingGuestRespawn = false;
     this.guestConnected = false;
     this.guestReady = false;
     this.guestState = null;
@@ -1077,6 +1130,7 @@ export class CoopHostMode implements GameMode {
   }
 
   private resetMatch(): void {
+    this.awaitingGuestRespawn = false;
     this.chestInteraction.dispose();
     this.knife.reset();
     this.lastGuestKnife = -Infinity;
@@ -1165,5 +1219,6 @@ export class CoopHostMode implements GameMode {
     this.ctx.hud.setDownedState(host.life.state, host.life.bleedRemaining,
       this.players.guest.life.reviver === 'host' ? this.players.guest.life.reviveElapsed / REVIVE_DURATION : 0);
     this.ctx.player.setDownedCamera(host.life.state === 'downed');
+    this.ctx.hud.setSpectatorVisible(this.getCinematicCamera() !== null);
   }
 }

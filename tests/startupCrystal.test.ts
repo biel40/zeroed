@@ -33,6 +33,12 @@ function setup() {
   return { ...harness, ctx, station, recovery, carrier, other, zombies };
 }
 
+/** The crystal's HUD note as one text: its task and live progress. */
+function noteText(recovery: ZombiesCrystalRecovery): string {
+  const note = recovery.objective();
+  return note === null ? '' : `${note.title}\n${note.details}`;
+}
+
 describe('startup crystal recovery', () => {
   it('starts once on power, selects a living walker and leaves round population and stats intact', () => {
     const { station, recovery, zombies, carrier, ctx, hud } = setup();
@@ -42,8 +48,8 @@ describe('startup crystal recovery', () => {
     expect(recovery.stationPrompt()).toContain('Turn on the power');
     station.powered = true;
     recovery.update(0.1, zombies);
-    expect(recovery.objective()).toContain(t('crystal.hunt'));
-    expect(recovery.objective()).toContain('↑ 4 m');
+    // The bearing is live progress: details, so the task (title) is announced only once.
+    expect(recovery.objective()).toEqual({ kicker: 'ФАКЕЛ-33', title: t('crystal.hunt'), details: '↑ 4 m' });
     expect(zombies.size).toBe(2);
     expect([carrier.hp, carrier.speed]).toEqual([100, 1]);
     expect(ctx.scene.getObjectByName('startup-crystal-objective')?.visible).toBe(true);
@@ -57,10 +63,10 @@ describe('startup crystal recovery', () => {
     station.powered = true;
     other.typeId = 'brute';
     recovery.update(0, new Set([other]));
-    expect(recovery.objective()).toContain(t('crystal.wait'));
+    expect(noteText(recovery)).toContain(t('crystal.wait'));
     recovery.update(0, new Set([carrier, other]));
     recovery.onKilled(other, { x: 0, y: 0, z: -1 });
-    expect(recovery.objective()).toContain(t('crystal.hunt'));
+    expect(noteText(recovery)).toContain(t('crystal.hunt'));
   });
 
   it('requires pickup and installation before unlocking, with no automatic purchase', () => {
@@ -70,22 +76,22 @@ describe('startup crystal recovery', () => {
     expect(recovery.interactAtStation()).toBe(true);
     expect(recovery.locked).toBe(true);
     recovery.onKilled(carrier, { x: 0, y: 0, z: -1 });
-    expect(recovery.objective()).toContain(t('crystal.collect'));
+    expect(noteText(recovery)).toContain(t('crystal.collect'));
     expect(recovery.pickupPrompt()).toContain('Press E');
     expect(recovery.locked).toBe(true);
     expect(recovery.pickUp()).toBe(true);
     expect(recovery.pickUp()).toBe(false);
     expect(recovery.stationPrompt()).toContain('INSTALL STARTUP CRYSTAL');
-    expect(recovery.objective()).toContain(t('crystal.return'));
+    expect(noteText(recovery)).toContain(t('crystal.return'));
     player.camera.rotation.y = -Math.PI / 2;
-    expect(recovery.objective()).toContain('↖');
+    expect(noteText(recovery)).toContain('↖');
     recovery.interactAtStation();
     expect(recovery.locked).toBe(false);
     expect(station.setLocked).toHaveBeenLastCalledWith(false);
     expect(station.activate).toHaveBeenCalledOnce();
-    expect(recovery.objective()).toContain(t('crystal.buy', { cost: 3500 }));
+    expect(noteText(recovery)).toContain(t('crystal.buy', { cost: 3500 }));
     recovery.update(600, zombies);
-    expect(recovery.objective()).toContain(t('crystal.buy', { cost: 3500 }));
+    expect(noteText(recovery)).toContain(t('crystal.buy', { cost: 3500 }));
     expect(hud.showRoundBanner).not.toHaveBeenCalled();
     const owned = vi.spyOn(ctx, 'hasWeapon').mockReturnValue(true);
     recovery.update(0, zombies);
@@ -102,7 +108,7 @@ describe('startup crystal recovery', () => {
     recovery.update(0, zombies);
     recovery.onKilled(carrier, { x: 0, y: 0, z: -1 });
     recovery.update(600, new Set());
-    expect(recovery.objective()).toContain(t('crystal.collect'));
+    expect(noteText(recovery)).toContain(t('crystal.collect'));
     player.rig.position.z = 10;
     expect(recovery.pickUp()).toBe(false);
     player.rig.position.z = 0;

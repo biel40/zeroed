@@ -119,10 +119,11 @@ function floatingStainFaces(arena: ZombieArena): string[] {
   let root: THREE.Object3D = arena.colliders[0];
   while (root.parent) root = root.parent;
   root.updateMatrixWorld(true);
-  const drawn: THREE.Object3D[] = [];
-  root.traverse((object) => { if (isDrawn(object)) drawn.push(object); });
+  const drawnBounds: { readonly object: THREE.Object3D; readonly box: THREE.Box3 }[] = [];
+  root.traverse((object) => { if (isDrawn(object)) drawnBounds.push({ object, box: new THREE.Box3().setFromObject(object) }); });
   const ray = new THREE.Raycaster();
   const lead = 0.5;
+  const reach = new THREE.Box3();
   const down = new THREE.Vector3(0, -1, 0);
   const floating: string[] = [];
   const check = (gap: number | null, where: string): void => {
@@ -134,6 +135,9 @@ function floatingStainFaces(arena: ZombieArena): string[] {
     if (faces === 'none') continue;
     const box = new THREE.Box3().setFromObject(collider);
     const size = box.getSize(new THREE.Vector3());
+    // Every probe ray stays inside the collider box grown by `lead`, so only meshes touching it can be hit.
+    reach.copy(box).expandByScalar(lead);
+    const drawn = drawnBounds.filter((bounds) => bounds.box.intersectsBox(reach)).map((bounds) => bounds.object);
     const label = `${collider.name || collider.uuid}`;
     for (const [u, v] of [[0.5, 0.5], [0.15, 0.15], [0.85, 0.85], [0.15, 0.85], [0.85, 0.15]]) {
       const origin = new THREE.Vector3(box.min.x + size.x * u, box.max.y + lead, box.min.z + size.z * v);

@@ -43,7 +43,7 @@ describe.skipIf(!existsSync(path))('remote soldier asset contract', () => {
     expect(avatar.isSkinned).toBe(true);
     expect(loaded.animations.flatMap((clip) => clip.tracks.map((track) => Array.from(track.values)))).toEqual(sourceTracks);
     const motion: RemoteAvatarMotion = { speed: 0, forwardSpeed: 0, pitch: 0,
-      aiming: false, reloading: false, alive: true, life: 'alive', reviving: false, stance: 'standing' };
+      aiming: false, reloading: false, life: 'alive', reviving: false, stance: 'standing' };
     const settle = (): number => {
       for (let i = 0; i < 120; i++) avatar.update(1 / 60, motion);
       avatar.group.updateMatrixWorld(true);
@@ -65,6 +65,16 @@ describe.skipIf(!existsSync(path))('remote soldier asset contract', () => {
     expect(settle()).toBeCloseTo(standingY, 2);
     motion.life = 'downed';
     settle();
+    const downedBounds = new THREE.Box3().setFromObject(avatar.group, true);
+    expect(downedBounds.min.y).toBeGreaterThan(-0.1);
+    expect(downedBounds.max.y).toBeLessThan(0.8);
+    motion.life = 'dead';
+    settle();
+    const deadBounds = new THREE.Box3().setFromObject(avatar.group, true);
+    expect(deadBounds.min.y).toBeGreaterThan(-0.1);
+    expect(deadBounds.min.y).toBeLessThan(0.15);
+    expect(deadBounds.max.y).toBeLessThan(0.8);
+    expect(deadBounds.max.y).toBeLessThanOrEqual(downedBounds.max.y + 0.05);
     motion.life = 'alive';
     expect(settle()).toBeCloseTo(standingY, 2);
     avatar.dispose();

@@ -347,39 +347,261 @@ body {
 
 /* ---------- Zombies mode ---------- */
 
+/* Objective corner: one field note per quest, amber rail; a timed event turns it red. */
 #hud-objective {
+  --objective-accent: #e9bd74;
+  --objective-glow: #e9a64a55;
   position: absolute;
   top: max(18px, env(safe-area-inset-top, 0px));
   left: max(18px, env(safe-area-inset-left, 0px));
-  max-width: min(310px, calc(100vw - 36px));
-  padding: 6px 9px;
-  border-left: 2px solid #ba7065;
-  background: linear-gradient(90deg, #10141399, #10141320);
-  color: #d1c9bb;
-  font: 400 11px/1.45 'Consolas', 'SF Mono', monospace;
-  text-shadow: 0 1px 3px #000;
-  white-space: pre-line;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, calc(100vw - 36px));
   pointer-events: none;
 }
 
-html.touch-controls-enabled #hud-objective {
-  max-width: min(300px, calc(100vw - 190px));
-  font-size: 10px;
-  padding: 5px 7px;
+#hud-objective.urgent,
+#objective-spotlight.urgent {
+  --objective-accent: #ff4a32;
+  --objective-glow: #ff3a2466;
 }
 
-/* A timed event (Protocol 33): larger, red rail, the clock in tabular figures. */
-#hud-objective.urgent {
-  border-left-color: #ff3a24;
-  background: linear-gradient(90deg, #2a0c09cc, #10141330);
-  color: #f1e3d2;
-  font-size: 13px;
+.objective-note {
+  position: relative;
+  padding: 7px 12px 8px 14px;
+  background: linear-gradient(90deg, #0d100fe6, #0d100f8c 70%, #0d100f00);
+  box-shadow: inset 0 1px 0 #ffffff0d;
+  color: #f1ebde;
+  text-shadow: 0 1px 2px #000;
+}
+.objective-note::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 3px;
+  background: var(--objective-accent);
+  box-shadow: 0 0 12px var(--objective-glow);
+}
+/* Hidden at once while its spotlight shows; on docking it fades in as the card lands. */
+.objective-note { transition: opacity 0.6s 0.6s ease-out; }
+.objective-note.awaiting { opacity: 0; transition: none; }
+.objective-note.arrived { animation: objective-note-arrive 1.1s ease-out; }
+
+.objective-note-kicker {
+  color: var(--objective-accent);
+  font: 700 10px/1.2 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.24em;
+}
+.objective-note-title {
+  margin-top: 3px;
+  font: 600 13px/1.3 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+.objective-note-details {
+  margin-top: 4px;
+  color: #bdc6ba;
+  font: 400 11px/1.45 'Consolas', 'SF Mono', monospace;
   font-variant-numeric: tabular-nums;
-  box-shadow: inset 2px 0 12px -6px #ff3a24;
+  white-space: pre-line;
 }
 
-html.touch-controls-enabled #hud-objective.urgent {
-  font-size: 11px;
+#hud-objective.urgent .objective-note {
+  background: linear-gradient(90deg, #2a0c09e6, #1a0d0b99 70%, #10141300);
+}
+#hud-objective.urgent .objective-note::before { animation: objective-rail-pulse 1.4s ease-in-out infinite; }
+#hud-objective.urgent .objective-note-title { font-size: 14px; }
+#hud-objective.urgent .objective-note-details { color: #f1e3d2; font-size: 12px; }
+
+html.touch-controls-enabled #hud-objective { width: min(300px, calc(100vw - 190px)); gap: 6px; }
+html.touch-controls-enabled .objective-note { padding: 5px 9px 6px 11px; }
+html.touch-controls-enabled .objective-note-title { font-size: 12px; }
+html.touch-controls-enabled .objective-note-details { font-size: 10px; }
+html.touch-controls-enabled #hud-objective.urgent .objective-note-title { font-size: 12px; }
+html.touch-controls-enabled #hud-objective.urgent .objective-note-details { font-size: 11px; }
+
+/* New objective: a wide card in the upper third, above the round banner,
+   that wipes open from its centre and later flies into its corner note
+   (ObjectiveTracker sets the flight as an inline transform). */
+#objective-spotlight {
+  --objective-accent: #e9bd74;
+  --objective-glow: #e9a64a55;
+  position: absolute;
+  top: 11%;
+  left: 0;
+  right: 0;
+  width: fit-content;
+  max-width: min(640px, calc(100vw - 48px));
+  margin-inline: auto;
+  padding: 14px 42px 16px;
+  background: linear-gradient(90deg, #0d100f00, #0d100feb 16%, #0d100feb 84%, #0d100f00);
+  color: #f6efe2;
+  text-align: center;
+  text-shadow: 0 2px 6px #000;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+#objective-spotlight::before,
+#objective-spotlight::after {
+  content: '';
+  position: absolute;
+  left: 12%; right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--objective-accent), transparent);
+  box-shadow: 0 0 10px var(--objective-glow);
+}
+#objective-spotlight::before { top: 0; }
+#objective-spotlight::after { bottom: 0; }
+#objective-spotlight.urgent {
+  background: linear-gradient(90deg, #2a0c0900, #2a0c09eb 16%, #2a0c09eb 84%, #2a0c0900);
+}
+
+.objective-spotlight-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--objective-accent);
+  font: 700 11px/1 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.5em;
+  /* The tracking also trails the last letter: shift it back to centre. */
+  text-indent: 0.5em;
+}
+.objective-spotlight-label::before,
+.objective-spotlight-label::after {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--objective-accent);
+}
+.objective-spotlight-kicker {
+  margin-top: 9px;
+  color: #c9bfa8;
+  font: 600 12px/1.2 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.3em;
+}
+.objective-spotlight-title {
+  margin-top: 6px;
+  font: 400 clamp(24px, 3.4vw, 38px)/1.08 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.03em;
+  text-wrap: balance;
+}
+.objective-spotlight-details {
+  margin-top: 8px;
+  color: #cdd5c9;
+  font: 400 13px/1.45 'Consolas', 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-line;
+}
+
+#objective-spotlight.entering { animation: objective-spotlight-open 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+#objective-spotlight.entering .objective-spotlight-label { animation: objective-spotlight-fade 0.5s 0.15s ease-out both; }
+#objective-spotlight.entering .objective-spotlight-title { animation: objective-spotlight-focus 0.8s 0.1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+#objective-spotlight.entering .objective-spotlight-kicker,
+#objective-spotlight.entering .objective-spotlight-details { animation: objective-spotlight-fade 0.5s 0.35s ease-out both; }
+/* Length of SPOTLIGHT_DOCK_MS in ObjectiveTracker. */
+#objective-spotlight.docking {
+  opacity: 0;
+  transition: transform 1.2s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.8s 0.4s ease-in-out;
+}
+
+/* An ended objective fades and rises away; LEAVE_MS in ObjectiveTracker. */
+#objective-spotlight.leaving,
+.objective-note.leaving { animation: objective-leave 0.7s ease-in-out both; }
+
+html.touch-controls-enabled #objective-spotlight { top: 9%; max-width: min(460px, calc(100vw - 200px)); padding: 10px 26px 11px; }
+html.touch-controls-enabled .objective-spotlight-label { font-size: 9px; }
+html.touch-controls-enabled .objective-spotlight-kicker { margin-top: 6px; font-size: 10px; }
+html.touch-controls-enabled .objective-spotlight-title { font-size: clamp(18px, 4.4vw, 26px); }
+html.touch-controls-enabled .objective-spotlight-details { margin-top: 5px; font-size: 11px; }
+
+@keyframes objective-spotlight-open {
+  0% { opacity: 0; clip-path: inset(0 50%); }
+  20% { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0); }
+}
+@keyframes objective-spotlight-focus {
+  0% { opacity: 0; filter: blur(8px); letter-spacing: 0.22em; }
+  100% { opacity: 1; filter: blur(0); letter-spacing: 0.03em; }
+}
+@keyframes objective-spotlight-fade {
+  from { opacity: 0; translate: 0 4px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes objective-note-arrive {
+  0% { background-color: #e9bd7438; box-shadow: inset 0 1px 0 #ffffff0d, 0 0 22px var(--objective-glow); }
+  100% { background-color: transparent; box-shadow: inset 0 1px 0 #ffffff0d, 0 0 0 transparent; }
+}
+@keyframes objective-leave {
+  from { opacity: 1; translate: 0 0; }
+  to { opacity: 0; translate: 0 -10px; }
+}
+@keyframes objective-leave-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes objective-rail-pulse {
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #objective-spotlight.entering,
+  #objective-spotlight.entering .objective-spotlight-label,
+  #objective-spotlight.entering .objective-spotlight-title,
+  #objective-spotlight.entering .objective-spotlight-kicker,
+  #objective-spotlight.entering .objective-spotlight-details { animation: objective-spotlight-fade 0.3s ease-out both; }
+  #objective-spotlight.docking { transform: none !important; transition: opacity 0.6s 0.5s ease-in-out; }
+  #objective-spotlight.leaving,
+  .objective-note.leaving { animation-name: objective-leave-fade; }
+  .objective-note.arrived,
+  #hud-objective.urgent .objective-note::before { animation: none; }
+}
+
+/* Boss fight: the guardian's name over a long red health bar at the top
+   centre, a pale trail lagging behind each hit and a notch at every phase. */
+#boss-bar {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  width: clamp(180px, calc(100vw - 2 * 350px), 520px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-align: center;
+  animation: boss-bar-enter 0.6s ease-out both;
+}
+.boss-bar-name {
+  margin-bottom: 5px;
+  color: #f3e6d6;
+  font: 700 15px/1 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.24em;
+  text-shadow: 0 0 12px #ff2a1a88, 0 2px 3px #000;
+}
+.boss-bar-name::before,
+.boss-bar-name::after { content: '★'; margin: 0 0.6em; color: #d8231b; font-size: 0.8em; vertical-align: 0.1em; }
+.boss-bar-track {
+  position: relative;
+  height: 11px;
+  background: linear-gradient(#0b0c0cdd, #1a0d0cdd);
+  box-shadow: inset 0 0 0 1px #c9c2b333, 0 0 0 1px #000a, 0 6px 18px #000a;
+  overflow: hidden;
+}
+.boss-bar-fill,
+.boss-bar-trail { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; }
+.boss-bar-fill {
+  background: linear-gradient(#e4372a, #8e1510 60%, #5d0c09);
+  box-shadow: 0 0 14px #ff2a1a77;
+  transition: width 0.12s linear;
+}
+.boss-bar-trail { background: #e9dfcf; opacity: 0.55; transition: width 0.7s 0.35s ease-in; }
+.boss-bar-marks > i { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #000c; }
+html.touch-controls-enabled #boss-bar { top: max(12px, env(safe-area-inset-top, 0px)); width: clamp(150px, calc(100vw - 2 * 320px), 420px); }
+html.touch-controls-enabled .boss-bar-name { font-size: 12px; }
+html.touch-controls-enabled .boss-bar-track { height: 8px; }
+@keyframes boss-bar-enter {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #boss-bar { animation: none; }
+  .boss-bar-fill, .boss-bar-trail { transition: none; }
 }
 
 /* Charred field notes: same red rail, mono kicker and Impact figures as the main menu. */
@@ -407,14 +629,53 @@ html.touch-controls-enabled #hud-objective.urgent {
 .survival-icon { width: 19px; height: 19px; flex: 0 0 19px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .survival-label { display: block; font-size: 9px; letter-spacing: .32em; color: #8e968a; }
 .survival-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; align-items: flex-end; }
-.points-counter { margin-left: auto; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.points-counter { position: relative; margin-left: auto; text-align: right; min-width: 0; overflow-wrap: anywhere; }
 #z-points {
-  display: block; color: #d9b469; line-height: 1;
+  display: block; color: #d9b469; line-height: 1; transform-origin: 100% 100%;
   font: 400 30px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .04em;
   text-shadow: 2px 3px 0 #000a, 0 0 18px #d9b46933;
 }
 #z-points.denied { animation: pointsdenied .5s ease; }
 @keyframes pointsdenied { 25%, 75% { color: #ef7767; transform: translateX(-2px); } 50% { transform: translateX(2px); } }
+/* Reward: the counter kicks and flares; a major reward (headshot, knife) flares hotter. */
+#z-points.gained { animation: points-gained .32s ease-out; }
+#z-points.gained-major { animation: points-gained-major .5s ease-out; }
+@keyframes points-gained {
+  30% { transform: scale(1.1); color: #f6d891; text-shadow: 2px 3px 0 #000a, 0 0 22px #f0c46e99; }
+}
+@keyframes points-gained-major {
+  25% { transform: scale(1.2); color: #fff1c9; text-shadow: 2px 3px 0 #000a, 0 0 30px #ffcf6ecc; }
+}
+/* "+N" popups (PointsPopups) spring out above the counter and float away,
+   each with its own sideways drift so a burst fans out. */
+.points-popups { position: absolute; right: 0; bottom: 100%; width: 0; height: 0; pointer-events: none; }
+.points-popup {
+  position: absolute; right: 0; bottom: 2px;
+  opacity: 0; white-space: nowrap;
+  color: #e9cf91;
+  font: 400 17px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .04em;
+  text-shadow: 1px 2px 0 #000c, 0 0 10px #d9b46955;
+  transform-origin: 100% 100%;
+}
+.points-popup.active { animation: points-rise .95s cubic-bezier(.2, .8, .3, 1) both; }
+.points-popup.kill { color: #f3c45e; font-size: 21px; text-shadow: 1px 2px 0 #000c, 0 0 14px #f0b44a80; }
+.points-popup.major {
+  color: #fff0c2; font-size: 26px;
+  text-shadow: 1px 2px 0 #000c, 0 0 8px #ffd27a, 0 0 22px #f0a83acc;
+  animation-duration: 1.2s;
+}
+@keyframes points-rise {
+  0% { opacity: 0; transform: translate(0, 10px) scale(.5); }
+  14% { opacity: 1; transform: translate(calc(var(--points-drift, 0px) * .3), -6px) scale(1.18); }
+  28% { transform: translate(calc(var(--points-drift, 0px) * .5), -14px) scale(1); }
+  65% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--points-drift, 0px), -46px) scale(.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #z-points.gained, #z-points.gained-major { animation: none; }
+  .points-popup.active { animation: points-fade .9s ease-out both; }
+}
+@keyframes points-fade { 0% { opacity: 0; } 15%, 60% { opacity: 1; } 100% { opacity: 0; } }
 #z-round { display: flex; align-items: center; gap: 9px; min-height: 40px; margin-top: 3px; color: #e96956; }
 .round-number {
   font: 400 28px/1 Impact, 'Arial Narrow', sans-serif; letter-spacing: .04em;
@@ -554,7 +815,7 @@ html.touch-controls-enabled #hud-objective.urgent {
 }
 
 #round-banner.active {
-  animation: bannerfade 2s ease-out forwards;
+  animation: bannerfade 3.8s ease-out forwards;
 }
 
 #interact-prompt {
@@ -763,7 +1024,7 @@ html.touch-controls-enabled #hud-objective.urgent {
   backdrop-filter: grayscale(0.9) sepia(0.28) brightness(0.72);
   z-index: 3;
 }
-#downed-status, #revive-status {
+#downed-status, #revive-status, #spectator-status {
   position: absolute; left: 50%; transform: translateX(-50%); z-index: 4;
   color: #eee7db; font: 700 16px 'Consolas', monospace;
   letter-spacing: 0.18em; text-align: center; text-shadow: 0 2px 8px #000;
@@ -771,6 +1032,9 @@ html.touch-controls-enabled #hud-objective.urgent {
 }
 #downed-status { top: 35%; display: grid; gap: 9px; }
 #downed-status strong { color: #d8584e; font-size: 28px; letter-spacing: 0.25em; }
+#spectator-status { bottom: 16%; display: grid; gap: 9px; width: min(520px, 90vw); font-size: 13px; }
+#spectator-status strong { font-size: 20px; color: #e1b494; }
+.spectating #hud-weapon, .spectating #crosshair, .spectating #scope-overlay { display: none; }
 #revive-status { top: 68%; width: min(300px, 70vw); }
 #revive-status div { height: 5px; margin-top: 10px; background: #241b19; border: 1px solid #ac7d68; }
 #revive-progress { display: block; height: 100%; background: #e1b494; }
@@ -790,22 +1054,27 @@ html.touch-controls-enabled #hud-objective.urgent {
   backdrop-filter: grayscale(1) contrast(1.08) brightness(0.8);
 }
 #death-filter.active { opacity: 1; transition: opacity 0.5s ease-out; }
-#downed-filter.hidden, #downed-status.hidden, #revive-status.hidden { display: none; }
+#downed-filter.hidden, #downed-status.hidden, #revive-status.hidden, #spectator-status.hidden { display: none; }
 
 @keyframes bannerfade {
   0% {
     opacity: 0;
     transform: translateX(-50%) scale(1.25);
   }
-  12% {
+  10% {
     opacity: 1;
     transform: translateX(-50%) scale(1);
   }
-  75% {
+  /* Held for most of ROUND_BANNER_MS, then a slow fade that rises slightly. */
+  80% {
     opacity: 1;
+    translate: 0 0;
+    animation-timing-function: ease-in-out;
   }
   100% {
     opacity: 0;
+    transform: translateX(-50%) scale(1);
+    translate: 0 -10px;
   }
 }
 
@@ -1489,24 +1758,6 @@ html.coop-guest #pause-restart {
 
 #map-select .mode-hint {
   margin: 12px 0 0;
-}
-
-/* Section label with a hairline that runs to the panel edge. */
-.map-select-kicker {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 0 0 14px;
-  color: #8e968a;
-  font: 700 11px 'Consolas', 'SF Mono', monospace;
-  letter-spacing: 0.42em;
-}
-
-.map-select-kicker::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(164, 172, 157, 0.28), transparent);
 }
 
 /* Closed-beta unlock: the settings dialog frame with the beta's gold accent. */
@@ -4042,7 +4293,6 @@ html.touch-controls-enabled .start-panel {
    input: compact it so it fits; whatever is left scrolls the whole layer. */
 @media (max-height: 760px) {
   .menu-header { margin-bottom: 14px; }
-  .map-select-kicker { margin-bottom: 10px; }
   .map-card-tagline { min-height: 0; }
   .menu-action { min-height: 48px; }
   .menu-footer { margin-top: 14px; }
@@ -4054,7 +4304,6 @@ html.touch-controls-enabled .start-panel {
   .menu-header { margin-bottom: 12px; }
   .map-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
   .map-card-art { aspect-ratio: 3 / 1; }
-  .map-select-kicker,
   .map-card-mode,
   .map-card-tagline { display: none; }
   .map-card-body { margin-top: -20px; padding-bottom: 12px; }
@@ -4253,6 +4502,9 @@ html.touch-controls-enabled #hud-zombies .round-scratches i:nth-child(3n) { heig
 html.touch-controls-enabled #hud-zombies .round-scratches i:nth-child(5n) { margin-right: 3px; }
 html.touch-controls-enabled #hud-zombies .round-number { font-size: 13px; }
 html.touch-controls-enabled #z-points { font-size: 15px; }
+html.touch-controls-enabled .points-popup { font-size: 12px; }
+html.touch-controls-enabled .points-popup.kill { font-size: 14px; }
+html.touch-controls-enabled .points-popup.major { font-size: 17px; }
 html.touch-controls-enabled #z-health { margin: 5px 0; }
 html.touch-controls-enabled #hud-zombies .health-heading { gap: 3px; font-size: 9px; }
 html.touch-controls-enabled #z-hp-bar { height: 3px; margin-top: 3px; }

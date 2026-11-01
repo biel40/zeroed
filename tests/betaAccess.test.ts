@@ -31,6 +31,12 @@ describe('temporary beta map access', () => {
     expect(canAccessZombieMap('station-33', hasBetaAccess())).toBe(true);
   });
 
+  it('grants Station 33 access to the newly authorized beta tester', () => {
+    storage();
+    expect(acceptBetaEmail('random.uses.1998@gmail.com')).toBe(true);
+    expect(canAccessZombieMap('station-33', hasBetaAccess())).toBe(true);
+  });
+
   it('rejects unlisted emails and unlisted stored sessions', () => {
     const values = storage('unlisted@example.com');
     expect(hasBetaAccess()).toBe(false);

@@ -84,7 +84,13 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 - Salud cooperativa: un jugador a 0 HP entra en `DOWNED` durante 20 s. El
   compañero puede usar E/USE a menos de 2 m; el anfitrión valida una única
   transacción de 2 s, la cancela si pierde alcance o estado y devuelve 40 % de
-  salud. Al agotarse el tiempo pasa al flujo `DEAD` existente. El snapshot
+  salud. Al agotarse el tiempo pasa a `DEAD`: observa en primera persona al
+  compañero hasta el inicio de la siguiente ronda, sin mover su cuerpo ni
+  poder combatir o interactuar. Reaparece en el punto inicial con salud completa
+  y la M1911; conserva Points y estadísticas. Los abatidos siguen necesitando
+  reanimación aunque cambie la ronda. Si ambos mueren, termina la partida.
+  Abatidos y cadáveres conservan la postura tumbada junto al suelo.
+  El snapshot
   replica estado, cuenta atrás y progreso; el gesto de manos, golpe y cámara
   baja se reproducen localmente. El protocolo del relay es la versión 6:
   desplegar el Worker antes que el frontend actualizado.

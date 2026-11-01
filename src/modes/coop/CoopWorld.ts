@@ -55,8 +55,10 @@ export class CoopWorld {
 
   private mapColliders: ReadonlySet<THREE.Object3D>;
   private readonly tmpDirection = new THREE.Vector3();
+  private readonly observerPosition = new THREE.Vector3();
 
-  public constructor(private readonly ctx: ModeContext) {
+  public constructor(private readonly ctx: ModeContext,
+    private readonly getViewCamera: () => THREE.Camera | null = () => null) {
     this.arena = createCoopArena(ctx);
     this.arena.init();
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
@@ -79,16 +81,20 @@ export class CoopWorld {
   }
 
   public placeLocalPlayer(slot: CoopPlayerId): void {
-    const spawn = this.arena.playerSpawn;
-    this.ctx.player.teleport(spawn.x,
-      spawn.y, slot === 'host' ? spawn.z : spawn.z + GUEST_SPAWN_OFFSET_Z,
-      spawn.floor, this.arena.playerBounds);
+    const spawn = this.playerSpawn(slot);
+    this.ctx.player.teleport(spawn.x, spawn.y, spawn.z, spawn.floor, this.arena.playerBounds);
     // Both players start in sight of each other, rather than side by side outside the camera FOV.
     this.ctx.player.face(slot === 'host' ? 0 : Math.PI);
   }
 
+  public playerSpawn(slot: CoopPlayerId): ZombieArena['playerSpawn'] {
+    const spawn = this.arena.playerSpawn;
+    return { ...spawn, z: slot === 'host' ? spawn.z : spawn.z + GUEST_SPAWN_OFFSET_Z };
+  }
+
   public update(dt: number): void {
-    this.arena.update(dt, this.ctx.player.rig.position);
+    const camera = this.getViewCamera();
+    this.arena.update(dt, camera ? camera.getWorldPosition(this.observerPosition) : this.ctx.player.rig.position);
   }
 
   /** The local player's networked state, sampled from the first-person rig. */
@@ -350,9 +356,9 @@ export class CoopWorld {
     this.onTopologyChanged?.();
   }
 
-  /** Cue for a world point as heard by the local player; both roles share it. */
+  /** Cue for a world point as heard from the current view; both roles share it. */
   public spatialCueFor(position: { readonly x: number; readonly y: number; readonly z: number }): SpatialCue {
-    return cameraSpatialCue(this.ctx.player.camera, position);
+    return cameraSpatialCue(this.getViewCamera() ?? this.ctx.player.camera, position);
   }
 
   /** Barrier board crack from its window, for both the host and the replaying guest. */

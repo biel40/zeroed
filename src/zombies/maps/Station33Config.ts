@@ -668,6 +668,42 @@ export const PROTOCOL33_SURFACE = {
 export const PROTOCOL33_TRUCK = { x: 20.4, z: -92.5, length: 7.2, width: 2.5, height: 3, cabOffset: 1.75 } as const;
 
 /**
+ * Solid props of the yard, all kept to its edges so the middle stays open
+ * ground for the guardian's fight: the sodium lamp's pole (south-west),
+ * three concrete road blocks, two huddles of fuel drums against the fence,
+ * the gate guards' sandbag nest and burning barrel by the north fence, and
+ * a stack of truck tyres.
+ */
+export const PROTOCOL33_YARD = {
+  lampPost: { x: 5.2, z: -94.5, height: 5.6 },
+  /** Centre and yaw of each 2.4 x 0.6 m block. */
+  roadBlocks: [
+    { x: 9.5, z: -86.0, yaw: 0.2 },
+    { x: 11.6, z: -96.2, yaw: -0.4 },
+    { x: 24.6, z: -82.2, yaw: 1.1 },
+  ],
+  drumHuddles: [
+    [[4.9, -80.0], [5.6, -80.2], [5.2, -80.85]],
+    [[26.1, -98.9], [25.4, -99.15]],
+  ],
+  sandbagNest: { x: 9.6, z: -99.15, length: 2.4, courses: 3 },
+  fireBarrel: { x: 6.1, z: -98.9 },
+  tyres: { x: 26.0, z: -86.5 },
+} as const;
+
+/**
+ * CAPITÁN URSS, the guardian of the extraction: once the escape is under
+ * way and a player is `awakenDepth` metres into the yard, he leaps the
+ * north fence from `leapFrom` and lands on `landing`, in the open middle
+ * of the yard. The truck will not leave while he stands.
+ */
+export const PROTOCOL33_GUARDIAN = {
+  landing: { x: 14.0, z: -91.0 },
+  leapFrom: { x: 13.0, y: PROTOCOL33_SURFACE_Y + 6.5, z: -104.5 },
+  awakenDepth: 1.6,
+} as const;
+
+/**
  * Open-air mood of the surface: a cold blue-grey night haze, thinner than
  * the station's air so the dead tower blocks show as silhouettes, and a
  * pale sky fill. The scene blends to it as the observer's eyes climb from

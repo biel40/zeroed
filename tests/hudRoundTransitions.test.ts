@@ -29,6 +29,7 @@ function hudHarness(): { hud: HUD; round: HudElement; element: (id: string) => H
     lastRound: -1, lastZombies: '', lastLamps: '',
     zRound: element('z-round'), zPoints: element('z-points'), zHpFill: element('z-hp-fill'),
     zKills: element('z-kills'), zHeadshots: element('z-headshots'), damageOverlay: element('damage-overlay'),
+    pointsPopups: { update: vi.fn() },
   });
   return { hud, round: element('z-round'), element };
 }

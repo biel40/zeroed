@@ -34,7 +34,7 @@ const avatars = stances.map((stance, index) => {
   avatar.setWeapon('m1911');
   scene.add(avatar.group);
   const motion: RemoteAvatarMotion = { speed: 0, forwardSpeed: 0, pitch: 0, aiming: false,
-    reloading: false, alive: true, life: 'alive', reviving: false, stance };
+    reloading: false, life: 'alive', reviving: false, stance };
   for (let i = 0; i < 120; i++) avatar.update(1 / 60, motion);
   return { avatar, motion };
 });

@@ -152,8 +152,8 @@ codigo: actualiza la guia.
   walker de la horda se convierte en portador, marcado por un cristal rojo
   sobre la cabeza, nucleo en el pecho y anillos de energia. Al morir deja un
   cristal persistente que se recoge y se instala gratis en el armario. El HUD
-  mantiene el paso actual con flecha y distancia en una nota discreta de la
-  esquina, sin banners centrales; la confirmacion de desbloqueo permanece
+  mantiene el paso actual con flecha y distancia en una nota de objetivo de la
+  esquina, sin banners de ronda; la confirmacion de desbloqueo permanece
   hasta comprar el arma. Las bajas en las entradas
   dejan el cristal al lado jugable de la barricada. Vende el arma (3500) y
   despues sus cristales (1750). Es la unica fuente de fuego del mapa: el
@@ -221,12 +221,27 @@ codigo: actualiza la guia.
   llego. Arriba, una caseta de hormigon con dintel y marquesina se abre al
   patio.
 - La superficie es una noche fria y muerta, no una ciudad jugable: un patio de
-  losas cercado por valla prefabricada de hormigon con espino, la puerta de
-  acero cerrada, un camion militar verde oliva con caja de furgon abierta y
-  su baliza, una farola de sodio que sigue encendida y bloques de hormigon.
-  Mas alla, bloques de viviendas brutalistas y un mastil con su luz de
-  aviso, solo siluetas en una bruma azulada mas fina que el aire de la
-  estacion. Sin emblemas ni rotulos reales.
+  losas cercado por valla prefabricada de hormigon con relieve de rombos,
+  espino y concertina, la puerta de acero cerrada con su estrella roja, un
+  camion militar verde oliva con caja de furgon sanitaria abierta y su
+  baliza, una farola de sodio que sigue encendida, bloques de hormigon, bidones,
+  el nido de sacos de la guardia con su barril de brasas y neumaticos.
+  Charcos, manchas, rodadas, octavillas y maleza cuentan el abandono. Todo
+  lo solido queda en los bordes: el centro es el terreno del guardian.
+- Mas alla de la valla, solo decorado: la carretera agrietada hacia la
+  niebla con la seta del centinela, una torre de vigilancia de madera con su
+  reflector muerto, postes de tendido con cables vencidos, un turismo
+  calcinado, abedules sin hojas, escombros y, al fondo, bloques de viviendas
+  brutalistas con alguna ventana aun encendida y un mastil con su luz de
+  aviso, siluetas en una bruma azulada mas fina que el aire de la estacion.
+  Sin emblemas ni rotulos reales.
+- El CAPITAN URSS es un homenaje original al superheroe sovietico de comic,
+  no una copia: traje rojo oscuro con flancos y cuello negros, estrella
+  blanca en el pecho y en las hombreras, casco negro completo con rendijas
+  rojas, cinturon blanco, grebas y botas blancas acolchadas, guantes negros y
+  un escudo redondo rojo con estrella blanca y aro de acero. Es un zombi: el
+  traje esta rasgado sobre piel podrida y heridas, el cuello va al aire y el
+  visor esta roto en la mejilla. Todo es procedural (`CaptainUssrModel`).
 
 ## El puesto de milicia
 

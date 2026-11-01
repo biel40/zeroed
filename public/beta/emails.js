@@ -1,4 +1,5 @@
 export const BETA_EMAILS = [
+  'random.uses.1998@gmail.com',
   'anavilmoy@gmail.com',
   'arxeus99@gmail.com',
   'biel40aws@gmail.com',

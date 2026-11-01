@@ -83,7 +83,7 @@
 
     <div id="hud-zombies" class="hud-panel hidden">
       <div class="survival-top"><div><span class="survival-label" data-i18n="hud.round"></span><div id="z-round"></div></div>
-        <div class="points-counter"><strong id="z-points" data-i18n-aria-label="hud.points">0</strong></div></div>
+        <div class="points-counter"><strong id="z-points" data-i18n-aria-label="hud.points">0</strong><div id="z-points-popups" class="points-popups" aria-hidden="true"></div></div></div>
       <div id="z-health"><div class="health-heading"><span><svg class="survival-icon" aria-hidden="true"><use href="#icon-health"/></svg> <span data-i18n="hud.health"></span></span><strong id="z-hp">100 / 100</strong></div>
         <div id="z-hp-bar"><span id="z-hp-fill"></span></div></div>
       <div class="survival-counters"><div><svg class="survival-icon" aria-hidden="true"><use href="#icon-kills"/></svg><span data-i18n="hud.kills"></span><strong id="z-kills">0</strong></div>
@@ -93,6 +93,20 @@
     </div>
 
     <div id="hud-objective" class="hidden" role="status"></div>
+    <div id="objective-spotlight" class="hidden" aria-hidden="true">
+      <div class="objective-spotlight-label" data-i18n="hud.newObjective"></div>
+      <div id="objective-spotlight-kicker" class="objective-spotlight-kicker"></div>
+      <div id="objective-spotlight-title" class="objective-spotlight-title"></div>
+      <div id="objective-spotlight-details" class="objective-spotlight-details"></div>
+    </div>
+    <div id="boss-bar" class="hidden" role="status">
+      <div id="boss-bar-name" class="boss-bar-name"></div>
+      <div class="boss-bar-track">
+        <span id="boss-bar-trail" class="boss-bar-trail"></span>
+        <span id="boss-bar-fill" class="boss-bar-fill"></span>
+        <span id="boss-bar-marks" class="boss-bar-marks"></span>
+      </div>
+    </div>
     <div id="round-banner">
       <div id="banner-title"></div>
       <div id="banner-sub"></div>
@@ -104,6 +118,7 @@
     <div id="downed-filter" class="hidden"></div>
     <div id="death-filter" aria-hidden="true"></div>
     <div id="downed-status" class="hidden" role="status"><strong data-i18n="hud.downed"></strong><span id="downed-countdown"></span></div>
+    <div id="spectator-status" class="hidden" role="status"><strong data-i18n="hud.spectating"></strong><span data-i18n="hud.respawnNextRound"></span></div>
     <div id="revive-status" class="hidden"><span data-i18n="hud.revivingTeammate"></span><div><i id="revive-progress"></i></div></div>
     <div id="host-pause-status" class="hidden" role="status" data-i18n="hud.hostPaused"></div>
   </div>
@@ -132,11 +147,10 @@
           </div>
         </div>
       </header>
-      <h2 id="map-select-kicker" class="map-select-kicker" data-i18n="menu.chooseMap"></h2>
       <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false, locks the ones the
            player cannot access yet and fills the data-map-* labels from the registry (players, access, action).
            The shared SVG viewport crops out the frames and copy baked into the decorative images. -->
-      <div class="map-grid" role="group" aria-labelledby="map-select-kicker">
+      <div class="map-grid">
         <button type="button" class="map-card" data-map="burned-mansion">
           <span class="map-card-media">
             <svg class="map-card-art" viewBox="116 76 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">

@@ -64,6 +64,7 @@ import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialC
 import { RoundCueGate } from '../audio/RoundCueGate';
 import { IntroCinematic } from '../rendering/IntroCinematic';
 import { CodeLockDialog } from '../ui/CodeLockDialog';
+import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
@@ -76,12 +77,6 @@ const MOAN_MIN_DELAY = 6;
 const MOAN_SPREAD = 9;
 /** A key still held from starting the run must not also skip its intro. */
 const INTRO_SKIP_GUARD = 0.6;
-
-/** Two objective notes sharing the corner, a blank line apart. */
-function joinNotes(first: string | null, second: string | null): string | null {
-  if (first === null || second === null) return first ?? second;
-  return `${first}\n\n${second}`;
-}
 
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
@@ -161,6 +156,8 @@ export class ZombiesMode implements GameMode {
   private activeRepairBarrier: WindowBarrier | null = null;
   /** Reused by the box/door/barrier facing check; avoids per-frame allocation. */
   private readonly tmpDirection = new THREE.Vector3();
+  /** The HUD objective notes, refilled every frame. */
+  private readonly objectiveNotes: ObjectiveNote[] = [];
   private readonly tmpAudioPosition = new THREE.Vector3();
   private readonly knife = new Knife();
   private readonly knifeCombat = new KnifeCombat();
@@ -265,6 +262,8 @@ export class ZombiesMode implements GameMode {
         spawnZombie: () => this.spawnRoundZombie(),
         escaped: (ending) => this.escape(ending),
         failed: () => this.endGame(),
+        hurtPlayer: (damage) => this.onPlayerHit(damage),
+        shake: (amount) => { this.trauma = Math.min(1, this.trauma + amount); },
       })
       : null;
 
@@ -341,19 +340,25 @@ export class ZombiesMode implements GameMode {
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
     this.arena.update(dt, playerPos);
-    let objective: string | null = null;
+    const notes = this.objectiveNotes;
+    notes.length = 0;
     const urgent = this.runAcceptsInput() && (this.evacuation?.isActive ?? false);
     if (this.runAcceptsInput()) {
-      let crystal: string | null = null;
-      for (const recovery of this.crystalRecoveries) {
-        crystal = recovery.objective();
-        if (crystal !== null) break;
-      }
       // A running evacuation is the only note; otherwise both quests share the corner.
+      if (!urgent) {
+        for (const recovery of this.crystalRecoveries) {
+          const crystal = recovery.objective();
+          if (crystal === null) continue;
+          notes.push(crystal);
+          break;
+        }
+      }
+      const guardian = this.evacuation?.guardianObjective() ?? null;
+      if (guardian !== null) notes.push(guardian);
       const evacuation = this.evacuation?.objective() ?? null;
-      objective = urgent ? evacuation : joinNotes(crystal, evacuation);
+      if (evacuation !== null) notes.push(evacuation);
     }
-    this.ctx.hud.setObjective?.(objective, urgent);
+    this.ctx.hud.setObjective?.(notes, urgent);
     if (this.box && this.boxView) {
       this.box.update(dt);
       this.boxView.update(dt, this.box);
@@ -375,6 +380,8 @@ export class ZombiesMode implements GameMode {
     weapon: Weapon,
   ): void {
     if (!this.runAcceptsInput()) return;
+    const damage = weapon.definition.damage * this.weaponDamageScale(weapon.definition.id);
+    if (this.evacuation?.guardian?.hit(object, damage, point, distance)) return;
     const zombie = object.userData.zombie as Zombie | undefined;
 
     if (!zombie) return;
@@ -386,12 +393,7 @@ export class ZombiesMode implements GameMode {
     if (headshot) this.ctx.audio.playHeadshotHit();
     else this.ctx.audio.playZombieHit();
     this.ctx.effects.puff(point, 0x6e1d16, 0.2);
-    const lethal = this.zombies.damageZombie(
-      zombie,
-      part,
-      weapon.definition.damage * this.weaponDamageScale(weapon.definition.id),
-      weapon.definition.id,
-    );
+    const lethal = this.zombies.damageZombie(zombie, part, damage, weapon.definition.id);
     // A surviving headshot pays 150 here; lethal hits pay through the kill
     // callback instead, so a direct hit is rewarded exactly once.
     if (!lethal) this.economy.awardHit(headshot);
@@ -402,6 +404,7 @@ export class ZombiesMode implements GameMode {
     if (!this.runAcceptsInput()) return true;
     if (weapon.definition.flame) {
       this.flames.fire(weapon, origin, direction);
+      this.evacuation?.guardian?.scorch(weapon, origin, direction, weapon.definition.damage * this.weaponDamageScale(weapon.definition.id));
       return true;
     }
     const energy = weapon.definition.energy;
@@ -1270,6 +1273,14 @@ export class ZombiesMode implements GameMode {
     const zombie = object?.userData.zombie as Zombie | undefined;
     const isTesla = config.color === WEAPON_DEFINITIONS.tesla.energy?.color;
 
+    // A bolt into the guardian spends itself on it: no chain, no splash.
+    const boltDamage = isTesla ? CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla') : WEAPON_DEFINITIONS.raygun.damage * this.weaponDamageScale('raygun');
+    if (object && this.evacuation?.guardian?.hit(object, boltDamage, point, distance)) {
+      if (isTesla) this.ctx.audio.playTeslaShot();
+      else this.ctx.audio.playRayImpact();
+      return;
+    }
+
     // Tesla: electric discharge that chains to nearby zombies. No splash;
     // the damage travels zombie-to-zombie, which is the whole point.
     if (isTesla && zombie && zombie.isAlive) {
@@ -1376,7 +1387,7 @@ export class ZombiesMode implements GameMode {
     this.flames?.reset();
     for (const recovery of this.crystalRecoveries) recovery.reset();
     this.evacuation?.reset();
-    this.ctx.hud.setObjective?.(null);
+    this.ctx.hud.resetObjectives?.();
     if (this.zombies) this.zombies.reset();
     this.footsteps?.reset();
     if (this.arena) {

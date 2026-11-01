@@ -136,7 +136,7 @@ export interface GameMode {
   /** Allow aiming the view while movement remains locked (for example DOWNED). */
   isDownedLookEnabled?(): boolean;
   /**
-   * Camera the shell renders instead of the player's (a map intro). While
+   * Camera the shell renders instead of the player's (intro or spectator). While
    * set, the first-person weapon and arms are hidden.
    */
   getCinematicCamera?(): THREE.Camera | null;

@@ -15,6 +15,7 @@ import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import type { WeaponId } from '../../weapons/WeaponTypes';
 import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules, EvacuationStage } from '../evacuation/EvacuationProtocol';
+import type { CaptainUssrField, GroundRect } from '../guardians/CaptainUssrBrain';
 
 export interface MysteryBoxPlacement {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -162,6 +163,23 @@ export interface ArenaEvacuationSwitch {
 }
 
 /**
+ * Boss guarding an evacuation's extraction (`kind` picks which): during
+ * the escape, a player entering `trigger` on `floor` wakes it; it leaps in
+ * from `leapFrom` onto `field.landing` and fights inside `field`, whose
+ * obstacles are the map's solids there. Nobody boards until it falls, and
+ * the escape clock waits for the fight.
+ */
+export interface ArenaEvacuationGuardian {
+  readonly kind: 'captain-ussr';
+  readonly floor: number;
+  /** Height of the ground it fights on. */
+  readonly groundY: number;
+  readonly field: CaptainUssrField;
+  readonly leapFrom: { readonly x: number; readonly y: number; readonly z: number };
+  readonly trigger: GroundRect;
+}
+
+/**
  * Optional evacuation easter egg. Once the map's power is on, its
  * auxiliary switches are thrown, the protocol is bought at `panel`, the
  * panel is defended while the exit unlocks, and the players reach
@@ -181,6 +199,8 @@ export interface ArenaEvacuation {
   readonly exitPosition: { readonly x: number; readonly y: number; readonly z: number };
   readonly extraction: ArenaUsePoint;
   readonly ending: ArenaEnding;
+  /** Optional boss between the escape and the extraction. */
+  readonly guardian?: ArenaEvacuationGuardian;
   /** The protocol reached `stage` (alarm, horde routing, the exit opening); called once per change. */
   showStage(stage: EvacuationStage): void;
   /** Unlocking progress (0..1) and whether anyone defends the panel, every frame while defending. */

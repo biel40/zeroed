@@ -3,11 +3,13 @@ import { cameraSpatialCue, type SpatialCue } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import { t } from '../i18n/i18n';
 import { actionKey } from '../ui/InteractionPrompts';
+import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 import { EVACUATION_HORDE, EvacuationHorde } from '../zombies/evacuation/EvacuationHorde';
 import { EvacuationProtocol, type EvacuationStage } from '../zombies/evacuation/EvacuationProtocol';
 import type { ArenaEnding, ArenaEvacuation, ArenaUsePoint } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 import { BEARING_ARROWS, bearingIndex } from './ObjectiveBearing';
+import { ZombiesGuardian } from './ZombiesGuardian';
 
 /** Kicker of every evacuation note: the protocol's own (diegetic) name. */
 const KICKER = 'ПРОТОКОЛ 33';
@@ -28,6 +30,10 @@ export interface EvacuationRun {
   escaped(ending: ArenaEnding): void;
   /** The escape clock ran out: the run ends as a death. */
   failed(): void;
+  /** The map's guardian struck the player. */
+  hurtPlayer(damage: number): void;
+  /** Rattles the camera (0..1). */
+  shake(amount: number): void;
 }
 
 /**
@@ -35,14 +41,18 @@ export interface EvacuationRun {
  * its switches, panel and extraction point, the paid start (charged once,
  * only when the protocol accepts it), the defence check around the panel,
  * the event's own horde in place of the rounds, HUD notes, banners and
- * sounds. The pure `EvacuationProtocol` decides; the map presents.
+ * sounds. The pure `EvacuationProtocol` decides; the map presents. A map's
+ * guardian (`ZombiesGuardian`) bars the extraction until it falls; its
+ * duel holds the escape clock and the horde.
  */
 export class ZombiesEvacuation {
   private readonly protocol: EvacuationProtocol;
   private readonly horde: EvacuationHorde;
+  /** The boss guarding the extraction; null on maps without one. */
+  public readonly guardian: ZombiesGuardian | null;
   private readonly forward = new THREE.Vector3();
-  private objectiveText: string | null = null;
-  /** What `objectiveText` was built from; rebuilt only when this changes. */
+  private objectiveNote: ObjectiveNote | null = null;
+  /** What `objectiveNote` was built from; rebuilt only when this changes. */
   private objectiveSignature = Number.NaN;
   /** Bearing (eighths of a turn) and whole metres to the extraction point, measured each frame while escaping. */
   private extractionBearing = 0;
@@ -57,6 +67,7 @@ export class ZombiesEvacuation {
   ) {
     this.protocol = new EvacuationProtocol(evacuation.rules);
     this.horde = new EvacuationHorde(EVACUATION_HORDE, ctx.profile.useReducedEffects);
+    this.guardian = evacuation.guardian ? new ZombiesGuardian(ctx, evacuation.guardian, run, Math.random) : null;
   }
 
   /** The defence or the escape is under way: the normal rounds wait. */
@@ -75,9 +86,11 @@ export class ZombiesEvacuation {
       this.protocol.update(dt, this.playerDefends());
       this.evacuation.showDefense(this.protocol.defenseProgress, this.protocol.defended);
     } else {
-      this.protocol.update(dt, true);
+      // The guardian's duel holds the escape clock.
+      this.protocol.update(this.guardian?.fighting ? 0 : dt, true);
     }
-    if (this.protocol.active) this.spawnHorde(dt);
+    this.guardian?.update(dt, this.protocol.stage === 'escaping');
+    if (this.protocol.active && !this.guardian?.fighting) this.spawnHorde(dt);
     this.processEvents();
     this.evacuation.showStage(this.protocol.stage);
   }
@@ -104,7 +117,9 @@ export class ZombiesEvacuation {
           return null;
       }
     }
-    if (this.protocol.stage === 'escaping' && this.facing(this.evacuation.extraction)) return t('evacuation.boardPrompt', { key });
+    if (this.protocol.stage === 'escaping' && this.facing(this.evacuation.extraction)) {
+      return this.guardian?.blocksExtraction ? this.guardian.blockedPrompt() : t('evacuation.boardPrompt', { key });
+    }
     return null;
   }
 
@@ -117,19 +132,25 @@ export class ZombiesEvacuation {
   }
 
   /** The persistent HUD note: what to do next, and the clocks while it runs. */
-  public objective(): string | null {
+  public objective(): ObjectiveNote | null {
     const signature = this.objectiveKey();
     if (signature !== this.objectiveSignature) {
       this.objectiveSignature = signature;
-      this.objectiveText = this.buildObjective();
+      this.objectiveNote = this.buildObjective();
     }
-    return this.objectiveText;
+    return this.objectiveNote;
+  }
+
+  /** The guardian's note while its duel lasts, shown before the protocol's own. */
+  public guardianObjective(): ObjectiveNote | null {
+    return this.guardian?.objective() ?? null;
   }
 
   public reset(): void {
     this.protocol.reset();
     this.horde.reset();
-    this.objectiveText = null;
+    this.guardian?.reset();
+    this.objectiveNote = null;
     this.objectiveSignature = Number.NaN;
     this.developerExit = false;
   }
@@ -150,7 +171,10 @@ export class ZombiesEvacuation {
       return true;
     }
     if (this.facing(this.evacuation.panel)) return this.useControlPanel();
-    if (this.protocol.stage === 'escaping' && this.facing(this.evacuation.extraction)) return this.protocol.extract();
+    if (this.protocol.stage === 'escaping' && this.facing(this.evacuation.extraction)) {
+      // Nobody boards while the guardian stands; USE is still spent on the truck.
+      return this.guardian?.blocksExtraction ? true : this.protocol.extract();
+    }
     return false;
   }
 
@@ -294,27 +318,30 @@ export class ZombiesEvacuation {
     return stage * 1e7 + restored;
   }
 
-  private buildObjective(): string | null {
+  private buildObjective(): ObjectiveNote | null {
     const { rules } = this.evacuation;
     switch (this.protocol.stage) {
       case 'exploration': {
         if (!this.protocol.briefed) return null;
         const lines = this.evacuation.switches.map(({ lever, labelKey }) =>
           `${this.protocol.isSwitchThrown(lever.id) ? '✓' : '✗'} ${t(labelKey)}`);
-        return `${KICKER} · ${t('evacuation.objectiveRestore')}\n${lines.join('\n')}`;
+        return { kicker: KICKER, title: t('evacuation.objectiveRestore'), details: lines.join('\n') };
       }
       case 'ready':
-        return `${KICKER} · ${t('evacuation.objectiveInitiate', { cost: rules.cost })}`;
+        return { kicker: KICKER, title: t('evacuation.objectiveInitiate', { cost: rules.cost }), details: '' };
       case 'defending': {
         const progress = this.protocol.defenseProgress;
         const cells = Math.floor(progress * GAUGE_CELLS);
         const gauge = `${'▮'.repeat(cells)}${'▯'.repeat(GAUGE_CELLS - cells)}`;
         const status = this.protocol.defended ? t('evacuation.objectiveHold') : t('evacuation.objectivePaused');
-        return `${KICKER} · ${t('evacuation.surviveBanner')}\n${t('evacuation.objectiveDoor')} ${gauge} ${Math.floor(progress * 100)}% · ${clock(this.protocol.defenseRemaining)}\n${status}`;
+        const door = `${t('evacuation.objectiveDoor')} ${gauge} ${Math.floor(progress * 100)}% · ${clock(this.protocol.defenseRemaining)}`;
+        return { kicker: KICKER, title: t('evacuation.surviveBanner'), details: `${door}\n${status}` };
       }
       case 'escaping': {
+        // The clock is progress, not the task: in the details it never re-announces.
         const arrow = BEARING_ARROWS[this.extractionBearing];
-        return `${KICKER} · ${t('evacuation.objectiveEscape')} · ${clock(this.protocol.escapeRemaining)}\n${arrow} ${this.extractionMetres} m`;
+        const details = `${clock(this.protocol.escapeRemaining)} · ${arrow} ${this.extractionMetres} m`;
+        return { kicker: KICKER, title: t('evacuation.objectiveEscape'), details };
       }
       default:
         return null;

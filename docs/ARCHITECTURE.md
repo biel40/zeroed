@@ -17,6 +17,8 @@ main.ts -> PWA + DeviceProfile + AssetManager + selector de mapa
 ```
 
 El loop y la pausa pertenecen a `Game`; la pausa compartida depende de la autoridad del modo. Consulta el [comportamiento cooperativo](MULTIPLAYER.md#alcance-y-límites). `Game.dispose()` libera los servicios y vuelve al menu sin recargar.
+En cooperativo, `CoopWorld` recibe la camara de observacion para situar el audio
+y actualizar la visibilidad del mapa; observar al compañero no desplaza el rig local.
 El loop no arranca en el constructor: `Game.prepare()` compila todos los
 materiales (incluidos pools ocultos), sube sus texturas y dibuja un frame
 mientras `#map-loading` cubre la pantalla, para que la entrada al mapa no
@@ -32,6 +34,7 @@ sufra tirones de compilacion de shaders.
 | `src/modes/coop/` | Cooperativo: `CoopWorld` (mapa compartido), `CoopHostMode` (autoridad), `CoopGuestMode` (replica) |
 | `src/network/` + `server/` + `cloudflare/` | Protocolo validado, interpolacion, validacion de disparos y relays |
 | `src/rendering/RemotePlayer*` | Compañero como entidad de mundo: interpolacion y cuerpo animado |
+| `src/rendering/CoopSpectator.ts` | Camara cooperativa desde la vista interpolada del compañero, separada del rig local |
 | `src/config/zombieMaps.ts` | Registro de mapas: visibilidad, nombre, cooperativo y factoria de arena |
 | `src/zombies/maps/*` | Geometria, colliders, spawns e interacciones de cada mapa; `shared/` reune utilidades sin mapa |
 | `src/weapons/` + `src/config/` | Logica pura, definiciones y viewmodels |
@@ -108,7 +111,11 @@ sufra tirones de compilacion de shaders.
   (`src/zombies/evacuation/`), cobra con `PlayerEconomy`, suspende las rondas
   y termina la run por el final o la derrota existentes. El mapa solo presenta
   (`showStage`, `showDefense`) y avisa con `onTopologyChanged` al cambiar
-  spawns o abrir la compuerta.
+  spawns o abrir la compuerta. Su `guardian` opcional
+  (`ArenaEvacuationGuardian`: tipo, planta, suelo, campo con obstaculos,
+  salto y zona de activacion) lo ejecuta `ZombiesGuardian` sobre la logica
+  pura `CaptainUssrBrain` y la vista `CaptainUssrView`
+  (`src/zombies/guardians/`); el mapa solo declara su terreno.
   Los pickups con `codeLock` separan la validacion del codigo de la aplicacion
   de una apertura autorizada; cooperativo replica las aperturas y recogidas
   bajo autoridad del anfitrion, sin introducir dependencias de un mapa.

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { t, type TranslationKey } from '../i18n/i18n';
 import { actionKey } from '../ui/InteractionPrompts';
+import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 import { StartupCrystalView } from '../zombies/StartupCrystalView';
 import type { Zombie } from '../zombies/Zombie';
 import type { ArenaWeaponStation } from '../zombies/maps/ZombieArena';
@@ -10,6 +11,8 @@ import { bearingArrow } from './ObjectiveBearing';
 type RecoveryStage = 'inactive' | 'hunting' | 'dropped' | 'carrying' | 'installed' | 'complete';
 type Position = Readonly<{ x: number; y: number; z: number }>;
 const PICKUP_RANGE = 2;
+/** Kicker of the crystal note: the weapon station's (diegetic) name. */
+const KICKER = 'ФАКЕЛ-33';
 
 /** Run-local unlock for any station requesting a startup crystal; the normal horde supplies its carrier. */
 export class ZombiesCrystalRecovery {
@@ -19,6 +22,7 @@ export class ZombiesCrystalRecovery {
   private dropFloor = 0;
   private readonly view: StartupCrystalView;
   private readonly forward = new THREE.Vector3();
+  private readonly note: { kicker: string; title: string; details: string } = { kicker: KICKER, title: '', details: '' };
 
   constructor(private readonly ctx: ModeContext, readonly station: ArenaWeaponStation) {
     this.view = new StartupCrystalView(ctx.scene);
@@ -94,21 +98,27 @@ export class ZombiesCrystalRecovery {
     return t('crystal.locked');
   }
 
-  objective(): string | null {
+  /** The HUD note, rewritten in place every frame (bearing and distance). */
+  objective(): ObjectiveNote | null {
     if (this.stage === 'inactive' || this.stage === 'complete') return null;
+    const note = this.note;
+    note.details = '';
     if (this.stage === 'installed') {
-      return `ФАКЕЛ-33 · ${t('crystal.buy', { cost: this.station.price })}`;
+      note.title = t('crystal.buy', { cost: this.station.price });
+      return note;
     }
     const key: TranslationKey = this.stage === 'hunting' ? (this.carrier ? 'crystal.hunt' : 'crystal.wait')
       : this.stage === 'dropped' ? 'crystal.collect' : 'crystal.return';
+    note.title = t(key);
     const target = this.targetPosition();
-    if (!target) return `ФАКЕЛ-33 · ${t(key)}`;
+    if (!target) return note;
     const player = this.ctx.player;
     const dx = target.x - player.rig.position.x;
     const dz = target.z - player.rig.position.z;
     player.camera.getWorldDirection(this.forward);
     const arrow = bearingArrow(this.forward.x, this.forward.z, dx, dz);
-    return `ФАКЕЛ-33 · ${t(key)}\n${arrow} ${Math.ceil(Math.hypot(dx, dz))} m`;
+    note.details = `${arrow} ${Math.ceil(Math.hypot(dx, dz))} m`;
+    return note;
   }
 
   reset(): void {

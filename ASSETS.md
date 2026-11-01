@@ -144,7 +144,8 @@ procedural de reserva.
   sustituidos se separan de la escena y se reutilizan al volver a equiparlos.
 - **Clips** (por nombre, sin distinguir mayúsculas): obligatorios `Idle` y
   `Walk`, `CrouchIdle`, `CrouchWalk`, `ProneIdle` y `ProneCrawl`; opcionales
-  `Run`, `Aim`, `Fire`/`Shoot`, `Reload`, `Death`. `Aim`, `Fire` y `Reload`
+  `Run`, `Aim`, `Fire`/`Shoot`, `Reload`. `ProneIdle` tambien representa
+  abatidos y cadaveres; el render no consume `Death`. `Aim`, `Fire` y `Reload`
   se filtran a huesos de torso/brazos y se aplican como capas aditivas sobre
   la postura y locomocion. Un modelo sin clips de postura usa el cuerpo de reserva.
 - **Coste**: ~6k triángulos, 59 meshes, 16 materiales y ~314 KiB.

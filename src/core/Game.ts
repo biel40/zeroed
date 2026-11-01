@@ -790,7 +790,7 @@ export class Game {
     // (networked) match never halts here; the menu only gates local input.
     if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
       this.input.suppressGamepad();
-      this.renderer.render(this.scene, this.player.camera);
+      this.renderer.render(this.scene, this.mode.getCinematicCamera?.() ?? this.player.camera);
       this.input.endFrame();
       this.dynamicResolution.resetWindow();
       return;

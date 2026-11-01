@@ -60,12 +60,12 @@ describe('Double Tap ring', () => {
     expect(internals.economy.points).toBe(0);
     expect(side.ctx.handRings.beginDonning).toHaveBeenCalledWith('index');
     expect(side.ctx.handRings.show).toHaveBeenLastCalledWith('index', 'charged', 0xffd43b);
-    expect(side.weapon.fireRateScale).toBe(2);
-    expect(internals.rings.damageScale).toBe(1.2);
+    expect(side.weapon.fireRateScale).toBe(1.25);
+    expect(internals.rings.damageScale).toBe(1.1);
     expect(mode.getInteractPrompt()).toBeNull();
     internals.rings.grant('doubleTap');
-    expect(side.weapon.fireRateScale).toBe(2);
-    expect(internals.rings.damageScale).toBe(1.2);
+    expect(side.weapon.fireRateScale).toBe(1.25);
+    expect(internals.rings.damageScale).toBe(1.1);
     internals.rings.updateJingle(true);
     expect(vi.mocked(side.ctx.audio.setRingJingle).mock.lastCall?.[3]).toBe(DOUBLE_TAP.jingle);
     mode.onRestartRequested();
@@ -85,13 +85,13 @@ describe('Double Tap ring', () => {
       const weapon = new Weapon(WEAPON_DEFINITIONS[id]);
       const base = weapon.definition.damage;
       run.mode.onTargetHit({} as HitTarget, 5, POINT, POINT, object, weapon);
-      expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', base * 1.2, id);
+      expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', base * 1.1, id);
       expect(weapon.definition.damage).toBe(base);
     }
     for (const key of 'MOTDRULES') run.mode.onKeyInput(key);
     run.mode.executeDeveloperCommand('damage 3');
     run.mode.onTargetHit({} as HitTarget, 5, POINT, POINT, object, run.side.weapon);
-    expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', WEAPON_DEFINITIONS.m1911.damage * (3 * 1.2), 'm1911');
+    expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', WEAPON_DEFINITIONS.m1911.damage * (3 * 1.1), 'm1911');
   });
 
   it('boosts Tesla chains and both Ray Gun direct and splash damage', () => {
@@ -104,26 +104,27 @@ describe('Double Tap ring', () => {
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     run.internals.onEnergyImpact(POINT, WEAPON_DEFINITIONS.tesla.energy!, object, 5);
-    expect(chain).toHaveBeenLastCalledWith(zombie, CHAIN_ZAP_DAMAGE * 1.2, 'torso');
+    expect(chain).toHaveBeenLastCalledWith(zombie, CHAIN_ZAP_DAMAGE * 1.1, 'torso');
     const raygun = WEAPON_DEFINITIONS.raygun;
     run.internals.onEnergyImpact(POINT, raygun.energy!, object, 5);
-    expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', raygun.damage * 1.2, 'raygun');
-    expect(splash).toHaveBeenLastCalledWith(POINT, raygun.energy!.splashRadius, raygun.energy!.splashDamage * 1.2);
+    expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', raygun.damage * 1.1, 'raygun');
+    expect(splash).toHaveBeenLastCalledWith(POINT, raygun.energy!.splashRadius, raygun.energy!.splashDamage * 1.1);
   });
 });
 
 describe('Weapon fire rate scale', () => {
-  it.each([30, 60, 120])('doubles automatic fire at %s fps, even when multiple rounds fall in one frame', (fps) => {
+  it.each([30, 60, 120])('scales automatic fire at %s fps, even when multiple rounds fall in one frame', (fps) => {
     const countShots = (scale: number): number => {
       const weapon = new Weapon(WEAPON_DEFINITIONS.vector);
       weapon.fireRateScale = scale;
       weapon.update(0, INPUT);
       weapon.clearEvents();
-      for (let frame = 1; frame <= fps / 2; frame++) weapon.update(1 / fps, INPUT);
+      for (let frame = 1; frame <= fps * 0.4; frame++) weapon.update(1 / fps, INPUT);
       return weapon.pendingEvents.filter((event) => event.type === 'shot').length;
     };
-    expect(countShots(1)).toBe(10);
-    expect(countShots(2)).toBe(20);
+    expect(countShots(1)).toBe(8);
+    expect(countShots(1.25)).toBe(10);
+    expect(countShots(2)).toBe(16);
   });
 
   it('never banks automatic shots during idle, reload or an overheated lockout', () => {

@@ -31,12 +31,12 @@ describe('KnifeCombat', () => {
     }
   });
 
-  it.each([0, 40])('limits contact to 2 m at %i degrees, including guest claims', (angle) => {
+  it.each([0, 40])('limits contact to 1.8 m at %i degrees, including guest claims', (angle) => {
     const combat = new KnifeCombat();
-    expect(KNIFE_RANGE).toBe(2);
+    expect(KNIFE_RANGE).toBe(1.8);
     const yaw = THREE.MathUtils.degToRad(angle);
-    const reachable = body(Math.sin(yaw) * 2.2, -Math.cos(yaw) * 2.2);
-    const outOfReach = body(Math.sin(yaw) * 2.3, -Math.cos(yaw) * 2.3);
+    const reachable = body(Math.sin(yaw) * 2, -Math.cos(yaw) * 2);
+    const outOfReach = body(Math.sin(yaw) * 2.1, -Math.cos(yaw) * 2.1);
     for (const claimed of [false, true]) {
       expect(combat.findImpact(ORIGIN, FORWARD, 0, [reachable], claimed ? reachable.userData.zombie : undefined)?.object)
         .toBe(reachable);

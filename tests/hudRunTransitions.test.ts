@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HUD } from '../src/ui/HUD';
 
 class HudElement {
@@ -17,7 +17,7 @@ class HudElement {
   };
 }
 
-function hudHarness(): { hud: HUD; element: (name: string) => HudElement } {
+function hudHarness(): { hud: HUD; element: (name: string) => HudElement; objectives: { update: ReturnType<typeof vi.fn> } } {
   const nodes = new Map<string, HudElement>();
   const element = (name: string): HudElement => {
     let node = nodes.get(name);
@@ -25,16 +25,18 @@ function hudHarness(): { hud: HUD; element: (name: string) => HudElement } {
     return node;
   };
   const hud = Object.create(HUD.prototype) as HUD;
-  for (const name of ['root', 'roundBanner', 'bannerTitle', 'bannerSub', 'ringFlash', 'protectionOverlay', 'damageOverlay', 'zPoints']) {
+  for (const name of ['root', 'roundBanner', 'bannerTitle', 'bannerSub', 'ringFlash', 'protectionOverlay', 'damageOverlay', 'zPoints', 'bossBar']) {
     Object.assign(hud, { [name]: element(name) });
   }
-  Object.assign(hud, { lastProtection: 0 });
-  return { hud, element };
+  const objectives = { update: vi.fn() };
+  // A boss bar was up when the run ended.
+  Object.assign(hud, { lastProtection: 0, objectives, pointsPopups: { reset: vi.fn() }, lastBossBar: 'CAPTAIN USSR|0.6,0.3' });
+  return { hud, element, objectives };
 }
 
 describe('HUD between runs', () => {
   it.each(['recharged', 'activated'])('does not replay a ring %s announcement or flash when another map starts', (event) => {
-    const { hud, element } = hudHarness();
+    const { hud, element, objectives } = hudHarness();
     hud.setHudVisible(true);
     hud.showRoundBanner('RESURRECTION', event);
     if (event === 'activated') {
@@ -52,6 +54,8 @@ describe('HUD between runs', () => {
       expect(element(name).classList.contains('active')).toBe(false);
     }
     expect(element('zPoints').classList.contains('denied')).toBe(false);
+    expect(objectives.update).toHaveBeenLastCalledWith(null, false);
+    expect(element('bossBar').classList.contains('hidden')).toBe(true);
     expect(element('bannerTitle').textContent).toBe('');
     expect(element('bannerSub').textContent).toBe('');
     expect(element('protectionOverlay').style.opacity).toBe('0');

@@ -5,7 +5,7 @@ import { ZOMBIES_WEAPON_PRELOAD } from '../src/config/weapons';
 
 const IDLE: RemoteAvatarMotion = {
   speed: 0, forwardSpeed: 0, pitch: 0, aiming: false, reloading: false,
-  alive: true, life: 'alive', reviving: false,
+  life: 'alive', reviving: false,
 };
 
 describe('procedural co-op soldier', () => {
@@ -50,6 +50,21 @@ describe('procedural co-op soldier', () => {
     expect(pistol).toBeDefined();
     expect(hand.getWorldPosition(new THREE.Vector3()).distanceTo(pistol.getWorldPosition(new THREE.Vector3()))).toBeLessThan(0.12);
     expect(slide.getWorldPosition(new THREE.Vector3()).z).toBeLessThan(pistol.getWorldPosition(new THREE.Vector3()).z);
+    avatar.dispose();
+  });
+
+  it('keeps the corpse on the floor after bleeding out and restores standing on respawn', () => {
+    const avatar = createRemoteAvatar(null, false);
+    const bounds = (): THREE.Box3 => new THREE.Box3().setFromObject(avatar.group);
+    avatar.update(1, IDLE);
+    const standingY = bounds().max.y;
+    for (let i = 0; i < 120; i++) avatar.update(1 / 60, { ...IDLE, life: 'downed' });
+    for (let i = 0; i < 120; i++) avatar.update(1 / 60, { ...IDLE, life: 'dead' });
+    expect(bounds().min.y).toBeGreaterThan(-0.1);
+    expect(bounds().min.y).toBeLessThan(0.15);
+    expect(bounds().max.y).toBeLessThan(0.8);
+    for (let i = 0; i < 120; i++) avatar.update(1 / 60, IDLE);
+    expect(bounds().max.y).toBeCloseTo(standingY, 2);
     avatar.dispose();
   });
 

@@ -1,18 +1,21 @@
 import * as THREE from 'three';
 import type { EvacuationStage } from '../../evacuation/EvacuationProtocol';
+import type { GroundRect } from '../../guardians/CaptainUssrBrain';
 import type { MapPower } from '../shared/MapPower';
 import { PowerLever } from '../shared/PowerLever';
 import {
   PROTOCOL33_BLAST_DOOR,
   PROTOCOL33_ENDING,
+  PROTOCOL33_GUARDIAN,
   PROTOCOL33_PANEL,
+  PROTOCOL33_SURFACE,
   PROTOCOL33_RULES,
   PROTOCOL33_SURFACE_Y,
   PROTOCOL33_SWITCHES,
   PROTOCOL33_TRUCK,
   type Protocol33Switch,
 } from '../Station33Config';
-import type { ArenaEvacuation, ArenaEvacuationSwitch, ArenaUsePoint } from '../ZombieArena';
+import type { ArenaEvacuation, ArenaEvacuationGuardian, ArenaEvacuationSwitch, ArenaUsePoint } from '../ZombieArena';
 import { BlastDoor } from './BlastDoor';
 import { Protocol33Panel } from './Protocol33Panel';
 import type { Station33BuildContext } from './Station33BuildContext';
@@ -39,7 +42,7 @@ interface AuxiliarySystem {
  * Station 33's evacuation (Protocol 33), as the map presents it: the two
  * auxiliary switches (the shared knife switch, each with a status lamp and
  * the ventilation's wall fan), the control panel, the blast door and the
- * alarm. `ZombiesMode` runs the protocol through `ArenaEvacuation`; the
+ * alarm, and CAPITÁN URSS guarding the yard. `ZombiesMode` runs the protocol through `ArenaEvacuation`; the
  * arena reads `hordeConverging` and `blastDoorCollider` for its layout and
  * hears through `onLayoutChanged` when either changes.
  */
@@ -62,6 +65,7 @@ export class Protocol33 implements ArenaEvacuation {
     lookDotMin: 0.35,
   };
 
+  public readonly guardian: ArenaEvacuationGuardian;
   public readonly exitPosition = { x: PROTOCOL33_BLAST_DOOR.x, y: 1.2, z: PROTOCOL33_BLAST_DOOR.z };
   public readonly switches: ReadonlyArray<ArenaEvacuationSwitch>;
   private readonly systems: ReadonlyArray<AuxiliarySystem>;
@@ -79,8 +83,11 @@ export class Protocol33 implements ArenaEvacuation {
     context: Station33BuildContext,
     private readonly lighting: Station33Lighting,
     private readonly power: MapPower,
+    /** Footprints of the yard's solids, which the guardian walks around. */
+    yardSolids: ReadonlyArray<GroundRect>,
     private readonly onLayoutChanged: () => void,
   ) {
+    this.guardian = protocol33Guardian(yardSolids);
     this.systems = PROTOCOL33_SWITCHES.map((config, index) => ({
       lever: new PowerLever(context, config, station33PowerLeverLook(context, config.plate), () => { this.panelState.restored[index] = true; }),
       lamp: buildStatusLamp(context, config),
@@ -193,4 +200,18 @@ function buildFan(context: Station33BuildContext, config: Protocol33Switch): THR
   if (context.profile.useReducedEffects) mount.traverse((object) => { object.castShadow = false; });
   group.add(mount);
   return rotor;
+}
+
+/** CAPITÁN URSS on the yard: its whole floor, its solids, awakened a few steps out of the stairhead. */
+function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>): ArenaEvacuationGuardian {
+  const { yard } = PROTOCOL33_SURFACE;
+  const { landing, leapFrom, awakenDepth } = PROTOCOL33_GUARDIAN;
+  return {
+    kind: 'captain-ussr',
+    floor: 1,
+    groundY: PROTOCOL33_SURFACE_Y,
+    field: { bounds: yard, obstacles: yardSolids, landing },
+    leapFrom,
+    trigger: { minX: yard.minX, maxX: yard.maxX, minZ: yard.minZ, maxZ: yard.maxZ - awakenDepth },
+  };
 }

@@ -115,6 +115,6 @@ export const RING_DEFINITIONS: Readonly<Record<RingId, RingDefinition>> = {
     chargesPerPurchase: 1,
     glowColor: 0xffd43b,
     jingle: 'doubleTime',
-    effect: { kind: 'firePower', fireRateScale: 2, damageScale: 1.2 },
+    effect: { kind: 'firePower', fireRateScale: 1.25, damageScale: 1.1 },
   },
 };

@@ -6,7 +6,7 @@ import { RIGHT_SHOULDER } from './ViewArms';
 import type { MeleeArmDriver } from './ViewArms';
 
 export const KNIFE_ATTACK_DURATION = 0.72;
-export const KNIFE_RANGE = 2;
+export const KNIFE_RANGE = 1.8;
 
 export function knifeDamageForRound(maxHp: number, round: number): number {
   return maxHp / Math.max(1, round);

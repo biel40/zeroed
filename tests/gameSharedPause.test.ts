@@ -129,6 +129,16 @@ describe('local pause vs shared simulation', () => {
     expect(game.renderer.render).toHaveBeenCalledOnce();
   });
 
+  it('keeps the spectator camera when the host pauses the shared simulation', () => {
+    const { game } = stubGame(true, false);
+    const spectator = new THREE.PerspectiveCamera();
+    game.mode.isSimulationPaused = () => true;
+    game.mode.getCinematicCamera = () => spectator;
+    prototype.frame.call(game);
+    expect(game.renderer.render).toHaveBeenLastCalledWith(game.scene, spectator);
+    expect(game.mode.update).not.toHaveBeenCalled();
+  });
+
   it('restores local input once the shared-match menu closes', () => {
     const { game, weapon } = stubGame(true, false);
     prototype.frame.call(game);

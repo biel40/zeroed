@@ -75,6 +75,8 @@ describe('Zombies map selection flow', () => {
     }
     expect(html.match(/data-map=/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
     expect(html).not.toContain('data-mode=');
+    expect(html).not.toContain('map-select-kicker');
+    expect(html).not.toContain('menu.chooseMap');
     expect(html).toContain('data-i18n="menu.zombies"');
     // Each card carries its own tagline and the chips HUD fills from the registry.
     expect(html.match(/data-i18n="map.[a-zA-Z0-9]+.tagline"/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);

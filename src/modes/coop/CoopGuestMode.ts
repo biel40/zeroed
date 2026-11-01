@@ -12,6 +12,7 @@ import {
   type MatchState,
 } from '../../network/Protocol';
 import { RemotePlayer } from '../../rendering/RemotePlayer';
+import { CoopSpectator } from '../../rendering/CoopSpectator';
 import { ReviveGesture } from '../../rendering/ReviveGesture';
 import { createRemoteAvatar } from '../../rendering/RemotePlayerAvatar';
 import type { HitTarget } from '../../shooting/HitTarget';
@@ -63,6 +64,7 @@ export class CoopGuestMode implements GameMode {
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
   private hostAvatar!: RemotePlayer;
+  private readonly spectator = new CoopSpectator();
   private gesture!: ReviveGesture;
   private readonly box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
   private boxView!: MysteryBoxView;
@@ -89,7 +91,7 @@ export class CoopGuestMode implements GameMode {
 
   public init(ctx: ModeContext): void {
     this.ctx = ctx;
-    this.world = new CoopWorld(ctx);
+    this.world = new CoopWorld(ctx, () => this.getCinematicCamera());
     this.boxView = new MysteryBoxView(ctx.assets, this.world.arena.mysteryBoxPlacement.position, MYSTERY_BOX_POOL, WEAPON_DEFINITIONS);
     this.boxView.group.rotation.y = this.world.arena.mysteryBoxPlacement.yaw;
     ctx.scene.add(this.boxView.group);
@@ -142,12 +144,15 @@ export class CoopGuestMode implements GameMode {
     this.knife.setEnabled(this.knife.isAttacking);
     this.knife.update(dt, false, this.ctx.player.speed01);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
-    this.world.update(dt);
     this.boxView.update(dt, this.box);
     this.replica.update(dt, this.world.arena.barriers);
     this.energy.update(dt);
     this.chain.update(dt);
     this.hostAvatar.update(dt);
+    this.spectator.update(this.hostAvatar,
+      !this.hostLost && this.match?.phase === 'playing' && this.match.stats.guest.life === 'dead',
+      this.match?.stats.host.life ?? 'alive');
+    this.world.update(dt);
     const own = this.match?.stats.guest;
     const host = this.match?.stats.host;
     this.gesture.update(dt, host?.reviver === 'guest' ? 'reviver'
@@ -216,6 +221,11 @@ export class CoopGuestMode implements GameMode {
     return this.revivePending === 0 && this.match?.stats.host.reviver !== 'guest';
   }
   public isDownedLookEnabled(): boolean { return this.match?.stats.guest.life === 'downed'; }
+
+  public getCinematicCamera(): THREE.Camera | null {
+    return !this.hostLost && this.match?.phase === 'playing' && this.match.stats.guest.life === 'dead'
+      && this.match.stats.host.life !== 'dead' ? this.spectator.getCamera(this.ctx.player.camera) : null;
+  }
 
   public onInteract(): void {
     if (!this.isGameplayInputEnabled()) return;
@@ -453,14 +463,24 @@ export class CoopGuestMode implements GameMode {
   private applyMatchState(state: MatchState): void {
     const previousBox = this.box.snapshot();
     const previousPhase = this.match?.phase;
+    const respawned = this.match?.stats.guest.life === 'dead'
+      && state.stats.guest.life === 'alive' && state.phase === 'playing';
+    const hostRespawned = this.match?.stats.host.life === 'dead'
+      && state.stats.host.life === 'alive' && state.phase === 'playing';
     // The first snapshot (join or restart) is a baseline, not a stream of new strikes.
     const firstSnapshot = this.match === null;
     this.match = state;
+    if (respawned) {
+      this.world.placeLocalPlayer('guest');
+      this.ctx.resetArsenal();
+      this.send({ type: 'playerState', state: this.world.localPlayerState() });
+    }
     for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(state.stats.guest.kills);
     this.ctx.hud.setHostPauseVisible(state.hostPaused);
     if (state.stats.host.reviver === 'guest') this.revivePending = 0;
     this.initialMatchWait = 0;
     this.round = state.round;
+    if (hostRespawned) this.hostAvatar.clear();
     this.hostAvatar.push(state.host);
     this.hostAvatar.setLife(state.stats.host.life, state.stats.host.reviver !== null);
     this.replica.applyStates(state.t, state.zombies);
@@ -610,5 +630,6 @@ export class CoopGuestMode implements GameMode {
     this.ctx.hud.setDownedState(guest?.life ?? 'alive', guest?.bleedRemaining ?? 0,
       this.match?.stats.host.reviver === 'guest' ? this.match.stats.host.reviveProgress : 0);
     this.ctx.player.setDownedCamera(guest?.life === 'downed');
+    this.ctx.hud.setSpectatorVisible(this.getCinematicCamera() !== null);
   }
 }

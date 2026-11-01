@@ -7,6 +7,9 @@ import type { Weapon } from '../weapons/Weapon';
 import { BetaThanksScreen } from './BetaThanksScreen';
 import { BetaUnlockDialog } from './BetaUnlockDialog';
 import { LanguagePicker } from './LanguagePicker';
+import type { ObjectiveNote } from './ObjectiveAnnouncer';
+import { ObjectiveTracker } from './ObjectiveTracker';
+import { PointsPopups } from './PointsPopups';
 import { bindInteractionPromptVisibility, renderInteractionPrompt } from './InteractionPromptView';
 import { SettingsPanel } from './SettingsPanel';
 import { getControllerFamily, getInputDevice, onInputDeviceChange } from '../player/InputPresentation';
@@ -33,6 +36,13 @@ export interface GameOverStats {
   readonly headshots: number;
 }
 
+/** A boss fight's bar: the boss's name, its health (0..1) and the health ratios where its phases change. */
+export interface BossBarState {
+  readonly name: string;
+  readonly health: number;
+  readonly marks: readonly number[];
+}
+
 /** The run's record an ending can show next to its final round. */
 export type EndingRecord = Pick<GameOverStats, 'kills' | 'headshots'>;
 
@@ -50,6 +60,8 @@ const ENDING_DETONATION_TIME: Record<EndingPresentationId, number> = {
 export type IntroPresentationId = 'station33';
 
 const MAP_LOADING_FADE_MS = 450;
+/** Length of `#round-banner.active` in style.css. */
+const ROUND_BANNER_MS = 3800;
 const MAP_LOADING_MIN_MS = 700;
 /** Matches the #start-screen opacity transition in style.css. */
 const START_SCREEN_FADE_MS = 450;
@@ -79,6 +91,7 @@ export class HUD {
   private readonly zombiesPanel: HTMLElement = mustGet('hud-zombies');
   private readonly zRound: HTMLElement = mustGet('z-round');
   private readonly zPoints: HTMLElement = mustGet('z-points');
+  private readonly pointsPopups = new PointsPopups(mustGet('z-points-popups'), this.zPoints);
   private readonly zHpFill: HTMLElement = mustGet('z-hp-fill');
   private readonly zKills: HTMLElement = mustGet('z-kills');
   private readonly zHeadshots: HTMLElement = mustGet('z-headshots');
@@ -102,6 +115,7 @@ export class HUD {
   private readonly deathFilter: HTMLElement = mustGet('death-filter');
   private readonly downedStatus: HTMLElement = mustGet('downed-status');
   private readonly downedCountdown: HTMLElement = mustGet('downed-countdown');
+  private readonly spectatorStatus: HTMLElement = mustGet('spectator-status');
   private readonly reviveStatus: HTMLElement = mustGet('revive-status');
   private readonly reviveProgress: HTMLElement = mustGet('revive-progress');
   private readonly hostPauseStatus: HTMLElement = mustGet('host-pause-status');
@@ -110,6 +124,12 @@ export class HUD {
   private readonly endingKills: HTMLElement = mustGet('ending-kills');
   private readonly endingHeadshots: HTMLElement = mustGet('ending-headshots');
   private readonly introScreen: HTMLElement = mustGet('intro-screen');
+  private readonly bossBar: HTMLElement = mustGet('boss-bar');
+  private readonly bossBarFill: HTMLElement = mustGet('boss-bar-fill');
+  private readonly bossBarTrail: HTMLElement = mustGet('boss-bar-trail');
+  /** Name and marks the boss bar shows; '' while it is hidden. */
+  private lastBossBar = '';
+  private lastBossHealth = -1;
 
   private lastWeapon: string = '';
   private lastAmmo: string = '';
@@ -128,6 +148,14 @@ export class HUD {
   private readonly settings: SettingsPanel;
   private readonly betaThanks = new BetaThanksScreen(mustGet('beta-thanks') as HTMLDialogElement,
     mustGet('beta-thanks-email'), mustGet('beta-thanks-close'));
+  /** When the current round banner started; its `bannerfade` lasts ROUND_BANNER_MS. */
+  private roundBannerShownAt = Number.NEGATIVE_INFINITY;
+  private readonly objectives = new ObjectiveTracker(mustGet('hud-objective'), {
+    root: mustGet('objective-spotlight'),
+    kicker: mustGet('objective-spotlight-kicker'),
+    title: mustGet('objective-spotlight-title'),
+    details: mustGet('objective-spotlight-details'),
+  }, () => Math.max(0, ROUND_BANNER_MS - (performance.now() - this.roundBannerShownAt)));
   private readonly betaUnlock = new BetaUnlockDialog(mustGet('beta-unlock') as HTMLDialogElement,
     mustGet('beta-access-form') as HTMLFormElement, mustGet('beta-email') as HTMLInputElement,
     mustGet('beta-message'), mustGet('beta-unlock-map'), mustGet('beta-unlock-cancel'));
@@ -215,25 +243,58 @@ export class HUD {
     // display:none would replay the old ring flash/banner in the next run.
     if (!visible) {
       this.roundBanner.classList.remove('active');
+      this.roundBannerShownAt = Number.NEGATIVE_INFINITY;
       this.bannerTitle.textContent = '';
       this.bannerSub.textContent = '';
       this.ringFlash.classList.remove('active');
       this.damageOverlay.classList.remove('active');
       this.zPoints.classList.remove('denied');
+      this.pointsPopups.reset();
+      this.setObjective(null);
+      this.setBossBar(null);
       this.setProtection(0);
     }
     this.root.classList.toggle('hidden', !visible);
   }
 
   /**
-   * Persistent current objective; kept separate from temporary round
-   * announcements and USE prompts. An `urgent` one (a timed event) stands out.
+   * Persistent current objectives, every frame; kept separate from temporary
+   * round announcements and USE prompts. A new one is spotlighted before it
+   * docks in the corner; an `urgent` one (a timed event) stands out.
    */
-  public setObjective(text: string | null, urgent = false): void {
-    const element = mustGet('hud-objective');
-    if (element.textContent !== (text ?? '')) element.textContent = text ?? '';
-    element.classList.toggle('hidden', text === null);
-    element.classList.toggle('urgent', urgent && text !== null);
+  public setObjective(notes: readonly ObjectiveNote[] | null, urgent = false): void {
+    this.objectives.update(notes, urgent);
+  }
+
+  /**
+   * The boss fight's bar, every frame while it lasts; null hides it. The DOM
+   * is only touched when the name, the marks or the health change.
+   */
+  public setBossBar(bar: BossBarState | null): void {
+    if (!bar) {
+      if (this.lastBossBar === '') return;
+      this.lastBossBar = '';
+      this.lastBossHealth = -1;
+      this.bossBar.classList.add('hidden');
+      return;
+    }
+    const key = `${bar.name}|${bar.marks.join(',')}`;
+    if (key !== this.lastBossBar) {
+      this.lastBossBar = key;
+      mustGet('boss-bar-name').textContent = bar.name;
+      mustGet('boss-bar-marks').innerHTML = bar.marks.map((mark) => `<i style="left:${clamp(mark, 0, 1) * 100}%"></i>`).join('');
+      this.bossBar.classList.remove('hidden');
+    }
+    const health = clamp(bar.health, 0, 1);
+    if (health === this.lastBossHealth) return;
+    this.lastBossHealth = health;
+    this.bossBarFill.style.width = `${health * 100}%`;
+    this.bossBarTrail.style.width = `${health * 100}%`;
+  }
+
+  /** A new run: clears the notes and announces every objective again. */
+  public resetObjectives(): void {
+    this.objectives.reset();
   }
 
   public showStartScreen(paused: boolean): void {
@@ -469,7 +530,13 @@ export class HUD {
   public clearCoopPresentation(): void {
     document.documentElement.classList.remove('coop-mode', 'coop-guest');
     this.setDownedState('alive', 0, 0);
+    this.setSpectatorVisible(false);
     this.setHostPauseVisible(false);
+  }
+
+  public setSpectatorVisible(visible: boolean): void {
+    this.root.classList.toggle('spectating', visible);
+    this.spectatorStatus.classList.toggle('hidden', !visible);
   }
 
   public setHostPauseVisible(visible: boolean): void {
@@ -487,7 +554,8 @@ export class HUD {
 
   public setZombiesPanelVisible(visible: boolean): void {
     this.zombiesPanel.classList.toggle('hidden', !visible);
-    this.setObjective(null);
+    this.pointsPopups.reset();
+    this.resetObjectives();
   }
 
   /** Zombies panel; the whole block only re-renders when something changed. */
@@ -503,6 +571,7 @@ export class HUD {
       mustGet('pause-round').textContent = `${state.round}`;
     }
     this.zPoints.textContent = formatNumber(state.points);
+    this.pointsPopups.update(state.points);
     mustGet('z-hp').textContent = `${Math.ceil(state.hp)} / ${state.maxHp}`;
     const ratio = state.maxHp > 0 ? clamp(state.hp / state.maxHp, 0, 1) : 0;
     this.zHpFill.style.width = `${ratio * 100}%`;
@@ -586,6 +655,7 @@ export class HUD {
     // Force reflow so the animation restarts on back-to-back rounds.
     void this.roundBanner.offsetWidth;
     this.roundBanner.classList.add('active');
+    this.roundBannerShownAt = performance.now();
   }
 
   /** Brief red vignette when the player takes a hit. */

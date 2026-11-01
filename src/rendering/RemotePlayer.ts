@@ -3,6 +3,7 @@ import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../n
 import type { PlayerNetState } from '../network/Protocol';
 import type { PlayerLifeState } from '../network/Protocol';
 import { EYE_HEIGHT } from '../player/PlayerController';
+import { stanceEyeOffset } from '../player/PlayerStance';
 import type { RemoteAvatar, RemoteAvatarMotion } from './RemotePlayerAvatar';
 
 /** Slightly more than two 20 Hz player ticks. */
@@ -23,12 +24,14 @@ export class RemotePlayer {
   private readonly clock = new RemoteClock(INTERPOLATION_DELAY);
   private readonly bracket: SampleBracket<PlayerNetState> = { from: null, to: null, alpha: 0 };
   private readonly motion: RemoteAvatarMotion = {
-    speed: 0, forwardSpeed: 0, pitch: 0, aiming: false, reloading: false, alive: true,
+    speed: 0, forwardSpeed: 0, pitch: 0, aiming: false, reloading: false,
     life: 'alive', reviving: false, stance: 'standing',
   };
   private hasPosition = false;
   private lastX = 0;
   private lastZ = 0;
+  private eyeOffsetY = 0;
+  private viewHidden = false;
 
   public constructor(private readonly avatar: RemoteAvatar) {
     this.root.add(avatar.group);
@@ -40,19 +43,29 @@ export class RemotePlayer {
     return this.samples.latest;
   }
 
+  /** The same buffered view used by the teammate body, for its spectator camera. */
+  public get viewPitch(): number { return this.motion.pitch; }
+
+  public get viewEyeOffsetY(): number { return this.eyeOffsetY; }
+
+  /** Retains the spectator's visibility choice when network packets arrive between frames. */
+  public setViewHidden(hidden: boolean): void {
+    this.viewHidden = hidden;
+    this.root.visible = this.latest !== null && !hidden;
+  }
+
   public push(state: PlayerNetState): void {
     this.clock.observe(state.t);
     if (this.samples.push(state)) {
       // A weapon switch is discrete state: show the newest accepted ID now,
       // while position and facing continue to use buffered interpolation.
       this.avatar.setWeapon(state.weapon);
-      this.root.visible = true;
+      this.root.visible = !this.viewHidden;
     }
   }
 
   public setLife(life: PlayerLifeState, reviving: boolean): void {
     this.motion.life = life;
-    this.motion.alive = life !== 'dead';
     this.motion.reviving = reviving;
   }
 
@@ -84,6 +97,9 @@ export class RemotePlayer {
     // Gameplay forward at yaw is (-sin, -cos): the camera looks down -Z.
     this.motion.forwardSpeed += (-vx * Math.sin(yaw) - vz * Math.cos(yaw) - this.motion.forwardSpeed) * blend;
     this.motion.pitch = from.pitch + (to.pitch - from.pitch) * alpha;
+    const fromEye = from.eyeOffsetY ?? stanceEyeOffset(from.stance);
+    const toEye = to.eyeOffsetY ?? stanceEyeOffset(to.stance);
+    this.eyeOffsetY = fromEye + (toEye - fromEye) * alpha;
     this.motion.aiming = to.ads;
     this.motion.reloading = to.reloading;
     this.motion.stance = to.stance ?? 'standing';
@@ -97,10 +113,12 @@ export class RemotePlayer {
     this.hasPosition = false;
     this.motion.speed = 0;
     this.motion.forwardSpeed = 0;
-    this.motion.alive = true;
     this.motion.life = 'alive';
     this.motion.reviving = false;
     this.motion.stance = 'standing';
+    this.motion.pitch = 0;
+    this.eyeOffsetY = 0;
+    this.viewHidden = false;
     this.avatar.setWeapon(null);
     this.root.visible = false;
   }

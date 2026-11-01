@@ -4,11 +4,14 @@ import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import type { PlayerHealth } from '../src/game/PlayerHealth';
 import { t } from '../src/i18n/i18n';
 import { actionKey } from '../src/ui/InteractionPrompts';
+import type { ObjectiveNote } from '../src/ui/ObjectiveAnnouncer';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
 import type { Input } from '../src/player/Input';
 import type { Weapon } from '../src/weapons/Weapon';
 import { roundConfig } from '../src/zombies/ZombieConfig';
+import { CAPTAIN_USSR, type CaptainUssrBrain } from '../src/zombies/guardians/CaptainUssrBrain';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { RoundManager } from '../src/zombies/RoundManager';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
@@ -87,6 +90,13 @@ function stand(side: TestContext, x: number, z: number, yaw: number, floor = 0):
   side.player.rig.updateMatrixWorld(true);
 }
 
+/** The objective corner as the player reads it, after checking its urgency. */
+function objectiveText(run: Run, urgent: boolean): string {
+  const [notes, lastUrgent] = run.side.hud.setObjective.mock.lastCall as [readonly ObjectiveNote[], boolean];
+  expect(lastUrgent).toBe(urgent);
+  return notes.map(({ kicker, title, details }) => `${kicker}\n${title}\n${details}`).join('\n\n');
+}
+
 function advance(run: Run, seconds: number): void {
   for (let step = 0; step < Math.round(seconds / STEP); step++) run.mode.update(STEP);
 }
@@ -108,6 +118,33 @@ function readyRun(): Run {
   atPanel(run);
   run.mode.update(STEP);
   return run;
+}
+
+interface GuardianInternals {
+  readonly brain: CaptainUssrBrain;
+  readonly view: { readonly hitboxes: readonly THREE.Mesh[] };
+}
+
+const guardianOf = (run: Run): GuardianInternals => (run.internals.evacuation as { guardian: GuardianInternals }).guardian;
+
+/** Out of the stairhead into the yard (invincible): CAPITÁN URSS leaps in and lands. */
+function confrontGuardian(run: Run): GuardianInternals {
+  run.internals.health.setInvincible(true);
+  stand(run.side, 15.0, -84.0, FACE_NORTH, 1);
+  advance(run, CAPTAIN_USSR.arrivalSeconds + STEP);
+  return guardianOf(run);
+}
+
+/** One overwhelming shot in its back, through the mode's ballistics callback. */
+function defeatGuardian(run: Run): void {
+  const { brain, view } = guardianOf(run);
+  const torso = view.hitboxes.find((hitbox) => hitbox.userData.guardianPart === 'torso')!;
+  const heavy = { definition: { ...WEAPON_DEFINITIONS.m1911, damage: 1e6 } } as unknown as Weapon;
+  const { x, z } = brain.position;
+  const behindX = x - Math.sin(brain.heading) * 3;
+  const behindZ = z - Math.cos(brain.heading) * 3;
+  stand(run.side, behindX, behindZ, Math.atan2(behindX - x, behindZ - z), 1);
+  run.mode.onTargetHit(torso.userData.target, 3, new THREE.Vector3(x, PROTOCOL33_SURFACE_Y + 1.4, z), new THREE.Vector3(0, 0, 1), torso, heavy);
 }
 
 /** Ready, funded, started at the panel and defended until the blast door opens. */
@@ -142,7 +179,7 @@ describe('Protocol 33 through the mode', () => {
     run.mode.onInteract();
     expect(run.side.hud.showRoundBanner).toHaveBeenLastCalledWith('ПРОТОКОЛ 33', expect.stringContaining(t('evacuation.ventilation')));
     run.mode.update(STEP);
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.stringContaining(t('evacuation.objectiveRestore')), false);
+    expect(objectiveText(run, false)).toContain(t('evacuation.objectiveRestore'));
 
     atVentilation(run);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.restorePrompt', { system: t('evacuation.ventilation'), key: KEY }));
@@ -195,7 +232,7 @@ describe('Protocol 33 through the mode', () => {
     run.spawns.mockClear();
     advance(run, 30);
     expect(run.spawns.mock.calls.length).toBeGreaterThan(early);
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.stringContaining('50%'), true);
+    expect(objectiveText(run, true)).toContain('50%');
   });
 
   it('unlocks only while the panel is defended and keeps the progress while nobody is there', () => {
@@ -206,8 +243,8 @@ describe('Protocol 33 through the mode', () => {
     stand(run.side, 0, 15, FACE_NORTH);
     advance(run, 45);
     expect(run.side.hud.showRoundBanner).toHaveBeenCalledWith(t('evacuation.pausedBanner'), t('evacuation.pausedSub'));
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.stringContaining(t('evacuation.objectivePaused')), true);
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.stringContaining('50%'), true);
+    expect(objectiveText(run, true)).toContain(t('evacuation.objectivePaused'));
+    expect(objectiveText(run, true)).toContain('50%');
     expect(run.internals.arena.evacuation.blastDoorCollider).not.toBeNull();
     atPanel(run);
     advance(run, 59.75);
@@ -221,6 +258,8 @@ describe('Protocol 33 through the mode', () => {
   it('ends the run with the escape when the player boards the truck in time', () => {
     const run = escapingRun();
     advance(run, 30);
+    confrontGuardian(run);
+    defeatGuardian(run);
     atTruck(run);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.boardPrompt', { key: KEY }));
     run.mode.onInteract();
@@ -231,6 +270,53 @@ describe('Protocol 33 through the mode', () => {
     expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
     advance(run, PROTOCOL33_ENDING.duration);
     expect(run.side.hud.showCredits).toHaveBeenCalledOnce();
+  });
+
+  it('wakes CAPITÁN URSS in the yard and holds the clock, the horde and the truck until he falls', () => {
+    const run = escapingRun();
+    advance(run, 10);
+    const name = t('guardian.captainUssr');
+    expect(run.side.hud.setBossBar).not.toHaveBeenCalledWith(expect.objectContaining({ name }));
+    const guardian = confrontGuardian(run);
+    expect(guardian.brain.state).not.toBe('dormant');
+    expect(run.side.hud.setBossBar).toHaveBeenLastCalledWith(expect.objectContaining({ name, health: 1 }));
+    expect(run.side.hud.showRoundBanner).toHaveBeenCalledWith(name, t('guardian.arrivalSub'));
+    expect(run.side.ctx.hitColliders).toEqual(expect.arrayContaining([...guardian.view.hitboxes]));
+    const corner = objectiveText(run, true);
+    expect(corner.startsWith(`${name}
+${t('guardian.objective')}
+${t('guardian.captainUssr.hint1')}`)).toBe(true);
+    expect(corner).toContain('ПРОТОКОЛ 33');
+
+    // Well past the escape's 60 s, the duel still holds the clock and the horde.
+    const spawned = run.spawns.mock.calls.length;
+    advance(run, PROTOCOL33_RULES.escapeSeconds + 10);
+    expect(run.internals.gameOver).toBe(false);
+    expect(run.spawns.mock.calls.length).toBe(spawned);
+    atTruck(run);
+    expect(run.mode.getInteractPrompt()).toBe(t('guardian.blocksBoarding', { name }));
+    run.mode.onInteract();
+    expect(run.side.hud.showEnding).not.toHaveBeenCalled();
+
+    defeatGuardian(run);
+    expect(guardian.brain.state).toBe('defeated');
+    expect(run.side.hud.showRoundBanner).toHaveBeenCalledWith(t('guardian.defeatedBanner', { name }), t('guardian.defeatedSub'));
+    for (const hitbox of guardian.view.hitboxes) expect(run.side.ctx.hitColliders).not.toContain(hitbox);
+    run.mode.update(STEP);
+    expect(run.side.hud.setBossBar).toHaveBeenLastCalledWith(null);
+    atTruck(run);
+    expect(run.mode.getInteractPrompt()).toBe(t('evacuation.boardPrompt', { key: KEY }));
+    run.mode.onInteract();
+    expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
+  });
+
+  it('puts CAPITÁN URSS back to sleep and out of the ballistics on restart', () => {
+    const run = escapingRun();
+    const guardian = confrontGuardian(run);
+    run.mode.onRestartRequested();
+    expect(guardian.brain.state).toBe('dormant');
+    for (const hitbox of guardian.view.hitboxes) expect(run.side.ctx.hitColliders).not.toContain(hitbox);
+    expect(run.side.hud.setBossBar).toHaveBeenLastCalledWith(null);
   });
 
   it('fails the evacuation through the normal game over after exactly 60 s on the clock', () => {
@@ -257,17 +343,16 @@ describe('Protocol 33 through the mode', () => {
     run.mode.update(STEP);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.panelPrompt', { key: KEY }));
     // Not briefed again yet: only the ФАКЕЛ-33 crystal note, which the power wakes.
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.not.stringContaining('ПРОТОКОЛ 33'), false);
+    expect(objectiveText(run, false)).not.toContain('ПРОТОКОЛ 33');
   });
 
   it('shares the objective corner with the crystal note while exploring, then holds it alone', () => {
     const run = readyRun();
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(
-      expect.stringMatching(/ФАКЕЛ-33[\s\S]*\n\nПРОТОКОЛ 33/), false);
+    expect(objectiveText(run, false)).toMatch(/^ФАКЕЛ-33[\s\S]*\n\nПРОТОКОЛ 33/);
     fund(run.internals.economy, COST);
     run.mode.onInteract();
     run.mode.update(STEP);
-    expect(run.side.hud.setObjective).toHaveBeenLastCalledWith(expect.not.stringContaining('ФАКЕЛ-33'), true);
+    expect(objectiveText(run, true)).not.toContain('ФАКЕЛ-33');
   });
 
   it('lets MOTDRULES skip everything and escape at the panel for the protocol\'s price, until a restart', () => {

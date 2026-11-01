@@ -201,8 +201,8 @@ export class Station33Arena implements ZombieArena {
     this.weaponStations = STATION33_WEAPON_STATIONS.map((station) => new WeaponStation(context, station, weaponStationLook, this.power));
     this.powerSwitch = new PowerLever(context, STATION33_POWER_SWITCH, station33PowerLeverLook(context), () => this.switchOnPower());
     buildEscapeRoute(context, this.lighting);
-    buildSurface(context, this.lighting);
-    this.evacuation = new Protocol33(context, this.lighting, this.power, () => this.onEvacuationLayout());
+    const yardSolids = buildSurface(context, this.lighting);
+    this.evacuation = new Protocol33(context, this.lighting, this.power, yardSolids, () => this.onEvacuationLayout());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
     this.hemisphere = createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects);

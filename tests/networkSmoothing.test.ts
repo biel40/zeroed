@@ -17,6 +17,44 @@ function playerState(t: number, x: number, overrides: Partial<PlayerNetState> = 
 afterEach(() => { vi.useRealTimers(); });
 
 describe('snapshot interpolation', () => {
+  it('keeps the spectator target hidden across incoming packets and restores it on handoff', () => {
+    const avatar: RemoteAvatar = { group: new THREE.Group(), isSkinned: false,
+      update: vi.fn(), setWeapon: vi.fn(), playFire: vi.fn(), dispose: vi.fn() };
+    const remote = new RemotePlayer(avatar);
+    remote.push(playerState(1, 0));
+    remote.setViewHidden(true);
+    remote.push(playerState(2, 1));
+    expect(remote.root.visible).toBe(false);
+    remote.setViewHidden(false);
+    expect(remote.root.visible).toBe(true);
+    remote.setViewHidden(true);
+    remote.clear();
+    remote.push(playerState(3, 0));
+    expect(remote.root.visible).toBe(true);
+    remote.dispose();
+  });
+
+  it('exposes an interpolated spectator view and falls back to legacy stance heights', () => {
+    vi.useFakeTimers({ toFake: ['performance'] });
+    const avatar: RemoteAvatar = { group: new THREE.Group(), isSkinned: false,
+      update: vi.fn(), setWeapon: vi.fn(), playFire: vi.fn(), dispose: vi.fn() };
+    const remote = new RemotePlayer(avatar);
+    remote.push(playerState(1, 0, { pitch: 0.1, eyeOffsetY: -0.2 }));
+    remote.push(playerState(1.1, 0, { pitch: 0.5, stance: 'prone' }));
+    vi.advanceTimersByTime(160);
+    remote.update(1 / 60);
+    // The position and view use the same bracket, delayed by 120 ms.
+    expect(remote.viewPitch).toBeGreaterThan(0.1);
+    expect(remote.viewPitch).toBeLessThan(0.5);
+    const blend = (remote.viewPitch - 0.1) / 0.4;
+    expect(remote.viewEyeOffsetY).toBeCloseTo(-0.2 + (-1.25 + 0.2) * blend);
+    remote.clear();
+    remote.push(playerState(2, 0));
+    remote.update(1 / 60);
+    expect(remote.viewPitch).toBe(0);
+    expect(remote.viewEyeOffsetY).toBe(0);
+    remote.dispose();
+  });
   it('passes posture to the avatar without moving the feet anchor and defaults legacy snapshots to standing', () => {
     const update = vi.fn();
     const avatar: RemoteAvatar = { group: new THREE.Group(), isSkinned: false,

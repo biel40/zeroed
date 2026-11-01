@@ -263,7 +263,7 @@ existente a `MOTDRULES`.
   recarga. Si el cargador estaba vacio, se inicia automaticamente al terminar
   el cuchillazo; una recarga tactica se vuelve a solicitar con R.
   El barrido frontal abarca 100 grados y
-  alcanza 2 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
+  alcanza 1,8 m, con asistencia vertical sobre los cuerpos. Cada ataque elige
   un solo objetivo, priorizando la mira y despues la alineacion y proximidad;
   paredes y cuerpos interpuestos bloquean cada trayectoria. La seleccion y
   validacion del invitado comparten estas reglas. Conserva dano por ronda,
@@ -451,6 +451,24 @@ existente a `MOTDRULES`.
   el tiempo, cartel y la derrota normal. Al subir, `SurfaceMood` mezcla la
   niebla, el fondo y la hemisferica del mapa con los de la superficie.
   Reiniciar lo devuelve todo al estado inicial.
+- Guardian de la extraccion (`ArenaEvacuation.guardian`, opcional; en
+  Station 33 el CAPITAN URSS, un supersoldado sovietico zombificado con
+  escudo): durante la huida, al entrar en su zona (el patio) salta la valla
+  y aterriza; mientras pelea, el reloj de huida y la horda del protocolo se
+  detienen y el camion no admite subir. `ZombiesGuardian` lo orquesta sobre
+  el cerebro puro `CaptainUssrBrain` (aleatoriedad inyectada) y su vista
+  `CaptainUssrView`. Su escudo bloquea los disparos que llegan dentro de su
+  arco frontal y cualquier impacto en el propio escudo; la cabeza recibe el
+  doble y aturdido recibe mas. Ataques: golpe de escudo a corta distancia,
+  lanzamiento del escudo (vuela hasta donde estaba el jugador y vuelve; sin
+  el queda expuesto de frente) y, desde la fase 2, la carga en linea recta,
+  que si choca con la valla o un solido lo deja aturdido. Fases al 60 % y al
+  30 % de vida, con cartel, consejo propio en la nota y ritmo mas agresivo.
+  Barra con nombre y marcas de fase arriba en el centro (`HUD.setBossBar`);
+  su nota `ObjectiveNote` va antes de la del protocolo. Le afectan balas,
+  Ray Gun, Tesla y llamas, pero no el cuchillo ni la salpicadura. Al caer, la
+  horda y el reloj siguen y se puede subir al camion. Valores en
+  `CAPTAIN_USSR`.
 - Puertas de pago de Station 33: la misma `PointDoorView`/`BuyableDoorVisual`
   que la mansion con chapas de acero en lugar de tablones y superficie de
   impacto metalica.
@@ -621,8 +639,8 @@ prompt, la muerte y el reinicio.
   y necesita electricidad.
 - Tiro doble (indice, pasivo, amarillo): una compra por run, 3000, en el
   taller al norte de la sala de electricidad de Station 33; necesita corriente.
-  Duplica la cadencia de cualquier arma equipada, incluido su ciclo de cerrojo,
-  y aumenta un 20 % el dano de balas, cadenas Tesla, Ray Gun y llama/quemaduras.
+  Aumenta un 25 % la cadencia de cualquier arma equipada, incluido su ciclo de
+  cerrojo, y un 10 % el dano de balas, cadenas Tesla, Ray Gun y llama/quemaduras.
   Conserva consumo por disparo, recargas y cuchillo; cambiar o adquirir armas
   mantiene el efecto y reiniciar lo elimina. Se combina multiplicando con
   el ajuste de dano de la consola de desarrollo.
@@ -729,6 +747,18 @@ En tactil, tocar la tarjeta equivale a pulsar USAR, incluidas las acciones
 mantenidas. En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
 guarda y se aplica al instante, sin desactivar las interacciones del juego.
 
+Los objetivos de los modos llegan al HUD como notas estructuradas
+(`ObjectiveNote`: emisor, tarea y progreso vivo). Arriba a la izquierda queda
+una nota por mision, con riel ambar o rojo si el evento es contrarreloj. Cada
+tarea nueva (`ObjectiveAnnouncer`) se presenta antes en una tarjeta grande en el
+tercio superior, que se abre desde el centro, se mantiene unos segundos y vuela
+hasta su nota de la esquina; espera a que termine el anuncio de ronda y las
+tareas simultaneas se presentan por turnos. Distancia, reloj o lista de control
+no vuelven a anunciarse. Una mision que termina, en la esquina o en la tarjeta,
+se desvanece subiendo un poco antes de desaparecer, y la siguiente tarjeta espera
+a ese fundido; una run nueva lo limpia al instante. Con movimiento reducido solo
+hay fundidos.
+
 El HUD y la pausa consumen la misma instantanea por jugador. La cartera separa
 Points disponibles de todos los obtenidos durante la run, incluidas reparaciones;
 las compras no reducen el acumulado. ZombieManager notifica la vida realmente
@@ -746,6 +776,11 @@ Las garras tienen un borde iluminado y al avanzar la ronda se traza la nueva
 marca con un brillo que se apaga; en rondas altas se animan las tres garras y
 el numero exacto. El efecto solo responde a aumentos de ronda y respeta el
 movimiento reducido, sin cambiar la distribucion del panel.
+
+Cada subida del saldo lanza sobre el contador un "+N" que salta y se desvanece
+mientras el contador late; las bajas y, sobre todo, headshots y cuchillo se
+muestran mas grandes y brillantes ([PointsPopups](../src/ui/PointsPopups.ts)).
+Gastar o reiniciar no lo dispara, y el invitado lo ve igual a partir de su saldo replicado.
 
 En dispositivos tactiles el panel permanece pequeno arriba a la derecha, bajo
 el boton de pausa, con ronda, puntos, vida y bajas; headshots y faroles se consultan
