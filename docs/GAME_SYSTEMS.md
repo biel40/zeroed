@@ -22,7 +22,9 @@ levantarse debe caber el cuerpo bajo los obstaculos; Espacio desde una postura
 baja intenta levantarse sin saltar. No se cambia de postura en el aire, caido,
 muerto ni con los controles bloqueados. El comportamiento es compartido entre
 individual y cooperativo. `Weapon` gobierna cadencia, municion,
-ADS, recoil y recarga; `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
+ADS, recoil y recarga. La M1911 tiene una patada vertical marcada, con un golpe
+visual de elevacion y retroceso y una recuperacion que deja sentir cada disparo.
+`WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
 `AudioSystem` sincroniza el foley. La palma y el pulgar de primera persona
 comparten una superficie cosida, continua al cambiar de agarre y nivel de detalle.
 Arma, brazos y cuchillo comprimen su
@@ -227,7 +229,11 @@ existente a `MOTDRULES`.
   mangas, guantes, muslos, espinillas, pies) con un multiplicador por vertice y
   funde accesorios rigidos (gorras, cascos, capuchas, cinturones, correas, equipo) en
   la misma malla, pesados a un solo hueso: sigue siendo un draw call, no hay
-  texturas nuevas y la altura de contrato no cambia. Se construyen una vez por
+  texturas nuevas y la altura de contrato no cambia. Una skin tambien puede
+  quemar el cuerpo (manchas chamuscadas y carbonizadas por ruido determinista,
+  cara incluida; ojos, boca y sangre intactos) y perder un antebrazo, cuyo
+  codo cierra un muñon rigido ([dano de skin](../src/zombies/skins/ZombieSkinDamage.ts)).
+  Burned Mansion viste asi a toda su horda. Se construyen una vez por
   walker cargado. Solo apariencia: tipo, hitboxes y animacion son los del walker.
   El primer impacto en la cabeza desprende gorras, ushankas y cascos completos,
   con sus insignias; las capuchas y el resto del equipo siguen puestos. El gorro

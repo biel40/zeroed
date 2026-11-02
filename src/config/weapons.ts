@@ -9,7 +9,7 @@ import type { WeaponDefinition, WeaponId } from '../weapons/WeaponTypes';
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   /**
    * M1911 — the Zombies starting pistol. Deliberately a sidearm: modest
-   * torso damage, light recoil, fast ADS
+   * torso damage, a pronounced upward kick, fast ADS
    * and a showy but unhurried reload. Precise players stretch it through early rounds;
    * raw damage per magazine keeps it from competing with the box weapons.
    * Detailed procedural view model (no CC0 GLB exists), finite 8 / 64 ammunition.
@@ -29,12 +29,12 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 30,
     recoil: {
-      verticalKick: 0.011,
-      horizontalKick: 0.003,
+      verticalKick: 0.018,
+      horizontalKick: 0.004,
       horizontalBias: 0,
       kickVariance: 0.2,
-      recoverySpeed: 12,
-      recoveryDelay: 0.06,
+      recoverySpeed: 10,
+      recoveryDelay: 0.08,
       cameraShare: 0.5,
       adsRecoilMultiplier: 0.7,
     },
@@ -60,7 +60,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       ads: [0, 0, -0.41],
       sway: 0.7,
       bob: 0.85,
-      visualRecoil: { kickImpulse: 0.7, pitchImpulse: 1.9, rollImpulse: 0.5, stiffness: 220, damping: 18 },
+      visualRecoil: { kickImpulse: 1, pitchImpulse: 2.8, rollImpulse: 0.65, stiffness: 220, damping: 18 },
       scale: 1,
       bodyColor: 0x202329,
       accentColor: 0x59301c,

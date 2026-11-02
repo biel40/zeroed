@@ -53,6 +53,7 @@ import {
   BARRIER_CONFIG,
   DEBUG_MAP_COLLIDERS,
   MANSION_AMBIENCE,
+  MANSION_ZOMBIE_SKINS,
   MANSION_AMBIENT_EVENTS,
   MANSION_AMMO_REFILLS,
   MANSION_RESURRECTION_LOCKER,
@@ -242,6 +243,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   readonly id = 'burned-mansion';
   readonly group = new THREE.Group();
   readonly ambience = MANSION_AMBIENCE;
+  readonly zombieSkins = MANSION_ZOMBIE_SKINS;
   readonly mysteryBoxPlacement = MANSION_BOX_PLACEMENT;
   readonly playerSpawn = MANSION_PLAYER_SPAWN;
   readonly useWallCollision = true;

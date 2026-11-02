@@ -77,6 +77,15 @@ export class ZombieBodyFrame {
     return this.dominant[vertex];
   }
 
+  public get vertexCount(): number {
+    return this.dominant.length;
+  }
+
+  /** Bind-pose position of a vertex in the body frame, written into `target`. */
+  public bodyPoint(vertex: number, target: THREE.Vector3): THREE.Vector3 {
+    return target.fromArray(this.bodyPositions, vertex * 3);
+  }
+
   /** Bind-pose bounds of the matching vertices in the body frame; empty if none match. */
   bounds(query: BodyRegionQuery): THREE.Box3 {
     const box = new THREE.Box3();

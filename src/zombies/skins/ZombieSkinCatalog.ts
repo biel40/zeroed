@@ -49,9 +49,22 @@ export type ZombieAccessory =
   /** Medal ribbons on the left breast, one bar per color. */
   | { readonly kind: 'medals'; readonly ribbons: readonly number[] };
 
+/** Charred patches spread over the whole body, face included (see ZombieSkinDamage). */
+export interface ZombieSkinBurns {
+  /** 0..1: roughly the share of the body the patches cover. */
+  readonly coverage: number;
+  /** Picks the patch layout, so two skins with the same coverage burn differently. */
+  readonly seed: number;
+}
+
+/** A forearm lost below the elbow; the upper arm ends in a charred stump. */
+export type ZombieSeveredLimb = 'leftForearm' | 'rightForearm';
+
 export interface ZombieSkinDefinition {
   readonly regions: Readonly<Partial<Record<ZombieSkinRegion, number>>>;
   readonly accessories: readonly ZombieAccessory[];
+  readonly burns?: ZombieSkinBurns;
+  readonly severedLimbs?: readonly ZombieSeveredLimb[];
 }
 
 const BOOT_LEATHER = 0x24201c;
@@ -124,6 +137,32 @@ export const ZOMBIE_SKINS = {
       { kind: 'shoulderBoards', cloth: 0xb09045, stripe: 0x2f4636 },
       { kind: 'medals', ribbons: [FADED_RED, 0xc0a050, 0x3a5a8a, 0xb0b0a8] },
     ],
+  },
+  /** Caught by the fire: scattered scorch marks on skin and clothes. */
+  scorched: {
+    regions: {},
+    accessories: [],
+    burns: { coverage: 0.3, seed: 11 },
+  },
+  /** Barely got out of the flames: large charred areas, face included. */
+  charred: {
+    regions: {},
+    accessories: [],
+    burns: { coverage: 0.55, seed: 23 },
+  },
+  /** Burnt and missing the left forearm. */
+  leftArmStump: {
+    regions: {},
+    accessories: [],
+    burns: { coverage: 0.35, seed: 37 },
+    severedLimbs: ['leftForearm'],
+  },
+  /** Burnt and missing the right forearm. */
+  rightArmStump: {
+    regions: {},
+    accessories: [],
+    burns: { coverage: 0.4, seed: 53 },
+    severedLimbs: ['rightForearm'],
   },
 } as const satisfies Record<string, ZombieSkinDefinition>;
 

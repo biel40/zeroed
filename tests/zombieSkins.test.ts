@@ -7,7 +7,8 @@ import { ZOMBIE_POOL_MODELS, zombiePoolSource } from '../src/zombies/ZombieManag
 import { ZombieVisual, ZOMBIE_MODELS, type ZombieModelSource } from '../src/zombies/ZombieVisual';
 import { STATION33_ZOMBIE_EYES, STATION33_ZOMBIE_SKINS } from '../src/zombies/maps/Station33Config';
 import { createSkinnedWalkerSource, dressZombieSources } from '../src/zombies/skins/ZombieSkinBuilder';
-import { ZOMBIE_SKINS, type ZombieSkinId } from '../src/zombies/skins/ZombieSkinCatalog';
+import { MANSION_ZOMBIE_SKINS } from '../src/zombies/maps/BurnedMansionConfig';
+import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from '../src/zombies/skins/ZombieSkinCatalog';
 import { walkerBandAt, walkerSkinRegion } from '../src/zombies/skins/ZombieSkinRegions';
 import { Zombie } from '../src/zombies/Zombie';
 
@@ -73,15 +74,18 @@ describe('walker skins', async () => {
       expect(mesh.skeleton.bones).toHaveLength(boneCount);
 
       const triangles = geometry.getAttribute('position').count / 3;
-      const accessories = ZOMBIE_SKINS[skinId].accessories.length;
-      if (accessories === 0) expect(triangles).toBe(plainTriangles);
+      const skin: ZombieSkinDefinition = ZOMBIE_SKINS[skinId];
+      for (const name of ['position', 'normal', 'uv', 'skinWeight', 'color']) {
+        expect((geometry.getAttribute(name).array as Float32Array).every(Number.isFinite), name).toBe(true);
+      }
+      // Severed limbs change the body itself; their own test covers them.
+      if (skin.severedLimbs?.length) return;
+
+      if (skin.accessories.length === 0) expect(triangles).toBe(plainTriangles);
       // Hats and belts stay a small fraction of the 2116-triangle body.
       else expect(triangles - plainTriangles).toBeGreaterThan(0);
       expect(triangles - plainTriangles).toBeLessThan(400);
 
-      for (const name of ['position', 'normal', 'uv', 'skinWeight', 'color']) {
-        expect((geometry.getAttribute(name).array as Float32Array).every(Number.isFinite), name).toBe(true);
-      }
       const weights = geometry.getAttribute('skinWeight');
       const indices = geometry.getAttribute('skinIndex');
       for (let vertex = plainTriangles * 3; vertex < weights.count; vertex++) {
@@ -109,6 +113,49 @@ describe('walker skins', async () => {
     }
     expect(face).toBeGreaterThan(0);
     expect(tinted).toBeGreaterThan(100);
+  });
+
+  it('chars patches of the body and face while the eyes and mouth keep the asset look', () => {
+    const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, 'charred'));
+    const colors = mesh.geometry.getAttribute('color');
+    const uvs = mesh.geometry.getAttribute('uv');
+    let charred = 0;
+    let charredHead = 0;
+    for (let vertex = 0; vertex < plainTriangles * 3; vertex++) {
+      const dark = colors.getX(vertex) < 0.5 && colors.getY(vertex) < 0.5 && colors.getZ(vertex) < 0.5;
+      const band = walkerBandAt(uvs.getX(vertex), uvs.getY(vertex));
+      if (band === 'eyes' || band === 'mouth') expect(colors.getX(vertex)).toBe(1);
+      if (!dark) continue;
+      charred++;
+      if (mesh.skeleton.bones[mesh.geometry.getAttribute('skinIndex').getX(vertex)].name === 'Head') charredHead++;
+    }
+    expect(charred / (plainTriangles * 3)).toBeGreaterThan(0.15);
+    expect(charred / (plainTriangles * 3)).toBeLessThan(0.85);
+    expect(charredHead).toBeGreaterThan(0);
+  });
+
+  it('cuts a forearm away and closes the elbow with a stump riding the upper arm', () => {
+    const plainMesh = skinnedMeshOf(walker);
+    const plainIndex = plainMesh.geometry.getAttribute('skinIndex');
+    const leftForearm = (bone: number): boolean => /^Left(ForeArm|Hand)/.test(plainMesh.skeleton.bones[bone].name);
+    let plainForearm = 0;
+    for (let vertex = 0; vertex < plainIndex.count; vertex++) if (leftForearm(plainIndex.getX(vertex))) plainForearm++;
+    expect(plainForearm).toBeGreaterThan(0);
+
+    const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, 'leftArmStump'));
+    const weights = mesh.geometry.getAttribute('skinWeight');
+    const indices = mesh.geometry.getAttribute('skinIndex');
+    const leftArm = mesh.skeleton.bones.findIndex((bone) => bone.name === 'LeftArm');
+    let stump = 0;
+    for (let vertex = 0; vertex < weights.count; vertex++) {
+      // No vertex is driven mainly by the lost bones any more.
+      let strongest = 0;
+      for (let slot = 1; slot < 4; slot++) if (weights.getComponent(vertex, slot) > weights.getComponent(vertex, strongest)) strongest = slot;
+      expect(leftForearm(indices.getComponent(vertex, strongest))).toBe(false);
+      if (weights.getX(vertex) === 1 && indices.getX(vertex) === leftArm) stump++;
+    }
+    expect(stump).toBeGreaterThan(0);
+    expect(mesh.geometry.getAttribute('position').count / 3).toBeLessThan(plainTriangles);
   });
 
   it('keeps the contract height even with a hat on', () => {
@@ -222,9 +269,16 @@ describe('walker skins', async () => {
 });
 
 describe('map skins', () => {
-  it('dresses the Station 33 horde in every catalog look, civilians included', () => {
-    expect(new Set(STATION33_ZOMBIE_SKINS)).toEqual(new Set(SKIN_IDS));
-    expect(STATION33_ZOMBIE_SKINS).toHaveLength(SKIN_IDS.length);
+  it('dresses the Station 33 horde in every uniform and civilian look, none of them burnt', () => {
+    const unburnt = SKIN_IDS.filter((skinId) => !(ZOMBIE_SKINS[skinId] as ZombieSkinDefinition).burns);
+    expect(new Set(STATION33_ZOMBIE_SKINS)).toEqual(new Set(unburnt));
+    expect(STATION33_ZOMBIE_SKINS).toHaveLength(unburnt.length);
+  });
+
+  it('dresses the Burned Mansion horde in every burnt look, one-armed bodies included', () => {
+    const burnt = SKIN_IDS.filter((skinId) => (ZOMBIE_SKINS[skinId] as ZombieSkinDefinition).burns);
+    expect(new Set(MANSION_ZOMBIE_SKINS)).toEqual(new Set(burnt));
+    expect(MANSION_ZOMBIE_SKINS.some((skinId) => (ZOMBIE_SKINS[skinId] as ZombieSkinDefinition).severedLimbs?.length)).toBe(true);
   });
 
   it('gives the Station 33 horde red eyes', () => {

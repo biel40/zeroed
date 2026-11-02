@@ -8,6 +8,7 @@ import { NUCLEAR_ENDING_DURATION } from '../ZombiesRunFlow';
 import type { ArenaAmbience, ArenaAmbientCue, ArenaEnding } from './ZombieArena';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
+import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 
 /** Pure tuning constants for the Burned Mansion map. */
 
@@ -25,6 +26,15 @@ export const MANSION_AMBIENCE = {
   musicTrack: 'background_music_theme',
   ambientBed: 'wind',
 } as const satisfies ArenaAmbience;
+
+/** The horde: the household caught in the fire, scorched, charred or missing a forearm. */
+export const MANSION_ZOMBIE_SKINS: readonly ZombieSkinId[] = [
+  'scorched',
+  'charred',
+  'leftArmStump',
+  'scorched',
+  'rightArmStump',
+];
 
 /**
  * Sounds of the gutted house between the fights, each from its own corner

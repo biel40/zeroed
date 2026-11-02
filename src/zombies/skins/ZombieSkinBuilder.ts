@@ -6,6 +6,7 @@ import { ZOMBIE_MODELS, type ZombieEyeColors, type ZombieModelSource } from '../
 import { ZombieBodyFrame } from './ZombieBodyFrame';
 import { buildAccessoryParts } from './ZombieSkinAccessories';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from './ZombieSkinCatalog';
+import { buildStumpParts, burnAt, charColor, severedTriangles } from './ZombieSkinDamage';
 import {
   ACCESSORY_BAND,
   ACCESSORY_UV,
@@ -17,22 +18,36 @@ import {
 
 const WHITE = new THREE.Color(1, 1, 1);
 
+/** Linear color a band of the atlas is painted with. */
+function bandColor(band: WalkerPaletteBand): THREE.Color {
+  const [r, g, b] = WALKER_BAND_COLORS[band];
+  return new THREE.Color().setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+}
+
 /**
- * Vertex color that turns a band of the atlas into `hex` once the shader
+ * Vertex color that turns a band of the atlas into `target` once the shader
  * multiplies them (both in linear space).
  */
-function tintFor(hex: number, band: WalkerPaletteBand): THREE.Color {
-  const [r, g, b] = WALKER_BAND_COLORS[band];
-  const source = new THREE.Color().setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
-  const target = new THREE.Color(hex);
-  return target.setRGB(target.r / source.r, target.g / source.g, target.b / source.b);
+function tintFor(target: number | THREE.Color, band: WalkerPaletteBand): THREE.Color {
+  const source = bandColor(band);
+  const color = new THREE.Color(target);
+  return color.setRGB(color.r / source.r, color.g / source.g, color.b / source.b);
+}
+
+/**
+ * Eyes, mouth and blood keep the asset look even on a burnt body (the blood
+ * band has no green to scale, so it could not be retinted anyway).
+ */
+function canBurn(band: WalkerPaletteBand): boolean {
+  return band !== 'eyes' && band !== 'mouth' && band !== 'blood';
 }
 
 /**
  * The walker geometry dressed in a skin: atlas regions retinted through a
- * vertex color multiplier and accessories appended as rigid triangles
- * weighted to one bone, so the body stays a single skinned draw sharing the
- * original texture. Returns non-indexed geometry.
+ * vertex color multiplier, burns painted the same way, severed forearms cut
+ * away and accessories (and stumps) appended as rigid triangles weighted to
+ * one bone, so the body stays a single skinned draw sharing the original
+ * texture. Returns non-indexed geometry.
  */
 export function buildSkinnedWalkerGeometry(
   geometry: THREE.BufferGeometry,
@@ -41,8 +56,14 @@ export function buildSkinnedWalkerGeometry(
 ): THREE.BufferGeometry {
   const base = geometry.index ? geometry.toNonIndexed() : geometry;
   const body = new ZombieBodyFrame(base, boneNames, ZOMBIE_MODELS.walker.height);
+  const severedLimbs = skin.severedLimbs ?? [];
+  const severed = severedTriangles(body, boneNames, severedLimbs);
+  const kept: number[] = [];
+  for (let triangle = 0; triangle < severed.length; triangle++) {
+    if (!severed[triangle]) kept.push(triangle * 3, triangle * 3 + 1, triangle * 3 + 2);
+  }
   // Keep detachable hats at the end so a shared attribute view can omit them.
-  const parts = buildAccessoryParts(skin.accessories, body)
+  const parts = [...buildAccessoryParts(skin.accessories, body), ...buildStumpParts(body, boneNames, severedLimbs, severed)]
     .sort((a, b) => Number(a.detachableHat) - Number(b.detachableHat)).map((part) => {
     const placed = part.geometry.clone().applyMatrix4(body.toGeometry);
     placed.computeVertexNormals();
@@ -50,7 +71,7 @@ export function buildSkinnedWalkerGeometry(
     return { geometry: placed, tint: tintFor(part.color, ACCESSORY_BAND), bone: body.boneIndex(part.bone), hat: part.detachableHat };
   });
 
-  const baseCount = base.getAttribute('position').count;
+  const baseCount = kept.length;
   const total = baseCount + parts.reduce((sum, part) => sum + part.geometry.getAttribute('position').count, 0);
   const position = new Float32Array(total * 3);
   const normal = new Float32Array(total * 3);
@@ -59,31 +80,40 @@ export function buildSkinnedWalkerGeometry(
   const skinWeight = new Float32Array(total * 4);
   const color = new Float32Array(total * 3);
 
+  /** Copies `attribute` from `offset` on; `vertices` picks and orders its source vertices. */
   const write = (
     target: Float32Array | Uint16Array, itemSize: number, offset: number,
-    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, vertices?: readonly number[],
   ): void => {
-    for (let vertex = 0; vertex < attribute.count; vertex++) {
-      for (let k = 0; k < itemSize; k++) target[(offset + vertex) * itemSize + k] = attribute.getComponent(vertex, k);
+    const count = vertices?.length ?? attribute.count;
+    for (let index = 0; index < count; index++) {
+      const vertex = vertices ? vertices[index] : index;
+      for (let k = 0; k < itemSize; k++) target[(offset + index) * itemSize + k] = attribute.getComponent(vertex, k);
     }
   };
-  write(position, 3, 0, base.getAttribute('position'));
-  write(normal, 3, 0, base.getAttribute('normal'));
-  write(uv, 2, 0, base.getAttribute('uv'));
-  write(skinIndex, 4, 0, base.getAttribute('skinIndex'));
-  write(skinWeight, 4, 0, base.getAttribute('skinWeight'));
+  write(position, 3, 0, base.getAttribute('position'), kept);
+  write(normal, 3, 0, base.getAttribute('normal'), kept);
+  write(uv, 2, 0, base.getAttribute('uv'), kept);
+  write(skinIndex, 4, 0, base.getAttribute('skinIndex'), kept);
+  write(skinWeight, 4, 0, base.getAttribute('skinWeight'), kept);
 
   const tints = new Map<string, THREE.Color>();
-  for (let vertex = 0; vertex < baseCount; vertex++) {
-    const band = walkerBandAt(uv[vertex * 2], uv[vertex * 2 + 1]);
+  const bodyPoint = new THREE.Vector3();
+  const burnt = new THREE.Color();
+  for (let index = 0; index < baseCount; index++) {
+    const vertex = kept[index];
+    const band = walkerBandAt(uv[index * 2], uv[index * 2 + 1]);
     const region = walkerSkinRegion(band, boneNames[body.dominantBone(vertex)]);
     const hex = region ? skin.regions[region] : undefined;
+    const burn = skin.burns && canBurn(band) ? burnAt(body.bodyPoint(vertex, bodyPoint), skin.burns) : 0;
     let tint = WHITE;
-    if (hex !== undefined) {
+    if (burn > 0) {
+      tint = tintFor(charColor(hex !== undefined ? burnt.set(hex) : burnt.copy(bandColor(band)), burn), band);
+    } else if (hex !== undefined) {
       const key = `${band}:${hex}`;
       tint = tints.get(key) ?? tints.set(key, tintFor(hex, band)).get(key)!;
     }
-    tint.toArray(color, vertex * 3);
+    tint.toArray(color, index * 3);
   }
 
   let offset = baseCount;
