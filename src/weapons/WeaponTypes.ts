@@ -1,6 +1,6 @@
 import type { ShotVariation } from '../audio/ShotVariation';
 
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'raygun' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -155,12 +155,12 @@ export interface WeaponAudioConfig {
   readonly variation?: ShotVariation;
   /**
    * Energy weapons get a sci-fi synth shot instead of a powder report; the
-   * value picks the voice: the Ray Gun's warbling zap or the arc weapon's.
+   * value picks the voice: the VORTEX-9's warbling zap or the arc weapon's.
    */
-  readonly energy?: 'raygun' | 'arc';
+  readonly energy?: 'vortex9' | 'arc';
 }
 
-/** Behaviour of an energy projectile weapon (Ray Gun). Zombies mode only. */
+/** Behaviour of an energy projectile weapon (VORTEX-9). Zombies mode only. */
 export interface EnergyWeaponConfig {
   /** Visible projectile travel speed, m/s. Deliberately slow enough to see. */
   readonly projectileSpeed: number;
@@ -381,7 +381,7 @@ export interface ViewModelConfig {
   readonly sightHeight: number;
   /** Overall chunkiness multiplier. */
   readonly bulk: number;
-  /** When set, the dedicated Ray Gun procedural builder is used with this glow color. */
+  /** When set, the dedicated VORTEX-9 procedural builder is used with this glow color. */
   readonly energyColor?: number;
   /**
    * 'pistol' uses the handgun builder (slide, hammer, grip magazine);

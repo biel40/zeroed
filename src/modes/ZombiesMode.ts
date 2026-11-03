@@ -81,7 +81,7 @@ const INTRO_SKIP_GUARD = 0.6;
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
  * brief post-hit invulnerability, game over / restart, and the mode-only
- * Ray Gun firing visible energy bolts with splash damage. The map registry
+ * VORTEX-9 firing visible energy bolts with splash damage. The map registry
  * builds the arena (geometry, interactions, ambience and ending); the mode
  * owns the run and its progression.
  */
@@ -399,7 +399,7 @@ export class ZombiesMode implements GameMode {
     if (!lethal) this.economy.awardHit(headshot);
   }
 
-  /** The Ray Gun bypasses hitscan ballistics and fires a visible bolt; a flame weapon scorches its cone. */
+  /** The VORTEX-9 bypasses hitscan ballistics and fires a visible bolt; a flame weapon scorches its cone. */
   onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
     if (!this.runAcceptsInput()) return true;
     if (weapon.definition.flame) {
@@ -1162,8 +1162,8 @@ export class ZombiesMode implements GameMode {
     this.economy.setUnlimitedSpending(true);
     if (hasSoulRitual(this.arena)) this.arena.unlockSecretRoom();
     this.evacuation?.enableDeveloperExit();
-    this.ctx.grantWeapon('raygun');
-    this.ctx.setWeaponInfiniteReserve('raygun');
+    this.ctx.grantWeapon('vortex9');
+    this.ctx.setWeaponInfiniteReserve('vortex9');
     this.ctx.grantWeapon('tesla');
     this.ctx.setWeaponInfiniteReserve('tesla');
     this.ctx.hud.showRoundBanner(t('banner.godMode'), t('dev.hint'));
@@ -1274,7 +1274,7 @@ export class ZombiesMode implements GameMode {
     const isTesla = config.color === WEAPON_DEFINITIONS.tesla.energy?.color;
 
     // A bolt into the guardian spends itself on it: no chain, no splash.
-    const boltDamage = isTesla ? CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla') : WEAPON_DEFINITIONS.raygun.damage * this.weaponDamageScale('raygun');
+    const boltDamage = isTesla ? CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla') : WEAPON_DEFINITIONS.vortex9.damage * this.weaponDamageScale('vortex9');
     if (object && this.evacuation?.guardian?.hit(object, boltDamage, point, distance)) {
       if (isTesla) this.ctx.audio.playTeslaShot();
       else this.ctx.audio.playRayImpact();
@@ -1321,7 +1321,7 @@ export class ZombiesMode implements GameMode {
 
     this.ctx.audio.playRayImpact();
 
-    const raygun = WEAPON_DEFINITIONS.raygun;
+    const vortex9 = WEAPON_DEFINITIONS.vortex9;
     if (zombie && zombie.isAlive) {
       const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
       const headshot = part === 'head';
@@ -1329,13 +1329,13 @@ export class ZombiesMode implements GameMode {
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
       const lethal = this.zombies.damageZombie(zombie, part,
-        raygun.damage * this.weaponDamageScale('raygun'), 'raygun');
+        vortex9.damage * this.weaponDamageScale('vortex9'), 'vortex9');
       if (!lethal) this.economy.awardHit(headshot);
     }
-    // Splash includes the directly-hit zombie: the Ray Gun fantasy is that
+    // Splash includes the directly-hit zombie: the VORTEX-9 fantasy is that
     // a bullseye on a packed horde is devastating.
     this.zombies.applySplash(point, config.splashRadius,
-      config.splashDamage * this.weaponDamageScale('raygun'));
+      config.splashDamage * this.weaponDamageScale('vortex9'));
   }
 
   /** Death: the body collapses in first person; the verdict waits for the fall to land. */

@@ -134,25 +134,40 @@ describe('walker skins', async () => {
     expect(charredHead).toBeGreaterThan(0);
   });
 
-  it('cuts a forearm away and closes the elbow with a stump riding the upper arm', () => {
+  it('cuts a forearm away and closes the elbow flush with the upper arm', () => {
     const plainMesh = skinnedMeshOf(walker);
     const plainIndex = plainMesh.geometry.getAttribute('skinIndex');
+    const plainWeight = plainMesh.geometry.getAttribute('skinWeight');
+    const plainPosition = plainMesh.geometry.getAttribute('position');
     const leftForearm = (bone: number): boolean => /^Left(ForeArm|Hand)/.test(plainMesh.skeleton.bones[bone].name);
+    const leftArm = plainMesh.skeleton.bones.findIndex((bone) => bone.name === 'LeftArm');
     let plainForearm = 0;
-    for (let vertex = 0; vertex < plainIndex.count; vertex++) if (leftForearm(plainIndex.getX(vertex))) plainForearm++;
+    const plainArm = new Box3();
+    for (let vertex = 0; vertex < plainIndex.count; vertex++) {
+      if (leftForearm(plainIndex.getX(vertex))) plainForearm++;
+      for (let slot = 0; slot < 4; slot++) {
+        if (plainWeight.getComponent(vertex, slot) > 0 && plainIndex.getComponent(vertex, slot) === leftArm) {
+          plainArm.expandByPoint(new Vector3().fromBufferAttribute(plainPosition, vertex));
+        }
+      }
+    }
     expect(plainForearm).toBeGreaterThan(0);
 
     const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, 'leftArmStump'));
     const weights = mesh.geometry.getAttribute('skinWeight');
     const indices = mesh.geometry.getAttribute('skinIndex');
-    const leftArm = mesh.skeleton.bones.findIndex((bone) => bone.name === 'LeftArm');
+    const position = mesh.geometry.getAttribute('position');
+    const tolerance = plainArm.getSize(new Vector3()).length() * 0.01;
     let stump = 0;
     for (let vertex = 0; vertex < weights.count; vertex++) {
-      // No vertex is driven mainly by the lost bones any more.
-      let strongest = 0;
-      for (let slot = 1; slot < 4; slot++) if (weights.getComponent(vertex, slot) > weights.getComponent(vertex, strongest)) strongest = slot;
-      expect(leftForearm(indices.getComponent(vertex, strongest))).toBe(false);
-      if (weights.getX(vertex) === 1 && indices.getX(vertex) === leftArm) stump++;
+      // The lost bones no longer drive anything, so the cut cannot drift off its cap.
+      for (let slot = 0; slot < 4; slot++) {
+        if (weights.getComponent(vertex, slot) > 0) expect(leftForearm(indices.getComponent(vertex, slot))).toBe(false);
+      }
+      if (weights.getX(vertex) !== 1 || indices.getX(vertex) !== leftArm) continue;
+      stump++;
+      // The cap closes the cut inside the arm's own silhouette instead of bulging out of it.
+      expect(plainArm.distanceToPoint(new Vector3().fromBufferAttribute(position, vertex))).toBeLessThanOrEqual(tolerance);
     }
     expect(stump).toBeGreaterThan(0);
     expect(mesh.geometry.getAttribute('position').count / 3).toBeLessThan(plainTriangles);

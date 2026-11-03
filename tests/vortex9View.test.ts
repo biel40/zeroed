@@ -3,18 +3,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import type { MagazineDropPool } from '../src/weapons/MagazineDrop';
-import { RAYGUN_LAYOUT } from '../src/weapons/RayGunViewModel';
+import { VORTEX9_LAYOUT } from '../src/weapons/Vortex9ViewModel';
 import { ReloadAnimator } from '../src/weapons/ReloadAnimator';
 import type { Weapon } from '../src/weapons/Weapon';
 import { buildProceduralViewModel, buildWeaponDisplayModel, WeaponView } from '../src/weapons/WeaponView';
 
 /**
- * Contract tests for the procedural Ray Gun: its named assemblies, a clean
+ * Contract tests for the procedural VORTEX-9: its named assemblies, a clean
  * picture through the scope tube, the screw-on canister reload, the energy flare
  * and flow, and a shot voice of its own.
  */
 
-const definition = WEAPON_DEFINITIONS.raygun;
+const definition = WEAPON_DEFINITIONS.vortex9;
 const view = definition.view;
 const originalDocument = globalThis.document;
 
@@ -46,17 +46,17 @@ function worldBox(object: THREE.Object3D): THREE.Box3 {
   return new THREE.Box3().setFromObject(object);
 }
 
-describe('Ray Gun view model', () => {
+describe('VORTEX-9 view model', () => {
   it('builds the dedicated model with its assemblies and screw-on canister', () => {
     const built = buildProceduralViewModel(view);
-    expect(built.group.name).toBe('raygun-root');
+    expect(built.group.name).toBe('vortex9-root');
     for (const name of ['body', 'canister', 'scope', 'grip']) {
-      expect(built.group.getObjectByName(`raygun-${name}`), name).toBeDefined();
+      expect(built.group.getObjectByName(`vortex9-${name}`), name).toBeDefined();
     }
-    const canister = built.group.getObjectByName('raygun-canister')!;
+    const canister = built.group.getObjectByName('vortex9-canister')!;
     expect(built.reloadParts?.magazine).toBe(canister);
     // The canister carries the whole front, emitter included, and pivots on the bore.
-    expect(worldBox(canister).min.z).toBeLessThan(RAYGUN_LAYOUT.emitter.z);
+    expect(worldBox(canister).min.z).toBeLessThan(VORTEX9_LAYOUT.emitter.z);
     expect(canister.position.x).toBe(0);
     expect(canister.position.y).toBe(0);
     expect(built.energyMaterials?.length).toBeGreaterThan(0);
@@ -66,15 +66,15 @@ describe('Ray Gun view model', () => {
 
   it('fires from the emitter ball and aims through the open scope tube', () => {
     const built = buildProceduralViewModel(view);
-    expect(built.muzzlePosition.z).toBeLessThan(RAYGUN_LAYOUT.emitter.z - RAYGUN_LAYOUT.emitter.radius + 0.001);
+    expect(built.muzzlePosition.z).toBeLessThan(VORTEX9_LAYOUT.emitter.z - VORTEX9_LAYOUT.emitter.radius + 0.001);
     expect(built.muzzlePosition.y).toBeCloseTo(0, 6);
-    expect(built.sightY).toBeCloseTo(RAYGUN_LAYOUT.sightY, 6);
+    expect(built.sightY).toBeCloseTo(VORTEX9_LAYOUT.sightY, 6);
 
     // Nothing ahead of the scope may rise into its picture: the seated cell
     // and the field arms stay below the tube's lower rim.
-    const scopeFrontZ = RAYGUN_LAYOUT.scope.z - RAYGUN_LAYOUT.scope.length / 2;
-    const ceiling = RAYGUN_LAYOUT.sightY - RAYGUN_LAYOUT.scope.radius;
-    const scope = built.group.getObjectByName('raygun-scope')!;
+    const scopeFrontZ = VORTEX9_LAYOUT.scope.z - VORTEX9_LAYOUT.scope.length / 2;
+    const ceiling = VORTEX9_LAYOUT.sightY - VORTEX9_LAYOUT.scope.radius;
+    const scope = built.group.getObjectByName('vortex9-scope')!;
     const point = new THREE.Vector3();
     built.group.updateWorldMatrix(true, true);
     let highest = -Infinity;
@@ -137,9 +137,9 @@ describe('Ray Gun view model', () => {
     expect(triangles).toBeLessThan(8000);
   });
 
-  it('builds the same Ray Gun for world display models (Mystery Box, bunker case)', () => {
+  it('builds the same VORTEX-9 for world display models (Mystery Box, bunker case)', () => {
     const display = buildWeaponDisplayModel(definition, null, 0.62);
-    expect(display.getObjectByName('raygun-root')).toBeDefined();
+    expect(display.getObjectByName('vortex9-root')).toBeDefined();
     const size = worldBox(display).getSize(new THREE.Vector3());
     expect(size.z).toBeCloseTo(0.62, 2);
   });
@@ -169,19 +169,19 @@ describe('Ray Gun view model', () => {
   });
 });
 
-describe('Ray Gun audio', () => {
+describe('VORTEX-9 audio', () => {
   it('fires its own warbling zap while the arc weapon keeps its voice', () => {
     const audio = new AudioSystem() as any;
-    const rayGun = vi.spyOn(audio, 'playRayGunShot').mockImplementation(() => {});
+    const vortex9 = vi.spyOn(audio, 'playVortex9Shot').mockImplementation(() => {});
     const arc = vi.spyOn(audio, 'playEnergyShot').mockImplementation(() => {});
 
     audio.playShot(definition.audio);
-    expect(rayGun).toHaveBeenCalledWith(definition.audio);
+    expect(vortex9).toHaveBeenCalledWith(definition.audio);
     expect(arc).not.toHaveBeenCalled();
 
     audio.playShot(WEAPON_DEFINITIONS.tesla.audio);
     expect(arc).toHaveBeenCalledWith(WEAPON_DEFINITIONS.tesla.audio);
-    expect(rayGun).toHaveBeenCalledTimes(1);
+    expect(vortex9).toHaveBeenCalledTimes(1);
   });
 
   it('layers a vibrato-modulated, filtered zap under a sub punch and an echo', () => {

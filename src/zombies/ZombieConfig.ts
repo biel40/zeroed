@@ -169,8 +169,8 @@ export const ZOMBIE_BARRIER_ATTACK_HIT_MOMENT = 0.475;
 export const ZOMBIE_DEATH_FALL = 1.0;
 export const ZOMBIE_CORPSE_LINGER = 1.6;
 export const ZOMBIE_DEATH_FADE = 0.8;
-/** Vaporization/dissolution duration for zombies eliminated by the Ray Gun (0.8–1.2 s). */
-export const ZOMBIE_RAYGUN_DEATH_DURATION = 1.0;
+/** Vaporization/dissolution duration for zombies eliminated by the VORTEX-9 (0.8–1.2 s). */
+export const ZOMBIE_VORTEX9_DEATH_DURATION = 1.0;
 
 // --- Per-zombie visual/behavior variation (fractions, applied at spawn) ---
 export const ZOMBIE_SPEED_JITTER = 0.08;
@@ -196,7 +196,7 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   m60: 500,
   l96: 60,
   barrett: 40,
-  raygun: 160,
+  vortex9: 160,
 };
 
 /** Maximum zombies one Tesla shot can electrocute, impact included. */
@@ -328,7 +328,7 @@ export function computeDamage(
 }
 
 /**
- * Ray Gun splash: full damage at the epicenter, linear falloff to zero at
+ * VORTEX-9 splash: full damage at the epicenter, linear falloff to zero at
  * the radius edge. Returns 0 outside the radius.
  */
 export function splashDamageAt(

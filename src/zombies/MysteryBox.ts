@@ -32,7 +32,7 @@ export const MYSTERY_BOX_POOL: readonly MysteryBoxEntry[] = [
   { weaponId: 'm60', weight: 20, rarity: 'standard' },
   { weaponId: 'l96', weight: 20, rarity: 'standard' },
   { weaponId: 'barrett', weight: 15, rarity: 'standard' },
-  { weaponId: 'raygun', weight: 10, rarity: 'rare' },
+  { weaponId: 'vortex9', weight: 10, rarity: 'rare' },
   { weaponId: 'tesla', weight: 1, rarity: 'legendary' },
 ];
 

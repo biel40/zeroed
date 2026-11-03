@@ -47,15 +47,15 @@ describe('Zombies progression contract', () => {
     expect(mode.weaponIds).toContain('m1911');
   });
 
-  it('keeps the Ray Gun out of the starting slots: earned, never given', () => {
+  it('keeps the VORTEX-9 out of the starting slots: earned, never given', () => {
     const mode = new ZombiesMode();
-    expect(mode.startingInventory).not.toContain('raygun');
+    expect(mode.startingInventory).not.toContain('vortex9');
     // Not directly slot-selectable either: it is not part of the start
     // loadout and the inventory caps at maxWeapons, so number keys can
     // never reach it. It IS preloaded so the Mystery Box can hand it
     // out without touching the network.
-    expect(mode.weaponIds).toContain('raygun');
-    expect(MYSTERY_BOX_POOL.some((e) => e.weaponId === 'raygun')).toBe(true);
+    expect(mode.weaponIds).toContain('vortex9');
+    expect(MYSTERY_BOX_POOL.some((e) => e.weaponId === 'vortex9')).toBe(true);
   });
 
   it('prices the box at 950 points, charged at activation', () => {
@@ -65,7 +65,7 @@ describe('Zombies progression contract', () => {
 
 });
 
-describe('Kills never grant a Ray Gun', () => {
+describe('Kills never grant a VORTEX-9', () => {
   interface MockContext {
     granted: WeaponId[];
     banners: string[];
@@ -80,7 +80,7 @@ describe('Kills never grant a Ray Gun', () => {
       hud: { showRoundBanner: (title: string) => ctx.banners.push(title) },
       audio: {
         playZombieDeath: () => undefined,
-        playMysteryBoxReveal: (isRayGun: boolean) => void ctx.reveals.push(isRayGun),
+        playMysteryBoxReveal: (isVortex9: boolean) => void ctx.reveals.push(isVortex9),
       },
     };
     return { mode, ctx };

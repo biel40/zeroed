@@ -756,7 +756,7 @@ export class CoopHostMode implements GameMode {
     } else {
       this.ctx.audio.playRayImpact();
       if (zombie?.isAlive) {
-        const lethal = this.zombies.damageZombie(zombie, part, WEAPON_DEFINITIONS.raygun.damage, 'raygun');
+        const lethal = this.zombies.damageZombie(zombie, part, WEAPON_DEFINITIONS.vortex9.damage, 'vortex9');
         if (!lethal) this.players[shooter].economy.awardHit(part === 'head');
       }
       this.zombies.applySplash(point, config.splashRadius, config.splashDamage);
@@ -766,7 +766,7 @@ export class CoopHostMode implements GameMode {
       if (target.isAlive && target.hp < hp) {
         this.send({ type: 'zombieHit', zombieId: this.zombies.networkIdOf(target),
           headshot: target === zombie && part === 'head', amount: hp - target.hp,
-          source: config === WEAPON_DEFINITIONS.tesla.energy ? 'tesla' : 'raygun',
+          source: config === WEAPON_DEFINITIONS.tesla.energy ? 'tesla' : 'vortex9',
           fromX: point.x, fromZ: point.z });
       }
     }

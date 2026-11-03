@@ -104,11 +104,11 @@ function holdDistance(grip: HandGripConfig, point: THREE.Vector3): number {
 }
 
 describe('Weapon hand anchors', () => {
-  it('declares both hands on every weapon except the one-handed Ray Gun', () => {
+  it('declares both hands on every weapon except the one-handed VORTEX-9', () => {
     for (const id of WEAPONS) {
       const hands = WEAPON_DEFINITIONS[id].view.hands;
       expect(hands.right, id).toBeDefined();
-      if (id === 'raygun') expect(hands.left, id).toBeUndefined();
+      if (id === 'vortex9') expect(hands.left, id).toBeUndefined();
       else expect(hands.left, id).toBeDefined();
     }
   });
@@ -500,23 +500,23 @@ describe('Reload hands', () => {
     expect(offMagazineGrip(seating)).toBeLessThan(0.01);
   });
 
-  it('shows the Ray Gun support hand only to carry its canister', () => {
-    const reload = WEAPON_DEFINITIONS.raygun.view.reloadAnim!;
-    const canisterOf = (setup: Rig) => setup.view.root.getObjectByName('raygun-canister')!;
+  it('shows the VORTEX-9 support hand only to carry its canister', () => {
+    const reload = WEAPON_DEFINITIONS.vortex9.view.reloadAnim!;
+    const canisterOf = (setup: Rig) => setup.view.root.getObjectByName('vortex9-canister')!;
 
-    const idle = rig(WEAPON_DEFINITIONS.raygun);
+    const idle = rig(WEAPON_DEFINITIONS.vortex9);
     for (let step = 0; step < 10; step++) frame(idle);
     expect(idle.arms.left.root.visible).toBe(false);
 
     for (const progress of [(reload.magOut + reload.magDrop) / 2, (reload.magDrop + reload.magIn) / 2, (reload.magIn + reload.magSeat) / 2]) {
-      const setup = reloading('raygun', progress);
+      const setup = reloading('vortex9', progress);
       expect(setup.arms.left.root.visible, `${progress}`).toBe(true);
       expect(gripError(setup, 'left'), `${progress}`).toBeLessThan(TOLERANCE);
       const grip = setup.arms.left.getGripWorldPosition(new THREE.Vector3());
       expect(canisterOf(setup).worldToLocal(grip).distanceTo(new THREE.Vector3(0, 0, -0.05)), `${progress}`).toBeLessThan(0.06);
     }
 
-    const done = reloading('raygun', Math.min(1, reload.magSeat + 0.15));
+    const done = reloading('vortex9', Math.min(1, reload.magSeat + 0.15));
     expect(done.arms.left.root.visible).toBe(false);
   });
 

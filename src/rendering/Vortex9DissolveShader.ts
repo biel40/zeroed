@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 
 /**
- * Duration of the Ray Gun vaporization / dissolution sequence in seconds
+ * Duration of the VORTEX-9 vaporization / dissolution sequence in seconds
  * (within the 0.8–1.2 s window).
  */
-export const RAYGUN_DISSOLVE_DURATION = 1.0;
+export const VORTEX9_DISSOLVE_DURATION = 1.0;
 
-export const RAYGUN_NEON_GREEN = 0x5cff3a;
-export const RAYGUN_HOT_CORE = 0xe8ffd1;
+export const VORTEX9_NEON_GREEN = 0x5cff3a;
+export const VORTEX9_HOT_CORE = 0xe8ffd1;
 const ASH_PARTICLE_COUNT = 36;
 const NOISE_TEXTURE_SIZE = 64;
 
-export interface RayGunDissolveUniforms {
+export interface Vortex9DissolveUniforms {
   uDissolveProgress: { value: number };
   uDissolveEdgeWidth: { value: number };
   uDissolveEdgeColor: { value: THREE.Color };
@@ -97,7 +97,7 @@ export function disposeDissolveNoiseTexture(): void {
 /**
  * Vertex shader declarations injected into MeshStandardMaterial via onBeforeCompile.
  */
-export const RAYGUN_DISSOLVE_VERTEX_PARS = /* glsl */ `
+export const VORTEX9_DISSOLVE_VERTEX_PARS = /* glsl */ `
 varying vec3 vDissolveLocalPos;
 `;
 
@@ -105,7 +105,7 @@ varying vec3 vDissolveLocalPos;
  * Vertex shader body snippet injected after `#include <skinning_vertex>` so
  * `vDissolveLocalPos` reflects the animated bone pose in model meters.
  */
-export const RAYGUN_DISSOLVE_VERTEX_MAIN = /* glsl */ `
+export const VORTEX9_DISSOLVE_VERTEX_MAIN = /* glsl */ `
 vDissolveLocalPos = transformed;
 `;
 
@@ -113,7 +113,7 @@ vDissolveLocalPos = transformed;
  * Fragment shader declarations and 3D Simplex-like procedural noise helper
  * combined with the tileable noise texture for mobile-friendly dissolution.
  */
-export const RAYGUN_DISSOLVE_FRAGMENT_PARS = /* glsl */ `
+export const VORTEX9_DISSOLVE_FRAGMENT_PARS = /* glsl */ `
 varying vec3 vDissolveLocalPos;
 uniform float uDissolveProgress;
 uniform float uDissolveEdgeWidth;
@@ -123,25 +123,25 @@ uniform vec3 uDissolveOrigin;
 uniform float uDissolveHeight;
 uniform sampler2D uDissolveNoiseMap;
 
-float rayGunHash31(vec3 p) {
+float vortex9Hash31(vec3 p) {
   p = fract(p * 0.1031);
   p += dot(p, p.yzx + 33.33);
   return fract((p.x + p.y) * p.z);
 }
 
-float rayGunNoise3D(vec3 p) {
+float vortex9Noise3D(vec3 p) {
   vec3 i = floor(p);
   vec3 f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(
     mix(
-      mix(rayGunHash31(i + vec3(0.0, 0.0, 0.0)), rayGunHash31(i + vec3(1.0, 0.0, 0.0)), f.x),
-      mix(rayGunHash31(i + vec3(0.0, 1.0, 0.0)), rayGunHash31(i + vec3(1.0, 1.0, 0.0)), f.x),
+      mix(vortex9Hash31(i + vec3(0.0, 0.0, 0.0)), vortex9Hash31(i + vec3(1.0, 0.0, 0.0)), f.x),
+      mix(vortex9Hash31(i + vec3(0.0, 1.0, 0.0)), vortex9Hash31(i + vec3(1.0, 1.0, 0.0)), f.x),
       f.y
     ),
     mix(
-      mix(rayGunHash31(i + vec3(0.0, 0.0, 1.0)), rayGunHash31(i + vec3(1.0, 0.0, 1.0)), f.x),
-      mix(rayGunHash31(i + vec3(0.0, 1.0, 1.0)), rayGunHash31(i + vec3(1.0, 1.0, 1.0)), f.x),
+      mix(vortex9Hash31(i + vec3(0.0, 0.0, 1.0)), vortex9Hash31(i + vec3(1.0, 0.0, 1.0)), f.x),
+      mix(vortex9Hash31(i + vec3(0.0, 1.0, 1.0)), vortex9Hash31(i + vec3(1.0, 1.0, 1.0)), f.x),
       f.y
     ),
     f.z
@@ -154,14 +154,14 @@ float rayGunNoise3D(vec3 p) {
  * Progressively discards fragments from the top and impact origin, adding an
  * incandescent neon-green plasma rim along the active dissolution threshold.
  */
-export const RAYGUN_DISSOLVE_FRAGMENT_MAIN = /* glsl */ `
+export const VORTEX9_DISSOLVE_FRAGMENT_MAIN = /* glsl */ `
 if (uDissolveProgress > 0.001) {
   float invHeight = 1.0 / max(uDissolveHeight, 0.1);
   float topDown = 1.0 - clamp(vDissolveLocalPos.y * invHeight, 0.0, 1.0);
   float radial = clamp(length(vDissolveLocalPos - uDissolveOrigin) * invHeight, 0.0, 1.0);
   vec2 noiseUv = vDissolveLocalPos.xz * 1.9 + vec2(vDissolveLocalPos.y * 1.35);
   float texNoise = texture2D(uDissolveNoiseMap, noiseUv).r;
-  float procNoise = rayGunNoise3D(vDissolveLocalPos * 4.5);
+  float procNoise = vortex9Noise3D(vDissolveLocalPos * 4.5);
   float combinedNoise = mix(texNoise, procNoise, 0.5);
 
   float dissolveField = mix(topDown, radial, 0.35) * 0.55 + combinedNoise * 0.45;
@@ -180,7 +180,7 @@ if (uDissolveProgress > 0.001) {
 }
 `;
 
-export const RAYGUN_ASH_VERTEX_SHADER = /* glsl */ `
+export const VORTEX9_ASH_VERTEX_SHADER = /* glsl */ `
 attribute vec3 aVelocity;
 attribute float aPhase;
 attribute float aScale;
@@ -210,7 +210,7 @@ void main() {
 }
 `;
 
-export const RAYGUN_ASH_FRAGMENT_SHADER = /* glsl */ `
+export const VORTEX9_ASH_FRAGMENT_SHADER = /* glsl */ `
 uniform vec3 uEdgeColor;
 uniform vec3 uHotColor;
 
@@ -229,33 +229,33 @@ void main() {
 `;
 
 /**
- * Installs the Ray Gun dissolution shader hook onto a zombie's standard material.
+ * Installs the VORTEX-9 dissolution shader hook onto a zombie's standard material.
  * Preserves hardware bone skinning, shadows, and PBR lighting while dormant
  * (`uDissolveProgress === 0`).
  */
-export function installRayGunDissolve(
+export function installVortex9Dissolve(
   material: THREE.MeshStandardMaterial,
   height = 1.8,
-): RayGunDissolveUniforms {
-  const existing = material.userData.rayGunDissolve as RayGunDissolveUniforms | undefined;
+): Vortex9DissolveUniforms {
+  const existing = material.userData.vortex9Dissolve as Vortex9DissolveUniforms | undefined;
   if (existing) {
     existing.uDissolveHeight.value = height;
     return existing;
   }
 
-  const uniforms: RayGunDissolveUniforms = {
+  const uniforms: Vortex9DissolveUniforms = {
     uDissolveProgress: { value: 0 },
     uDissolveEdgeWidth: { value: 0.11 },
-    uDissolveEdgeColor: { value: new THREE.Color(RAYGUN_NEON_GREEN) },
-    uDissolveHotColor: { value: new THREE.Color(RAYGUN_HOT_CORE) },
+    uDissolveEdgeColor: { value: new THREE.Color(VORTEX9_NEON_GREEN) },
+    uDissolveHotColor: { value: new THREE.Color(VORTEX9_HOT_CORE) },
     uDissolveOrigin: { value: new THREE.Vector3(0, height * 0.55, 0) },
     uDissolveHeight: { value: height },
     uDissolveNoiseMap: { value: getDissolveNoiseTexture() },
   };
-  material.userData.rayGunDissolve = uniforms;
+  material.userData.vortex9Dissolve = uniforms;
 
   const prevCacheKey = material.customProgramCacheKey.bind(material);
-  material.customProgramCacheKey = () => `${prevCacheKey()}|raygun-dissolve-v1`;
+  material.customProgramCacheKey = () => `${prevCacheKey()}|vortex9-dissolve-v1`;
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uDissolveProgress = uniforms.uDissolveProgress;
@@ -269,21 +269,21 @@ export function installRayGunDissolve(
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        `#include <common>\n${RAYGUN_DISSOLVE_VERTEX_PARS}`,
+        `#include <common>\n${VORTEX9_DISSOLVE_VERTEX_PARS}`,
       )
       .replace(
         '#include <skinning_vertex>',
-        `#include <skinning_vertex>\n${RAYGUN_DISSOLVE_VERTEX_MAIN}`,
+        `#include <skinning_vertex>\n${VORTEX9_DISSOLVE_VERTEX_MAIN}`,
       );
 
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\n${RAYGUN_DISSOLVE_FRAGMENT_PARS}`,
+        `#include <common>\n${VORTEX9_DISSOLVE_FRAGMENT_PARS}`,
       )
       .replace(
         '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>\n${RAYGUN_DISSOLVE_FRAGMENT_MAIN}`,
+        `#include <emissivemap_fragment>\n${VORTEX9_DISSOLVE_FRAGMENT_MAIN}`,
       );
   };
   material.needsUpdate = true;
@@ -292,14 +292,14 @@ export function installRayGunDissolve(
 
 /**
  * Updates the dissolution progress (`0..1`) and optional local-space impact origin
- * on a material previously registered with `installRayGunDissolve`.
+ * on a material previously registered with `installVortex9Dissolve`.
  */
-export function setRayGunDissolveState(
+export function setVortex9DissolveState(
   material: THREE.Material,
   progress: number,
   origin?: THREE.Vector3,
 ): void {
-  const uniforms = material.userData.rayGunDissolve as RayGunDissolveUniforms | undefined;
+  const uniforms = material.userData.vortex9Dissolve as Vortex9DissolveUniforms | undefined;
   if (!uniforms) return;
   uniforms.uDissolveProgress.value = THREE.MathUtils.clamp(progress, 0, 1);
   if (origin) uniforms.uDissolveOrigin.value.copy(origin);
@@ -307,10 +307,10 @@ export function setRayGunDissolveState(
 
 /**
  * Ascending neon-green plasma ash particle burst attached to a zombie visual
- * during a Ray Gun vaporization death. Uses a single draw call (`THREE.Points`)
+ * during a VORTEX-9 vaporization death. Uses a single draw call (`THREE.Points`)
  * and exposes `dispose()` for explicit GPU memory cleanup.
  */
-export class RayGunAshParticles {
+export class Vortex9AshParticles {
   public readonly points: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
   private readonly geometry: THREE.BufferGeometry;
   private readonly material: THREE.ShaderMaterial;
@@ -319,7 +319,7 @@ export class RayGunAshParticles {
   private readonly phases = new Float32Array(ASH_PARTICLE_COUNT);
   private readonly positionAttr: THREE.BufferAttribute;
 
-  public constructor(height = 1.8, colors: { readonly edge: number; readonly hot: number } = { edge: RAYGUN_NEON_GREEN, hot: RAYGUN_HOT_CORE }) {
+  public constructor(height = 1.8, colors: { readonly edge: number; readonly hot: number } = { edge: VORTEX9_NEON_GREEN, hot: VORTEX9_HOT_CORE }) {
     this.geometry = new THREE.BufferGeometry();
     const initialPositions = new Float32Array(ASH_PARTICLE_COUNT * 3);
     const scales = new Float32Array(ASH_PARTICLE_COUNT);
@@ -355,8 +355,8 @@ export class RayGunAshParticles {
     this.geometry.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
 
     this.material = new THREE.ShaderMaterial({
-      vertexShader: RAYGUN_ASH_VERTEX_SHADER,
-      fragmentShader: RAYGUN_ASH_FRAGMENT_SHADER,
+      vertexShader: VORTEX9_ASH_VERTEX_SHADER,
+      fragmentShader: VORTEX9_ASH_FRAGMENT_SHADER,
       uniforms: {
         uProgress: { value: 0 },
         uPointScale: { value: 68 },
@@ -371,7 +371,7 @@ export class RayGunAshParticles {
     });
 
     this.points = new THREE.Points(this.geometry, this.material);
-    this.points.name = 'raygun-ash-particles';
+    this.points.name = 'vortex9-ash-particles';
     this.points.frustumCulled = false;
     this.points.visible = false;
   }

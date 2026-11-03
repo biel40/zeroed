@@ -7,10 +7,10 @@ import type { BuiltProcedural } from './WeaponView';
 import type { ViewModelConfig } from './WeaponTypes';
 
 /**
- * Ray Gun layout in meters: bore on y = 0, -Z towards the emitter. The sight
+ * VORTEX-9 layout in meters: bore on y = 0, -Z towards the emitter. The sight
  * line runs through the open scope tube, so ADS frames the target in it.
  */
-export const RAYGUN_LAYOUT = {
+export const VORTEX9_LAYOUT = {
   sightY: 0.07,
   scope: { z: 0.04, length: 0.055, radius: 0.022 },
   rearHousing: { rearZ: 0.1, frontZ: -0.01, bottomY: -0.04, topY: 0.045, width: 0.062 },
@@ -36,16 +36,16 @@ const TRIGGER_FIN_PROFILE: readonly ProfilePoint[] = [
 ];
 
 /**
- * Ray Gun view model: chipped red housings with glowing plasma windows, a
+ * VORTEX-9 view model: chipped red housings with glowing plasma windows, a
  * stack of tapered accelerator discs ending in the emitter ball, three spiked
  * field arms and an open scope tube. Everything ahead of the collar rings is
  * the screw-on plasma canister, the live reload part ('canister' style);
  * `energyFlow` scrolls through the windows.
  */
-export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
+export function buildVortex9(config: ViewModelConfig): BuiltProcedural {
   const group = new THREE.Group();
-  group.name = 'raygun-root';
-  const L = RAYGUN_LAYOUT;
+  group.name = 'vortex9-root';
+  const L = VORTEX9_LAYOUT;
   const glowColor = config.energyColor ?? 0x5cff3a;
   const grime = grimeTexture();
   const flow = plasmaTexture();
@@ -86,7 +86,7 @@ export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
 
   const assembly = (name: string, x = 0, y = 0, z = 0): THREE.Group => {
     const part = new THREE.Group();
-    part.name = `raygun-${name}`;
+    part.name = `vortex9-${name}`;
     part.position.set(x, y, z);
     group.add(part);
     return part;
@@ -96,7 +96,7 @@ export function buildRayGun(config: ViewModelConfig): BuiltProcedural {
     parent: THREE.Object3D, x = 0, y = 0, z = 0,
   ): THREE.Mesh => {
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = `raygun-${name}`;
+    mesh.name = `vortex9-${name}`;
     mesh.position.set(x, y, z);
     parent.add(mesh);
     return mesh;

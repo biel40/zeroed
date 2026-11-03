@@ -14,7 +14,7 @@ const TRAIL_LENGTH = 1.4;
 const TRAIL_RADIUS = 0.05;
 const PROJECTILE_RADIUS = 0.07;
 const GLOW_SCALE = 0.42;
-const RAYGUN_RING_RED = 0xff3b1f;
+const VORTEX9_RING_RED = 0xff3b1f;
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 interface EnergyBolt {
@@ -126,7 +126,7 @@ function getScorchTexture(): THREE.DataTexture {
 }
 
 /**
- * Ray Gun & Wonder Weapon projectiles: visible energy bolts traveling in a
+ * VORTEX-9 & Wonder Weapon projectiles: visible energy bolts traveling in a
  * straight line (no gravity), pooled and segment-raycast against the shared
  * collider array. Features:
  *  - Bright plasma core + unstable halo + 3 concentric red/green energy rings
@@ -370,9 +370,9 @@ export class EnergyProjectiles {
     bolt.trail.visible = true;
 
     // Characteristic concentric rings: alternating neon green and crimson-red
-    // plasma for the Ray Gun, or electric cyan/white for arc bolts.
-    const isRayGun = config.splashRadius > 0;
-    const altRingColor = isRayGun ? RAYGUN_RING_RED : 0xffffff;
+    // plasma for the VORTEX-9, or electric cyan/white for arc bolts.
+    const isVortex9 = config.splashRadius > 0;
+    const altRingColor = isVortex9 ? VORTEX9_RING_RED : 0xffffff;
     for (let r = 0; r < bolt.rings.length; r++) {
       const ring = bolt.rings[r];
       bolt.ringMaterials[r].color.setHex(r === 1 ? altRingColor : config.color);
@@ -628,8 +628,8 @@ export class EnergyProjectiles {
     p.vz = -dz * 0.4;
     p.baseScale = 0.75;
 
-    const isRayGun = config.splashRadius > 0;
-    this.tmpColor.setHex(isRayGun && index % 4 === 0 ? RAYGUN_RING_RED : config.color);
+    const isVortex9 = config.splashRadius > 0;
+    this.tmpColor.setHex(isVortex9 && index % 4 === 0 ? VORTEX9_RING_RED : config.color);
     this.particleMesh.setColorAt(index, this.tmpColor);
     if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
   }
@@ -639,9 +639,9 @@ export class EnergyProjectiles {
     normal: THREE.Vector3,
     config: EnergyWeaponConfig,
   ): void {
-    const isRayGun = config.splashRadius > 0;
+    const isVortex9 = config.splashRadius > 0;
     this.tmpColor.setHex(config.color);
-    this.tmpAltColor.setHex(isRayGun ? RAYGUN_RING_RED : 0xffffff);
+    this.tmpAltColor.setHex(isVortex9 ? VORTEX9_RING_RED : 0xffffff);
 
     for (let i = 0; i < IMPACT_PARTICLE_COUNT; i++) {
       const p = this.particles[this.particleCursor];

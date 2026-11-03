@@ -1,6 +1,6 @@
 import type { WeaponId } from '../../weapons/WeaponTypes';
 
-export type WallBuyWeaponId = Exclude<WeaponId, 'raygun' | 'tesla'>;
+export type WallBuyWeaponId = Exclude<WeaponId, 'vortex9' | 'tesla'>;
 
 export interface WallBuyConfig {
   readonly id: string;
@@ -21,7 +21,7 @@ export class WallBuy {
   readonly lookDotMin: number;
 
   constructor(readonly config: WallBuyConfig) {
-    if ((config.weaponId as WeaponId) === 'raygun' || (config.weaponId as WeaponId) === 'tesla') {
+    if ((config.weaponId as WeaponId) === 'vortex9' || (config.weaponId as WeaponId) === 'tesla') {
       throw new Error(`Special weapon "${config.weaponId}" cannot be a wall buy`);
     }
     if (!Number.isFinite(config.price) || config.price < 0) {

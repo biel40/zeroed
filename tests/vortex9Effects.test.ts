@@ -3,23 +3,23 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import {
   getDissolveNoiseTexture,
-  RAYGUN_ASH_FRAGMENT_SHADER,
-  RAYGUN_ASH_VERTEX_SHADER,
-  RAYGUN_DISSOLVE_DURATION,
-  RAYGUN_DISSOLVE_FRAGMENT_MAIN,
-  RAYGUN_DISSOLVE_FRAGMENT_PARS,
-  RAYGUN_DISSOLVE_VERTEX_MAIN,
-  RAYGUN_DISSOLVE_VERTEX_PARS,
-  RAYGUN_NEON_GREEN,
-} from '../src/rendering/RayGunDissolveShader';
+  VORTEX9_ASH_FRAGMENT_SHADER,
+  VORTEX9_ASH_VERTEX_SHADER,
+  VORTEX9_DISSOLVE_DURATION,
+  VORTEX9_DISSOLVE_FRAGMENT_MAIN,
+  VORTEX9_DISSOLVE_FRAGMENT_PARS,
+  VORTEX9_DISSOLVE_VERTEX_MAIN,
+  VORTEX9_DISSOLVE_VERTEX_PARS,
+  VORTEX9_NEON_GREEN,
+} from '../src/rendering/Vortex9DissolveShader';
 import type { Weapon } from '../src/weapons/Weapon';
 import { WeaponView } from '../src/weapons/WeaponView';
 import { EnergyProjectiles } from '../src/zombies/EnergyProjectiles';
 import { Zombie } from '../src/zombies/Zombie';
-import { roundConfig, ZOMBIE_RAYGUN_DEATH_DURATION } from '../src/zombies/ZombieConfig';
+import { roundConfig, ZOMBIE_VORTEX9_DEATH_DURATION } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 
-const raygunDef = WEAPON_DEFINITIONS.raygun;
+const vortex9Def = WEAPON_DEFINITIONS.vortex9;
 const originalDocument = globalThis.document;
 
 beforeAll(() => {
@@ -45,9 +45,9 @@ function fakeWeapon(state: Weapon['state'] = 'ready', stateProgress = 0): Weapon
   return { state, stateProgress, adsAlpha: 0, reloadType: 'empty' } as Weapon;
 }
 
-describe('Ray Gun Muzzle & Projectile VFX', () => {
+describe('VORTEX-9 Muzzle & Projectile VFX', () => {
   it('displays a 65ms green plasma muzzle flash with a plasma ring on shot', () => {
-    const view = new WeaponView(raygunDef, null);
+    const view = new WeaponView(vortex9Def, null);
     const flash = view.root.getObjectByName('muzzle-plasma-ring')?.parent as THREE.Sprite | undefined;
     expect(flash).toBeDefined();
     expect(flash!.visible).toBe(false);
@@ -81,7 +81,7 @@ describe('Ray Gun Muzzle & Projectile VFX', () => {
     projectiles.fire(
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0, 0, -1),
-      raygunDef.energy!,
+      vortex9Def.energy!,
     );
 
     // Advance partway along the segmented raycast: bolt + 3 concentric rings are visible
@@ -104,7 +104,7 @@ describe('Ray Gun Muzzle & Projectile VFX', () => {
     expect(visibleCores).toBe(1);
     expect(visibleRings).toBe(3);
     // Alternating neon green and plasma red rings
-    expect(ringColors).toContain(RAYGUN_NEON_GREEN);
+    expect(ringColors).toContain(VORTEX9_NEON_GREEN);
     expect(ringColors).toContain(0xff3b1f);
 
     // Advance until impact at z = -5
@@ -143,8 +143,8 @@ describe('Ray Gun Muzzle & Projectile VFX', () => {
   });
 });
 
-describe('Ray Gun Vaporization / Dissolution Death & Cleanup', () => {
-  it('dissolves a zombie killed by the Ray Gun over 1.0s with GLSL noise shader and ascending ash particles', () => {
+describe('VORTEX-9 Vaporization / Dissolution Death & Cleanup', () => {
+  it('dissolves a zombie killed by the VORTEX-9 over 1.0s with GLSL noise shader and ascending ash particles', () => {
     const zombie = new Zombie();
     let deathFinished = false;
     zombie.onDeathFinished = () => {
@@ -152,26 +152,26 @@ describe('Ray Gun Vaporization / Dissolution Death & Cleanup', () => {
     };
     zombie.spawn(0, 0, 100, 1.8);
 
-    const killed = zombie.applyDamage(200, false, 0, 1, 'raygun');
+    const killed = zombie.applyDamage(200, false, 0, 1, 'vortex9');
     expect(killed).toBe(true);
     expect(zombie.isAlive).toBe(false);
-    expect(zombie.deathKind).toBe('raygun');
-    expect(ZOMBIE_RAYGUN_DEATH_DURATION).toBe(RAYGUN_DISSOLVE_DURATION);
-    expect(ZOMBIE_RAYGUN_DEATH_DURATION).toBeGreaterThanOrEqual(0.8);
-    expect(ZOMBIE_RAYGUN_DEATH_DURATION).toBeLessThanOrEqual(1.2);
+    expect(zombie.deathKind).toBe('vortex9');
+    expect(ZOMBIE_VORTEX9_DEATH_DURATION).toBe(VORTEX9_DISSOLVE_DURATION);
+    expect(ZOMBIE_VORTEX9_DEATH_DURATION).toBeGreaterThanOrEqual(0.8);
+    expect(ZOMBIE_VORTEX9_DEATH_DURATION).toBeLessThanOrEqual(1.2);
 
     // Halfway through dissolution (0.5s of 1.0s)
     zombie.update(0.5);
     expect(deathFinished).toBe(false);
     expect(zombie.visual.currentDissolveProgress).toBeCloseTo(0.5, 2);
 
-    const points = zombie.visual.root.getObjectByName('raygun-ash-particles') as THREE.Points | undefined;
+    const points = zombie.visual.root.getObjectByName('vortex9-ash-particles') as THREE.Points | undefined;
     expect(points).toBeDefined();
     expect(points!.visible).toBe(true);
 
     const ashMat = points!.material as THREE.ShaderMaterial;
-    expect(ashMat.vertexShader).toBe(RAYGUN_ASH_VERTEX_SHADER);
-    expect(ashMat.fragmentShader).toBe(RAYGUN_ASH_FRAGMENT_SHADER);
+    expect(ashMat.vertexShader).toBe(VORTEX9_ASH_VERTEX_SHADER);
+    expect(ashMat.fragmentShader).toBe(VORTEX9_ASH_FRAGMENT_SHADER);
     expect(ashMat.uniforms.uProgress.value).toBeCloseTo(0.5, 2);
 
     // Check that custom GLSL dissolve snippets are wired into zombie materials via onBeforeCompile
@@ -188,10 +188,10 @@ describe('Ray Gun Vaporization / Dissolution Death & Cleanup', () => {
       fragmentShader: '#include <common>\nvoid main() {\n#include <emissivemap_fragment>\n}',
     };
     meshMat!.onBeforeCompile(fakeShader as any, {} as any);
-    expect(fakeShader.vertexShader).toContain(RAYGUN_DISSOLVE_VERTEX_PARS);
-    expect(fakeShader.vertexShader).toContain(RAYGUN_DISSOLVE_VERTEX_MAIN);
-    expect(fakeShader.fragmentShader).toContain(RAYGUN_DISSOLVE_FRAGMENT_PARS);
-    expect(fakeShader.fragmentShader).toContain(RAYGUN_DISSOLVE_FRAGMENT_MAIN);
+    expect(fakeShader.vertexShader).toContain(VORTEX9_DISSOLVE_VERTEX_PARS);
+    expect(fakeShader.vertexShader).toContain(VORTEX9_DISSOLVE_VERTEX_MAIN);
+    expect(fakeShader.fragmentShader).toContain(VORTEX9_DISSOLVE_FRAGMENT_PARS);
+    expect(fakeShader.fragmentShader).toContain(VORTEX9_DISSOLVE_FRAGMENT_MAIN);
     expect(fakeShader.uniforms.uDissolveNoiseMap.value).toBe(getDissolveNoiseTexture());
     expect(fakeShader.uniforms.uDissolveProgress.value).toBeCloseTo(0.5, 2);
 
@@ -202,7 +202,7 @@ describe('Ray Gun Vaporization / Dissolution Death & Cleanup', () => {
     zombie.dispose();
   });
 
-  it('immediately removes zombie hit colliders and A* navigation state upon Ray Gun kill', () => {
+  it('immediately removes zombie hit colliders and A* navigation state upon VORTEX-9 kill', () => {
     const hitColliders: THREE.Object3D[] = [];
     const onKilled = vi.fn();
 
@@ -215,14 +215,14 @@ describe('Ray Gun Vaporization / Dissolution Death & Cleanup', () => {
     zombie.position.set(2, 0, -4);
     expect(hitColliders.length).toBe(2);
 
-    // Ray Gun splash kill
+    // VORTEX-9 splash kill
     manager.applySplash(new THREE.Vector3(2, 0, -4), 3.5, 500);
 
     expect(zombie.isAlive).toBe(false);
-    expect(zombie.deathKind).toBe('raygun');
+    expect(zombie.deathKind).toBe('vortex9');
     // Colliders removed on the exact kill frame
     expect(hitColliders.length).toBe(0);
-    expect(onKilled).toHaveBeenCalledWith(zombie, false, 'raygun', { x: 2, y: 0, z: -4 });
+    expect(onKilled).toHaveBeenCalledWith(zombie, false, 'vortex9', { x: 2, y: 0, z: -4 });
 
     manager.dispose();
   });

@@ -39,7 +39,7 @@ export interface GuardianRun {
 /**
  * The guardian of an evacuation (CAPITÁN URSS) in a single-player run: it
  * wakes when the player enters its ground during the escape, routes shots,
- * Ray Gun and Tesla bolts and flames at its hitboxes into the brain, turns
+ * VORTEX-9 and Tesla bolts and flames at its hitboxes into the brain, turns
  * the brain's events into damage, banners, sounds and camera shake, and
  * keeps its HUD bar and objective note. The pure `CaptainUssrBrain`
  * decides; `CaptainUssrView` presents.

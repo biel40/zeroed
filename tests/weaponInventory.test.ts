@@ -3,13 +3,13 @@ import { WeaponInventory } from '../src/game/WeaponInventory';
 
 describe('WeaponInventory (zombies two-weapon rule)', () => {
   it('allows an explicit developer grant to replace the selected pinned weapon only', () => {
-    const inventory = new WeaponInventory(['raygun', 'tesla'], 2);
-    inventory.pin('raygun');
+    const inventory = new WeaponInventory(['vortex9', 'tesla'], 2);
+    inventory.pin('vortex9');
     inventory.pin('tesla');
-    expect(inventory.grant('m1911').equipped).toBe('raygun');
-    expect(inventory.grant('m1911', true)).toEqual({ equipped: 'm1911', dropped: 'raygun' });
+    expect(inventory.grant('m1911').equipped).toBe('vortex9');
+    expect(inventory.grant('m1911', true)).toEqual({ equipped: 'm1911', dropped: 'vortex9' });
     expect(inventory.weapons).toEqual(['m1911', 'tesla']);
-    expect(inventory.isPinned('raygun')).toBe(false);
+    expect(inventory.isPinned('vortex9')).toBe(false);
     expect(inventory.isPinned('tesla')).toBe(true);
   });
   it('starts with the M1911 alone and one empty slot', () => {
@@ -70,7 +70,7 @@ describe('WeaponInventory (zombies two-weapon rule)', () => {
   it('reset restores the starting inventory (zombies restart)', () => {
     const inventory = new WeaponInventory(['m1911'], 2);
     inventory.grant('ak47');
-    inventory.grant('raygun');
+    inventory.grant('vortex9');
     inventory.reset(['m1911']);
     expect(inventory.weapons).toEqual(['m1911']);
     expect(inventory.currentWeapon).toBe('m1911');
@@ -83,19 +83,19 @@ describe('WeaponInventory (zombies two-weapon rule)', () => {
     expect(inventory.switchTo(0)).toBe('m4a1');
   });
 
-  it('keeps pinned Ray Gun and Zeus in both slots and ignores replacements until reset', () => {
+  it('keeps pinned VORTEX-9 and Zeus in both slots and ignores replacements until reset', () => {
     const inventory = new WeaponInventory(['m1911'], 2);
-    inventory.grant('raygun');
-    inventory.pin('raygun');
+    inventory.grant('vortex9');
+    inventory.pin('vortex9');
     inventory.grant('tesla');
     inventory.pin('tesla');
 
-    expect([...inventory.weapons].sort()).toEqual(['raygun', 'tesla']);
+    expect([...inventory.weapons].sort()).toEqual(['tesla', 'vortex9']);
     expect(inventory.grant('ak47')).toEqual({ equipped: 'tesla', dropped: null });
-    expect([...inventory.weapons].sort()).toEqual(['raygun', 'tesla']);
+    expect([...inventory.weapons].sort()).toEqual(['tesla', 'vortex9']);
 
     inventory.reset(['m1911']);
-    expect(inventory.isPinned('raygun')).toBe(false);
+    expect(inventory.isPinned('vortex9')).toBe(false);
     expect(inventory.isPinned('tesla')).toBe(false);
     expect(inventory.weapons).toEqual(['m1911']);
   });

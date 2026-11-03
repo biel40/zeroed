@@ -28,7 +28,7 @@ interface ModeInternals {
 
 type EnergyConfig = NonNullable<typeof WEAPON_DEFINITIONS.tesla.energy>;
 const ZEUS = WEAPON_DEFINITIONS.tesla.energy!;
-const RAY_GUN = WEAPON_DEFINITIONS.raygun.energy!;
+const VORTEX9 = WEAPON_DEFINITIONS.vortex9.energy!;
 
 function startRun(): { mode: ZombiesMode; internals: ModeInternals; side: TestContext } {
   const side = makeContext();
@@ -172,7 +172,7 @@ describe('ZEUS-77 temporary power', () => {
     const { machine, impact } = crewLocker(internals);
     const far = impact.clone().add(new THREE.Vector3(0, 0, -(ZEUS_MACHINE_CHARGE_REACH + 0.5)));
     internals.onEnergyImpact(far, ZEUS, null, 8);
-    internals.onEnergyImpact(impact, RAY_GUN, null, 8);
+    internals.onEnergyImpact(impact, VORTEX9, null, 8);
     expect(machine.powered).toBe(false);
 
     const resurrection = internals.arena.ringMachines.find((candidate) => candidate.ringId === 'resurrection')!;

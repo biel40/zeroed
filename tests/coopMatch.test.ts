@@ -11,7 +11,7 @@ import type { PlayerHealth } from '../src/game/PlayerHealth';
 import type { CoopWorld } from '../src/modes/coop/CoopWorld';
 import type { MatchState, PlayerNetState } from '../src/network/Protocol';
 import type { Zombie } from '../src/zombies/Zombie';
-import { roundConfig } from '../src/zombies/ZombieConfig';
+import { roundConfig, ZOMBIE_SPAWN_DURATION } from '../src/zombies/ZombieConfig';
 import { ZombieBleeding } from '../src/zombies/ZombieBleeding';
 import { parseHostMessage } from '../src/network/Protocol';
 import { NUCLEAR_ENDING_DURATION } from '../src/zombies/ZombiesRunFlow';
@@ -50,7 +50,7 @@ interface HostInternals {
   readonly box: MysteryBoxMachine;
   readonly boxOwner: 'host' | 'guest' | null;
   useBox(buyer: 'host' | 'guest', action: 'activate' | 'pickup', equippedWeapon: WeaponId): void;
-  onEnergyImpact(point: THREE.Vector3, config: NonNullable<typeof WEAPON_DEFINITIONS.raygun.energy>,
+  onEnergyImpact(point: THREE.Vector3, config: NonNullable<typeof WEAPON_DEFINITIONS.vortex9.energy>,
     object: THREE.Object3D | null, distance: number, shooter: 'host' | 'guest'): void;
 }
 
@@ -349,6 +349,9 @@ describe('co-op combat authority', () => {
   it('validates the guest slash direction and obstruction before accepting a side hit', () => {
     const match = startedMatch();
     const zombie = spawnOne(match);
+    // A zombie still rising from the ground sits below the slash arc.
+    match.step(1 / 30, Math.ceil(ZOMBIE_SPAWN_DURATION * 30) + 1);
+    expect(zombie.state).not.toBe('spawn');
     const id = host(match).zombies.networkIdOf(zombie);
     const position = match.guestSide.player.rig.position;
     const claim = (): void => match.relay.host.onMessage?.({ type: 'knifeHitClaim', zombieId: id });
@@ -363,9 +366,10 @@ describe('co-op combat authority', () => {
     claim();
     expect(zombie.hp).toBe(hp);
 
-    zombie.group.position.set(position.x + 0.9, zombie.position.y, position.z + 1.2);
+    // Off-axis but inside the slash arc and the knife reach.
+    zombie.group.position.set(position.x + 0.6, zombie.position.y, position.z + 0.8);
     const blocker = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 0.1), new THREE.MeshBasicMaterial());
-    blocker.position.set(position.x + 0.45, position.y, position.z + 0.6);
+    blocker.position.set(position.x + 0.3, position.y, position.z + 0.4);
     blocker.updateMatrixWorld(true);
     match.hostSide.ctx.hitColliders.push(blocker);
     claim();
@@ -513,14 +517,14 @@ describe('co-op Mystery Box', () => {
 });
 
 describe('co-op special weapons', () => {
-  it('awards a guest Ray Gun splash kill to the guest only', () => {
+  it('awards a guest VORTEX-9 splash kill to the guest only', () => {
     const match = startedMatch();
     const zombie = spawnOne(match);
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     object.userData.hitPart = 'torso';
     host(match).onEnergyImpact(zombie.position.clone().add(new THREE.Vector3(0, 1, 0)),
-      WEAPON_DEFINITIONS.raygun.energy!, object, 3, 'guest');
+      WEAPON_DEFINITIONS.vortex9.energy!, object, 3, 'guest');
     match.step(1 / 30, 3);
     expect(host(match).players.guest.kills).toBe(1);
     expect(host(match).players.host.kills).toBe(0);
@@ -548,19 +552,19 @@ describe('co-op special weapons', () => {
     expect(guest(match).match?.stats.host.totalDamage).toBe(0);
   });
 
-  it.each(['host', 'guest'] as const)('never grants a Ray Gun at 115 kills to %s', (shooter) => {
+  it.each(['host', 'guest'] as const)('never grants a VORTEX-9 at 115 kills to %s', (shooter) => {
     const match = startedMatch();
     host(match).players[shooter].kills = 114;
     const zombie = spawnOne(match);
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     host(match).onEnergyImpact(zombie.position.clone().add(new THREE.Vector3(0, 1, 0)),
-      WEAPON_DEFINITIONS.raygun.energy!, object, 3, shooter);
+      WEAPON_DEFINITIONS.vortex9.energy!, object, 3, shooter);
     match.relay.flush();
     expect(host(match).players[shooter].kills).toBe(115);
-    expect(host(match).guestInventory.has('raygun')).toBe(false);
-    expect(match.guestSide.ctx.grantWeapon).not.toHaveBeenCalledWith('raygun');
-    expect(match.hostSide.ctx.grantWeapon).not.toHaveBeenCalledWith('raygun');
+    expect(host(match).guestInventory.has('vortex9')).toBe(false);
+    expect(match.guestSide.ctx.grantWeapon).not.toHaveBeenCalledWith('vortex9');
+    expect(match.hostSide.ctx.grantWeapon).not.toHaveBeenCalledWith('vortex9');
   });
 });
 

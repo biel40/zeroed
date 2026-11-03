@@ -114,7 +114,7 @@ export interface GameMode {
   ): void;
   /**
    * Intercepts a shot before it enters the ballistic simulation. Return
-   * true when the mode handles it itself (Ray Gun energy bolts).
+   * true when the mode handles it itself (VORTEX-9 energy bolts).
    */
   onWeaponFired?(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean;
   /** Local weapon accepted a reload request. */

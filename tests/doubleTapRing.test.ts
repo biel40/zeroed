@@ -94,7 +94,7 @@ describe('Double Tap ring', () => {
     expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', WEAPON_DEFINITIONS.m1911.damage * (3 * 1.1), 'm1911');
   });
 
-  it('boosts Tesla chains and both Ray Gun direct and splash damage', () => {
+  it('boosts Tesla chains and both VORTEX-9 direct and splash damage', () => {
     const run = startRun();
     buyRing(run);
     const chain = vi.spyOn(run.internals.zombies, 'applyChainLightning').mockReturnValue([]);
@@ -105,10 +105,10 @@ describe('Double Tap ring', () => {
     object.userData.zombie = zombie;
     run.internals.onEnergyImpact(POINT, WEAPON_DEFINITIONS.tesla.energy!, object, 5);
     expect(chain).toHaveBeenLastCalledWith(zombie, CHAIN_ZAP_DAMAGE * 1.1, 'torso');
-    const raygun = WEAPON_DEFINITIONS.raygun;
-    run.internals.onEnergyImpact(POINT, raygun.energy!, object, 5);
-    expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', raygun.damage * 1.1, 'raygun');
-    expect(splash).toHaveBeenLastCalledWith(POINT, raygun.energy!.splashRadius, raygun.energy!.splashDamage * 1.1);
+    const vortex9 = WEAPON_DEFINITIONS.vortex9;
+    run.internals.onEnergyImpact(POINT, vortex9.energy!, object, 5);
+    expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', vortex9.damage * 1.1, 'vortex9');
+    expect(splash).toHaveBeenLastCalledWith(POINT, vortex9.energy!.splashRadius, vortex9.energy!.splashDamage * 1.1);
   });
 });
 
@@ -146,7 +146,7 @@ describe('Weapon fire rate scale', () => {
     expect(barrett.ammoInMagazine).toBe(before - 1);
   });
 
-  it.each<WeaponId>(['ak47', 'm1911', 'l96', 'raygun', 'tesla', 'fakel'])
+  it.each<WeaponId>(['ak47', 'm1911', 'l96', 'vortex9', 'tesla', 'fakel'])
   ('halves the firing interval of %s, including bolt cycling, with one round spent per shot', (id) => {
     const definition = WEAPON_DEFINITIONS[id];
     const baseRpm = definition.rpm;

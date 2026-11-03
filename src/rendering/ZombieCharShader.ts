@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getDissolveNoiseTexture } from './RayGunDissolveShader';
+import { getDissolveNoiseTexture } from './Vortex9DissolveShader';
 
 /** Colour of glowing embers in the cracks of a charred body. */
 const EMBER_COLOR = new THREE.Color(1, 0.3, 0.05);
@@ -57,7 +57,7 @@ if (uCharAmount > 0.001) {
 
 /**
  * Adds the ФАКЕЛ-33 char layer to a zombie's standard material, keeping any
- * shader hook already installed (the Ray Gun dissolve) and the material's
+ * shader hook already installed (the VORTEX-9 dissolve) and the material's
  * skinning, shadows and lighting. Dormant (a uniform branch, no recompile)
  * while `uCharAmount` is 0.
  */

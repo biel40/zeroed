@@ -127,9 +127,9 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   impacto del invitado con la misma selección de cuerpos que el modo individual.
 - Arsenal especial: la Mystery Box cobra 950 Points al jugador que la activa,
   muestra la misma tirada a ambos y reserva el resultado para ese comprador.
-  L96 usa la balistica compartida. Ray Gun y ZEUS-77 muestran proyectiles en
+  L96 usa la balistica compartida. VORTEX-9 y ZEUS-77 muestran proyectiles en
   ambos clientes; el anfitrión resuelve impactos, splash y cadenas y atribuye
-  cada baja al tirador. La Ray Gun solo se obtiene de la Mystery Box;
+  cada baja al tirador. La VORTEX-9 solo se obtiene de la Mystery Box;
   no hay recompensas por bajas.
 - Arsenal: ambos empiezan con la M1911 y pueden llevar dos armas. Las compras
   de pared de Burned Mansion (AK-47, Vector, M4A1 y M60) cuestan puntos individuales;

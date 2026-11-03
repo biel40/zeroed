@@ -17,9 +17,6 @@ const SCORCH_COLOR = new THREE.Color(0x4a2c1c);
 const CHAR_COLOR = new THREE.Color(0x120e0c);
 /** Seared flesh closing a severed limb. */
 const STUMP_COLOR = 0x3a120c;
-/** The stump sits a bit proud of the cut so no gap shows while the arm swings. */
-const STUMP_FIT = 1.25;
-const STUMP_MIN_RADIUS = 0.03;
 
 const SEVERED_BONES: Readonly<Record<ZombieSeveredLimb, { readonly lost: RegExp; readonly stump: string }>> = {
   leftForearm: { lost: /^Left(ForeArm|Hand)/, stump: 'LeftArm' },
@@ -101,8 +98,33 @@ export function severedTriangles(
 }
 
 /**
- * One rounded stump per severed limb, centered on the rim the cut leaves
- * (the kept vertices of the removed triangles) and riding the upper arm.
+ * Skeleton index each lost bone hands its weight to: the upper arm it was cut
+ * from, so the kept elbow stops following a forearm that is no longer there
+ * and the rim stays flush with its rigid cap.
+ */
+export function severedBoneRemap(boneNames: readonly string[], limbs: readonly ZombieSeveredLimb[]): Map<number, number> {
+  const remap = new Map<number, number>();
+  for (const limb of limbs) {
+    const { lost, stump } = SEVERED_BONES[limb];
+    const stumpIndex = boneNames.indexOf(stump);
+    if (stumpIndex < 0) throw new Error(`Zombie rig has no bone "${stump}"`);
+    boneNames.forEach((name, index) => {
+      if (lost.test(name)) remap.set(index, stumpIndex);
+    });
+  }
+  return remap;
+}
+
+/** Bind-pose position key, so seams split by the UVs still share their edges. */
+function pointKey(body: ZombieBodyFrame, vertex: number, point: THREE.Vector3): string {
+  body.bodyPoint(vertex, point);
+  return `${Math.round(point.x * 1e4)},${Math.round(point.y * 1e4)},${Math.round(point.z * 1e4)}`;
+}
+
+/**
+ * One flat cap per severed limb: a fan from the center of the cut over every
+ * edge the removed triangles left open, facing the lost forearm, so the arm
+ * simply ends where it was cut.
  */
 export function buildStumpParts(
   body: ZombieBodyFrame,
@@ -110,27 +132,61 @@ export function buildStumpParts(
   limbs: readonly ZombieSeveredLimb[],
   severed: Uint8Array,
 ): AccessoryPart[] {
-  const parts: AccessoryPart[] = [];
   const point = new THREE.Vector3();
-  for (const limb of limbs) {
-    const { lost, stump } = SEVERED_BONES[limb];
-    const rim: THREE.Vector3[] = [];
-    for (let triangle = 0; triangle < severed.length; triangle++) {
-      if (!severed[triangle]) continue;
-      for (let corner = 0; corner < 3; corner++) {
-        const vertex = triangle * 3 + corner;
-        const bone = boneNames[body.dominantBone(vertex)];
-        // Rim of this limb only: the kept side of a cut on the same arm.
-        if (lost.test(bone) || !bone.startsWith(stump)) continue;
-        rim.push(body.bodyPoint(vertex, point).clone());
-      }
+  const limbOf = (triangle: number): ZombieSeveredLimb | undefined => limbs.find((limb) => {
+    for (let corner = 0; corner < 3; corner++) {
+      if (SEVERED_BONES[limb].lost.test(boneNames[body.dominantBone(triangle * 3 + corner)])) return true;
     }
+    return false;
+  });
+  const keptEdges = new Map<string, readonly [number, number]>();
+  const cutEdges = new Map<string, ZombieSeveredLimb>();
+  for (let triangle = 0; triangle < severed.length; triangle++) {
+    const limb = severed[triangle] ? limbOf(triangle) : undefined;
+    if (severed[triangle] && !limb) continue;
+    for (let corner = 0; corner < 3; corner++) {
+      const a = triangle * 3 + corner;
+      const b = triangle * 3 + ((corner + 1) % 3);
+      const keyA = pointKey(body, a, point);
+      const keyB = pointKey(body, b, point);
+      const edge = keyA < keyB ? `${keyA}|${keyB}` : `${keyB}|${keyA}`;
+      if (limb) cutEdges.set(edge, limb);
+      else keptEdges.set(edge, [a, b]);
+    }
+  }
+
+  const parts: AccessoryPart[] = [];
+  for (const limb of limbs) {
+    const rim = [...keptEdges].filter(([edge]) => cutEdges.get(edge) === limb).map(([, ends]) => ends);
     if (rim.length === 0) continue;
-    const center = rim.reduce((sum, p) => sum.add(p), new THREE.Vector3()).divideScalar(rim.length);
-    const spread = rim.reduce((sum, p) => sum + p.distanceTo(center), 0) / rim.length;
-    const radius = Math.max(STUMP_MIN_RADIUS, spread * STUMP_FIT);
-    const geometry = new THREE.IcosahedronGeometry(radius, 1).toNonIndexed().translate(center.x, center.y, center.z);
-    parts.push({ geometry, color: STUMP_COLOR, bone: stump, detachableHat: false });
+    const center = new THREE.Vector3();
+    for (const [a, b] of rim) center.add(body.bodyPoint(a, point)).add(body.bodyPoint(b, point));
+    center.divideScalar(rim.length * 2);
+    // Outward is toward where the forearm used to be.
+    const lostCenter = new THREE.Vector3();
+    let lostCount = 0;
+    for (let vertex = 0; vertex < body.vertexCount; vertex++) {
+      if (!SEVERED_BONES[limb].lost.test(boneNames[body.dominantBone(vertex)])) continue;
+      lostCenter.add(body.bodyPoint(vertex, point));
+      lostCount++;
+    }
+    const outward = lostCenter.divideScalar(Math.max(1, lostCount)).sub(center);
+
+    const positions = new Float32Array(rim.length * 9);
+    const pointA = new THREE.Vector3();
+    const pointB = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+    rim.forEach(([a, b], index) => {
+      body.bodyPoint(a, pointA);
+      body.bodyPoint(b, pointB);
+      normal.subVectors(pointA, center).cross(point.subVectors(pointB, center));
+      const [first, second] = normal.dot(outward) >= 0 ? [pointA, pointB] : [pointB, pointA];
+      center.toArray(positions, index * 9);
+      first.toArray(positions, index * 9 + 3);
+      second.toArray(positions, index * 9 + 6);
+    });
+    const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    parts.push({ geometry, color: STUMP_COLOR, bone: SEVERED_BONES[limb].stump, detachableHat: false });
   }
   return parts;
 }

@@ -333,8 +333,8 @@ export class AudioSystem {
   }
 
   public playShot(config: WeaponAudioConfig): void {
-    if (config.energy === 'raygun') {
-      this.playRayGunShot(config);
+    if (config.energy === 'vortex9') {
+      this.playVortex9Shot(config);
       return;
     }
     if (config.energy) {
@@ -782,10 +782,10 @@ export class AudioSystem {
   }
 
   /**
-   * Ray Gun shot: a warbling sawtooth zap dropping through a resonant
+   * VORTEX-9 shot: a warbling sawtooth zap dropping through a resonant
    * low-pass sweep, over a sub punch, a bright sizzle and a softer echo zap.
    */
-  private playRayGunShot(config: WeaponAudioConfig): void {
+  private playVortex9Shot(config: WeaponAudioConfig): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     const { ctx, master } = audio;
@@ -828,7 +828,7 @@ export class AudioSystem {
     this.sweep(0.075, 'triangle', 900, 160, volume * 0.16, 0.2);
   }
 
-  /** Ray Gun impact: a plasma whoomph through a closing low-pass, sub drop and crackle. */
+  /** VORTEX-9 impact: a plasma whoomph through a closing low-pass, sub drop and crackle. */
   public playRayImpact(): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
@@ -1665,7 +1665,7 @@ export class AudioSystem {
   }
 
   /**
-   * Result reveal. Normal pulls get a two-tone chime; the Ray Gun gets a
+   * Result reveal. Normal pulls get a two-tone chime; the VORTEX-9 gets a
    * bright ascending arpeggio with a shimmer tail — the rare-jackpot tell.
    */
   public playMysteryBoxReveal(energy: boolean): void {

@@ -105,8 +105,10 @@ export default defineConfig({
     setupFiles: ['tests/setup.ts'],
     // Co-op and zombie integration tests build the real Burned Mansion synchronously (~0.2 s alone),
     // which a saturated machine stretches past the 5 s default. A synchronous test cannot be
-    // interrupted anyway, so the default only produced load-dependent failures.
-    testTimeout: 30_000,
+    // interrupted anyway, so the default only produced load-dependent failures. A throttled laptop
+    // under load still stretched 4-10 s map tests past 30 s; hooks build the same maps.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
     // One worker per logical processor oversubscribes hybrid CPUs: the map-building tests land on
     // efficiency cores and the first one per file (which bakes every procedural texture) stretched
     // from ~0.6 s to 8-10 s, occasionally past the timeout. Half the processors keeps the same

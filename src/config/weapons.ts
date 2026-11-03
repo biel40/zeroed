@@ -29,7 +29,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 30,
     recoil: {
-      verticalKick: 0.018,
+      verticalKick: 0.020,
       horizontalKick: 0.004,
       horizontalBias: 0,
       kickVariance: 0.2,
@@ -872,13 +872,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
 
   /**
-   * Ray Gun — original retro-futuristic homage to the classic zombies-mode
+   * VORTEX-9 — original retro-futuristic homage to the classic zombies-mode
    * wonder weapon. Procedural view model, synthesized audio, visible energy
    * projectile with splash damage. Only registered in Zombies mode.
    */
-  raygun: {
-    id: 'raygun',
-    name: 'RAY GUN',
+  vortex9: {
+    id: 'vortex9',
+    name: 'VORTEX-9',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
     rpm: 140,
@@ -911,9 +911,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 48, gravity: 0, maxDistance: 80, drag: 0 },
     moveSpeedMultiplier: 1,
     equipTime: 0.4,
-    audio: { volume: 0.5, duration: 0.22, lowpass: 4200, thump: 200, energy: 'raygun' },
+    audio: { volume: 0.5, duration: 0.22, lowpass: 4200, thump: 200, energy: 'vortex9' },
     view: {
-      // No GLB: dedicated procedural builder (RayGunViewModel). Body is the
+      // No GLB: dedicated procedural builder (Vortex9ViewModel). Body is the
       // chipped red enamel, accent the worn fitting metal under it.
       energyColor: 0x5cff3a,
       hip: [0.25, -0.21, -0.42],
@@ -1009,7 +1009,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     audio: { volume: 0.6, duration: 0.2, lowpass: 5200, thump: 240, energy: 'arc' },
     view: {
       // Dedicated procedural builder: exposed helical coil, removable caged
-      // capacitor and fork emitter. No GLB, like the Ray Gun.
+      // capacitor and fork emitter. No GLB, like the VORTEX-9.
       teslaFrame: 'tesla',
       energyColor: 0x7fd4ff,
       hip: [0.24, -0.22, -0.44],
@@ -1173,7 +1173,7 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh
  * rolls never touch the network. This is NOT the slot list:
  * the zombies inventory starts with the M1911 alone (see
  * ZombiesMode.startingInventory); both Wonder Weapons can come from the
- * Mystery Box; the Ray Gun is exclusive to it. Map
+ * Mystery Box; the VORTEX-9 is exclusive to it. Map
  * exclusives (the ФАКЕЛ-33) are not here: the map registry adds them to
  * the preload of their own map only (`ZombieMapDefinition.exclusiveWeapons`).
  */
@@ -1187,6 +1187,6 @@ export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm60',
   'l96',
   'barrett',
-  'raygun',
+  'vortex9',
   'tesla',
 ];

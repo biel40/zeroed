@@ -6,7 +6,7 @@ import { ZOMBIE_MODELS, type ZombieEyeColors, type ZombieModelSource } from '../
 import { ZombieBodyFrame } from './ZombieBodyFrame';
 import { buildAccessoryParts } from './ZombieSkinAccessories';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from './ZombieSkinCatalog';
-import { buildStumpParts, burnAt, charColor, severedTriangles } from './ZombieSkinDamage';
+import { buildStumpParts, burnAt, charColor, severedBoneRemap, severedTriangles } from './ZombieSkinDamage';
 import {
   ACCESSORY_BAND,
   ACCESSORY_UV,
@@ -96,6 +96,8 @@ export function buildSkinnedWalkerGeometry(
   write(uv, 2, 0, base.getAttribute('uv'), kept);
   write(skinIndex, 4, 0, base.getAttribute('skinIndex'), kept);
   write(skinWeight, 4, 0, base.getAttribute('skinWeight'), kept);
+  const lostBones = severedBoneRemap(boneNames, severedLimbs);
+  for (let slot = 0; slot < baseCount * 4; slot++) skinIndex[slot] = lostBones.get(skinIndex[slot]) ?? skinIndex[slot];
 
   const tints = new Map<string, THREE.Color>();
   const bodyPoint = new THREE.Vector3();

@@ -145,7 +145,7 @@ describe('startup crystal recovery', () => {
 });
 
 describe('crystal drop and mode integration', () => {
-  it.each(['m1911', 'knife', 'fakel', 'tesla', 'raygun'] as const)(
+  it.each(['m1911', 'knife', 'fakel', 'tesla', 'vortex9'] as const)(
     'drops on the playable side when the carrier is killed with %s before breaching', (source) => {
       const barrier = new WindowBarrier('quest-entry', 0, -10, 0, -1,
         { boardCount: 3, boardHp: 100, repairInterval: 1, repairRewardCap: 3 });

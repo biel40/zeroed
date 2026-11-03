@@ -21,7 +21,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | AK-47 | Builder procedural dedicado `buildAk47` (frame `'ak47'`) en `src/weapons/AK47ViewModel.ts` | Original del proyecto | ~5.7k | Sin descarga |
 | M60 | Builder procedural dedicado `buildM60` (frame `'lmg'`) en `src/weapons/M60ViewModel.ts` | Original del proyecto | ~7.2k | Sin descarga |
 | M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
-| Ray Gun | Builder procedural dedicado `buildRayGun` en `src/weapons/RayGunViewModel.ts` | Original del proyecto | ~7k | Sin descarga |
+| VORTEX-9 | Builder procedural dedicado `buildVortex9` en `src/weapons/Vortex9ViewModel.ts` | Original del proyecto | ~7k | Sin descarga |
 
 El GLB anterior de la M4A1, "Assault Rifle" (AssaultRifle2_1) de Quaternius
 (https://poly.pizza/m/Bgvuu4CUMV, CC0, 131 KB), se conserva en el repositorio
@@ -51,7 +51,7 @@ punto de mira triangular, el apagallamas de cuatro patas, el bípode plegado y
 la bolsa de 100 cartuchos con la cinta. Su wall buy usa los mismos perfiles con
 el bípode desplegado, como en la foto.
 
-La Ray Gun procedural combina carcasas de esmalte rojo desconchado, ventanas
+La VORTEX-9 procedural combina carcasas de esmalte rojo desconchado, ventanas
 de plasma con un mapa emisivo que fluye, discos aceleradores, tres brazos con
 puas y una mira tubular abierta por la que se apunta. Pintura, desgaste y
 plasma se dibujan en canvas en runtime (`ProceduralTextures.ts`); su disparo e

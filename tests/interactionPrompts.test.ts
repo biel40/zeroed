@@ -47,7 +47,7 @@ describe('interaction prompt presentation', () => {
   });
 
   it('preserves locked requirements and arbitrary labels without inventing a key', () => {
-    const title = '<RAY GUN> — 6000';
+    const title = '<VORTEX-9> — 6000';
     const detail = 'LOCKED — 80/200 kills';
     expect(interactionPromptContent(`${title}\n${detail}`)).toEqual({ title, detail, action: null });
     expect(interactionPromptContent('Press E prototype')).toEqual({ title: 'Press E prototype', detail: '', action: null });

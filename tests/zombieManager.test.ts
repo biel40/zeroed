@@ -772,21 +772,21 @@ describe('Special weapons against late-round hordes', () => {
     manager.dispose();
   });
 
-  it('lets a round-30 walker survive a point-blank Ray Gun torso hit plus full splash', () => {
+  it('lets a round-30 walker survive a point-blank VORTEX-9 torso hit plus full splash', () => {
     const manager = new ZombieManager(() => 0, {}, false, [[0, -20]], [], [], () => 0.99);
     manager.registerColliders([]);
     manager.spawnZombie(roundConfig(30), 0, 4, 30);
     const zombie = [...manager.actives][0];
-    const raygun = WEAPON_DEFINITIONS.raygun;
-    manager.damageZombie(zombie, 'torso', raygun.damage, 'raygun');
-    manager.applySplash(zombie.position, raygun.energy!.splashRadius, raygun.energy!.splashDamage);
+    const vortex9 = WEAPON_DEFINITIONS.vortex9;
+    manager.damageZombie(zombie, 'torso', vortex9.damage, 'vortex9');
+    manager.applySplash(zombie.position, vortex9.energy!.splashRadius, vortex9.energy!.splashDamage);
     expect(zombie.isAlive).toBe(true);
     expect(zombie.hp).toBe(zombie.maxHp - 1000);
     manager.dispose();
   });
 });
 
-describe('ZombieManager splash damage (Ray Gun)', () => {
+describe('ZombieManager splash damage (VORTEX-9)', () => {
   it('damages zombies inside the radius with falloff and spares the rest', () => {
     const { manager } = makeManager();
     manager.spawnZombie(roundConfig(1), 0, 4);

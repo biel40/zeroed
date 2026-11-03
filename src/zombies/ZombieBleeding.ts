@@ -22,7 +22,7 @@ export class ZombieBleeding {
   private consecutiveHits = 0;
 
   public hit(source: ZombieKillSource | 'normal' | undefined, lethal: boolean): BloodBurstProfile | null {
-    if (source === 'fakel' || source === 'raygun' || source === 'tesla' || (source === 'barrett' && lethal)) return null;
+    if (source === 'fakel' || source === 'vortex9' || source === 'tesla' || (source === 'barrett' && lethal)) return null;
     if (source === 'knife') return KNIFE_BURST;
     if (this.quietTime >= RAPID_HIT_WINDOW) this.consecutiveHits = 0;
     const burst = BULLET_BURSTS[Math.min(this.consecutiveHits, BULLET_BURSTS.length - 1)];

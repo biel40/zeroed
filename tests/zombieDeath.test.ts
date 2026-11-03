@@ -36,14 +36,14 @@ describe('zombie death style resolution', () => {
     ['ppsh41', false, 'riddled'],
     ['ak47', false, 'riddled'],
     ['m60', false, 'riddled'],
-    ['raygun', false, 'blast'],
+    ['vortex9', false, 'blast'],
     ['tesla', false, 'shock'],
     ['fakel', false, 'burn'],
     [undefined, false, 'knockback'],
     ['m1911', true, 'headshot'],
     ['m60', true, 'headshot'],
     ['ppsh41', true, 'headshot'],
-    ['raygun', true, 'headshot'],
+    ['vortex9', true, 'headshot'],
     // Electrocution and the blade read better than a generic head snap.
     ['tesla', true, 'shock'],
     ['knife', true, 'slash'],
@@ -55,7 +55,7 @@ describe('zombie death style resolution', () => {
 
   it('topples single shots and blasts forward when the hit lands in the back', () => {
     expect(resolveZombieDeathStyle('m1911', false, 0.9)).toBe('stumble');
-    expect(resolveZombieDeathStyle('raygun', false, 0.9)).toBe('stumble');
+    expect(resolveZombieDeathStyle('vortex9', false, 0.9)).toBe('stumble');
     expect(resolveZombieDeathStyle('m60', false, 0.9)).toBe('riddled');
     expect(resolveZombieDeathStyle('m1911', false, 0.2)).toBe('knockback');
   });

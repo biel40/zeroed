@@ -8,7 +8,7 @@ import type { MysteryBoxEntry, MysteryBoxMachine, MysteryBoxPhase } from './Myst
 import { MYSTERY_BOX_SIZE } from './MysteryBox';
 
 const GLOW_COLOR = 0x8f6bff;
-const RAYGUN_COLOR = WEAPON_DEFINITIONS.raygun.energy?.color ?? 0x63f2a4;
+const VORTEX9_COLOR = WEAPON_DEFINITIONS.vortex9.energy?.color ?? 0x63f2a4;
 export const LEGENDARY_MYSTERY_BOX_COLOR = 0xffc928;
 
 const BOX_WIDTH = MYSTERY_BOX_SIZE.width;
@@ -27,7 +27,7 @@ export function getMysteryBoxResultColor(
   rarity: MysteryBoxEntry['rarity'] | undefined,
 ): number {
   if (rarity === 'legendary') return LEGENDARY_MYSTERY_BOX_COLOR;
-  if (weaponId === 'raygun' && rarity === 'rare') return RAYGUN_COLOR;
+  if (weaponId === 'vortex9' && rarity === 'rare') return VORTEX9_COLOR;
   return GLOW_COLOR;
 }
 

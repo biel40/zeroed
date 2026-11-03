@@ -16,7 +16,7 @@ import {
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
   ZOMBIE_ELECTRIFIED_DURATION,
-  ZOMBIE_RAYGUN_DEATH_DURATION,
+  ZOMBIE_VORTEX9_DEATH_DURATION,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_TYPE_CONFIGS,
@@ -40,12 +40,12 @@ export type ZombieState =
   | 'barrierAttack'
   | 'barrierBreak';
 
-/** Lifecycle of the death: a fallen corpse, the Ray Gun dissolve, or a body blown into gibs. */
-export type ZombieDeathKind = 'normal' | 'raygun' | 'shatter';
+/** Lifecycle of the death: a fallen corpse, the VORTEX-9 dissolve, or a body blown into gibs. */
+export type ZombieDeathKind = 'normal' | 'vortex9' | 'shatter';
 
-/** Death lifecycle a replicated style implies; the Ray Gun dissolve also follows a lethal headshot locally. */
+/** Death lifecycle a replicated style implies; the VORTEX-9 dissolve also follows a lethal headshot locally. */
 function deathKindOf(style: ZombieDeathStyle): ZombieDeathKind {
-  if (style === 'blast') return 'raygun';
+  if (style === 'blast') return 'vortex9';
   return style === 'shatter' ? 'shatter' : 'normal';
 }
 
@@ -266,7 +266,7 @@ export class Zombie implements HitTarget {
     if (this.hp <= 0) {
       const killSource = source === 'normal' ? undefined : source;
       const style = resolveZombieDeathStyle(killSource, headshot, this.impact.y);
-      this.enterDeath(style, killSource === 'raygun' ? 'raygun' : deathKindOf(style), headshot);
+      this.enterDeath(style, killSource === 'vortex9' ? 'vortex9' : deathKindOf(style), headshot);
       return true;
     }
     return false;
@@ -292,7 +292,7 @@ export class Zombie implements HitTarget {
       );
     }
     const inferredSource = style === 'slash' ? 'knife' : style === 'shatter' ? 'barrett'
-      : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'raygun' : undefined;
+      : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'vortex9' : undefined;
     this.bleed(1, headshot, source ?? inferredSource, true);
     this.enterDeath(style);
   }
@@ -385,8 +385,8 @@ export class Zombie implements HitTarget {
       // The body falls forward onto its face: the blood spreads under its chest.
       this.bloodPool.bleed(BURN_POOL_FORWARD * ZOMBIE_TYPE_CONFIGS[this.typeId].bodyScale[2]);
     }
-    if (deathKind === 'raygun') {
-      this.stateTimer = ZOMBIE_RAYGUN_DEATH_DURATION;
+    if (deathKind === 'vortex9') {
+      this.stateTimer = ZOMBIE_VORTEX9_DEATH_DURATION;
       this.tmpImpactOrigin.set(0, headshot ? 1.55 : 1.05, 0);
       this.visual.setDissolveProgress(0.01, this.tmpImpactOrigin);
     } else {
@@ -513,8 +513,8 @@ export class Zombie implements HitTarget {
       }
       case 'death': {
         this.stateTimer -= dt;
-        if (this.deathKind === 'raygun') {
-          const progress = 1 - Math.max(0, this.stateTimer / ZOMBIE_RAYGUN_DEATH_DURATION);
+        if (this.deathKind === 'vortex9') {
+          const progress = 1 - Math.max(0, this.stateTimer / ZOMBIE_VORTEX9_DEATH_DURATION);
           this.visual.setDissolveProgress(progress);
           if (this.stateTimer <= 0) {
             this.group.visible = false;

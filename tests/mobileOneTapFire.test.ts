@@ -42,7 +42,7 @@ describe('mobile 1-Tap ADS Fire', () => {
     expect(state.rightButtonDown).toBe(false);
   });
 
-  it.each<WeaponId>(['m1911', 'raygun', 'tesla'])(
+  it.each<WeaponId>(['m1911', 'vortex9', 'tesla'])(
     '%s repeats at its real cadence while the mobile fire button is held',
     (weaponId) => {
       const state = new InputState();

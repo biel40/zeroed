@@ -193,7 +193,7 @@ describe('zombie bleeding intensity', () => {
     const bleeding = new ZombieBleeding();
     expect(bleeding.hit('barrett', true)).toBeNull();
     expect(bleeding.hit('barrett', false)).not.toBeNull();
-    for (const source of ['fakel', 'tesla', 'raygun'] as const) expect(bleeding.hit(source, false)).toBeNull();
+    for (const source of ['fakel', 'tesla', 'vortex9'] as const) expect(bleeding.hit(source, false)).toBeNull();
   });
 });
 

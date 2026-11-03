@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { registerFadeMaterial, setFadeOpacity } from '../rendering/FadeMaterials';
 import {
-  installRayGunDissolve,
-  RayGunAshParticles,
-  RAYGUN_NEON_GREEN,
-  setRayGunDissolveState,
-} from '../rendering/RayGunDissolveShader';
+  installVortex9Dissolve,
+  Vortex9AshParticles,
+  VORTEX9_NEON_GREEN,
+  setVortex9DissolveState,
+} from '../rendering/Vortex9DissolveShader';
 import type { ZombieState } from './Zombie';
 import { windowVaultPose, type WindowVaultPose } from './barriers/WindowVault';
 import { ShinyStars } from './ShinyStars';
@@ -531,7 +531,7 @@ export class ZombieVisual {
   private readonly rootWorldRotation = new THREE.Quaternion();
   private readonly boneBasis = new THREE.Quaternion();
   private readonly shinyStars: ShinyStars | null;
-  private readonly rayGunAsh: RayGunAshParticles;
+  private readonly vortex9Ash: Vortex9AshParticles;
   private readonly eyeMaterials: readonly THREE.Material[];
   /** Opaque while alive; blended only during the death fade. */
   private readonly fadeMaterials: readonly THREE.Material[];
@@ -559,7 +559,7 @@ export class ZombieVisual {
   /** 0..1 char of the skin while burning alive; seconds since a burn death began (null when none). */
   private scorch = 0;
   private incinerateTime: number | null = null;
-  private readonly embers: RayGunAshParticles;
+  private readonly embers: Vortex9AshParticles;
   /** True while flash or charge own the emissive; the glow is restored once both end. */
   private emissiveOverridden = false;
   private opacity = 1;
@@ -773,7 +773,7 @@ export class ZombieVisual {
       .filter((material) => material.blending === THREE.NormalBlending);
     for (const material of this.fadeMaterials) registerFadeMaterial(material);
     for (const material of this.materials) {
-      installRayGunDissolve(material, this.modelConfig.height);
+      installVortex9Dissolve(material, this.modelConfig.height);
       installZombieChar(material);
     }
     this.root.updateMatrixWorld(true);
@@ -798,11 +798,11 @@ export class ZombieVisual {
       : FLAME_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
     this.flames = new ZombieFlames(flameAnchors);
     this.root.add(this.flames.mesh);
-    this.embers = new RayGunAshParticles(this.modelConfig.height, EMBER_COLORS);
+    this.embers = new Vortex9AshParticles(this.modelConfig.height, EMBER_COLORS);
     this.embers.points.name = 'zombie-burn-embers';
     this.root.add(this.embers.points);
-    this.rayGunAsh = new RayGunAshParticles(this.modelConfig.height);
-    this.root.add(this.rayGunAsh.points);
+    this.vortex9Ash = new Vortex9AshParticles(this.modelConfig.height);
+    this.root.add(this.vortex9Ash.points);
     // Pitch and roll tip the body in its own frame; the death twist then yaws the result.
     this.root.rotation.order = 'YXZ';
   }
@@ -849,7 +849,7 @@ export class ZombieVisual {
     this.shinyStars?.setEnabled(typeId === 'shiny');
     this.dissolveOrigin.set(0, this.modelConfig.height * 0.55, 0);
     this.setDissolveProgress(0, this.dissolveOrigin);
-    this.rayGunAsh.reset();
+    this.vortex9Ash.reset();
 
     for (let index = 0; index < this.materials.length; index++) {
       const material = this.materials[index];
@@ -1143,16 +1143,16 @@ export class ZombieVisual {
   }
 
   /**
-   * Drives the Ray Gun energy dissolution shader (`0..1`) and ascending ash
+   * Drives the VORTEX-9 energy dissolution shader (`0..1`) and ascending ash
    * particle burst instead of the standard corpse fall-and-linger sequence.
    */
   public setDissolveProgress(progress: number, localOrigin?: THREE.Vector3): void {
     this.dissolveProgress = THREE.MathUtils.clamp(progress, 0, 1);
     if (localOrigin) this.dissolveOrigin.copy(localOrigin);
     for (const material of this.materials) {
-      setRayGunDissolveState(material, this.dissolveProgress, localOrigin);
+      setVortex9DissolveState(material, this.dissolveProgress, localOrigin);
       if (this.dissolveProgress > 0) {
-        material.emissive.setHex(RAYGUN_NEON_GREEN);
+        material.emissive.setHex(VORTEX9_NEON_GREEN);
         material.emissiveIntensity = Math.sin(this.dissolveProgress * Math.PI) * 1.65;
       }
     }
@@ -1161,7 +1161,7 @@ export class ZombieVisual {
       for (const material of this.eyeMaterials) material.opacity = eyeAlpha;
       if (this.currentAction) this.currentAction.paused = true;
     }
-    this.rayGunAsh.setProgress(this.dissolveProgress);
+    this.vortex9Ash.setProgress(this.dissolveProgress);
   }
 
   public get currentDissolveProgress(): number {
@@ -1376,7 +1376,7 @@ export class ZombieVisual {
         material.emissive.setHex(FLASH_COLOR);
         material.emissiveIntensity = this.flash * 1.5;
       } else if (this.dissolveProgress > 0) {
-        material.emissive.setHex(RAYGUN_NEON_GREEN);
+        material.emissive.setHex(VORTEX9_NEON_GREEN);
         material.emissiveIntensity = Math.sin(this.dissolveProgress * Math.PI) * 1.65;
       } else if (charge > 0) {
         material.emissive.setHex(ELECTRIC_COLOR);
@@ -1607,7 +1607,7 @@ export class ZombieVisual {
    */
   public dispose(): void {
     this.mixer?.stopAllAction();
-    this.rayGunAsh.dispose();
+    this.vortex9Ash.dispose();
     this.embers.dispose();
     this.flames.dispose();
     if (this.shinyStars) {

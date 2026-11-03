@@ -250,9 +250,9 @@ describe('Bolt action', () => {
 });
 
 describe('ADS and spread', () => {
-  it('gives the Ray Gun a devastating direct hit and splash profile', () => {
-    expect(WEAPON_DEFINITIONS.raygun.damage).toBeGreaterThan(250);
-    expect(WEAPON_DEFINITIONS.raygun.energy?.splashDamage ?? 0).toBeGreaterThan(500);
+  it('gives the VORTEX-9 a devastating direct hit and splash profile', () => {
+    expect(WEAPON_DEFINITIONS.vortex9.damage).toBeGreaterThan(250);
+    expect(WEAPON_DEFINITIONS.vortex9.energy?.splashDamage ?? 0).toBeGreaterThan(500);
   });
 
   it('blends adsAlpha at the configured speed and drops it while reloading', () => {

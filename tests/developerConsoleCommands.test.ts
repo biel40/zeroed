@@ -46,7 +46,7 @@ describe('developer console commands', () => {
     commands.execute('damage 3', target);
     commands.execute('damage 5', target);
     expect(commands.damageScale('m1911')).toBe(5);
-    expect(commands.damageScale('raygun')).toBe(1);
+    expect(commands.damageScale('vortex9')).toBe(1);
     expect(WEAPON_DEFINITIONS.m1911.damage).toBe(base);
     commands.reset();
     expect(commands.damageScale('m1911')).toBe(1);

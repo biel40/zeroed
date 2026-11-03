@@ -802,7 +802,7 @@ describe('Burned Mansion topology', () => {
     expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-glass'))).toBe(true);
     expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-frame'))).toBe(true);
     expect(cases.every((weaponCase) => weaponCase.children.some((child) => child.userData.mapRole === 'case-weapon-display'))).toBe(true);
-    expect(arena.group.getObjectByName('bunker-raygun-case')).toBeUndefined();
+    expect(arena.group.getObjectByName('bunker-vortex9-case')).toBeUndefined();
 
     unlock(arena, 'nuclear-bunker');
     const bunkerObstacles = arena.wallColliders;
@@ -1277,7 +1277,7 @@ describe('Burned Mansion topology', () => {
     expect(wall.position.y).toBeCloseTo(MANSION_BUNKER_Y + 1.6);
   });
 
-  it('keeps clear walking routes from the stair landing to the ZEUS-77 case and the former Ray Gun space', () => {
+  it('keeps clear walking routes from the stair landing to the ZEUS-77 case and the former VORTEX-9 space', () => {
     const arena = makeArena();
     const landing = [MANSION_STAIR_CENTER_X, -7.2] as const;
     const emptyCaseSpace = [-1.2, -3] as const;

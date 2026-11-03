@@ -143,7 +143,7 @@ describe('Barrel overheating', () => {
   });
 
   it('semi-automatic and energy weapons have no barrel glow', () => {
-    for (const id of ['m1911', 'l96', 'raygun', 'tesla'] as const) {
+    for (const id of ['m1911', 'l96', 'vortex9', 'tesla'] as const) {
       expect(findGlow(new WeaponView(WEAPON_DEFINITIONS[id], null)), id).toBeUndefined();
     }
   });

@@ -47,9 +47,9 @@ function roll(machine: MysteryBoxMachine): WeaponId {
 }
 
 describe('Mystery Box pool', () => {
-  it('contains the standard weapons, Ray Gun and ZEUS-77', () => {
+  it('contains the standard weapons, VORTEX-9 and ZEUS-77', () => {
     expect(MYSTERY_BOX_POOL.map((entry) => entry.weaponId).sort()).toEqual(
-      ['ak47', 'barrett', 'l96', 'm4a1', 'm60', 'mp5', 'ppsh41', 'raygun', 'tesla', 'vector'].sort(),
+      ['ak47', 'barrett', 'l96', 'm4a1', 'm60', 'mp5', 'ppsh41', 'tesla', 'vector', 'vortex9'].sort(),
     );
   });
 
@@ -57,15 +57,15 @@ describe('Mystery Box pool', () => {
     expect(MYSTERY_BOX_POOL.some((entry) => entry.weaponId === 'm1911')).toBe(false);
   });
 
-  it('makes ZEUS-77 a legendary pull rarer than the Ray Gun', () => {
+  it('makes ZEUS-77 a legendary pull rarer than the VORTEX-9', () => {
     const tesla = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'tesla');
-    const raygun = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'raygun');
+    const vortex9 = MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'vortex9');
     expect(tesla).toMatchObject({ weight: 1, rarity: 'legendary' });
-    expect(raygun).toMatchObject({ weight: 10, rarity: 'rare' });
-    expect(tesla!.weight).toBeLessThan(raygun!.weight);
+    expect(vortex9).toMatchObject({ weight: 10, rarity: 'rare' });
+    expect(tesla!.weight).toBeLessThan(vortex9!.weight);
     const others = MYSTERY_BOX_POOL.filter((entry) => entry.rarity === 'standard');
-    expect(raygun).toBeDefined();
-    for (const entry of others) expect(raygun!.weight).toBeLessThan(entry.weight);
+    expect(vortex9).toBeDefined();
+    for (const entry of others) expect(vortex9!.weight).toBeLessThan(entry.weight);
   });
 
   it('maps the legendary ZEUS-77 reveal to gold', () => {
@@ -82,7 +82,7 @@ describe('pickWeighted (deterministic, injected rng)', () => {
     { weaponId: 'ak47', weight: 25, rarity: 'standard' },
     { weaponId: 'm60', weight: 20, rarity: 'standard' },
     { weaponId: 'l96', weight: 20, rarity: 'standard' },
-    { weaponId: 'raygun', weight: 10, rarity: 'rare' },
+    { weaponId: 'vortex9', weight: 10, rarity: 'rare' },
     { weaponId: 'tesla', weight: 1, rarity: 'legendary' },
   ];
 
@@ -93,7 +93,7 @@ describe('pickWeighted (deterministic, injected rng)', () => {
     expect(pickWeighted(pool, () => 0.25)).toBe('ak47');
     expect(pickWeighted(pool, () => 0.55)).toBe('m60');
     expect(pickWeighted(pool, () => 0.75)).toBe('l96');
-    expect(pickWeighted(pool, () => 0.95)).toBe('raygun');
+    expect(pickWeighted(pool, () => 0.95)).toBe('vortex9');
     expect(pickWeighted(pool, () => 0.9999)).toBe('tesla');
   });
 
@@ -113,16 +113,16 @@ describe('pickWeighted (deterministic, injected rng)', () => {
 
   it('completely excludes the equipped weapon while preserving the other weights', () => {
     expect(pickWeighted(pool, () => 0, null, 1, ['m4a1'])).toBe('ak47');
-    expect(pickWeighted(pool, () => 0.9999, null, 1, ['tesla'])).toBe('raygun');
+    expect(pickWeighted(pool, () => 0.9999, null, 1, ['tesla'])).toBe('vortex9');
   });
 
   it('excludes both slots and keeps relative weights and the exact-total fallback', () => {
     const carried: WeaponId[] = ['m4a1', 'tesla'];
-    // Remaining weights: AK 25, M60 20, L96 20, Ray Gun 10 (total 75).
+    // Remaining weights: AK 25, M60 20, L96 20, VORTEX-9 10 (total 75).
     expect(pickWeighted(pool, () => 0, null, 1, carried)).toBe('ak47');
     expect(pickWeighted(pool, () => 0.34, null, 1, carried)).toBe('m60');
     expect(pickWeighted(pool, () => 0.61, null, 1, carried)).toBe('l96');
-    expect(pickWeighted(pool, () => 1, null, 1, carried)).toBe('raygun');
+    expect(pickWeighted(pool, () => 1, null, 1, carried)).toBe('vortex9');
   });
 
   it('falls back to the last entry when the roll lands on the exact total', () => {

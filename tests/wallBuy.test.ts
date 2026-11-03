@@ -46,7 +46,7 @@ describe('Wall Buy', () => {
   it('validates prices and rejects special weapons', () => {
     expect(() => new WallBuy({ ...CONFIG, price: -1 })).toThrow(/weapon price/);
     expect(() => new WallBuy({ ...CONFIG, ammoPrice: Number.NaN })).toThrow(/ammo price/);
-    expect(() => new WallBuy({ ...CONFIG, weaponId: 'raygun' } as unknown as WallBuyConfig)).toThrow(/Special weapon/);
+    expect(() => new WallBuy({ ...CONFIG, weaponId: 'vortex9' } as unknown as WallBuyConfig)).toThrow(/Special weapon/);
   });
 
   it('charges the weapon price and grants an unowned weapon', () => {

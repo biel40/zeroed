@@ -208,7 +208,7 @@ export interface ZombiePlayerTarget {
 /**
  * Owns the zombie population: pooling, spawning, steering (seek + soft
  * neighbor separation), attacks and damage. The shared collider array is
- * mutated on spawn/death so the existing BallisticsSystem and the Ray Gun
+ * mutated on spawn/death so the existing BallisticsSystem and the VORTEX-9
  * projectiles hit zombies with zero changes to the shooting layer.
  */
 export class ZombieManager {
@@ -712,7 +712,7 @@ export class ZombieManager {
     return chain;
   }
 
-  /** Ray Gun splash: linear falloff around the impact point, XZ distance. */
+  /** VORTEX-9 splash: linear falloff around the impact point, XZ distance. */
   applySplash(center: THREE.Vector3, radius: number, splashDamage: number): void {
     for (const zombie of this.pool.actives) {
       if (!zombie.isAlive) continue;
@@ -724,8 +724,8 @@ export class ZombieManager {
       const damage = splashDamageAt(splashDamage, Math.hypot(dx, dz), radius);
       if (damage <= 0) continue;
       // applyDamage already triggers the red hit flash; splash kills vaporize.
-      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, 'raygun')) {
-        this.kill(zombie, false, 'raygun');
+      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, 'vortex9')) {
+        this.kill(zombie, false, 'vortex9');
       }
     }
   }

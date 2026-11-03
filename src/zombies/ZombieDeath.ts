@@ -26,7 +26,7 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   ppsh41: 'riddled',
   ak47: 'riddled',
   m60: 'riddled',
-  raygun: 'blast',
+  vortex9: 'blast',
   tesla: 'shock',
   // Burnt alive: thrashes in the fire, kneels and collapses curled up, charred (ZombieVisual.incinerate).
   fakel: 'burn',
@@ -304,7 +304,7 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieFallStyle, ZombieDeathProfile> 
       pose.right[2] += (0.16 - pose.right[2]) * clutch;
     },
   },
-  // Ray Gun: lifted off its feet and thrown back, limbs trailing the blast.
+  // VORTEX-9: lifted off its feet and thrown back, limbs trailing the blast.
   blast: {
     duration: 0.9,
     fall: 'back',

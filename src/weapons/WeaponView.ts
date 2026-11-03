@@ -15,7 +15,7 @@ import { buildMP5 } from './MP5ViewModel';
 import { buildVector } from './VectorViewModel';
 import { buildPPSH41 } from './PPSH41ViewModel';
 import { buildM60 } from './M60ViewModel';
-import { buildRayGun } from './RayGunViewModel';
+import { buildVortex9 } from './Vortex9ViewModel';
 import { buildFakel } from './FakelViewModel';
 import { InspectAnimator } from './InspectAnimator';
 import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
@@ -57,7 +57,7 @@ function getFlashTexture(): THREE.CanvasTexture {
 
 /**
  * Pure white-to-alpha plasma burst + corona ring texture so energy weapons
- * (Ray Gun, Tesla) tint cleanly to their neon bolt color without orange bleed.
+ * (VORTEX-9, Tesla) tint cleanly to their neon bolt color without orange bleed.
  */
 function getPlasmaFlashTexture(): THREE.DataTexture {
   if (plasmaFlashTexture) return plasmaFlashTexture;
@@ -967,7 +967,7 @@ function buildPistol(config: ViewModelConfig): BuiltProcedural {
 
 /**
  * Procedural fallback for GLB weapons that failed to load. Kept deliberately
- * simple; the GLB path is the primary one, and the M60/Ray Gun/Tesla/M1911
+ * simple; the GLB path is the primary one, and the M60/VORTEX-9/Tesla/M1911
  * have their own dedicated builders (see buildProceduralViewModel).
  */
 function buildProcedural(config: ViewModelConfig): BuiltProcedural {
@@ -1121,14 +1121,14 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
 
 /**
  * Picks the procedural builder for a view config: dedicated builders for
- * the Wonder Weapons (Ray Gun, Tesla), the M1911 pistol, the AK-47, the
+ * the Wonder Weapons (VORTEX-9, Tesla), the M1911 pistol, the AK-47, the
  * M4A1, the MP5A3, the Vector, the PPSh-41, the L96A1, the Barrett and its PTRS-41 look and the M60 GPMG; the generic long-gun fallback otherwise
  * (a GLB that failed to load). Single dispatch shared by the first-person WeaponView and the
  * world-space display models so both always build the same weapon.
  */
 export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural {
   if (view.teslaFrame === 'tesla') return buildTesla(view);
-  if (view.energyColor !== undefined) return buildRayGun(view);
+  if (view.energyColor !== undefined) return buildVortex9(view);
   if (view.frame === 'pistol') return buildPistol(view);
   if (view.frame === 'lmg') return buildM60(view);
   if (view.frame === 'ak47') return buildAk47(view);
@@ -1146,7 +1146,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
 /**
  * World-space display model of a weapon (Mystery Box roulette, pickups).
  * GLB weapons CLONE the cached AssetManager scene — shared geometry and
- * materials, zero network. Procedural weapons (M60, Ray Gun) are rebuilt
+ * materials, zero network. Procedural weapons (M60, VORTEX-9) are rebuilt
  * from the same builders the first-person viewmodel uses. The result is
  * centered on its pivot and normalized to `targetLength` meters.
  */

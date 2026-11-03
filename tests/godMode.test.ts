@@ -27,10 +27,10 @@ describe('Zombies GOD_MODE developer command', () => {
     expect(health.damage(1)).toBe(true);
     (mode as unknown as { gameOver: boolean }).gameOver = true;
     grantWeapon.mockClear();
-    mode.executeDeveloperCommand('weapon raygun');
+    mode.executeDeveloperCommand('weapon vortex9');
     expect(grantWeapon).not.toHaveBeenCalled();
   });
-  it('activates once after MOTDRULES and grants infinite-ammo Ray Gun and Zeus', () => {
+  it('activates once after MOTDRULES and grants infinite-ammo VORTEX-9 and Zeus', () => {
     const mode = new ZombiesMode();
     const events: string[] = [];
     (mode as unknown as { ctx: unknown }).ctx = {
@@ -54,8 +54,8 @@ describe('Zombies GOD_MODE developer command', () => {
 
     expect(unlockSecretRoom).toHaveBeenCalledOnce();
     expect(events).toEqual([
-      'grant:raygun',
-      'infinite:raygun',
+      'grant:vortex9',
+      'infinite:vortex9',
       'grant:tesla',
       'infinite:tesla',
       'banner:GOD MODE ENABLED',

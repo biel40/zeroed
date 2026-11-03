@@ -92,7 +92,7 @@ de bruces encogido como un cadaver calcinado; el fuego lo envuelve, la piel
 se carboniza a trozos hasta quedar negra con grietas de brasas que respiran
 y quemaduras en carne viva (`ZombieCharShader`, encadenado al shader de
 disolucion, sin recompilar), suben chispas y ceniza (las particulas de la
-Ray Gun en naranja) y un charco de sangre se extiende bajo el cuerpo
+VORTEX-9 en naranja) y un charco de sangre se extiende bajo el cuerpo
 (`ZombieBloodPool`). Quemarse vivo ya oscurece la piel. El chorro vive en el mundo (`FlameJet`): una vara presurizada de unos 3 m,
 blanca con nucleo azul y dos helices carmesi del cristal girando a su
 alrededor, que se rompe en bolas de fuego (`FlameParticles`, pools fijos,
@@ -187,7 +187,7 @@ validacion manual. Detalles de entrega y comprobacion en
 
 ### Consola de desarrollador
 
-El comando individual `MOTDRULES` fija Ray Gun y ZEUS-77 con reserva infinita
+El comando individual `MOTDRULES` fija VORTEX-9 y ZEUS-77 con reserva infinita
 en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
 restaura el cierre y el inventario inicial. En Station 33, el panel del
 Protocolo 33 ofrece ademas escapar al momento por su precio (10000), sin
@@ -204,7 +204,7 @@ en un desplegable avanzado y utiliza la misma validacion.
 `ring <id>` (alias `drink`) concede o recarga los anillos sin consumir
 compras ni exigir maquinas del mapa. `ammo full|infinite` afecta al arma
 equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
-Ray Gun y cadenas ZEUS) y `invincible on|off` permite probar salud y
+VORTEX-9 y cadenas ZEUS) y `invincible on|off` permite probar salud y
 resurreccion. No es un sistema de mejora comprable: son ajustes temporales
 de prueba, reiniciados con la run. Historial con arriba/abajo y `clear`
 para limpiar la salida. Solo individual, disponible con el mismo acceso
@@ -215,7 +215,7 @@ existente a `MOTDRULES`.
 - La vida conserva la curva de las rondas 1–5 y suma 35 HP por ronda desde
   la 6, sin techo fijo; los multiplicadores de tipo siguen aplicandose.
   ZEUS-77 descarga 450 de dano sobre hasta seis objetivos, con saltos de 5 m;
-  solo la cabeza del impacto directo multiplica el dano. Ray Gun hace 400
+  solo la cabeza del impacto directo multiplica el dano. VORTEX-9 hace 400
   de dano directo y hasta 600 de area en 2,5 m con caida lineal. Individual
   y cooperativo usan el mismo balance.
 - Rondas con descanso de 6 s; limite global de 24 activos. `normal` y `shiny`
@@ -232,7 +232,8 @@ existente a `MOTDRULES`.
   texturas nuevas y la altura de contrato no cambia. Una skin tambien puede
   quemar el cuerpo (manchas chamuscadas y carbonizadas por ruido determinista,
   cara incluida; ojos, boca y sangre intactos) y perder un antebrazo, cuyo
-  codo cierra un muñon rigido ([dano de skin](../src/zombies/skins/ZombieSkinDamage.ts)).
+  codo se cierra con una tapa plana al ras del corte y deja de seguir al hueso
+  perdido ([dano de skin](../src/zombies/skins/ZombieSkinDamage.ts)).
   Burned Mansion viste asi a toda su horda. Se construyen una vez por
   walker cargado. Solo apariencia: tipo, hitboxes y animacion son los del walker.
   El primer impacto en la cabeza desprende gorras, ushankas y cascos completos,
@@ -307,8 +308,8 @@ existente a `MOTDRULES`.
 - Muertes segun el golpe letal (`ZombieDeath`), sin ragdoll: cuchillo (gira,
   se sujeta el corte y cae de lado), pistola y L96 (retrocede y cae de
   espaldas), automaticas (sacudidas por cada impacto y se desploma de bruces),
-  headshot con arma de fuego (se derrumba inerte), Ray Gun (vaporizacion de
-  1.0 s con `RayGunDissolveShader`, borde incandescente verde y cenizas
+  headshot con arma de fuego (se derrumba inerte), VORTEX-9 (vaporizacion de
+  1.0 s con `Vortex9DissolveShader`, borde incandescente verde y cenizas
   ascendentes), Tesla (convulsiona rigido y cae) y Barrett (`shatter`, siempre,
   incluso en headshot: el cuerpo desaparece y `ZombieGibs` lanza sus pedazos con
   munones rojos, restos y gotas de sangre varios metros en la direccion del
@@ -472,7 +473,7 @@ existente a `MOTDRULES`.
   30 % de vida, con cartel, consejo propio en la nota y ritmo mas agresivo.
   Barra con nombre y marcas de fase arriba en el centro (`HUD.setBossBar`);
   su nota `ObjectiveNote` va antes de la del protocolo. Le afectan balas,
-  Ray Gun, Tesla y llamas, pero no el cuchillo ni la salpicadura. Al caer, la
+  VORTEX-9, Tesla y llamas, pero no el cuchillo ni la salpicadura. Al caer, la
   horda y el reloj siguen y se puede subir al camion. Valores en
   `CAPTAIN_USSR`.
 - Puertas de pago de Station 33: la misma `PointDoorView`/`BuyableDoorVisual`
@@ -563,7 +564,7 @@ existente a `MOTDRULES`.
   cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),
   con dano completo a cada uno; una pared la detiene;
   reutiliza la recarga de fusil y no necesita accionar el cerrojo entre disparos.
-  La Ray Gun se obtiene exclusivamente en la caja; ZEUS-77 es una tirada
+  La VORTEX-9 se obtiene exclusivamente en la caja; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
   ajustado al tamano y orientacion de la caja, tanto en individual como en
@@ -579,7 +580,7 @@ existente a `MOTDRULES`.
   de energia al alcanzar el requisito; comprar eleva el cristal y el arma.
   El cooperativo valida las bajas y cobra al comprador en el anfitrion;
   cada cliente muestra su propio progreso y ambos ven la apertura compartida.
-  La Ray Gun no tiene recompensa por bajas ni vitrina en el bunker.
+  La VORTEX-9 no tiene recompensa por bajas ni vitrina en el bunker.
   Easter egg del bunker: la ultima mascara de gas de la pared norte
   (`ArenaGasMaskRack`) se pone y se vuelve a colgar con USE. Es cosmetica y
   solo individual (`ZombiesGasMask`): la mano derecha la lleva a la cara como
@@ -646,7 +647,7 @@ prompt, la muerte y el reinicio.
 - Tiro doble (indice, pasivo, amarillo): una compra por run, 3000, en el
   taller al norte de la sala de electricidad de Station 33; necesita corriente.
   Aumenta un 25 % la cadencia de cualquier arma equipada, incluido su ciclo de
-  cerrojo, y un 10 % el dano de balas, cadenas Tesla, Ray Gun y llama/quemaduras.
+  cerrojo, y un 10 % el dano de balas, cadenas Tesla, VORTEX-9 y llama/quemaduras.
   Conserva consumo por disparo, recargas y cuchillo; cambiar o adquirir armas
   mantiene el efecto y reiniciar lo elimina. Se combina multiplicando con
   el ajuste de dano de la consola de desarrollo.
