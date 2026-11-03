@@ -6,7 +6,7 @@ import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { BetaThanksScreen } from './BetaThanksScreen';
-import { BetaUnlockDialog } from './BetaUnlockDialog';
+import { MapUnlockDialog, type MapUnlockAccount } from './MapUnlockDialog';
 import { LanguagePicker } from './LanguagePicker';
 import type { ObjectiveNote } from './ObjectiveAnnouncer';
 import { ObjectiveTracker } from './ObjectiveTracker';
@@ -157,9 +157,18 @@ export class HUD {
     title: mustGet('objective-spotlight-title'),
     details: mustGet('objective-spotlight-details'),
   }, () => Math.max(0, ROUND_BANNER_MS - (performance.now() - this.roundBannerShownAt)));
-  private readonly betaUnlock = new BetaUnlockDialog(mustGet('beta-unlock') as HTMLDialogElement,
-    mustGet('beta-access-form') as HTMLFormElement, mustGet('beta-email') as HTMLInputElement,
-    mustGet('beta-message'), mustGet('beta-unlock-map'), mustGet('beta-unlock-cancel'));
+  private readonly mapUnlock = new MapUnlockDialog({
+    dialog: mustGet('beta-unlock') as HTMLDialogElement,
+    form: mustGet('beta-access-form') as HTMLFormElement,
+    mapName: mustGet('beta-unlock-map'),
+    hint: mustGet('beta-unlock-hint'),
+    emailField: mustGet('beta-email-field'),
+    email: mustGet('beta-email') as HTMLInputElement,
+    message: mustGet('beta-message'),
+    cancelButton: mustGet('beta-unlock-cancel'),
+    submitButton: mustGet('beta-unlock-submit') as HTMLButtonElement,
+    signOutButton: mustGet('beta-signout') as HTMLButtonElement,
+  });
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -349,7 +358,7 @@ export class HUD {
   /**
    * Initial picker: Zombies is the only mode, so the player chooses its arena
    * directly. Maps the player cannot access yet stay listed but locked; their
-   * card asks for a closed-beta email, thanks the tester and then opens the map.
+   * card opens the account dialog, and the map unlocks once the account owns it.
    */
   public showMapSelect(onSelect: (mapId: ZombieMapId) => void, entitlements: EntitlementProvider): void {
     this.fadeOutStartScreen();
@@ -380,9 +389,7 @@ export class HUD {
         onSelect(map.id);
       };
       // Assignment replaces a previous handler if this menu is shown again.
-      button.onclick = locked
-        ? () => this.betaUnlock.open(map.nameKey, (email) => this.betaThanks.show(email, select))
-        : select;
+      button.onclick = locked ? () => this.mapUnlock.open(map.nameKey) : select;
     }
     firstPlayableButton?.focus();
   }
@@ -391,9 +398,14 @@ export class HUD {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
   }
 
-  /** Closed-beta email check used by locked map cards; it may throw when access cannot be saved. */
-  public setBetaAccessHandler(acceptEmail: (email: string) => boolean): void {
-    this.betaUnlock.setAcceptEmail(acceptEmail);
+  /** The account behind locked map cards; `onSignedOut` lets the caller refresh the menu. */
+  public setMapUnlockAccount(account: MapUnlockAccount, onSignedOut: () => void): void {
+    this.mapUnlock.setAccount(account, onSignedOut);
+  }
+
+  /** Thank-you card for a closed-beta tester who has just signed in. */
+  public showBetaThanks(email: string, onClose: () => void): void {
+    this.betaThanks.show(email, onClose);
   }
 
   /** Settings quality buttons (main menu only); the choice applies from the next match. */

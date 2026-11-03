@@ -228,7 +228,7 @@
     </div>
   </div>
 
-  <!-- Opened from a locked map card; BetaUnlockDialog names the map and checks the email. -->
+  <!-- Opened from a locked map card; MapUnlockDialog mails a login link or offers to sign out. -->
   <dialog id="beta-unlock" class="beta-unlock" aria-labelledby="beta-unlock-map" aria-describedby="beta-unlock-hint">
     <form id="beta-access-form" class="beta-unlock-form">
       <p class="beta-unlock-kicker">
@@ -236,13 +236,16 @@
         <span data-i18n="map.locked"></span>
       </p>
       <h2 id="beta-unlock-map" class="beta-unlock-map"></h2>
-      <p id="beta-unlock-hint" class="beta-unlock-hint" data-i18n="beta.unlockHint"></p>
-      <label for="beta-email" data-i18n="beta.email"></label>
-      <input id="beta-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="beta-message" />
+      <p id="beta-unlock-hint" class="beta-unlock-hint" data-i18n="account.unlockHint"></p>
+      <div id="beta-email-field">
+        <label for="beta-email" data-i18n="account.email"></label>
+        <input id="beta-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="beta-message" />
+      </div>
       <p id="beta-message" role="status" aria-live="polite"></p>
       <div class="beta-unlock-actions">
         <button type="button" id="beta-unlock-cancel" data-i18n="beta.cancel"></button>
-        <button type="submit" id="beta-unlock-submit" data-i18n="menu.unlock"></button>
+        <button type="button" id="beta-signout" class="hidden" data-i18n="account.signOut"></button>
+        <button type="submit" id="beta-unlock-submit" data-i18n="account.sendLink"></button>
       </div>
     </form>
   </dialog>

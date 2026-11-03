@@ -1,40 +1,30 @@
-# Acceso temporal a mapas de beta
+# Acceso de la beta cerrada a mapas premium
 
-Burned Mansion sigue abierto, en individual y cooperativo. Los mapas con
-`product` en [el registro](../../src/config/zombieMaps.ts), actualmente
-Station 33, aparecen en el menu con candado: al pulsar su tarjeta,
-[BetaUnlockDialog](../../src/ui/BetaUnlockDialog.ts) pide un correo de
-`BETA_EMAILS` en `emails.js`. Mientras no haya pagos,
-[BetaEntitlementProvider](../../src/entitlements/BetaEntitlementProvider.ts)
-concede todos los productos premium a quien tenga acceso de beta. No hay
-distincion entre desarrolladores y testers ni excepcion en Vite dev.
+Burned Mansion sigue abierto, en individual y cooperativo, sin cuenta. Los
+mapas con `product` en [el registro](../../src/config/zombieMaps.ts),
+actualmente Station 33, aparecen con candado mientras la cuenta no los tenga.
 
-`access.js` reutiliza la clave `zeroed.betaAccess` en `sessionStorage` y valida
-el correo contra la lista cada vez que se consulta el permiso. Las sesiones
-anteriores con correos aun autorizados siguen siendo validas. El menu y el
-arranque de partida comparten `canAccessZombieMap`: `?map=station-33` sin
-permiso muestra el menu con la tarjeta bloqueada. Si no se puede leer o
-guardar la sesion, Station 33 permanece restringido.
+Los testers ya no se comprueban en el cliente: tienen una concesion `*` en la
+[API de cuentas](../../cloudflare/api/README.md), que incluye todo el contenido
+premium presente y futuro. La lista de correos no se publica; se carga en la
+base de datos con `npm run api:seed-beta` desde un archivo fuera del
+repositorio.
 
-Es el mecanismo local de la beta anterior: **no verifica la titularidad del
-correo ni proporciona autenticacion de servidor**. La lista y la comprobacion
-se descargan al cliente; alguien puede introducir un correo ajeno autorizado
-o manipular el cliente. Para restringir por identidad real hace falta otro
-sistema de autenticacion.
+Flujo: la tarjeta bloqueada abre [MapUnlockDialog](../../src/ui/MapUnlockDialog.ts),
+que envia un enlace de un solo uso al correo. Al abrirlo, el juego inicia sesion,
+carga los productos y, si la cuenta es de beta, muestra
+[BetaThanksScreen](../../src/ui/BetaThanksScreen.ts) antes del menu. Una
+cuenta sin el mapa ve su correo y puede cerrar sesion. `?map=station-33` sin
+permiso muestra el menu con la tarjeta bloqueada.
 
-`src/main.ts` mantiene la PWA activa. `BETA_ENABLED` y `VITE_BETA_ENABLED` no
-controlan este permiso. En Vercel, `vercel.json` redirige solo las antiguas
-paginas de beta al juego, conservando la consulta; `access.js` y `emails.js`
-deben servirse como archivos, sin redireccion.
+Limites: el codigo de Station 33 sigue en el paquete del juego, asi que un
+cliente modificado puede abrirlo. La app Android no puede iniciar sesion: el
+enlace se abre en el navegador y su origen no esta permitido en la API.
 
-Al aceptar un correo, [BetaThanksScreen](../../src/ui/BetaThanksScreen.ts) muestra
-una tarjeta de agradecimiento sobre capturas de `public/assets/beta/`; al
-cerrarla se abre el mapa desbloqueado. Con un acceso ya guardado la tarjeta
-aparece sin candado y el agradecimiento no se repite.
+`vercel.json` redirige las antiguas paginas de beta al juego.
 
-Validacion manual: comprobar en una sesion nueva que Burned Mansion funciona
-y Station 33 aparece bloqueado y no abre por enlace directo; probar un correo
-ajeno a la lista y uno autorizado (tarjeta de agradecimiento y partida),
-recargar la misma pestaña y regresar al menu tras una partida. Repetir en
-movil y PWA instalada, y comprobar los enlaces antiguos de beta. Las copias
-antiguas offline necesitan actualizarse con conexion.
+Validacion manual (con la API local o desplegada): en una sesion nueva,
+Burned Mansion funciona y Station 33 aparece bloqueado y no abre por enlace
+directo; pedir un enlace con un correo de tester, abrirlo, ver el
+agradecimiento y jugar; recargar; cerrar sesion desde la tarjeta; probar un
+correo sin concesion. Repetir en movil y PWA instalada.

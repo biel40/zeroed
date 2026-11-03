@@ -13,6 +13,11 @@ export interface RecentLoginRequests {
   readonly byRequester: number;
 }
 
+export interface GrantRecord {
+  readonly productId: string;
+  readonly source: 'beta' | 'purchase' | 'manual';
+}
+
 export interface SessionRecord {
   readonly userId: string;
   readonly email: string;
@@ -83,12 +88,12 @@ export class AccountStore {
     await this.database.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
   }
 
-  /** Product ids of the account's active grants, possibly including '*'. */
-  public async listGrantedProducts(userId: string): Promise<string[]> {
+  /** The account's active grants; `productId` may be '*'. */
+  public async listActiveGrants(userId: string): Promise<GrantRecord[]> {
     const { results } = await this.database.prepare(`
-      SELECT DISTINCT product_id AS productId FROM grants WHERE user_id = ? AND revoked_at IS NULL
-    `).bind(userId).all<{ productId: string }>();
-    return results.map((row) => row.productId);
+      SELECT product_id AS productId, source FROM grants WHERE user_id = ? AND revoked_at IS NULL
+    `).bind(userId).all<GrantRecord>();
+    return results;
   }
 
   public async purgeExpired(now: number): Promise<void> {

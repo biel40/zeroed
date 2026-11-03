@@ -1,20 +1,20 @@
 import './style.css';
-import type * as BetaAccess from '../public/beta/access.js';
+import { AccountApi, DEFAULT_ACCOUNT_API_URL } from './account/AccountApi';
+import { readLoginToken } from './account/loginLink';
+import { WebAccount, type AccountStorage, type LoginCompletion } from './account/WebAccount';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { MusicManager } from './audio/MusicManager';
 import { canAccessZombieMap, COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
-import { BetaEntitlementProvider } from './entitlements/BetaEntitlementProvider';
-import type { EntitlementProvider } from './entitlements/EntitlementProvider';
 import type { GameMode } from './modes/GameMode';
 import { setupPWA } from './pwa';
 import { ZombiesMode } from './modes/ZombiesMode';
 import { CoopGuestMode } from './modes/coop/CoopGuestMode';
 import { CoopHostMode } from './modes/coop/CoopHostMode';
 import { CoopConnection } from './network/CoopConnection';
-import { applyDocumentTranslations, t } from './i18n/i18n';
+import { applyDocumentTranslations, getLanguage, t } from './i18n/i18n';
 import { HUD } from './ui/HUD';
 import { GamepadControls } from './player/GamepadControls';
 
@@ -31,14 +31,16 @@ class ZeroedBoot {
   private readonly gamepad = new GamepadControls();
   private menuFrame = 0;
   private lastMenuTime = 0;
-  private readonly entitlements: EntitlementProvider;
 
-  public constructor(private readonly betaAccess: typeof BetaAccess) {
+  /**
+   * `entitlements` decides premium map access everywhere below. `loginToken`
+   * comes from a login link this page was opened with, if any.
+   */
+  public constructor(private readonly entitlements: WebAccount, private readonly loginToken: string | null) {
     const container = document.getElementById('app');
     if (!container) throw new Error('Missing #app container');
 
     this.container = container;
-    this.entitlements = new BetaEntitlementProvider(betaAccess);
     this.profile = getDeviceProfile(undefined, getQualityPreference());
     this.hud = new HUD();
     this.assets = new AssetManager(this.profile.anisotropyLimit);
@@ -219,20 +221,39 @@ class ZeroedBoot {
     try {
       // Individual asset failures degrade to procedural/flat fallbacks inside the
       // AssetManager, so loading always completes.
-      await this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total));
+      const [, login] = await Promise.all([
+        this.assets.loadAll(manifest, (loaded, total) => this.hud.setLoadProgress(loaded / total)),
+        this.syncAccount(),
+      ]);
       this.hud.setReady();
-      // Locked cards open their map through the regular selection, which startGame rechecks.
-      this.hud.setBetaAccessHandler((email) => this.betaAccess.acceptBetaEmail(email));
+      // Unlocked cards open their map through the regular selection, which startGame rechecks.
+      this.hud.setMapUnlockAccount({
+        getEmail: () => this.entitlements.getEmail(),
+        requestLogin: (email) => this.entitlements.requestLogin(email, getLanguage()),
+        signOut: () => this.entitlements.signOut(),
+      }, () => this.showMapMenu());
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
       this.hud.setQualitySelect(this.profile.quality, (quality) => {
         setQualityPreference(quality);
         this.profile = getDeviceProfile(undefined, quality);
       });
 
-      this.openRequestedMap();
+      const email = this.entitlements.getEmail();
+      if (login === 'signed-in' && email && this.entitlements.isBetaTester()) {
+        this.hud.showBetaThanks(email, () => this.openRequestedMap());
+      } else {
+        this.openRequestedMap();
+      }
     } catch (error: unknown) {
       this.hud.setError(error instanceof Error ? t('start.initFailed', { message: error.message }) : t('start.initFailedGeneric'));
     }
+  }
+
+  /** Signs in from the opening login link, or refreshes the remembered products. Never rejects. */
+  private async syncAccount(): Promise<LoginCompletion | null> {
+    if (this.loginToken) return this.entitlements.completeLogin(this.loginToken);
+    await this.entitlements.refresh();
+    return null;
   }
 
   public async run(): Promise<void> {
@@ -240,21 +261,26 @@ class ZeroedBoot {
   }
 }
 
+function getAccountStorage(): AccountStorage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    // Blocked site data: the account lasts until the page closes.
+    return undefined;
+  }
+}
+
+/** Removes a login link's token from the address bar so it is not bookmarked or shared. */
+function takeLoginToken(): string | null {
+  const token = readLoginToken(window.location.hash);
+  if (token) history.replaceState(history.state, '', window.location.pathname + window.location.search);
+  return token;
+}
+
 applyDocumentTranslations();
 async function boot(): Promise<void> {
   setupPWA();
-  // Shared static module: keep the existing beta list and session contract.
-  const accessUrl = new URL(`${import.meta.env.BASE_URL}beta/access.js`, window.location.href).href;
-  let betaAccess: typeof BetaAccess;
-  try {
-    betaAccess = await import(/* @vite-ignore */ accessUrl) as typeof BetaAccess;
-  } catch {
-    // A missing beta module must neither expose restricted maps nor block the public game.
-    betaAccess = {
-      hasBetaAccess: () => false,
-      acceptBetaEmail: () => { throw new Error('Beta access unavailable'); },
-    };
-  }
-  await new ZeroedBoot(betaAccess).run();
+  const api = new AccountApi(import.meta.env.VITE_ACCOUNT_API_URL?.trim() || DEFAULT_ACCOUNT_API_URL);
+  await new ZeroedBoot(new WebAccount(api, getAccountStorage()), takeLoginToken()).run();
 }
 void boot();

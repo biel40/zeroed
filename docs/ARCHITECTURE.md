@@ -63,12 +63,12 @@ sufra tirones de compilacion de shaders.
   [EntitlementProvider](../src/entitlements/EntitlementProvider.ts) y comparte
   la regla entre el selector y el arranque, incluidos enlaces directos; el
   selector lista bloqueados los mapas sin permiso. Cada plataforma aporta su
-  proveedor; en web, `BetaEntitlementProvider` concede todos los productos a
-  quien tenga acceso de beta. `public/beta/access.js` conserva la lista y
-  sesion de beta y `main.ts` la inyecta en `HUD`, cuyo `BetaUnlockDialog`
-  recoge el correo; tras el agradecimiento, la seleccion normal abre el mapa y
-  `main.ts` vuelve a comprobar el permiso. Es una comprobacion de cliente, con
-  los limites descritos en [acceso de beta](../public/beta/README.md).
+  proveedor; en web es [WebAccount](../src/account/WebAccount.ts), que recuerda
+  los productos de la cuenta y los refresca con la
+  [API de cuentas](../cloudflare/api/README.md) mediante `AccountApi`. `main.ts`
+  canjea el enlace de acceso (`#login=`) al arrancar y entrega la cuenta a
+  `HUD`, cuyo `MapUnlockDialog` pide el enlace o permite cerrar sesion. La
+  comprobacion final sigue en el cliente; ver [acceso de beta](../public/beta/README.md).
 
 - `ZombieMapDefinition.weapons` es el `WeaponCatalog` con que el mapa nombra y
   dibuja las armas ([reskins](../src/config/weaponReskins.ts)). `ZombiesMode`

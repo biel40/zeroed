@@ -106,7 +106,7 @@ describe('Zombies map selection flow', () => {
     );
   });
 
-  it('labels the cards from the registry, locks beta maps and handles them again after reopening the picker', () => {
+  it('labels the cards from the registry, locks premium maps behind the account dialog and handles them again after reopening the picker', async () => {
     const card = (mapId: string): FakeElement => {
       const element = new FakeElement();
       element.dataset.map = mapId;
@@ -126,14 +126,17 @@ describe('Zombies map selection flow', () => {
       'beta-unlock': new FakeDialog(),
       'beta-access-form': new FakeElement(),
       'beta-email': new FakeElement(),
+      'beta-email-field': new FakeElement(),
       'beta-message': new FakeElement(),
       'beta-unlock-map': new FakeElement(),
+      'beta-unlock-hint': new FakeElement(),
+      'beta-unlock-submit': new FakeElement(),
+      'beta-signout': new FakeElement(),
       'beta-thanks': new FakeDialog(),
       'beta-thanks-email': new FakeElement(),
       'beta-thanks-close': new FakeElement(),
     };
     const unlockDialog = elements['beta-unlock'] as FakeDialog;
-    const thanksDialog = elements['beta-thanks'] as FakeDialog;
     const generic = new FakeElement();
     const previousDocument = globalThis.document;
     Object.defineProperty(globalThis, 'document', {
@@ -176,11 +179,17 @@ describe('Zombies map selection flow', () => {
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
-      // Without an allowed beta session the card stays listed but locked behind the email prompt.
+      // Signed out, the card stays listed but locked behind the login-link prompt.
       mansion.focused = false;
-      const acceptEmail = vi.fn((email: string) => email === 'bielet40@gmail.com');
-      ui.setBetaAccessHandler(acceptEmail);
-      ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), noProducts);
+      let accountEmail: string | null = null;
+      const requestLogin = vi.fn(async (email: string) => (email.includes('@') ? 'sent' as const : 'invalid-email' as const));
+      const onSignedOut = vi.fn();
+      ui.setMapUnlockAccount({
+        getEmail: () => accountEmail,
+        requestLogin,
+        signOut: async () => { accountEmail = null; },
+      }, onSignedOut);
+      ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts);
       expect(station.classList.contains('hidden')).toBe(false);
       expect(station.dataset.locked).toBe('true');
       expect(station.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
@@ -189,29 +198,43 @@ describe('Zombies map selection flow', () => {
       station.onclick?.();
       expect(unlockDialog.open).toBe(true);
       expect(elements['beta-unlock-map'].textContent).toBe('STATION 33');
+      expect(elements['beta-unlock-hint'].dataset.i18n).toBe('account.unlockHint');
+      expect(elements['beta-email-field'].classList.contains('hidden')).toBe(false);
+      expect(elements['beta-signout'].classList.contains('hidden')).toBe(true);
       expect(mapSelect.classList.contains('hidden')).toBe(false);
 
-      const submit = (email: string): void => {
+      const flush = async (): Promise<void> => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      };
+      const submit = async (email: string): Promise<void> => {
         elements['beta-email'].value = email;
         elements['beta-access-form'].onsubmit?.({ preventDefault: () => undefined });
+        await flush();
       };
-      submit('unlisted@example.com');
-      expect(elements['beta-message'].dataset.i18n).toBe('beta.denied');
-      expect(unlockDialog.open).toBe(true);
-      expect(thanksDialog.open).toBe(false);
+      await submit('not-an-email');
+      expect(elements['beta-message'].dataset.i18n).toBe('account.invalidEmail');
 
-      // The thanks card appears first; the map opens when the tester leaves it.
-      submit('bielet40@gmail.com');
-      expect(acceptEmail).toHaveBeenLastCalledWith('bielet40@gmail.com');
-      expect(unlockDialog.open).toBe(false);
-      expect(thanksDialog.open).toBe(true);
-      expect(elements['beta-thanks-email'].textContent).toBe('bielet40@gmail.com');
+      // The link is mailed; the map unlocks only when the player opens it.
+      await submit('  Bielet40@Gmail.com ');
+      expect(requestLogin).toHaveBeenLastCalledWith('bielet40@gmail.com');
+      expect(elements['beta-message'].textContent).toContain('bielet40@gmail.com');
+      expect(unlockDialog.open).toBe(true);
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
-      elements['beta-thanks-close'].onclick?.();
-      expect(thanksDialog.open).toBe(false);
-      expect(selected).toEqual(['burned-mansion', 'again:station-33', 'tester:station-33']);
-      expect(mapSelect.classList.contains('hidden')).toBe(true);
-      expect(station.onclick).toBeNull();
+
+      // Signed in without the map, the dialog names the account and offers to sign out.
+      unlockDialog.close();
+      accountEmail = 'player@example.com';
+      station.onclick?.();
+      expect(elements['beta-unlock-hint'].textContent).toContain('player@example.com');
+      expect(elements['beta-email-field'].classList.contains('hidden')).toBe(true);
+      expect(elements['beta-unlock-submit'].classList.contains('hidden')).toBe(true);
+      expect(elements['beta-signout'].classList.contains('hidden')).toBe(false);
+      elements['beta-signout'].onclick?.();
+      await flush();
+      expect(accountEmail).toBeNull();
+      expect(unlockDialog.open).toBe(false);
+      expect(onSignedOut).toHaveBeenCalledOnce();
+      expect(selected).toEqual(['burned-mansion', 'again:station-33']);
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();

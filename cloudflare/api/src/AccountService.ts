@@ -34,6 +34,8 @@ export interface AuthenticatedSession extends SessionRecord {
 export interface Entitlements {
   readonly email: string;
   readonly products: ProductId[];
+  /** A closed-beta tester; the game thanks them on sign-in. */
+  readonly beta: boolean;
 }
 
 export interface AccountServiceOptions {
@@ -110,8 +112,9 @@ export class AccountService {
 
   /** Known products only, in catalog order; grants for products this build does not sell are ignored. */
   public async getEntitlements(session: AuthenticatedSession): Promise<Entitlements> {
-    const granted = new Set(await this.options.store.listGrantedProducts(session.userId));
+    const grants = await this.options.store.listActiveGrants(session.userId);
+    const granted = new Set(grants.map((grant) => grant.productId));
     const products = PRODUCT_IDS.filter((product) => granted.has(ALL_PREMIUM) || granted.has(product));
-    return { email: session.email, products };
+    return { email: session.email, products, beta: grants.some((grant) => grant.source === 'beta') };
   }
 }

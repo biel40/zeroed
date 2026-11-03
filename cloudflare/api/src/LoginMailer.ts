@@ -16,7 +16,8 @@ export class ResendMailer implements LoginMailer {
   public constructor(
     private readonly apiKey: string,
     private readonly from: string,
-    private readonly fetchFn: typeof fetch = fetch,
+    // Wrapped: the runtime rejects `fetch` called with another `this`.
+    private readonly fetchFn: typeof fetch = (input, init) => fetch(input, init),
   ) {}
 
   public async send(email: LoginEmail): Promise<void> {

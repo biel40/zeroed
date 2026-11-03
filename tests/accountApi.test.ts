@@ -147,13 +147,13 @@ describe('account API', () => {
   it('gives a new account no premium products', async () => {
     const response = await getEntitlements(await signIn());
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ email: 'player@example.com', products: [] });
+    expect(await response.json()).toEqual({ email: 'player@example.com', products: [], beta: false });
   });
 
   it('expands an all-premium beta grant to every product, present and future', async () => {
     database.exec(buildBetaSeedSql(['tester@example.com'], now));
     const response = await getEntitlements(await signIn('tester@example.com'));
-    expect(await response.json()).toEqual({ email: 'tester@example.com', products: [...PRODUCT_IDS] });
+    expect(await response.json()).toEqual({ email: 'tester@example.com', products: [...PRODUCT_IDS], beta: true });
   });
 
   it('ignores revoked grants and products this build does not know', async () => {
@@ -165,10 +165,10 @@ describe('account API', () => {
       INSERT INTO grants (user_id, product_id, source, created_at)
         VALUES ('${user?.id}', 'map.future', 'manual', 0);
     `);
-    expect(await (await getEntitlements(token)).json()).toEqual({ email: 'player@example.com', products: [] });
+    expect(await (await getEntitlements(token)).json()).toEqual({ email: 'player@example.com', products: [], beta: false });
 
     database.exec(`INSERT INTO grants (user_id, product_id, source, created_at) VALUES ('${user?.id}', 'map.station-33', 'purchase', 0)`);
-    expect(await (await getEntitlements(token)).json()).toEqual({ email: 'player@example.com', products: ['map.station-33'] });
+    expect(await (await getEntitlements(token)).json()).toEqual({ email: 'player@example.com', products: ['map.station-33'], beta: false });
   });
 
   it('renews an active session at most daily and expires an idle one', async () => {

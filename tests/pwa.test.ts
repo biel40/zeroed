@@ -12,11 +12,11 @@ function pngSize(fileName: string): readonly [number, number] {
 }
 
 describe('PWA contract', () => {
-  it('starts the public game with PWA support and loads the optional beta access module', () => {
+  it('starts the public game with PWA support and the web account, without a client-side beta list', () => {
     const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
     expect(main).not.toContain('VITE_BETA_ENABLED');
-    expect(main).toContain('new ZeroedBoot(betaAccess).run()');
-    expect(main).toContain('beta/access.js');
+    expect(main).toContain('new ZeroedBoot(new WebAccount(');
+    expect(main).not.toContain('beta/access.js');
     expect(main).not.toContain('location.replace');
     expect(main.indexOf('setupPWA();')).toBeLessThan(main.indexOf('new ZeroedBoot('));
     expect(config).not.toContain('BETA_ENABLED');

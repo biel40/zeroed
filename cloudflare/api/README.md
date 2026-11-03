@@ -3,7 +3,7 @@
 Worker `zeroed-api` (Hono + D1), independiente del relay cooperativo. Da
 cuentas sin contraseña para los productos premium de la web: el jugador pide un
 enlace de un solo uso, lo canjea por una sesion y consulta sus permisos. Los
-mapas gratis no la usan. Todavia no esta desplegada ni conectada al cliente.
+mapas gratis no la usan. El cliente la usa mediante `WebAccount`; aun no esta desplegada.
 
 - Rutas en [app.ts](src/app.ts); reglas (caducidades, limites, concesion `*`)
   en [AccountService](src/AccountService.ts); SQL en
@@ -18,6 +18,8 @@ mapas gratis no la usan. Todavia no esta desplegada ni conectada al cliente.
 1. Copiar `.dev.vars.example` a `.dev.vars`: los enlaces se imprimen en la
    consola en vez de enviarse.
 2. `npm run api:db:migrate:local` y `npm run api:dev` (puerto 8788).
+3. Arrancar el juego contra ella con `VITE_ACCOUNT_API_URL=http://localhost:8788`
+   (por ejemplo en `.env.local`) y `npm run dev`.
 
 ## Primer despliegue (pendiente)
 

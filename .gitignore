@@ -20,3 +20,6 @@ releases/
 
 # Navigation map for agents, regenerated with npm run codemap.
 CODEMAP.md
+
+# Closed-beta tester list for npm run api:seed-beta; never commit it.
+beta-testers.txt

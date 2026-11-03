@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRODUCT_IDS, type ProductId } from '../src/config/products';
 import { canAccessZombieMap, getZombieMapProduct, ZOMBIE_MAPS } from '../src/config/zombieMaps';
-import { BetaEntitlementProvider } from '../src/entitlements/BetaEntitlementProvider';
 import type { EntitlementProvider } from '../src/entitlements/EntitlementProvider';
 
 function owning(...products: ProductId[]): EntitlementProvider {
@@ -31,14 +30,5 @@ describe('map entitlements', () => {
       const product = getZombieMapProduct(id);
       if (product !== undefined) expect(PRODUCT_IDS).toContain(product);
     }
-  });
-
-  it('grants every premium product to closed-beta testers and none to other players', () => {
-    let tester = false;
-    const entitlements = new BetaEntitlementProvider({ hasBetaAccess: () => tester });
-    for (const product of PRODUCT_IDS) expect(entitlements.owns(product)).toBe(false);
-    // Read live, so a tester unlocking from the menu owns the products immediately.
-    tester = true;
-    for (const product of PRODUCT_IDS) expect(entitlements.owns(product)).toBe(true);
   });
 });

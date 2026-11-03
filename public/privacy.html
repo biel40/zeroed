@@ -22,16 +22,17 @@
 <body>
 <main>
   <h1>Política de privacidad de Zeroed</h1>
-  <p class="date">Última actualización: 30 de octubre de 2026.</p>
+  <p class="date">Última actualización: 3 de noviembre de 2026.</p>
 
   <h2>1. Responsable y contacto</h2>
   <p>El responsable de Zeroed es <strong>Biel40</strong>, nombre del desarrollador en Google Play. Esta política se aplica al juego Android <strong>es.zeroed.game</strong> y a su versión web en <a href="https://zeroed.es">zeroed.es</a>.</p>
   <p>Para consultas de privacidad o solicitudes sobre tus datos, escribe a <a href="mailto:biel40aws@gmail.com">biel40aws@gmail.com</a>.</p>
 
   <h2>2. Datos que utiliza el juego</h2>
-  <p>Zeroed no requiere crear una cuenta ni introducir una contraseña para jugar. No incorpora anuncios, seguimiento publicitario ni un servicio de analítica integrado por el desarrollador. No solicita acceso a contactos, cámara, micrófono ni ubicación GPS.</p>
+  <p>Zeroed no requiere una cuenta para jugar a los mapas gratuitos y nunca pide contraseña. No incorpora anuncios, seguimiento publicitario ni un servicio de analítica integrado por el desarrollador. No solicita acceso a contactos, cámara, micrófono ni ubicación GPS.</p>
+  <h3>Cuenta para mapas premium (versión web)</h3>
+  <p>Para desbloquear un mapa premium en la web, introduces tu correo y recibes un enlace de acceso de un solo uso. El correo se envía al servidor de cuentas de Zeroed (Cloudflare), que lo usa como identificador de tu cuenta y guarda qué contenido premium tienes, y a Resend, que entrega el mensaje. Para limitar abusos se guarda temporalmente un resumen cifrado (hash) de la dirección IP de cada solicitud. Los enlaces caducan a los 15 minutos y las sesiones a los 90 días sin uso; el dispositivo guarda en <code>localStorage</code> la sesión y la lista de contenido desbloqueado. Puedes cerrar la sesión desde el propio juego o pedir la eliminación de tu cuenta en el contacto indicado. Burned Mansion no requiere este paso.</p>
   <h3>Partidas individuales</h3>
-  <p>Para acceder temporalmente a mapas de beta, puedes introducir un correo invitado. La comprobación se realiza en el dispositivo contra la lista de beta descargada con el juego y el correo se guarda en <code>sessionStorage</code> durante la sesión de la pestaña. Este formulario no envía el correo a un servidor ni verifica su titularidad. Burned Mansion no requiere este paso.</p>
   <p>La simulación y las estadísticas de la partida se procesan en el dispositivo. Este modo no se conecta al servidor cooperativo. La aplicación Android incluye los archivos del juego; en la versión web, el navegador los descarga del alojamiento.</p>
   <h3>Partidas cooperativas</h3>
   <p>Al crear una sala o unirte a ella, el juego utiliza un servidor de Cloudflare para conectar a dos jugadores y retransmitir los mensajes de la partida. Se transmiten el código de sala, el rol de anfitrión o invitado y datos como posiciones en el mapa, acciones, armas, salud, puntos y estado de los enemigos. Las posiciones corresponden al mundo ficticio del juego, no a tu ubicación geográfica.</p>
@@ -53,17 +54,18 @@
   <p>Los datos necesarios para el cooperativo se retransmiten al otro jugador. Los proveedores de infraestructura procesan la información necesaria para alojar y conectar el servicio:</p>
   <ul>
     <li><strong>Vercel</strong>, alojamiento de la web: <a href="https://vercel.com/legal/privacy-notice">información de privacidad</a>.</li>
-    <li><strong>Cloudflare</strong>, servidor cooperativo: <a href="https://www.cloudflare.com/privacypolicy/">información de privacidad</a>.</li>
+    <li><strong>Cloudflare</strong>, servidor cooperativo y de cuentas: <a href="https://www.cloudflare.com/privacypolicy/">información de privacidad</a>.</li>
+    <li><strong>Resend</strong>, envío de los correos de acceso: <a href="https://resend.com/legal/privacy-policy">información de privacidad</a>.</li>
     <li><strong>Google/Gmail</strong>, si contactas por correo: <a href="https://policies.google.com/privacy">información de privacidad</a>.</li>
   </ul>
   <p>Estos servicios pueden tratar información en otros países, incluidos Estados Unidos, conforme a sus condiciones y mecanismos de protección para transferencias internacionales. Puedes consultar la información de los proveedores o contactar con Biel40 para solicitar más detalles.</p>
   <p>Google Play gestiona por separado la distribución y actualización de la aplicación. La aplicación que elijas para compartir un código tratará el contenido conforme a su propia política.</p>
 
   <h2>5. Conservación y eliminación</h2>
-  <p>Zeroed mantiene el estado de la partida mientras se ejecuta y no implementa un guardado persistente de partidas o cuentas. Cuando se desconecta el anfitrión, el servidor cierra la sala cooperativa.</p>
+  <p>Zeroed mantiene el estado de la partida mientras se ejecuta y no implementa un guardado persistente de partidas. La cuenta web (correo y contenido premium desbloqueado) se conserva hasta que pidas su eliminación; los enlaces de acceso caducados y las sesiones vencidas se borran a diario. Cuando se desconecta el anfitrión, el servidor cierra la sala cooperativa.</p>
   <p>Esto no implica la eliminación inmediata de los registros técnicos de infraestructura. Su conservación depende del servicio, plan y configuración por defecto de Vercel y Cloudflare y de sus necesidades de seguridad y obligaciones legales. El desarrollador no mantiene una copia adicional ni un archivo propio de esos registros. Puedes solicitar información sobre su conservación o eliminación mediante el correo de contacto.</p>
   <p>Los mensajes de soporte se conservan mientras sean necesarios para atender la consulta y su seguimiento o para cumplir obligaciones legales. Puedes solicitar su eliminación; si existe una razón legal para conservar información, se te explicará.</p>
-  <p>Para eliminar los archivos locales, borra los datos de la aplicación desde los ajustes de Android o los datos del sitio desde el navegador. No hay cuentas de Zeroed que debas eliminar.</p>
+  <p>Para eliminar los archivos locales, borra los datos de la aplicación desde los ajustes de Android o los datos del sitio desde el navegador. Para eliminar tu cuenta web, escribe al correo de contacto.</p>
 
   <h2>6. Seguridad y opciones del usuario</h2>
   <p>La web utiliza HTTPS y el servicio cooperativo alojado en Cloudflare utiliza conexiones cifradas por Internet. Comparte el código de sala únicamente con la persona con la que quieras jugar. Ningún sistema puede garantizar una seguridad absoluta.</p>

@@ -3,7 +3,7 @@
 - **Shell comun y modos aislados.** `Game` posee servicios compartidos; cada
   `GameMode` recibe un `ModeContext`. Individual y cooperativo comparten loop
   sin compartir estado de run.
-- **Mapas por registro.** La run y los modos no dependen de un mapa concreto: el registro y `ZombieArena` separan seleccion, capacidades y geometria. Classic se retiro por decision del usuario. El cooperativo usa un mapa fijo sin negociacion; cada mapa premium es un producto y su acceso pasa por un proveedor de permisos por plataforma, que mientras no haya pagos solo concede la beta en el cliente. Contratos en [arquitectura](ARCHITECTURE.md#contratos) y estado en [mapas](GAME_SYSTEMS.md#mapas-e-interacciones).
+- **Mapas por registro.** La run y los modos no dependen de un mapa concreto: el registro y `ZombieArena` separan seleccion, capacidades y geometria. Classic se retiro por decision del usuario. El cooperativo usa un mapa fijo sin negociacion; cada mapa premium es un producto y su acceso pasa por un proveedor de permisos por plataforma; en web, una cuenta por correo cuyas concesiones guarda el servidor (la beta cerrada recibe `*`). Contratos en [arquitectura](ARCHITECTURE.md#contratos) y estado en [mapas](GAME_SYSTEMS.md#mapas-e-interacciones).
 - **Logica separada de vistas.** Armas, economia, rondas, salud, Mystery Box,
   barreras, puertas, anillos, trayectorias y cadena Tesla son testeables sin
   Three.js.
