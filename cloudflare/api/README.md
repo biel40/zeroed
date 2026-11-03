@@ -10,6 +10,12 @@ mapas gratis no la usan. El cliente la usa mediante `WebAccount`; aun no esta de
   [AccountStore](src/AccountStore.ts) y esquema en [migrations/](migrations/).
 - `*` concede todos los productos premium, presentes y futuros; se usa para los
   testers de la beta cerrada.
+- Correo de acceso en [loginEmail.ts](src/loginEmail.ts). El logo
+  (`public/pwa-192x192.png`) y la cabecera animada (`public/assets/email/`,
+  generada con `node scripts/generate-email-banner.mjs`) se sirven desde
+  `APP_URL`, así que deben estar publicados en la web antes de desplegar un
+  correo que los use. `npm run api:preview-email -- es salida.html` lo genera
+  con las imagenes locales para revisarlo en el navegador.
 - Tests: `tests/accountApi.test.ts`, contra SQLite en memoria con las mismas
   migraciones.
 

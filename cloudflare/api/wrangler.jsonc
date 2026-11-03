@@ -7,15 +7,15 @@
     {
       "binding": "DB",
       "database_name": "zeroed-accounts",
-      // Replace with the id printed by `wrangler d1 create zeroed-accounts` before the first deploy.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "fca73e0f-843b-4821-86cf-bd0dcaac7641",
       "migrations_dir": "migrations"
     }
   ],
   "triggers": { "crons": ["17 4 * * *"] },
   "vars": {
-    "APP_URL": "https://zeroed.es",
-    "ALLOWED_ORIGINS": "https://zeroed.es",
+    // zeroed.es redirects to www, so the game runs on the www origin; the bare domain stays allowed.
+    "APP_URL": "https://www.zeroed.es",
+    "ALLOWED_ORIGINS": "https://www.zeroed.es,https://zeroed.es",
     "EMAIL_FROM": "Zeroed <login@zeroed.es>"
   }
 }

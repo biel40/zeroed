@@ -71,7 +71,13 @@ export class AccountService {
       expiresAt: now + LOGIN_LINK_MINUTES * MINUTE_MS,
     });
     try {
-      await mailer.send(buildLoginEmail(email, `${appUrl}/#login=${token}`, LOGIN_LINK_MINUTES, language));
+      await mailer.send(buildLoginEmail({
+        to: email,
+        link: `${appUrl}/#login=${token}`,
+        expiryMinutes: LOGIN_LINK_MINUTES,
+        language,
+        appUrl,
+      }));
       return 'sent';
     } catch (error) {
       console.error('Login email failed', error);
