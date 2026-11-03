@@ -160,6 +160,7 @@ export class HUD {
   private readonly mapUnlock = new MapUnlockDialog({
     dialog: mustGet('beta-unlock') as HTMLDialogElement,
     form: mustGet('beta-access-form') as HTMLFormElement,
+    kicker: mustGet('beta-unlock-kicker'),
     mapName: mustGet('beta-unlock-map'),
     hint: mustGet('beta-unlock-hint'),
     emailField: mustGet('beta-email-field'),
@@ -169,6 +170,10 @@ export class HUD {
     submitButton: mustGet('beta-unlock-submit') as HTMLButtonElement,
     signOutButton: mustGet('beta-signout') as HTMLButtonElement,
   });
+  /** Menu corner button: the signed-in email, or a sign-in label; `data-signed-in` picks its style. */
+  private readonly accountButton = mustGet('account-button') as HTMLButtonElement;
+  private readonly accountLabel: HTMLElement = mustGet('account-label');
+  private account: MapUnlockAccount | null = null;
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -381,6 +386,8 @@ export class HUD {
       button.dataset.access = premium ? 'premium' : 'free';
       button.dataset.locked = String(locked);
       setTranslatedText(button.querySelector('[data-map-access]'), premium ? 'map.access.premium' : 'map.access.free');
+      // Whether playing the map needs signing in: never for free maps, always for premium ones.
+      setTranslatedText(button.querySelector('[data-map-account]'), premium ? 'map.access.accountRequired' : 'map.access.noAccount');
       setTranslatedText(button.querySelector('[data-map-players]'), map.coop ? 'map.players.coop' : 'map.players.solo');
       setTranslatedText(button.querySelector('[data-map-action]'), locked ? 'menu.unlock' : 'menu.play');
       const select = (): void => {
@@ -391,6 +398,7 @@ export class HUD {
       // Assignment replaces a previous handler if this menu is shown again.
       button.onclick = locked ? () => this.mapUnlock.open(map.nameKey) : select;
     }
+    this.updateAccountButton();
     firstPlayableButton?.focus();
   }
 
@@ -398,9 +406,22 @@ export class HUD {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
   }
 
-  /** The account behind locked map cards; `onSignedOut` lets the caller refresh the menu. */
+  /** The account behind locked map cards and the menu's account button; `onSignedOut` lets the caller refresh the menu. */
   public setMapUnlockAccount(account: MapUnlockAccount, onSignedOut: () => void): void {
+    this.account = account;
     this.mapUnlock.setAccount(account, onSignedOut);
+    this.accountButton.onclick = () => this.mapUnlock.open(null);
+  }
+
+  private updateAccountButton(): void {
+    const email = this.account?.getEmail() ?? null;
+    this.accountButton.dataset.signedIn = String(email !== null);
+    if (!email) {
+      setTranslatedText(this.accountLabel, 'account.signIn');
+      return;
+    }
+    delete this.accountLabel.dataset.i18n;
+    this.accountLabel.textContent = email;
   }
 
   /** Thank-you card for a closed-beta tester who has just signed in. */

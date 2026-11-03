@@ -1323,12 +1323,22 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   margin-bottom: clamp(18px, 3.5dvh, 34px);
 }
 
+/* Top-right menu controls: language, then account. */
+.menu-corner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+}
+
 .language-picker {
   position: relative;
   z-index: 2;
   flex: none;
 }
 
+.account-button,
 .language-toggle,
 .language-options button {
   display: flex;
@@ -1342,9 +1352,68 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   letter-spacing: 0.14em;
 }
 
+.account-button,
 .language-toggle {
   min-height: 36px;
   padding: 6px 10px;
+}
+
+/* An email can be long; the label truncates instead of pushing the title. */
+.account-button { max-width: min(280px, 50vw); transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s; }
+.account-button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-icon {
+  flex: none;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 50%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+/* Signed out: the menu's red call to action. */
+.account-button[data-signed-in="false"] {
+  border-color: rgba(207, 94, 85, 0.6);
+  background: rgba(105, 21, 17, 0.55);
+  color: #f1ece2;
+}
+.account-button[data-signed-in="false"]:hover,
+.account-button[data-signed-in="false"]:focus-visible { background: rgba(150, 30, 24, 0.72); }
+
+/* Signed in: the closed beta's gold, with a breathing status light. */
+.account-button[data-signed-in="true"] {
+  border-color: rgba(227, 181, 82, 0.45);
+  background: linear-gradient(135deg, rgba(227, 181, 82, 0.16), rgba(10, 14, 14, 0.9) 65%);
+  color: #efe3c4;
+  box-shadow: inset 0 0 14px rgba(227, 181, 82, 0.08);
+}
+.account-button[data-signed-in="true"] .account-icon { background: rgba(227, 181, 82, 0.16); stroke: #e3b552; }
+.account-button[data-signed-in="true"]::after {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e3b552;
+  box-shadow: 0 0 8px rgba(227, 181, 82, 0.8);
+  animation: account-light 2.6s ease-in-out infinite;
+}
+.account-button[data-signed-in="true"]:hover,
+.account-button[data-signed-in="true"]:focus-visible {
+  border-color: rgba(240, 211, 155, 0.8);
+  color: #fff6e2;
+  box-shadow: inset 0 0 14px rgba(227, 181, 82, 0.12), 0 0 18px rgba(227, 181, 82, 0.22);
+}
+
+@keyframes account-light {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-button[data-signed-in="true"]::after { animation: none; }
 }
 
 .language-toggle::after {
@@ -1394,6 +1463,8 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
 }
 
+.account-button:hover,
+.account-button:focus-visible,
 .language-toggle:hover,
 .language-toggle:focus-visible,
 .language-options button:hover,
@@ -1407,14 +1478,14 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   color: #f1ece2;
 }
 
-/* Narrow panels: the picker would squeeze the title, so it takes its own row above it. */
+/* Narrow panels: the corner controls would squeeze the title, so they take their own row above it. */
 @media (max-width: 600px) {
   .menu-header {
     flex-direction: column-reverse;
     align-items: stretch;
   }
 
-  .language-picker {
+  .menu-corner {
     align-self: flex-end;
     margin: -6px -6px 0 0;
   }
@@ -1754,10 +1825,6 @@ html.coop-guest #pause-restart {
 #map-select .zeroed-title {
   font-size: clamp(40px, min(8vw, 10dvh), 96px);
   text-indent: 0;
-}
-
-#map-select .mode-hint {
-  margin: 12px 0 0;
 }
 
 /* Closed-beta unlock: the settings dialog frame with the beta's gold accent. */
@@ -4136,13 +4203,6 @@ html.touch-controls-enabled #intro-skip small {
   animation: map-loading-sweep 1.3s ease-in-out infinite;
 }
 
-.map-loading-tagline {
-  margin-top: 18px;
-  color: #6f766c;
-  font: 600 10px 'Consolas', 'SF Mono', monospace;
-  letter-spacing: 0.28em;
-}
-
 @keyframes map-loading-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes map-loading-sweep {
   from { transform: translateX(-100%); }
@@ -4300,7 +4360,6 @@ html.touch-controls-enabled .start-panel {
 
 @media (max-height: 560px) {
   #map-select .start-panel { padding: 16px clamp(20px, 5vw, 42px); }
-  #map-select .mode-hint { margin-top: 6px; }
   .menu-header { margin-bottom: 12px; }
   .map-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
   .map-card-art { aspect-ratio: 3 / 1; }

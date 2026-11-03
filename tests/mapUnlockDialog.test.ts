@@ -32,9 +32,9 @@ class FakeDialog extends FakeElement {
 function createDialog(account: MapUnlockAccount): { unlock: MapUnlockDialog; view: Record<keyof MapUnlockElements, FakeElement>; dialog: FakeDialog } {
   const dialog = new FakeDialog();
   const view = {
-    dialog, form: new FakeElement(), mapName: new FakeElement(), hint: new FakeElement(), emailField: new FakeElement(),
-    email: new FakeElement(), message: new FakeElement(), cancelButton: new FakeElement(), submitButton: new FakeElement(),
-    signOutButton: new FakeElement(),
+    dialog, form: new FakeElement(), kicker: new FakeElement(), mapName: new FakeElement(), hint: new FakeElement(),
+    emailField: new FakeElement(), email: new FakeElement(), message: new FakeElement(), cancelButton: new FakeElement(),
+    submitButton: new FakeElement(), signOutButton: new FakeElement(),
   };
   const unlock = new MapUnlockDialog(view as unknown as MapUnlockElements);
   unlock.setAccount(account, () => undefined);
@@ -103,5 +103,37 @@ describe('map unlock dialog', () => {
     unlock.open('map.station33');
     expect(view.email.value).toBe('');
     expect(view.message.textContent).toBe('');
+  });
+
+  it('opens from the account button without a map: sign-in form when signed out', () => {
+    const { unlock, view, dialog } = createDialog(signedOut(async () => 'sent'));
+    unlock.open(null);
+    expect(dialog.open).toBe(true);
+    expect(view.mapName.dataset.i18n).toBe('account.title');
+    expect(view.kicker.classList.contains('hidden')).toBe(true);
+    expect(view.hint.dataset.i18n).toBe('account.signInHint');
+    expect(view.emailField.classList.contains('hidden')).toBe(false);
+    expect(view.signOutButton.classList.contains('hidden')).toBe(true);
+
+    unlock.open('map.station33');
+    expect(view.kicker.classList.contains('hidden')).toBe(false);
+  });
+
+  it('shows the signed-in address and signs out from the account button', async () => {
+    let email: string | null = 'player@example.com';
+    const onSignedOut = vi.fn();
+    const { unlock, view, dialog } = createDialog(signedOut(async () => 'sent'));
+    unlock.setAccount({ getEmail: () => email, requestLogin: async () => 'sent', signOut: async () => { email = null; } }, onSignedOut);
+    unlock.open(null);
+    expect(view.hint.textContent).toBe('Signed in as player@example.com.');
+    expect(view.emailField.classList.contains('hidden')).toBe(true);
+    expect(view.submitButton.classList.contains('hidden')).toBe(true);
+    expect(view.signOutButton.classList.contains('hidden')).toBe(false);
+
+    view.signOutButton.onclick?.();
+    await flush();
+    expect(email).toBeNull();
+    expect(dialog.open).toBe(false);
+    expect(onSignedOut).toHaveBeenCalledOnce();
   });
 });

@@ -11,6 +11,8 @@ export interface MapUnlockAccount {
 export interface MapUnlockElements {
   readonly dialog: HTMLDialogElement;
   readonly form: HTMLFormElement;
+  /** "Locked map" label, hidden when opened from the account button. */
+  readonly kicker: HTMLElement;
   readonly mapName: HTMLElement;
   readonly hint: HTMLElement;
   readonly emailField: HTMLElement;
@@ -28,9 +30,10 @@ const OUTCOME_MESSAGES: Readonly<Record<Exclude<LoginRequestOutcome, 'sent'>, Tr
 };
 
 /**
- * Opened from a locked map card. Signed out, it mails a login link; the map
- * unlocks when the player opens that link. Signed in without the map, it says
- * so and offers to sign out. Access rules stay in the account.
+ * Opened from a locked map card or the menu's account button. Signed out, it
+ * mails a login link; maps unlock when the player opens that link. Signed in,
+ * it names the account (and, for a map, that it is not owned) and offers to
+ * sign out. Access rules stay in the account.
  */
 export class MapUnlockDialog {
   private account: MapUnlockAccount | null = null;
@@ -51,12 +54,14 @@ export class MapUnlockDialog {
     this.onSignedOut = onSignedOut;
   }
 
-  public open(mapNameKey: TranslationKey): void {
+  /** `mapNameKey` is the locked map, or null when opened from the account button. */
+  public open(mapNameKey: TranslationKey | null): void {
     const { view } = this;
     const email = this.account?.getEmail() ?? null;
-    setTranslatedText(view.mapName, mapNameKey);
-    if (email) this.setText(view.hint, t('account.notOwned', { email }));
-    else setTranslatedText(view.hint, 'account.unlockHint');
+    setTranslatedText(view.mapName, mapNameKey ?? 'account.title');
+    view.kicker.classList.toggle('hidden', mapNameKey === null);
+    if (email) this.setText(view.hint, t(mapNameKey ? 'account.notOwned' : 'account.signedInAs', { email }));
+    else setTranslatedText(view.hint, mapNameKey ? 'account.unlockHint' : 'account.signInHint');
     view.emailField.classList.toggle('hidden', email !== null);
     view.submitButton.classList.toggle('hidden', email !== null);
     view.signOutButton.classList.toggle('hidden', email === null);

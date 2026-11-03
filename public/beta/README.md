@@ -14,7 +14,9 @@ Flujo: la tarjeta bloqueada abre [MapUnlockDialog](../../src/ui/MapUnlockDialog.
 que envia un enlace de un solo uso al correo. Al abrirlo, el juego inicia sesion,
 carga los productos y, si la cuenta es de beta, muestra
 [BetaThanksScreen](../../src/ui/BetaThanksScreen.ts) antes del menu. Una
-cuenta sin el mapa ve su correo y puede cerrar sesion. `?map=station-33` sin
+cuenta sin el mapa ve su correo y puede cerrar sesion. El boton de cuenta, arriba
+a la derecha del menu, muestra el correo (o "Iniciar sesion") y abre el mismo
+dialogo para entrar o cerrar sesion. `?map=station-33` sin
 permiso muestra el menu con la tarjeta bloqueada.
 
 Limites: el codigo de Station 33 sigue en el paquete del juego, asi que un
@@ -26,5 +28,5 @@ enlace se abre en el navegador y su origen no esta permitido en la API.
 Validacion manual (con la API local o desplegada): en una sesion nueva,
 Burned Mansion funciona y Station 33 aparece bloqueado y no abre por enlace
 directo; pedir un enlace con un correo de tester, abrirlo, ver el
-agradecimiento y jugar; recargar; cerrar sesion desde la tarjeta; probar un
+agradecimiento y jugar; recargar; cerrar sesion desde el boton de cuenta; probar un
 correo sin concesion. Repetir en movil y PWA instalada.

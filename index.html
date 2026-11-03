@@ -128,23 +128,29 @@
       <header class="menu-header">
         <div class="menu-brand">
           <h1 class="zeroed-title">ZEROED</h1>
-          <p class="mode-hint" data-i18n="menu.tagline"></p>
         </div>
-        <!-- Flags are inline SVG: Windows has no emoji flags. LanguagePicker copies the active one into the toggle. -->
-        <div id="language-select" class="language-picker">
-          <button type="button" id="language-toggle" class="language-toggle" aria-haspopup="true" aria-expanded="false"
-            aria-controls="language-options" data-i18n-aria-label="menu.language"></button>
-          <div id="language-options" class="language-options" role="group" data-i18n-aria-label="menu.language" hidden>
-            <button type="button" data-language="es" lang="es">
-              <svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#aa151b" /><rect y="0.5" width="3" height="1" fill="#f1bf00" /></svg>Español
-            </button>
-            <button type="button" data-language="en" lang="en">
-              <svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" stroke-width="2" /><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10" /><path d="M30,0 v30 M0,15 h60" stroke="#c8102e" stroke-width="6" /></svg>English
-            </button>
-            <button type="button" data-language="ca" lang="ca">
-              <svg class="flag" viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#fcdd09" /><path d="M0,1h9M0,2.333h9M0,3.667h9M0,5h9" stroke="#da121a" stroke-width="0.667" /></svg>Català
-            </button>
+        <div class="menu-corner">
+          <!-- Flags are inline SVG: Windows has no emoji flags. LanguagePicker copies the active one into the toggle. -->
+          <div id="language-select" class="language-picker">
+            <button type="button" id="language-toggle" class="language-toggle" aria-haspopup="true" aria-expanded="false"
+              aria-controls="language-options" data-i18n-aria-label="menu.language"></button>
+            <div id="language-options" class="language-options" role="group" data-i18n-aria-label="menu.language" hidden>
+              <button type="button" data-language="es" lang="es">
+                <svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#aa151b" /><rect y="0.5" width="3" height="1" fill="#f1bf00" /></svg>Español
+              </button>
+              <button type="button" data-language="en" lang="en">
+                <svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6" /><path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" stroke-width="2" /><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10" /><path d="M30,0 v30 M0,15 h60" stroke="#c8102e" stroke-width="6" /></svg>English
+              </button>
+              <button type="button" data-language="ca" lang="ca">
+                <svg class="flag" viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#fcdd09" /><path d="M0,1h9M0,2.333h9M0,3.667h9M0,5h9" stroke="#da121a" stroke-width="0.667" /></svg>Català
+              </button>
+            </div>
           </div>
+          <!-- HUD shows the signed-in email or a sign-in label; the button opens MapUnlockDialog without a map. -->
+          <button type="button" id="account-button" class="account-button">
+            <svg class="account-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.2" r="3.6" /><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" /></svg>
+            <span id="account-label"></span>
+          </button>
         </div>
       </header>
       <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false, locks the ones the
@@ -168,6 +174,7 @@
             <span class="map-card-tagline" data-i18n="map.burnedMansion.tagline"></span>
             <span class="map-card-meta">
               <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-chip" data-map-account></span>
               <span class="map-card-action" data-map-action></span>
             </span>
           </span>
@@ -189,6 +196,7 @@
             <span class="map-card-tagline" data-i18n="map.station33.tagline"></span>
             <span class="map-card-meta">
               <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-chip" data-map-account></span>
               <span class="map-card-action" data-map-action></span>
             </span>
           </span>
@@ -228,10 +236,10 @@
     </div>
   </div>
 
-  <!-- Opened from a locked map card; MapUnlockDialog mails a login link or offers to sign out. -->
+  <!-- Opened from a locked map card or the account button; MapUnlockDialog mails a login link or offers to sign out. -->
   <dialog id="beta-unlock" class="beta-unlock" aria-labelledby="beta-unlock-map" aria-describedby="beta-unlock-hint">
     <form id="beta-access-form" class="beta-unlock-form">
-      <p class="beta-unlock-kicker">
+      <p id="beta-unlock-kicker" class="beta-unlock-kicker">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="1.5" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7M12 14.6v2.2" /></svg>
         <span data-i18n="map.locked"></span>
       </p>
@@ -583,7 +591,6 @@
       <p class="map-loading-kicker" data-i18n="mapLoading.preparing"></p>
       <h2 id="map-loading-title" class="map-loading-title" data-i18n="map.burnedMansion">BURNED MANSION</h2>
       <div class="map-loading-bar" aria-hidden="true"><span></span></div>
-      <p class="map-loading-tagline" data-i18n="menu.tagline"></p>
     </div>
   </div>
 

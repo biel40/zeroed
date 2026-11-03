@@ -111,6 +111,7 @@ describe('Zombies map selection flow', () => {
       const element = new FakeElement();
       element.dataset.map = mapId;
       element.slots['[data-map-access]'] = new FakeElement();
+      element.slots['[data-map-account]'] = new FakeElement();
       element.slots['[data-map-players]'] = new FakeElement();
       element.slots['[data-map-action]'] = new FakeElement();
       return element;
@@ -132,6 +133,9 @@ describe('Zombies map selection flow', () => {
       'beta-unlock-hint': new FakeElement(),
       'beta-unlock-submit': new FakeElement(),
       'beta-signout': new FakeElement(),
+      'beta-unlock-kicker': new FakeElement(),
+      'account-button': new FakeElement(),
+      'account-label': new FakeElement(),
       'beta-thanks': new FakeDialog(),
       'beta-thanks-email': new FakeElement(),
       'beta-thanks-close': new FakeElement(),
@@ -165,11 +169,13 @@ describe('Zombies map selection flow', () => {
       expect(mansion.dataset.access).toBe('free');
       expect(mansion.dataset.locked).toBe('false');
       expect(mansion.slots['[data-map-access]'].dataset.i18n).toBe('map.access.free');
+      expect(mansion.slots['[data-map-account]'].textContent).toBe('NO ACCOUNT');
       expect(mansion.slots['[data-map-players]'].textContent).toBe('1–2 PLAYERS');
       expect(mansion.slots['[data-map-action]'].textContent).toBe('PLAY');
       expect(station.dataset.access).toBe('premium');
       expect(station.dataset.locked).toBe('false');
       expect(station.slots['[data-map-access]'].textContent).toBe('PREMIUM');
+      expect(station.slots['[data-map-account]'].textContent).toBe('ACCOUNT REQUIRED');
       expect(station.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion']);
@@ -235,6 +241,20 @@ describe('Zombies map selection flow', () => {
       expect(unlockDialog.open).toBe(false);
       expect(onSignedOut).toHaveBeenCalledOnce();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
+
+      // The account button in the menu corner reflects the session and opens the account dialog.
+      ui.showMapSelect((mapId) => selected.push(mapId), noProducts);
+      expect(elements['account-label'].dataset.i18n).toBe('account.signIn');
+      expect(elements['account-button'].dataset.signedIn).toBe('false');
+      accountEmail = 'player@example.com';
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
+      expect(elements['account-label'].textContent).toBe('player@example.com');
+      expect(elements['account-button'].dataset.signedIn).toBe('true');
+      expect(elements['account-label'].dataset.i18n).toBeUndefined();
+      elements['account-button'].onclick?.();
+      expect(unlockDialog.open).toBe(true);
+      expect(elements['beta-unlock-map'].dataset.i18n).toBe('account.title');
+      expect(elements['beta-signout'].classList.contains('hidden')).toBe(false);
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();
