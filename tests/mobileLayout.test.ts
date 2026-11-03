@@ -43,10 +43,9 @@ describe('mobile stylesheet cascade', () => {
     expect(weaponRule).toContain('bottom: auto');
   });
 
-  it('keeps the touch button wrappers transparent to pointers', () => {
-    // Solid wrappers would swallow camera drags in the gaps between buttons.
-    const wrappers = css.slice(css.indexOf('.touch-primary,'), css.indexOf('.touch-primary {'));
-    expect(wrappers).toContain('pointer-events: none');
+  it('keeps the touch button wrapper transparent to pointers', () => {
+    // A solid wrapper would swallow camera drags in the gaps between buttons.
+    expect(css).toMatch(/\n\.touch-actions \{[^}]*pointer-events: none/);
     expect(css).toMatch(/#touch-controls button \{[^}]*pointer-events: auto/);
   });
 
@@ -57,16 +56,16 @@ describe('mobile stylesheet cascade', () => {
     expect(css).toMatch(/#touch-controls button \{[^}]*touch-action: none/);
   });
 
-  it('keeps the required mobile actions with dedicated fire and knife buttons', () => {
-    expect(html).not.toContain('id="btn-jump"');
-    expect(html).not.toContain('id="btn-ads"');
-    expect(html).not.toContain('id="btn-mode"');
-    for (const action of ['fire', 'knife', 'reload', 'interact', 'swap-weapon', 'pause', 'crouch', 'prone']) {
-      expect(html).toContain(`data-action="${action}"`);
-    }
+  it('keeps the required mobile actions with dedicated fire, aim and knife buttons', () => {
     const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('<div id="hud-weapon"'));
-    expect(touchControls.match(/data-action=/g)).toHaveLength(8);
-    expect(touchControls).toContain('id="btn-knife"');
+    for (const id of ['btn-jump', 'btn-mode', 'btn-prone', 'btn-interact']) {
+      expect(touchControls).not.toContain(`id="${id}"`);
+    }
+    for (const action of ['fire', 'aim', 'knife', 'reload', 'swap-weapon', 'pause', 'crouch']) {
+      expect(touchControls).toContain(`data-action="${action}"`);
+    }
+    expect(touchControls.match(/data-action=/g)).toHaveLength(7);
+    expect(touchControls).toMatch(/id="btn-aim"[^>]*aria-pressed="false"/);
   });
 
   it('lets a tap on the interaction prompt press USE only on touch profiles', () => {
@@ -77,9 +76,17 @@ describe('mobile stylesheet cascade', () => {
     );
   });
 
-  it('keeps comfortable secondary targets and a dominant square fire button', () => {
-    expect(css).toContain('--touch-secondary-size: clamp(52px, 6vw, 58px)');
-    expect(css).toContain('--touch-fire-size: clamp(92px, 7vw, 116px)');
+  it('keeps the prompt as the touch USE control even when prompts are hidden', () => {
+    expect(css).toMatch(
+      /html\.touch-controls-enabled #interact-prompt\[hidden\]:not\(\.hidden\) \{[^}]*display: block !important/,
+    );
+  });
+
+  it('keeps comfortable round targets, a larger aim button and a dominant fire button', () => {
+    expect(css).toContain('--touch-secondary-size: clamp(48px, 5.4vw, 54px)');
+    expect(css).toContain('--touch-aim-size: clamp(58px, 6.4vw, 66px)');
+    expect(css).toContain('--touch-fire-size: clamp(104px, 9vw, 128px)');
+    expect(css).toMatch(/#touch-controls \.touch-actions button \{[^}]*border-radius: 50%/);
     expect(css).toMatch(/#touch-controls button \{[^}]*min-width: 48px;[^}]*height: 48px/);
     expect(css).toContain('#touch-controls #btn-fire {');
     expect(css).not.toContain('width: 70px; height: 70px');
@@ -88,8 +95,8 @@ describe('mobile stylesheet cascade', () => {
   it('positions the action cluster inside the right and bottom safe areas', () => {
     expect(css).toContain('env(safe-area-inset-right, 0px)');
     expect(css).toContain('env(safe-area-inset-bottom, 0px)');
-    expect(css).toContain('grid-template-columns: repeat(2, var(--touch-secondary-size))');
-    expect(css).toContain('var(--touch-fire-size) + var(--touch-fire-gap)');
+    expect(css).toContain('bottom: calc(var(--touch-edge-bottom) + var(--touch-fire-lift))');
+    expect(css).toMatch(/#touch-controls #btn-aim\[aria-pressed='true'\] \{/);
   });
 
   it('provides immediate pressed feedback without an input-delaying transition', () => {

@@ -15,7 +15,8 @@ que envia un enlace de un solo uso al correo. Al abrirlo, el juego inicia sesion
 carga los productos y, si la cuenta es de beta, muestra
 [BetaThanksScreen](../../src/ui/BetaThanksScreen.ts) antes del menu. Una
 cuenta sin el mapa ve su correo y puede cerrar sesion. El boton de cuenta, arriba
-a la derecha del menu, muestra el correo (o "Iniciar sesion") y abre el mismo
+a la derecha del menu, muestra la inicial y el correo, con la placa "BETA TESTER"
+en cuentas de beta (o "Iniciar sesion"), y abre el mismo
 dialogo para entrar o cerrar sesion. `?map=station-33` sin
 permiso muestra el menu con la tarjeta bloqueada.
 

@@ -136,6 +136,8 @@ describe('Zombies map selection flow', () => {
       'beta-unlock-kicker': new FakeElement(),
       'account-button': new FakeElement(),
       'account-label': new FakeElement(),
+      'account-avatar': new FakeElement(),
+      'account-badge': new FakeElement(),
       'beta-thanks': new FakeDialog(),
       'beta-thanks-email': new FakeElement(),
       'beta-thanks-close': new FakeElement(),
@@ -188,10 +190,12 @@ describe('Zombies map selection flow', () => {
       // Signed out, the card stays listed but locked behind the login-link prompt.
       mansion.focused = false;
       let accountEmail: string | null = null;
+      let betaTester = false;
       const requestLogin = vi.fn(async (email: string) => (email.includes('@') ? 'sent' as const : 'invalid-email' as const));
       const onSignedOut = vi.fn();
       ui.setMapUnlockAccount({
         getEmail: () => accountEmail,
+        isBetaTester: () => betaTester,
         requestLogin,
         signOut: async () => { accountEmail = null; },
       }, onSignedOut);
@@ -251,6 +255,13 @@ describe('Zombies map selection flow', () => {
       expect(elements['account-label'].textContent).toBe('player@example.com');
       expect(elements['account-button'].dataset.signedIn).toBe('true');
       expect(elements['account-label'].dataset.i18n).toBeUndefined();
+      // Signed in, the avatar shows the email's initial; only beta testers get the badge.
+      expect(elements['account-avatar'].textContent).toBe('P');
+      expect(elements['account-badge'].classList.contains('hidden')).toBe(true);
+      betaTester = true;
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
+      expect(elements['account-badge'].classList.contains('hidden')).toBe(false);
+      expect(elements['account-badge'].dataset.i18n).toBe('betaThanks.tester');
       elements['account-button'].onclick?.();
       expect(unlockDialog.open).toBe(true);
       expect(elements['beta-unlock-map'].dataset.i18n).toBe('account.title');

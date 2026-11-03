@@ -96,6 +96,7 @@ export class Input {
   public releaseAll(): void {
     this.state.releaseAll();
     this.state.endFrame();
+    this.mobile?.syncAimIndicator();
     this.suppressGamepad();
   }
 

@@ -229,6 +229,7 @@ class ZeroedBoot {
       // Unlocked cards open their map through the regular selection, which startGame rechecks.
       this.hud.setMapUnlockAccount({
         getEmail: () => this.entitlements.getEmail(),
+        isBetaTester: () => this.entitlements.isBetaTester(),
         requestLogin: (email) => this.entitlements.requestLogin(email, getLanguage()),
         signOut: () => this.entitlements.signOut(),
       }, () => this.showMapMenu());

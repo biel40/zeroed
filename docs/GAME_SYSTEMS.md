@@ -14,7 +14,10 @@ Input -> PlayerController -> WeaponInventory -> Weapon
 
 `Input` unifica desktop, tactil y mando estandar del navegador. `PlayerController` gestiona camara, recoil,
 movimiento, salto y colision opcional. C alterna agachado/de pie y Z tumbado/de pie;
-los botones tactiles AGACHAR/TUMBAR usan las mismas acciones. Las posturas bajas
+el boton tactil AGACH. usa la misma accion (en tactil no hay boton para tumbarse).
+En tactil, los botones redondos rodean FUEGO, elevado bajo el pulgar derecho:
+FUEGO mantiene apuntar y disparar con una pulsacion, y APUNT. fija o suelta el
+ADS con cada toque. Las posturas bajas
 reducen velocidad y altura de colision; la camara y el compañero aceleran y
 frenan gradualmente al cambiar de postura, conservando continuidad al invertir
 la transicion. Para
@@ -750,9 +753,10 @@ Los avisos de interaccion comparten una tarjeta oscura de alto contraste, con
 accion, tecla o boton tactil y coste separados. La entrada despliega el marco
 y un reflejo breve, seguido de dos pulsos en la tecla; se omiten con movimiento
 reducido. Los requisitos bloqueados conservan su texto sin ofrecer una tecla.
-En tactil, tocar la tarjeta equivale a pulsar USAR, incluidas las acciones
-mantenidas. En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
-guarda y se aplica al instante, sin desactivar las interacciones del juego.
+En tactil, la tarjeta es el control de usar: tocarla interactua, incluidas las
+acciones mantenidas. En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
+guarda y se aplica al instante, sin desactivar las interacciones del juego, y no
+oculta la tarjeta en tactil.
 
 Los objetivos de los modos llegan al HUD como notas estructuradas
 (`ObjectiveNote`: emisor, tarea y progreso vivo). Arriba a la izquierda queda

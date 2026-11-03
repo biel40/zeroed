@@ -18,6 +18,11 @@ import { gamepadMenuButtonLabel } from '../player/GamepadBindings';
 import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
 
 /** Live state shown on the Zombies mode panel. */
+/** The menu's account: what the unlock dialog needs plus the beta-tester badge. */
+export interface MenuAccount extends MapUnlockAccount {
+  isBetaTester(): boolean;
+}
+
 export interface ZombieHudState {
   readonly round: number;
   readonly hp: number;
@@ -173,7 +178,9 @@ export class HUD {
   /** Menu corner button: the signed-in email, or a sign-in label; `data-signed-in` picks its style. */
   private readonly accountButton = mustGet('account-button') as HTMLButtonElement;
   private readonly accountLabel: HTMLElement = mustGet('account-label');
-  private account: MapUnlockAccount | null = null;
+  private readonly accountAvatar: HTMLElement = mustGet('account-avatar');
+  private readonly accountBadge: HTMLElement = mustGet('account-badge');
+  private account: MenuAccount | null = null;
 
   public constructor() {
     const fill = this.loadingBar.querySelector('span');
@@ -407,7 +414,7 @@ export class HUD {
   }
 
   /** The account behind locked map cards and the menu's account button; `onSignedOut` lets the caller refresh the menu. */
-  public setMapUnlockAccount(account: MapUnlockAccount, onSignedOut: () => void): void {
+  public setMapUnlockAccount(account: MenuAccount, onSignedOut: () => void): void {
     this.account = account;
     this.mapUnlock.setAccount(account, onSignedOut);
     this.accountButton.onclick = () => this.mapUnlock.open(null);
@@ -416,6 +423,9 @@ export class HUD {
   private updateAccountButton(): void {
     const email = this.account?.getEmail() ?? null;
     this.accountButton.dataset.signedIn = String(email !== null);
+    this.accountBadge.classList.toggle('hidden', !email || !this.account?.isBetaTester());
+    setTranslatedText(this.accountBadge, 'betaThanks.tester');
+    this.accountAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
     if (!email) {
       setTranslatedText(this.accountLabel, 'account.signIn');
       return;

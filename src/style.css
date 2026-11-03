@@ -178,10 +178,11 @@ body {
 #touch-controls {
   --touch-edge-right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
   --touch-edge-bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
-  --touch-secondary-size: clamp(52px, 6vw, 58px);
-  --touch-secondary-gap: clamp(10px, 1.5vmin, 14px);
-  --touch-fire-size: clamp(92px, 7vw, 116px);
-  --touch-fire-gap: clamp(18px, 2vw, 28px);
+  --touch-fire-size: clamp(104px, 9vw, 128px);
+  --touch-fire-lift: clamp(16px, 4.5vh, 34px);
+  --touch-secondary-size: clamp(48px, 5.4vw, 54px);
+  --touch-aim-size: clamp(58px, 6.4vw, 66px);
+  --touch-arc-gap: clamp(10px, 1.4vmin, 14px);
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -223,43 +224,63 @@ body {
   will-change: transform;
 }
 
-/* Action clusters. The wrappers stay transparent to pointers so the gaps
-   between buttons keep dragging the camera; only the buttons themselves
-   swallow touches. */
-.touch-primary,
-.touch-secondary {
+/* Action cluster: the box matches FIRE, raised above the bottom edge, and the
+   round secondary buttons orbit its centre. --arc-x/--arc-y are the unit
+   direction (cos/sin) and --arc-r the distance between centres. The box
+   stays transparent to pointers so the gaps keep dragging the camera; only
+   the buttons swallow touches. */
+.touch-actions {
   position: absolute;
-  display: flex;
-  pointer-events: none;
-}
-
-.touch-primary {
   right: var(--touch-edge-right);
-  bottom: var(--touch-edge-bottom);
-  align-items: flex-end;
+  bottom: calc(var(--touch-edge-bottom) + var(--touch-fire-lift));
+  width: var(--touch-fire-size);
+  height: var(--touch-fire-size);
+  pointer-events: none;
+  --arc-inner: calc(var(--touch-fire-size) / 2 + var(--touch-arc-gap) + var(--touch-secondary-size) / 2);
 }
 
-/* Two compact secondary rows sit left of FIRE, leaving the primary action
-   isolated at the right thumb's resting position. */
-.touch-secondary {
-  right: calc(var(--touch-edge-right) + var(--touch-fire-size) + var(--touch-fire-gap));
-  bottom: var(--touch-edge-bottom);
-  display: grid;
-  grid-template-columns: repeat(2, var(--touch-secondary-size));
-  gap: var(--touch-secondary-gap);
+#touch-controls .touch-actions button {
+  --size: var(--touch-secondary-size);
+  --arc-r: var(--arc-inner);
+  position: absolute;
+  left: calc(50% + var(--arc-x) * var(--arc-r) - var(--size) / 2);
+  top: calc(50% - var(--arc-y) * var(--arc-r) - var(--size) / 2);
+  width: var(--size);
+  height: var(--size);
+  padding: 0;
+  border-radius: 50%;
+}
+
+#touch-controls #btn-crouch { --arc-x: -0.906; --arc-y: -0.423; }
+#touch-controls #btn-reload { --arc-x: -0.559; --arc-y: 0.829; }
+#touch-controls #btn-knife { --arc-x: 0.105; --arc-y: 0.995; }
+
+#touch-controls #btn-aim {
+  --size: var(--touch-aim-size);
+  --arc-r: calc(var(--touch-fire-size) / 2 + var(--touch-arc-gap) + var(--touch-aim-size) / 2);
+  --arc-x: -0.956;
+  --arc-y: 0.292;
+}
+
+/* Infrequent action on an outer ring, clear of the thumb's sweep. */
+#touch-controls #btn-weapon {
+  --arc-r: calc(var(--arc-inner) + var(--touch-secondary-size) + var(--touch-arc-gap));
+  --arc-x: -0.866;
+  --arc-y: 0.5;
 }
 
 #touch-controls button {
   min-width: 48px;
   height: 48px;
   padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
   border-radius: 13px;
-  background: rgba(12, 17, 22, 0.5);
+  background: rgba(12, 17, 22, 0.42);
   color: #eef5ff;
-  font: 700 11px 'Segoe UI', sans-serif;
-  letter-spacing: 0.05em;
+  font: 700 10px 'Segoe UI', sans-serif;
+  letter-spacing: 0.06em;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  opacity: 0.8;
   pointer-events: auto;
   /* 'none', not 'manipulation': no pan/zoom gesture may start on a button. */
   touch-action: none;
@@ -274,30 +295,30 @@ body {
   transform: scale(0.94);
 }
 
-.touch-secondary button {
-  opacity: 0.72;
-}
-
-.touch-secondary button:not(#btn-pause) {
-  width: var(--touch-secondary-size);
-  height: var(--touch-secondary-size);
-  padding: 0;
-}
-
 #touch-controls #btn-knife {
   color: #fff1d0;
   border-color: rgba(240, 194, 105, 0.5);
-  background: rgba(75, 54, 28, 0.62);
+  background: rgba(75, 54, 28, 0.55);
   font-size: 9px;
 }
 
+/* Latched ADS stays lit until tapped again. */
+#touch-controls #btn-aim[aria-pressed='true'] {
+  color: #1b1408;
+  border-color: rgba(255, 214, 140, 0.9);
+  background: rgba(227, 181, 82, 0.78);
+  opacity: 1;
+}
+
 #touch-controls #btn-fire {
-  width: var(--touch-fire-size);
-  height: var(--touch-fire-size);
-  border-radius: 50%;
-  font-size: 14px;
-  background: rgba(178, 34, 34, 0.5);
-  border-color: rgba(255, 120, 100, 0.45);
+  --size: var(--touch-fire-size);
+  --arc-x: 0;
+  --arc-y: 0;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  opacity: 0.92;
+  background: rgba(178, 34, 34, 0.55);
+  border: 2px solid rgba(255, 120, 100, 0.55);
 }
 
 #btn-pause {
@@ -1360,7 +1381,7 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 
 /* An email can be long; the label truncates instead of pushing the title. */
 .account-button { max-width: min(280px, 50vw); transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s; }
-.account-button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-icon {
   flex: none;
   box-sizing: border-box;
@@ -1389,7 +1410,33 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   color: #efe3c4;
   box-shadow: inset 0 0 14px rgba(227, 181, 82, 0.08);
 }
-.account-button[data-signed-in="true"] .account-icon { background: rgba(227, 181, 82, 0.16); stroke: #e3b552; }
+/* Signed in, the email's initial replaces the generic icon. */
+.account-avatar { display: none; }
+.account-button[data-signed-in="true"] .account-icon { display: none; }
+.account-button[data-signed-in="true"] .account-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(240, 211, 155, 0.7);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f0d39b, #b8862f 70%);
+  color: #1a1206;
+  font: 800 12px 'Consolas', monospace;
+  letter-spacing: 0;
+  box-shadow: 0 0 8px rgba(227, 181, 82, 0.35);
+}
+.account-badge {
+  flex: none;
+  padding: 2px 5px;
+  border: 1px solid rgba(227, 181, 82, 0.6);
+  background: rgba(227, 181, 82, 0.14);
+  color: #e3b552;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
 .account-button[data-signed-in="true"]::after {
   content: '';
   flex: none;
@@ -4272,6 +4319,12 @@ kbd {
 
 html.touch-controls-enabled #touch-controls {
   display: block;
+}
+
+/* The prompt is the only touch USE control: the hide-prompts preference must
+   not remove it, while an absent target (.hidden) still does. */
+html.touch-controls-enabled #interact-prompt[hidden]:not(.hidden) {
+  display: block !important;
 }
 
 /* Tapping the prompt presses USE, so it must receive touches on mobile. */

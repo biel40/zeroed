@@ -10,6 +10,11 @@ export const MOBILE_INPUT_CONFIG = {
   joystickDeadZone: 0.14,
 } as const;
 
+/** Held while FIRE is down; FIRE keeps its 1-Tap ADS behaviour. */
+const TOUCH_FIRE_KEY = 'TouchFire';
+/** Latched by APUNT: a tap toggles ADS until tapped again or input is released. */
+const TOUCH_AIM_KEY = 'TouchAim';
+
 interface MobileInputActions {
   readonly onWeaponSwap: () => void;
   readonly onPauseRequest: () => void;
@@ -21,8 +26,13 @@ export function applyMobileAction(state: InputState, action: string, pressed: bo
     case 'fire':
       // 1-Tap ADS Fire: held touch repeats semi-auto at the weapon's real cadence.
       state.leftButtonDown = pressed;
-      state.rightButtonDown = pressed;
       state.repeatSemiAuto = pressed;
+      state.setKey(TOUCH_FIRE_KEY, pressed);
+      syncTouchAds(state);
+      break;
+    case 'aim':
+      if (pressed) state.setKey(TOUCH_AIM_KEY, !isTouchAimLatched(state));
+      syncTouchAds(state);
       break;
     case 'reload':
       state.setKey('KeyR', pressed);
@@ -39,12 +49,17 @@ export function applyMobileAction(state: InputState, action: string, pressed: bo
     case 'crouch':
       state.setKey('KeyC', pressed);
       break;
-    case 'prone':
-      state.setKey('KeyZ', pressed);
-      break;
     default:
       break;
   }
+}
+
+function isTouchAimLatched(state: InputState): boolean {
+  return state.isDown(TOUCH_AIM_KEY);
+}
+
+function syncTouchAds(state: InputState): void {
+  state.rightButtonDown = state.isDown(TOUCH_FIRE_KEY) || isTouchAimLatched(state);
 }
 
 /** Pointer-event adapter for analog movement, touch look and action buttons. */
@@ -53,6 +68,7 @@ export class MobileInput {
   private readonly buttonOwners = new Map<HTMLElement, number>();
   private readonly joystickBase = document.getElementById('joystick');
   private readonly joystickKnob = document.getElementById('joystick-knob');
+  private readonly aimButton = document.getElementById('btn-aim');
   private readonly stickResult: AnalogStickResult = { x: 0, y: 0, offsetX: 0, offsetY: 0 };
 
   private lookPointerId: number | null = null;
@@ -76,7 +92,12 @@ export class MobileInput {
     this.bindActionButtons();
   }
 
-  dispose(): void {
+  /** Mirrors the latched ADS, which a global input release can also clear. */
+  public syncAimIndicator(): void {
+    this.aimButton?.setAttribute('aria-pressed', String(isTouchAimLatched(this.state)));
+  }
+
+  public dispose(): void {
     this.releaseAll();
     for (const [target, type, listener] of this.listeners) {
       target.removeEventListener(type, listener);
@@ -84,7 +105,7 @@ export class MobileInput {
     this.listeners.length = 0;
   }
 
-  /** Touch buttons plus the interaction prompt, which doubles as a larger USE button. */
+  /** Touch buttons plus the interaction prompt, which is the touch USE control. */
   private bindActionButtons(): void {
     const controls = document.querySelectorAll<HTMLElement>(
       '#touch-controls [data-action], #interact-prompt[data-action]',
@@ -103,6 +124,7 @@ export class MobileInput {
         if (action === 'swap-weapon') this.actions.onWeaponSwap();
         else if (action === 'pause') this.actions.onPauseRequest();
         else applyMobileAction(this.state, action, true);
+        if (action === 'aim') this.syncAimIndicator();
       };
       const pointerEnd = (event: Event): void => {
         const pointerEvent = event as PointerEvent;
@@ -222,6 +244,7 @@ export class MobileInput {
     this.movePointerId = null;
     this.buttonOwners.clear();
     this.state.releaseAll();
+    this.syncAimIndicator();
     this.hideJoystick();
   }
 

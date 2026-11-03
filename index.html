@@ -59,19 +59,15 @@
       <div id="joystick">
         <div id="joystick-knob"></div>
       </div>
-      <!-- Secondary actions: small, out of the aiming thumb's way. -->
-      <div class="touch-secondary">
-        <button type="button" data-action="reload" id="btn-reload" data-i18n-aria-label="touch.reloadLabel" data-i18n="touch.reload"></button>
-        <button type="button" data-action="interact" id="btn-interact" data-i18n-aria-label="touch.useLabel" data-i18n="touch.use"></button>
-        <button type="button" data-action="swap-weapon" id="btn-weapon" data-i18n-aria-label="touch.weaponLabel" data-i18n="touch.weapon"></button>
-        <button type="button" data-action="knife" id="btn-knife" data-i18n-aria-label="touch.knifeLabel" data-i18n="touch.knife"></button>
-        <button type="button" data-action="crouch" id="btn-crouch" data-i18n-aria-label="controls.crouch" data-i18n="touch.crouch"></button>
-        <button type="button" data-action="prone" id="btn-prone" data-i18n-aria-label="controls.prone" data-i18n="touch.prone"></button>
-        <button type="button" data-action="pause" id="btn-pause" data-i18n-aria-label="touch.pauseLabel">| |</button>
-      </div>
-      <!-- Primary actions: right thumb rest position. -->
-      <div class="touch-primary">
+      <button type="button" data-action="pause" id="btn-pause" data-i18n-aria-label="touch.pauseLabel">| |</button>
+      <!-- FIRE rests under the right thumb; secondary actions orbit it. USE is the interaction prompt. -->
+      <div class="touch-actions">
         <button type="button" data-action="fire" id="btn-fire" data-i18n-aria-label="touch.fireLabel" data-i18n="touch.fire"></button>
+        <button type="button" data-action="aim" id="btn-aim" aria-pressed="false" data-i18n-aria-label="touch.aimLabel" data-i18n="touch.aim"></button>
+        <button type="button" data-action="crouch" id="btn-crouch" data-i18n-aria-label="controls.crouch" data-i18n="touch.crouch"></button>
+        <button type="button" data-action="reload" id="btn-reload" data-i18n-aria-label="touch.reloadLabel" data-i18n="touch.reload"></button>
+        <button type="button" data-action="knife" id="btn-knife" data-i18n-aria-label="touch.knifeLabel" data-i18n="touch.knife"></button>
+        <button type="button" data-action="swap-weapon" id="btn-weapon" data-i18n-aria-label="touch.weaponLabel" data-i18n="touch.weapon"></button>
       </div>
     </div>
 
@@ -149,7 +145,9 @@
           <!-- HUD shows the signed-in email or a sign-in label; the button opens MapUnlockDialog without a map. -->
           <button type="button" id="account-button" class="account-button">
             <svg class="account-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.2" r="3.6" /><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" /></svg>
-            <span id="account-label"></span>
+            <span id="account-avatar" class="account-avatar" aria-hidden="true"></span>
+            <span id="account-label" class="account-label"></span>
+            <span id="account-badge" class="account-badge hidden"></span>
           </button>
         </div>
       </header>

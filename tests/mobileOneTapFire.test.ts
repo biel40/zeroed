@@ -42,6 +42,31 @@ describe('mobile 1-Tap ADS Fire', () => {
     expect(state.rightButtonDown).toBe(false);
   });
 
+  it('latches ADS with the aim button and keeps it through a fire tap', () => {
+    const state = new InputState();
+    applyMobileAction(state, 'aim', true);
+    applyMobileAction(state, 'aim', false);
+    expect(state.rightButtonDown).toBe(true);
+
+    applyMobileAction(state, 'fire', true);
+    applyMobileAction(state, 'fire', false);
+    expect(state.leftButtonDown).toBe(false);
+    expect(state.rightButtonDown).toBe(true);
+
+    applyMobileAction(state, 'aim', true);
+    applyMobileAction(state, 'aim', false);
+    expect(state.rightButtonDown).toBe(false);
+  });
+
+  it('drops latched ADS when all input is released', () => {
+    const state = new InputState();
+    applyMobileAction(state, 'aim', true);
+    state.releaseAll();
+    expect(state.rightButtonDown).toBe(false);
+    applyMobileAction(state, 'aim', true);
+    expect(state.rightButtonDown).toBe(true);
+  });
+
   it.each<WeaponId>(['m1911', 'vortex9', 'tesla'])(
     '%s repeats at its real cadence while the mobile fire button is held',
     (weaponId) => {

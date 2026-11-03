@@ -120,7 +120,7 @@ describe('shared player stances', () => {
 
   it('resets posture on teleport and separates it from the downed view', () => {
     const { player, input, tick } = setup();
-    applyMobileAction(input, 'prone', true);
+    input.setKey('KeyZ', true);
     tick(90);
     expect(player.stance).toBe('prone');
     player.setDownedCamera(true);
@@ -131,7 +131,7 @@ describe('shared player stances', () => {
     expect(player.camera.position.y).toBe(0);
   });
 
-  it('maps touch posture buttons to the same press/release actions', () => {
+  it('maps the touch crouch button to the same press/release action', () => {
     const { player, input, tick } = setup();
     applyMobileAction(input, 'crouch', true);
     tick();
