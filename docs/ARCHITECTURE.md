@@ -33,6 +33,7 @@ sufra tirones de compilacion de shaders.
 | `src/modes/ZombiesMode.ts` | Run, rondas, economia, salud, armas y progresion |
 | `src/modes/coop/` | Cooperativo: `CoopWorld` (mapa compartido), `CoopHostMode` (autoridad), `CoopGuestMode` (replica) |
 | `src/network/` + `server/` + `cloudflare/` | Protocolo validado, interpolacion, validacion de disparos y relays |
+| `cloudflare/api/` | API de cuentas web (Worker con Hono y D1): enlace magico, sesiones y permisos; ver [API de cuentas](../cloudflare/api/README.md) |
 | `src/rendering/RemotePlayer*` | Compañero como entidad de mundo: interpolacion y cuerpo animado |
 | `src/rendering/CoopSpectator.ts` | Camara cooperativa desde la vista interpolada del compañero, separada del rig local |
 | `src/config/zombieMaps.ts` | Registro de mapas: visibilidad, nombre, cooperativo y factoria de arena |
@@ -56,14 +57,18 @@ sufra tirones de compilacion de shaders.
   la persistencia sigue en `PlayerSettings`. No cambia la frontera de red.
   Mapeo central en [GamepadBindings](../src/player/GamepadBindings.ts).
 
-- `ZombieMapDefinition.betaOnly` y `canAccessZombieMap` comparten la regla de
-  acceso entre el selector y el arranque, incluidos enlaces directos; el
-  selector lista bloqueados los mapas sin permiso. `public/beta/access.js`
-  conserva la lista y sesion de beta y `main.ts` la inyecta en `HUD`, cuyo
-  `BetaUnlockDialog` recoge el correo; tras el agradecimiento, la seleccion
-  normal abre el mapa y `main.ts` vuelve a comprobar el permiso. Es una
-  comprobacion de cliente, con los limites descritos en
-  [acceso de beta](../public/beta/README.md).
+- Un mapa premium declara `ZombieMapDefinition.product`, un `ProductId` de
+  [productos](../src/config/products.ts); los gratuitos lo omiten y la tarjeta
+  premium del menu se deriva de el. `canAccessZombieMap` consulta un
+  [EntitlementProvider](../src/entitlements/EntitlementProvider.ts) y comparte
+  la regla entre el selector y el arranque, incluidos enlaces directos; el
+  selector lista bloqueados los mapas sin permiso. Cada plataforma aporta su
+  proveedor; en web, `BetaEntitlementProvider` concede todos los productos a
+  quien tenga acceso de beta. `public/beta/access.js` conserva la lista y
+  sesion de beta y `main.ts` la inyecta en `HUD`, cuyo `BetaUnlockDialog`
+  recoge el correo; tras el agradecimiento, la seleccion normal abre el mapa y
+  `main.ts` vuelve a comprobar el permiso. Es una comprobacion de cliente, con
+  los limites descritos en [acceso de beta](../public/beta/README.md).
 
 - `ZombieMapDefinition.weapons` es el `WeaponCatalog` con que el mapa nombra y
   dibuja las armas ([reskins](../src/config/weaponReskins.ts)). `ZombiesMode`

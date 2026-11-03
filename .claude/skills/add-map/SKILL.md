@@ -21,7 +21,7 @@ vuelve.
 - Pregunta al usuario lo que no se deduce y cambia el diseno:
   - id en kebab-case;
   - individual o cooperativo (hoy el cooperativo solo usa `COOP_ZOMBIE_MAP_ID`);
-  - premium o incluido;
+  - premium (producto propio en `src/config/products.ts`) o incluido;
   - tematica y direccion de arte;
   - que contiene la primera fase.
 - Un mapa grande se construye por fases (como Station 33): la fase 1 es una
@@ -78,7 +78,7 @@ Opcional, solo si el mapa lo tiene:
 
 | Archivo | Que anadir |
 |---|---|
-| `src/config/zombieMaps.ts` | Entrada en `ZOMBIE_MAPS`: `id`, `visible`, `nameKey`, `coop`, `premium`, `createArena`. |
+| `src/config/zombieMaps.ts` | Entrada en `ZOMBIE_MAPS`: `id`, `visible`, `nameKey`, `coop`, `product` solo si es premium, `createArena`. |
 | `index.html` | Tarjeta `<button class="map-card" data-map="<id>">` copiando la estructura de las existentes: arte SVG propio dentro de `.map-card-media` con su `.map-card-lock`, `data-map-access`, `data-map-players`, `data-map-action`, nombre y lema con `data-i18n`. |
 | `src/style.css` | Estilos y animaciones del arte de la tarjeta, si los necesita. |
 | `src/i18n/en.ts`, `es.ts`, `ca.ts` | `map.<clave>` y `map.<clave>.tagline` en los tres idiomas (`tests/i18n.test.ts` exige las mismas claves). |
@@ -108,7 +108,7 @@ Un final opcional sigue el mismo patron con `EndingPresentationId`.
 
 - `tests/zombieArenaContract.test.ts` y `tests/mapSelection.test.ts`
   recorren `ZOMBIE_MAPS` solos. Anade a `mapSelection` la expectativa de
-  `visible`/`coop`/`premium` del mapa nuevo.
+  `visible`/`coop`/`product` del mapa nuevo.
 - Crea `tests/<mapa>.test.ts` siguiendo `tests/station33.test.ts`:
   - `ZombiesMode` arranca y reinicia en el mapa;
   - la zona inicial esta sola y la puerta cerrada;

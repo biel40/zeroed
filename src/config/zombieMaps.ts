@@ -1,11 +1,13 @@
 import type * as THREE from 'three';
 import type { DeviceProfile } from '../core/DeviceProfile';
+import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import type { TranslationKey } from '../i18n/i18n';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { Station33Arena } from '../zombies/maps/Station33Arena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
 import { STATION33_WEAPONS } from '../zombies/maps/Station33Config';
 import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
+import type { ProductId } from './products';
 import { WEAPON_DEFINITIONS } from './weapons';
 
 export type ZombieArenaFactory = (scene: THREE.Scene, profile: DeviceProfile) => ZombieArena;
@@ -14,13 +16,11 @@ export interface ZombieMapDefinition {
   readonly id: string;
   /** Listed in the map menu; maps the player cannot access yet appear locked. */
   readonly visible: boolean;
-  /** Requires an allowed beta email to play, from its locked menu card or a direct link. */
-  readonly betaOnly: boolean;
+  /** Premium maps require owning this product to play, from the menu or a direct link; free maps omit it. */
+  readonly product?: ProductId;
   readonly nameKey: TranslationKey;
   /** Playable in the co-op modes. */
   readonly coop: boolean;
-  /** Presentation only until payments exist; does not enforce access. */
-  readonly premium: boolean;
   /**
    * Weapons only this map hands out (sold by its own stations). They are
    * preloaded on this map alone, never pooled in the Mystery Box and never
@@ -37,10 +37,8 @@ export const ZOMBIE_MAPS = {
   'burned-mansion': {
     id: 'burned-mansion',
     visible: true,
-    betaOnly: false,
     nameKey: 'map.burnedMansion',
     coop: true,
-    premium: false,
     exclusiveWeapons: [],
     weapons: WEAPON_DEFINITIONS,
     createArena: (scene, profile) => new BurnedMansionArena(scene, profile),
@@ -48,10 +46,9 @@ export const ZOMBIE_MAPS = {
   'station-33': {
     id: 'station-33',
     visible: true,
-    betaOnly: true,
+    product: 'map.station-33',
     nameKey: 'map.station33',
     coop: false,
-    premium: true,
     exclusiveWeapons: ['fakel'],
     weapons: STATION33_WEAPONS,
     createArena: (scene, profile) => new Station33Arena(scene, profile),
@@ -68,12 +65,23 @@ export function isZombieMapId(value: string | null | undefined): value is Zombie
 }
 
 /** Shared by menu visibility and every match entry point, including `?map=`. */
-export function canAccessZombieMap(value: string | null | undefined, betaAccess: boolean): value is ZombieMapId {
-  return isZombieMapId(value) && (!ZOMBIE_MAPS[value].betaOnly || betaAccess);
+export function canAccessZombieMap(
+  value: string | null | undefined,
+  entitlements: EntitlementProvider,
+): value is ZombieMapId {
+  if (!isZombieMapId(value)) return false;
+  const product: ProductId | undefined = getZombieMapProduct(value);
+  return product === undefined || entitlements.owns(product);
+}
+
+/** The product a premium map is sold as; undefined for a free map. */
+export function getZombieMapProduct(mapId: ZombieMapId): ProductId | undefined {
+  const map: ZombieMapDefinition = ZOMBIE_MAPS[mapId];
+  return map.product;
 }
 
 export function getZombieMapDefinition(
   value: string | undefined,
-): (typeof ZOMBIE_MAPS)[ZombieMapId] | undefined {
+): (ZombieMapDefinition & { readonly id: ZombieMapId }) | undefined {
   return isZombieMapId(value) ? ZOMBIE_MAPS[value] : undefined;
 }

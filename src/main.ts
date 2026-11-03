@@ -6,6 +6,8 @@ import { canAccessZombieMap, COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS, type ZombieMapId }
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
+import { BetaEntitlementProvider } from './entitlements/BetaEntitlementProvider';
+import type { EntitlementProvider } from './entitlements/EntitlementProvider';
 import type { GameMode } from './modes/GameMode';
 import { setupPWA } from './pwa';
 import { ZombiesMode } from './modes/ZombiesMode';
@@ -29,12 +31,14 @@ class ZeroedBoot {
   private readonly gamepad = new GamepadControls();
   private menuFrame = 0;
   private lastMenuTime = 0;
+  private readonly entitlements: EntitlementProvider;
 
   public constructor(private readonly betaAccess: typeof BetaAccess) {
     const container = document.getElementById('app');
     if (!container) throw new Error('Missing #app container');
 
     this.container = container;
+    this.entitlements = new BetaEntitlementProvider(betaAccess);
     this.profile = getDeviceProfile(undefined, getQualityPreference());
     this.hud = new HUD();
     this.assets = new AssetManager(this.profile.anisotropyLimit);
@@ -60,7 +64,7 @@ class ZeroedBoot {
   }
 
   private async startGame(mode: GameMode, mapId: ZombieMapId): Promise<void> {
-    if (!canAccessZombieMap(mapId, this.betaAccess.hasBetaAccess())) {
+    if (!canAccessZombieMap(mapId, this.entitlements)) {
       this.showMapMenu();
       return;
     }
@@ -115,12 +119,12 @@ class ZeroedBoot {
   }
 
   private showMapMenu(): void {
-    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId), this.betaAccess.hasBetaAccess());
+    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId), this.entitlements);
   }
 
   private openRequestedMap(): void {
     const requestedMap = new URLSearchParams(window.location.search).get('map');
-    if (canAccessZombieMap(requestedMap, this.betaAccess.hasBetaAccess())) {
+    if (canAccessZombieMap(requestedMap, this.entitlements)) {
       void this.startGame(new ZombiesMode(requestedMap), requestedMap);
     } else {
       this.showMapMenu();

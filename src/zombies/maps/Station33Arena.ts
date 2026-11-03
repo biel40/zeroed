@@ -96,7 +96,7 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
 
 /**
  * Station 33, a deep Soviet metro station overrun by the dead. Single-player
- * and premium; betaOnly restricts it through the map registry. The arena only
+ * and premium; its registry product restricts access. The arena only
  * orchestrates: zone builders shape the geometry, `Station33Lighting` and
  * `Station33Atmosphere` keep it alive, and gameplay objects come from the
  * shared barrier, door, wall-buy and Mystery Box systems.

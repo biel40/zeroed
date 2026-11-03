@@ -1,0 +1,4 @@
+# Copy to .dev.vars (ignored by Git) for `npm run api:dev`.
+APP_URL=http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:5173
+MAIL_TRANSPORT=console

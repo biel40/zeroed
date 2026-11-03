@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { acceptBetaEmail, hasBetaAccess } from '../public/beta/access.js';
 import { canAccessZombieMap } from '../src/config/zombieMaps';
+import { BetaEntitlementProvider } from '../src/entitlements/BetaEntitlementProvider';
 
 describe('temporary beta map access', () => {
+  const entitlements = new BetaEntitlementProvider({ hasBetaAccess });
   afterEach(() => vi.unstubAllGlobals());
 
   function storage(initial: string | null = null): Map<string, string> {
@@ -18,9 +20,9 @@ describe('temporary beta map access', () => {
   it('keeps Burned Mansion public and denies Station 33 without an allowed session', () => {
     storage();
     expect(hasBetaAccess()).toBe(false);
-    expect(canAccessZombieMap('burned-mansion', hasBetaAccess())).toBe(true);
-    expect(canAccessZombieMap('station-33', hasBetaAccess())).toBe(false);
-    expect(canAccessZombieMap('unknown', true)).toBe(false);
+    expect(canAccessZombieMap('burned-mansion', entitlements)).toBe(true);
+    expect(canAccessZombieMap('station-33', entitlements)).toBe(false);
+    expect(canAccessZombieMap('unknown', new BetaEntitlementProvider({ hasBetaAccess: () => true }))).toBe(false);
   });
 
   it('normalizes an existing beta email and restores its session', () => {
@@ -28,13 +30,13 @@ describe('temporary beta map access', () => {
     expect(acceptBetaEmail('  ANAVILMOY@GMAIL.COM  ')).toBe(true);
     expect(values.get('zeroed.betaAccess')).toBe('anavilmoy@gmail.com');
     expect(hasBetaAccess()).toBe(true);
-    expect(canAccessZombieMap('station-33', hasBetaAccess())).toBe(true);
+    expect(canAccessZombieMap('station-33', entitlements)).toBe(true);
   });
 
   it('grants Station 33 access to the newly authorized beta tester', () => {
     storage();
     expect(acceptBetaEmail('random.uses.1998@gmail.com')).toBe(true);
-    expect(canAccessZombieMap('station-33', hasBetaAccess())).toBe(true);
+    expect(canAccessZombieMap('station-33', entitlements)).toBe(true);
   });
 
   it('rejects unlisted emails and unlisted stored sessions', () => {

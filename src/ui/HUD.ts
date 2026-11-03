@@ -1,4 +1,5 @@
 import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
+import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
 import { formatNumber, onLanguageChange, setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
@@ -350,7 +351,7 @@ export class HUD {
    * directly. Maps the player cannot access yet stay listed but locked; their
    * card asks for a closed-beta email, thanks the tester and then opens the map.
    */
-  public showMapSelect(onSelect: (mapId: ZombieMapId) => void, betaAccess: boolean): void {
+  public showMapSelect(onSelect: (mapId: ZombieMapId) => void, entitlements: EntitlementProvider): void {
     this.fadeOutStartScreen();
     this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
@@ -364,12 +365,13 @@ export class HUD {
         button.onclick = null;
         continue;
       }
-      const locked = !canAccessZombieMap(map.id, betaAccess);
+      const locked = !canAccessZombieMap(map.id, entitlements);
+      const premium = map.product !== undefined;
       if (!locked && !firstPlayableButton) firstPlayableButton = button;
       // The registry, not the markup, decides each card's players, access and action labels.
-      button.dataset.access = map.premium ? 'premium' : 'free';
+      button.dataset.access = premium ? 'premium' : 'free';
       button.dataset.locked = String(locked);
-      setTranslatedText(button.querySelector('[data-map-access]'), map.premium ? 'map.access.premium' : 'map.access.free');
+      setTranslatedText(button.querySelector('[data-map-access]'), premium ? 'map.access.premium' : 'map.access.free');
       setTranslatedText(button.querySelector('[data-map-players]'), map.coop ? 'map.players.coop' : 'map.players.solo');
       setTranslatedText(button.querySelector('[data-map-action]'), locked ? 'menu.unlock' : 'menu.play');
       const select = (): void => {

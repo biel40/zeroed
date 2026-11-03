@@ -1,11 +1,13 @@
 # Acceso temporal a mapas de beta
 
-Burned Mansion sigue abierto, en individual y cooperativo. Los mapas marcados
-con `betaOnly` en [el registro](../../src/config/zombieMaps.ts), actualmente
+Burned Mansion sigue abierto, en individual y cooperativo. Los mapas con
+`product` en [el registro](../../src/config/zombieMaps.ts), actualmente
 Station 33, aparecen en el menu con candado: al pulsar su tarjeta,
 [BetaUnlockDialog](../../src/ui/BetaUnlockDialog.ts) pide un correo de
-`BETA_EMAILS` en `emails.js`. No hay distincion entre desarrolladores y testers
-ni excepcion en Vite dev. `premium` sigue siendo solo presentacion.
+`BETA_EMAILS` en `emails.js`. Mientras no haya pagos,
+[BetaEntitlementProvider](../../src/entitlements/BetaEntitlementProvider.ts)
+concede todos los productos premium a quien tenga acceso de beta. No hay
+distincion entre desarrolladores y testers ni excepcion en Vite dev.
 
 `access.js` reutiliza la clave `zeroed.betaAccess` en `sessionStorage` y valida
 el correo contra la lista cada vez que se consulta el permiso. Las sesiones

@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { COOP_ZOMBIE_MAP_ID, isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
+import type { EntitlementProvider } from '../src/entitlements/EntitlementProvider';
 import { HUD } from '../src/ui/HUD';
+
+const allProducts: EntitlementProvider = { owns: (): boolean => true };
+const noProducts: EntitlementProvider = { owns: (): boolean => false };
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
@@ -89,8 +93,8 @@ describe('Zombies map selection flow', () => {
   });
 
   it('lists Burned Mansion for everyone and Station 33 as a locked single-player premium map', () => {
-    expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, betaOnly: false, coop: true, premium: false });
-    expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, betaOnly: true, coop: false, premium: true });
+    expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true });
+    expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, product: 'map.station-33', coop: false });
     expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
     expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);
@@ -146,7 +150,7 @@ describe('Zombies map selection flow', () => {
     try {
       const selected: string[] = [];
       const ui = new HUD();
-      ui.showMapSelect((mapId) => selected.push(mapId), true);
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
       // The loading screen cross-fades out over the menu before hiding.
       expect(startScreen.classList.contains('leaving')).toBe(true);
       vi.runAllTimers();
@@ -168,7 +172,7 @@ describe('Zombies map selection flow', () => {
       expect(selected).toEqual(['burned-mansion']);
       expect(mapSelect.classList.contains('hidden')).toBe(true);
 
-      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), true);
+      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), allProducts);
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
@@ -176,7 +180,7 @@ describe('Zombies map selection flow', () => {
       mansion.focused = false;
       const acceptEmail = vi.fn((email: string) => email === 'bielet40@gmail.com');
       ui.setBetaAccessHandler(acceptEmail);
-      ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), false);
+      ui.showMapSelect((mapId) => selected.push(`tester:${mapId}`), noProducts);
       expect(station.classList.contains('hidden')).toBe(false);
       expect(station.dataset.locked).toBe('true');
       expect(station.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
@@ -223,8 +227,8 @@ describe('Zombies map selection flow', () => {
     expect(main).toContain('startGame(new ZombiesMode(mapId), mapId)');
     // Direct links use the same beta access rule as the menu, and startGame rechecks it.
     expect(main).toContain('startGame(new ZombiesMode(requestedMap), requestedMap)');
-    expect(main).toContain('canAccessZombieMap(requestedMap, this.betaAccess.hasBetaAccess())');
-    expect(main).toContain('if (!canAccessZombieMap(mapId, this.betaAccess.hasBetaAccess()))');
+    expect(main).toContain('canAccessZombieMap(requestedMap, this.entitlements)');
+    expect(main).toContain('if (!canAccessZombieMap(mapId, this.entitlements))');
     expect(main).not.toContain('showModeSelect');
     expect(main).not.toContain('ClassicMode');
   });

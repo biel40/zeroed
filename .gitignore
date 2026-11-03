@@ -3,6 +3,7 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+.dev.vars
 *.local
 .env
 .env.*

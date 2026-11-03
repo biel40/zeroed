@@ -15,6 +15,9 @@
     "multiplayer:cloudflare:dev": "wrangler dev",
     "multiplayer:cloudflare:deploy": "wrangler deploy",
     "multiplayer:cloudflare:test": "node --test cloudflare/multiplayer.test.mjs",
+    "api:dev": "wrangler dev --config cloudflare/api/wrangler.jsonc --port 8788",
+    "api:db:migrate:local": "wrangler d1 migrations apply zeroed-accounts --local --config cloudflare/api/wrangler.jsonc",
+    "api:seed-beta": "vite-node cloudflare/api/scripts/seed-beta.ts --",
     "generate:zombie-brute": "node scripts/generate-brute-asset.mjs",
     "generate:player": "node scripts/generate-soldier-asset.mjs",
     "generate:zombies": "npm run generate:zombie-brute",
@@ -34,6 +37,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "hono": "^4.13.16",
     "three": "^0.178.0",
     "ws": "^8.21.3"
   },
