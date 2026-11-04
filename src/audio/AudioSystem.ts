@@ -983,7 +983,9 @@ export class AudioSystem {
     for (const [type, ratio, level] of [['sawtooth', 1, 1], ['square', 1.51, 0.35]] as const) {
       const osc = ctx.createOscillator();
       osc.type = type;
-      const pulse = (hz: number, beat: number): void => osc.frequency.linearRampToValueAtTime(hz * ratio, at(beat));
+      const pulse = (hz: number, beat: number): void => {
+        osc.frequency.linearRampToValueAtTime(hz * ratio, at(beat));
+      };
       osc.frequency.setValueAtTime(30 * ratio, at(caught));
       pulse(36, caught + 0.4);
       pulse(36, ESCAPE_BEAT.launch);
