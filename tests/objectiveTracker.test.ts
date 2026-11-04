@@ -53,15 +53,27 @@ class FakeElement {
   }
 }
 
+/** The round banner's clock as the HUD reports it, driven by the fake timers. */
+class FakeBanner {
+  private shownUntil = 0;
+
+  public show(ms = 3800): void {
+    this.shownUntil = Date.now() + ms;
+  }
+
+  public readonly remainingMs = (): number => Math.max(0, this.shownUntil - Date.now());
+}
+
 const crystal: ObjectiveNote = { kicker: 'CRYSTAL', title: 'Find it', details: '' };
 const guardian: ObjectiveNote = { kicker: 'GUARDIAN', title: 'Kill it', details: '' };
 
-function harness(): { tracker: ObjectiveTracker; corner: FakeElement; spotlight: FakeElement } {
+function harness(): { tracker: ObjectiveTracker; corner: FakeElement; spotlight: FakeElement; banner: FakeBanner } {
   const corner = new FakeElement();
   const part = (): HTMLElement => new FakeElement() as unknown as HTMLElement;
   const spotlightNote: ObjectiveNoteElements = { root: part(), kicker: part(), title: part(), details: part() };
-  const tracker = new ObjectiveTracker(corner as unknown as HTMLElement, spotlightNote, () => 0);
-  return { tracker, corner, spotlight: spotlightNote.root as unknown as FakeElement };
+  const banner = new FakeBanner();
+  const tracker = new ObjectiveTracker(corner as unknown as HTMLElement, spotlightNote, banner.remainingMs);
+  return { tracker, corner, spotlight: spotlightNote.root as unknown as FakeElement, banner };
 }
 
 /** Corner children still fading out. */
@@ -125,6 +137,35 @@ describe('ObjectiveTracker', () => {
     expect(spotlight.classes.has('leaving')).toBe(false);
     expect(spotlight.classes.has('entering')).toBe(true);
     expect(spotlight.classes.has('hidden')).toBe(false);
+  });
+
+  it('waits for a round banner that starts after the objective was announced', () => {
+    const { tracker, spotlight, banner } = harness();
+    tracker.update([crystal], false);
+    banner.show();
+
+    vi.advanceTimersByTime(3799);
+    expect(spotlight.classes.has('entering')).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(spotlight.classes.has('entering')).toBe(true);
+  });
+
+  it('docks the spotlight at once when a round banner appears during its hold', () => {
+    const { tracker, corner, spotlight, banner } = harness();
+    tracker.update([crystal], false);
+    vi.advanceTimersByTime(1000);
+    expect(spotlight.classes.has('entering')).toBe(true);
+
+    banner.show();
+    tracker.update([crystal], false);
+    expect(spotlight.classes.has('docking')).toBe(true);
+    expect(corner.children[0].classes.has('awaiting')).toBe(false);
+
+    vi.advanceTimersByTime(1200);
+    expect(spotlight.classes.has('hidden')).toBe(true);
+    expect(corner.children[0].classes.has('arrived')).toBe(true);
+    // The cancelled hold must not fire a second dock later.
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('fades an ended corner note in place while the next note takes its element', () => {

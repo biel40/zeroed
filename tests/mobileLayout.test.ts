@@ -43,6 +43,15 @@ describe('mobile stylesheet cascade', () => {
     expect(weaponRule).toContain('bottom: auto');
   });
 
+  it('anchors the touch survival panel bottom left, away from PAUSE and the action cluster', () => {
+    const touchBlock = css.slice(css.indexOf('html.touch-controls-enabled #hud-zombies {'));
+    const panelRule = touchBlock.slice(0, touchBlock.indexOf('}'));
+    expect(panelRule).toContain('left: calc(10px + env(safe-area-inset-left, 0px))');
+    expect(panelRule).toContain('bottom: calc(10px + env(safe-area-inset-bottom, 0px))');
+    expect(panelRule).toContain('top: auto');
+    expect(panelRule).toContain('right: auto');
+  });
+
   it('keeps the touch button wrapper transparent to pointers', () => {
     // A solid wrapper would swallow camera drags in the gaps between buttons.
     expect(css).toMatch(/\n\.touch-actions \{[^}]*pointer-events: none/);
@@ -83,10 +92,11 @@ describe('mobile stylesheet cascade', () => {
   });
 
   it('keeps comfortable round targets, a larger aim button and a dominant fire button', () => {
-    expect(css).toContain('--touch-secondary-size: clamp(48px, 5.4vw, 54px)');
-    expect(css).toContain('--touch-aim-size: clamp(58px, 6.4vw, 66px)');
-    expect(css).toContain('--touch-fire-size: clamp(104px, 9vw, 128px)');
-    expect(css).toMatch(/#touch-controls \.touch-actions button \{[^}]*border-radius: 50%/);
+    expect(css).toContain('--touch-secondary-size: clamp(44px, 4.8vw, 50px)');
+    expect(css).toContain('--touch-aim-size: clamp(52px, 5.8vw, 60px)');
+    expect(css).toContain('--touch-fire-size: clamp(88px, 8vw, 116px)');
+    // The orbit drops the generic 48px floor so its own size applies.
+    expect(css).toMatch(/#touch-controls \.touch-actions button \{[^}]*min-width: 0;[^}]*border-radius: 50%/);
     expect(css).toMatch(/#touch-controls button \{[^}]*min-width: 48px;[^}]*height: 48px/);
     expect(css).toContain('#touch-controls #btn-fire {');
     expect(css).not.toContain('width: 70px; height: 70px');

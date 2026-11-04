@@ -178,11 +178,11 @@ body {
 #touch-controls {
   --touch-edge-right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
   --touch-edge-bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
-  --touch-fire-size: clamp(104px, 9vw, 128px);
-  --touch-fire-lift: clamp(16px, 4.5vh, 34px);
-  --touch-secondary-size: clamp(48px, 5.4vw, 54px);
-  --touch-aim-size: clamp(58px, 6.4vw, 66px);
-  --touch-arc-gap: clamp(10px, 1.4vmin, 14px);
+  --touch-fire-size: clamp(88px, 8vw, 116px);
+  --touch-fire-lift: clamp(12px, 3.5vh, 28px);
+  --touch-secondary-size: clamp(44px, 4.8vw, 50px);
+  --touch-aim-size: clamp(52px, 5.8vw, 60px);
+  --touch-arc-gap: clamp(8px, 1.2vmin, 12px);
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -247,8 +247,10 @@ body {
   top: calc(50% - var(--arc-y) * var(--arc-r) - var(--size) / 2);
   width: var(--size);
   height: var(--size);
+  min-width: 0;
   padding: 0;
   border-radius: 50%;
+  font-size: 9px;
 }
 
 #touch-controls #btn-crouch { --arc-x: -0.906; --arc-y: -0.423; }
@@ -262,11 +264,12 @@ body {
   --arc-y: 0.292;
 }
 
-/* Infrequent action on an outer ring, clear of the thumb's sweep. */
+/* Infrequent action on the outer ring straight above the cluster, out of the
+   thumb's sideways camera sweep towards the centre of the screen. */
 #touch-controls #btn-weapon {
   --arc-r: calc(var(--arc-inner) + var(--touch-secondary-size) + var(--touch-arc-gap));
-  --arc-x: -0.866;
-  --arc-y: 0.5;
+  --arc-x: -0.174;
+  --arc-y: 0.985;
 }
 
 #touch-controls button {
@@ -4419,11 +4422,12 @@ html.touch-controls-enabled #hud-weapon {
   min-width: 0;
 }
 
+/* Bottom left, clear of PAUSE and the right-thumb action cluster. */
 html.touch-controls-enabled #hud-zombies {
-  right: calc(10px + env(safe-area-inset-right, 0px));
-  top: calc(62px + env(safe-area-inset-top, 0px));
-  bottom: auto;
-  left: auto;
+  left: calc(10px + env(safe-area-inset-left, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  top: auto;
+  right: auto;
   min-width: 0;
 }
 
@@ -4662,12 +4666,12 @@ html.touch-controls-enabled .start-panel {
 }
 @media (prefers-reduced-motion: reduce) { #z-hp-fill { transition: none; } }
 
-/* Keep combat information in the old small corner panel on touch devices.
+/* Keep combat information in a small corner panel on touch devices.
    Detailed headshots and lamp progress remain available in the pause menu. */
 html.touch-controls-enabled #hud-zombies {
-  width: 150px;
+  width: 128px;
   max-width: calc(100vw - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
-  padding: 6px 9px;
+  padding: 5px 8px;
   display: block;
   font: 700 10px/1.25 'Consolas', 'SF Mono', monospace;
   border: 1px solid rgba(118, 105, 90, 0.28);
@@ -4704,39 +4708,6 @@ html.touch-controls-enabled #z-rings { margin-top: 3px; }
 html.touch-controls-enabled #hud-zombies .ring .ring-icon { width: 12px; height: 12px; flex-basis: 12px; }
 html.touch-controls-enabled #hud-zombies .survival-counters > div + div,
 html.touch-controls-enabled #z-lamps { display: none; }
-
-/* iOS browser tabs only: -webkit-touch-callout is supported by iOS/iPadOS
-   WebKit alone, and display-mode: browser leaves out the Home Screen app.
-   Other phones keep their layout. Safari's landscape bars shrink the viewport
-   (~290px with address and tab rows), so the panel's default slot under PAUSE
-   reaches down into the RELOAD and KNIFE orbit. */
-@supports (-webkit-touch-callout: none) {
-  /* Short: the panel moves up beside PAUSE. */
-  @media (display-mode: browser) and (orientation: landscape) and (max-height: 400px) {
-    html.touch-controls-enabled #hud-zombies {
-      top: calc(10px + env(safe-area-inset-top, 0px));
-      right: calc(76px + env(safe-area-inset-right, 0px));
-    }
-  }
-
-  /* Very short: even the raised column reaches the orbit, so the panel becomes
-     one row. "+N" popups start under the row and rise into the counter; the
-     boss bar drops below it. */
-  @media (display-mode: browser) and (orientation: landscape) and (max-height: 340px) {
-    html.touch-controls-enabled #hud-zombies {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: auto;
-    }
-    html.touch-controls-enabled #hud-zombies .survival-top { flex-wrap: nowrap; align-items: center; gap: 10px; }
-    html.touch-controls-enabled #z-health { flex: 0 0 112px; margin: 0; }
-    html.touch-controls-enabled #hud-zombies .survival-counters { flex: 0 0 auto; padding: 0; border-top: 0; }
-    html.touch-controls-enabled #z-rings { margin-top: 0; }
-    html.touch-controls-enabled .points-popups { top: 100%; bottom: auto; }
-    html.touch-controls-enabled #boss-bar { top: calc(66px + env(safe-area-inset-top, 0px)); }
-  }
-}
 
 html.touch-controls-enabled #hud-zombies::before,
 html.touch-controls-enabled #hud-zombies::after,

@@ -24,8 +24,9 @@ function writeText(element: HTMLElement, text: string): void {
 /**
  * HUD objective corner: the persistent notes at the top left and, when the
  * `ObjectiveAnnouncer` reports a new objective, a large spotlight card that
- * holds for a moment and then flies into its corner note. The spotlight waits
- * for any round banner to clear so the two never stack. An objective that
+ * holds for a moment and then flies into its corner note. The spotlight never
+ * shares the screen with the round banner: it waits for one to clear, and one
+ * that appears during its hold sends it to its corner at once. An objective that
  * ends fades away instead of vanishing; a new run (`reset`) clears at once.
  */
 export class ObjectiveTracker {
@@ -79,6 +80,7 @@ export class ObjectiveTracker {
     }
     this.spotlight.classList.toggle('urgent', urgent);
     this.render(this.spotlightNote, spotlit);
+    if (this.phase === 'showing' && this.bannerRemainingMs() > 0) this.dockSpotlight();
   }
 
   /** A new run: hides everything and announces every objective again. */
@@ -106,6 +108,12 @@ export class ObjectiveTracker {
   }
 
   private showSpotlight(): void {
+    // A banner that began after the announcement keeps the card waiting.
+    const bannerMs = this.bannerRemainingMs();
+    if (bannerMs > 0) {
+      this.timer = window.setTimeout(() => this.showSpotlight(), bannerMs);
+      return;
+    }
     this.phase = 'showing';
     this.spotlight.style.removeProperty('transform');
     this.spotlight.classList.remove('hidden', 'docking', 'leaving');
@@ -120,6 +128,8 @@ export class ObjectiveTracker {
    * inside it, while the note fades in underneath (see `.docking` in style.css).
    */
   private dockSpotlight(): void {
+    // Docking early on a banner cuts the hold short.
+    clearTimeout(this.timer);
     const target = this.notes.find((note) => note.kicker.textContent === this.spotlightKicker && !note.root.classList.contains('hidden'));
     if (!target) {
       this.cancelSpotlight();

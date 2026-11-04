@@ -17,7 +17,8 @@ movimiento, salto y colision opcional. C alterna agachado/de pie y Z tumbado/de 
 el boton tactil AGACH. usa la misma accion (en tactil no hay boton para tumbarse).
 En tactil, los botones redondos rodean FUEGO, elevado bajo el pulgar derecho:
 FUEGO mantiene apuntar y disparar con una pulsacion, y APUNT. fija o suelta el
-ADS con cada toque. Las posturas bajas
+ADS con cada toque. ARMA queda en un anillo exterior encima del grupo, fuera del
+barrido lateral de la camara. Las posturas bajas
 reducen velocidad y altura de colision; la camara y el compañero aceleran y
 frenan gradualmente al cambiar de postura, conservando continuidad al invertir
 la transicion. Para
@@ -778,7 +779,8 @@ Los objetivos de los modos llegan al HUD como notas estructuradas
 una nota por mision, con riel ambar o rojo si el evento es contrarreloj. Cada
 tarea nueva (`ObjectiveAnnouncer`) se presenta antes en una tarjeta grande en el
 tercio superior, que se abre desde el centro, se mantiene unos segundos y vuela
-hasta su nota de la esquina; espera a que termine el anuncio de ronda y las
+hasta su nota de la esquina. Nunca coincide con el anuncio central: espera a que
+termine y, si aparece uno mientras se muestra, vuela en el acto a su nota. Las
 tareas simultaneas se presentan por turnos. Distancia, reloj o lista de control
 no vuelven a anunciarse. Una mision que termina, en la esquina o en la tarjeta,
 se desvanece subiendo un poco antes de desaparecer, y la siguiente tarjeta espera
@@ -808,8 +810,8 @@ mientras el contador late; las bajas y, sobre todo, headshots y cuchillo se
 muestran mas grandes y brillantes ([PointsPopups](../src/ui/PointsPopups.ts)).
 Gastar o reiniciar no lo dispara, y el invitado lo ve igual a partir de su saldo replicado.
 
-En dispositivos tactiles el panel permanece pequeno arriba a la derecha, bajo
-el boton de pausa, con ronda, puntos, vida y bajas; headshots y faroles se consultan
+En dispositivos tactiles el panel permanece pequeno abajo a la izquierda, lejos
+de la pausa y de los botones de accion, con ronda, puntos, vida y bajas; headshots y faroles se consultan
 en la pausa para dejar libre la vista de combate.
 
 La pantalla de derrota muestra la ronda alcanzada y permite reintentar el mapa
