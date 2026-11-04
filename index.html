@@ -151,6 +151,8 @@
           </button>
         </div>
       </header>
+      <!-- Above the maps: iPhone Safari has no Fullscreen API, so installing is the only way to hide its bars. -->
+      <p id="ios-install-hint" class="ios-install-hint hidden" data-i18n="menu.iosHint"></p>
       <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false, locks the ones the
            player cannot access yet and fills the data-map-* labels from the registry (players, access, action).
            The shared SVG viewport crops out the frames and copy baked into the decorative images. -->
@@ -230,7 +232,6 @@
         <button type="button" id="pwa-install" class="pwa-action hidden" data-i18n="menu.install"></button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden" data-i18n="menu.update"></button>
       </div>
-      <p id="ios-install-hint" class="ios-install-hint hidden" data-i18n="menu.iosHint"></p>
     </div>
   </div>
 

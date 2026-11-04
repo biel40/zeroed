@@ -2704,7 +2704,7 @@ html.coop-guest #pause-restart {
 
 .ios-install-hint {
   max-width: 370px;
-  margin: 12px auto 0;
+  margin: 0 auto 12px;
   color: #b8c0ca;
   font: 12px/1.5 'Segoe UI', sans-serif;
   text-align: center;
@@ -4629,6 +4629,16 @@ html.touch-controls-enabled #z-rings { margin-top: 3px; }
 html.touch-controls-enabled #hud-zombies .ring .ring-icon { width: 12px; height: 12px; flex-basis: 12px; }
 html.touch-controls-enabled #hud-zombies .survival-counters > div + div,
 html.touch-controls-enabled #z-lamps { display: none; }
+
+/* Short landscape viewports (a Safari tab with its bars, browser chrome on
+   phones): the panel's default slot under PAUSE reaches down into the RELOAD
+   and KNIFE orbit, so it moves up beside PAUSE instead. */
+@media (orientation: landscape) and (max-height: 400px) {
+  html.touch-controls-enabled #hud-zombies {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    right: calc(76px + env(safe-area-inset-right, 0px));
+  }
+}
 
 html.touch-controls-enabled #hud-zombies::before,
 html.touch-controls-enabled #hud-zombies::after,

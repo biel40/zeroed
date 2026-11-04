@@ -58,6 +58,10 @@ function isTouchAimLatched(state: InputState): boolean {
   return state.isDown(TOUCH_AIM_KEY);
 }
 
+function preventDefault(event: Event): void {
+  event.preventDefault();
+}
+
 function syncTouchAds(state: InputState): void {
   state.rightButtonDown = state.isDown(TOUCH_FIRE_KEY) || isTouchAimLatched(state);
 }
@@ -141,6 +145,10 @@ export class MobileInput {
       this.add(control, 'pointerup', pointerEnd as EventListener);
       this.add(control, 'pointercancel', pointerEnd as EventListener);
       this.add(control, 'lostpointercapture', pointerEnd as EventListener);
+      // Chromium on Android (Brave, Chrome) opens a long-press menu via
+      // 'contextmenu' even when pointerdown is cancelled; -webkit-touch-callout
+      // only covers Safari.
+      this.add(control, 'contextmenu', preventDefault);
     }
   }
 
