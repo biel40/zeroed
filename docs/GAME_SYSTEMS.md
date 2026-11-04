@@ -193,9 +193,10 @@ validacion manual. Detalles de entrega y comprobacion en
 El comando individual `MOTDRULES` fija VORTEX-9 y ZEUS-77 con reserva infinita
 en ambas ranuras y tambien abre esa pared sin rellenar los faroles; reiniciar
 restaura el cierre y el inventario inicial. En Station 33, el panel del
-Protocolo 33 ofrece ademas escapar al momento por su precio (10000), sin
-electricidad, interruptores, defensa ni huida, y lleva al final de la
-evacuacion (`EvacuationProtocol.skipToExtraction`).
+Protocolo 33 ofrece ademas abrir la salida al momento por su precio (10000),
+sin electricidad, interruptores ni defensa: empieza la huida con su reloj y
+hay que subir al patio, vencer al guardian y usar el camion
+(`EvacuationProtocol.skipToEscape`).
 Tras activarlo, F2 abre una consola local de desarrollador que pausa la
 partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
 El panel ofrece selectores de armas y anillos, botones de municion y
@@ -591,14 +592,15 @@ existente a `MOTDRULES`.
   visor SVG del HUD cierra la vista con vaho al respirar.
   El final de 30000 Points es el que declara la mansion (`MANSION_NUCLEAR_ENDING`) y pasa por
   `PLAYING -> ENDING -> CREDITS -> FINISHED` y detiene gameplay.
-  La secuencia nuclear dura 25 s y es CSS puro (transform/opacity, sin bordes
+  La secuencia nuclear dura ~20 s y es CSS puro (transform/opacity, sin bordes
   expuestos): alarma con cuenta atras, detonacion a `NUCLEAR_DETONATION_TIME`
   (flash, bola de fuego, hongo tras la silueta de la mansion y onda
   expansiva). La onda llega a camara (`--impact`, 1.4 s despues) con muro de
   polvo y un temblor fuerte que decae; los creditos esperan ~13 s de
   plano del hongo y la ceniza. El estilo base de cada capa es el fotograma
-  final, asi que CREDITS y `prefers-reduced-motion` no saltan. Al terminar
-  quedan los creditos y se habilita volver al menu. Sustituye musica/viento y
+  final, asi que CREDITS y `prefers-reduced-motion` no saltan. La duracion de
+  cada final acaba cuando aterriza el titulo de los creditos, y entonces se
+  habilita volver al menu. Sustituye musica/viento y
   arranca `nuclear_alarm.mp3` y `radioactivity.mp3` en bucle;
   `nuclear_explosion.mp3` suena una vez, retrasado para coincidir con el flash.
   Los tres se detienen (y el retraso se cancela) al terminar o salir.
@@ -607,10 +609,23 @@ existente a `MOTDRULES`.
   sonidos basta con colocar los MP3 en `public/assets/audio/` y reconstruir
   (en Android, `npm run android:sync`).
   El final de la evacuacion de Station 33 (`PROTOCOL33_ENDING`, presentacion y
-  audio `evacuation`) reutiliza la misma pantalla: fundido a negro, la tarjeta
-  «STATION 33 — ESCAPE SUCCESSFUL» con el ultimo mensaje de radio
-  (procedural en `AudioSystem`, sobre `radioactivity.mp3`) y despues los
-  creditos con la ronda, las bajas y los disparos a la cabeza.
+  audio `evacuation`) se rueda en la escena con `EndingCinematic` (planos con
+  cortes en `PROTOCOL33_ESCAPE_SHOTS`) bajo la misma pantalla, transparente
+  (`filmed`): letterbox y grano; el camion cierra sus puertas, enciende los
+  faros y arranca; embiste la puerta del patio, que se abre de golpe, y se
+  pierde por la carretera en la niebla. Tras el, una horda
+  (`PROTOCOL33_ESCAPE_HORDE`) sale en tropel de la caseta de la escalera y
+  corre hasta amontonarse en la puerta abierta: zombis reales del modo, al
+  ritmo de una ronda alta como minimo, que no pueden herir porque la run ya
+  ha terminado y desaparecen al reiniciar. Una grua sube sobre el patio con
+  el titulo dorado «STATION 33» (eco de la intro), la frase de huida y el
+  ultimo mensaje de radio. Funde a negro y salen los creditos con
+  la ronda, las bajas y los disparos a la cabeza. Todo sigue el reloj de
+  `EVACUATION_ENDING_TIMELINE`: la pose pura del camion y la puerta y el
+  calendario de la horda (`EscapeDrive`), el overlay CSS y el audio
+  procedural de `AudioSystem` (arranque, motor, choque, horda y radio, sobre
+  `radioactivity.mp3`). Con
+  `prefers-reduced-motion` se pasa directo a los creditos.
 
 ## Anillos
 

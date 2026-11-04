@@ -33,6 +33,7 @@ import { WeaponStation } from './shared/WeaponStation';
 import { CodeWeaponChest } from './shared/CodeWeaponChest';
 import { createStation33Signage } from './station33/Station33Signage';
 import { buildSubestacion } from './station33/SubestacionBuilder';
+import type { EscapeDeparture } from './station33/EscapeDeparture';
 import { buildSurface } from './station33/SurfaceBuilder';
 import { SurfaceMood } from './station33/SurfaceMood';
 import { buildTaller } from './station33/TallerBuilder';
@@ -40,6 +41,7 @@ import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
   PROTOCOL33_HORDE_ZONES,
+  PROTOCOL33_SURFACE_Y,
   STATION33_AMBIENCE,
   STATION33_AMMO_REFILLS,
   STATION33_AMBIENT_EVENTS,
@@ -141,6 +143,7 @@ export class Station33Arena implements ZombieArena {
   onBarrierBoardRebuilt: (() => void) | null = null;
   onAmbientCue: ((cue: ArenaAmbientCue) => void) | null = null;
   onAmbush: ((ambush: ArenaAmbush) => boolean) | null = null;
+  onEndingZombie: ((spot: ArenaAmbush) => boolean) | null = null;
 
   colliders: ReadonlyArray<THREE.Object3D> = [];
   wallColliders: ReadonlyArray<THREE.Box3> = [];
@@ -161,6 +164,8 @@ export class Station33Arena implements ZombieArena {
   private readonly ticketAmbush = new AmbushTrigger(TICKET_WINDOW_AMBUSH_SITES, TICKET_WINDOW_AMBUSH);
   private readonly hemisphere: THREE.HemisphereLight;
   private readonly surfaceMood: SurfaceMood;
+  /** The truck leaving through the gate in the filmed ending. */
+  private readonly departure: EscapeDeparture;
   /** Seconds into the intro while its cues are pending, else null. */
   private introTime: number | null = null;
   private nextIntroCue = 0;
@@ -201,8 +206,10 @@ export class Station33Arena implements ZombieArena {
     this.weaponStations = STATION33_WEAPON_STATIONS.map((station) => new WeaponStation(context, station, weaponStationLook, this.power));
     this.powerSwitch = new PowerLever(context, STATION33_POWER_SWITCH, station33PowerLeverLook(context), () => this.switchOnPower());
     buildEscapeRoute(context, this.lighting);
-    const yardSolids = buildSurface(context, this.lighting);
-    this.evacuation = new Protocol33(context, this.lighting, this.power, yardSolids, () => this.onEvacuationLayout());
+    const surface = buildSurface(context, this.lighting, (x, z) =>
+      this.onEndingZombie?.({ position: { x, y: PROTOCOL33_SURFACE_Y, z }, floor: 1 }) ?? false);
+    this.departure = surface.departure;
+    this.evacuation = new Protocol33(context, this.lighting, this.power, surface.solids, () => this.onEvacuationLayout());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
     this.hemisphere = createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects);
@@ -254,6 +261,7 @@ export class Station33Arena implements ZombieArena {
     for (const refill of this.ammoRefills) refill.update?.(dt);
     this.powerSwitch.update(dt);
     this.evacuation.update(dt);
+    this.departure.update(dt);
     this.updateTicketAmbush(observerPosition);
     this.ticketShutters.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
@@ -271,6 +279,7 @@ export class Station33Arena implements ZombieArena {
     this.power.reset();
     this.powerSwitch.reset();
     this.evacuation.reset();
+    this.departure.reset();
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
@@ -297,6 +306,11 @@ export class Station33Arena implements ZombieArena {
   finishIntro(): void {
     this.introTime = null;
     this.lighting.finishPowerUp();
+  }
+
+  /** The filmed escape (`PROTOCOL33_ENDING`): the truck rams the gate and drives off into the fog. */
+  startEnding(): void {
+    this.departure.start();
   }
 
   /**

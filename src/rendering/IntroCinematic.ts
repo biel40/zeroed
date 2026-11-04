@@ -4,7 +4,7 @@ import type { ArenaIntro, ArenaIntroShot } from '../zombies/maps/ZombieArena';
 /** How far ahead of the player's eyes the closing shot aims. */
 const HANDOFF_TARGET_DISTANCE = 10;
 
-interface PathKey {
+export interface PathKey {
   readonly time: number;
   readonly position: THREE.Vector3;
   readonly target: THREE.Vector3;
@@ -59,7 +59,20 @@ export function sampleIntroPath(
   blend(target, k0.target, k1.target, k2.target, k3.target, s);
 }
 
-function toKey(shot: ArenaIntroShot): PathKey {
+/** Copies the player camera's lens (fov, aspect, clip planes) so resizes apply mid-cinematic too. */
+export function matchPlayerLens(camera: THREE.PerspectiveCamera, playerCamera: THREE.PerspectiveCamera): void {
+  if (
+    camera.fov === playerCamera.fov && camera.aspect === playerCamera.aspect
+    && camera.near === playerCamera.near && camera.far === playerCamera.far
+  ) return;
+  camera.fov = playerCamera.fov;
+  camera.aspect = playerCamera.aspect;
+  camera.near = playerCamera.near;
+  camera.far = playerCamera.far;
+  camera.updateProjectionMatrix();
+}
+
+export function toPathKey(shot: ArenaIntroShot): PathKey {
   return {
     time: shot.time,
     position: new THREE.Vector3(shot.position.x, shot.position.y, shot.position.z),
@@ -83,7 +96,7 @@ export class IntroCinematic {
   private playing = false;
 
   constructor(readonly definition: ArenaIntro) {
-    this.keys = definition.shots.map(toKey);
+    this.keys = definition.shots.map(toPathKey);
     this.handoff = { time: definition.duration, position: new THREE.Vector3(), target: new THREE.Vector3() };
     this.keys.push(this.handoff);
     this.camera.name = 'intro-cinematic-camera';
@@ -129,17 +142,7 @@ export class IntroCinematic {
     sampleIntroPath(this.keys, easeIntroTime(this.elapsed, this.definition.duration), this.position, this.target);
     this.camera.position.copy(this.position);
     this.camera.lookAt(this.target);
-
-    if (
-      this.camera.fov !== playerCamera.fov || this.camera.aspect !== playerCamera.aspect
-      || this.camera.near !== playerCamera.near || this.camera.far !== playerCamera.far
-    ) {
-      this.camera.fov = playerCamera.fov;
-      this.camera.aspect = playerCamera.aspect;
-      this.camera.near = playerCamera.near;
-      this.camera.far = playerCamera.far;
-      this.camera.updateProjectionMatrix();
-    }
+    matchPlayerLens(this.camera, playerCamera);
     this.camera.updateMatrixWorld(true);
   }
 }

@@ -1,11 +1,19 @@
 import { isProductId, type ProductId } from '../config/products';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import type { Language } from '../i18n/i18n';
-import type { AccountApi, LoginRequestOutcome } from './AccountApi';
+import type { AccountBackend, LoginRequestOutcome } from './AccountApi';
 
 export type AccountStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export type LoginCompletion = 'signed-in' | 'invalid-link' | 'unavailable';
+
+/** A login request either mails a link or, for a local tester, signs in at once. */
+export type LoginAttempt = LoginRequestOutcome | 'signed-in';
+
+/** Issues a login token without mailing a link; only local development provides one. */
+export interface LocalLogin {
+  loginTokenFor(email: string): string | null;
+}
 
 interface SavedAccount {
   readonly sessionToken: string;
@@ -24,7 +32,11 @@ const STORAGE_KEY = 'zeroed.account';
 export class WebAccount implements EntitlementProvider {
   private saved: SavedAccount | null;
 
-  public constructor(private readonly api: AccountApi, private readonly storage: AccountStorage | undefined) {
+  public constructor(
+    private readonly api: AccountBackend,
+    private readonly storage: AccountStorage | undefined,
+    private readonly localLogin: LocalLogin | null = null,
+  ) {
     this.saved = this.load();
   }
 
@@ -40,8 +52,11 @@ export class WebAccount implements EntitlementProvider {
     return this.saved?.beta ?? false;
   }
 
-  public requestLogin(email: string, language: Language): Promise<LoginRequestOutcome> {
-    return this.api.requestLogin(email, language);
+  /** Never rejects. */
+  public async requestLogin(email: string, language: Language): Promise<LoginAttempt> {
+    const localToken = this.localLogin?.loginTokenFor(email) ?? null;
+    if (!localToken) return this.api.requestLogin(email, language);
+    return (await this.completeLogin(localToken)) === 'signed-in' ? 'signed-in' : 'unavailable';
   }
 
   /** Never rejects. A signed-in account whose products could not load yet owns none until the next refresh. */

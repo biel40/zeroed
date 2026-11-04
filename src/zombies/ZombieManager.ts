@@ -542,15 +542,17 @@ export class ZombieManager {
   /**
    * A map-staged scare: one plain walker of the round bursts out at (x, z)
    * standing, facing the player and already hunting them, with no ground
-   * rise, barrier or entry route. False when the pool is full or the spot is
-   * blocked; the caller then keeps the spawn for the round.
+   * rise, barrier or entry route, on the walking surface of `floor`. False
+   * when the pool is full or the spot is blocked; the caller then keeps the
+   * spawn for the round.
    */
-  spawnAmbushZombie(config: RoundConfig, x: number, z: number, round: number, playerX: number, playerZ: number): boolean {
+  spawnAmbushZombie(config: RoundConfig, x: number, z: number, round: number, playerX: number, playerZ: number, floor = 0): boolean {
     const profile = ZOMBIE_TYPE_CONFIGS.normal;
-    if (this.hitsObstacle(x, z, 0, profile.bodyRadius)) return false;
+    const feetY = this.floorBaseY(floor);
+    if (this.hitsObstacle(x, z, feetY, profile.bodyRadius)) return false;
     const zombie = this.pool.acquire(profile.modelId);
     if (!zombie) return false;
-    this.placeZombie(zombie, { x, z }, config, round, 'normal');
+    this.placeZombie(zombie, { x, z }, config, round, 'normal', feetY, floor);
     zombie.barrierTarget = null;
     this.entryRoutes.delete(zombie);
     zombie.faceTowards(playerX, playerZ);
@@ -559,7 +561,15 @@ export class ZombieManager {
     return true;
   }
 
-  private placeZombie(zombie: Zombie, spawn: ZombieSpawnPoint, config: RoundConfig, round: number, typeId: ZombieTypeId): void {
+  private placeZombie(
+    zombie: Zombie,
+    spawn: ZombieSpawnPoint,
+    config: RoundConfig,
+    round: number,
+    typeId: ZombieTypeId,
+    feetY = 0,
+    floor = 0,
+  ): void {
     const profile = ZOMBIE_TYPE_CONFIGS[typeId];
     this.roundState.delete(zombie);
     this.headings.delete(zombie);
@@ -581,8 +591,8 @@ export class ZombieManager {
         * earlyRoundSpeedMultiplier(round)
         * profile.speedMultiplier
         * jitter(ZOMBIE_SPEED_JITTER),
-      0,
-      0,
+      feetY,
+      floor,
       typeId,
       ZOMBIE_ATTACK_DAMAGE * profile.damageMultiplier,
     );

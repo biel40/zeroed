@@ -359,6 +359,16 @@ codigo: actualiza la guia.
   "STATION 33" con "СТАНЦИЯ 33" y lema. Aterriza en los ojos del jugador; se
   salta con cualquier tecla, boton tactil o pausa. Sistema descrito en
   `GAME_SYSTEMS.md` (`ArenaIntro`, `IntroCinematic`, `#intro-screen`).
+- Final rodado en la escena real, como la intro: subir al camion es la
+  recompensa de todo el mapa y debe lucirse. El camion arranca con los
+  faros tartamudeando, revienta la puerta de la estrella roja y se hunde por
+  la carretera en la niebla con sus pilotos rojos; la horda sale en tropel de
+  la caseta y se estrella contra la puerta abierta, demasiado tarde. La
+  ultima imagen es el patio desde lo alto, con la horda amontonada en la
+  puerta, bajo el titulo dorado, eco del de la intro. Sin
+  ciudad jugable ni rotulos: la huida la cuentan el camion, la puerta abierta
+  y la radio. Camion y puerta son rigs propios (`EscapeTruck`, `YardGate`),
+  fuera del batch estatico, para poder moverse.
 - Cualquier momento premium nuevo (finales, revelaciones, nuevas zonas) debe
   sentirse cinematografico y diegetico antes que con mas UI.
 

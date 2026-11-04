@@ -26,8 +26,15 @@ enlace se abre en el navegador y su origen no esta permitido en la API.
 
 `vercel.json` redirige las antiguas paginas de beta al juego.
 
+Pruebas en local: con `npm run dev`, los correos de
+[LocalTesterBackend](../../src/account/LocalTesterBackend.ts) entran al momento
+desde el mismo dialogo, sin enlace ni API, con todo el contenido premium y la
+placa de beta; el resto de correos sigue el flujo normal. Los builds de
+produccion no incluyen ese modulo.
+
 Validacion manual (con la API local o desplegada): en una sesion nueva,
 Burned Mansion funciona y Station 33 aparece bloqueado y no abre por enlace
 directo; pedir un enlace con un correo de tester, abrirlo, ver el
-agradecimiento y jugar; recargar; cerrar sesion desde el boton de cuenta; probar un
-correo sin concesion. Repetir en movil y PWA instalada.
+agradecimiento y jugar; recargar; comprobar que el boton de cuenta muestra el
+correo completo y la placa de beta; cerrar sesion y probar un correo sin
+concesion. Repetir en movil y PWA instalada.

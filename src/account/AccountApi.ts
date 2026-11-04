@@ -20,13 +20,21 @@ export interface AccountEntitlements {
   readonly beta: boolean;
 }
 
+/**
+ * What `WebAccount` needs from an account server. Methods that return null
+ * mean the server rejected the token; network and server errors reject.
+ */
+export interface AccountBackend {
+  requestLogin(email: string, language: Language): Promise<LoginRequestOutcome>;
+  verifyLogin(loginToken: string): Promise<IssuedSession | null>;
+  fetchEntitlements(sessionToken: string): Promise<AccountEntitlements | null>;
+  logout(sessionToken: string): Promise<void>;
+}
+
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
-/**
- * HTTP client for the account API. Methods that return null mean the server
- * rejected the token; network and server errors reject.
- */
-export class AccountApi {
+/** HTTP client for the account API. */
+export class AccountApi implements AccountBackend {
   private readonly baseUrl: string;
 
   public constructor(baseUrl: string, private readonly fetchFn: FetchFn = (input, init) => fetch(input, init)) {

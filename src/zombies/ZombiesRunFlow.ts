@@ -1,8 +1,9 @@
 export type ZombiesRunState = 'PLAYING' | 'ENDING' | 'CREDITS' | 'FINISHED' | 'GAME_OVER';
 
-export const NUCLEAR_ENDING_DURATION = 25;
 /** Seconds from the start of the ending cinematic to the on-screen detonation flash. */
 export const NUCLEAR_DETONATION_TIME = 3.2;
+/** Ends as the credits title lands (style.css: detonation + 13.5 s delay + 3.4 s), so the menu button appears right away. */
+export const NUCLEAR_ENDING_DURATION = NUCLEAR_DETONATION_TIME + 17;
 
 export class ZombiesRunFlow {
   private current: ZombiesRunState = 'PLAYING';

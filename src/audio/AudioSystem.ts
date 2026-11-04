@@ -9,6 +9,7 @@ import { muffleCutoff, type SpatialCue } from './SpatialCue';
 import { AmbientBed, type AmbientBedId } from './AmbientBed';
 import { VoiceLimiter } from './VoiceLimiter';
 import { shotGainScale, shotPlaybackRate } from './ShotVariation';
+import { EVACUATION_ENDING_TIMELINE as ESCAPE_BEAT } from '../zombies/evacuation/EvacuationEndingTimeline';
 
 const PING_THROTTLE = 0.045;
 // Reload foley was hard to hear over gunfire/music; boost it above the raw profile values.
@@ -169,8 +170,8 @@ const SIREN_PITCH: ReadonlyArray<readonly [number, number]> = [
   [0, 90], [2.2, 640], [3.4, 560], [4.8, 660], [6.2, 545], [7.4, 650], [9.5, 120],
 ];
 const SIREN_DURATION = 9.5;
-/** Seconds into each ending before its last radio call crackles in; endings without one are absent. */
-const ENDING_RADIO_DELAY: Partial<Record<EndingAudioId, number>> = { evacuation: 2.2 };
+/** The escape's last radio call crackles in under the title card, as its text line appears (style.css). */
+const ESCAPE_RADIO_DELAY = ESCAPE_BEAT.title + 1;
 /**
  * Ambience mix (bed and map cues) between rounds: the last kill opens a
  * quiet breath, the next round's sting builds it back up.
@@ -305,8 +306,10 @@ export class AudioSystem {
 
   public startEndingAudio(id: EndingAudioId): void {
     this.music.startEndingAudio(id);
-    const radioDelay = ENDING_RADIO_DELAY[id];
-    if (radioDelay !== undefined) this.playRadioSignOff(radioDelay);
+    if (id !== 'evacuation') return;
+    this.playTruckDeparture();
+    this.playEscapeHorde();
+    this.playRadioSignOff(ESCAPE_RADIO_DELAY);
   }
 
   public stopEndingAudio(): void {
@@ -944,6 +947,89 @@ export class AudioSystem {
     for (let jolt = 0; jolt < 7; jolt++) this.tick(0.4 + jolt * 0.42, 320 + jolt * 15, 0.12, 2.5, 0.38, output);
     this.tick(3.6, 90, 0.6, 1, 0.5, output);
     this.tick(3.62, 1250, 0.18, 14, 0.4, output);
+  }
+
+  /**
+   * The escape truck on the ending's clock: the starter grinds, the diesel
+   * catches and idles, roars off at the launch, rams the gate (a thump, the
+   * steel ringing, the leaves banging on their posts) and fades away down
+   * the road under the title.
+   */
+  private playTruckDeparture(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const { ctx, master } = audio;
+    const at = (beat: number): number => ctx.currentTime + beat;
+    for (let crank = 0; crank < 9; crank++) this.tick(ESCAPE_BEAT.ignition + crank * 0.09, 420, 0.16, 3, 0.06);
+    const caught = ESCAPE_BEAT.ignition + 0.85;
+    const passing = ESCAPE_BEAT.gateImpact + 1;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(260, at(caught));
+    filter.frequency.linearRampToValueAtTime(900, at(ESCAPE_BEAT.launch + 0.5));
+    filter.frequency.linearRampToValueAtTime(320, at(ESCAPE_BEAT.title));
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, at(caught));
+    gain.gain.exponentialRampToValueAtTime(0.24, at(caught + 0.2));
+    gain.gain.exponentialRampToValueAtTime(0.14, at(caught + 1));
+    gain.gain.setValueAtTime(0.14, at(ESCAPE_BEAT.launch));
+    gain.gain.exponentialRampToValueAtTime(0.32, at(ESCAPE_BEAT.launch + 0.4));
+    gain.gain.setValueAtTime(0.32, at(passing));
+    gain.gain.exponentialRampToValueAtTime(0.07, at(ESCAPE_BEAT.title));
+    gain.gain.exponentialRampToValueAtTime(0.0001, at(ESCAPE_BEAT.fadeOut + 0.6));
+    filter.connect(gain);
+    gain.connect(master);
+    // Firing pulse and its rougher second harmonic; a gear change once it is past the gate.
+    for (const [type, ratio, level] of [['sawtooth', 1, 1], ['square', 1.51, 0.35]] as const) {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      const pulse = (hz: number, beat: number): void => osc.frequency.linearRampToValueAtTime(hz * ratio, at(beat));
+      osc.frequency.setValueAtTime(30 * ratio, at(caught));
+      pulse(36, caught + 0.4);
+      pulse(36, ESCAPE_BEAT.launch);
+      pulse(58, ESCAPE_BEAT.gateImpact + 0.6);
+      pulse(72, ESCAPE_BEAT.launch + 2.8);
+      pulse(52, ESCAPE_BEAT.launch + 3.0);
+      pulse(66, ESCAPE_BEAT.title);
+      const voice = ctx.createGain();
+      voice.gain.value = level;
+      osc.connect(voice);
+      voice.connect(filter);
+      osc.start(at(caught));
+      osc.stop(at(ESCAPE_BEAT.fadeOut + 0.7));
+    }
+    const impact = ESCAPE_BEAT.gateImpact;
+    this.tick(impact, 90, 0.7, 0.8, 0.6);
+    this.tick(impact, 1250, 0.3, 12, 0.9);
+    this.tick(impact + 0.02, 2300, 0.22, 9, 0.7);
+    this.tick(impact + 0.05, 600, 0.35, 2, 0.35);
+    for (const bang of [0.35, 0.62, 0.8]) this.tick(impact + bang, 1600 - bang * 400, 0.12, 10, 0.4);
+  }
+
+  /**
+   * The escape's horde pouring out after the truck: a shriek at the
+   * stairhead, then a swelling crowd of low growls, dull through the night
+   * air, that dies away under the title.
+   */
+  private playEscapeHorde(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const t = audio.ctx.currentTime + ESCAPE_BEAT.horde;
+    const crowd = audio.ctx.createBiquadFilter();
+    crowd.type = 'lowpass';
+    crowd.frequency.value = 900;
+    crowd.connect(audio.master);
+    this.sweep(0, 'sawtooth', 640, 1150, 0.18, 0.5, t, crowd);
+    const voices = 16;
+    const span = ESCAPE_BEAT.title + 1.5 - ESCAPE_BEAT.horde;
+    for (let voice = 0; voice < voices; voice++) {
+      const start = (voice / voices) * span + Math.random() * 0.25;
+      // The crowd swells as it gathers, then thins out under the title.
+      const swell = Math.sin(Math.PI * (start / span));
+      const pitch = 62 + Math.random() * 46;
+      this.sweep(0, 'sawtooth', pitch, pitch * (1.25 + Math.random() * 0.3), 0.05 + 0.09 * swell, 0.7 + Math.random() * 0.5, t + start, crowd);
+      this.tick(ESCAPE_BEAT.horde + start, 140 + Math.random() * 120, 0.08 + 0.12 * swell, 0.8, 0.4, crowd);
+    }
   }
 
   /**

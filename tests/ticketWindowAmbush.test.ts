@@ -83,6 +83,16 @@ describe('ZombieManager ambush spawn', () => {
     expect(Math.sin(zombie.group.rotation.y)).toBeCloseTo(1, 5);
   });
 
+  it('stands on the floor it is asked for', () => {
+    const manager = new ZombieManager(() => 0);
+    manager.registerColliders([]);
+    manager.setNavigationBounds([{ floor: 1, baseY: 7, minX: -10, maxX: 10, minZ: -10, maxZ: 10 }]);
+    expect(manager.spawnAmbushZombie(roundConfig(1), 0, 0, 1, 3, 0, 1)).toBe(true);
+    const zombie = [...manager.actives][0];
+    expect(zombie.floor).toBe(1);
+    expect(zombie.position.y).toBe(7);
+  });
+
   it('refuses a spot inside a solid', () => {
     const manager = new ZombieManager(() => 0);
     const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1));

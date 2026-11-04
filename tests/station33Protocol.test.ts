@@ -19,6 +19,7 @@ import {
   PROTOCOL33_BLAST_DOOR,
   PROTOCOL33_ENDING,
   PROTOCOL33_ESCAPE,
+  PROTOCOL33_ESCAPE_HORDE,
   PROTOCOL33_RULES,
   PROTOCOL33_SURFACE,
   PROTOCOL33_SURFACE_AMBIENCE,
@@ -263,13 +264,48 @@ describe('Protocol 33 through the mode', () => {
     atTruck(run);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.boardPrompt', { key: KEY }));
     run.mode.onInteract();
-    expect(run.side.hud.showEnding).toHaveBeenCalledWith(run.internals.rounds.round, 'evacuation', { kills: 0, headshots: 0 });
+    expect(run.side.hud.showEnding).toHaveBeenCalledWith(run.internals.rounds.round, 'evacuation', { kills: 0, headshots: 0 }, true);
     expect(run.side.ctx.audio.startEndingAudio).toHaveBeenCalledWith('evacuation');
     expect(run.side.ctx.unlockPointer).toHaveBeenCalled();
+    // The map films the escape: its camera replaces the player's until the run restarts.
+    expect(run.mode.getCinematicCamera()).not.toBeNull();
     run.mode.onInteract();
     expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
-    advance(run, PROTOCOL33_ENDING.duration);
+    advance(run, PROTOCOL33_ENDING.duration - STEP);
+    expect(run.side.hud.showCredits).not.toHaveBeenCalled();
+    advance(run, 2 * STEP);
     expect(run.side.hud.showCredits).toHaveBeenCalledOnce();
+    expect(run.mode.getCinematicCamera()).not.toBeNull();
+  });
+
+  it('floods the yard with a harmless horde behind the departing truck, cleared on restart', () => {
+    const run = escapingRun();
+    advance(run, 30);
+    confrontGuardian(run);
+    defeatGuardian(run);
+    atTruck(run);
+    run.mode.onInteract();
+    run.internals.health.setInvincible(false);
+    const zombies = run.internals.zombies as unknown as ZombieManager;
+    expect(zombies.aliveCount).toBe(0);
+    advance(run, PROTOCOL33_ESCAPE_HORDE.from + 1);
+    expect(zombies.aliveCount).toBeGreaterThan(0);
+    const [first] = zombies.actives;
+    expect(first.floor).toBe(1);
+    const startZ = first.position.z;
+    const hp = run.internals.health.hp;
+    advance(run, 8);
+    expect(first.position.z).toBeLessThan(startZ - 4);
+    expect(zombies.aliveCount).toBe(PROTOCOL33_ESCAPE_HORDE.count);
+    advance(run, 10);
+    // By the crane shot the horde has piled up in the gateway the truck left by.
+    const chase = PROTOCOL33_ENDING.hordeChase!.position;
+    const atGate = [...zombies.actives].filter((zombie) => Math.hypot(zombie.position.x - chase.x, zombie.position.z - chase.z) < 6);
+    expect(atGate.length).toBeGreaterThan(PROTOCOL33_ESCAPE_HORDE.count / 2);
+    expect(run.internals.health.hp).toBe(hp);
+    expect(run.internals.gameOver).toBe(false);
+    run.mode.onRestartRequested();
+    expect(zombies.aliveCount).toBe(0);
   });
 
   it('wakes CAPITÁN URSS in the yard and holds the clock, the horde and the truck until he falls', () => {
@@ -355,17 +391,21 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     expect(objectiveText(run, true)).not.toContain('ФАКЕЛ-33');
   });
 
-  it('lets MOTDRULES skip everything and escape at the panel for the protocol\'s price, until a restart', () => {
+  it('lets MOTDRULES open the exit at the panel for the protocol\'s price, leaving the escape and its guardian, until a restart', () => {
     const run = startRun();
     atPanel(run);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.panelNeedsPower'));
     for (const key of 'MOTDRULES') run.mode.onKeyInput(key);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.developerExitPrompt', { key: KEY, cost: COST }));
     run.mode.onInteract();
-    expect(run.side.hud.showEnding).toHaveBeenCalledWith(run.internals.rounds.round, 'evacuation', { kills: 0, headshots: 0 });
-    expect(run.side.ctx.audio.startEndingAudio).toHaveBeenCalledWith('evacuation');
+    run.mode.update(STEP);
+    expect(run.side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('evacuation.escapeBanner', { seconds: 60 }), 'ПРОТОКОЛ 33');
+    expect(run.internals.arena.evacuation.blastDoorCollider).toBeNull();
+    expect(run.side.hud.showEnding).not.toHaveBeenCalled();
+    expect(run.mode.getInteractPrompt()).toBeNull();
+    const banners = run.side.hud.showRoundBanner.mock.calls.length;
     run.mode.onInteract();
-    expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
+    expect(run.side.hud.showRoundBanner).toHaveBeenCalledTimes(banners);
 
     run.mode.onRestartRequested();
     atPanel(run);

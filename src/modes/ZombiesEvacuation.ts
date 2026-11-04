@@ -57,7 +57,7 @@ export class ZombiesEvacuation {
   /** Bearing (eighths of a turn) and whole metres to the extraction point, measured each frame while escaping. */
   private extractionBearing = 0;
   private extractionMetres = 0;
-  /** God mode (MOTDRULES): the panel sells the way out directly, skipping every step. */
+  /** God mode (MOTDRULES): the panel sells the opened exit directly, skipping every step before the escape. */
   private developerExit = false;
 
   public constructor(
@@ -75,7 +75,7 @@ export class ZombiesEvacuation {
     return this.protocol.active;
   }
 
-  /** The developer command is on: the panel offers to escape at once, for the protocol's price. */
+  /** The developer command is on: the panel offers to open the exit at once, for the protocol's price. */
   public enableDeveloperExit(): void {
     this.developerExit = true;
   }
@@ -107,6 +107,8 @@ export class ZombiesEvacuation {
     }
     if (this.facing(this.evacuation.panel)) {
       if (this.canSkip()) return t('evacuation.developerExitPrompt', { key, cost: this.evacuation.rules.cost });
+      // The developer shortcut can open the exit with the power still off: the panel has nothing left to ask.
+      if (this.protocol.stage === 'escaping') return null;
       if (!powered) return t('evacuation.panelNeedsPower');
       switch (this.protocol.stage) {
         case 'exploration':
@@ -179,18 +181,18 @@ export class ZombiesEvacuation {
   }
 
   private canSkip(): boolean {
-    return this.developerExit && this.protocol.stage !== 'completed' && this.protocol.stage !== 'failed';
+    return this.developerExit && this.protocol.canSkipToEscape;
   }
 
   private useControlPanel(): boolean {
     const { cost } = this.evacuation.rules;
     if (this.canSkip()) {
-      // Charged like the real start, once: the skip only succeeds before the run's end.
+      // Charged like the real start, once: the skip only succeeds before the exit opens.
       if (!this.run.economy.canAfford(cost)) {
         this.ctx.hud.flashNotEnoughPoints();
         return true;
       }
-      if (this.protocol.skipToExtraction() && !this.run.economy.spend(cost)) throw new Error('Evacuation became unaffordable after validation');
+      if (this.protocol.skipToEscape() && !this.run.economy.spend(cost)) throw new Error('Evacuation became unaffordable after validation');
       return true;
     }
     if (!this.evacuation.powered) return true;

@@ -281,7 +281,15 @@ function takeLoginToken(): string | null {
 applyDocumentTranslations();
 async function boot(): Promise<void> {
   setupPWA();
+  await new ZeroedBoot(await createAccount(), takeLoginToken()).run();
+}
+
+/** Dev servers also sign local testers in without a mailed link; production builds never include that backend. */
+async function createAccount(): Promise<WebAccount> {
   const api = new AccountApi(import.meta.env.VITE_ACCOUNT_API_URL?.trim() || DEFAULT_ACCOUNT_API_URL);
-  await new ZeroedBoot(new WebAccount(api, getAccountStorage()), takeLoginToken()).run();
+  if (!import.meta.env.DEV) return new WebAccount(api, getAccountStorage());
+  const { LocalTesterBackend, LOCAL_TESTER_EMAILS } = await import('./account/LocalTesterBackend');
+  const backend = new LocalTesterBackend(api, LOCAL_TESTER_EMAILS);
+  return new WebAccount(backend, getAccountStorage(), backend);
 }
 void boot();

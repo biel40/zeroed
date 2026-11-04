@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { LoginRequestOutcome } from '../src/account/AccountApi';
+import type { LoginAttempt } from '../src/account/WebAccount';
 import { setLanguage } from '../src/i18n/i18n';
 import { MapUnlockDialog, type MapUnlockAccount, type MapUnlockElements } from '../src/ui/MapUnlockDialog';
 
@@ -41,7 +41,7 @@ function createDialog(account: MapUnlockAccount): { unlock: MapUnlockDialog; vie
   return { unlock, view, dialog };
 }
 
-function signedOut(requestLogin: (email: string) => Promise<LoginRequestOutcome>): MapUnlockAccount {
+function signedOut(requestLogin: (email: string) => Promise<LoginAttempt>): MapUnlockAccount {
   return { getEmail: () => null, requestLogin, signOut: async () => undefined };
 }
 
@@ -67,8 +67,18 @@ describe('map unlock dialog', () => {
     expect(view.message.textContent).toBe('Te hemos enviado un enlace a player@example.com. Ábrelo en este dispositivo para entrar.');
   });
 
+  it('closes and refreshes the menu when a local tester is signed in at once', async () => {
+    const onAccountChanged = vi.fn();
+    const { unlock, view, dialog } = createDialog(signedOut(async () => 'signed-in'));
+    unlock.setAccount(signedOut(async () => 'signed-in'), onAccountChanged);
+    unlock.open('map.station33');
+    await submit(view, 'tester@example.com');
+    expect(dialog.open).toBe(false);
+    expect(onAccountChanged).toHaveBeenCalledOnce();
+  });
+
   it('explains rate limits and connection failures', async () => {
-    let outcome: LoginRequestOutcome = 'rate-limited';
+    let outcome: LoginAttempt = 'rate-limited';
     const { unlock, view } = createDialog(signedOut(async () => outcome));
     unlock.open('map.station33');
     await submit(view, 'a@example.com');
@@ -79,8 +89,8 @@ describe('map unlock dialog', () => {
   });
 
   it('sends one request at a time', async () => {
-    let finish: (outcome: LoginRequestOutcome) => void = () => undefined;
-    const requestLogin = vi.fn(() => new Promise<LoginRequestOutcome>((resolve) => { finish = resolve; }));
+    let finish: (outcome: LoginAttempt) => void = () => undefined;
+    const requestLogin = vi.fn(() => new Promise<LoginAttempt>((resolve) => { finish = resolve; }));
     const { unlock, view } = createDialog(signedOut(requestLogin));
     unlock.open('map.station33');
     void submit(view, 'a@example.com');
@@ -121,9 +131,9 @@ describe('map unlock dialog', () => {
 
   it('shows the signed-in address and signs out from the account button', async () => {
     let email: string | null = 'player@example.com';
-    const onSignedOut = vi.fn();
+    const onAccountChanged = vi.fn();
     const { unlock, view, dialog } = createDialog(signedOut(async () => 'sent'));
-    unlock.setAccount({ getEmail: () => email, requestLogin: async () => 'sent', signOut: async () => { email = null; } }, onSignedOut);
+    unlock.setAccount({ getEmail: () => email, requestLogin: async () => 'sent', signOut: async () => { email = null; } }, onAccountChanged);
     unlock.open(null);
     expect(view.hint.textContent).toBe('Signed in as player@example.com.');
     expect(view.emailField.classList.contains('hidden')).toBe(true);
@@ -134,6 +144,6 @@ describe('map unlock dialog', () => {
     await flush();
     expect(email).toBeNull();
     expect(dialog.open).toBe(false);
-    expect(onSignedOut).toHaveBeenCalledOnce();
+    expect(onAccountChanged).toHaveBeenCalledOnce();
   });
 });

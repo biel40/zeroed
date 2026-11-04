@@ -1,23 +1,21 @@
 import * as THREE from 'three';
-import { starGeometry } from '../../../rendering/StarGeometry';
 import type { GroundRect } from '../../guardians/CaptainUssrBrain';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { addSolidProxy } from '../shared/SolidProxy';
 import { placement } from '../shared/StaticMeshBatch';
-import { PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, PROTOCOL33_TRUCK, PROTOCOL33_YARD, STATION33_WALL_THICKNESS } from '../Station33Config';
+import { PROTOCOL33_GATE, PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, PROTOCOL33_TRUCK, PROTOCOL33_YARD, STATION33_WALL_THICKNESS } from '../Station33Config';
+import { EscapeDeparture, type EscapeHordeRequest } from './EscapeDeparture';
+import { EscapeTruck } from './EscapeTruck';
 import { addOilDrums, oilDrumsFootprint } from './OilDrums';
 import { addSandbagWall, SANDBAG_WALL_DEPTH } from './Sandbags';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { buildSurfaceOutskirts, WASTELAND } from './SurfaceOutskirts';
+import { YardGate } from './YardGate';
+import { yardSolid } from './YardSolid';
 
 const { yard, kiosk, fenceHeight } = PROTOCOL33_SURFACE;
 const GROUND = PROTOCOL33_SURFACE_Y;
 const HALF_THICKNESS = STATION33_WALL_THICKNESS / 2;
-/** The yard's steel gate in the north fence, in front of the truck. */
-const GATE = { minX: PROTOCOL33_TRUCK.x - 2, maxX: PROTOCOL33_TRUCK.x + 2 } as const;
-/** How far the truck's rear doors stand open, in radians from shut. */
-const DOOR_OPEN_ANGLE = 1.75;
 /** Size of a road block. */
 const ROAD_BLOCK = { length: 2.4, width: 0.6, height: 0.6 } as const;
 /** Truck tyres stacked flat by the fence, and their size. */
@@ -30,18 +28,27 @@ const TYRE = { radius: 0.5, width: 0.32, stack: 3 } as const;
  * guards' sandbag nest and fire barrel, and a wasteland running off into
  * the fog towards dead tower blocks (`buildSurfaceOutskirts`). The yard's
  * ground, fence, truck and props are solids on floor 1; everything beyond
- * the fence is batched scenery. Returns the footprints of the yard's
- * solids, which the guardian walks around.
+ * the fence is batched scenery. The truck and the gate are their own rigs,
+ * which the filmed ending drives through `departure`; it lets the horde out
+ * of the stairhead through `requestZombie`.
  */
-export function buildSurface(context: Station33BuildContext, lighting: Station33Lighting): GroundRect[] {
+export function buildSurface(context: Station33BuildContext, lighting: Station33Lighting, requestZombie: EscapeHordeRequest): SurfaceBuild {
   const solids: GroundRect[] = [];
   buildGround(context);
   buildFence(context);
-  solids.push(...buildTruck(context, lighting));
+  const truck = new EscapeTruck(context, lighting);
+  solids.push(...truck.solids);
   solids.push(...buildYardProps(context, lighting));
   buildYardWear(context);
   buildSurfaceOutskirts(context, lighting);
-  return solids;
+  return { solids, departure: new EscapeDeparture(truck, new YardGate(context), requestZombie) };
+}
+
+export interface SurfaceBuild {
+  /** Footprints of the yard's solids, which the guardian walks around. */
+  readonly solids: ReadonlyArray<GroundRect>;
+  /** The truck leaving through the gate, for the filmed ending. */
+  readonly departure: EscapeDeparture;
 }
 
 function buildGround(context: Station33BuildContext): void {
@@ -71,8 +78,8 @@ function buildGround(context: Station33BuildContext): void {
 /**
  * Precast concrete fence on the four sides, posts every two metres, a
  * diamond relief on each panel's inner face and barbed wire on top (with
- * a concertina coil where the device can afford it); the steel gate in
- * the north side stays shut under its red star. The south side runs into
+ * a concertina coil where the device can afford it); the north side
+ * leaves a gap between two posts for the `YardGate`. The south side runs into
  * the kiosk. Long sides are split under the zombies' 20 m obstacle limit.
  */
 function buildFence(context: Station33BuildContext): void {
@@ -89,8 +96,8 @@ function buildFence(context: Station33BuildContext): void {
     { axis: 'z', fixed: west, from: middleZ, to: south + HALF_THICKNESS, inward: 1 },
     { axis: 'z', fixed: east, from: north - HALF_THICKNESS, to: middleZ, inward: -1 },
     { axis: 'z', fixed: east, from: middleZ, to: south + HALF_THICKNESS, inward: -1 },
-    { axis: 'x', fixed: north, from: west - HALF_THICKNESS, to: GATE.minX, inward: 1 },
-    { axis: 'x', fixed: north, from: GATE.maxX, to: east + HALF_THICKNESS, inward: 1 },
+    { axis: 'x', fixed: north, from: west - HALF_THICKNESS, to: PROTOCOL33_GATE.minX, inward: 1 },
+    { axis: 'x', fixed: north, from: PROTOCOL33_GATE.maxX, to: east + HALF_THICKNESS, inward: 1 },
     { axis: 'x', fixed: south, from: west - HALF_THICKNESS, to: kiosk.minX, inward: -1 },
     { axis: 'x', fixed: south, from: kiosk.maxX, to: east + HALF_THICKNESS, inward: -1 },
   ];
@@ -132,109 +139,8 @@ function buildFence(context: Station33BuildContext): void {
       batch.add(coil.translate(cx, top + 0.38, cz), materials.railSteel);
     }
   });
-  // The shut gate: two steel leaves between posts, a solid like the fence.
-  const width = GATE.maxX - GATE.minX;
-  const gateX = (GATE.minX + GATE.maxX) / 2;
-  structure.addBox(gateX, GROUND + 1.35, north, width, 2.7, 0.12, materials.paintedSteel, {
-    name: 'surface-gate', surface: 'metal', mapRole: 'wall', blocksPlayer: true, castShadow: false, uvSeed: 370,
-  });
-  batch.addBox(materials.greySteel, gateX, GROUND + 1.35, north + 0.07, 0.06, 2.6, 0.03);
-  for (const x of [GATE.minX, GATE.maxX]) batch.addBox(materials.greySteel, x, GROUND + 1.5, north, 0.3, 3.0, 0.3);
-  // Frame rails across both leaves, and a red star on each.
-  for (const y of [0.35, 1.35, 2.5]) batch.addBox(materials.greySteel, gateX, GROUND + y, north + 0.075, width - 0.1, 0.08, 0.03);
-  for (const side of [-1, 1]) {
-    const star = starGeometry(0.42, 0.17, 0.03).translate(gateX + side * width / 4, GROUND + 1.85, north + 0.09);
-    batch.add(star, materials.redEnamel);
-  }
-}
-
-/**
- * An olive 6x6 army truck with a box body (kung), nose to the gate: bonnet
- * and cab, six wheels under mudguards, fuel tank and spare wheel, the
- * body's rear doors swung open on its dark inside with a ladder down, and
- * a battery beacon on the cab roof. Proxies make it solid; their
- * footprints are returned.
- */
-function buildTruck(context: Station33BuildContext, lighting: Station33Lighting): GroundRect[] {
-  const { batch, materials } = context;
-  const { x, z, length, width, height, cabOffset } = PROTOCOL33_TRUCK;
-  const frontZ = z - length / 2;
-  const rearZ = z + length / 2;
-  /** Box on the truck: `fromNose` metres behind the nose, `y` over the ground, `dx` across. */
-  const part = (material: THREE.Material, fromNose: number, y: number, w: number, h: number, d: number, dx = 0): void =>
-    batch.addBox(material, x + dx, GROUND + y, frontZ + fromNose, w, h, d);
-  const wheelRadius = 0.55;
-  const axles = [1.15, 4.95, 6.25];
-  for (const fromNose of axles) {
-    for (const side of [-1, 1]) {
-      const wheel = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.4, 18).rotateZ(Math.PI / 2);
-      batch.add(wheel.translate(x + side, GROUND + wheelRadius, frontZ + fromNose), materials.rubber);
-      const hub = new THREE.CylinderGeometry(0.24, 0.24, 0.42, 10).rotateZ(Math.PI / 2);
-      batch.add(hub.translate(x + side, GROUND + wheelRadius, frontZ + fromNose), materials.greySteel);
-    }
-  }
-  // Mudguards over the rear bogie.
-  for (const side of [-1, 1]) part(materials.paintedSteel, (axles[1] + axles[2]) / 2, 1.2, 0.48, 0.06, 2.6, side);
-  part(materials.greySteel, length / 2, 0.82, 1.3, 0.2, length - 0.3);
-  // Bonnet, grille, bumper, front wings and dead headlights.
-  part(materials.paintedSteel, 0.6, 1.4, 2.0, 0.85, 1.2);
-  part(materials.greySteel, 0.01, 1.35, 1.2, 0.6, 0.04);
-  for (let slat = -2; slat <= 2; slat++) part(materials.rubber, -0.01, 1.35, 0.06, 0.52, 0.02, slat * 0.2);
-  part(materials.greySteel, -0.08, 0.95, width - 0.1, 0.2, 0.16);
-  for (const side of [-1, 1]) {
-    const lamp = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12).rotateX(Math.PI / 2);
-    batch.add(lamp.translate(x + side * 0.85, GROUND + 1.55, frontZ - 0.02), materials.windowGlass);
-    part(materials.paintedSteel, axles[0], 1.1, 0.5, 0.12, 1.3, side);
-    // Mirror arms out of the cab.
-    part(materials.greySteel, cabOffset - 0.45, 2.1, 0.32, 0.03, 0.03, side * (width / 2 + 0.12));
-    part(materials.rubber, cabOffset - 0.45, 2.1, 0.03, 0.26, 0.16, side * (width / 2 + 0.28));
-  }
-  // Cab with its windscreen, side windows and the battery beacon on the roof.
-  const cabTop = 2.525;
-  part(materials.paintedSteel, cabOffset, (0.975 + cabTop) / 2, width - 0.1, cabTop - 0.975, 1.1);
-  part(materials.windowGlass, cabOffset - 0.56, 2.05, width - 0.4, 0.6, 0.03);
-  for (const side of [-1, 1]) part(materials.windowGlass, cabOffset, 2.05, 0.03, 0.55, 0.7, side * (width / 2 - 0.04));
-  const beacon = new THREE.CylinderGeometry(0.12, 0.14, 0.2, 12).translate(x, GROUND + cabTop + 0.1, frontZ + cabOffset);
-  batch.add(beacon, lighting.circuitMaterial('emergency'));
-  // Fuel tank under the body's west side, the spare wheel on its east flank.
-  const tank = new THREE.CylinderGeometry(0.26, 0.26, 1.1, 14).rotateX(Math.PI / 2);
-  batch.add(tank.translate(x - width / 2 + 0.2, GROUND + 0.75, frontZ + 3.1), materials.greySteel);
-  const spare = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.36, 18).rotateZ(Math.PI / 2);
-  batch.add(spare.translate(x + width / 2 + 0.2, GROUND + 1.85, frontZ + 3.4), materials.rubber);
-  // The box body, open at the back on its dark inside, its doors swung out and a ladder down.
-  const bodyFront = cabOffset + 0.65;
-  const bodyBottom = 1.0;
-  const bodyCenterY = GROUND + (bodyBottom + height) / 2;
-  part(materials.paintedSteel, (bodyFront + length) / 2 - 0.05, (bodyBottom + height) / 2, width, height - bodyBottom, length - bodyFront - 0.1);
-  // Ribs along the body and a red cross panel on each flank: the medical kung of the evacuation.
-  for (let rib = bodyFront + 0.5; rib < length - 0.3; rib += 0.9) {
-    part(materials.greySteel, rib, (bodyBottom + height) / 2, width + 0.04, height - bodyBottom - 0.1, 0.05);
-  }
-  for (const side of [-1, 1]) {
-    const flank = side * (width / 2 + 0.03);
-    part(materials.stucco, (bodyFront + length) / 2, 2.15, 0.02, 0.9, 0.9, flank);
-    part(materials.redEnamel, (bodyFront + length) / 2, 2.15, 0.03, 0.62, 0.2, flank);
-    part(materials.redEnamel, (bodyFront + length) / 2, 2.15, 0.03, 0.2, 0.62, flank);
-  }
-  batch.addBox(materials.rubber, x, bodyCenterY, rearZ - 0.06, width - 0.16, height - bodyBottom - 0.16, 0.02);
-  const leafLength = width / 2 - 0.04;
-  const solids: GroundRect[] = [];
-  for (const side of [-1, 1]) {
-    // Hinged on the rear corner; closed it would reach the middle, open it swings out and back.
-    const hingeX = x + side * (width / 2);
-    const leaf = new THREE.BoxGeometry(leafLength, height - bodyBottom - 0.1, 0.05)
-      .translate(-side * leafLength / 2, 0, 0).rotateY(side * DOOR_OPEN_ANGLE).translate(hingeX, bodyCenterY, rearZ + 0.02);
-    batch.add(leaf, materials.paintedSteel);
-    const reachX = hingeX - side * Math.cos(DOOR_OPEN_ANGLE) * leafLength;
-    const door = solid(context, 'surface-truck-door', 'metal',
-      { minX: Math.min(hingeX, reachX) - 0.05, maxX: Math.max(hingeX, reachX) + 0.05, minZ: rearZ, maxZ: rearZ + Math.sin(DOOR_OPEN_ANGLE) * leafLength + 0.05 },
-      GROUND + bodyBottom, GROUND + height - 0.1);
-    solids.push(door);
-  }
-  for (const side of [-0.3, 0.3]) part(materials.greySteel, length + 0.22, 0.55, 0.04, 1.0, 0.04, side);
-  for (const rung of [0.3, 0.6, 0.9]) part(materials.greySteel, length + 0.4 - rung * 0.36, rung, 0.6, 0.03, 0.05);
-  solids.push(solid(context, 'surface-truck', 'metal', { minX: x - width / 2, maxX: x + width / 2, minZ: frontZ - 0.2, maxZ: rearZ + 0.1 }, GROUND, GROUND + height));
-  return solids;
+  // The gate's posts; its leaves are a `YardGate`.
+  for (const x of [PROTOCOL33_GATE.minX, PROTOCOL33_GATE.maxX]) batch.addBox(materials.greySteel, x, GROUND + 1.5, north, 0.3, 3.0, 0.3);
 }
 
 /**
@@ -251,14 +157,14 @@ function buildYardProps(context: Station33BuildContext, lighting: Station33Light
   batch.addBox(materials.serviceConcrete, x + 0.5, GROUND + height - 0.1, z, 1.1, 0.1, 0.12);
   batch.addBox(materials.greySteel, x + 1.0, GROUND + height - 0.22, z, 0.5, 0.14, 0.26);
   batch.addBox(lighting.circuitMaterial('amber'), x + 1.0, GROUND + height - 0.31, z, 0.4, 0.04, 0.18);
-  solids.push(solid(context, 'surface-lamp-post', 'concrete', { minX: x - 0.15, maxX: x + 0.15, minZ: z - 0.15, maxZ: z + 0.15 }, GROUND, GROUND + height));
+  solids.push(yardSolid(context, 'surface-lamp-post', 'concrete', { minX: x - 0.15, maxX: x + 0.15, minZ: z - 0.15, maxZ: z + 0.15 }, GROUND, GROUND + height));
   roadBlocks.forEach(({ x: bx, z: bz, yaw }, index) => {
     // Turned blocks stay solid through an axis-aligned box around them.
     batch.addBox(materials.serviceConcrete, bx, GROUND + ROAD_BLOCK.height / 2, bz, ROAD_BLOCK.length, ROAD_BLOCK.height, ROAD_BLOCK.width, 0, yaw, 0, 371 + index);
     batch.addBox(materials.hazardPaint, bx, GROUND + ROAD_BLOCK.height - 0.12, bz, ROAD_BLOCK.length + 0.01, 0.12, ROAD_BLOCK.width + 0.01, 0, yaw, 0);
     const halfX = Math.abs(Math.cos(yaw)) * ROAD_BLOCK.length / 2 + Math.abs(Math.sin(yaw)) * ROAD_BLOCK.width / 2;
     const halfZ = Math.abs(Math.sin(yaw)) * ROAD_BLOCK.length / 2 + Math.abs(Math.cos(yaw)) * ROAD_BLOCK.width / 2;
-    solids.push(solid(context, 'surface-road-block', 'concrete', { minX: bx - halfX, maxX: bx + halfX, minZ: bz - halfZ, maxZ: bz + halfZ }, GROUND, GROUND + ROAD_BLOCK.height));
+    solids.push(yardSolid(context, 'surface-road-block', 'concrete', { minX: bx - halfX, maxX: bx + halfX, minZ: bz - halfZ, maxZ: bz + halfZ }, GROUND, GROUND + ROAD_BLOCK.height));
   });
   drumHuddles.forEach((drums, index) => {
     addOilDrums(context, `surface-drums-${index}`, drums, GROUND);
@@ -276,7 +182,7 @@ function buildYardProps(context: Station33BuildContext, lighting: Station33Light
   }
   const leaning = new THREE.TorusGeometry(TYRE.radius - TYRE.width / 2, TYRE.width / 2, 6, 16);
   batch.add(leaning, materials.rubber, placement(tyres.x - 0.75, GROUND + TYRE.radius - 0.02, tyres.z + 0.25, 0.25, Math.PI / 2 - 0.3, 0));
-  solids.push(solid(context, 'surface-tyres', 'wood',
+  solids.push(yardSolid(context, 'surface-tyres', 'wood',
     { minX: tyres.x - 1.15, maxX: tyres.x + TYRE.radius + 0.15, minZ: tyres.z - TYRE.radius - 0.1, maxZ: tyres.z + TYRE.radius + 0.1 }, GROUND, GROUND + TYRE.stack * TYRE.width));
   return solids;
 }
@@ -295,7 +201,7 @@ function buildFireBarrel(context: Station33BuildContext, lighting: Station33Ligh
   batch.add(embers.translate(x, GROUND + height - 0.12, z), lighting.circuitMaterial('amber'));
   const ash = new THREE.CylinderGeometry(radius + 0.25, radius + 0.4, 0.04, 16);
   batch.add(ash.translate(x, GROUND + 0.02, z), materials.rubble);
-  return solid(context, 'surface-fire-barrel', 'metal', { minX: x - radius - 0.05, maxX: x + radius + 0.05, minZ: z - radius - 0.05, maxZ: z + radius + 0.05 }, GROUND, GROUND + height);
+  return yardSolid(context, 'surface-fire-barrel', 'metal', { minX: x - radius - 0.05, maxX: x + radius + 0.05, minZ: z - radius - 0.05, maxZ: z + radius + 0.05 }, GROUND, GROUND + height);
 }
 
 /**
@@ -343,10 +249,4 @@ function buildYardWear(context: Station33BuildContext): void {
     const blade = new THREE.ConeGeometry(0.05 + random() * 0.05, 0.3 + random() * 0.4, 4);
     batch.add(blade, materials.burlap, placement(x, GROUND + 0.2, z, (random() - 0.5) * 0.5, random() * Math.PI, (random() - 0.5) * 0.5));
   }
-}
-
-/** A solid proxy over `rect`, from `bottom` to `top`; returns its footprint. */
-function solid(context: Station33BuildContext, name: string, surface: 'metal' | 'concrete' | 'wood', rect: GroundRect, bottom: number, top: number): GroundRect {
-  addSolidProxy(context, name, { x: rect.minX, y: bottom, z: rect.minZ }, { x: rect.maxX, y: top, z: rect.maxZ }, surface, 'none');
-  return rect;
 }

@@ -1,10 +1,10 @@
-import type { LoginRequestOutcome } from '../account/AccountApi';
+import type { LoginAttempt } from '../account/WebAccount';
 import { setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 
 /** What the dialog needs from the player's account; `main.ts` supplies it. */
 export interface MapUnlockAccount {
   getEmail(): string | null;
-  requestLogin(email: string): Promise<LoginRequestOutcome>;
+  requestLogin(email: string): Promise<LoginAttempt>;
   signOut(): Promise<void>;
 }
 
@@ -23,7 +23,7 @@ export interface MapUnlockElements {
   readonly signOutButton: HTMLButtonElement;
 }
 
-const OUTCOME_MESSAGES: Readonly<Record<Exclude<LoginRequestOutcome, 'sent'>, TranslationKey>> = {
+const OUTCOME_MESSAGES: Readonly<Record<Exclude<LoginAttempt, 'sent' | 'signed-in'>, TranslationKey>> = {
   'invalid-email': 'account.invalidEmail',
   'rate-limited': 'account.rateLimited',
   unavailable: 'account.unavailable',
@@ -31,13 +31,14 @@ const OUTCOME_MESSAGES: Readonly<Record<Exclude<LoginRequestOutcome, 'sent'>, Tr
 
 /**
  * Opened from a locked map card or the menu's account button. Signed out, it
- * mails a login link; maps unlock when the player opens that link. Signed in,
+ * mails a login link; maps unlock when the player opens that link (a local
+ * tester is signed in at once and the dialog closes). Signed in,
  * it names the account (and, for a map, that it is not owned) and offers to
  * sign out. Access rules stay in the account.
  */
 export class MapUnlockDialog {
   private account: MapUnlockAccount | null = null;
-  private onSignedOut: () => void = () => undefined;
+  private onAccountChanged: () => void = () => undefined;
   private busy = false;
 
   public constructor(private readonly view: MapUnlockElements) {
@@ -49,9 +50,9 @@ export class MapUnlockDialog {
     view.signOutButton.onclick = () => void this.signOut();
   }
 
-  public setAccount(account: MapUnlockAccount, onSignedOut: () => void): void {
+  public setAccount(account: MapUnlockAccount, onAccountChanged: () => void): void {
     this.account = account;
-    this.onSignedOut = onSignedOut;
+    this.onAccountChanged = onAccountChanged;
   }
 
   /** `mapNameKey` is the locked map, or null when opened from the account button. */
@@ -78,7 +79,8 @@ export class MapUnlockDialog {
     setTranslatedText(view.message, 'account.sending');
     const outcome = await account.requestLogin(email);
     this.setBusy(false);
-    if (outcome === 'sent') this.setText(view.message, t('account.sent', { email }));
+    if (outcome === 'signed-in') this.closeAfterAccountChange();
+    else if (outcome === 'sent') this.setText(view.message, t('account.sent', { email }));
     else setTranslatedText(view.message, OUTCOME_MESSAGES[outcome]);
   }
 
@@ -87,8 +89,12 @@ export class MapUnlockDialog {
     this.setBusy(true);
     await this.account.signOut();
     this.setBusy(false);
+    this.closeAfterAccountChange();
+  }
+
+  private closeAfterAccountChange(): void {
     this.view.dialog.close();
-    this.onSignedOut();
+    this.onAccountChanged();
   }
 
   private setBusy(busy: boolean): void {

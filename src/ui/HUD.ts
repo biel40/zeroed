@@ -413,10 +413,10 @@ export class HUD {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
   }
 
-  /** The account behind locked map cards and the menu's account button; `onSignedOut` lets the caller refresh the menu. */
-  public setMapUnlockAccount(account: MenuAccount, onSignedOut: () => void): void {
+  /** The account behind locked map cards and the menu's account button; `onAccountChanged` lets the caller refresh the menu after signing in or out. */
+  public setMapUnlockAccount(account: MenuAccount, onAccountChanged: () => void): void {
     this.account = account;
-    this.mapUnlock.setAccount(account, onSignedOut);
+    this.mapUnlock.setAccount(account, onAccountChanged);
     this.accountButton.onclick = () => this.mapUnlock.open(null);
   }
 
@@ -735,10 +735,15 @@ export class HUD {
     mustGet('go-main-menu').onclick = handlers.onMainMenu;
   }
 
-  /** The map's ending cinematic, then its credits; `record` fills the escape's kills and headshots. */
-  public showEnding(round: number, presentation: EndingPresentationId, record?: EndingRecord): void {
+  /**
+   * The map's ending cinematic, then its credits; `record` fills the escape's
+   * kills and headshots. `filmed`: the map films the ending in the scene, so
+   * the overlay stays see-through until it fades to black.
+   */
+  public showEnding(round: number, presentation: EndingPresentationId, record?: EndingRecord, filmed = false): void {
     this.root.classList.add('hidden');
     this.setInteractionPrompt(null);
+    this.endingScreen.classList.toggle('filmed', filmed);
     this.endingScreen.dataset.presentation = presentation;
     this.endingScreen.style.setProperty('--detonation', `${ENDING_DETONATION_TIME[presentation]}s`);
     this.endingRound.textContent = `${round}`;
@@ -756,7 +761,7 @@ export class HUD {
 
   public hideEnding(): void {
     this.endingScreen.classList.add('hidden');
-    this.endingScreen.classList.remove('ending', 'credits');
+    this.endingScreen.classList.remove('ending', 'credits', 'filmed');
   }
 
   /**

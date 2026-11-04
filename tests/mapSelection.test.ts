@@ -192,13 +192,13 @@ describe('Zombies map selection flow', () => {
       let accountEmail: string | null = null;
       let betaTester = false;
       const requestLogin = vi.fn(async (email: string) => (email.includes('@') ? 'sent' as const : 'invalid-email' as const));
-      const onSignedOut = vi.fn();
+      const onAccountChanged = vi.fn();
       ui.setMapUnlockAccount({
         getEmail: () => accountEmail,
         isBetaTester: () => betaTester,
         requestLogin,
         signOut: async () => { accountEmail = null; },
-      }, onSignedOut);
+      }, onAccountChanged);
       ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts);
       expect(station.classList.contains('hidden')).toBe(false);
       expect(station.dataset.locked).toBe('true');
@@ -243,7 +243,7 @@ describe('Zombies map selection flow', () => {
       await flush();
       expect(accountEmail).toBeNull();
       expect(unlockDialog.open).toBe(false);
-      expect(onSignedOut).toHaveBeenCalledOnce();
+      expect(onAccountChanged).toHaveBeenCalledOnce();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
       // The account button in the menu corner reflects the session and opens the account dialog.

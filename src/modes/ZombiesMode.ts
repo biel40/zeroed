@@ -62,6 +62,8 @@ import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
 import { ZombiesEvacuation } from './ZombiesEvacuation';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { RoundCueGate } from '../audio/RoundCueGate';
+import { EYE_HEIGHT } from '../player/PlayerController';
+import { EndingCinematic } from '../rendering/EndingCinematic';
 import { IntroCinematic } from '../rendering/IntroCinematic';
 import { CodeLockDialog } from '../ui/CodeLockDialog';
 import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
@@ -77,6 +79,8 @@ const MOAN_MIN_DELAY = 6;
 const MOAN_SPREAD = 9;
 /** A key still held from starting the run must not also skip its intro. */
 const INTRO_SKIP_GUARD = 0.6;
+/** A horde a map stages in its filmed ending runs at least like this round's. */
+const ENDING_HORDE_MIN_ROUND = 15;
 
 /**
  * Zombies mode: infinite rounds, a hard-capped pooled horde, player HP with
@@ -146,6 +150,10 @@ export class ZombiesMode implements GameMode {
   /** The map's opening cinematic; played once, on the first gameplay start. */
   private intro: IntroCinematic | null = null;
   private introPlayed = false;
+  /** The map's filmed ending while it plays (and holds under the credits), else null. */
+  private endingCinematic: EndingCinematic | null = null;
+  /** Where the filmed ending's staged horde runs, while it plays; else null. */
+  private endingHordeChase: ArenaEnding['hordeChase'] | null = null;
   /** Arena colliders currently registered in `ctx.hitColliders`. */
   private arenaStaticColliders = new Set<THREE.Object3D>();
   private trauma = 0;
@@ -224,6 +232,7 @@ export class ZombiesMode implements GameMode {
     };
     ctx.audio.setAmbientBed(this.arena.ambience.ambientBed ?? null);
     this.arena.onAmbush = (ambush) => this.spawnAmbush(ambush);
+    this.arena.onEndingZombie = (spot) => this.spawnEndingZombie(spot);
     ctx.scene.add(this.zombies.group);
     this.arena.onTopologyChanged = () => this.syncArenaTopology();
     if (hasSoulRitual(this.arena)) {
@@ -294,6 +303,8 @@ export class ZombiesMode implements GameMode {
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
     if (this.runFlow.state === 'ENDING') {
       this.arena.update(dt, this.ctx.player?.rig.position);
+      if (this.ctx.player) this.endingCinematic?.update(dt, this.ctx.player.camera);
+      this.updateEndingHorde(dt);
       if (this.runFlow.update(dt)) {
         this.ctx.audio.stopEndingAudio();
         this.ctx.hud.showCredits();
@@ -480,9 +491,10 @@ export class ZombiesMode implements GameMode {
     this.rings?.updateJingle(false);
   }
 
-  /** While the intro plays, the shell renders its camera instead of the player's. */
+  /** While the intro or a filmed ending plays, the shell renders its camera instead of the player's. */
   getCinematicCamera(): THREE.Camera | null {
-    return this.intro?.isPlaying ? this.intro.camera : null;
+    if (this.intro?.isPlaying) return this.intro.camera;
+    return this.endingCinematic?.isPlaying ? this.endingCinematic.camera : null;
   }
 
   /** Skip the pause screen while the game-over panel is up. */
@@ -1368,6 +1380,9 @@ export class ZombiesMode implements GameMode {
   private restart(): void {
     this.onExit();
     this.endIntro();
+    this.endingCinematic?.stop();
+    this.endingCinematic = null;
+    this.endingHordeChase = null;
     this.gameOver = false;
     this.gameOverPending = false;
     this.runFlow.reset();
@@ -1443,8 +1458,36 @@ export class ZombiesMode implements GameMode {
     this.ctx.audio.startEndingAudio(ending.audio);
     this.ctx.hud.setInteractionPrompt(null);
     this.pushHudState();
-    this.ctx.hud.showEnding(this.rounds.round, ending.presentation, { kills: this.kills, headshots: this.headshots });
+    const filmed = this.startEndingCinematic(ending);
+    this.ctx.hud.showEnding(this.rounds.round, ending.presentation, { kills: this.kills, headshots: this.headshots }, filmed);
     this.ctx.unlockPointer();
+  }
+
+  /** The map films its ending in the scene when it brings shots; returns whether it does. */
+  private startEndingCinematic(ending: ArenaEnding): boolean {
+    if (!ending.shots || !this.ctx.player) return false;
+    this.endingCinematic = new EndingCinematic(ending.shots);
+    this.endingCinematic.start(this.ctx.player.camera);
+    this.endingHordeChase = ending.hordeChase ?? null;
+    this.arena.startEnding?.();
+    return true;
+  }
+
+  /** One zombie of the filmed ending's horde at the map's spot, already running for the chase point. */
+  private spawnEndingZombie(spot: ArenaAmbush): boolean {
+    const chase = this.endingHordeChase;
+    if (!chase || this.runFlow.state !== 'ENDING') return false;
+    const round = Math.max(this.rounds.round, ENDING_HORDE_MIN_ROUND);
+    const { x, z } = spot.position;
+    return this.zombies.spawnAmbushZombie(roundConfig(round), x, z, round, chase.position.x, chase.position.z, spot.floor);
+  }
+
+  /** The staged horde runs for the chase point as if it were the player; the run is over, so nothing it does can hurt. */
+  private updateEndingHorde(dt: number): void {
+    const chase = this.endingHordeChase;
+    if (!chase) return;
+    const { x, y, z } = chase.position;
+    this.zombies.update(dt, x, z, chase.floor, y + EYE_HEIGHT);
   }
 
   /** The players escaped through the map's evacuation: its ending, like a bought one. */

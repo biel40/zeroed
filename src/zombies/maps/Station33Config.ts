@@ -1,5 +1,7 @@
 import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules } from '../evacuation/EvacuationProtocol';
+import { EVACUATION_ENDING_DURATION, EVACUATION_ENDING_TIMELINE as ESCAPE_BEAT } from '../evacuation/EvacuationEndingTimeline';
+import type { EscapeDriveConfig, EscapeHordeConfig } from './station33/EscapeDrive';
 import type { AmmoRefillPlacement } from './shared/AmmoRefill';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
@@ -18,6 +20,7 @@ import type {
   ArenaAmbience,
   ArenaAmbientCue,
   ArenaEnding,
+  ArenaEndingShot,
   ArenaIntro,
   MysteryBoxPlacement,
   PlayerBounds,
@@ -716,8 +719,108 @@ export const PROTOCOL33_SURFACE_AMBIENCE = {
   blend: { from: 4.5, to: 8.2 },
 } as const;
 
-/** How boarding the truck ends the run: the escape card, the last radio call, then the credits. */
-export const PROTOCOL33_ENDING: ArenaEnding = { presentation: 'evacuation', audio: 'evacuation', duration: 13 };
+/** The yard's gate in the north fence, centred on the truck and the road: two steel leaves hinged on their posts. */
+export const PROTOCOL33_GATE = {
+  minX: PROTOCOL33_TRUCK.x - 2,
+  maxX: PROTOCOL33_TRUCK.x + 2,
+  /** Centre line of the north fence. */
+  z: PROTOCOL33_SURFACE.yard.minZ - STATION33_WALL_THICKNESS / 2,
+  height: 2.7,
+  thickness: 0.12,
+} as const;
+
+/** How far the truck's bumper stands ahead of its nose. */
+export const PROTOCOL33_TRUCK_BUMPER_REACH = 0.16;
+
+/**
+ * The truck's departure in the filmed ending (`EscapeDrive`): it rams the
+ * gate open on the impact beat and drives north down the road into the fog.
+ */
+export const PROTOCOL33_DEPARTURE: EscapeDriveConfig = {
+  gateGap: (PROTOCOL33_TRUCK.z - PROTOCOL33_TRUCK.length / 2 - PROTOCOL33_TRUCK_BUMPER_REACH)
+    - (PROTOCOL33_GATE.z + PROTOCOL33_GATE.thickness / 2),
+  topSpeed: 13,
+  maxDistance: 115,
+  gateSwing: 1.95,
+};
+
+/**
+ * The escape as the ending films it, on `EVACUATION_ENDING_TIMELINE`:
+ * ignition at the truck's nose with the lamps sputtering on; the gate
+ * rammed open from the road as the truck tears past; its tail lights
+ * sinking into the fog from the broken gate; the horde charging out of the
+ * stairhead at the gate; and a crane rising over the yard as the horde
+ * piles up at the open gate, under the title, until the fade.
+ */
+export const PROTOCOL33_ESCAPE_SHOTS: ReadonlyArray<ArenaEndingShot> = [
+  {
+    duration: ESCAPE_BEAT.launch + 0.3,
+    shake: 0.006,
+    keys: [
+      { time: 0, position: { x: 23.3, y: 7.45, z: -98.7 }, target: { x: 20.9, y: 8.65, z: -95.0 } },
+      { time: ESCAPE_BEAT.launch + 0.3, position: { x: 22.85, y: 7.6, z: -98.1 }, target: { x: 20.7, y: 8.8, z: -95.3 } },
+    ],
+  },
+  {
+    duration: 3.1,
+    shake: 0.02,
+    keys: [
+      { time: 0, position: { x: 17.2, y: 7.35, z: -107.5 }, target: { x: 20.4, y: 8.3, z: -100.2 } },
+      { time: 1.3, position: { x: 17.3, y: 7.36, z: -107.7 }, target: { x: 20.4, y: 8.2, z: -101 } },
+      { time: 2.0, position: { x: 17.4, y: 7.38, z: -107.9 }, target: { x: 20.6, y: 8.0, z: -106 } },
+      { time: 3.1, position: { x: 17.55, y: 7.42, z: -108.2 }, target: { x: 20.6, y: 7.9, z: -122 } },
+    ],
+  },
+  {
+    duration: 1.8,
+    shake: 0.004,
+    keys: [
+      { time: 0, position: { x: 21.4, y: 7.9, z: -101.4 }, target: { x: 20.4, y: 8.0, z: -125 } },
+      { time: 1.8, position: { x: 21.0, y: 9.3, z: -102.6 }, target: { x: 20.4, y: 7.8, z: -140 } },
+    ],
+  },
+  {
+    duration: ESCAPE_BEAT.title - (ESCAPE_BEAT.launch + 0.3 + 3.1 + 1.8),
+    shake: 0.012,
+    keys: [
+      { time: 0, position: { x: 24.6, y: 7.75, z: -97.6 }, target: { x: 15.5, y: 8.5, z: -80 } },
+      { time: 2.2, position: { x: 24.3, y: 7.7, z: -96.9 }, target: { x: 17, y: 8.2, z: -86 } },
+    ],
+  },
+  {
+    duration: ESCAPE_BEAT.credits - ESCAPE_BEAT.title,
+    keys: [
+      { time: 0, position: { x: 13.5, y: 12.5, z: -81.5 }, target: { x: 20.4, y: 7.2, z: -112 } },
+      { time: ESCAPE_BEAT.credits - ESCAPE_BEAT.title, position: { x: 14.5, y: 22, z: -84.5 }, target: { x: 20.4, y: 7.5, z: -150 } },
+    ],
+  },
+];
+
+/**
+ * The horde of the filmed escape: it bursts out of the stairhead once the
+ * truck is through the gate and runs for the gateway it left by
+ * (`PROTOCOL33_ENDING.hordeChase`), west of the parked truck's solids.
+ */
+export const PROTOCOL33_ESCAPE_HORDE: EscapeHordeConfig = {
+  from: ESCAPE_BEAT.horde,
+  interval: 0.3,
+  count: 18,
+  doorway: { x: (PROTOCOL33_SURFACE.kiosk.minX + PROTOCOL33_SURFACE.kiosk.maxX) / 2, z: PROTOCOL33_SURFACE.yard.maxZ - 0.8, spread: 0.9 },
+};
+
+/**
+ * How boarding the truck ends the run: filmed in the yard (the truck rams
+ * the gate and vanishes down the road, the horde floods out after it), the title with the last radio
+ * call, then the credits. `duration` ends as the credits title lands, so
+ * the menu button appears right away.
+ */
+export const PROTOCOL33_ENDING: ArenaEnding = {
+  presentation: 'evacuation',
+  audio: 'evacuation',
+  duration: EVACUATION_ENDING_DURATION,
+  shots: PROTOCOL33_ESCAPE_SHOTS,
+  hordeChase: { position: { x: PROTOCOL33_GATE.minX + 0.6, y: PROTOCOL33_SURFACE_Y, z: PROTOCOL33_SURFACE.yard.minZ + 1 }, floor: 1 },
+};
 
 /** While the protocol runs, the horde only comes through the entrances around the workshop. */
 export const PROTOCOL33_HORDE_ZONES: ReadonlyArray<Station33ZoneId> = ['cocheras', 'subestacion', 'taller'];
@@ -812,7 +915,12 @@ export interface Station33PointLight {
   readonly circuit: Station33LightCircuit;
   /** Room it lights: the player's room gets its lights first. */
   readonly zone: Station33ZoneId;
+  /** Optional handle for a light a moving object carries (the truck's beacon). */
+  readonly id?: string;
 }
+
+/** The point light on the truck's cab roof, which rides away with it. */
+export const PROTOCOL33_TRUCK_BEACON_LIGHT = 'truck-beacon';
 
 export const FLUORESCENT_COLOR = 0xd2eadf;
 export const AMBER_LAMP_COLOR = 0xffa65a;
@@ -915,7 +1023,7 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
   // The surface: the truck's beacon, the stairhead's floodlight and one sodium lamp left burning.
   {
     x: PROTOCOL33_TRUCK.x, y: PROTOCOL33_SURFACE_Y + 2.9, z: PROTOCOL33_TRUCK.z - PROTOCOL33_TRUCK.length / 2 + PROTOCOL33_TRUCK.cabOffset,
-    color: EMERGENCY_COLOR, intensity: 6, distance: 13, circuit: 'emergency', zone: 'superficie',
+    color: EMERGENCY_COLOR, intensity: 6, distance: 13, circuit: 'emergency', zone: 'superficie', id: PROTOCOL33_TRUCK_BEACON_LIGHT,
   },
   { x: 15, y: PROTOCOL33_SURFACE_Y + 3.1, z: -79.3, color: SURFACE_FLOOD_COLOR, intensity: 7, distance: 15, circuit: 'steady', zone: 'superficie' },
   { x: 6.2, y: PROTOCOL33_SURFACE_Y + 5.4, z: -94.5, color: AMBER_LAMP_COLOR, intensity: 6, distance: 16, circuit: 'amber', zone: 'superficie' },

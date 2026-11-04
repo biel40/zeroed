@@ -15,7 +15,8 @@ describe('PWA contract', () => {
   it('starts the public game with PWA support and the web account, without a client-side beta list', () => {
     const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
     expect(main).not.toContain('VITE_BETA_ENABLED');
-    expect(main).toContain('new ZeroedBoot(new WebAccount(');
+    expect(main).toContain('new ZeroedBoot(await createAccount()');
+    expect(main).toContain('if (!import.meta.env.DEV) return new WebAccount(api, getAccountStorage());');
     expect(main).not.toContain('beta/access.js');
     expect(main).not.toContain('location.replace');
     expect(main.indexOf('setupPWA();')).toBeLessThan(main.indexOf('new ZeroedBoot('));

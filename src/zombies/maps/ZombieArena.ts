@@ -213,9 +213,31 @@ export interface ArenaEnding {
   readonly audio: EndingAudioId;
   /** Seconds from the purchase to the credits. */
   readonly duration: number;
+  /**
+   * Optional: the map films its ending in the scene (shots back to back,
+   * hard cuts between them) under the HUD overlay, and stages it in
+   * `ZombieArena.startEnding`. Omitted plays the HUD cinematic alone.
+   */
+  readonly shots?: ReadonlyArray<ArenaEndingShot>;
+  /**
+   * Optional, with `shots`: where the horde the map stages during the filmed
+   * ending (`ZombieArena.onEndingZombie`) runs, instead of the player. It
+   * cannot hurt anyone: the run is over.
+   */
+  readonly hordeChase?: { readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly floor: number };
 }
 
-/** A camera keyframe of a map intro, in world space. */
+/** One camera move of a filmed ending. */
+export interface ArenaEndingShot {
+  /** Seconds the shot lasts before cutting to the next one. */
+  readonly duration: number;
+  /** Camera path on the shot's own clock (0..duration), at least one key. */
+  readonly keys: ReadonlyArray<ArenaIntroShot>;
+  /** Optional handheld shake: the largest jitter, in metres, of the camera and its aim. */
+  readonly shake?: number;
+}
+
+/** A camera keyframe in world space (map intros and filmed endings). */
 export interface ArenaIntroShot {
   /** Seconds on the intro's eased timeline (see `IntroCinematic`). */
   readonly time: number;
@@ -388,6 +410,12 @@ export interface ZombieArena {
    * play its reveal, otherwise it may ask again later.
    */
   onAmbush?: ((ambush: ArenaAmbush) => boolean) | null;
+  /**
+   * Optional: during a filmed ending with `hordeChase`, the map asks the mode
+   * for one zombie at its spot, which runs to the chase point. True when it
+   * spawned one; otherwise the map may ask again later.
+   */
+  onEndingZombie?: ((spot: ArenaAmbush) => boolean) | null;
   /** Optional visual event fired when a rebuilt board finishes seating. */
   onBarrierBoardRebuilt?: (() => void) | null;
   /**
@@ -403,6 +431,8 @@ export interface ZombieArena {
   startIntro?(): void;
   /** Settles whatever `startIntro` staged once the intro ends or is skipped. */
   finishIntro?(): void;
+  /** Stages the map side of a filmed ending (`ArenaEnding.shots`) as its camera starts; `reset` undoes it. */
+  startEnding?(): void;
   /** Called when the run restarts. */
   reset(): void;
   /**

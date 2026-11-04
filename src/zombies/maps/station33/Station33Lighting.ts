@@ -96,6 +96,7 @@ interface CircuitLight {
   readonly circuit: Station33LightCircuit;
   readonly baseIntensity: number;
   readonly zone: Station33ZoneId;
+  readonly id?: string;
 }
 
 /**
@@ -144,6 +145,13 @@ export class Station33Lighting {
   /** Real lights currently visible (always the quality budget). */
   get visiblePointLights(): ReadonlyArray<THREE.PointLight> {
     return this.lights.filter((entry) => entry.light.visible).map((entry) => entry.light);
+  }
+
+  /** The real light declared with `id` in STATION33_POINT_LIGHTS, for an object that carries it (budget and circuit still apply). */
+  public pointLight(id: string): THREE.PointLight {
+    const entry = this.lights.find((candidate) => candidate.id === id);
+    if (!entry) throw new Error(`Station 33 has no point light "${id}"`);
+    return entry.light;
   }
 
   /** Emissive material driven by `circuit` (shared by every lamp on it). */
@@ -376,7 +384,7 @@ export class Station33Lighting {
       light.castShadow = false;
       light.userData.mapRole = 'station-light';
       this.context.group.add(light);
-      this.lights.push({ light, circuit: config.circuit, baseIntensity: config.intensity, zone: config.zone });
+      this.lights.push({ light, circuit: config.circuit, baseIntensity: config.intensity, zone: config.zone, id: config.id });
     }
   }
 }

@@ -158,14 +158,22 @@ export class EvacuationProtocol {
     return true;
   }
 
+  /** The developer shortcut is still on offer: the exit has not opened yet. */
+  public get canSkipToEscape(): boolean {
+    return this.current !== 'escaping' && this.current !== 'completed' && this.current !== 'failed';
+  }
+
   /**
-   * Developer shortcut: from any unfinished stage straight to a successful
-   * extraction, skipping power, switches, defence and escape. Once per run.
+   * Developer shortcut: from any stage before the exit opens straight to the
+   * escape, skipping power, switches and defence; the escape clock, the
+   * extraction (and the map's guardian) still have to be faced. Once per run.
    */
-  public skipToExtraction(): boolean {
-    if (this.current === 'completed' || this.current === 'failed') return false;
-    this.current = 'completed';
-    this.pendingEvents.push({ type: 'extracted' });
+  public skipToEscape(): boolean {
+    if (!this.canSkipToEscape) return false;
+    this.current = 'escaping';
+    this.wasBriefed = true;
+    this.escapeLeft = this.rules.escapeSeconds;
+    this.pendingEvents.push({ type: 'doorOpened' });
     return true;
   }
 

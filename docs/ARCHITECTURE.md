@@ -65,7 +65,9 @@ sufra tirones de compilacion de shaders.
   selector lista bloqueados los mapas sin permiso. Cada plataforma aporta su
   proveedor; en web es [WebAccount](../src/account/WebAccount.ts), que recuerda
   los productos de la cuenta y los refresca con la
-  [API de cuentas](../cloudflare/api/README.md) mediante `AccountApi`. `main.ts`
+  [API de cuentas](../cloudflare/api/README.md) mediante un `AccountBackend`
+  (`AccountApi`; en `npm run dev`, `LocalTesterBackend` lo envuelve y da
+  entrada inmediata a los testers locales). `main.ts`
   canjea el enlace de acceso (`#login=`) al arrancar y entrega la cuenta a
   `HUD`, cuyo `MapUnlockDialog` pide el enlace o permite cerrar sesion. La
   comprobacion final sigue en el cliente; ver [acceso de beta](../public/beta/README.md).
@@ -105,7 +107,11 @@ sufra tirones de compilacion de shaders.
   quiere, la intensidad de la luz de entorno y un fondo sonoro `ambientBed`),
   sonidos ambientales opcionales (`onAmbientCue`, que el modo reproduce), su
   intro opcional (planos de camara y presentacion), su
-  final (cinematica, audio y duracion) y avisa con `onTopologyChanged` cuando
+  final (cinematica, audio y duracion; con `shots`, planos con cortes que
+  `EndingCinematic` rueda en la escena mientras `startEnding` pone en marcha
+  lo que el mapa mueve; con `hordeChase`, el mapa pide zombis con
+  `onEndingZombie` y el modo los lleva a ese punto sin que puedan herir) y
+  avisa con `onTopologyChanged` cuando
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
@@ -155,7 +161,8 @@ mapa. Nuevo modo:
 datos en un config propio, utilidades comunes de `maps/shared/`), entrada en
 `ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` (arte SVG propio) y claves
 `map.<nombre>` y `map.<nombre>.tagline` en los tres diccionarios; el test de contrato lo recorre solo. Un final nuevo anade su id
-de presentacion en `HUD` y de audio en `MusicManager`. Una intro nueva anade su
+de presentacion en `HUD` y de audio en `MusicManager`; si se rueda en la escena,
+el HUD lo recibe como `filmed` y su overlay deja ver la escena. Una intro nueva anade su
 id en `IntroPresentationId` y su overlay en `#intro-screen`. Nuevo blanco: `HitTarget` y
 registro en colliders. Nuevo tipo zombie: registro de estadisticas/modelo,
 orden de spawn y asset si procede.
