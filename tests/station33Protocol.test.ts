@@ -21,6 +21,7 @@ import {
   PROTOCOL33_ENDING,
   PROTOCOL33_ESCAPE,
   PROTOCOL33_ESCAPE_HORDE,
+  PROTOCOL33_GUARDIAN_ENTRANCE,
   PROTOCOL33_PANEL,
   PROTOCOL33_RULES,
   PROTOCOL33_SURFACE,
@@ -130,11 +131,11 @@ interface GuardianInternals {
 
 const guardianOf = (run: Run): GuardianInternals => (run.internals.evacuation as { guardian: GuardianInternals }).guardian;
 
-/** Out of the stairhead into the yard (invincible): CAPITÁN URSS leaps in and lands. */
+/** Out of the stairhead into the yard (invincible): CAPITÁN URSS's filmed entrance plays through and the fight starts. */
 function confrontGuardian(run: Run): GuardianInternals {
   run.internals.health.setInvincible(true);
   stand(run.side, 15.0, -84.0, FACE_NORTH, 1);
-  advance(run, CAPTAIN_USSR.arrivalSeconds + STEP);
+  advance(run, PROTOCOL33_GUARDIAN_ENTRANCE.duration + STEP);
   return guardianOf(run);
 }
 
@@ -374,7 +375,11 @@ describe('Protocol 33 through the mode', () => {
     const guardian = confrontGuardian(run);
     expect(guardian.brain.state).not.toBe('dormant');
     expect(run.side.hud.setBossBar).toHaveBeenLastCalledWith(expect.objectContaining({ name, health: 1 }));
-    expect(run.side.hud.showRoundBanner).toHaveBeenCalledWith(name, t('guardian.arrivalSub'));
+    expect(run.side.hud.showBossIntro).toHaveBeenCalledWith(
+      { kicker: 'КАПИТАН СССР', name, tagline: t('guardian.arrivalSub') },
+      PROTOCOL33_GUARDIAN_ENTRANCE.duration,
+      PROTOCOL33_GUARDIAN_ENTRANCE.titleAt,
+    );
     expect(run.side.ctx.hitColliders).toEqual(expect.arrayContaining([...guardian.view.hitboxes]));
     const corner = objectiveText(run, true);
     expect(corner.startsWith(`${name}
@@ -402,6 +407,69 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.boardPrompt', { key: KEY }));
     run.mode.onInteract();
     expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
+  });
+
+  it('films CAPITÁN URSS\'s entrance with the run held: perched, roaring, leaping in, then the fight', () => {
+    const run = escapingRun();
+    const { brain, view } = guardianOf(run);
+    const zombies = run.internals.zombies as unknown as ZombieManager;
+    const entrance = PROTOCOL33_GUARDIAN_ENTRANCE;
+    run.internals.health.setInvincible(false);
+    advance(run, 5);
+    const clock = objectiveText(run, true);
+    stand(run.side, 15.0, -84.0, FACE_NORTH, 1);
+    run.mode.update(STEP);
+    // Filmed through its own camera, the player and the run on hold.
+    const camera = run.mode.getCinematicCamera();
+    expect(camera).not.toBeNull();
+    expect(run.mode.isGameplayInputEnabled()).toBe(false);
+    expect(run.side.hud.showBossIntro).toHaveBeenCalledOnce();
+    expect(brain.state).toBe('dormant');
+    expect((view as unknown as { group: THREE.Group }).group.visible).toBe(true);
+    const spawned = run.spawns.mock.calls.length;
+    const alive = zombies.aliveCount;
+    const hp = run.internals.health.hp;
+    advance(run, entrance.leapAt - 2 * STEP);
+    expect(brain.state).toBe('dormant');
+    advance(run, 2 * STEP);
+    expect(brain.state).toBe('arriving');
+    expect(run.side.ctx.hitColliders).toEqual(expect.arrayContaining([...view.hitboxes]));
+    advance(run, CAPTAIN_USSR.arrivalSeconds + STEP);
+    // Landed, it waits for the camera: it neither walks nor strikes.
+    const landed = { ...brain.position };
+    advance(run, entrance.duration - entrance.leapAt - CAPTAIN_USSR.arrivalSeconds - 3 * STEP);
+    expect(run.mode.getCinematicCamera()).toBe(camera);
+    expect(brain.position).toEqual(landed);
+    expect(run.spawns.mock.calls.length).toBe(spawned);
+    expect(zombies.aliveCount).toBe(alive);
+    expect(run.internals.health.hp).toBe(hp);
+    expect(run.side.hud.hideBossIntro).not.toHaveBeenCalled();
+    advance(run, 2 * STEP);
+    expect(run.mode.getCinematicCamera()).toBeNull();
+    expect(run.side.hud.hideBossIntro).toHaveBeenCalledOnce();
+    expect(run.mode.isGameplayInputEnabled()).toBe(true);
+    // The escape clock never moved while it was filmed.
+    expect(objectiveText(run, true)).toContain(clock.split('\n').at(-1)!.split(' · ')[0]);
+  });
+
+  it('cuts a playing entrance back to first person on restart', () => {
+    const run = escapingRun();
+    stand(run.side, 15.0, -84.0, FACE_NORTH, 1);
+    advance(run, 1);
+    expect(run.mode.getCinematicCamera()).not.toBeNull();
+    run.mode.onRestartRequested();
+    expect(run.mode.getCinematicCamera()).toBeNull();
+    expect(run.side.hud.hideBossIntro).toHaveBeenCalled();
+    expect(guardianOf(run).brain.state).toBe('dormant');
+  });
+
+  it('cuts the entrance\'s shots to its length and lands CAPITÁN URSS before his title card', () => {
+    const entrance = PROTOCOL33_GUARDIAN_ENTRANCE;
+    const filmed = entrance.shots.reduce((sum, shot) => sum + shot.duration, 0);
+    expect(filmed).toBeCloseTo(entrance.duration, 6);
+    expect(entrance.roarAt).toBeLessThan(entrance.leapAt);
+    expect(entrance.leapAt + CAPTAIN_USSR.arrivalSeconds).toBeLessThan(entrance.titleAt);
+    expect(entrance.titleAt).toBeLessThan(entrance.duration);
   });
 
   it('lets the ФАКЕЛ burn CAPITÁN URSS head-on, straight through his raised shield', () => {

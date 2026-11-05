@@ -85,6 +85,12 @@ export class CaptainUssrView {
   /** Seconds into the current roar; `ROAR_SECONDS` or more when none plays. */
   private roarTime = ROAR_SECONDS;
   private lastPhase = 1;
+  /** Shown on its perch before a filmed entrance's leap, facing `perchHeading`. */
+  private perched = false;
+  private readonly perchAt = new THREE.Vector3();
+  private perchHeading = 0;
+  /** The next frame snaps every joint to its pose instead of easing (it just appeared). */
+  private snapPose = false;
 
   public constructor(castShadow: boolean) {
     this.rig = buildCaptainUssr(castShadow);
@@ -112,15 +118,30 @@ export class CaptainUssrView {
     this.shieldRecoil.kick(1);
   }
 
+  /** Before a filmed entrance's leap: crouched at `at` facing `heading`, until the brain wakes. */
+  public perch(at: THREE.Vector3Like, heading: number): void {
+    this.perched = true;
+    this.perchAt.set(at.x, at.y, at.z);
+    this.perchHeading = heading;
+    this.roarTime = ROAR_SECONDS;
+    this.snapPose = true;
+  }
+
+  /** Rears up and roars now, over whatever it is doing. */
+  public roar(): void {
+    this.roarTime = 0;
+  }
+
   /**
    * Follows the brain: `groundY` is the fight's ground, `leapFrom` where the
-   * leap in starts. Hidden while dormant.
+   * leap in starts. Hidden while dormant, unless shown on its perch.
    */
   public update(dt: number, boss: CaptainUssrSnapshot, groundY: number, leapFrom: THREE.Vector3Like): void {
     const step = Math.max(0, dt);
-    this.group.visible = boss.state !== 'dormant';
+    this.group.visible = boss.state !== 'dormant' || this.perched;
     if (!this.group.visible) return;
     if (boss.state !== this.previous) {
+      if (boss.state !== 'dormant') this.perched = false;
       this.bashFollowThrough = this.previous === 'bashWindup' && boss.state === 'recovering';
       if (boss.state === 'arriving') {
         this.leapStart.set(leapFrom.x, leapFrom.y, leapFrom.z);
@@ -140,7 +161,9 @@ export class CaptainUssrView {
     this.stride += step * (1.4 + boss.speed * 1.5);
     this.placeRoot(boss, groundY);
     this.choosePose(boss);
-    this.applyPose(step, boss.state === 'arriving' || boss.state === 'charging' ? POSE_RATE * 2 : POSE_RATE);
+    const rate = boss.state === 'arriving' || boss.state === 'charging' ? POSE_RATE * 2 : POSE_RATE;
+    this.applyPose(step, this.snapPose ? 0 : rate);
+    this.snapPose = false;
     this.animateDetails(step, boss);
     this.placeShield(step, boss, groundY);
     this.previous = boss.state;
@@ -156,6 +179,8 @@ export class CaptainUssrView {
     this.shieldRecoil.reset();
     this.roarTime = ROAR_SECONDS;
     this.lastPhase = 1;
+    this.perched = false;
+    this.snapPose = false;
     Object.assign(this.pose, emptyPose());
     Object.assign(this.target, emptyPose());
     this.applyPose(0, 0);
@@ -182,6 +207,11 @@ export class CaptainUssrView {
 
   private placeRoot(boss: CaptainUssrSnapshot, groundY: number): void {
     const root = this.rig.root;
+    if (boss.state === 'dormant') {
+      root.rotation.y = this.perchHeading;
+      root.position.copy(this.perchAt);
+      return;
+    }
     root.rotation.y = boss.heading;
     if (boss.state !== 'arriving') {
       root.position.set(boss.position.x, groundY, boss.position.z);
@@ -203,6 +233,20 @@ export class CaptainUssrView {
     const p = boss.stateProgress;
     this.guard(pose, boss.speed);
     switch (boss.state) {
+      case 'dormant':
+        // On its perch: crouched over the drop, the free hand braced, the shield on its arm, eyes on the yard below.
+        pose.bodyDrop = -0.45;
+        pose.bodyPitch = 0.45;
+        pose.headPitch = -0.3;
+        pose.hipX[0] = -1.0;
+        pose.hipX[1] = -0.8;
+        pose.kneeX[0] = 1.75;
+        pose.kneeX[1] = 1.5;
+        pose.shoulderX[1] = 0.25;
+        pose.shoulderZ[1] = -0.3;
+        pose.elbowX[1] = -0.35;
+        pose.shield.set(0.3, 1.1, 0.42);
+        break;
       case 'arriving': {
         const landed = p >= 0.8;
         // In the air: tucked, the free fist raised for the blow. Landed: a deep three-point squash that rises.
@@ -327,11 +371,11 @@ export class CaptainUssrView {
         break;
       }
     }
-    this.roar(pose, boss.state);
+    this.overlayRoar(pose, boss.state);
   }
 
   /** The roar over whatever it is doing: head thrown back, chest out, the free arm flung wide, the shield up. */
-  private roar(pose: Pose, state: CaptainUssrState): void {
+  private overlayRoar(pose: Pose, state: CaptainUssrState): void {
     const weight = state === 'defeated' || state === 'arriving' ? 0 : roarWeight(this.roarTime);
     if (weight <= 0) return;
     const blend = (from: number, to: number): number => THREE.MathUtils.lerp(from, to, weight);

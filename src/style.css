@@ -3240,6 +3240,194 @@ html.touch-controls-enabled #intro-skip small {
   }
 }
 
+/* ---------- Boss entrance ---------- */
+
+/*
+ * Letterbox and title card over a boss's filmed entrance. The bars close in
+ * at once and open again at the end of --boss-intro-duration; the card comes
+ * up at --boss-title-at (both set by HUD.showBossIntro).
+ */
+#boss-intro {
+  --boss-intro-duration: 7s;
+  --boss-title-at: 4.5s;
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#hud.boss-intro-active {
+  visibility: hidden;
+}
+
+.boss-intro-grade,
+.boss-intro-letterbox {
+  position: absolute;
+  inset: 0;
+}
+
+/* Blood-red vignette and a cold crush in the corners. */
+.boss-intro-grade {
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(30, 0, 0, 0.78) 100%),
+    linear-gradient(180deg, rgba(90, 8, 4, 0.18), rgba(8, 2, 2, 0.24));
+  opacity: 0;
+}
+
+.boss-intro-letterbox::before,
+.boss-intro-letterbox::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12vh;
+  background: #000;
+  transform: scaleY(0);
+}
+
+.boss-intro-letterbox::before { top: 0; transform-origin: top; }
+.boss-intro-letterbox::after { bottom: 0; transform-origin: bottom; }
+
+.boss-intro-title {
+  position: absolute;
+  left: clamp(16px, 7vw, 120px);
+  bottom: calc(12vh + clamp(20px, 5vh, 56px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  opacity: 0;
+}
+
+.boss-intro-kicker {
+  color: #ff5a3c;
+  font: 700 clamp(12px, 1.5vw, 17px) 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.6em;
+  text-shadow: 0 0 14px rgba(255, 50, 20, 0.7);
+}
+
+.boss-intro-name {
+  margin: 0;
+  /* Gunmetal struck with red, a glint sweeping across once. */
+  background:
+    linear-gradient(105deg, transparent 42%, rgba(255, 236, 228, 0.95) 50%, transparent 58%) 160% 0 / 250% 100% no-repeat,
+    linear-gradient(180deg, #ffd9cf 0%, #d23a24 52%, #6e0d06 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font: 400 clamp(52px, 10vw, 132px)/0.92 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.06em;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.75)) drop-shadow(0 0 30px rgba(220, 40, 20, 0.45));
+  white-space: nowrap;
+}
+
+.boss-intro-rule {
+  width: min(520px, 70vw);
+  height: 2px;
+  background: linear-gradient(90deg, #ff5a3c, rgba(220, 40, 20, 0));
+  box-shadow: 0 0 12px rgba(255, 60, 30, 0.6);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.boss-intro-tagline {
+  margin: 0;
+  color: #e4d6d2;
+  font: 600 clamp(13px, 1.5vw, 17px)/1.4 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 6px #000;
+  opacity: 0;
+}
+
+#boss-intro.playing .boss-intro-grade {
+  animation: boss-intro-grade var(--boss-intro-duration) linear both;
+}
+
+#boss-intro.playing .boss-intro-letterbox::before,
+#boss-intro.playing .boss-intro-letterbox::after {
+  animation: boss-intro-bars var(--boss-intro-duration) cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+#boss-intro.playing .boss-intro-title {
+  animation: boss-intro-title calc(var(--boss-intro-duration) - var(--boss-title-at)) ease-out var(--boss-title-at) both;
+}
+
+#boss-intro.playing .boss-intro-kicker {
+  animation: intro-track 1s cubic-bezier(0.2, 0.7, 0.2, 1) var(--boss-title-at) both;
+}
+
+#boss-intro.playing .boss-intro-name {
+  animation:
+    boss-intro-slam 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) calc(var(--boss-title-at) + 0.1s) both,
+    intro-glint 1.1s ease-in-out calc(var(--boss-title-at) + 0.6s) both;
+}
+
+#boss-intro.playing .boss-intro-rule {
+  animation: intro-rule 0.7s cubic-bezier(0.3, 0.7, 0.2, 1) calc(var(--boss-title-at) + 0.35s) both;
+}
+
+#boss-intro.playing .boss-intro-tagline {
+  animation: intro-rise 0.7s ease-out calc(var(--boss-title-at) + 0.55s) both;
+}
+
+/* In fast, held, out as the bars open. */
+@keyframes boss-intro-grade {
+  0% { opacity: 0; }
+  6%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes boss-intro-bars {
+  0% { transform: scaleY(0); }
+  7%, 93% { transform: scaleY(1); }
+  100% { transform: scaleY(0); }
+}
+
+@keyframes boss-intro-title {
+  0%, 85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* The name slams in over-scaled and settles with a jolt. */
+@keyframes boss-intro-slam {
+  from { opacity: 0; transform: scale(1.6); letter-spacing: 0.24em; }
+  to { opacity: 1; transform: none; letter-spacing: 0.06em; }
+}
+
+@media (orientation: portrait), (max-width: 600px) {
+  .boss-intro-title {
+    left: 16px;
+    right: 16px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .boss-intro-name {
+    font-size: clamp(40px, 13vw, 96px);
+  }
+}
+
+@media (max-height: 500px) {
+  .boss-intro-name {
+    font-size: clamp(34px, 12vh, 64px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #boss-intro.playing .boss-intro-kicker,
+  #boss-intro.playing .boss-intro-tagline,
+  #boss-intro.playing .boss-intro-rule {
+    transform: none;
+    animation-name: intro-fade;
+  }
+
+  #boss-intro.playing .boss-intro-name {
+    animation: intro-fade 0.6s ease-out calc(var(--boss-title-at) + 0.1s) both;
+  }
+}
+
 /* ---------- Ending and credits ---------- */
 
 /*

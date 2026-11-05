@@ -313,6 +313,10 @@ export class ZombiesMode implements GameMode {
     }
     if (this.runFlow.state === 'CREDITS' || this.runFlow.state === 'FINISHED') return;
     this.updateIntro(dt);
+    if (this.evacuation?.filming) {
+      this.updateFilmedGuardian(dt);
+      return;
+    }
 
     // The horde keeps shambling behind the game-over screen; it just can't
     // hurt anyone anymore.
@@ -491,9 +495,11 @@ export class ZombiesMode implements GameMode {
     this.rings?.updateJingle(false);
   }
 
-  /** While the intro or a filmed ending plays, the shell renders its camera instead of the player's. */
+  /** While the intro, a guardian's entrance or a filmed ending plays, the shell renders its camera instead of the player's. */
   getCinematicCamera(): THREE.Camera | null {
     if (this.intro?.isPlaying) return this.intro.camera;
+    const guardianCamera = this.evacuation?.cinematicCamera ?? null;
+    if (guardianCamera) return guardianCamera;
     return this.endingCinematic?.isPlaying ? this.endingCinematic.camera : null;
   }
 
@@ -521,7 +527,18 @@ export class ZombiesMode implements GameMode {
 
   /** The run itself is live: rounds, health, kills and hits keep resolving. */
   private runAcceptsInput(): boolean {
-    return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying;
+    return !this.gameOver && this.runFlow.acceptsGameplay && !this.intro?.isPlaying && !(this.evacuation?.filming ?? false);
+  }
+
+  /**
+   * A guardian's filmed entrance holds the whole run: the horde, the
+   * player, health and the clocks stand still; only the guardian, the
+   * evacuation's own presentation and the map move under its camera.
+   */
+  private updateFilmedGuardian(dt: number): void {
+    this.evacuation?.update(dt);
+    this.arena.update(dt, this.ctx.player.rig.position);
+    this.pushHudState();
   }
 
   /** E pressed: door unlock > barrier repair > soul lamp > ritual > gas mask > power switch > evacuation > purchases (rings among them). */

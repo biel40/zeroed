@@ -49,6 +49,14 @@ export interface BossBarState {
   readonly marks: readonly number[];
 }
 
+/** A boss's title card over its filmed entrance. */
+export interface BossIntroCard {
+  /** Diegetic line over the name (e.g. its Cyrillic title). */
+  readonly kicker: string;
+  readonly name: string;
+  readonly tagline: string;
+}
+
 /** The run's record an ending can show next to its final round. */
 export type EndingRecord = Pick<GameOverStats, 'kills' | 'headshots'>;
 
@@ -130,6 +138,7 @@ export class HUD {
   private readonly endingKills: HTMLElement = mustGet('ending-kills');
   private readonly endingHeadshots: HTMLElement = mustGet('ending-headshots');
   private readonly introScreen: HTMLElement = mustGet('intro-screen');
+  private readonly bossIntro: HTMLElement = mustGet('boss-intro');
   private readonly bossBar: HTMLElement = mustGet('boss-bar');
   private readonly bossBarFill: HTMLElement = mustGet('boss-bar-fill');
   private readonly bossBarTrail: HTMLElement = mustGet('boss-bar-trail');
@@ -786,6 +795,32 @@ export class HUD {
     this.root.classList.remove('intro-active');
     this.introScreen.classList.add('hidden');
     this.introScreen.classList.remove('playing');
+  }
+
+  /**
+   * Letterbox and title card over a boss's filmed entrance: the bars close
+   * in, `card` comes up at `titleAt` seconds, and the gameplay HUD stays
+   * hidden until `hideBossIntro`. The CSS timeline runs on `duration`.
+   */
+  public showBossIntro(card: BossIntroCard, duration: number, titleAt: number): void {
+    this.root.classList.add('boss-intro-active');
+    this.setInteractionPrompt(null);
+    mustGet('boss-intro-kicker').textContent = card.kicker;
+    mustGet('boss-intro-name').textContent = card.name;
+    mustGet('boss-intro-tagline').textContent = card.tagline;
+    this.bossIntro.style.setProperty('--boss-intro-duration', `${duration}s`);
+    this.bossIntro.style.setProperty('--boss-title-at', `${titleAt}s`);
+    // Re-adding the class restarts the CSS timeline on a replay.
+    this.bossIntro.classList.remove('playing');
+    void this.bossIntro.offsetWidth;
+    this.bossIntro.classList.remove('hidden');
+    this.bossIntro.classList.add('playing');
+  }
+
+  public hideBossIntro(): void {
+    this.root.classList.remove('boss-intro-active');
+    this.bossIntro.classList.add('hidden');
+    this.bossIntro.classList.remove('playing');
   }
 
   public setCreditsMainMenuHandler(handler: () => void): void {

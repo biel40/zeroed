@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { cameraSpatialCue, type SpatialCue } from '../audio/SpatialCue';
+import { EndingCinematic } from '../rendering/EndingCinematic';
 import { t, type TranslationKey } from '../i18n/i18n';
 import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 import type { Weapon } from '../weapons/Weapon';
 import { selectFlameTargets, type FlameHit } from '../zombies/FlameTargeting';
 import { CAPTAIN_USSR, CaptainUssrBrain, type CaptainUssrHitPart } from '../zombies/guardians/CaptainUssrBrain';
 import { CaptainUssrView } from '../zombies/guardians/CaptainUssrView';
-import type { ArenaEvacuationGuardian } from '../zombies/maps/ZombieArena';
+import { GuardianEntrance } from '../zombies/guardians/GuardianEntrance';
+import type { ArenaEvacuationGuardian, ArenaGuardianEntrance } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 
 /** Camera jolt of its landing and of a charge crashing nearby, at point blank. */
@@ -18,6 +20,10 @@ const BURN_FLINCH = 0.35;
 const TRAUMA_REACH = 14;
 /** The player still counts as within its reach this far outside its field. */
 const REACH_MARGIN = 1;
+/** Its diegetic title over its name on the entrance's card. */
+const KICKER = 'КАПИТАН СССР';
+/** Height of its growl over its feet. */
+const ROAR_HEIGHT = 1.9;
 const HINTS: Readonly<Record<1 | 2 | 3, TranslationKey>> = {
   1: 'guardian.captainUssr.hint1',
   2: 'guardian.captainUssr.hint2',
@@ -43,8 +49,10 @@ export interface GuardianRun {
  * wakes when the player enters its ground during the escape, routes shots,
  * VORTEX-9 and Tesla bolts and flames at its hitboxes into the brain, turns
  * the brain's events into damage, banners, sounds and camera shake, and
- * keeps its HUD bar and objective note. The pure `CaptainUssrBrain`
- * decides; `CaptainUssrView` presents.
+ * keeps its HUD bar and objective note. With a filmed entrance, waking it
+ * holds the run (`filming`) while its camera films it on its perch, the
+ * roar, the leap and the landing under the HUD's title card. The pure
+ * `CaptainUssrBrain` decides; `CaptainUssrView` presents.
  */
 export class ZombiesGuardian {
   private readonly brain: CaptainUssrBrain;
@@ -63,6 +71,12 @@ export class ZombiesGuardian {
   private registered = false;
   private note: ObjectiveNote | null = null;
   private notePhase = 0;
+  /** The filmed entrance: its beats, its clock and its camera; null when it leaps straight in. */
+  private readonly entrance: {
+    readonly config: ArenaGuardianEntrance;
+    readonly clock: GuardianEntrance;
+    readonly film: EndingCinematic;
+  } | null;
 
   public constructor(
     private readonly ctx: ModeContext,
@@ -74,6 +88,18 @@ export class ZombiesGuardian {
     this.view = new CaptainUssrView(!ctx.profile.useReducedEffects);
     ctx.scene.add(this.view.group);
     this.leapFrom = new THREE.Vector3(guardian.leapFrom.x, guardian.leapFrom.y, guardian.leapFrom.z);
+    const config = guardian.entrance;
+    this.entrance = config ? { config, clock: new GuardianEntrance(config), film: new EndingCinematic(config.shots) } : null;
+  }
+
+  /** Its filmed entrance is playing: the run holds while the shell films through `cinematicCamera`. */
+  public get filming(): boolean {
+    return this.entrance?.clock.playing ?? false;
+  }
+
+  /** The entrance's camera while it plays, else null. */
+  public get cinematicCamera(): THREE.Camera | null {
+    return this.entrance && this.filming ? this.entrance.film.camera : null;
   }
 
   /** Not yet beaten: nobody boards. */
@@ -81,16 +107,17 @@ export class ZombiesGuardian {
     return this.brain.state !== 'defeated';
   }
 
-  /** Arriving or fighting: the escape clock and the horde wait for the duel. */
+  /** Filmed, arriving or fighting: the escape clock and the horde wait for the duel. */
   public get fighting(): boolean {
-    return this.brain.state !== 'dormant' && this.brain.state !== 'defeated';
+    return this.filming || (this.brain.state !== 'dormant' && this.brain.state !== 'defeated');
   }
 
   /** `escaping`: the escape is under way, so the player can wake it. */
   public update(dt: number, escaping: boolean): void {
     this.readPlayer();
-    if (escaping && this.brain.state === 'dormant' && this.playerInTrigger()) this.awaken();
-    this.brain.update(dt, this.player);
+    if (escaping && this.brain.state === 'dormant' && !this.filming && this.playerInTrigger()) this.wake();
+    if (this.entrance && this.filming) this.updateEntrance(this.entrance.clock, this.entrance.film, dt);
+    else this.brain.update(dt, this.player);
     this.processEvents();
     this.view.update(dt, this.brain, this.guardian.groundY, this.leapFrom);
     this.showBar();
@@ -149,8 +176,11 @@ export class ZombiesGuardian {
     return t('guardian.blocksBoarding', { name: this.name() });
   }
 
-  /** New run: asleep, out of the ballistics, its bar hidden. */
+  /** New run: asleep, out of the ballistics, its bar and any entrance card hidden. */
   public reset(): void {
+    this.entrance?.clock.reset();
+    this.entrance?.film.stop();
+    this.ctx.hud.hideBossIntro();
     this.brain.reset();
     this.view.reset();
     this.unregister();
@@ -179,19 +209,58 @@ export class ZombiesGuardian {
     return this.ctx.player.floor === floor && x > trigger.minX && x < trigger.maxX && z > trigger.minZ && z < trigger.maxZ;
   }
 
-  private awaken(): void {
+  /** The player stepped onto its ground: its entrance starts on the perch, or it leaps straight in. */
+  private wake(): void {
+    if (!this.entrance) {
+      this.awaken(true);
+      return;
+    }
+    const { config, clock, film } = this.entrance;
+    const { landing } = this.guardian.field;
+    clock.start();
+    this.view.perch(this.leapFrom, Math.atan2(landing.x - this.leapFrom.x, landing.z - this.leapFrom.z));
+    film.start(this.ctx.player.camera);
+    this.ctx.hud.showBossIntro({ kicker: KICKER, name: this.name(), tagline: t('guardian.arrivalSub') }, config.duration, config.titleAt);
+    this.ctx.audio.playAmbushScare(this.cueAt(this.leapFrom.x, this.leapFrom.y, this.leapFrom.z));
+  }
+
+  /**
+   * The entrance's beats: the roar on the perch, then the leap; only the
+   * leap runs the brain, so once landed it waits for the camera to hand
+   * back before it fights.
+   */
+  private updateEntrance(clock: GuardianEntrance, film: EndingCinematic, dt: number): void {
+    clock.update(dt);
+    if (clock.due.roar) {
+      this.view.roar();
+      this.ctx.audio.playZombieSpawn(this.cueAt(this.leapFrom.x, this.leapFrom.y + ROAR_HEIGHT, this.leapFrom.z));
+    }
+    if (clock.due.leap) this.awaken(false);
+    if (this.brain.state === 'arriving') this.brain.update(dt, this.player);
+    film.update(dt, this.ctx.player.camera);
+    if (!clock.due.finished) return;
+    film.stop();
+    this.ctx.hud.hideBossIntro();
+  }
+
+  /** Into the fight: the leap starts and its hitboxes join the ballistics; `scare` plays its stinger. */
+  private awaken(scare: boolean): void {
     if (!this.brain.awaken(this.run.round(), this.player.x, this.player.z)) return;
     this.register();
-    this.ctx.audio.playAmbushScare(this.cueAt(this.leapFrom.x, this.leapFrom.y, this.leapFrom.z));
+    if (scare) this.ctx.audio.playAmbushScare(this.cueAt(this.leapFrom.x, this.leapFrom.y, this.leapFrom.z));
   }
 
   private processEvents(): void {
     for (const event of this.brain.pendingEvents) {
       switch (event.type) {
         case 'arrived':
-          this.ctx.hud.showRoundBanner(this.name(), t('guardian.arrivalSub'));
-          this.shakeNear(LANDING_TRAUMA);
+          // Filmed, its title card names it and the camera is not the player's.
+          if (!this.filming) {
+            this.ctx.hud.showRoundBanner(this.name(), t('guardian.arrivalSub'));
+            this.shakeNear(LANDING_TRAUMA);
+          }
           this.ctx.audio.playBarrierBreak(this.cueAtBoss(0.2));
+          this.ctx.audio.playZombieSpawn(this.cueAtBoss(ROAR_HEIGHT));
           break;
         case 'phase':
           this.ctx.hud.showRoundBanner(this.name(), t(PHASE_BANNERS[event.phase]));

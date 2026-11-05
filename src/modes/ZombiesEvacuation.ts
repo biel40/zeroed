@@ -81,6 +81,15 @@ export class ZombiesEvacuation {
     return this.protocol.active;
   }
 
+  /** The guardian's filmed entrance is playing: the run holds, filmed through `cinematicCamera`. */
+  public get filming(): boolean {
+    return this.guardian?.filming ?? false;
+  }
+
+  public get cinematicCamera(): THREE.Camera | null {
+    return this.guardian?.cinematicCamera ?? null;
+  }
+
   /** The developer command is on: the panel offers to open the exit at once, for the protocol's price. */
   public enableDeveloperExit(): void {
     this.developerExit = true;

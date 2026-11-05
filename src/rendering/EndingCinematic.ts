@@ -16,10 +16,11 @@ function wobble(time: number, phase: number): number {
 }
 
 /**
- * Films a map's ending (`ArenaEnding.shots`) through its own camera, which
- * the shell renders instead of the player's while `isPlaying`. Shots play
- * back to back with hard cuts; after the last one the camera holds its final
- * frame until `stop`, under the HUD's credits.
+ * Films a map's ending (`ArenaEnding.shots`), or a guardian's entrance
+ * (`ArenaGuardianEntrance.shots`), through its own camera, which the shell
+ * renders instead of the player's while `isPlaying`. Shots play back to
+ * back with hard cuts; after the last one the camera holds its final frame
+ * until `stop` (under the HUD's credits, at the end of a run).
  */
 export class EndingCinematic {
   public readonly camera = new THREE.PerspectiveCamera();

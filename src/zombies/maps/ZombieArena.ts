@@ -16,6 +16,7 @@ import type { WeaponId } from '../../weapons/WeaponTypes';
 import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules, EvacuationStage } from '../evacuation/EvacuationProtocol';
 import type { CaptainUssrField, GroundRect } from '../guardians/CaptainUssrBrain';
+import type { GuardianEntranceBeats } from '../guardians/GuardianEntrance';
 
 export interface MysteryBoxPlacement {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -175,8 +176,24 @@ export interface ArenaEvacuationGuardian {
   /** Height of the ground it fights on. */
   readonly groundY: number;
   readonly field: CaptainUssrField;
+  /** Where its leap starts: its perch, where the entrance shows it before the leap. */
   readonly leapFrom: { readonly x: number; readonly y: number; readonly z: number };
   readonly trigger: GroundRect;
+  /** Optional filmed entrance; without one it leaps straight in. */
+  readonly entrance?: ArenaGuardianEntrance;
+}
+
+/**
+ * A guardian's filmed entrance: waking it holds the whole run (the horde,
+ * the clocks, the player) while the camera films it on its perch, its
+ * roar, the leap and the landing, under the HUD's title card, then cuts
+ * back to first person. The beats run from the moment it wakes.
+ */
+export interface ArenaGuardianEntrance extends GuardianEntranceBeats {
+  /** When its title card comes up. */
+  readonly titleAt: number;
+  /** Shots back to back with hard cuts (like a filmed ending's); together they last `duration`. */
+  readonly shots: ReadonlyArray<ArenaEndingShot>;
 }
 
 /**

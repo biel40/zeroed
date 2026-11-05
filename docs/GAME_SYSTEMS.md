@@ -470,8 +470,13 @@ existente a `MOTDRULES`.
   Reiniciar lo devuelve todo al estado inicial.
 - Guardian de la extraccion (`ArenaEvacuation.guardian`, opcional; en
   Station 33 el CAPITAN URSS, un supersoldado sovietico zombificado con
-  escudo): durante la huida, al entrar en su zona (el patio) salta la valla
-  y aterriza; mientras pelea, el reloj de huida y la horda del protocolo se
+  escudo): durante la huida, al entrar en su zona (el patio) arranca su
+  entrada filmada (`PROTOCOL33_GUARDIAN_ENTRANCE`, 7 s, sin saltar): la run
+  se congela (horda, reloj, vida y control del jugador) y, entre bandas de
+  cine, aparece agazapado sobre el primer poste electrico tras la valla,
+  ruge, salta al patio, aterriza y vuelve a rugir bajo su rotulo; luego la
+  camara vuelve a primera persona y empieza el combate. Mientras pelea, el
+  reloj de huida y la horda del protocolo se
   detienen y el camion no admite subir. `ZombiesGuardian` lo orquesta sobre
   el cerebro puro `CaptainUssrBrain` (aleatoriedad inyectada) y su vista
   `CaptainUssrView`. Su escudo bloquea los disparos que llegan dentro de su

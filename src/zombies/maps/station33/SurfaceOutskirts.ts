@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { starGeometry } from '../../../rendering/StarGeometry';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { placement } from '../shared/StaticMeshBatch';
-import { PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, PROTOCOL33_TRUCK } from '../Station33Config';
+import { PROTOCOL33_POWER_LINE, PROTOCOL33_ROAD, PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 
@@ -11,11 +11,10 @@ const { yard } = PROTOCOL33_SURFACE;
 /** How far the dead wasteland runs before the fog swallows it. */
 export const WASTELAND = { minX: -90, maxX: 120, minZ: -210, maxZ: -30 } as const;
 /** The road out of the gate, north into the fog. */
-const ROAD = { x: PROTOCOL33_TRUCK.x, width: 6.5, fromZ: yard.minZ - 0.3, toZ: WASTELAND.minZ } as const;
+const ROAD = { ...PROTOCOL33_ROAD, fromZ: yard.minZ - 0.3, toZ: WASTELAND.minZ } as const;
 /** The guards' watchtower outside the yard's north-west corner. */
 const WATCHTOWER = { x: 0.6, z: -104.2, height: 6.2, size: 2.6 } as const;
-/** Power poles along the road's west verge, every `spacing` metres. */
-const POWER_LINE = { x: ROAD.x - ROAD.width / 2 - 1.6, fromZ: -104, spacing: 14, poles: 7, height: 8 } as const;
+const POWER_LINE = PROTOCOL33_POWER_LINE;
 /** A burnt-out saloon nosed into the verge across the road. */
 const CAR_WRECK = { x: ROAD.x + ROAD.width / 2 + 2.4, z: -114, yaw: 0.45 } as const;
 /** Birches stand off the fence, off the road and off the tower. */

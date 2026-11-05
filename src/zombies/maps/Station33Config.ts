@@ -21,6 +21,7 @@ import type {
   ArenaAmbientCue,
   ArenaEnding,
   ArenaEndingShot,
+  ArenaGuardianEntrance,
   ArenaIntro,
   MysteryBoxPlacement,
   PlayerBounds,
@@ -670,6 +671,16 @@ export const PROTOCOL33_SURFACE = {
  */
 export const PROTOCOL33_TRUCK = { x: 20.4, z: -92.5, length: 7.2, width: 2.5, height: 3, cabOffset: 1.75 } as const;
 
+/** The road out of the gate, north into the fog: its centre line, in line with the truck, and its width. */
+export const PROTOCOL33_ROAD = { x: PROTOCOL33_TRUCK.x, width: 6.5 } as const;
+
+/**
+ * Power poles along the road's west verge, every `spacing` metres north
+ * from `fromZ`; `height` is each pole's top over the ground. The first,
+ * just outside the north fence, is CAPITÁN URSS's perch.
+ */
+export const PROTOCOL33_POWER_LINE = { x: PROTOCOL33_ROAD.x - PROTOCOL33_ROAD.width / 2 - 1.6, fromZ: -104, spacing: 14, poles: 7, height: 8 } as const;
+
 /**
  * Solid props of the yard, all kept to its edges so the middle stays open
  * ground for the guardian's fight: the sodium lamp's pole (south-west),
@@ -697,14 +708,66 @@ export const PROTOCOL33_YARD = {
 /**
  * CAPITÁN URSS, the guardian of the extraction: once the escape is under
  * way and a player is `awakenDepth` metres into the yard, he leaps the
- * north fence from `leapFrom` and lands on `landing`, in the open middle
- * of the yard. The truck will not leave while he stands.
+ * north fence from his perch on top of the first power pole (`leapFrom`)
+ * and lands on `landing`, in the open middle of the yard. The truck will
+ * not leave while he stands.
  */
 export const PROTOCOL33_GUARDIAN = {
   landing: { x: 14.0, z: -91.0 },
-  leapFrom: { x: 13.0, y: PROTOCOL33_SURFACE_Y + 6.5, z: -104.5 },
+  leapFrom: { x: PROTOCOL33_POWER_LINE.x, y: PROTOCOL33_SURFACE_Y + PROTOCOL33_POWER_LINE.height, z: PROTOCOL33_POWER_LINE.fromZ },
   awakenDepth: 1.6,
 } as const;
+
+/**
+ * CAPITÁN URSS's filmed entrance, from the moment the player steps into
+ * the yard: from the stairhead, a figure crouched on the power pole over
+ * the fence; a low close-up as he roars against the sky; a wide shot from
+ * the west fence as he leaps the fence and slams down; and a low
+ * three-quarter shot from his free side as he rises and roars again under
+ * his title card. Then the fight.
+ */
+export const PROTOCOL33_GUARDIAN_ENTRANCE: ArenaGuardianEntrance = {
+  roarAt: 1.9,
+  leapAt: 3.0,
+  titleAt: 4.7,
+  duration: 7.0,
+  shots: [
+    {
+      duration: 1.6,
+      shake: 0.004,
+      keys: [
+        { time: 0, position: { x: 14.8, y: 8.25, z: -82.6 }, target: { x: 15.4, y: 14.6, z: -104 } },
+        { time: 1.6, position: { x: 14.9, y: 8.4, z: -84.2 }, target: { x: 15.5, y: 15.4, z: -104 } },
+      ],
+    },
+    {
+      duration: 1.4,
+      shake: 0.006,
+      keys: [
+        { time: 0, position: { x: 17.4, y: 12.9, z: -100.9 }, target: { x: 15.55, y: 16.3, z: -104 } },
+        { time: 1.4, position: { x: 17.1, y: 12.7, z: -101.3 }, target: { x: 15.55, y: 16.4, z: -104 } },
+      ],
+    },
+    {
+      duration: 1.5,
+      shake: 0.01,
+      keys: [
+        { time: 0, position: { x: 6.6, y: 8.3, z: -90.6 }, target: { x: 15.3, y: 14.2, z: -102 } },
+        { time: 0.7, position: { x: 6.7, y: 8.3, z: -90.6 }, target: { x: 14.9, y: 12.2, z: -96.5 } },
+        { time: 1.2, position: { x: 6.8, y: 8.28, z: -90.55 }, target: { x: 14.1, y: 8.2, z: -91.2 } },
+        { time: 1.5, position: { x: 6.9, y: 8.25, z: -90.5 }, target: { x: 14.0, y: 8.4, z: -91 } },
+      ],
+    },
+    {
+      duration: 2.5,
+      shake: 0.008,
+      keys: [
+        { time: 0, position: { x: 12.7, y: 7.6, z: -87.6 }, target: { x: 14.0, y: 8.85, z: -91 } },
+        { time: 2.5, position: { x: 12.95, y: 7.65, z: -88.3 }, target: { x: 14.0, y: 9.0, z: -91 } },
+      ],
+    },
+  ],
+};
 
 /**
  * Open-air mood of the surface: a cold blue-grey night haze, thinner than

@@ -126,7 +126,11 @@ sufra tirones de compilacion de shaders.
   (`ArenaEvacuationGuardian`: tipo, planta, suelo, campo con obstaculos,
   salto y zona de activacion) lo ejecuta `ZombiesGuardian` sobre la logica
   pura `CaptainUssrBrain` y la vista `CaptainUssrView`
-  (`src/zombies/guardians/`); el mapa solo declara su terreno.
+  (`src/zombies/guardians/`); el mapa solo declara su terreno. Con
+  `entrance` (`ArenaGuardianEntrance`: tiempos y planos) su aparicion se
+  filma: el reloj puro `GuardianEntrance` marca los tiempos, `EndingCinematic`
+  rueda los planos, `ZombiesMode` congela la run mientras dura y el HUD
+  muestra la tarjeta (`showBossIntro`).
   Los pickups con `codeLock` separan la validacion del codigo de la aplicacion
   de una apertura autorizada; cooperativo replica las aperturas y recogidas
   bajo autoridad del anfitrion, sin introducir dependencias de un mapa.
