@@ -29,7 +29,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 30,
     recoil: {
-      verticalKick: 0.022,
+      verticalKick: 0.024,
       horizontalKick: 0.004,
       horizontalBias: 0,
       kickVariance: 0.2,
@@ -234,7 +234,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 22,
     recoil: {
-      verticalKick: 0.0092,
+      verticalKick: 0.010,
       horizontalKick: 0.0042,
       horizontalBias: 0.1,
       kickVariance: 0.28,
@@ -438,7 +438,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 22,
     recoil: {
-      verticalKick: 0.0085,
+      verticalKick: 0.0092,
       horizontalKick: 0.0045,
       horizontalBias: 0.12,
       kickVariance: 0.3,
