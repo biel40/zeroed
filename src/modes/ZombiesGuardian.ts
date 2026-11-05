@@ -12,6 +12,8 @@ import type { ModeContext } from './GameMode';
 /** Camera jolt of its landing and of a charge crashing nearby, at point blank. */
 const LANDING_TRAUMA = 0.7;
 const CRASH_TRAUMA = 0.45;
+/** Each tick of flame jolts it lightly: a stream keeps it writhing without a full flinch per tick. */
+const BURN_FLINCH = 0.35;
 /** Beyond this distance its landing and crashes no longer shake the view. */
 const TRAUMA_REACH = 14;
 /** The player still counts as within its reach this far outside its field. */
@@ -104,6 +106,7 @@ export class ZombiesGuardian {
     this.ctx.player.camera.getWorldPosition(this.camera);
     const result = this.brain.takeHit(damage, part, this.camera.x, this.camera.z);
     if (result === 'blocked') {
+      this.view.block();
       this.ctx.audio.playImpact('metal');
       this.ctx.effects.puff(point, 0xffcf8a, 0.12);
     } else if (result !== 'ignored') {
@@ -126,8 +129,8 @@ export class ZombiesGuardian {
     this.flameBody.position.set(x, this.guardian.groundY, z);
     selectFlameTargets(origin, direction, flame.range, this.flameCandidates, flame, this.flameHits);
     if (this.flameHits.length === 0) return;
-    this.ctx.player.camera.getWorldPosition(this.camera);
-    if (this.brain.takeHit(damage, 'torso', this.camera.x, this.camera.z) !== 'blocked') this.view.flash();
+    // The flamethrower's reward: fire wraps around the shield, every tick lands.
+    if (this.brain.takeBurn(damage) !== 'ignored') this.view.flash(BURN_FLINCH);
     this.processEvents();
   }
 

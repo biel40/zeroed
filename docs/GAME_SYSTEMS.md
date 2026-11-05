@@ -476,7 +476,11 @@ existente a `MOTDRULES`.
   el cerebro puro `CaptainUssrBrain` (aleatoriedad inyectada) y su vista
   `CaptainUssrView`. Su escudo bloquea los disparos que llegan dentro de su
   arco frontal y cualquier impacto en el propio escudo; la cabeza recibe el
-  doble y aturdido recibe mas. Ataques: golpe de escudo a corta distancia,
+  doble y aturdido recibe mas. Las llamas del ФАКЕЛ nunca se bloquean
+  (`CaptainUssrBrain.takeBurn`): queman desde cualquier lado, como premio a
+  tenerlo. Al recibir un impacto se sacude hacia atras y el escudo retrocede
+  al bloquear; ruge al aterrizar y al entrar en cada fase, respira quieto y al
+  caer se derrumba de rodillas antes de desplomarse (`CaptainUssrMotion`). Ataques: golpe de escudo a corta distancia,
   lanzamiento del escudo (vuela hasta donde estaba el jugador y vuelve; sin
   el queda expuesto de frente) y, desde la fase 2, la carga en linea recta,
   que si choca con la valla o un solido lo deja aturdido. Fases al 60 % y al

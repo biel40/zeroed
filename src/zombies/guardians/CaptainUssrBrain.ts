@@ -269,15 +269,16 @@ export class CaptainUssrBrain {
   public takeHit(damage: number, part: CaptainUssrHitPart, fromX: number, fromZ: number): CaptainUssrHitResult {
     if (!this.engaged) return 'ignored';
     if (part === 'shield' || (this.blocking && this.faces(fromX, fromZ))) return 'blocked';
-    const scale = (part === 'head' ? this.tuning.headMultiplier : 1) * (this.current === 'stunned' ? this.tuning.stunMultiplier : 1);
-    this.hp = Math.max(0, this.hp - Math.max(0, damage) * scale);
-    this.updatePhase();
-    if (this.hp > 0) return 'hurt';
-    this.current = 'defeated';
-    this.holdingShield = true;
-    this.syncShield();
-    this.pendingEvents.push({ type: 'defeated' });
-    return 'killed';
+    return this.applyDamage(damage, part);
+  }
+
+  /**
+   * A flame weapon's tick: fire wraps around the shield, so it is never
+   * blocked, from any side; it counts as a body hit (stun bonus included).
+   */
+  public takeBurn(damage: number): CaptainUssrHitResult {
+    if (!this.engaged) return 'ignored';
+    return this.applyDamage(damage, 'torso');
   }
 
   public clearEvents(): void {
@@ -303,6 +304,19 @@ export class CaptainUssrBrain {
     this.chargeTravelled = 0;
     this.syncShield();
     this.pendingEvents.length = 0;
+  }
+
+  /** Damage that got through: the head and a stunned body take more; crossing a threshold or dying is an event. */
+  private applyDamage(damage: number, part: CaptainUssrHitPart): CaptainUssrHitResult {
+    const scale = (part === 'head' ? this.tuning.headMultiplier : 1) * (this.current === 'stunned' ? this.tuning.stunMultiplier : 1);
+    this.hp = Math.max(0, this.hp - Math.max(0, damage) * scale);
+    this.updatePhase();
+    if (this.hp > 0) return 'hurt';
+    this.current = 'defeated';
+    this.holdingShield = true;
+    this.syncShield();
+    this.pendingEvents.push({ type: 'defeated' });
+    return 'killed';
   }
 
   private stalk(dt: number, player: CaptainUssrTarget): void {

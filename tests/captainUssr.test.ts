@@ -106,6 +106,26 @@ describe('Captain USSR brain', () => {
     expect(brain.health).toBe(brain.maxHealth - 200 - 100 * CAPTAIN_USSR.headMultiplier);
   });
 
+  it('burns through its shield: flames hurt it from any side, never blocked', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    expect(brain.blocking).toBe(true);
+    expect(brain.takeHit(100, 'torso', player.x, player.z)).toBe('blocked');
+    expect(brain.takeBurn(100)).toBe('hurt');
+    expect(brain.takeBurn(100)).toBe('hurt');
+    expect(brain.health).toBe(brain.maxHealth - 200);
+    expect(brain.takeBurn(brain.maxHealth)).toBe('killed');
+    expect(brain.takeBurn(100)).toBe('ignored');
+  });
+
+  it('ignores flames before it has landed', () => {
+    const brain = brainWith();
+    expect(brain.takeBurn(100)).toBe('ignored');
+    brain.awaken(ROUND, 15, 25);
+    expect(brain.takeBurn(100)).toBe('ignored');
+    expect(brain.health).toBe(brain.maxHealth);
+  });
+
   it('bashes a player who stays in front of it, and misses one who steps back in time', () => {
     const close = { x: 15, z: 16.8, reachable: true };
     const brain = fighting(close);

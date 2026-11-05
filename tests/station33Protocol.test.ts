@@ -404,6 +404,23 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
   });
 
+  it('lets the ФАКЕЛ burn CAPITÁN URSS head-on, straight through his raised shield', () => {
+    const run = escapingRun();
+    const { brain } = confrontGuardian(run);
+    const { x, z } = brain.position;
+    const frontX = x + Math.sin(brain.heading) * 4;
+    const frontZ = z + Math.cos(brain.heading) * 4;
+    stand(run.side, frontX, frontZ, Math.atan2(frontX - x, frontZ - z), 1);
+    expect(brain.blocking).toBe(true);
+    const origin = run.side.player.camera.getWorldPosition(new THREE.Vector3());
+    const direction = new THREE.Vector3(x - origin.x, 0, z - origin.z).normalize();
+    const fakel = { definition: WEAPON_DEFINITIONS.fakel } as unknown as Weapon;
+    const before = brain.health;
+    for (let tick = 0; tick < 10; tick++) run.mode.onWeaponFired(fakel, origin, direction);
+    expect(brain.health).toBeLessThan(before);
+    expect(before - brain.health).toBeCloseTo(10 * WEAPON_DEFINITIONS.fakel.damage, 0);
+  });
+
   it('puts CAPITÁN URSS back to sleep and out of the ballistics on restart', () => {
     const run = escapingRun();
     const guardian = confrontGuardian(run);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { CaptainUssrBrain, CaptainUssrHitPart, CaptainUssrState } from './CaptainUssrBrain';
 import { buildCaptainUssr, CAPTAIN_USSR_BODY, SHIELD_RADIUS, type CaptainUssrRig } from './CaptainUssrModel';
+import { anticipation, Flinch, ROAR_SECONDS, roarWeight } from './CaptainUssrMotion';
 
 /** What the view reads from the brain each frame. */
 export type CaptainUssrSnapshot = Pick<CaptainUssrBrain,
@@ -17,8 +18,13 @@ const SHIELD_SPIN = 22;
 const FLASH_SECONDS = 0.14;
 /** How high the leap arcs over the straight line between its ends. */
 const LEAP_ARC = 3;
-/** Seconds the death fall takes. */
-const FALL_SECONDS = 1.1;
+/** Seconds the death takes: the knees buckle first (`KNEEL_SHARE` of it), then it topples back. */
+const FALL_SECONDS = 1.7;
+const KNEEL_SHARE = 0.4;
+/** How far a full flinch throws the body and the head back, and a blocked shot the shield (rad, m). */
+const FLINCH = { body: 0.2, head: 0.4, shieldPitch: 0.3, shieldBack: 0.12 } as const;
+/** Breathing while it stands still: rad/s and how deep. */
+const BREATH = { rate: 1.8, depth: 0.035 } as const;
 
 /** A pose: every joint angle and where the shield rides while held, in the body's frame. */
 interface Pose {
@@ -74,6 +80,11 @@ export class CaptainUssrView {
   private stride = 0;
   private spin = 0;
   private flashLeft = 0;
+  private readonly flinch = new Flinch();
+  private readonly shieldRecoil = new Flinch();
+  /** Seconds into the current roar; `ROAR_SECONDS` or more when none plays. */
+  private roarTime = ROAR_SECONDS;
+  private lastPhase = 1;
 
   public constructor(castShadow: boolean) {
     this.rig = buildCaptainUssr(castShadow);
@@ -90,9 +101,15 @@ export class CaptainUssrView {
     this.group.visible = false;
   }
 
-  /** A landed hit: the suit flushes red for a moment. */
-  public flash(): void {
+  /** A landed hit: the suit flushes red for a moment and the body jolts back by `strength` (0..1). */
+  public flash(strength = 1): void {
     this.flashLeft = FLASH_SECONDS;
+    this.flinch.kick(strength);
+  }
+
+  /** A shot rang off the shield: it is knocked back against the arm. */
+  public block(): void {
+    this.shieldRecoil.kick(1);
   }
 
   /**
@@ -105,9 +122,19 @@ export class CaptainUssrView {
     if (!this.group.visible) return;
     if (boss.state !== this.previous) {
       this.bashFollowThrough = this.previous === 'bashWindup' && boss.state === 'recovering';
-      if (boss.state === 'arriving') this.leapStart.set(leapFrom.x, leapFrom.y, leapFrom.z);
+      if (boss.state === 'arriving') {
+        this.leapStart.set(leapFrom.x, leapFrom.y, leapFrom.z);
+        this.lastPhase = boss.phase;
+      }
+      // Landed: it rears up and roars.
+      if (this.previous === 'arriving' && boss.state !== 'defeated') this.roarTime = 0;
       this.stateTime = 0;
     }
+    if (boss.phase > this.lastPhase && boss.state !== 'defeated') this.roarTime = 0;
+    this.lastPhase = boss.phase;
+    this.roarTime += step;
+    this.flinch.update(step);
+    this.shieldRecoil.update(step);
     this.stateTime += step;
     this.time += step;
     this.stride += step * (1.4 + boss.speed * 1.5);
@@ -125,6 +152,10 @@ export class CaptainUssrView {
     this.stateTime = 0;
     this.flashLeft = 0;
     this.spin = 0;
+    this.flinch.reset();
+    this.shieldRecoil.reset();
+    this.roarTime = ROAR_SECONDS;
+    this.lastPhase = 1;
     Object.assign(this.pose, emptyPose());
     Object.assign(this.target, emptyPose());
     this.applyPose(0, 0);
@@ -174,42 +205,70 @@ export class CaptainUssrView {
     switch (boss.state) {
       case 'arriving': {
         const landed = p >= 0.8;
-        pose.hipX[0] = pose.hipX[1] = landed ? -0.9 : -1.1;
-        pose.kneeX[0] = pose.kneeX[1] = landed ? 1.6 : 1.9;
-        pose.bodyDrop = landed ? -0.42 * (1 - (p - 0.8) / 0.2) : 0;
-        pose.bodyPitch = landed ? 0.35 : -0.1;
-        pose.shoulderX[1] = landed ? -0.2 : -2.4;
-        pose.shoulderZ[1] = landed ? -0.5 : -0.2;
+        // In the air: tucked, the free fist raised for the blow. Landed: a deep three-point squash that rises.
+        const rise = landed ? (p - 0.8) / 0.2 : 0;
+        pose.hipX[0] = pose.hipX[1] = landed ? -1.0 : -1.1;
+        pose.kneeX[0] = pose.kneeX[1] = landed ? 1.8 - 0.4 * rise : 1.9;
+        pose.bodyDrop = landed ? -0.55 * (1 - rise) : 0;
+        pose.bodyPitch = landed ? 0.5 - 0.2 * rise : -0.1;
+        pose.headPitch = landed ? -0.2 : 0.1;
+        pose.shoulderX[1] = landed ? 0.35 : -2.4;
+        pose.shoulderZ[1] = landed ? -0.35 : -0.2;
+        pose.elbowX[1] = landed ? -0.1 : -0.5;
+        pose.shield.set(0.3, landed ? 0.9 : 1.4, 0.45);
         break;
       }
-      case 'bashWindup':
-        pose.torsoYaw = 0.55 * p;
-        pose.shield.set(0.42, 1.32, 0.15);
-        pose.shieldYaw = 0.6;
+      case 'bashWindup': {
+        // Coils back behind the shield, weight on the rear leg, then drives it.
+        const coil = anticipation(p);
+        pose.torsoYaw = 0.75 * coil;
+        pose.bodyDrop = -0.12 * coil;
+        pose.bodyPitch = -0.08 * coil;
+        pose.hipX[0] = -0.25 * coil;
+        pose.hipX[1] = 0.35 * coil;
+        pose.kneeX[0] = 0.25 + 0.3 * coil;
+        pose.kneeX[1] = 0.45 * coil;
+        pose.shield.set(0.42 + 0.1 * coil, 1.32, 0.15 - 0.15 * coil);
+        pose.shieldYaw = 0.6 + 0.25 * coil;
         pose.shoulderX[0] = -0.4;
-        pose.shoulderZ[0] = 0.5;
+        pose.shoulderZ[0] = 0.5 + 0.2 * coil;
         break;
+      }
       case 'recovering':
         if (this.bashFollowThrough && this.stateTime < 0.35) {
-          // The bash's follow-through: the shield driven forward.
-          pose.torsoYaw = -0.4;
+          // The bash's follow-through: a lunge, the shield driven forward off the front foot.
+          pose.torsoYaw = -0.45;
+          pose.bodyPitch = 0.3;
+          pose.bodyDrop = -0.1;
+          pose.hipX[0] = -0.65;
+          pose.hipX[1] = 0.3;
+          pose.kneeX[0] = 0.6;
+          pose.kneeX[1] = 0.2;
           pose.shield.set(0.05, 1.38, 0.95);
           pose.shoulderX[0] = -1.55;
           pose.elbowX[0] = -0.2;
         }
         break;
-      case 'throwWindup':
-        // Backhand: the shield cocked across the chest to the right shoulder.
-        pose.torsoYaw = -0.7 * p;
+      case 'throwWindup': {
+        // Backhand: the shield cocked across the chest to the right shoulder, body wound up and low.
+        const coil = anticipation(p);
+        pose.torsoYaw = -0.95 * coil;
+        pose.bodyDrop = -0.1 * coil;
+        pose.bodyRoll = -0.06 * coil;
+        pose.kneeX[0] = pose.kneeX[1] = 0.1 + 0.35 * coil;
         pose.shield.set(-0.32, 1.5, 0.22);
-        pose.shieldYaw = -1.1;
+        pose.shieldYaw = -1.1 - 0.3 * coil;
         pose.shoulderX[0] = -1.4;
-        pose.shoulderZ[0] = -0.9;
+        pose.shoulderZ[0] = -0.9 - 0.2 * coil;
         pose.elbowX[0] = -1.4;
         break;
+      }
       case 'shieldFlight':
-        // Follow-through, arm flung out to the left; the right fist clenched by the chest.
+        // Follow-through, arm flung out to the left off a step forward; the right fist clenched by the chest.
         pose.torsoYaw = 0.35;
+        pose.bodyPitch = 0.12;
+        pose.hipX[0] = -0.45;
+        pose.kneeX[0] = 0.4;
         pose.shoulderX[0] = -1.2;
         pose.shoulderZ[0] = 1.1;
         pose.elbowX[0] = -0.1;
@@ -232,9 +291,11 @@ export class CaptainUssrView {
         pose.shield.set(0.05, 1.22, 0.7);
         break;
       case 'stunned':
-        pose.bodyPitch = -0.12;
+        // Dazed: swaying on its feet, the head lolling in slow circles.
+        pose.bodyPitch = -0.12 + Math.cos(this.time * 2.4) * 0.04;
         pose.bodyRoll = Math.sin(this.time * 2.4) * 0.12;
-        pose.headPitch = 0.45;
+        pose.torsoYaw = Math.sin(this.time * 1.7) * 0.15;
+        pose.headPitch = 0.45 + Math.sin(this.time * 3.1) * 0.12;
         pose.shoulderX[0] = pose.shoulderX[1] = 0.1;
         pose.shoulderZ[0] = 0.15;
         pose.shoulderZ[1] = -0.15;
@@ -247,22 +308,40 @@ export class CaptainUssrView {
         break;
       case 'defeated': {
         const fall = Math.min(1, this.stateTime / FALL_SECONDS);
-        const eased = fall * fall;
-        pose.bodyPitch = -1.5 * eased;
-        pose.bodyDrop = -0.78 * eased;
-        pose.headPitch = -0.3;
-        pose.shoulderX[0] = pose.shoulderX[1] = -2.2 * eased;
+        // First the knees buckle and the shield slips from its arm; then it topples onto its back.
+        const kneel = Math.min(1, fall / KNEEL_SHARE);
+        const topple = Math.max(0, (fall - KNEEL_SHARE) / (1 - KNEEL_SHARE));
+        const toppled = topple * topple;
+        pose.bodyDrop = -0.5 * kneel - 0.28 * toppled;
+        pose.bodyPitch = 0.15 * kneel * (1 - topple) - 1.5 * toppled;
+        pose.bodyRoll = 0.08 * kneel * (1 - topple);
+        pose.headPitch = 0.5 * (1 - topple) - 0.3 * topple;
+        pose.shoulderX[0] = pose.shoulderX[1] = 0.15 * kneel * (1 - topple) - 2.2 * toppled;
         pose.shoulderZ[0] = 0.6;
         pose.shoulderZ[1] = -0.6;
-        pose.elbowX[0] = pose.elbowX[1] = 0;
-        pose.hipX[0] = -0.3;
-        pose.hipX[1] = 0.1;
-        pose.kneeX[0] = pose.kneeX[1] = 0.2;
+        pose.elbowX[0] = pose.elbowX[1] = -0.2 * (1 - topple);
+        pose.hipX[0] = pose.hipX[1] = -0.3 * topple;
+        pose.kneeX[0] = pose.kneeX[1] = 1.6 * kneel * (1 - topple) + 0.2 * topple;
         pose.shield.set(0.85, 0.05, 0.35);
         pose.shieldPitch = -Math.PI / 2;
         break;
       }
     }
+    this.roar(pose, boss.state);
+  }
+
+  /** The roar over whatever it is doing: head thrown back, chest out, the free arm flung wide, the shield up. */
+  private roar(pose: Pose, state: CaptainUssrState): void {
+    const weight = state === 'defeated' || state === 'arriving' ? 0 : roarWeight(this.roarTime);
+    if (weight <= 0) return;
+    const blend = (from: number, to: number): number => THREE.MathUtils.lerp(from, to, weight);
+    pose.headPitch = blend(pose.headPitch, -0.6);
+    pose.bodyPitch = blend(pose.bodyPitch, -0.2);
+    pose.torsoYaw = blend(pose.torsoYaw, 0);
+    pose.shoulderX[1] = blend(pose.shoulderX[1], -0.5);
+    pose.shoulderZ[1] = blend(pose.shoulderZ[1], -1.25);
+    pose.elbowX[1] = blend(pose.elbowX[1], -0.7);
+    pose.shield.y = blend(pose.shield.y, pose.shield.y + 0.25);
   }
 
   /** The guard and march: shield up in front, legs and free arm swinging with the walking speed. */
@@ -287,6 +366,12 @@ export class CaptainUssrView {
     pose.shield.set(0.16, 1.32, 0.52);
     pose.shieldYaw = -0.12;
     pose.shieldPitch = 0;
+    // Standing still it breathes: the chest heaves, the free arm and the shield ride it.
+    const breath = Math.sin(this.time * BREATH.rate) * BREATH.depth * (1 - amplitude);
+    pose.bodyPitch += breath;
+    pose.headPitch -= breath;
+    pose.shoulderZ[1] -= breath * 1.5;
+    pose.shield.y += breath * 0.4;
   }
 
   /** Eases every joint towards `target` (`rate` 0 snaps). */
@@ -310,10 +395,13 @@ export class CaptainUssrView {
       from.kneeX[side] = ease(from.kneeX[side], to.kneeX[side]);
     }
     const rig = this.rig;
+    // Jolts ride on top of the eased pose, so they stay crisp.
+    const flinch = this.flinch.value;
+    const recoil = this.shieldRecoil.value;
     rig.body.position.y = CAPTAIN_USSR_BODY.hips + from.bodyDrop;
-    rig.body.rotation.set(from.bodyPitch, 0, from.bodyRoll);
+    rig.body.rotation.set(from.bodyPitch - flinch * FLINCH.body, 0, from.bodyRoll);
     rig.torso.rotation.y = from.torsoYaw;
-    rig.head.rotation.x = from.headPitch;
+    rig.head.rotation.x = from.headPitch - flinch * FLINCH.head;
     for (let side = 0; side < 2; side++) {
       // Positive sideways angles swing an arm towards +x: the left one out, the right one in.
       rig.shoulders[side].rotation.set(from.shoulderX[side], 0, from.shoulderZ[side]);
@@ -322,7 +410,8 @@ export class CaptainUssrView {
       rig.knees[side].rotation.x = from.kneeX[side];
     }
     rig.shieldMount.position.copy(from.shield);
-    rig.shieldMount.rotation.set(from.shieldPitch, from.shieldYaw, 0);
+    rig.shieldMount.position.z -= recoil * FLINCH.shieldBack;
+    rig.shieldMount.rotation.set(from.shieldPitch - recoil * FLINCH.shieldPitch, from.shieldYaw, 0);
   }
 
   /** Rags in the wind of its march, eyes burning hotter with each phase, the hit flash fading. */
