@@ -1,5 +1,7 @@
+import { Capacitor } from '@capacitor/core';
 import { registerSW } from 'virtual:pwa-register';
 import { getDeviceProfile } from './core/DeviceProfile';
+import { resolveInstallAction, type InstallAction } from './pwaInstall';
 import { confirmDialog } from './ui/ConfirmDialog';
 
 interface InstallPromptEvent extends Event {
@@ -26,12 +28,16 @@ function isIOS(): boolean {
 export class PwaLifecycle {
   private readonly profile: ReturnType<typeof getDeviceProfile>;
   private readonly standalone: boolean;
+  private readonly isNativeApp: boolean;
   private readonly installButton: HTMLButtonElement;
-  private readonly iosInstallHint: HTMLElement;
+  private readonly installGuide: HTMLDialogElement;
+  private readonly iosInstallSteps: HTMLElement;
+  private readonly browserInstallSteps: HTMLElement;
   private readonly updateButtons: HTMLButtonElement[];
   private readonly mapSelect: HTMLElement;
   private readonly pauseMenu: HTMLElement;
   private installPrompt: InstallPromptEvent | null = null;
+  private installedThisVisit: boolean = false;
   private updateAvailable: boolean = false;
   private applyingUpdate: boolean = false;
   private confirmingUpdate = false;
@@ -47,10 +53,17 @@ export class PwaLifecycle {
   public constructor() {
     this.profile = getDeviceProfile();
     this.standalone = isStandalone();
+    this.isNativeApp = Capacitor.isNativePlatform();
     this.installButton = button('pwa-install');
-    const iosInstallHint = document.getElementById('ios-install-hint');
-    if (!iosInstallHint) throw new Error('Missing #ios-install-hint');
-    this.iosInstallHint = iosInstallHint;
+    const installGuide = document.getElementById('pwa-install-guide');
+    const iosInstallSteps = document.getElementById('pwa-install-ios');
+    const browserInstallSteps = document.getElementById('pwa-install-browser');
+    if (!(installGuide instanceof HTMLDialogElement) || !iosInstallSteps || !browserInstallSteps) {
+      throw new Error('Missing PWA install guide');
+    }
+    this.installGuide = installGuide;
+    this.iosInstallSteps = iosInstallSteps;
+    this.browserInstallSteps = browserInstallSteps;
     this.updateButtons = [button('pwa-update-menu'), button('pwa-update-pause')];
     const mapSelect = document.getElementById('map-select');
     const pauseMenu = document.getElementById('pause-menu');
@@ -59,8 +72,37 @@ export class PwaLifecycle {
     this.pauseMenu = pauseMenu;
     this.serviceWorker = 'serviceWorker' in navigator ? navigator.serviceWorker : null;
     this.controllerSeen = this.serviceWorker?.controller != null;
-    this.installButton.classList.add('hidden');
-    this.iosInstallHint.classList.toggle('hidden', !isIOS() || this.standalone);
+    this._refreshInstallButton();
+  }
+
+  private _installAction(): InstallAction {
+    return resolveInstallAction({
+      isMobile: this.profile.isMobile,
+      isInstalledApp: this.isNativeApp || this.installedThisVisit || isStandalone(),
+      isIOS: isIOS(),
+      hasInstallPrompt: this.installPrompt !== null,
+    });
+  }
+
+  private _refreshInstallButton(): void {
+    this.installButton.classList.toggle('hidden', this._installAction() === 'none');
+  }
+
+  private async _install(): Promise<void> {
+    const action = this._installAction();
+    if (action === 'none') return;
+    if (action === 'prompt' && this.installPrompt) {
+      // A prompt can only be shown once; a dismissed install falls back to the written steps.
+      const prompt = this.installPrompt;
+      this.installPrompt = null;
+      await prompt.prompt();
+      await prompt.userChoice;
+      this._refreshInstallButton();
+      return;
+    }
+    this.iosInstallSteps.classList.toggle('hidden', action !== 'ios-steps');
+    this.browserInstallSteps.classList.toggle('hidden', action !== 'browser-steps');
+    if (!this.installGuide.open) this.installGuide.showModal();
   }
 
   private _setUpdateAvailable(available: boolean): void {
@@ -182,21 +224,15 @@ export class PwaLifecycle {
       if (!this.profile.isMobile) return;
       event.preventDefault();
       this.installPrompt = event as InstallPromptEvent;
-      this.installButton.classList.toggle('hidden', isStandalone() || !this.profile.isMobile);
+      this._refreshInstallButton();
     });
 
-    this.installButton.addEventListener('click', async () => {
-      if (!this.profile.isMobile || !this.installPrompt || isStandalone()) return;
-      const prompt = this.installPrompt;
-      this.installPrompt = null;
-      this.installButton.classList.add('hidden');
-      await prompt.prompt();
-      await prompt.userChoice;
-    });
+    this.installButton.addEventListener('click', () => void this._install());
 
     window.addEventListener('appinstalled', () => {
       this.installPrompt = null;
-      this.installButton.classList.add('hidden');
+      this.installedThisVisit = true;
+      this._refreshInstallButton();
     });
   }
 }

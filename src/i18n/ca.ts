@@ -93,7 +93,8 @@ export const ca: Record<TranslationKey, string> = {
   'menu.attribution': 'Zombis basats en',
   'menu.install': 'INSTAL·LAR ZEROED',
   'menu.update': 'ACTUALITZAR ZEROED',
-  'menu.iosHint': 'A Safari, toca Comparteix i «Afegeix a la pantalla d’inici» per jugar sense les barres del navegador.',
+  'menu.installIos': 'A Safari, toca Comparteix i «Afegeix a la pantalla d’inici» per jugar sense les barres del navegador.',
+  'menu.installBrowser': 'Obre el menú del navegador (⋮) i tria «Instal·la l’aplicació» o «Afegeix a la pantalla d’inici» per jugar a pantalla completa.',
   'menu.updateConfirm': 'Actualitzar reiniciarà la partida actual. Vols continuar?',
 
   'privacy.title': 'Privadesa de Zeroed',

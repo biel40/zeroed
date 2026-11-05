@@ -85,11 +85,13 @@ describe('PWA contract', () => {
   });
 
   it('keeps install and update actions hidden until supported or needed', () => {
-    expect(html).toMatch(/id="pwa-install" class="pwa-action hidden"/);
+    expect(html).toMatch(/id="pwa-install" class="menu-action hidden"/);
     expect(html).toMatch(/id="pwa-update-menu" class="pwa-action hidden"/);
     expect(html).toMatch(/id="pwa-update-pause" class="hidden"/);
+    expect(html).toContain('id="pwa-install-guide"');
     expect(pwa).toContain('getDeviceProfile()');
-    expect(pwa).toContain("this.installButton.classList.toggle('hidden', isStandalone() || !this.profile.isMobile)");
+    expect(pwa).toContain('Capacitor.isNativePlatform()');
+    expect(pwa).toContain("this.installButton.classList.toggle('hidden', this._installAction() === 'none')");
     expect(pwa).toContain("window.addEventListener('beforeinstallprompt'");
     expect(pwa).toContain("window.addEventListener('appinstalled'");
   });

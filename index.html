@@ -151,8 +151,6 @@
           </button>
         </div>
       </header>
-      <!-- Above the maps: iPhone Safari has no Fullscreen API, so installing is the only way to hide its bars. -->
-      <p id="ios-install-hint" class="ios-install-hint hidden" data-i18n="menu.iosHint"></p>
       <!-- One card per map in src/config/zombieMaps.ts. HUD hides maps with visible: false, locks the ones the
            player cannot access yet and fills the data-map-* labels from the registry (players, access, action).
            The shared SVG viewport crops out the frames and copy baked into the decorative images. -->
@@ -216,6 +214,13 @@
           </svg>
           <span data-i18n="menu.settings"></span>
         </button>
+        <!-- Mobile browsers only (PwaLifecycle): installing is the only way to hide iPhone Safari's bars. -->
+        <button type="button" id="pwa-install" class="menu-action hidden">
+          <svg class="menu-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="6.5" y="2.5" width="11" height="19" rx="2" /><path d="M12 7v7.5M8.8 11.5 12 14.7l3.2-3.2M10.5 18.5h3" />
+          </svg>
+          <span data-i18n="menu.install"></span>
+        </button>
       </div>
       <footer class="menu-footer">
         <div class="menu-credits">
@@ -229,7 +234,6 @@
         </div>
       </footer>
       <div class="pwa-actions" aria-live="polite">
-        <button type="button" id="pwa-install" class="pwa-action hidden" data-i18n="menu.install"></button>
         <button type="button" id="pwa-update-menu" class="pwa-action hidden" data-i18n="menu.update"></button>
       </div>
     </div>
@@ -291,6 +295,17 @@
       <button type="button" id="privacy-close" data-i18n-aria-label="privacy.closeLabel" data-i18n="privacy.close"></button>
     </div>
     <iframe id="privacy-frame" data-i18n-title="privacy.frameTitle"></iframe>
+  </dialog>
+
+  <!-- Install steps for mobile browsers without an install prompt; PwaLifecycle shows the matching paragraph. -->
+  <dialog id="pwa-install-guide" class="confirm-dialog" data-i18n-aria-label="menu.install">
+    <form method="dialog">
+      <p id="pwa-install-ios" data-i18n="menu.installIos"></p>
+      <p id="pwa-install-browser" data-i18n="menu.installBrowser"></p>
+      <div class="settings-actions">
+        <button type="submit" autofocus data-i18n="settings.close"></button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Live player settings: open from the main menu or the pause menu. -->

@@ -95,7 +95,8 @@ export const en = {
   'menu.attribution': 'Zombies based on',
   'menu.install': 'INSTALL ZEROED',
   'menu.update': 'UPDATE ZEROED',
-  'menu.iosHint': 'In Safari, tap Share and “Add to Home Screen” to play without the browser bars.',
+  'menu.installIos': 'In Safari, tap Share and “Add to Home Screen” to play without the browser bars.',
+  'menu.installBrowser': 'Open the browser menu (⋮) and choose “Install app” or “Add to Home screen” to play in full screen.',
   'menu.updateConfirm': 'Updating will restart the current match. Continue?',
 
   'privacy.title': 'Zeroed privacy',

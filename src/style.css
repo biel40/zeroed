@@ -2689,7 +2689,7 @@ html.coop-guest #pause-restart {
 #privacy-frame { flex: 1; min-height: 0; width: 100%; border: 0; }
 
 .pwa-actions {
-  /* Install and update entry points in the start menu are temporarily hidden. */
+  /* The update entry point in the start menu is temporarily hidden. */
   display: none;
   justify-content: center;
   gap: 12px;
@@ -2712,14 +2712,6 @@ html.coop-guest #pause-restart {
 .pwa-action:focus-visible {
   color: #cf5e55;
   border-color: #cf5e55;
-}
-
-.ios-install-hint {
-  max-width: 370px;
-  margin: 0 auto 12px;
-  color: #b8c0ca;
-  font: 12px/1.5 'Segoe UI', sans-serif;
-  text-align: center;
 }
 
 /* Menus ease in each time .hidden is removed, which restarts the animation. */
