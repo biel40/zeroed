@@ -19,7 +19,7 @@ export interface EvacuationHordeTuning {
 }
 
 export const EVACUATION_HORDE: EvacuationHordeTuning = {
-  rampSeconds: 150,
+  rampSeconds: 60,
   interval: { start: 2.6, end: 0.85 },
   alive: { start: 8, end: 17 },
   alivePerRound: 0.25,

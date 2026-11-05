@@ -170,6 +170,10 @@ const SIREN_PITCH: ReadonlyArray<readonly [number, number]> = [
   [0, 90], [2.2, 640], [3.4, 560], [4.8, 660], [6.2, 545], [7.4, 650], [9.5, 120],
 ];
 const SIREN_DURATION = 9.5;
+/** One klaxon blast, seconds: shorter than its fastest repeat. */
+const KLAXON_DURATION = 0.3;
+/** The klaxon's two horn tones, Hz: a dissonant pair that beats harshly. */
+const KLAXON_TONES: ReadonlyArray<readonly [OscillatorType, number]> = [['square', 415], ['sawtooth', 554]];
 /** The escape's last radio call crackles in under the title card, as its text line appears (style.css). */
 const ESCAPE_RADIO_DELAY = ESCAPE_BEAT.title + 1;
 /**
@@ -894,9 +898,10 @@ export class AudioSystem {
   /**
    * An evacuation alarm: an electro-mechanical siren winding up from a
    * growl, wailing twice through its horn and running down, heard across
-   * the whole station.
+   * the whole station; from `outside` it (the listener has left) the cue's
+   * own attenuation and muffle rule instead.
    */
-  public playEvacuationSiren(cue: SpatialCue): void {
+  public playEvacuationSiren(cue: SpatialCue, outside = false): void {
     const audio = this.context();
     if (!audio) return;
     const { ctx } = audio;
@@ -905,7 +910,7 @@ export class AudioSystem {
     horn.type = 'bandpass';
     horn.frequency.value = 720;
     horn.Q.value = 0.9;
-    horn.connect(this.spatialBus(audio, cue, SIREN_MIN_ATTENUATION));
+    horn.connect(this.spatialBus(audio, cue, outside ? 0 : SIREN_MIN_ATTENUATION));
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(0.24, t + 1.2);
@@ -924,11 +929,46 @@ export class AudioSystem {
     }
   }
 
-  /** The station's intercom reading an order: the PA horn's chime and garbled voice, over every other sound. */
-  public playIntercomAnnouncement(cue: SpatialCue): void {
+  /**
+   * The station's intercom reading an order: the PA horn's chime and garbled
+   * voice, over every other sound unless heard from `outside` the station.
+   */
+  public playIntercomAnnouncement(cue: SpatialCue, outside = false): void {
     const audio = this.context();
     if (!audio) return;
-    this.playPaCrackle(audio, this.spatialBus(audio, cue, AMBIENT_CUE_MIN_ATTENUATION), audio.ctx.currentTime);
+    this.playPaCrackle(audio, this.spatialBus(audio, cue, outside ? 0 : AMBIENT_CUE_MIN_ATTENUATION), audio.ctx.currentTime);
+  }
+
+  /**
+   * One blast of an evacuation klaxon: two harsh horn tones beating against
+   * each other through a narrow horn, sagging a little as the blast dies.
+   * Heard across the whole station unless from `outside` it.
+   */
+  public playEscapeKlaxon(cue: SpatialCue, outside = false): void {
+    const audio = this.context();
+    if (!audio) return;
+    const { ctx } = audio;
+    const t = ctx.currentTime;
+    const horn = ctx.createBiquadFilter();
+    horn.type = 'bandpass';
+    horn.frequency.value = 980;
+    horn.Q.value = 1.3;
+    horn.connect(this.spatialBus(audio, cue, outside ? 0 : SIREN_MIN_ATTENUATION));
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.2, t + 0.025);
+    gain.gain.setValueAtTime(0.2, t + KLAXON_DURATION - 0.07);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + KLAXON_DURATION);
+    gain.connect(horn);
+    for (const [type, pitch] of KLAXON_TONES) {
+      const tone = ctx.createOscillator();
+      tone.type = type;
+      tone.frequency.setValueAtTime(pitch, t);
+      tone.frequency.linearRampToValueAtTime(pitch * 0.94, t + KLAXON_DURATION);
+      tone.connect(gain);
+      tone.start(t);
+      tone.stop(t + KLAXON_DURATION + 0.02);
+    }
   }
 
   /**

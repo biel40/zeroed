@@ -4,6 +4,7 @@ import type { PlayerEconomy } from '../game/PlayerEconomy';
 import { t } from '../i18n/i18n';
 import { actionKey } from '../ui/InteractionPrompts';
 import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
+import { ESCAPE_ALARM, EscapeAlarm } from '../zombies/evacuation/EscapeAlarm';
 import { EVACUATION_HORDE, EvacuationHorde } from '../zombies/evacuation/EvacuationHorde';
 import { EvacuationProtocol, type EvacuationStage } from '../zombies/evacuation/EvacuationProtocol';
 import type { ArenaEnding, ArenaEvacuation, ArenaUsePoint } from '../zombies/maps/ZombieArena';
@@ -16,6 +17,10 @@ const KICKER = 'ПРОТОКОЛ 33';
 const GAUGE_CELLS = 10;
 /** Players counted for the horde: single-player runs host one. */
 const PLAYERS = 1;
+/** The escape's alarms come from speakers all over the station, not from one spot. */
+const STATION_ALARM_CUE: SpatialCue = { pan: 0, attenuation: 0.8, muffle: 0 };
+/** Heard from outside the station: distant and muffled, leaving room for the fight in the open. */
+const OUTSIDE_ALARM_CUE: SpatialCue = { pan: 0, attenuation: 0.22, muffle: 0.9 };
 const STAGE_ORDER: readonly EvacuationStage[] = ['locked', 'exploration', 'ready', 'defending', 'escaping', 'completed', 'failed'];
 
 /** What the evacuation needs from the run that hosts it. */
@@ -48,6 +53,7 @@ export interface EvacuationRun {
 export class ZombiesEvacuation {
   private readonly protocol: EvacuationProtocol;
   private readonly horde: EvacuationHorde;
+  private readonly alarm = new EscapeAlarm(ESCAPE_ALARM);
   /** The boss guarding the extraction; null on maps without one. */
   public readonly guardian: ZombiesGuardian | null;
   private readonly forward = new THREE.Vector3();
@@ -92,6 +98,7 @@ export class ZombiesEvacuation {
     this.guardian?.update(dt, this.protocol.stage === 'escaping');
     if (this.protocol.active && !this.guardian?.fighting) this.spawnHorde(dt);
     this.processEvents();
+    this.soundEscapeAlarm(dt);
     this.evacuation.showStage(this.protocol.stage);
   }
 
@@ -151,6 +158,7 @@ export class ZombiesEvacuation {
   public reset(): void {
     this.protocol.reset();
     this.horde.reset();
+    this.alarm.reset();
     this.guardian?.reset();
     this.objectiveNote = null;
     this.objectiveSignature = Number.NaN;
@@ -241,16 +249,18 @@ export class ZombiesEvacuation {
           break;
         case 'doorOpened':
           this.ctx.audio.playBlastDoorOpen(this.cueAt(this.evacuation.exitPosition));
-          this.ctx.audio.playEvacuationSiren(this.cueAt(this.evacuation.panel.position));
+          this.alarm.start();
           this.ctx.hud.showRoundBanner(t('evacuation.escapeBanner', { seconds: this.evacuation.rules.escapeSeconds }), KICKER);
           break;
         case 'escapeFailed':
           this.horde.stop();
+          this.alarm.stop();
           this.ctx.hud.showRoundBanner(t('evacuation.failedBanner'), KICKER);
           this.run.failed();
           break;
         case 'extracted':
           this.horde.stop();
+          this.alarm.stop();
           this.run.escaped(this.evacuation.ending);
           break;
       }
@@ -292,6 +302,18 @@ export class ZombiesEvacuation {
     return this.evacuation.switches
       .map(({ lever, labelKey }) => `${t(labelKey)} ${this.protocol.isSwitchThrown(lever.id) ? '✓' : '✗'}`)
       .join(separator);
+  }
+
+  /** The station's alarms while escaping, muffled once the player has left the panel's floor (the station). */
+  private soundEscapeAlarm(dt: number): void {
+    this.alarm.update(dt, this.protocol.escapeRemaining);
+    const { siren, announcement, klaxon } = this.alarm.due;
+    if (!siren && !announcement && !klaxon) return;
+    const outside = this.ctx.player.floor !== this.evacuation.panel.floor;
+    const cue = outside ? OUTSIDE_ALARM_CUE : STATION_ALARM_CUE;
+    if (siren) this.ctx.audio.playEvacuationSiren(cue, outside);
+    if (announcement) this.ctx.audio.playIntercomAnnouncement(cue, outside);
+    if (klaxon) this.ctx.audio.playEscapeKlaxon(cue, outside);
   }
 
   private cueAt(position: ArenaUsePoint['position']): SpatialCue {

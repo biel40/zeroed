@@ -14,12 +14,14 @@ import { roundConfig } from '../src/zombies/ZombieConfig';
 import { CAPTAIN_USSR, type CaptainUssrBrain } from '../src/zombies/guardians/CaptainUssrBrain';
 import { ZombieManager } from '../src/zombies/ZombieManager';
 import type { RoundManager } from '../src/zombies/RoundManager';
+import { DEFENSE_RING_NAME } from '../src/zombies/maps/shared/DefenseZoneRing';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
 import {
   PROTOCOL33_BLAST_DOOR,
   PROTOCOL33_ENDING,
   PROTOCOL33_ESCAPE,
   PROTOCOL33_ESCAPE_HORDE,
+  PROTOCOL33_PANEL,
   PROTOCOL33_RULES,
   PROTOCOL33_SURFACE,
   PROTOCOL33_SURFACE_AMBIENCE,
@@ -226,34 +228,90 @@ describe('Protocol 33 through the mode', () => {
 
     const round = run.internals.rounds.round;
     run.spawns.mockClear();
-    advance(run, 30);
+    const half = PROTOCOL33_RULES.defenseSeconds / 2;
+    advance(run, half);
     expect(run.internals.rounds.round).toBe(round);
+    expect(run.internals.arena.evacuation.blastDoorCollider).not.toBeNull();
     const early = run.spawns.mock.calls.length;
     expect(early).toBeGreaterThan(5);
     run.spawns.mockClear();
-    advance(run, 30);
+    advance(run, half);
     expect(run.spawns.mock.calls.length).toBeGreaterThan(early);
-    expect(objectiveText(run, true)).toContain('50%');
+  });
+
+  it('rings the defence zone on the workshop floor while it is defended, red while nobody holds it', () => {
+    const run = readyRun();
+    const ring = run.internals.arena.group.getObjectByName(DEFENSE_RING_NAME) as THREE.Mesh;
+    const color = (): THREE.Color => (ring.material as THREE.MeshBasicMaterial).color;
+    expect(ring.visible).toBe(false);
+    fund(run.internals.economy, COST);
+    run.mode.onInteract();
+    advance(run, STEP);
+    expect(ring.visible).toBe(true);
+    expect(color().g).toBeGreaterThan(color().b);
+    const { position } = run.internals.arena.evacuation.panel;
+    const box = new THREE.Box3().setFromObject(ring);
+    expect(box.min.x).toBeGreaterThanOrEqual(TALLER.hall.minX);
+    expect(box.max.x).toBeLessThanOrEqual(TALLER.hall.maxX);
+    expect(box.min.z).toBeGreaterThanOrEqual(TALLER.hall.minZ);
+    expect(box.max.z).toBeLessThanOrEqual(TALLER.hall.maxZ);
+    // Centred on the panel's defence check, its far edges on the defence radius.
+    expect(Math.abs(box.min.x - (position.x - PROTOCOL33_PANEL.defenseRadius))).toBeLessThan(0.25);
+    expect(Math.abs(box.max.z - (position.z + PROTOCOL33_PANEL.defenseRadius))).toBeLessThan(0.25);
+    stand(run.side, 0, 15, FACE_NORTH);
+    advance(run, 1);
+    expect(color().r).toBeGreaterThan(color().g * 3);
+    atPanel(run);
+    advance(run, PROTOCOL33_RULES.defenseSeconds);
+    expect(run.internals.arena.evacuation.blastDoorCollider).toBeNull();
+    expect(ring.visible).toBe(false);
   });
 
   it('unlocks only while the panel is defended and keeps the progress while nobody is there', () => {
     const run = readyRun();
     fund(run.internals.economy, COST);
     run.mode.onInteract();
-    advance(run, 60);
+    const half = PROTOCOL33_RULES.defenseSeconds / 2;
+    advance(run, half);
     stand(run.side, 0, 15, FACE_NORTH);
-    advance(run, 45);
+    advance(run, PROTOCOL33_RULES.defenseSeconds);
     expect(run.side.hud.showRoundBanner).toHaveBeenCalledWith(t('evacuation.pausedBanner'), t('evacuation.pausedSub'));
     expect(objectiveText(run, true)).toContain(t('evacuation.objectivePaused'));
     expect(objectiveText(run, true)).toContain('50%');
     expect(run.internals.arena.evacuation.blastDoorCollider).not.toBeNull();
     atPanel(run);
-    advance(run, 59.75);
+    advance(run, half - STEP);
     expect(run.internals.arena.evacuation.blastDoorCollider).not.toBeNull();
     advance(run, STEP);
     expect(run.internals.arena.evacuation.blastDoorCollider).toBeNull();
     expect(run.side.ctx.audio.playBlastDoorOpen).toHaveBeenCalledOnce();
     expect(run.side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('evacuation.escapeBanner', { seconds: 60 }), 'ПРОТОКОЛ 33');
+  });
+
+  it('keeps the station\'s alarms going through the escape, quickening at the end and muffled outside', () => {
+    const run = escapingRun();
+    const { audio } = run.side.ctx;
+    const siren = vi.mocked(audio.playEvacuationSiren);
+    const intercom = vi.mocked(audio.playIntercomAnnouncement);
+    const klaxon = vi.mocked(audio.playEscapeKlaxon);
+    expect(siren).toHaveBeenLastCalledWith(expect.anything(), false);
+    expect(intercom).toHaveBeenLastCalledWith(expect.anything(), false);
+    siren.mockClear();
+    intercom.mockClear();
+    advance(run, 30);
+    expect(siren.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(intercom.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(klaxon).not.toHaveBeenCalled();
+    advance(run, 10);
+    const early = klaxon.mock.calls.length;
+    expect(early).toBeGreaterThan(0);
+    expect(klaxon).toHaveBeenLastCalledWith(expect.anything(), false);
+    klaxon.mockClear();
+    advance(run, 10);
+    expect(klaxon.mock.calls.length).toBeGreaterThan(early);
+    stand(run.side, 15.0, -84.0, FACE_NORTH, 1);
+    advance(run, 1);
+    expect(klaxon).toHaveBeenLastCalledWith(expect.anything(), true);
   });
 
   it('ends the run with the escape when the player boards the truck in time', () => {

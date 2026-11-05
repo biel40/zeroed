@@ -453,13 +453,18 @@ existente a `MOTDRULES`.
   nota pasa a modo urgente y las rondas se suspenden: `EvacuationHorde` genera
   zombis de la ronda actual cada vez mas rapido y con mas limite simultaneo
   (menor en efectos reducidos), solo por las entradas de las cocheras, la sala
-  de maquinas y el taller. La compuerta acumula 120 s de desbloqueo mientras el
-  jugador siga a menos de `defenseRadius` del panel; fuera se pausa sin perder
-  progreso, con cartel, nota y el indicador del panel parpadeando. Los zombis
+  de maquinas y el taller. La compuerta acumula 45 s de desbloqueo mientras el
+  jugador siga a menos de `defenseRadius` del panel, zona que marca en el suelo
+  del taller un anillo brillante (`DefenseZoneRing`, recortado a las paredes de
+  la sala): ambar mientras se defiende; fuera se pausa sin perder progreso, con
+  cartel, nota, el anillo en rojo y el indicador del panel parpadeando. Los zombis
   no atacan el panel. Al completarse la compuerta sube (deja de ser solida al
   instante) y empiezan 60 s para subir por el pasillo y la escalera (planta 1,
   `escapeStairTransitions`) al patio de la superficie, que los zombis tambien
-  recorren, y usar el camion. Lo logrado lleva al final del mapa; si se acaba
+  recorren, y usar el camion. Durante la huida `EscapeAlarm` mantiene la
+  sirena sin pausa, repite la megafonia y, en los ultimos 25 s, suma un
+  claxon cada vez mas rapido; fuera de la planta del panel se oyen lejanas y
+  amortiguadas. Lo logrado lleva al final del mapa; si se acaba
   el tiempo, cartel y la derrota normal. Al subir, `SurfaceMood` mezcla la
   niebla, el fondo y la hemisferica del mapa con los de la superficie.
   Reiniciar lo devuelve todo al estado inicial.

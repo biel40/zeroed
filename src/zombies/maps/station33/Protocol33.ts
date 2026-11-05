@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { EvacuationStage } from '../../evacuation/EvacuationProtocol';
 import type { GroundRect } from '../../guardians/CaptainUssrBrain';
+import { DefenseZoneRing } from '../shared/DefenseZoneRing';
 import type { MapPower } from '../shared/MapPower';
 import { PowerLever } from '../shared/PowerLever';
 import {
@@ -13,6 +14,7 @@ import {
   PROTOCOL33_SURFACE_Y,
   PROTOCOL33_SWITCHES,
   PROTOCOL33_TRUCK,
+  TALLER,
   type Protocol33Switch,
 } from '../Station33Config';
 import type { ArenaEvacuation, ArenaEvacuationGuardian, ArenaEvacuationSwitch, ArenaUsePoint } from '../ZombieArena';
@@ -41,8 +43,8 @@ interface AuxiliarySystem {
 /**
  * Station 33's evacuation (Protocol 33), as the map presents it: the two
  * auxiliary switches (the shared knife switch, each with a status lamp and
- * the ventilation's wall fan), the control panel, the blast door and the
- * alarm, and CAPITÁN URSS guarding the yard. `ZombiesMode` runs the protocol through `ArenaEvacuation`; the
+ * the ventilation's wall fan), the control panel with the glowing ring of
+ * its defence zone on the workshop floor, the blast door and the alarm, and CAPITÁN URSS guarding the yard. `ZombiesMode` runs the protocol through `ArenaEvacuation`; the
  * arena reads `hordeConverging` and `blastDoorCollider` for its layout and
  * hears through `onLayoutChanged` when either changes.
  */
@@ -70,6 +72,7 @@ export class Protocol33 implements ArenaEvacuation {
   public readonly switches: ReadonlyArray<ArenaEvacuationSwitch>;
   private readonly systems: ReadonlyArray<AuxiliarySystem>;
   private readonly panelView: Protocol33Panel;
+  private readonly defenseZone: DefenseZoneRing;
   private readonly door: BlastDoor;
   private readonly panelState = {
     powered: false,
@@ -96,6 +99,8 @@ export class Protocol33 implements ArenaEvacuation {
     }));
     this.switches = PROTOCOL33_SWITCHES.map((config, index) => ({ labelKey: config.labelKey, lever: this.systems[index].lever }));
     this.panelView = new Protocol33Panel(context, PROTOCOL33_SWITCHES.length);
+    const { x, z } = this.panel.position;
+    this.defenseZone = new DefenseZoneRing(context.group, { x, z, y: 0, radius: this.defenseRadius, bounds: TALLER.hall });
     this.door = new BlastDoor(context);
   }
 
@@ -141,9 +146,10 @@ export class Protocol33 implements ArenaEvacuation {
     }
     this.door.update(step);
     this.panelView.update(step, this.panelState);
+    this.defenseZone.update(step, this.panelState.stage === 'defending', this.panelState.defended);
   }
 
-  /** New run: switches open, lamps dark, fan still, door shut, alarm off (the lighting resets itself). */
+  /** New run: switches open, lamps dark, fan still, zone ring hidden, door shut, alarm off (the lighting resets itself). */
   public reset(): void {
     this.systems.forEach((system, index) => {
       system.lever.reset();
@@ -157,6 +163,7 @@ export class Protocol33 implements ArenaEvacuation {
     this.panelState.defended = true;
     this.door.reset();
     this.panelView.reset(PROTOCOL33_SWITCHES.length);
+    this.defenseZone.reset();
     this.update(0);
   }
 }

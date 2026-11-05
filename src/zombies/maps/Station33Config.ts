@@ -599,7 +599,7 @@ export const PROTOCOL33_BLAST_DOOR = { x: 15.0, z: TALLER_NORTH_WALL_Z, width: 1
 /**
  * The evacuation panel against the workshop's east wall, beside the blast
  * door, facing west; the door keeps unlocking while a living player stands
- * within `defenseRadius` of it.
+ * within `defenseRadius` of it, which a glowing ring on the floor marks during the defence.
  */
 export const PROTOCOL33_PANEL = { x: TALLER.hall.maxX, z: -58.0, width: 1.2, depth: 0.42, height: 1.9, defenseRadius: 6.5 } as const;
 
@@ -627,11 +627,11 @@ export const PROTOCOL33_SWITCHES: ReadonlyArray<Protocol33Switch> = [
   },
 ];
 
-/** Exactly 10000 Points to start it, 120 s of defended unlocking, 60 s to get out. */
+/** Exactly 10000 Points to start it, 45 s of defended unlocking, 60 s to get out. */
 export const PROTOCOL33_RULES: EvacuationRules = {
   switchIds: PROTOCOL33_SWITCHES.map((entry) => entry.id),
   cost: 10000,
-  defenseSeconds: 120,
+  defenseSeconds: 45,
   escapeSeconds: 60,
 };
 
