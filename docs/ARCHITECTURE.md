@@ -43,6 +43,7 @@ sufra tirones de compilacion de shaders.
 | `src/zombies/` | IA, pool, combate, barreras, puertas y wonder weapons |
 | `src/game/` | Inventario, salud, economia, anillos y estadisticas puras |
 | `src/pwa.ts` | Service Worker, instalacion y actualizaciones |
+| `desktop/` + `src/platform/DesktopShell.ts` | App de escritorio Electron: ventana, origen `app://` y puente minimo con el cliente; ver [escritorio](DESKTOP.md) |
 | `src/i18n/` | Diccionarios es/en/ca, `t()` e idioma activo |
 | `src/main.ts` | Arranque publico y comprobacion de acceso a mapas; contrato temporal en `public/beta/README.md` |
 

@@ -94,6 +94,7 @@ export const en = {
   'menu.privacy': 'Privacy policy',
   'menu.attribution': 'Zombies based on',
   'menu.install': 'INSTALL ZEROED',
+  'menu.quit': 'QUIT',
   'menu.update': 'UPDATE ZEROED',
   'menu.installIos': 'In Safari, tap Share and “Add to Home Screen” to play without the browser bars.',
   'menu.installBrowser': 'Open the browser menu (⋮) and choose “Install app” or “Add to Home screen” to play in full screen.',

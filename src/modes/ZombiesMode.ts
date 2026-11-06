@@ -100,12 +100,7 @@ export class ZombiesMode implements GameMode {
   /** Two-weapon carry limit, enforced by the shared inventory. */
   readonly maxWeapons = 2;
 
-  /**
-   * Every Zombies weapon runs a finite reserve (generous tier). The mode
-   * table ZOMBIES_RESERVE_AMMO wins over the shared definition (so the
-   * M1911 gets 64 in zombies while keeping 8/64 by definition); weapons
-   * not listed — the Tesla — keep their definition reserve.
-   */
+  /** Prefer the Zombies reserve override when the weapon has one. */
   reserveAmmoFor(id: WeaponId): number | undefined {
     return ZOMBIES_RESERVE_AMMO[id] ?? WEAPON_DEFINITIONS[id].reserveAmmo;
   }

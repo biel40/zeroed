@@ -12,7 +12,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    * torso damage, a pronounced upward kick, fast ADS
    * and a showy but unhurried reload. Precise players stretch it through early rounds;
    * raw damage per magazine keeps it from competing with the box weapons.
-   * Detailed procedural view model (no CC0 GLB exists), finite 8 / 64 ammunition.
+   * Detailed procedural view model (no CC0 GLB exists).
    */
   m1911: {
     id: 'm1911',
@@ -21,7 +21,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     defaultFireMode: 'semi',
     rpm: 360,
     magazineSize: 8,
-    reserveAmmo: 64,
+    reserveAmmo: 40,
     reloadTime: 3.1,
     tacticalReloadTime: 2.3,
     boltAction: false,
@@ -29,7 +29,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     scoped: false,
     damage: 30,
     recoil: {
-      verticalKick: 0.024,
+      verticalKick: 0.026,
       horizontalKick: 0.004,
       horizontalBias: 0,
       kickVariance: 0.2,

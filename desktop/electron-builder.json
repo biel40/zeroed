@@ -1,0 +1,24 @@
+{
+  "appId": "es.zeroed.game",
+  "productName": "Zeroed",
+  "directories": {
+    "output": "releases/desktop"
+  },
+  "files": [
+    "package.json",
+    "dist/**/*",
+    "desktop/*.mjs",
+    "desktop/*.cjs",
+    "!desktop/*.test.mjs",
+    "!node_modules/**/*"
+  ],
+  "win": {
+    "target": "dir",
+    "icon": "assets/icon.png"
+  },
+  "linux": {
+    "target": "dir",
+    "executableName": "zeroed",
+    "icon": "assets/icon.png"
+  }
+}

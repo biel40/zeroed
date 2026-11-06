@@ -27,6 +27,11 @@
   fisica en el loop ni assets nuevos, y el estilo viaja como dato en red.
 - **Navegacion recuperable.** Steering es el camino barato; A* por planta,
   ajuste local y recolocacion validada son fallback, no un navmesh continuo.
+- **Escritorio con Electron.** Steam recibe el mismo build web dentro de
+  Electron: Chromium garantiza el mismo WebGL, Pointer Lock y Gamepad API que
+  la web, y `steamworks.js` da acceso al SDK de Steam desde el proceso
+  principal. El cliente solo conoce el puente minimo del preload. Ver
+  [escritorio](DESKTOP.md).
 - **PWA fuera del gameplay.** Workbox precachea shell y cachea assets pesados
   bajo demanda; navegador actualiza al entrar y standalone espera a selector o
   pausa.

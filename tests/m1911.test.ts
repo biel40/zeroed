@@ -40,12 +40,12 @@ function finishReload(weapon: Weapon): void {
 }
 
 describe('M1911 definition', () => {
-  it('is a semi-automatic pistol with an 8-round magazine and 64 in reserve', () => {
+  it('is a semi-automatic pistol with an 8-round magazine and 40 in reserve', () => {
     const def = WEAPON_DEFINITIONS.m1911;
     expect(def.fireModes).toEqual(['semi']);
     expect(def.defaultFireMode).toBe('semi');
     expect(def.magazineSize).toBe(8);
-    expect(def.reserveAmmo).toBe(64);
+    expect(def.reserveAmmo).toBe(40);
     expect(def.boltAction).toBe(false);
     expect(def.scoped).toBe(false);
   });
@@ -57,10 +57,10 @@ describe('M1911 definition', () => {
 });
 
 describe('M1911 firing', () => {
-  it('starts every life at 8 / 64', () => {
+  it('starts every life at 8 / 40', () => {
     const m1911 = makeM1911();
     expect(m1911.ammoInMagazine).toBe(8);
-    expect(m1911.reserveAmmo).toBe(64);
+    expect(m1911.reserveAmmo).toBe(40);
   });
 
   it('fires exactly once per trigger press (semi)', () => {
@@ -75,39 +75,39 @@ describe('M1911 firing', () => {
     expect(m1911.ammoInMagazine).toBe(7);
     fireOnce(m1911);
     expect(m1911.ammoInMagazine).toBe(6);
-    expect(m1911.reserveAmmo).toBe(64);
+    expect(m1911.reserveAmmo).toBe(40);
   });
 });
 
 describe('M1911 reserve ammo', () => {
-  it('reloads 3 / 64 into 8 / 59', () => {
+  it('reloads 3 / 40 into 8 / 35', () => {
     const m1911 = makeM1911();
     for (let i = 0; i < 5; i++) fireOnce(m1911);
     expect(m1911.ammoInMagazine).toBe(3);
 
     finishReload(m1911);
     expect(m1911.ammoInMagazine).toBe(8);
-    expect(m1911.reserveAmmo).toBe(59);
+    expect(m1911.reserveAmmo).toBe(35);
   });
 
   it('never tops the magazine past 8 and only draws what it needs', () => {
     const m1911 = makeM1911();
-    fireOnce(m1911); // 7 / 64
+    fireOnce(m1911); // 7 / 40
     finishReload(m1911);
     expect(m1911.ammoInMagazine).toBe(8);
-    expect(m1911.reserveAmmo).toBe(63);
+    expect(m1911.reserveAmmo).toBe(39);
   });
 
   it('never drives the reserve negative and refuses to reload at 0 / 0', () => {
     const m1911 = makeM1911();
-    // Burn the full 72-round supply (8 in the mag + 64 reserve), completing
+    // Burn the full 48-round supply, completing
     // each automatic reload when the magazine runs dry.
     let shots = 0;
     while (m1911.ammoInMagazine > 0 || (m1911.reserveAmmo ?? 0) > 0) {
       if (m1911.ammoInMagazine === 0) finishReload(m1911);
       shots += fireOnce(m1911).filter((e) => e === 'shot').length;
     }
-    expect(shots).toBe(72);
+    expect(shots).toBe(48);
     expect(m1911.ammoInMagazine).toBe(0);
     expect(m1911.reserveAmmo).toBe(0);
 
@@ -125,20 +125,20 @@ describe('M1911 reserve ammo', () => {
     step(m1911, 0.3); // mid-reload…
     m1911.equip(); // …cancelled by an equip, like switching weapons
     expect(m1911.ammoInMagazine).toBe(3);
-    expect(m1911.reserveAmmo).toBe(64);
+    expect(m1911.reserveAmmo).toBe(40);
   });
 });
 
 describe('M1911 reset (zombies restart / fresh pickup)', () => {
-  it('restores 8 / 64 from any state', () => {
+  it('restores 8 / 40 from any state', () => {
     const m1911 = makeM1911();
     for (let i = 0; i < 12; i++) fireOnce(m1911);
     finishReload(m1911);
-    expect(m1911.reserveAmmo).toBeLessThan(64);
+    expect(m1911.reserveAmmo).toBeLessThan(40);
 
     m1911.resetAmmo();
     expect(m1911.ammoInMagazine).toBe(8);
-    expect(m1911.reserveAmmo).toBe(64);
+    expect(m1911.reserveAmmo).toBe(40);
     expect(m1911.state).toBe('ready');
     // And it still fires afterwards.
     expect(fireOnce(m1911)).toContain('shot');

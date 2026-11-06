@@ -11,6 +11,7 @@
 - Burned Mansion tiene acceso publico individual y cooperativo. Station 33 es individual y premium de presentacion; aparece bloqueado en el menu y temporalmente requiere un correo de la lista de beta para abrirse, tambien por enlace directo. El permiso es local y no verifica la titularidad del correo: consulta [acceso de beta](../public/beta/README.md). Direccion artistica en [Station 33](STATION_33.md). Su final es el easter egg de evacuacion Protocolo 33, hasta la superficie, donde el guardian CAPITAN URSS cierra el paso al camion; consulta [evacuacion](GAME_SYSTEMS.md#mapas-e-interacciones).
 - Combate, rondas, economia, progresion, enemigos y anillos estan disponibles en individual; el alcance cooperativo se detalla en [MULTIPLAYER.md](MULTIPLAYER.md#alcance-y-límites). Consulta [zombies](GAME_SYSTEMS.md#zombies) y [anillos](GAME_SYSTEMS.md#anillos).
 - PWA instalable y distribucion Android preparada; consulta [PWA](PWA.md) y [Android](ANDROID_DOCS.md).
+- App de escritorio Electron empaquetable para Windows y Linux, sin Steamworks todavia; consulta [escritorio](DESKTOP.md).
 - El relay cooperativo local y el Worker de Cloudflare estan preparados; consulta [despliegue](MULTIPLAYER.md#despliegue-gratuito-vercel--cloudflare).
 
 ## Limitaciones y bugs abiertos

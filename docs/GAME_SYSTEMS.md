@@ -28,6 +28,8 @@ muerto ni con los controles bloqueados. El comportamiento es compartido entre
 individual y cooperativo. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga. La M1911 tiene una patada vertical marcada, con un golpe
 visual de elevacion y retroceso y una recuperacion que deja sentir cada disparo.
+En individual y cooperativo, cada jugador empieza con seis cargadores de ocho
+balas para la M1911, incluido el que lleva puesto.
 `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
 `AudioSystem` sincroniza el foley. La palma y el pulgar de primera persona
 comparten una superficie cosida, continua al cambiar de agarre y nivel de detalle.

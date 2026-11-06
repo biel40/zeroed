@@ -180,14 +180,10 @@ export const ROUND_BREAK_SECONDS = 6;
 export const ROUND_START_DELAY = 2.5;
 
 /**
- * Finite reserve ammunition per weapon in Zombies mode (generous tier).
- * The mode table wins over the WeaponDefinition (see reserveAmmoFor), so
- * the M1911 starts a run with 72 rounds total: 8 in the mag + 64 here.
- * The Tesla (5/25) is not listed and keeps its definition value. These
- * overrides keep every Zombies weapon on a finite reserve.
+ * Zombies reserve overrides. Weapons without an entry keep the reserve
+ * from their definition.
  */
 export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
-  m1911: 64,
   m4a1: 300,
   mp5: 180,
   vector: 240,

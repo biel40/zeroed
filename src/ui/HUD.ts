@@ -425,6 +425,13 @@ export class HUD {
     (mustGet('coop-select') as HTMLButtonElement).onclick = handler;
   }
 
+  /** Shows the main menu's quit button; only the desktop app can close itself. */
+  public enableQuit(handler: () => void): void {
+    const button = mustGet('menu-quit') as HTMLButtonElement;
+    button.onclick = handler;
+    button.classList.remove('hidden');
+  }
+
   /** The account behind locked map cards and the menu's account button; `onAccountChanged` lets the caller refresh the menu after signing in or out. */
   public setMapUnlockAccount(account: MenuAccount, onAccountChanged: () => void): void {
     this.account = account;

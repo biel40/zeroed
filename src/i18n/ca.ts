@@ -92,6 +92,7 @@ export const ca: Record<TranslationKey, string> = {
   'menu.privacy': 'Política de privadesa',
   'menu.attribution': 'Zombis basats en',
   'menu.install': 'INSTAL·LAR ZEROED',
+  'menu.quit': 'SORTIR',
   'menu.update': 'ACTUALITZAR ZEROED',
   'menu.installIos': 'A Safari, toca Comparteix i «Afegeix a la pantalla d’inici» per jugar sense les barres del navegador.',
   'menu.installBrowser': 'Obre el menú del navegador (⋮) i tria «Instal·la l’aplicació» o «Afegeix a la pantalla d’inici» per jugar a pantalla completa.',

@@ -9,6 +9,7 @@ import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
 import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
+import { getDesktopShell } from './platform/DesktopShell';
 import { setupPWA } from './pwa';
 import { ZombiesMode } from './modes/ZombiesMode';
 import { CoopGuestMode } from './modes/coop/CoopGuestMode';
@@ -234,6 +235,8 @@ class ZeroedBoot {
         signOut: () => this.entitlements.signOut(),
       }, () => this.showMapMenu());
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
+      const desktop = getDesktopShell();
+      if (desktop) this.hud.enableQuit(() => desktop.quit());
       this.hud.setQualitySelect(this.profile.quality, (quality) => {
         setQualityPreference(quality);
         this.profile = getDeviceProfile(undefined, quality);
@@ -280,7 +283,8 @@ function takeLoginToken(): string | null {
 
 applyDocumentTranslations();
 async function boot(): Promise<void> {
-  setupPWA();
+  // The desktop app ships its files with each update; a service worker would only cache stale copies.
+  if (!getDesktopShell()) setupPWA();
   await new ZeroedBoot(await createAccount(), takeLoginToken()).run();
 }
 

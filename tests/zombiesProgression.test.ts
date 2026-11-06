@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
+import { coopReserveAmmo } from '../src/modes/coop/CoopWeapons';
 import type { GameMode } from '../src/modes/GameMode';
 import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING } from '../src/zombies/MysteryBox';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
@@ -17,15 +18,11 @@ describe('Zombies progression contract', () => {
     expect(mode.maxWeapons).toBe(2);
   });
 
-  it('starts the M1911 at 8 / 64 by definition', () => {
-    expect(WEAPON_DEFINITIONS.m1911.magazineSize).toBe(8);
-    expect(WEAPON_DEFINITIONS.m1911.reserveAmmo).toBe(64);
-  });
-
-  it('gives the M1911 a 72-round total in Zombies: 8 in the mag, 64 in reserve', () => {
+  it('starts solo and co-op with six M1911 magazines including the loaded one', () => {
     const mode = new ZombiesMode();
     expect(WEAPON_DEFINITIONS.m1911.magazineSize).toBe(8);
-    expect(mode.reserveAmmoFor?.('m1911')).toBe(64);
+    expect(mode.reserveAmmoFor('m1911')).toBe(40);
+    expect(coopReserveAmmo('m1911')).toBe(40);
   });
 
   it('keeps the ZEUS-77 at 5 / 25 as a full 30-shot capacity', () => {
