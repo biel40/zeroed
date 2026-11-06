@@ -288,12 +288,17 @@ async function boot(): Promise<void> {
   await new ZeroedBoot(await createAccount(), takeLoginToken()).run();
 }
 
-/** Dev servers also sign local testers in without a mailed link; production builds never include that backend. */
+/**
+ * Dev servers and internal desktop builds (`npm run desktop:build -- --testers`) also sign local
+ * testers in without a mailed link; other builds never include that backend.
+ */
 async function createAccount(): Promise<WebAccount> {
   const api = new AccountApi(import.meta.env.VITE_ACCOUNT_API_URL?.trim() || DEFAULT_ACCOUNT_API_URL);
-  if (!import.meta.env.DEV) return new WebAccount(api, getAccountStorage());
-  const { LocalTesterBackend, LOCAL_TESTER_EMAILS } = await import('./account/LocalTesterBackend');
-  const backend = new LocalTesterBackend(api, LOCAL_TESTER_EMAILS);
-  return new WebAccount(backend, getAccountStorage(), backend);
+  if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TESTERS === 'true') {
+    const { LocalTesterBackend, LOCAL_TESTER_EMAILS } = await import('./account/LocalTesterBackend');
+    const backend = new LocalTesterBackend(api, LOCAL_TESTER_EMAILS);
+    return new WebAccount(backend, getAccountStorage(), backend);
+  }
+  return new WebAccount(api, getAccountStorage());
 }
 void boot();

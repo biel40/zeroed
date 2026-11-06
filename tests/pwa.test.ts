@@ -16,7 +16,9 @@ describe('PWA contract', () => {
     const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
     expect(main).not.toContain('VITE_BETA_ENABLED');
     expect(main).toContain('new ZeroedBoot(await createAccount()');
-    expect(main).toContain('if (!import.meta.env.DEV) return new WebAccount(api, getAccountStorage());');
+    // Local testers only in dev servers and internal desktop builds; everything else uses the account server.
+    expect(main).toContain("if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TESTERS === 'true') {");
+    expect(main).toContain('return new WebAccount(api, getAccountStorage());');
     expect(main).not.toContain('beta/access.js');
     expect(main).not.toContain('location.replace');
     expect(main.indexOf('setupPWA();')).toBeLessThan(main.indexOf('new ZeroedBoot('));

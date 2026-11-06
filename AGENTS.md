@@ -29,7 +29,7 @@ Identifica el area, consulta sus rutas, busca simbolos y lee solo las secciones 
 | Cooperativo y red | [Cooperativo](docs/MULTIPLAYER.md#alcance-y-límites), [modos](src/modes/GameMode.ts) | [tests](tests/coopMatch.test.ts); `npm run multiplayer:test-server` y `npm run multiplayer:cloudflare:test` |
 | UI e idiomas | [HUD](docs/GAME_SYSTEMS.md#hud-y-estadisticas-de-partida), [idiomas](src/i18n/) | [tests](tests/i18n.test.ts), [visores](tools/viewers/README.md) |
 | PWA y Android | [PWA](docs/PWA.md#prueba-y-depuracion), [Android](docs/ANDROID_DOCS.md#build-e-instalacion), [entrada PWA](src/pwa.ts) | [comandos](package.json) |
-| Escritorio y Steam | [Escritorio](docs/DESKTOP.md), [proceso principal](desktop/main.mjs) | `npm run desktop:test`, `npm run desktop:pack` |
+| Escritorio y Steam | [Escritorio](docs/DESKTOP.md), [estado Steam](docs/STEAM.md), [proceso principal](desktop/main.mjs) | `npm run desktop:test`, `npm run desktop:pack` |
 
 Consulta [arquitectura](docs/ARCHITECTURE.md#contratos), [decisiones](docs/DECISIONS.md), [estado](docs/PROJECT_STATE.md), [beta](public/beta/README.md) y el catalogo de skills de la sesion cuando corresponda.
 

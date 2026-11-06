@@ -23,6 +23,7 @@ gameplay ni assets propios. Web, PWA, Android y escritorio comparten codigo.
 
 ```powershell
 npm run desktop:build      # tsc + vite build --mode desktop en dist/
+npm run desktop:build -- --testers # build interno: testers locales sin enlace
 npm run desktop:start      # abre dist/ en Electron (F12 = DevTools sin empaquetar)
 npm run desktop:pack       # build + releases/desktop/win-unpacked/Zeroed.exe
 npm run desktop:pack:linux # build + releases/desktop/linux-unpacked (Steam Deck/Linux)
@@ -45,30 +46,6 @@ partida en Burned Mansion con raton (Pointer Lock, Esc pausa), mando, audio,
 F11/Alt+Enter, cooperativo contra la web, enlaces externos en el navegador y
 SALIR. Repetir tras reiniciar para ver que los ajustes se conservan.
 
-## Pendiente para publicar en Steam
+## Steam y limitaciones
 
-Orden previsto; cada paso depende de tener el App ID de Steamworks.
-
-1. **Steamworks SDK** con `steamworks.js` en el proceso principal, expuesto por
-   el preload: inicializacion con el App ID, overlay de Steam
-   (`electronEnableSteamOverlay`) y cierre limpio. Sin Steam en marcha, la app
-   debe seguir arrancando en desarrollo.
-2. **Permisos por DLC.** Un `EntitlementProvider` de Steam que responda
-   `owns()` con la propiedad del DLC de cada `ProductId`; en escritorio sustituye
-   a `WebAccount` y oculta el inicio de sesion por correo. Los testers reciben
-   claves del DLC.
-3. **Cooperativo premium** verificado en servidor por plataforma (tickets de
-   sesion de Steam), segun la fase 6 de monetizacion.
-4. **Steamworks (web):** depots Windows y Linux, opciones de lanzamiento
-   (`Zeroed.exe` / `zeroed`), Steam Cloud con Auto-Cloud sobre la carpeta de
-   datos de usuario, configuracion de Steam Input para mandos, ficha de la
-   tienda, clasificacion por edades y build de revision.
-5. Opcional: logros y estadisticas de Steam, presencia enriquecida.
-
-## Limitaciones
-
-- Sin Steam integrado todavia: Station 33 aparece bloqueado y el inicio de
-  sesion por correo no funciona, porque la API de cuentas no admite el origen
-  `app://zeroed` (igual que en Android).
-- No se ha validado en hardware real: rendimiento, mando con Steam Input,
-  overlay ni Steam Deck.
+Estado, pasos pendientes y limitaciones en [Steam](STEAM.md).
