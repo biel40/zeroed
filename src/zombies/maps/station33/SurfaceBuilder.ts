@@ -5,12 +5,15 @@ import { placement } from '../shared/StaticMeshBatch';
 import { PROTOCOL33_GATE, PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, PROTOCOL33_TRUCK, PROTOCOL33_YARD, STATION33_WALL_THICKNESS } from '../Station33Config';
 import { EscapeDeparture, type EscapeHordeRequest } from './EscapeDeparture';
 import { EscapeTruck } from './EscapeTruck';
-import { addOilDrums, oilDrumsFootprint } from './OilDrums';
-import { addSandbagWall, SANDBAG_WALL_DEPTH } from './Sandbags';
+import { addOilDrums, OIL_DRUM, oilDrumsFootprint } from './OilDrums';
+import { addSandbagWall, SANDBAG_WALL_DEPTH, sandbagWallHeight } from './Sandbags';
+import { addSnowCap } from './SnowCover';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { buildSurfaceOutskirts, WASTELAND } from './SurfaceOutskirts';
+import { buildYardDressing } from './YardDressing';
 import { YardGate } from './YardGate';
+import { buildYardDrifts } from './YardSnow';
 import { yardSolid } from './YardSolid';
 
 const { yard, kiosk, fenceHeight } = PROTOCOL33_SURFACE;
@@ -22,11 +25,14 @@ const ROAD_BLOCK = { length: 2.4, width: 0.6, height: 0.6 } as const;
 const TYRE = { radius: 0.5, width: 0.32, stack: 3 } as const;
 
 /**
- * The abandoned surface over Station 33: a fenced concrete yard in front of
+ * The abandoned, snowbound surface over Station 33: a fenced yard of
+ * trodden snow in front of
  * the stairhead, an olive evacuation truck waiting at the shut gate with
  * its box body open, one sodium lamp, road blocks, fuel drums, the gate
- * guards' sandbag nest and fire barrel, and a wasteland running off into
- * the fog towards dead tower blocks (`buildSurfaceOutskirts`). The yard's
+ * guards' sandbag nest and fire barrel, snow settled on all of it and
+ * drifted against the fence, the post's loudspeakers, banner and flag
+ * (`buildYardDressing`), and a snowfield running off into the fog towards
+ * dead tower blocks (`buildSurfaceOutskirts`). The yard's
  * ground, fence, truck and props are solids on floor 1; everything beyond
  * the fence is batched scenery. The truck and the gate are their own rigs,
  * which the filmed ending drives through `departure`; it lets the horde out
@@ -40,6 +46,8 @@ export function buildSurface(context: Station33BuildContext, lighting: Station33
   solids.push(...truck.solids);
   solids.push(...buildYardProps(context, lighting));
   buildYardWear(context);
+  buildYardDrifts(context);
+  buildYardDressing(context);
   buildSurfaceOutskirts(context, lighting);
   return { solids, departure: new EscapeDeparture(truck, new YardGate(context), requestZombie) };
 }
@@ -58,10 +66,10 @@ function buildGround(context: Station33BuildContext): void {
   const minZ = yard.minZ - STATION33_WALL_THICKNESS;
   // It runs under the fence and into the stairhead's doorway as its landing.
   const maxZ = yard.maxZ + STATION33_WALL_THICKNESS;
-  structure.addBox((minX + maxX) / 2, GROUND - 0.08, (minZ + maxZ) / 2, maxX - minX, 0.16, maxZ - minZ, materials.depotFloor, {
+  structure.addBox((minX + maxX) / 2, GROUND - 0.08, (minZ + maxZ) / 2, maxX - minX, 0.16, maxZ - minZ, materials.snowYard, {
     name: 'surface-yard', surface: 'concrete', mapRole: 'slab', blocksPlayer: false, castShadow: false, uvSeed: 360,
   });
-  // Wasteland around the yard, leaving the kiosk's footprint open over the flight.
+  // Snowfield around the yard, leaving the kiosk's footprint open over the flight.
   const pieces: ReadonlyArray<readonly [number, number, number, number]> = [
     [WASTELAND.minX, WASTELAND.maxX, WASTELAND.minZ, minZ],
     [WASTELAND.minX, minX, minZ, WASTELAND.maxZ],
@@ -71,14 +79,15 @@ function buildGround(context: Station33BuildContext): void {
     [kiosk.minX, kiosk.maxX, kiosk.maxZ, WASTELAND.maxZ],
   ];
   for (const [x0, x1, z0, z1] of pieces) {
-    batch.addBox(materials.trackBed, (x0 + x1) / 2, GROUND - 0.06, (z0 + z1) / 2, x1 - x0, 0.12, z1 - z0, 0, 0, 0, 361);
+    batch.addBox(materials.snow, (x0 + x1) / 2, GROUND - 0.06, (z0 + z1) / 2, x1 - x0, 0.12, z1 - z0, 0, 0, 0, 361);
   }
 }
 
 /**
  * Precast concrete fence on the four sides, posts every two metres, a
  * diamond relief on each panel's inner face and barbed wire on top (with
- * a concertina coil where the device can afford it); the north side
+ * a concertina coil where the device can afford it), snow settled along
+ * its top and on every post; the north side
  * leaves a gap between two posts for the `YardGate`. The south side runs into
  * the kiosk. Long sides are split under the zombies' 20 m obstacle limit.
  */
@@ -111,10 +120,12 @@ function buildFence(context: Station33BuildContext): void {
     structure.addBox(x, GROUND + fenceHeight / 2, z, width, fenceHeight, depth, materials.serviceConcrete, {
       name: 'surface-fence', surface: 'concrete', mapRole: 'wall', blocksPlayer: true, castShadow: false, uvSeed: 362 + index,
     });
+    addSnowCap(batch, materials.snow, x, top, z, width, depth);
     const at = (s: number, out: number): readonly [number, number] => (run.axis === 'x' ? [s, run.fixed + out] : [run.fixed + out, s]);
     for (let post = run.from; post <= run.to + 1e-6; post += 2) {
       const [px, pz] = at(post, 0);
       batch.addBox(materials.serviceConcrete, px, GROUND + fenceHeight / 2 + 0.05, pz, 0.36, fenceHeight + 0.1, 0.36);
+      addSnowCap(batch, materials.snow, px, top + 0.1, pz, 0.36, 0.36);
       // Steel brackets on each post carry the wire and its coil.
       batch.addBox(materials.greySteel, px, top + 0.2, pz, 0.05, 0.42, 0.05);
     }
@@ -145,8 +156,9 @@ function buildFence(context: Station33BuildContext): void {
 
 /**
  * The sodium lamp on its pole, the road blocks, the fuel drums, the gate
- * guards' sandbag nest with its fire barrel, and a stack of tyres. Returns
- * their footprints.
+ * guards' sandbag nest with its fire barrel (the only thing the snow left
+ * bare), and a stack of tyres, all but the fire under a cap of snow.
+ * Returns their footprints.
  */
 function buildYardProps(context: Station33BuildContext, lighting: Station33Lighting): GroundRect[] {
   const { batch, materials } = context;
@@ -155,6 +167,7 @@ function buildYardProps(context: Station33BuildContext, lighting: Station33Light
   const { x, z, height } = lampPost;
   batch.addBox(materials.serviceConcrete, x, GROUND + height / 2, z, 0.22, height, 0.22);
   batch.addBox(materials.serviceConcrete, x + 0.5, GROUND + height - 0.1, z, 1.1, 0.1, 0.12);
+  addSnowCap(batch, materials.snow, x + 0.5, GROUND + height - 0.05, z, 1.1, 0.12, 0, 0.04);
   batch.addBox(materials.greySteel, x + 1.0, GROUND + height - 0.22, z, 0.5, 0.14, 0.26);
   batch.addBox(lighting.circuitMaterial('amber'), x + 1.0, GROUND + height - 0.31, z, 0.4, 0.04, 0.18);
   solids.push(yardSolid(context, 'surface-lamp-post', 'concrete', { minX: x - 0.15, maxX: x + 0.15, minZ: z - 0.15, maxZ: z + 0.15 }, GROUND, GROUND + height));
@@ -162,15 +175,21 @@ function buildYardProps(context: Station33BuildContext, lighting: Station33Light
     // Turned blocks stay solid through an axis-aligned box around them.
     batch.addBox(materials.serviceConcrete, bx, GROUND + ROAD_BLOCK.height / 2, bz, ROAD_BLOCK.length, ROAD_BLOCK.height, ROAD_BLOCK.width, 0, yaw, 0, 371 + index);
     batch.addBox(materials.hazardPaint, bx, GROUND + ROAD_BLOCK.height - 0.12, bz, ROAD_BLOCK.length + 0.01, 0.12, ROAD_BLOCK.width + 0.01, 0, yaw, 0);
+    addSnowCap(batch, materials.snow, bx, GROUND + ROAD_BLOCK.height, bz, ROAD_BLOCK.length, ROAD_BLOCK.width, yaw);
     const halfX = Math.abs(Math.cos(yaw)) * ROAD_BLOCK.length / 2 + Math.abs(Math.sin(yaw)) * ROAD_BLOCK.width / 2;
     const halfZ = Math.abs(Math.sin(yaw)) * ROAD_BLOCK.length / 2 + Math.abs(Math.cos(yaw)) * ROAD_BLOCK.width / 2;
     solids.push(yardSolid(context, 'surface-road-block', 'concrete', { minX: bx - halfX, maxX: bx + halfX, minZ: bz - halfZ, maxZ: bz + halfZ }, GROUND, GROUND + ROAD_BLOCK.height));
   });
   drumHuddles.forEach((drums, index) => {
     addOilDrums(context, `surface-drums-${index}`, drums, GROUND);
+    drums.forEach(([dx, dz], drum) => {
+      if (drum === OIL_DRUM.leaningIndex) return;
+      batch.add(new THREE.CylinderGeometry(OIL_DRUM.radius - 0.03, OIL_DRUM.radius - 0.02, 0.06, 14), materials.snow, placement(dx, GROUND + OIL_DRUM.height + 0.03, dz));
+    });
     solids.push(oilDrumsFootprint(drums));
   });
   addSandbagWall(context, { ...sandbagNest, y: GROUND }, 3631, 'surface-sandbags');
+  addSnowCap(batch, materials.snow, sandbagNest.x, GROUND + sandbagWallHeight(sandbagNest.courses) - 0.03, sandbagNest.z, sandbagNest.length - 0.1, SANDBAG_WALL_DEPTH - 0.06, 0, 0.08);
   solids.push({
     minX: sandbagNest.x - sandbagNest.length / 2, maxX: sandbagNest.x + sandbagNest.length / 2,
     minZ: sandbagNest.z - SANDBAG_WALL_DEPTH / 2, maxZ: sandbagNest.z + SANDBAG_WALL_DEPTH / 2,
@@ -180,6 +199,8 @@ function buildYardProps(context: Station33BuildContext, lighting: Station33Light
     const tyre = new THREE.TorusGeometry(TYRE.radius - TYRE.width / 2, TYRE.width / 2, 6, 16).rotateX(Math.PI / 2);
     batch.add(tyre, materials.rubber, placement(tyres.x + level * 0.05, GROUND + TYRE.width / 2 + level * TYRE.width * 0.9, tyres.z - level * 0.04, 0, level * 0.4, 0));
   }
+  const stackTop = GROUND + TYRE.stack * TYRE.width * 0.9 + TYRE.width * 0.1;
+  batch.add(new THREE.CylinderGeometry(TYRE.radius - 0.08, TYRE.radius - 0.05, 0.06, 16), materials.snow, placement(tyres.x + (TYRE.stack - 1) * 0.05, stackTop, tyres.z - (TYRE.stack - 1) * 0.04));
   const leaning = new THREE.TorusGeometry(TYRE.radius - TYRE.width / 2, TYRE.width / 2, 6, 16);
   batch.add(leaning, materials.rubber, placement(tyres.x - 0.75, GROUND + TYRE.radius - 0.02, tyres.z + 0.25, 0.25, Math.PI / 2 - 0.3, 0));
   solids.push(yardSolid(context, 'surface-tyres', 'wood',
@@ -205,8 +226,8 @@ function buildFireBarrel(context: Station33BuildContext, lighting: Station33Ligh
 }
 
 /**
- * What years of neglect left on the yard, all flat and walkable: rain
- * puddles, oil and blood stains, tyre tracks to the gate, rubble and
+ * What years of neglect left on the yard, all flat and walkable: frozen
+ * puddles, oil and blood stains in the snow, tyre tracks to the gate, rubble and
  * leaflets from the evacuation, and weeds through the cracks.
  */
 function buildYardWear(context: Station33BuildContext): void {
@@ -218,7 +239,7 @@ function buildYardWear(context: Station33BuildContext): void {
   const puddles: ReadonlyArray<readonly [number, number, number, number]> = [
     [12.5, -88.5, 2.4, 1.6], [17.0, -84.0, 1.4, 1.0], [7.5, -91.0, 1.8, 1.2], [22.5, -86.5, 1.2, 0.9], [15.5, -97.5, 2.0, 1.1],
   ];
-  puddles.forEach(([x, z, w, d], index) => flat(materials.puddle, x, z, w, d, 0.006, index * 1.3));
+  puddles.forEach(([x, z, w, d], index) => flat(materials.frozenPuddle, x, z, w, d, 0.006, index * 1.3));
   flat(materials.floorGrime, PROTOCOL33_TRUCK.x, PROTOCOL33_TRUCK.z + 0.6, 2.2, 3.0, 0.004, 0.1);
   flat(materials.bloodSmear, 13.8, -82.4, 1.4, 0.8, 0.007, 0.7);
   flat(materials.bloodSplatter, 19.1, -84.6, 1.0, 1.0, 0.007, 2.1);
@@ -239,7 +260,7 @@ function buildYardWear(context: Station33BuildContext): void {
     const z = yard.minZ + 1 + random() * (yard.maxZ - yard.minZ - 2);
     flat(materials.paper, x, z, 0.21, 0.3, 0.008 + index * 0.0002, random() * Math.PI);
   }
-  // Dry weeds along the foot of the fence.
+  // Dry weeds poking out of the snow along the foot of the fence.
   for (let index = 0; index < 40; index++) {
     const side = index % 4;
     const along = random();

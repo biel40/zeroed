@@ -11,6 +11,8 @@ export class PlayerHealth {
   private invincible = false;
   /** Seconds since the last landed hit; regen starts once it passes the delay. */
   private regenTimer = 0;
+  /** Multiplier on the regeneration delay (the white ring shortens it). */
+  private regenDelayScale = 1;
 
   constructor(
     /** Max HP without bonuses (the Armour ring scales it). */
@@ -40,6 +42,11 @@ export class PlayerHealth {
     this.currentMaxHp = next;
   }
 
+  /** The wait before regeneration becomes `scale` times the base delay (1 = normal). */
+  public setRegenDelayScale(scale: number): void {
+    this.regenDelayScale = scale;
+  }
+
   get isDead(): boolean {
     return this.hp <= 0;
   }
@@ -58,7 +65,7 @@ export class PlayerHealth {
     this.regenTimer += dt;
     // The tick that crosses the delay already heals: the delay gates the
     // START of regeneration, never its rate. HP is hard-capped at maxHp.
-    if (this.regenTimer >= this.regenDelay) {
+    if (this.regenTimer >= this.regenDelay * this.regenDelayScale) {
       this.hp = Math.min(this.maxHp, this.hp + this.regenRate * dt);
     }
   }
@@ -81,6 +88,7 @@ export class PlayerHealth {
     this.hp = this.baseMaxHp;
     this.invulnTimer = 0;
     this.regenTimer = 0;
+    this.regenDelayScale = 1;
     this.invincible = false;
   }
 

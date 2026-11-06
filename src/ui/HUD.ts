@@ -116,6 +116,8 @@ export class HUD {
   private readonly ringFlash: HTMLElement = mustGet('ring-flash');
   private readonly protectionOverlay: HTMLElement = mustGet('protection-overlay');
   private lastProtection = 0;
+  private readonly radianceOverlay: HTMLElement = mustGet('radiance-overlay');
+  private lastRadiance = 0;
   private readonly gasMaskOverlay: HTMLElement = mustGet('gas-mask-overlay');
   private lastGasMask = 0;
   private readonly gameOverPanel: HTMLElement = mustGet('game-over');
@@ -284,6 +286,7 @@ export class HUD {
       this.setObjective(null);
       this.setBossBar(null);
       this.setProtection(0);
+      this.setRadiance(0);
     }
     this.root.classList.toggle('hidden', !visible);
   }
@@ -674,6 +677,19 @@ export class HUD {
   }
 
   /**
+   * Faint white halo with slow rays around the view, 0..1: the white ring
+   * is lit. Polled every frame; the DOM is only touched when the level changes.
+   */
+  public setRadiance(level: number): void {
+    const rounded = Math.round(clamp(level, 0, 1) * 100) / 100;
+    if (rounded === this.lastRadiance) return;
+    this.lastRadiance = rounded;
+    this.radianceOverlay.style.opacity = `${rounded}`;
+    // The rays only turn while the halo shows.
+    this.radianceOverlay.classList.toggle('lit', rounded > 0);
+  }
+
+  /**
    * Gas mask visor over the view, 0..1 (0 bare face, 1 worn): it closes in
    * from beyond the screen edges as the mask meets the face. Polled every
    * frame; the DOM is only touched when the level changes.
@@ -686,9 +702,10 @@ export class HUD {
     this.gasMaskOverlay.classList.toggle('worn', rounded >= 1);
   }
 
-  /** Brief cold flash over the whole view: a ring just fired. */
-  public flashRing(): void {
+  /** Brief flash over the whole view: cold when a ring fires, white when the white ring lights up. */
+  public flashRing(tone: 'cold' | 'radiant' = 'cold'): void {
     this.ringFlash.classList.remove('active');
+    this.ringFlash.classList.toggle('radiant', tone === 'radiant');
     void this.ringFlash.offsetWidth;
     this.ringFlash.classList.add('active');
   }

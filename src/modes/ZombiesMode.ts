@@ -412,6 +412,9 @@ export class ZombiesMode implements GameMode {
     // A surviving headshot pays 150 here; lethal hits pay through the kill
     // callback instead, so a direct hit is rewarded exactly once.
     if (!lethal) this.economy.awardHit(headshot);
+    // The white ring's primed echo ripples out from this hit.
+    const echo = this.rings?.releaseEcho(point);
+    if (echo) this.zombies.applySplash(point, echo.echoRadius, damage * echo.echoDamageShare, weapon.definition.id);
   }
 
   /** The VORTEX-9 bypasses hitscan ballistics and fires a visible bolt; a flame weapon scorches its cone. */
@@ -1166,8 +1169,10 @@ export class ZombiesMode implements GameMode {
 
     // Rewards are mutually exclusive: the risky knife finisher beats a
     // headshot, and neither stacks with the ordinary kill payout.
-    if (source === 'knife') this.economy.awardKnifeKill(rewardMultiplier);
-    else this.economy.awardKill(headshot, rewardMultiplier);
+    const reward = rewardMultiplier * (this.rings?.killPointsScale ?? 1);
+    if (source === 'knife') this.economy.awardKnifeKill(reward);
+    else this.economy.awardKill(headshot, reward);
+    this.rings?.registerKill();
     if (deathPosition && floor !== undefined && hasSoulRitual(this.arena)) {
       this.arena.captureSoul(deathPosition, floor);
     }

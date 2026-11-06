@@ -71,6 +71,9 @@ function harness(): { tracker: ObjectiveTracker; corner: FakeElement; spotlight:
   const corner = new FakeElement();
   const part = (): HTMLElement => new FakeElement() as unknown as HTMLElement;
   const spotlightNote: ObjectiveNoteElements = { root: part(), kicker: part(), title: part(), details: part() };
+  (spotlightNote.root as unknown as FakeElement).append(
+    ...[spotlightNote.kicker, spotlightNote.title, spotlightNote.details] as unknown as FakeElement[],
+  );
   const banner = new FakeBanner();
   const tracker = new ObjectiveTracker(corner as unknown as HTMLElement, spotlightNote, banner.remainingMs);
   return { tracker, corner, spotlight: spotlightNote.root as unknown as FakeElement, banner };
@@ -91,6 +94,40 @@ describe('ObjectiveTracker', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('draws a measured objective as a gauge between the title and the details', () => {
+    const { tracker, corner } = harness();
+    const door: ObjectiveNote = {
+      ...crystal,
+      details: 'Hold',
+      gauge: { label: 'DOOR', ratio: 0.473, readout: '47% · 1:03', stalled: false },
+    };
+    tracker.update([door], false);
+    const note = corner.children.find((child) => !child.classes.has('leaving'))!;
+    const gauge = note.children[2];
+    expect(gauge.classes.has('objective-gauge')).toBe(true);
+    expect(note.children[3].textContent).toBe('Hold');
+    expect(gauge.classes.has('hidden')).toBe(false);
+    expect(gauge.classes.has('stalled')).toBe(false);
+    const [head, track] = gauge.children;
+    expect(head.children.map((child) => child.textContent)).toEqual(['DOOR', '47% · 1:03']);
+    expect((track.children[0].style as unknown as { width: string }).width).toBe('47.30%');
+
+    tracker.update([{ ...door, gauge: { ...door.gauge!, ratio: 1.4, stalled: true } }], false);
+    expect(gauge.classes.has('stalled')).toBe(true);
+    expect((track.children[0].style as unknown as { width: string }).width).toBe('100.00%');
+
+    tracker.update([crystal], false);
+    expect(gauge.classes.has('hidden')).toBe(true);
+  });
+
+  it('shows the gauge in the spotlight above its details', () => {
+    const { tracker, spotlight } = harness();
+    tracker.update([{ ...crystal, gauge: { label: 'DOOR', ratio: 0, readout: '0%', stalled: false } }], false);
+    const gauge = spotlight.children[2];
+    expect(gauge.classes.has('objective-gauge')).toBe(true);
+    expect(gauge.classes.has('hidden')).toBe(false);
   });
 
   it('fades the spotlight out when its objective ends before docking', () => {

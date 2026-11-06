@@ -91,7 +91,7 @@ interface SteamPuff {
 }
 
 /** Soft round alpha spot shared by dust motes and steam. */
-function makeSoftSpot(size: number): THREE.DataTexture {
+export function makeSoftSpot(size: number): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {

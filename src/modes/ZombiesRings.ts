@@ -3,15 +3,18 @@ import { spatialMuffle, spatialPan } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { PlayerHealth } from '../game/PlayerHealth';
 import { PlayerRings } from '../game/rings/PlayerRings';
+import type { RadiantRingEffect } from '../game/rings/RadiantRing';
 import { RING_DEFINITIONS, type RingId } from '../game/rings/RingCatalog';
 import { t } from '../i18n/i18n';
 import { getUpPose } from '../player/ReviveGetUp';
 import { stanceEyeOffset } from '../player/PlayerStance';
 import { actionKey } from '../ui/InteractionPrompts';
+import type { RingHudEntry } from '../ui/SurvivalPresentation';
 import { RingDonning } from '../weapons/RingDonning';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
 import type { ArenaRingMachine, RingMachineDisplay } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
+import { ZombiesRadiantRing } from './ZombiesRadiantRing';
 
 /** How strongly the worn ring flares when recharged, and when it fires (putting it on flares it on its own). */
 const RECHARGE_PULSE = 0.8;
@@ -44,7 +47,8 @@ export function protectionVignette(elapsed: number, remaining: number): number {
  * effects (a charged Resurrection ring takes the place of a death, a
  * Sleight of Hand ring speeds every reload, an Armour ring doubles the
  * max health, Double Tap speeds up fire and boosts weapon damage), plays
- * the hands putting a new ring on and keeps the
+ * the hands putting a new ring on, lights the free white ring while every
+ * catalog ring is charged (`ZombiesRadiantRing`) and keeps the
  * first-person hand, the machines, the weapons, the health and the HUD in
  * step with the run's `PlayerRings`. `ZombiesMode` delegates every ring
  * concern here.
@@ -53,6 +57,7 @@ export class ZombiesRings {
   private readonly rings = new PlayerRings();
   private damageMultiplier = 1;
   private readonly donning: RingDonning;
+  private readonly radiant: ZombiesRadiantRing;
   private readonly forward = new THREE.Vector3();
   private readonly listener = new THREE.Vector3();
   /** Seconds into getting back up after a resurrection, and how long it takes; null when standing. */
@@ -69,12 +74,28 @@ export class ZombiesRings {
     private readonly health: PlayerHealth,
   ) {
     this.donning = new RingDonning(ctx.player.camera, ctx.handRings);
+    this.radiant = new ZombiesRadiantRing(ctx, this.donning, health);
     this.present();
   }
 
   /** True while the hands are putting a ring on: both are busy. */
   get isDonning(): boolean {
     return this.donning.isAnimating;
+  }
+
+  /** Multiplier on kill rewards (the white ring). */
+  get killPointsScale(): number {
+    return this.radiant.killPointsScale;
+  }
+
+  /** A zombie died: the white ring counts it toward its scavenge and echo. */
+  registerKill(): void {
+    this.radiant.registerKill();
+  }
+
+  /** A bullet hit a zombie at `point`: the white ring's primed echo, if any, for the mode to apply. */
+  releaseEcho(point: THREE.Vector3): RadiantRingEffect | null {
+    return this.radiant.releaseEcho(point);
   }
 
   /** Uses the same effects and presentation as a purchase, on any map. */
@@ -176,6 +197,7 @@ export class ZombiesRings {
    */
   update(dt: number): void {
     this.donning.update(dt);
+    if (this.radiant.update(dt)) this.present();
     this.updateProtection(dt);
     if (this.getUpElapsed === null) return;
     this.getUpElapsed += Math.max(0, dt);
@@ -237,6 +259,7 @@ export class ZombiesRings {
     this.ctx.hud.setProtection(0);
     this.rings.reset();
     this.donning.reset();
+    this.radiant.reset();
     this.ctx.handRings.clear();
     this.present();
   }
@@ -267,28 +290,40 @@ export class ZombiesRings {
     const { audio, hud, handRings } = this.ctx;
     this.present();
     for (const event of this.rings.pendingEvents) {
-      const ring = RING_DEFINITIONS[event.ringId];
-      const name = t(ring.nameKey);
       switch (event.type) {
-        case 'purchased':
+        case 'purchased': {
+          const ring = RING_DEFINITIONS[event.ringId];
           audio.playRingPurchase();
-          hud.showRoundBanner(name, t('banner.ringWorn', { finger: t(`ring.finger.${ring.finger}`) }));
+          hud.showRoundBanner(t(ring.nameKey), t('banner.ringWorn', { finger: t(`ring.finger.${ring.finger}`) }));
           this.donning.start(ring.finger);
           break;
-        case 'recharged':
+        }
+        case 'recharged': {
+          const ring = RING_DEFINITIONS[event.ringId];
           audio.playRingRecharge();
-          hud.showRoundBanner(name, t('banner.ringRecharged'));
+          hud.showRoundBanner(t(ring.nameKey), t('banner.ringRecharged'));
           handRings.pulse(ring.finger, RECHARGE_PULSE);
           break;
-        case 'consumed':
+        }
+        case 'consumed': {
+          const ring = RING_DEFINITIONS[event.ringId];
           audio.playResurrection();
           hud.flashRing();
-          hud.showRoundBanner(name, t('banner.ringActivated'));
+          hud.showRoundBanner(t(ring.nameKey), t('banner.ringActivated'));
           handRings.pulse(ring.finger, FIRE_PULSE);
+          break;
+        }
+        case 'radiantAwakened':
+          this.radiant.awaken();
+          break;
+        case 'radiantFaded':
+          this.radiant.fade();
           break;
       }
     }
     this.rings.clearEvents();
+    // Again, now that the white ring may have lit up or gone dark.
+    this.present();
   }
 
   /**
@@ -340,13 +375,17 @@ export class ZombiesRings {
     for (const { ringId, finger, charges } of worn) {
       this.ctx.handRings.show(finger, charges > 0 ? 'charged' : 'spent', RING_DEFINITIONS[ringId].glowColor);
     }
+    this.radiant.present();
     for (const machine of this.machines) machine.setDisplay(this.displayFor(machine));
-    this.ctx.hud.updateRings(worn.map(({ ringId, finger, charges }) => ({
+    const hudRings: RingHudEntry[] = worn.map(({ ringId, finger, charges }) => ({
       finger,
       nameKey: RING_DEFINITIONS[ringId].nameKey,
       charged: charges > 0,
       glowColor: RING_DEFINITIONS[ringId].glowColor,
-    })));
+    }));
+    const radiant = this.radiant.hudEntry();
+    if (radiant) hudRings.push(radiant);
+    this.ctx.hud.updateRings(hudRings);
   }
 
   /** Stocked until bought, empty while charged or once every purchase is used, else calling for a recharge. */

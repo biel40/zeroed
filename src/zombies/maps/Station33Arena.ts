@@ -36,6 +36,7 @@ import { buildSubestacion } from './station33/SubestacionBuilder';
 import type { EscapeDeparture } from './station33/EscapeDeparture';
 import { buildSurface } from './station33/SurfaceBuilder';
 import { SurfaceMood } from './station33/SurfaceMood';
+import { SurfaceSnowfall } from './station33/SurfaceSnowfall';
 import { buildTaller } from './station33/TallerBuilder';
 import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
@@ -164,6 +165,7 @@ export class Station33Arena implements ZombieArena {
   private readonly ticketAmbush = new AmbushTrigger(TICKET_WINDOW_AMBUSH_SITES, TICKET_WINDOW_AMBUSH);
   private readonly hemisphere: THREE.HemisphereLight;
   private readonly surfaceMood: SurfaceMood;
+  private readonly snowfall: SurfaceSnowfall;
   /** The truck leaving through the gate in the filmed ending. */
   private readonly departure: EscapeDeparture;
   /** Seconds into the intro while its cues are pending, else null. */
@@ -211,6 +213,7 @@ export class Station33Arena implements ZombieArena {
     this.departure = surface.departure;
     this.evacuation = new Protocol33(context, this.lighting, this.power, surface.solids, () => this.onEvacuationLayout());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
+    this.snowfall = new SurfaceSnowfall(this.group, profile.quality);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
     this.hemisphere = createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects);
     this.group.add(this.hemisphere);
@@ -268,6 +271,7 @@ export class Station33Arena implements ZombieArena {
     this.lighting.update(dt, observerPosition);
     this.atmosphere.update(dt);
     this.surfaceMood.update(observerPosition?.y);
+    this.snowfall.update(dt, observerPosition?.y);
   }
 
   reset(): void {
@@ -289,6 +293,7 @@ export class Station33Arena implements ZombieArena {
     this.ambientEvents.reset();
     this.lighting.reset();
     this.atmosphere.reset();
+    this.snowfall.reset();
     this.surfaceMood.reset();
     this.applyAmbience();
     this.activeZones.clear();

@@ -102,8 +102,15 @@ export class PlayerController {
   private currentStance: PlayerStance = 'standing';
   private readonly stanceTransition = new StanceTransition();
   private deathStartY = 0;
+  /** Mode-owned multiplier on walking speed (the white ring); 1 is normal. */
+  private moveSpeedScale = 1;
 
   public get stance(): PlayerStance { return this.currentStance; }
+
+  /** Walking speed multiplier set by the mode (1 = normal). */
+  public setMoveSpeedScale(scale: number): void {
+    this.moveSpeedScale = scale;
+  }
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(this.fov, aspect, 0.08, 700);
@@ -249,7 +256,8 @@ export class PlayerController {
     if (this.wish.lengthSq() > 1) this.wish.normalize();
 
     const speed =
-      WALK_SPEED * STANCE[this.currentStance].speed * definition.moveSpeedMultiplier * (1 - ADS_MOVE_PENALTY * weapon.adsAlpha);
+      WALK_SPEED * this.moveSpeedScale * STANCE[this.currentStance].speed * definition.moveSpeedMultiplier
+      * (1 - ADS_MOVE_PENALTY * weapon.adsAlpha);
     this.wish.multiplyScalar(speed);
     this.velocity.x = damp(this.velocity.x, this.wish.x, ACCELERATION, dt);
     this.velocity.z = damp(this.velocity.z, this.wish.z, ACCELERATION, dt);

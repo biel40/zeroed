@@ -25,12 +25,12 @@ function hudHarness(): { hud: HUD; element: (name: string) => HudElement; object
     return node;
   };
   const hud = Object.create(HUD.prototype) as HUD;
-  for (const name of ['root', 'roundBanner', 'bannerTitle', 'bannerSub', 'ringFlash', 'protectionOverlay', 'damageOverlay', 'zPoints', 'bossBar']) {
+  for (const name of ['root', 'roundBanner', 'bannerTitle', 'bannerSub', 'ringFlash', 'protectionOverlay', 'radianceOverlay', 'damageOverlay', 'zPoints', 'bossBar']) {
     Object.assign(hud, { [name]: element(name) });
   }
   const objectives = { update: vi.fn() };
   // A boss bar was up when the run ended.
-  Object.assign(hud, { lastProtection: 0, objectives, pointsPopups: { reset: vi.fn() }, lastBossBar: 'CAPTAIN USSR|0.6,0.3' });
+  Object.assign(hud, { lastProtection: 0, lastRadiance: 0, objectives, pointsPopups: { reset: vi.fn() }, lastBossBar: 'CAPTAIN USSR|0.6,0.3' });
   return { hud, element, objectives };
 }
 
@@ -43,6 +43,7 @@ describe('HUD between runs', () => {
       hud.flashRing();
       hud.setProtection(0.8);
     }
+    hud.setRadiance(0.6);
     hud.flashDamage();
     hud.flashNotEnoughPoints();
 
@@ -59,6 +60,8 @@ describe('HUD between runs', () => {
     expect(element('bannerTitle').textContent).toBe('');
     expect(element('bannerSub').textContent).toBe('');
     expect(element('protectionOverlay').style.opacity).toBe('0');
+    expect(element('radianceOverlay').style.opacity).toBe('0');
+    expect(element('radianceOverlay').classList.contains('lit')).toBe(false);
     expect(element('damageOverlay').classList.contains('protected')).toBe(false);
 
     // A genuine activation in the next run still uses the same effects.

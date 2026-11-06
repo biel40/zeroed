@@ -79,18 +79,21 @@ describe('survival presentation', () => {
     expect(lampProgress(lamps)).not.toContain('llenos');
   });
 
-  it('shows worn rings by finger, dimming a spent one, with names only in the pause detail', () => {
+  it('shows only icons in pause while retaining ring colors, spent states and accessible labels', () => {
     const ring = { finger: 'ring', nameKey: 'ring.resurrection', glowColor: 0x3fd8c8 } as const;
-    const compact = ringProgress([{ ...ring, charged: true }], true);
-    expect(compact).toContain('class="ring charged"');
-    expect(compact).toContain('--ring-glow:#3fd8c8');
-    expect(compact).toContain('aria-label="RESURRECCIÓN — ANULAR: cargado"');
-    expect(compact).not.toContain('<strong>');
-    const detail = ringProgress([{ ...ring, charged: false }]);
-    expect(detail).toContain('class="ring spent"');
-    expect(detail).toContain('ANILLOS');
-    expect(detail).toContain('<strong>RESURRECCIÓN</strong>');
-    expect(detail).toContain('ANULAR · gastado');
+    const pause = ringProgress([
+      { ...ring, charged: true },
+      { finger: 'middle', nameKey: 'ring.armor', glowColor: 0xff0000, charged: false },
+    ]);
+    expect(pause.match(/class="survival-icon ring-icon"/g)).toHaveLength(2);
+    expect(pause).toContain('class="ring charged"');
+    expect(pause).toContain('--ring-glow:#3fd8c8');
+    expect(pause).toContain('aria-label="RESURRECCIÓN — ANULAR: cargado"');
+    expect(pause).toContain('class="ring spent"');
+    expect(pause).toContain('aria-label="ARMADURA — CORAZÓN: gastado"');
+    expect(pause.replace(/<[^>]*>/g, '')).toBe('');
+    expect(pause).not.toContain('title=');
+    expect(ringProgress([{ ...ring, charged: true }], true)).toContain('title="RESURRECCIÓN — ANULAR: cargado"');
     expect(ringProgress([])).not.toContain('class="ring ');
   });
 

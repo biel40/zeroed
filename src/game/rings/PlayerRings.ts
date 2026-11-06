@@ -1,9 +1,13 @@
-import { RING_DEFINITIONS, type RingFinger, type RingId } from './RingCatalog';
+import { RING_DEFINITIONS, RING_IDS, type RingFinger, type RingId } from './RingCatalog';
 
 export type RingEvent =
   | { readonly type: 'purchased'; readonly ringId: RingId }
   | { readonly type: 'recharged'; readonly ringId: RingId }
-  | { readonly type: 'consumed'; readonly ringId: RingId };
+  | { readonly type: 'consumed'; readonly ringId: RingId }
+  /** Every catalog ring is now worn and charged: the white ring lights up. */
+  | { readonly type: 'radiantAwakened' }
+  /** A worn ring was spent: the white ring goes dark until it is recharged. */
+  | { readonly type: 'radiantFaded' };
 
 /** Outcome of using a ring machine. */
 export type RingPurchaseResult = 'purchased' | 'recharged' | 'unavailable' | 'notEnoughPoints';
@@ -27,6 +31,12 @@ export class PlayerRings {
   readonly pendingEvents: RingEvent[] = [];
   private readonly charges = new Map<RingId, number>();
   private readonly purchases = new Map<RingId, number>();
+  private radiant = false;
+
+  /** True while every catalog ring is worn and charged (the white ring shines). */
+  get isRadiant(): boolean {
+    return this.radiant;
+  }
 
   has(ringId: RingId): boolean {
     return this.charges.has(ringId);
@@ -71,6 +81,7 @@ export class PlayerRings {
     this.charges.set(ringId, RING_DEFINITIONS[ringId].chargesPerPurchase);
     this.purchases.set(ringId, this.purchasesOf(ringId) + 1);
     this.pendingEvents.push({ type, ringId });
+    this.syncRadiance();
     return type;
   }
 
@@ -80,6 +91,7 @@ export class PlayerRings {
     if (charges <= 0) return false;
     this.charges.set(ringId, charges - 1);
     this.pendingEvents.push({ type: 'consumed', ringId });
+    this.syncRadiance();
     return true;
   }
 
@@ -92,12 +104,22 @@ export class PlayerRings {
     const type = this.has(ringId) ? 'recharged' : 'purchased';
     this.charges.set(ringId, RING_DEFINITIONS[ringId].chargesPerPurchase);
     this.pendingEvents.push({ type, ringId });
+    this.syncRadiance();
   }
 
   /** New run: no rings, no charges, prices back to the first, no pending events. */
   reset(): void {
     this.charges.clear();
     this.purchases.clear();
+    this.radiant = false;
     this.clearEvents();
+  }
+
+  /** Queues the white ring's change after a ring is bought, recharged or spent. */
+  private syncRadiance(): void {
+    const radiant = RING_IDS.every((ringId) => this.chargesOf(ringId) > 0);
+    if (radiant === this.radiant) return;
+    this.radiant = radiant;
+    this.pendingEvents.push({ type: radiant ? 'radiantAwakened' : 'radiantFaded' });
   }
 }

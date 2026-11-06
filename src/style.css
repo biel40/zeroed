@@ -580,6 +580,120 @@ html.touch-controls-enabled .objective-spotlight-details { margin-top: 5px; font
   #hud-objective.urgent .objective-note::before { animation: none; }
 }
 
+/* Measured objective (ObjectiveGauge): label and readout over a segmented
+   track. The fill glows hot while it advances and turns into a blinking
+   hazard stripe while stalled. Its width eases over the 1 s between updates. */
+.objective-gauge {
+  --gauge-hot: #ffcf7a;
+  --gauge-core: #ff9b2f;
+  --gauge-edge: #fff4d6;
+  --gauge-glow: #ff9b2f88;
+  margin-top: 7px;
+}
+.objective-gauge.stalled {
+  --gauge-hot: #ff5a3c;
+  --gauge-core: #8f1d12;
+  --gauge-edge: #ff8a70;
+  --gauge-glow: #ff2a1466;
+}
+.objective-gauge-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font: 700 10px/1.2 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+.objective-gauge-label { color: var(--gauge-hot); }
+.objective-gauge-readout { color: #fff6e6; letter-spacing: 0.08em; font-size: 12px; }
+.objective-gauge-track {
+  position: relative;
+  height: 9px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #000000b3, #1a1410cc);
+  border: 1px solid #ffffff24;
+  box-shadow: inset 0 1px 3px #000, 0 0 0 1px #00000080;
+}
+/* Ten cells: thin notches drawn over the fill. */
+.objective-gauge-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), #0b0908e6 calc(10% - 2px) 10%);
+  pointer-events: none;
+}
+.objective-gauge-fill {
+  position: relative;
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--gauge-hot), var(--gauge-core) 70%, color-mix(in srgb, var(--gauge-core) 70%, #000));
+  box-shadow: 0 0 10px var(--gauge-glow);
+  transition: width 1s linear;
+}
+/* A light sweep running along the fill while it advances. */
+.objective-gauge-fill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, #ffffff73, transparent);
+  animation: objective-gauge-sweep 1.6s ease-in-out infinite;
+}
+/* The leading edge: a bright cap where the fill ends. */
+.objective-gauge-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 3px;
+  background: var(--gauge-edge);
+  box-shadow: 0 0 8px 2px var(--gauge-edge);
+}
+.objective-gauge.stalled .objective-gauge-fill {
+  background:
+    repeating-linear-gradient(-45deg, #ff3b2299 0 6px, #2a0705cc 6px 12px),
+    linear-gradient(180deg, var(--gauge-hot), var(--gauge-core));
+  background-size: 17px 100%, 100% 100%;
+  animation: objective-gauge-hazard 0.8s linear infinite;
+}
+.objective-gauge.stalled .objective-gauge-fill::before { display: none; }
+.objective-gauge.stalled .objective-gauge-track { animation: objective-gauge-alarm 0.9s steps(2, jump-none) infinite; }
+.objective-gauge.stalled .objective-gauge-readout { animation: objective-gauge-blink 0.9s steps(2, jump-none) infinite; }
+
+#objective-spotlight .objective-gauge {
+  width: min(380px, 100%);
+  margin: 12px auto 0;
+}
+#objective-spotlight .objective-gauge-head { font-size: 11px; }
+#objective-spotlight .objective-gauge-readout { font-size: 14px; }
+#objective-spotlight .objective-gauge-track { height: 12px; }
+html.touch-controls-enabled .objective-gauge { margin-top: 5px; }
+html.touch-controls-enabled .objective-gauge-track { height: 7px; }
+html.touch-controls-enabled .objective-gauge-readout { font-size: 11px; }
+
+@keyframes objective-gauge-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(260%); }
+}
+@keyframes objective-gauge-hazard {
+  to { background-position: 17px 0, 0 0; }
+}
+@keyframes objective-gauge-alarm {
+  50% { border-color: #ff3b22cc; box-shadow: inset 0 1px 3px #000, 0 0 10px #ff2a1488; }
+}
+@keyframes objective-gauge-blink {
+  50% { color: #ff6a50; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .objective-gauge-fill { transition: none; }
+  .objective-gauge-fill::before { display: none; }
+  .objective-gauge.stalled .objective-gauge-fill,
+  .objective-gauge.stalled .objective-gauge-track,
+  .objective-gauge.stalled .objective-gauge-readout { animation: none; }
+}
+
 /* Boss fight: the guardian's name over a long red health bar at the top
    centre, a pale trail lagging behind each hit and a notch at every phase. */
 #boss-bar {
@@ -800,18 +914,15 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 
 /* Rings: the worn band and its enamel, glowing in the ring's colour while charged. */
 .ring-progress { margin-top: 9px; text-align: left; }
-.ring-icons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-.ring { display: flex; align-items: center; gap: 8px; color: #6a6e66; }
+.ring-icons { display: flex; flex-wrap: wrap; }
+.ring { display: flex; align-items: center; color: #6a6e66; }
 .ring .ring-icon { width: 22px; height: 22px; flex-basis: 22px; }
 .ring .ring-bezel { fill: currentColor; }
 .ring.charged .ring-icon { color: #c9c4b6; filter: drop-shadow(0 0 5px var(--ring-glow)); }
 .ring.charged .ring-bezel { fill: var(--ring-glow); stroke: var(--ring-glow); }
 .ring.spent { opacity: .5; }
-.ring-text { display: flex; flex-direction: column; gap: 2px; }
-.ring-text strong { font-size: 12px; letter-spacing: .12em; color: #e3dccb; }
-.ring-text small { font-size: 9px; letter-spacing: .2em; color: #8e968a; }
 #z-rings { margin-top: 7px; }
-#hud-zombies .ring-icons { gap: 5px; margin: 0; }
+#hud-zombies .ring-icons { gap: 5px; }
 #hud-zombies .ring .ring-icon { width: 17px; height: 17px; flex-basis: 17px; }
 
 #round-banner {
@@ -1145,6 +1256,39 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   box-shadow: inset 0 0 110px rgba(110, 200, 255, 0.45);
 }
 
+/* White ring: a faint white halo with slow rays at the edges of the view,
+   much lighter than the blue protection. The mode drives its opacity. */
+#radiance-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(240, 246, 255, 0.07) 78%, rgba(236, 244, 255, 0.2) 100%);
+  box-shadow: inset 0 0 70px rgba(245, 250, 255, 0.22);
+}
+
+#radiance-overlay::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.1) 0deg 1.4deg, transparent 1.4deg 11deg);
+  -webkit-mask-image: radial-gradient(circle at center, transparent 30%, #000 50%);
+  mask-image: radial-gradient(circle at center, transparent 30%, #000 50%);
+}
+
+#radiance-overlay.lit::before {
+  animation: radiance-rays 60s linear infinite;
+}
+
+@keyframes radiance-rays {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #radiance-overlay.lit::before { animation: none; }
+}
+
 #damage-overlay.protected::before {
   opacity: 0;
 }
@@ -1198,6 +1342,11 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 
 #ring-flash.active {
   animation: ringflash 1.1s ease-out forwards;
+}
+
+/* The white ring lighting up: a softer white flash. */
+#ring-flash.radiant {
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.42) 0%, rgba(236, 244, 255, 0.2) 45%, rgba(210, 222, 240, 0.4) 100%);
 }
 
 @keyframes ringflash {
@@ -4730,7 +4879,7 @@ html.touch-controls-enabled .start-panel {
 #pause-lamps { margin-top: 12px; padding: 12px 14px 13px; border: 1px solid #a4ac9d1f; background: #0b0e0d; font-family: 'Consolas', 'SF Mono', monospace; }
 #pause-lamps .lamp-icons { gap: 18px; }
 #pause-lamps .lamp .lamp-icon { width: 30px; height: 30px; flex-basis: 30px; }
-#pause-rings { margin-top: 12px; padding: 12px 14px 13px; border: 1px solid #a4ac9d1f; background: #0b0e0d; font-family: 'Consolas', 'SF Mono', monospace; }
+#pause-rings { margin-top: 12px; padding: 12px 14px; border: 1px solid #a4ac9d1f; background: #0b0e0d; }
 #pause-rings .ring-icons { gap: 18px; }
 #pause-rings .ring .ring-icon { width: 30px; height: 30px; flex-basis: 30px; }
 #pause-menu .pause-actions { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin-top: 22px; }

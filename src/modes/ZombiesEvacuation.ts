@@ -14,7 +14,6 @@ import { ZombiesGuardian } from './ZombiesGuardian';
 
 /** Kicker of every evacuation note: the protocol's own (diegetic) name. */
 const KICKER = 'ПРОТОКОЛ 33';
-const GAUGE_CELLS = 10;
 /** Players counted for the horde: single-player runs host one. */
 const PLAYERS = 1;
 /** The escape's alarms come from speakers all over the station, not from one spot. */
@@ -364,11 +363,15 @@ export class ZombiesEvacuation {
         return { kicker: KICKER, title: t('evacuation.objectiveInitiate', { cost: rules.cost }), details: '' };
       case 'defending': {
         const progress = this.protocol.defenseProgress;
-        const cells = Math.floor(progress * GAUGE_CELLS);
-        const gauge = `${'▮'.repeat(cells)}${'▯'.repeat(GAUGE_CELLS - cells)}`;
-        const status = this.protocol.defended ? t('evacuation.objectiveHold') : t('evacuation.objectivePaused');
-        const door = `${t('evacuation.objectiveDoor')} ${gauge} ${Math.floor(progress * 100)}% · ${clock(this.protocol.defenseRemaining)}`;
-        return { kicker: KICKER, title: t('evacuation.surviveBanner'), details: `${door}\n${status}` };
+        const defended = this.protocol.defended;
+        const status = defended ? t('evacuation.objectiveHold') : t('evacuation.objectivePaused');
+        const gauge = {
+          label: t('evacuation.objectiveDoor'),
+          ratio: progress,
+          readout: `${Math.floor(progress * 100)}% · ${clock(this.protocol.defenseRemaining)}`,
+          stalled: !defended,
+        };
+        return { kicker: KICKER, title: t('evacuation.surviveBanner'), details: status, gauge };
       }
       case 'escaping': {
         // The clock is progress, not the task: in the details it never re-announces.

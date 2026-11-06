@@ -466,7 +466,9 @@ existente a `MOTDRULES`.
   claxon cada vez mas rapido; fuera de la planta del panel se oyen lejanas y
   amortiguadas. Lo logrado lleva al final del mapa; si se acaba
   el tiempo, cartel y la derrota normal. Al subir, `SurfaceMood` mezcla la
-  niebla, el fondo y la hemisferica del mapa con los de la superficie.
+  niebla, el fondo y la hemisferica del mapa con los de la superficie, y
+  `SurfaceSnowfall` hace nevar sobre el patio (solo con la vista en el tramo
+  alto de la escalera o arriba; copos segun la calidad del dispositivo).
   Reiniciar lo devuelve todo al estado inicial.
 - Guardian de la extraccion (`ArenaEvacuation.guardian`, opcional; en
   Station 33 el CAPITAN URSS, un supersoldado sovietico zombificado con
@@ -684,6 +686,20 @@ prompt, la muerte y el reinicio.
   Conserva consumo por disparo, recargas y cuchillo; cambiar o adquirir armas
   mantiene el efecto y reiniciar lo elimina. Se combina multiplicando con
   el ajuste de dano de la consola de desarrollo.
+- Resplandor (pulgar, blanco, gratis): no se vende. Se enciende mientras se
+  llevan cargados todos los anillos del catalogo (`PlayerRings.isRadiant`) y
+  se apaga en cuanto uno se gasta (una Resurreccion) hasta recargarlo; un mapa
+  sin todas las maquinas nunca lo da. La primera vez, al terminar de ponerse
+  el cuarto anillo, las manos se lo ponen en el pulgar con un destello blanco;
+  despues solo se ilumina o se apaga. Encendido mantiene un halo blanco tenue
+  con rayos lentos en el borde de la vista y da un poco de todo
+  (`RADIANT_RING` en `src/game/rings/RadiantRing.ts`, orquestado por
+  `ZombiesRadiantRing`): algo mas de velocidad al andar, regeneracion que
+  empieza antes, algo mas de puntos por baja, cada pocas bajas una parte de la
+  reserva del arma equipada y, cada tantas bajas, un eco que hace que la
+  siguiente bala que impacta en un zombi suelte una onda de dano a su
+  alrededor. Las bajas solo cuentan mientras brilla. Es por jugador, como
+  todos los anillos (el cooperativo no tiene anillos).
 - Una maquina puede esperar a la electricidad del mapa
   (`ArenaRingMachine.powered`): hasta entonces esta apagada, no suena y su
   prompt solo avisa de que hay que encender la electricidad, sin cobrar. En
@@ -721,8 +737,8 @@ prompt, la muerte y el reinicio.
   la mano izquierda (`ViewArms`); mientras dura no se dispara, ni se apunta,
   ni se usa el cuchillo o la mascara. Solo presentacion: el efecto rige desde
   la compra. Recargar no repite la animacion. `Game.prepare` los muestra todos para compilar sus shaders.
-- El HUD muestra iconos compactos por anillo (tambien en movil) y la pausa,
-  nombre, dedo y estado; un anillo gastado se atenua.
+- El HUD y la pausa muestran un icono por anillo equipado, tambien en movil.
+  Los anillos gastados se atenuan.
 - Activar `MOTDRULES` no concede anillos automaticamente; la consola permite concederlos. Reiniciar los retira.
 - Solo individual: el cooperativo no los usa.
 
@@ -796,7 +812,10 @@ tercio superior, que se abre desde el centro, se mantiene unos segundos y vuela
 hasta su nota de la esquina. Nunca coincide con el anuncio central: espera a que
 termine y, si aparece uno mientras se muestra, vuela en el acto a su nota. Las
 tareas simultaneas se presentan por turnos. Distancia, reloj o lista de control
-no vuelven a anunciarse. Una mision que termina, en la esquina o en la tarjeta,
+no vuelven a anunciarse. Un progreso medido (`ObjectiveGauge`, como el
+desbloqueo de la compuerta) se dibuja como barra segmentada bajo la tarea, con
+etiqueta, porcentaje y reloj; si se detiene, parpadea en rojo con franjas de
+peligro. Una mision que termina, en la esquina o en la tarjeta,
 se desvanece subiendo un poco antes de desaparecer, y la siguiente tarjeta espera
 a ese fundido; una run nueva lo limpia al instante. Con movimiento reducido solo
 hay fundidos.

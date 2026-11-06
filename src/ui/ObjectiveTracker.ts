@@ -1,4 +1,5 @@
 import { ObjectiveAnnouncer, type ObjectiveNote } from './ObjectiveAnnouncer';
+import { ObjectiveGaugeView } from './ObjectiveGauge';
 
 /** How long a new objective holds the spotlight before docking. */
 const SPOTLIGHT_HOLD_MS = 4500;
@@ -17,6 +18,11 @@ export interface ObjectiveNoteElements {
   readonly details: HTMLElement;
 }
 
+/** A note's elements plus the gauge the tracker builds into it. */
+interface ObjectiveNoteView extends ObjectiveNoteElements {
+  readonly gauge: ObjectiveGaugeView;
+}
+
 function writeText(element: HTMLElement, text: string): void {
   if (element.textContent !== text) element.textContent = text;
 }
@@ -31,8 +37,9 @@ function writeText(element: HTMLElement, text: string): void {
  */
 export class ObjectiveTracker {
   private readonly announcer = new ObjectiveAnnouncer();
-  private readonly notes: ObjectiveNoteElements[] = [];
+  private readonly notes: ObjectiveNoteView[] = [];
   private readonly spotlight: HTMLElement;
+  private readonly spotlightNote: ObjectiveNoteView;
   private phase: SpotlightPhase = 'idle';
   /** Kicker of the note in the spotlight; its corner note stays hidden until it docks. */
   private spotlightKicker: string | null = null;
@@ -42,11 +49,13 @@ export class ObjectiveTracker {
 
   public constructor(
     private readonly corner: HTMLElement,
-    private readonly spotlightNote: ObjectiveNoteElements,
+    spotlightNote: ObjectiveNoteElements,
     /** Milliseconds until the round banner clears (0 when none shows). */
     private readonly bannerRemainingMs: () => number,
   ) {
     this.spotlight = spotlightNote.root;
+    const gauge = new ObjectiveGaugeView((root) => spotlightNote.details.before(root));
+    this.spotlightNote = { ...spotlightNote, gauge };
   }
 
   /** Called every frame: null (or empty) hides the corner without forgetting what was announced. */
@@ -146,7 +155,7 @@ export class ObjectiveTracker {
     this.timer = window.setTimeout(() => this.finishSpotlight(target), SPOTLIGHT_DOCK_MS);
   }
 
-  private finishSpotlight(target: ObjectiveNoteElements): void {
+  private finishSpotlight(target: ObjectiveNoteView): void {
     this.cancelSpotlight();
     target.root.classList.remove('arrived');
     void target.root.offsetWidth;
@@ -186,7 +195,7 @@ export class ObjectiveTracker {
    * A shown corner note whose kicker is no longer listed leaves a copy fading
    * in its place, so the element can take the next note's content at once.
    */
-  private leaveIfEnded(element: ObjectiveNoteElements, notes: readonly ObjectiveNote[]): void {
+  private leaveIfEnded(element: ObjectiveNoteView, notes: readonly ObjectiveNote[]): void {
     const root = element.root;
     if (root.classList.contains('hidden') || root.classList.contains('awaiting')) return;
     const kicker = element.kicker.textContent;
@@ -201,26 +210,29 @@ export class ObjectiveTracker {
     }, LEAVE_MS));
   }
 
-  private render(element: ObjectiveNoteElements, note: ObjectiveNote): void {
+  private render(element: ObjectiveNoteView, note: ObjectiveNote): void {
     writeText(element.kicker, note.kicker);
     writeText(element.title, note.title);
     writeText(element.details, note.details);
     element.details.classList.toggle('hidden', note.details === '');
+    element.gauge.render(note.gauge);
   }
 
   /** The corner note at `index`, built on first use (one per quest). */
-  private noteAt(index: number): ObjectiveNoteElements {
+  private noteAt(index: number): ObjectiveNoteView {
     while (this.notes.length <= index) {
       const part = (className: string): HTMLElement => {
         const element = document.createElement('div');
         element.className = className;
         return element;
       };
+      const details = part('objective-note-details');
       const note = {
         root: part('objective-note'),
         kicker: part('objective-note-kicker'),
         title: part('objective-note-title'),
-        details: part('objective-note-details'),
+        details,
+        gauge: new ObjectiveGaugeView((root) => details.before(root)),
       };
       note.root.append(note.kicker, note.title, note.details);
       this.corner.append(note.root);

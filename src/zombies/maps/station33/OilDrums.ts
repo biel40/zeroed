@@ -6,6 +6,8 @@ import type { Station33BuildContext } from './Station33BuildContext';
 
 const RADIUS = 0.3;
 const HEIGHT = 0.88;
+/** Size of each drum; the third of a huddle is the one that leans. */
+export const OIL_DRUM = { radius: RADIUS, height: HEIGHT, leaningIndex: 2 } as const;
 
 /**
  * A huddle of oil drums at floor points (x, z), the third one leaning and
@@ -15,7 +17,7 @@ const HEIGHT = 0.88;
 export function addOilDrums(context: Station33BuildContext, name: string, drums: ReadonlyArray<readonly [number, number]>, baseY = 0): void {
   const { batch, materials } = context;
   drums.forEach(([x, z], index) => {
-    const lean = index === 2 ? 0.12 : 0;
+    const lean = index === OIL_DRUM.leaningIndex ? 0.12 : 0;
     const drum = new THREE.CylinderGeometry(RADIUS, RADIUS, HEIGHT, 16);
     batch.add(drum, index === 1 ? materials.paintedSteel : materials.greySteel, placement(x, baseY + HEIGHT / 2, z, lean, index * 0.7, 0));
     for (const y of [0.25, 0.63]) {

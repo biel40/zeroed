@@ -220,21 +220,33 @@ codigo: actualiza la guia.
   salida al pie, pilotos rojos y la mano ensangrentada de alguien que no
   llego. Arriba, una caseta de hormigon con dintel y marquesina se abre al
   patio.
-- La superficie es una noche fria y muerta, no una ciudad jugable: un patio de
-  losas cercado por valla prefabricada de hormigon con relieve de rombos,
-  espino y concertina, la puerta de acero cerrada con su estrella roja, un
-  camion militar verde oliva con caja de furgon sanitaria abierta y su
-  baliza, una farola de sodio que sigue encendida, bloques de hormigon, bidones,
-  el nido de sacos de la guardia con su barril de brasas y neumaticos.
-  Charcos, manchas, rodadas, octavillas y maleza cuentan el abandono. Todo
-  lo solido queda en los bordes: el centro es el terreno del guardian.
-- Mas alla de la valla, solo decorado: la carretera agrietada hacia la
-  niebla con la seta del centinela, una torre de vigilancia de madera con su
-  reflector muerto, postes de tendido con cables vencidos, un turismo
-  calcinado, abedules sin hojas, escombros y, al fondo, bloques de viviendas
-  brutalistas con alguna ventana aun encendida y un mastil con su luz de
-  aviso, siluetas en una bruma azulada mas fina que el aire de la estacion.
-  Sin emblemas ni rotulos reales.
+- La superficie es una noche de invierno sovietica, fria, nevada y muerta, no
+  una ciudad jugable: un patio de losas bajo nieve pisada y aguanieve,
+  cercado por valla prefabricada de hormigon con relieve de rombos, espino y
+  concertina, la puerta de acero cerrada con su estrella roja, un camion
+  militar verde oliva con caja de furgon sanitaria abierta y su baliza, una
+  farola de sodio que sigue encendida con dos altavoces de bocina, bloques de
+  hormigon, bidones, el nido de sacos de la guardia con su barril de brasas
+  (lo unico sin nieve) y neumaticos. En la caseta de la escalera ondea una
+  bandera roja rota y en la valla oeste cuelga una pancarta roja con estrella.
+  Charcos helados, manchas, rodadas, octavillas y maleza cuentan el abandono;
+  la nieve cubre cada tapa y se amontona al pie de la valla, sin estorbar.
+  Todo lo solido queda en los bordes: el centro es el terreno del guardian.
+- Nieva siempre en la superficie; la nieve es decorado y nunca bloquea al
+  jugador ni a la horda. Los ventisqueros del patio son bajos y pegados a la
+  valla para no tapar los planos rodados.
+- Mas alla de la valla, solo decorado y nevado: la carretera agrietada hacia
+  la niebla con bordes de aguanieve, montones de nieve apartada y la seta del
+  centinela, una torre de vigilancia de madera con su reflector muerto,
+  postes de tendido con cables vencidos, un turismo calcinado, abedules sin
+  hojas, escombros medio enterrados, un cartel de propaganda con estrella y
+  rayos sobre la valla este, un obelisco a los caidos con su llama apagada,
+  una parada de autobus de hormigon con mosaico y carambanos y, al fondo,
+  bloques de viviendas brutalistas con alguna ventana aun encendida, un
+  mastil con su luz de aviso y las chimeneas a franjas y la torre de
+  refrigeracion de una central termica, siluetas en una bruma azulada mas
+  fina que el aire de la estacion. Sin emblemas ni rotulos reales: los
+  carteles solo llevan estrellas, rayos y letras ilegibles.
 - El CAPITAN URSS es un homenaje original al superheroe sovietico de comic,
   no una copia: traje rojo oscuro con flancos y cuello negros, estrella
   blanca en el pecho y en las hombreras, casco negro completo con rendijas

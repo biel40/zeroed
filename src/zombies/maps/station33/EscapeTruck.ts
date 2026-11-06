@@ -5,6 +5,7 @@ import type { GroundRect } from '../../guardians/CaptainUssrBrain';
 import { StaticMeshBatch } from '../shared/StaticMeshBatch';
 import { PROTOCOL33_SURFACE_Y, PROTOCOL33_TRUCK, PROTOCOL33_TRUCK_BEACON_LIGHT, PROTOCOL33_TRUCK_BUMPER_REACH } from '../Station33Config';
 import type { EscapeDrivePose } from './EscapeDrive';
+import { addSnowCap } from './SnowCover';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { yardSolid } from './YardSolid';
@@ -183,6 +184,9 @@ function buildChassis(context: Station33BuildContext, batch: StaticMeshBatch, li
   batch.add(new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, 0.36, 18).rotateZ(Math.PI / 2).translate(width / 2 + 0.2, 1.85, FRONT + 3.4), materials.rubber);
   // The box body, open at the back on its dark inside, with a ladder down.
   part(materials.paintedSteel, (BODY_FRONT + length) / 2 - 0.05, (BODY_BOTTOM + height) / 2, width, height - BODY_BOTTOM, length - BODY_FRONT - 0.1);
+  // Snow on the bonnet and along the box's roof: it has stood here all night.
+  addSnowCap(batch, materials.snow, 0, 1.825, FRONT + 0.6, 2.0, 1.2, 0, 0.05);
+  addSnowCap(batch, materials.snow, 0, height, FRONT + (BODY_FRONT + length) / 2 - 0.05, width, length - BODY_FRONT - 0.1, 0, 0.1);
   // Ribs along the body and a red cross panel on each flank: the medical kung of the evacuation.
   for (let rib = BODY_FRONT + 0.5; rib < length - 0.3; rib += 0.9) {
     part(materials.greySteel, rib, (BODY_BOTTOM + height) / 2, width + 0.04, height - BODY_BOTTOM - 0.1, 0.05);

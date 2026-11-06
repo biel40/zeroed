@@ -118,3 +118,6 @@ export const RING_DEFINITIONS: Readonly<Record<RingId, RingDefinition>> = {
     effect: { kind: 'firePower', fireRateScale: 1.25, damageScale: 1.1 },
   },
 };
+
+/** Every catalog ring, in catalog order. */
+export const RING_IDS = Object.keys(RING_DEFINITIONS) as readonly RingId[];

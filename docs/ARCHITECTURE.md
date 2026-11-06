@@ -160,7 +160,8 @@ sufra tirones de compilacion de shaders.
 Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo anillo:
 `RingId` + `RingDefinition` (dedo libre, efecto como dato), su gancho en
 `ZombiesRings`, claves `ring.*` y una maquina en las `ringMachines` de un
-mapa. Nuevo modo:
+mapa; entra solo en la condicion del anillo blanco (`RING_IDS`), que ocupa el
+pulgar fuera del catalogo. Nuevo modo:
 `GameMode` y selector. Nuevo mapa: clase que implemente `ZombieArena` (sus
 datos en un config propio, utilidades comunes de `maps/shared/`), entrada en
 `ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` (arte SVG propio) y claves

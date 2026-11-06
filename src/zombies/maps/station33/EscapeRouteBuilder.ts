@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EYE_HEIGHT, type FloorTransitionZone, type StairRamp } from '../../../player/PlayerController';
 import type { StainFaces } from '../../GibWalls';
+import { seededRandom } from '../shared/ProceduralNoise';
 import { addSolidProxy } from '../shared/SolidProxy';
 import {
   PROTOCOL33_ESCAPE,
@@ -10,6 +11,7 @@ import {
   STATION33_PLAYER_BOUNDS,
   STATION33_WALL_THICKNESS,
 } from '../Station33Config';
+import { addIcicles, addSnowCap } from './SnowCover';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 
@@ -143,7 +145,8 @@ function buildFlight(context: Station33BuildContext): void {
 /**
  * The stairhead on the surface: the buried flight's walls rise into a
  * squat concrete kiosk with a heavy lintel and canopy over its doorway,
- * a flat roof and a back wall where the ceiling meets the ground.
+ * a flat roof and a back wall where the ceiling meets the ground. Snow
+ * lies on the roof and the canopy, and icicles hang from both front edges.
  */
 function buildKiosk(context: Station33BuildContext): void {
   const { batch, materials, structure, signage } = context;
@@ -152,9 +155,18 @@ function buildKiosk(context: Station33BuildContext): void {
   structure.addBox(CENTER_X, (doorTop + KIOSK_TOP) / 2, frontZ, kiosk.maxX - kiosk.minX, KIOSK_TOP - doorTop, STATION33_WALL_THICKNESS,
     materials.serviceConcrete, { name: 'escape-kiosk-lintel', surface: 'concrete', mapRole: 'wall', blocksPlayer: true, castShadow: false, uvSeed: 337 });
   const depth = kiosk.maxZ - kiosk.minZ;
-  batch.addBox(materials.serviceConcrete, CENTER_X, KIOSK_TOP + 0.1, (kiosk.minZ + kiosk.maxZ) / 2, kiosk.maxX - kiosk.minX + 0.2, 0.2, depth + 0.2);
+  const roof = { width: kiosk.maxX - kiosk.minX + 0.2, depth: depth + 0.2, z: (kiosk.minZ + kiosk.maxZ) / 2 };
+  const canopy = { width: kiosk.maxX - kiosk.minX + 0.6, depth: 1.0, z: kiosk.minZ - 0.5, y: doorTop + 0.22, thickness: 0.14 };
+  batch.addBox(materials.serviceConcrete, CENTER_X, KIOSK_TOP + 0.1, roof.z, roof.width, 0.2, roof.depth);
   batch.addBox(materials.serviceConcrete, CENTER_X, (RISE + KIOSK_TOP) / 2, KIOSK_REAR_Z, kiosk.maxX - kiosk.minX, kiosk.height, STATION33_WALL_THICKNESS);
-  batch.addBox(materials.serviceConcrete, CENTER_X, doorTop + 0.22, kiosk.minZ - 0.5, kiosk.maxX - kiosk.minX + 0.6, 0.14, 1.0);
+  batch.addBox(materials.serviceConcrete, CENTER_X, canopy.y, canopy.z, canopy.width, canopy.thickness, canopy.depth);
+  addSnowCap(batch, materials.snow, CENTER_X, KIOSK_TOP + 0.2, roof.z, roof.width, roof.depth, 0, 0.14);
+  addSnowCap(batch, materials.snow, CENTER_X, canopy.y + canopy.thickness / 2, canopy.z, canopy.width, canopy.depth, 0, 0.1);
+  const random = seededRandom(3861);
+  const roofFront = roof.z - roof.depth / 2;
+  const canopyFront = canopy.z - canopy.depth / 2;
+  addIcicles(batch, materials.iceGlaze, { x: CENTER_X - roof.width / 2, z: roofFront }, { x: CENTER_X + roof.width / 2, z: roofFront }, KIOSK_TOP, 0.16, 0.45, random);
+  addIcicles(batch, materials.iceGlaze, { x: CENTER_X - canopy.width / 2, z: canopyFront }, { x: CENTER_X + canopy.width / 2, z: canopyFront }, canopy.y - canopy.thickness / 2, 0.14, 0.38, random);
   batch.addBox(materials.hazardPaint, CENTER_X, doorTop - 0.05, kiosk.minZ - 0.004, WIDTH, 0.1, 0.01);
   const plate = signage.signGeometry('route-33', 0.5, 0.5).rotateY(Math.PI).translate(CENTER_X, doorTop + 0.75, kiosk.minZ - 0.012);
   batch.add(plate, signage.material);

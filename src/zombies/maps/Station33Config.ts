@@ -776,10 +776,33 @@ export const PROTOCOL33_GUARDIAN_ENTRANCE: ArenaGuardianEntrance = {
  * `blend.from` to `blend.to` on the flight's upper half.
  */
 export const PROTOCOL33_SURFACE_AMBIENCE = {
-  backgroundColor: 0x0d1216,
-  fog: { color: 0x0d1216, density: 0.024 },
-  hemisphereLight: { skyColor: 0x5a6a7c, groundColor: 0x1a1714, intensity: 1.1, reducedIntensity: 1.3 },
+  backgroundColor: 0x121a21,
+  fog: { color: 0x141c23, density: 0.026 },
+  // The snow throws some of the sky back up: a pale ground fill, not the station's brown.
+  hemisphereLight: { skyColor: 0x5a6a7c, groundColor: 0x343c44, intensity: 1.1, reducedIntensity: 1.3 },
   blend: { from: 4.5, to: 8.2 },
+} as const;
+
+/**
+ * Snow falling over the surface: flakes drift through a box around the
+ * yard (wider north, over the gate and the road), sinking at their own
+ * speed, carried by a steady wind and swaying around it. Counts follow the
+ * device quality; the fall only runs while the observer is on the upper
+ * flight or above (`PROTOCOL33_SURFACE_AMBIENCE.blend.from`).
+ */
+export const PROTOCOL33_SNOWFALL = {
+  volume: {
+    minX: PROTOCOL33_SURFACE.yard.minX - 6,
+    maxX: PROTOCOL33_SURFACE.yard.maxX + 6,
+    minY: PROTOCOL33_SURFACE_Y,
+    maxY: PROTOCOL33_SURFACE_Y + 12,
+    minZ: PROTOCOL33_SURFACE.yard.minZ - 12,
+    maxZ: PROTOCOL33_SURFACE.yard.maxZ + 4,
+  },
+  flakes: { low: 260, medium: 520, high: 900 },
+  fallSpeed: { min: 0.55, max: 1.15 },
+  wind: { x: 0.35, z: -0.12 },
+  sway: 0.35,
 } as const;
 
 /** The yard's gate in the north fence, centred on the truck and the road: two steel leaves hinged on their posts. */

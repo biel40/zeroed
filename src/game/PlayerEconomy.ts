@@ -27,9 +27,11 @@ export class PlayerEconomy {
 
   get totalEarned(): number { return this.earned; }
 
+  /** Rewards are whole points, whatever multipliers built them. */
   private award(amount: number): void {
-    this.balance += amount;
-    this.earned += amount;
+    const points = Math.round(amount);
+    this.balance += points;
+    this.earned += points;
   }
 
   /** Non-lethal direct-hit reward. Call only when the zombie survived. */

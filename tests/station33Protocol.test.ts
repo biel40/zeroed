@@ -98,7 +98,10 @@ function stand(side: TestContext, x: number, z: number, yaw: number, floor = 0):
 function objectiveText(run: Run, urgent: boolean): string {
   const [notes, lastUrgent] = run.side.hud.setObjective.mock.lastCall as [readonly ObjectiveNote[], boolean];
   expect(lastUrgent).toBe(urgent);
-  return notes.map(({ kicker, title, details }) => `${kicker}\n${title}\n${details}`).join('\n\n');
+  return notes.map(({ kicker, title, details, gauge }) => {
+    const bar = gauge ? `\n${gauge.label} ${gauge.readout}` : '';
+    return `${kicker}\n${title}${bar}\n${details}`;
+  }).join('\n\n');
 }
 
 function advance(run: Run, seconds: number): void {

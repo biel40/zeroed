@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { makeBloodDecalTexture } from './shared/BloodDecalTexture';
 import { seededRandom, tileableNoise, valueNoise } from './shared/ProceduralNoise';
 import { bake, decalMaterial, decalTexture, hash2, mix, surfaceMaterial, type Painter, type Rgb } from './shared/ProceduralSurface';
+import { makeIceTexture, snowFieldPainter, snowYardPainter } from './station33/SnowSurfaces';
 
 /**
  * Surfaces of Station 33: cold Soviet-era marble, chequered granite, stained
@@ -59,6 +60,14 @@ export interface Station33Materials {
   readonly puddle: THREE.MeshStandardMaterial;
   /** Dusty corner web anchored at the texture's top-left corner, seen from both sides. */
   readonly cobweb: THREE.MeshStandardMaterial;
+  /** The surface yard's slabs under trodden snow and slush. */
+  readonly snowYard: THREE.MeshStandardMaterial;
+  /** Fresh snow: open ground, drifts and the caps on everything outdoors. */
+  readonly snow: THREE.MeshStandardMaterial;
+  /** Clear ice of the icicles. */
+  readonly iceGlaze: THREE.MeshStandardMaterial;
+  /** Frozen puddles on the surface. */
+  readonly frozenPuddle: THREE.MeshStandardMaterial;
   /** Invisible proxy for collision-only volumes (never drawn). */
   readonly collider: THREE.MeshBasicMaterial;
 }
@@ -615,6 +624,10 @@ export function createStation33Materials(anisotropyLimit: number): Station33Mate
     floorGrime: decalMaterial('station33_floor_grime', makeBlotTexture(347, false), 0.95),
     puddle: decalMaterial('station33_puddle', makeBlotTexture(353, true), 0.08),
     cobweb: decalMaterial('station33_cobweb', makeCobwebTexture(359), 0.9, { side: THREE.DoubleSide }),
+    snowYard: surfaceMaterial('station33_snow_yard', bake('snow-yard', 256, 2, snowYardPainter(256, 2)), anisotropy, 3),
+    snow: surfaceMaterial('station33_snow', bake('snow-field', 256, 1.5, snowFieldPainter(256)), anisotropy, 2.5),
+    iceGlaze: new THREE.MeshStandardMaterial({ name: 'station33_ice_glaze', color: 0xa9c2d0, roughness: 0.08, metalness: 0.1 }),
+    frozenPuddle: decalMaterial('station33_frozen_puddle', makeIceTexture(3833), 0.06, { metalness: 0.15 }),
     collider: new THREE.MeshBasicMaterial({ name: 'station33_collider', visible: false }),
   };
 }

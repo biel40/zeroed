@@ -260,6 +260,18 @@ export class Weapon {
     return true;
   }
 
+  /**
+   * Adds `share` of the starting reserve (at least one round) back to a
+   * finite reserve, capped at its starting size. False when the reserve is
+   * bottomless or already full.
+   */
+  public restoreReserveShare(share: number): boolean {
+    if (this.reserveAmmo === null || this.initialReserve === null || this.reserveAmmo >= this.initialReserve) return false;
+    const rounds = Math.max(1, Math.round(this.initialReserve * share));
+    this.reserveAmmo = Math.min(this.initialReserve, this.reserveAmmo + rounds);
+    return true;
+  }
+
   public setInfiniteReserve(): void {
     this.reserveAmmo = null;
   }

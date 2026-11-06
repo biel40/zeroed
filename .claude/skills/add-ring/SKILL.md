@@ -32,7 +32,7 @@ Lee "Anillos" en `docs/GAME_SYSTEMS.md` y `docs/STATION_33.md`.
 
 | Archivo | Que anadir |
 |---|---|
-| `src/game/rings/RingCatalog.ts` | El id en `RingId`, una variante nueva de `RingEffect` (`kind` + parametros con su comentario de unidades) y la entrada en `RING_DEFINITIONS`: `finger`, `nameKey`, `descriptionKey`, `prices` (crecientes, economia de la mansion), `chargesPerPurchase`, `glowColor`. |
+| `src/game/rings/RingCatalog.ts` | El pulgar es del anillo blanco (`RadiantRing.ts`, gratis al llevar cargados todos los del catalogo): con los cinco dedos ocupados, decide con el usuario donde va un anillo nuevo, y recuerda que se sumara a la condicion del blanco. El id en `RingId`, una variante nueva de `RingEffect` (`kind` + parametros con su comentario de unidades) y la entrada en `RING_DEFINITIONS`: `finger`, `nameKey`, `descriptionKey`, `prices` (crecientes, economia de la mansion), `chargesPerPurchase`, `glowColor`. |
 | `src/modes/ZombiesRings.ts` | El hook del efecto: un metodo pequeno que el modo consulta (como `tryResurrect`), que lee `RING_DEFINITIONS[ringId].effect` filtrando por su `kind` y llama a `consumeCharge` si es consumible. |
 | `src/modes/ZombiesMode.ts` | Una llamada a ese hook en el punto exacto del sistema afectado, sin logica del anillo dentro del modo. |
 | `src/i18n/en.ts`, `es.ts`, `ca.ts` | `ring.<id>` (nombre en mayusculas) y `ring.<id>.description`, en los tres idiomas. |

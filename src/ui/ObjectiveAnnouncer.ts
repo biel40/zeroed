@@ -1,3 +1,5 @@
+import type { ObjectiveGauge } from './ObjectiveGauge';
+
 /** One quest's entry in the HUD objective corner. */
 export interface ObjectiveNote {
   /** Diegetic source of the quest (e.g. ПРОТОКОЛ 33); one note per kicker. */
@@ -6,6 +8,8 @@ export interface ObjectiveNote {
   readonly title: string;
   /** Live progress (bearing, clock, checklist), one item per line; never re-announced. */
   readonly details: string;
+  /** Measured progress drawn as a bar between the title and the details; never re-announced. */
+  readonly gauge?: ObjectiveGauge;
 }
 
 /**

@@ -722,8 +722,12 @@ export class ZombieManager {
     return chain;
   }
 
-  /** VORTEX-9 splash: linear falloff around the impact point, XZ distance. */
-  applySplash(center: THREE.Vector3, radius: number, splashDamage: number): void {
+  /**
+   * Splash with linear falloff around the impact point, XZ distance: the
+   * VORTEX-9 by default (its kills vaporize), or the white ring's echo with
+   * the weapon that released it.
+   */
+  applySplash(center: THREE.Vector3, radius: number, splashDamage: number, source: ZombieKillSource = 'vortex9'): void {
     for (const zombie of this.pool.actives) {
       if (!zombie.isAlive) continue;
       if (Math.abs(zombie.position.y - center.y) > 2) continue;
@@ -733,9 +737,9 @@ export class ZombieManager {
       const dz = zombie.position.z - center.z;
       const damage = splashDamageAt(splashDamage, Math.hypot(dx, dz), radius);
       if (damage <= 0) continue;
-      // applyDamage already triggers the red hit flash; splash kills vaporize.
-      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, 'vortex9')) {
-        this.kill(zombie, false, 'vortex9');
+      // applyDamage already triggers the red hit flash.
+      if (this.applyTrackedDamage(zombie, damage, false, center.x, center.z, source)) {
+        this.kill(zombie, false, source);
       }
     }
   }

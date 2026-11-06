@@ -19,18 +19,18 @@ function ringIcon(): string {
   return '<svg class="survival-icon ring-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="6.5"/><path class="ring-bezel" d="M9.2 7.4 12 4l2.8 3.4L12 9.6Z"/></svg>';
 }
 
-/** Worn rings: compact icons for the combat HUD, name, finger and state for the pause menu. */
-export function ringProgress(rings: readonly RingHudEntry[], compact = false): string {
+/** Worn rings as icons with accessible labels and optional combat HUD tooltips. */
+export function ringProgress(rings: readonly RingHudEntry[], showTooltips = false): string {
   const items = rings.map((ring) => {
     const name = t(ring.nameKey);
     const finger = t(`ring.finger.${ring.finger}`);
     const state = t(ring.charged ? 'hud.ringCharged' : 'hud.ringSpent');
     const color = `#${ring.glowColor.toString(16).padStart(6, '0')}`;
     const label = t('hud.ringLabel', { ring: name, finger, state });
-    const detail = compact ? '' : `<span class="ring-text"><strong>${name}</strong><small>${finger} · ${state}</small></span>`;
-    return `<span class="ring ${ring.charged ? 'charged' : 'spent'}" style="--ring-glow:${color}" aria-label="${label}" title="${label}">${ringIcon()}${detail}</span>`;
+    const tooltip = showTooltips ? ` title="${label}"` : '';
+    return `<span class="ring ${ring.charged ? 'charged' : 'spent'}" style="--ring-glow:${color}" role="img" aria-label="${label}"${tooltip}>${ringIcon()}</span>`;
   }).join('');
-  return `${compact ? '' : `<div class="lamp-heading"><span>${t('hud.rings')}</span></div>`}<div class="ring-icons">${items}</div>`;
+  return `<div class="ring-icons">${items}</div>`;
 }
 
 /** Draw the newest tally on an advance; high rounds retain an exact numeral. */
