@@ -127,11 +127,18 @@ sufra tirones de compilacion de shaders.
   (`ArenaEvacuationGuardian`: tipo, planta, suelo, campo con obstaculos,
   salto y zona de activacion) lo ejecuta `ZombiesGuardian` sobre la logica
   pura `CaptainUssrBrain` y la vista `CaptainUssrView`
-  (`src/zombies/guardians/`); el mapa solo declara su terreno. Con
+  (`src/zombies/guardians/`); el mapa solo declara su terreno. La vista no
+  decide: posa el cuerpo con logica pura y testeable (la coreografia
+  `CaptainUssrChoreography`, los muelles `PoseSpring`, la marcha e IK de
+  piernas `CaptainUssrGait` y la caida del escudo `DroppedShield`) y devuelve
+  en `cues` pisadas e impactos que el modo hace sonar y temblar. Con
   `entrance` (`ArenaGuardianEntrance`: tiempos y planos) su aparicion se
   filma: el reloj puro `GuardianEntrance` marca los tiempos, `EndingCinematic`
   rueda los planos, `ZombiesMode` congela la run mientras dura y el HUD
-  muestra la tarjeta (`showBossIntro`).
+  muestra la tarjeta (`showBossIntro`). Con `music` (un `MusicTrackName`) su
+  tema de duelo sustituye la musica del mapa: `MusicManager.startDuelTheme`
+  pausa la pista del mapa y `stopDuelTheme` la devuelve donde estaba; las
+  pistas `lazy` no se precargan y, si su archivo falta, sigue la del mapa.
   Los pickups con `codeLock` separan la validacion del codigo de la aplicacion
   de una apertura autorizada; cooperativo replica las aperturas y recogidas
   bajo autoridad del anfitrion, sin introducir dependencias de un mapa.

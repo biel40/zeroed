@@ -247,13 +247,21 @@ codigo: actualiza la guia.
   refrigeracion de una central termica, siluetas en una bruma azulada mas
   fina que el aire de la estacion. Sin emblemas ni rotulos reales: los
   carteles solo llevan estrellas, rayos y letras ilegibles.
-- El CAPITAN URSS es un homenaje original al superheroe sovietico de comic,
-  no una copia: traje rojo oscuro con flancos y cuello negros, estrella
-  blanca en el pecho y en las hombreras, casco negro completo con rendijas
-  rojas, cinturon blanco, grebas y botas blancas acolchadas, guantes negros y
-  un escudo redondo rojo con estrella blanca y aro de acero. Es un zombi: el
-  traje esta rasgado sobre piel podrida y heridas, el cuello va al aire y el
-  visor esta roto en la mejilla. Todo es procedural (`CaptainUssrModel`).
+- El CAPITAN URSS es un homenaje original al arquetipo del supersoldado
+  sovietico de comic, no una copia de ningun personaje: un coloso con traje
+  rojo de punto bajo una coraza de cuero granate (peto, bandas segmentadas en
+  el vientre y espaldar) cerrada por correas de lona crema en torno a una
+  gran estrella facetada de pavon; hombreras de cuero tostado, puños y botas
+  altas crema con correas, guantes negros y cinturon con hebilla de estrella y
+  cartucheras. Casco de aviador de cuero con cresta e insignia de estrella,
+  gafas de cuero cuyas lentes brillan rojas por los ojos muertos de detras y
+  una barba gris poblada. El escudo es rojo esmaltado y desconchado, con aro
+  de acero, campo de pavon con surcos concentricos y una gran estrella
+  facetada perfilada en rojo. Es un zombi: piel podrida gris verdosa, el
+  traje rasgado en el antebrazo derecho y el muslo izquierdo, jirones y la
+  mejilla rota. Todo es procedural, con texturas horneadas en codigo
+  (`CaptainUssrModel`, `CaptainUssrSurfaces`, `CaptainUssrShield`); se revisa
+  en `tools/viewers/guardian-viewer.html`.
 
 ## El puesto de milicia
 
@@ -374,13 +382,19 @@ codigo: actualiza la guia.
 - Final rodado en la escena real, como la intro: subir al camion es la
   recompensa de todo el mapa y debe lucirse. El camion arranca con los
   faros tartamudeando, revienta la puerta de la estrella roja y se hunde por
-  la carretera en la niebla con sus pilotos rojos; la horda sale en tropel de
-  la caseta y se estrella contra la puerta abierta, demasiado tarde. La
-  ultima imagen es el patio desde lo alto, con la horda amontonada en la
-  puerta, bajo el titulo dorado, eco del de la intro. Sin
-  ciudad jugable ni rotulos: la huida la cuentan el camion, la puerta abierta
-  y la radio. Camion y puerta son rigs propios (`EscapeTruck`, `YardGate`),
-  fuera del batch estatico, para poder moverse.
+  la carretera con sus pilotos rojos; la horda sale en tropel de
+  la caseta y se estrella contra la puerta abierta, demasiado tarde. Desde
+  la cabina se ve como la estacion entera arde detras: la caseta revienta en
+  llamas y el fuego corre por los respiraderos sobre todas las salas, el
+  unico incendio del mapa. La grua final sube desde la horda amontonada en
+  la puerta hasta una gran catedral ortodoxa en una cumbre nevada, a
+  contraluz del halo de la luna y con alguna ventana aun encendida: hacia
+  alli huye el camion. Va bajo el titulo dorado, eco del de la intro. Sin
+  ciudad jugable ni rotulos: la huida la cuentan el camion, la puerta abierta,
+  el incendio y la radio. Camion y puerta son rigs propios (`EscapeTruck`,
+  `YardGate`), fuera del batch estatico, para poder moverse; el incendio
+  (`StationBlaze`) y la cordillera (`HighlandCathedral`) solo existen
+  durante el final.
 - Cualquier momento premium nuevo (finales, revelaciones, nuevas zonas) debe
   sentirse cinematografico y diegetico antes que con mas UI.
 
@@ -411,8 +425,9 @@ codigo: actualiza la guia.
 - La Mystery Box vive en la consigna. El final es la evacuacion del
   Protocolo 33; la superficie queda al norte de todo lo subterraneo, en la
   planta 1, y no debe crecer hasta parecer una ciudad jugable.
-- Nada de recursos que rompan el tono: fuego, colores saturados, humor,
-  señaletica traducida o UI que explique lo que el escenario puede mostrar.
+- Nada de recursos que rompan el tono: fuego (salvo el incendio del final),
+  colores saturados, humor, señaletica traducida o UI que explique lo que el
+  escenario puede mostrar.
 - Ningun solido puede superar 20 m de planta (el filtro de obstaculos de los
   zombis lo ignoraria y abriria un paso fantasma): parte los muros largos.
 - Valida con `npm run typecheck` y `npm test` (`tests/station33.test.ts` y

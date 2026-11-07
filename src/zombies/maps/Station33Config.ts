@@ -1,7 +1,9 @@
 import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules } from '../evacuation/EvacuationProtocol';
 import { EVACUATION_ENDING_DURATION, EVACUATION_ENDING_TIMELINE as ESCAPE_BEAT } from '../evacuation/EvacuationEndingTimeline';
-import type { EscapeDriveConfig, EscapeHordeConfig } from './station33/EscapeDrive';
+import type { EscapeBlazeConfig } from './station33/EscapeBlaze';
+import { createEscapeDrivePose, escapeDrivePose, type EscapeDriveConfig, type EscapeHordeConfig } from './station33/EscapeDrive';
+import type { HighlandsConfig } from './station33/HighlandCathedral';
 import type { AmmoRefillPlacement } from './shared/AmmoRefill';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
@@ -23,6 +25,7 @@ import type {
   ArenaEndingShot,
   ArenaGuardianEntrance,
   ArenaIntro,
+  ArenaIntroShot,
   MysteryBoxPlacement,
   PlayerBounds,
   ZombieNavigationBounds,
@@ -830,13 +833,47 @@ export const PROTOCOL33_DEPARTURE: EscapeDriveConfig = {
   gateSwing: 1.95,
 };
 
+/** The shot riding the truck's cab, looking back down the road: when it starts, how long it lasts, its key spacing. */
+const ESCAPE_RIDE = { from: ESCAPE_BEAT.launch + 0.3 + 3.1, duration: 3.6, keyStep: 0.4 } as const;
+/** Where the ride's camera sits on the moving truck: west of its centre line, over the cab, just behind the nose. */
+const ESCAPE_RIDE_MOUNT = { side: -0.55, height: 4.8, behindNose: 0.6 } as const;
+
+/**
+ * Keys of the ride, every `keyStep` seconds on the truck's own pose (it
+ * cruises at a steady speed by then, so the path keeps the camera over the
+ * cab): the aim drifts up from the gate to the stairhead as it burns.
+ */
+function escapeRideKeys(): ArenaIntroShot[] {
+  const pose = createEscapeDrivePose();
+  const steps = Math.round(ESCAPE_RIDE.duration / ESCAPE_RIDE.keyStep);
+  const keys: ArenaIntroShot[] = [];
+  for (let step = 0; step <= steps; step++) {
+    const progress = step / steps;
+    const time = progress * ESCAPE_RIDE.duration;
+    const driven = escapeDrivePose(ESCAPE_RIDE.from + time, PROTOCOL33_DEPARTURE, pose).distance;
+    const noseZ = PROTOCOL33_TRUCK.z - PROTOCOL33_TRUCK.length / 2 - driven;
+    keys.push({
+      time,
+      position: { x: PROTOCOL33_TRUCK.x + ESCAPE_RIDE_MOUNT.side, y: PROTOCOL33_SURFACE_Y + ESCAPE_RIDE_MOUNT.height, z: noseZ - ESCAPE_RIDE_MOUNT.behindNose },
+      target: { x: 16.2 - 1.6 * progress, y: PROTOCOL33_SURFACE_Y + 2.4 + 3 * progress, z: -86 + 14 * progress },
+    });
+  }
+  return keys;
+}
+
+/** The burning stairhead seen from the gate, as the last of the horde runs out of the flames. */
+const ESCAPE_STAIRHEAD_SHOT = ESCAPE_BEAT.title - (ESCAPE_RIDE.from + ESCAPE_RIDE.duration);
+
 /**
  * The escape as the ending films it, on `EVACUATION_ENDING_TIMELINE`:
  * ignition at the truck's nose with the lamps sputtering on; the gate
- * rammed open from the road as the truck tears past; its tail lights
- * sinking into the fog from the broken gate; the horde charging out of the
- * stairhead at the gate; and a crane rising over the yard as the horde
- * piles up at the open gate, under the title, until the fade.
+ * rammed open from the road as the truck tears past; the ride on the cab,
+ * looking back as the horde floods the yard after it and the stairhead
+ * bursts into flames that spread over the whole station (`PROTOCOL33_BLAZE`);
+ * the burning stairhead from the gate as the last of the horde runs out of
+ * it; and a crane rising over the yard from the horde piled at the gate,
+ * up the road, to the cathedral on the mountains (`PROTOCOL33_HIGHLANDS`),
+ * under the title, until the fade.
  */
 export const PROTOCOL33_ESCAPE_SHOTS: ReadonlyArray<ArenaEndingShot> = [
   {
@@ -858,26 +895,25 @@ export const PROTOCOL33_ESCAPE_SHOTS: ReadonlyArray<ArenaEndingShot> = [
     ],
   },
   {
-    duration: 1.8,
-    shake: 0.004,
-    keys: [
-      { time: 0, position: { x: 21.4, y: 7.9, z: -101.4 }, target: { x: 20.4, y: 8.0, z: -125 } },
-      { time: 1.8, position: { x: 21.0, y: 9.3, z: -102.6 }, target: { x: 20.4, y: 7.8, z: -140 } },
-    ],
+    duration: ESCAPE_RIDE.duration,
+    shake: 0.03,
+    keys: escapeRideKeys(),
   },
   {
-    duration: ESCAPE_BEAT.title - (ESCAPE_BEAT.launch + 0.3 + 3.1 + 1.8),
+    duration: ESCAPE_STAIRHEAD_SHOT,
     shake: 0.012,
     keys: [
-      { time: 0, position: { x: 24.6, y: 7.75, z: -97.6 }, target: { x: 15.5, y: 8.5, z: -80 } },
-      { time: 2.2, position: { x: 24.3, y: 7.7, z: -96.9 }, target: { x: 17, y: 8.2, z: -86 } },
+      { time: 0, position: { x: 24.6, y: 7.75, z: -97.6 }, target: { x: 15.5, y: 8.9, z: -80 } },
+      { time: ESCAPE_STAIRHEAD_SHOT, position: { x: 24.3, y: 7.7, z: -96.9 }, target: { x: 16.5, y: 9.6, z: -82 } },
     ],
   },
   {
     duration: ESCAPE_BEAT.credits - ESCAPE_BEAT.title,
     keys: [
-      { time: 0, position: { x: 13.5, y: 12.5, z: -81.5 }, target: { x: 20.4, y: 7.2, z: -112 } },
-      { time: ESCAPE_BEAT.credits - ESCAPE_BEAT.title, position: { x: 14.5, y: 22, z: -84.5 }, target: { x: 20.4, y: 7.5, z: -150 } },
+      { time: 0, position: { x: 8.5, y: 12, z: -83.5 }, target: { x: 20, y: 7.6, z: -101 } },
+      { time: 2, position: { x: 9.2, y: 17.5, z: -85.6 }, target: { x: 19.5, y: 13, z: -140 } },
+      { time: 4.6, position: { x: 10.3, y: 27.5, z: -88.2 }, target: { x: 16.6, y: 44, z: -200 } },
+      { time: ESCAPE_BEAT.credits - ESCAPE_BEAT.title, position: { x: 10.5, y: 29, z: -88.6 }, target: { x: 16.7, y: 45.5, z: -200 } },
     ],
   },
 ];
@@ -889,9 +925,53 @@ export const PROTOCOL33_ESCAPE_SHOTS: ReadonlyArray<ArenaEndingShot> = [
  */
 export const PROTOCOL33_ESCAPE_HORDE: EscapeHordeConfig = {
   from: ESCAPE_BEAT.horde,
-  interval: 0.3,
+  interval: 0.36,
   count: 18,
   doorway: { x: (PROTOCOL33_SURFACE.kiosk.minX + PROTOCOL33_SURFACE.kiosk.maxX) / 2, z: PROTOCOL33_SURFACE.yard.maxZ - 0.8, spread: 0.9 },
+};
+
+/**
+ * The fire that razes Station 33 behind the escape (`EscapeBlaze`): the
+ * stairhead bursts into flames on the `blaze` beat, its doorway and the
+ * fuel drums by it catch, and the front runs over the ground above the
+ * whole station, flames bursting through its shafts and vents, every one
+ * alight before the title.
+ */
+export const PROTOCOL33_BLAZE: EscapeBlazeConfig = {
+  from: ESCAPE_BEAT.blaze,
+  spreadSpeed: 14,
+  catchSeconds: 1.2,
+  flareDecay: 0.45,
+  sources: [
+    { x: 15, z: -75.4, base: 1.6, radius: 2.2, height: 8, flare: 2.2 },
+    { x: 15, z: -77.9, base: 0, radius: 1.1, height: 3.2, flare: 1 },
+    { x: 5.3, z: -80.4, base: 0.6, radius: 1.3, height: 6, flare: 1.8 },
+    { x: 7, z: -66, base: 0, radius: 3.2, height: 11, flare: 0.8 },
+    { x: 23, z: -63, base: 0, radius: 3, height: 9, flare: 0.6 },
+    { x: -3, z: -54, base: 0, radius: 4, height: 13, flare: 0.6 },
+    { x: 15, z: -48, base: 0, radius: 4.5, height: 16, flare: 0.8 },
+    { x: 28, z: -42, base: 0, radius: 3.5, height: 10, flare: 0.5 },
+    { x: -12, z: -40, base: 0, radius: 3.2, height: 9, flare: 0.5 },
+    { x: 5, z: -35, base: 0, radius: 4, height: 12, flare: 0.6 },
+  ],
+};
+
+/**
+ * The mountains on the northern horizon, shown only in the filmed ending
+ * (`HighlandCathedral`), far past the fog: two snowed ridges and, on a
+ * summit straight up the road, a great cathedral with a few windows still
+ * lit, backed by the moon's halo. The closing crane rises to it.
+ */
+export const PROTOCOL33_HIGHLANDS: HighlandsConfig = {
+  span: { minX: -900, maxX: 900 },
+  ground: PROTOCOL33_SURFACE_Y,
+  ridges: [
+    { z: -670, minHeight: 70, maxHeight: 190, snowLine: 140, color: 0x1d2833, snowColor: 0x2e3a48, seed: 4101 },
+    { z: -600, minHeight: 35, maxHeight: 100, snowLine: 85, color: 0x111920, snowColor: 0x27333f, seed: 4102 },
+  ],
+  cathedral: { ridge: 1, x: 90, summit: 120, plateau: 100, shoulder: 90 },
+  sky: { z: -695, height: 320, color: 0x1e2a36 },
+  halo: { offsetX: 30, height: 190, size: 280, color: 0x34465a },
 };
 
 /**
@@ -1001,12 +1081,15 @@ export interface Station33PointLight {
   readonly circuit: Station33LightCircuit;
   /** Room it lights: the player's room gets its lights first. */
   readonly zone: Station33ZoneId;
-  /** Optional handle for a light a moving object carries (the truck's beacon). */
+  /** Optional handle for a light another object drives (the truck's beacon, the stairhead's floodlight). */
   readonly id?: string;
 }
 
 /** The point light on the truck's cab roof, which rides away with it. */
 export const PROTOCOL33_TRUCK_BEACON_LIGHT = 'truck-beacon';
+
+/** The floodlight over the stairhead's door, which the escape's blaze turns to firelight. */
+export const PROTOCOL33_STAIRHEAD_FLOOD_LIGHT = 'stairhead-flood';
 
 export const FLUORESCENT_COLOR = 0xd2eadf;
 export const AMBER_LAMP_COLOR = 0xffa65a;
@@ -1111,7 +1194,10 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
     x: PROTOCOL33_TRUCK.x, y: PROTOCOL33_SURFACE_Y + 2.9, z: PROTOCOL33_TRUCK.z - PROTOCOL33_TRUCK.length / 2 + PROTOCOL33_TRUCK.cabOffset,
     color: EMERGENCY_COLOR, intensity: 6, distance: 13, circuit: 'emergency', zone: 'superficie', id: PROTOCOL33_TRUCK_BEACON_LIGHT,
   },
-  { x: 15, y: PROTOCOL33_SURFACE_Y + 3.1, z: -79.3, color: SURFACE_FLOOD_COLOR, intensity: 7, distance: 15, circuit: 'steady', zone: 'superficie' },
+  {
+    x: 15, y: PROTOCOL33_SURFACE_Y + 3.1, z: -79.3, color: SURFACE_FLOOD_COLOR, intensity: 7, distance: 15, circuit: 'steady', zone: 'superficie',
+    id: PROTOCOL33_STAIRHEAD_FLOOD_LIGHT,
+  },
   { x: 6.2, y: PROTOCOL33_SURFACE_Y + 5.4, z: -94.5, color: AMBER_LAMP_COLOR, intensity: 6, distance: 16, circuit: 'amber', zone: 'superficie' },
 ];
 

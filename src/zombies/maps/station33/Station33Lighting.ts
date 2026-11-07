@@ -147,7 +147,7 @@ export class Station33Lighting {
     return this.lights.filter((entry) => entry.light.visible).map((entry) => entry.light);
   }
 
-  /** The real light declared with `id` in STATION33_POINT_LIGHTS, for an object that carries it (budget and circuit still apply). */
+  /** The real light declared with `id` in STATION33_POINT_LIGHTS, for an object that carries or tints it (budget and circuit still drive its intensity). */
   public pointLight(id: string): THREE.PointLight {
     const entry = this.lights.find((candidate) => candidate.id === id);
     if (!entry) throw new Error(`Station 33 has no point light "${id}"`);

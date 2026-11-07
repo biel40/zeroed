@@ -222,5 +222,6 @@ function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>): ArenaEvacuat
     leapFrom,
     trigger: { minX: yard.minX, maxX: yard.maxX, minZ: yard.minZ, maxZ: yard.maxZ - awakenDepth },
     entrance: PROTOCOL33_GUARDIAN_ENTRANCE,
+    music: 'captain_ussr_theme',
   };
 }

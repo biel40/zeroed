@@ -499,6 +499,26 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     expect(guardian.brain.state).toBe('dormant');
     for (const hitbox of guardian.view.hitboxes) expect(run.side.ctx.hitColliders).not.toContain(hitbox);
     expect(run.side.hud.setBossBar).toHaveBeenLastCalledWith(null);
+    // Its theme stops with the fight.
+    expect(run.side.ctx.audio.stopDuelTheme).toHaveBeenCalledOnce();
+  });
+
+  it('plays CAPITÁN URSS\'s theme through the duel, lands with a thud and fades the theme out once he falls', () => {
+    const run = escapingRun();
+    const { audio } = run.side.ctx;
+    confrontGuardian(run);
+    expect(audio.startDuelTheme).toHaveBeenCalledExactlyOnceWith('captain_ussr_theme');
+    expect(audio.playGuardianFootfall).toHaveBeenCalled();
+    defeatGuardian(run);
+    advance(run, 1);
+    expect(audio.stopDuelTheme).not.toHaveBeenCalled();
+    const level = vi.mocked(audio.setDuelThemeLevel).mock.lastCall![0];
+    expect(level).toBeGreaterThan(0);
+    expect(level).toBeLessThan(1);
+    advance(run, 2.5);
+    expect(audio.stopDuelTheme).toHaveBeenCalledOnce();
+    run.mode.onRestartRequested();
+    expect(audio.stopDuelTheme).toHaveBeenCalledOnce();
   });
 
   it('fails the evacuation through the normal game over after exactly 60 s on the clock', () => {

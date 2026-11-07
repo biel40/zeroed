@@ -8,13 +8,15 @@ export type MusicTrackName =
   | 'nuclear_explosion'
   | 'radioactivity'
   | 'background_music_theme'
-  | 'station33_theme';
+  | 'station33_theme'
+  | 'captain_ussr_theme';
 
 export const ZOMBIES_MUSIC_PATHS = {
   roundStart: `${import.meta.env.BASE_URL}assets/audio/zombies_round_start.mp3`,
   menu: `${import.meta.env.BASE_URL}assets/audio/menu_theme.mp3`,
   gameplay: `${import.meta.env.BASE_URL}assets/audio/background_music_theme.mp3`,
   station33: `${import.meta.env.BASE_URL}assets/audio/station33_theme.mp3`,
+  captainUssr: `${import.meta.env.BASE_URL}assets/audio/captain_ussr_theme.mp3`,
   nuclearAlarm: `${import.meta.env.BASE_URL}assets/audio/nuclear_alarm.mp3`,
   nuclearExplosion: `${import.meta.env.BASE_URL}assets/audio/nuclear_explosion.mp3`,
   radioactivity: `${import.meta.env.BASE_URL}assets/audio/radioactivity.mp3`,
@@ -25,6 +27,8 @@ interface MusicTrackDef {
   readonly path: string;
   readonly volume: number;
   readonly loop: boolean;
+  /** Loaded only when first played, never with the rest: a duel's theme that may not be shipped yet. */
+  readonly lazy?: boolean;
 }
 
 const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
@@ -70,6 +74,13 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
     volume: 0.15,
     loop: true,
   },
+  captain_ussr_theme: {
+    name: 'captain_ussr_theme',
+    path: ZOMBIES_MUSIC_PATHS.captainUssr,
+    volume: 0.28,
+    loop: true,
+    lazy: true,
+  },
 };
 
 /** nuclear_explosion.mp3 opens with ~0.5 s of silence before the blast. */
@@ -105,6 +116,13 @@ export class MusicManager {
   private readonly pauseOffsets = new Map<MusicTrackName, number>();
   private endingAudioStarted = false;
   private explosionTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The map's gameplay bed, remembered so a duel's theme can pause it and hand it back. */
+  private bed: MusicTrackName | null = null;
+  /** The duel's theme playing over the paused bed, and its fade level (0..1). */
+  private duel: MusicTrackName | null = null;
+  private duelLevel = 1;
+  /** The pause menu holds every track: whatever starts meanwhile waits for `resume`. */
+  private held = false;
 
   public constructor() {
     // The manager lives for the whole page, so the subscription is never removed.
@@ -114,7 +132,7 @@ export class MusicManager {
   }
 
   private volumeOf(name: MusicTrackName): number {
-    return MUSIC_TRACKS[name].volume * musicGain();
+    return MUSIC_TRACKS[name].volume * musicGain() * (name === this.duel ? this.duelLevel : 1);
   }
 
   public setEnabled(enabled: boolean): void {
@@ -141,6 +159,7 @@ export class MusicManager {
   preload(): void {
     if (!this.enabled) return;
     for (const name of Object.keys(MUSIC_TRACKS) as MusicTrackName[]) {
+      if (MUSIC_TRACKS[name].lazy) continue;
       const player = this.getPlayer(name);
       if (!player) continue;
       if (player.readyState === 0 && typeof player.load === 'function') player.load();
@@ -149,6 +168,7 @@ export class MusicManager {
 
   resume(): void {
     if (!this.enabled) return;
+    this.held = false;
     // Only tracks explicitly paused (pause()) resume here; a freshly
     // preloaded-but-never-played track must wait for its own trigger
     // (playRoundStartOnce / startMenuLoop), not restart on every gesture.
@@ -163,6 +183,7 @@ export class MusicManager {
 
   pause(): void {
     if (!this.enabled) return;
+    this.held = true;
     for (const [name, player] of this.players) {
       if (player.paused) continue;
       this.pauseOffsets.set(name, player.currentTime);
@@ -174,6 +195,10 @@ export class MusicManager {
     this.endingAudioStarted = false;
     this.cancelPendingExplosion();
     this.pauseOffsets.clear();
+    this.bed = null;
+    this.duel = null;
+    this.duelLevel = 1;
+    this.held = false;
     for (const player of this.players.values()) {
       player.pause();
       player.currentTime = 0;
@@ -263,12 +288,81 @@ export class MusicManager {
   /** Gameplay bed (the map's track): starts once at match start and keeps looping through rounds. */
   startGameplayLoop(name: MusicTrackName): void {
     if (!this.enabled) return;
+    this.bed = name;
+    // A duel's theme holds the bed until it ends.
+    if (this.duel) return;
     const player = this.getPlayer(name);
     if (!player) return;
     if (!player.paused) return;
 
     player.loop = true;
     player.volume = this.volumeOf(name);
+    void player.play().catch(() => undefined);
+  }
+
+  /**
+   * A boss duel's theme, looped from its start in place of the map's bed,
+   * which pauses where it is. A theme whose file is missing or will not
+   * play leaves the bed playing.
+   */
+  startDuelTheme(name: MusicTrackName): void {
+    if (!this.enabled || this.duel === name) return;
+    this.stopDuelTheme();
+    const player = this.getPlayer(name);
+    if (!player) return;
+    this.duel = name;
+    this.duelLevel = 1;
+    this.holdBed();
+    player.loop = true;
+    player.volume = this.volumeOf(name);
+    if (this.held) {
+      this.pauseOffsets.set(name, 0);
+      return;
+    }
+    player.currentTime = 0;
+    void player.play().catch(() => {
+      if (this.duel !== name) return;
+      this.duel = null;
+      this.restoreBed();
+    });
+  }
+
+  /** Fades the duel's theme: its volume times `level` (0..1). */
+  setDuelThemeLevel(level: number): void {
+    this.duelLevel = Math.min(1, Math.max(0, level));
+    const player = this.duel ? this.players.get(this.duel) : undefined;
+    if (player && this.duel) player.volume = this.volumeOf(this.duel);
+  }
+
+  /** Ends the duel's theme; the map's bed carries on from where it paused. */
+  stopDuelTheme(): void {
+    const name = this.duel;
+    if (!name) return;
+    this.duel = null;
+    this.duelLevel = 1;
+    this.pauseOffsets.delete(name);
+    const player = this.players.get(name);
+    if (player) {
+      player.pause();
+      player.currentTime = 0;
+    }
+    this.restoreBed();
+  }
+
+  private holdBed(): void {
+    if (!this.bed) return;
+    this.pauseOffsets.delete(this.bed);
+    this.players.get(this.bed)?.pause();
+  }
+
+  private restoreBed(): void {
+    if (!this.enabled || !this.bed) return;
+    const player = this.players.get(this.bed);
+    if (!player || !player.paused) return;
+    if (this.held) {
+      this.pauseOffsets.set(this.bed, player.currentTime);
+      return;
+    }
     void player.play().catch(() => undefined);
   }
 }

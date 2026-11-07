@@ -7,9 +7,11 @@ import {
   PROTOCOL33_DEPARTURE,
   PROTOCOL33_ENDING,
   PROTOCOL33_ESCAPE_HORDE,
+  PROTOCOL33_HIGHLANDS,
   PROTOCOL33_SURFACE_Y,
   PROTOCOL33_TRUCK,
 } from '../src/zombies/maps/Station33Config';
+import { cathedralSite, ridgeHeight } from '../src/zombies/maps/station33/HighlandCathedral';
 import type { ArenaAmbush } from '../src/zombies/maps/ZombieArena';
 import { installCanvasDocument, TEST_PROFILE } from './coopHarness';
 
@@ -128,4 +130,86 @@ describe('Station 33 filmed escape', () => {
     play(arena, 6);
     expect(truck.position.z).toBe(PROTOCOL33_TRUCK.z);
   });
+
+  it('sets the station ablaze behind the escape and turns the stairhead floodlight to firelight', () => {
+    const arena = makeArena();
+    const [blaze] = named(arena, 'station-blaze');
+    const [flames] = named(arena, 'station-blaze-flames') as THREE.Points[];
+    const flood = stairheadFloodlight(arena);
+    const coldFlood = flood.color.clone();
+    expect(blaze.visible).toBe(false);
+    arena.startEnding();
+    play(arena, BEAT.blaze - 0.1);
+    expect(blaze.visible).toBe(true);
+    expect(glowOf(flames)).toBe(0);
+    expect(flood.color.equals(coldFlood)).toBe(true);
+    play(arena, 4);
+    expect(glowOf(flames)).toBeGreaterThan(0);
+    expect(flood.color.r).toBeGreaterThan(flood.color.b * 2);
+    arena.reset();
+    expect(blaze.visible).toBe(false);
+    expect(flood.color.equals(coldFlood)).toBe(true);
+  });
+
+  it('shows the cathedral on the mountains for the ending only, and closes the crane on it', () => {
+    const arena = makeArena();
+    const [highlands] = named(arena, 'highland-cathedral');
+    expect(highlands.visible).toBe(false);
+    arena.startEnding();
+    expect(highlands.visible).toBe(true);
+    arena.reset();
+    expect(highlands.visible).toBe(false);
+
+    const player = new THREE.PerspectiveCamera(75, 16 / 9, 0.08, 700);
+    const cinematic = new EndingCinematic(PROTOCOL33_ENDING.shots ?? []);
+    cinematic.start(player);
+    cinematic.update(BEAT.fadeOut - 0.05, player);
+    cinematic.camera.updateMatrixWorld(true);
+    const site = cathedralSite(PROTOCOL33_HIGHLANDS);
+    for (const height of [0, 60]) {
+      const point = new THREE.Vector3(site.x, site.y + height, site.z);
+      expect(point.distanceTo(cinematic.camera.position)).toBeLessThan(player.far);
+      const onScreen = point.project(cinematic.camera);
+      expect(Math.abs(onScreen.x)).toBeLessThan(0.5);
+      expect(onScreen.y).toBeGreaterThan(0);
+      expect(onScreen.y).toBeLessThan(0.9);
+    }
+  });
 });
+
+describe('Station 33 highlands', () => {
+  it('raises the cathedral summit over the rest of its ridge, flat under its terrace', () => {
+    const { cathedral, span } = PROTOCOL33_HIGHLANDS;
+    for (let x = cathedral.x - 45; x <= cathedral.x + 45; x += 5) {
+      expect(ridgeHeight(PROTOCOL33_HIGHLANDS, cathedral.ridge, x)).toBeCloseTo(cathedral.summit, 9);
+    }
+    for (let x = span.minX; x <= span.maxX; x += 3) {
+      expect(ridgeHeight(PROTOCOL33_HIGHLANDS, cathedral.ridge, x)).toBeLessThanOrEqual(cathedral.summit + 1e-9);
+    }
+  });
+
+  it('sinks the ridges behind the cathedral so it stands against the sky', () => {
+    const { cathedral } = PROTOCOL33_HIGHLANDS;
+    for (let index = 0; index < cathedral.ridge; index++) {
+      for (let x = cathedral.x - 20; x <= cathedral.x + 20; x += 5) {
+        expect(ridgeHeight(PROTOCOL33_HIGHLANDS, index, x)).toBeLessThan(cathedral.summit);
+      }
+    }
+  });
+});
+
+/** Total colour the cloud adds to the picture this frame. */
+function glowOf(points: THREE.Points): number {
+  const colors = points.geometry.getAttribute('color');
+  let total = 0;
+  for (let index = 0; index < colors.array.length; index++) total += colors.array[index];
+  return total;
+}
+
+function stairheadFloodlight(arena: Station33Arena): THREE.PointLight {
+  const lights: THREE.PointLight[] = [];
+  arena.group.traverse((object) => { if (object instanceof THREE.PointLight) lights.push(object); });
+  const flood = lights.find((light) => Math.abs(light.position.x - 15) < 1e-6 && Math.abs(light.position.z + 79.3) < 1e-6);
+  if (!flood) throw new Error('No stairhead floodlight');
+  return flood;
+}

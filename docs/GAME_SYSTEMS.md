@@ -487,9 +487,22 @@ existente a `MOTDRULES`.
   arco frontal y cualquier impacto en el propio escudo; la cabeza recibe el
   doble y aturdido recibe mas. Las llamas del ФАКЕЛ nunca se bloquean
   (`CaptainUssrBrain.takeBurn`): queman desde cualquier lado, como premio a
-  tenerlo. Al recibir un impacto se sacude hacia atras y el escudo retrocede
-  al bloquear; ruge al aterrizar y al entrar en cada fase, respira quieto y al
-  caer se derrumba de rodillas antes de desplomarse (`CaptainUssrMotion`). Ataques: golpe de escudo a corta distancia,
+  tenerlo. Su cuerpo se anima con fisica: la coreografia pura
+  (`CaptainUssrChoreography`) fija cada pose y muelles amortiguados
+  (`CaptainUssrPose`) le dan peso e inercia y encajan los impactos como
+  sacudidas segun el lado y la parte alcanzada; las piernas se resuelven por
+  IK sobre los pies que planta su marcha (`CaptainUssrGait`, sin patinar) y
+  el brazo del escudo sobre su asa. Aterriza del salto con una rodilla y el
+  puño en el suelo, tensa cada ataque (el aro del escudo destella justo antes
+  de soltarlo), rasca el suelo antes de embestir, rebota contra lo que choca,
+  ruge al aterrizar y en cada fase, echa vaho y en la fase 3 humea y le
+  brillan las venas. Al morir se tambalea, cae de rodillas y se desploma de
+  bruces; el escudo se le escapa, rebota y se asienta vibrando como una
+  moneda (`DroppedShield`). Pisadas, golpes contra el suelo y el escudo
+  suenan y, cerca, sacuden la camara. Su tema de duelo
+  (`ArenaEvacuationGuardian.music`; en Station 33 `captain_ussr_theme.mp3`,
+  aun sin archivo) sustituye a la musica del mapa al despertarlo y se funde
+  al caer; sin el archivo sigue sonando la del mapa. Ataques: golpe de escudo a corta distancia,
   lanzamiento del escudo (vuela hasta donde estaba el jugador y vuelve; sin
   el queda expuesto de frente) y, desde la fase 2, la carga en linea recta,
   que si choca con la valla o un solido lo deja aturdido. Fases al 60 % y al
@@ -632,18 +645,27 @@ existente a `MOTDRULES`.
   cortes en `PROTOCOL33_ESCAPE_SHOTS`) bajo la misma pantalla, transparente
   (`filmed`): letterbox y grano; el camion cierra sus puertas, enciende los
   faros y arranca; embiste la puerta del patio, que se abre de golpe, y se
-  pierde por la carretera en la niebla. Tras el, una horda
+  aleja por la carretera. Tras el, una horda
   (`PROTOCOL33_ESCAPE_HORDE`) sale en tropel de la caseta de la escalera y
   corre hasta amontonarse en la puerta abierta: zombis reales del modo, al
   ritmo de una ronda alta como minimo, que no pueden herir porque la run ya
-  ha terminado y desaparecen al reiniciar. Una grua sube sobre el patio con
-  el titulo dorado «STATION 33» (eco de la intro), la frase de huida y el
-  ultimo mensaje de radio. Funde a negro y salen los creditos con
+  ha terminado y desaparecen al reiniciar. Un plano montado sobre la cabina
+  mira atras mientras la horda le persigue: la caseta revienta en llamas y
+  el incendio (`PROTOCOL33_BLAZE`) se propaga por los bidones y los
+  respiraderos sobre toda la estacion, con humo, chispas, resplandor en el
+  cielo y el foco de la caseta convertido en luz de fuego; luego la caseta
+  ardiendo vista desde la puerta. Una grua sube sobre el patio desde la
+  horda hasta la catedral en las montañas del horizonte
+  (`PROTOCOL33_HIGHLANDS`, visible solo en este final), con el titulo dorado
+  «STATION 33» (eco de la intro), la frase de huida y el ultimo mensaje de
+  radio. Funde a negro y salen los creditos con
   la ronda, las bajas y los disparos a la cabeza. Todo sigue el reloj de
   `EVACUATION_ENDING_TIMELINE`: la pose pura del camion y la puerta y el
-  calendario de la horda (`EscapeDrive`), el overlay CSS y el audio
-  procedural de `AudioSystem` (arranque, motor, choque, horda y radio, sobre
-  `radioactivity.mp3`). Con
+  calendario de la horda (`EscapeDrive`), la propagacion del fuego
+  (`EscapeBlaze`), el overlay CSS y el audio procedural de `AudioSystem`
+  (arranque, motor, choque, horda, incendio y radio, sobre
+  `radioactivity.mp3`). Fuego, cordillera y catedral ignoran la niebla para
+  leerse desde lejos. Con
   `prefers-reduced-motion` se pasa directo a los creditos.
 
 ## Anillos

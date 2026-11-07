@@ -26,11 +26,14 @@ const BIRCH_CLEARANCE = { fence: 4, road: 2 } as const;
  * Panel blocks and a mast of the dead city around the station: plain
  * concrete masses with balcony bands and window rows, a handful still
  * lit by someone, far enough for the surface fog to leave silhouettes.
+ * The road and its power line run north between the two blocks across it,
+ * the way the escape truck leaves.
  */
 const CITY_BLOCKS: ReadonlyArray<{ readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number; readonly height: number }> = [
   { minX: -30, maxX: -8, minZ: -135, maxZ: -123, height: 33 },
   { minX: 48, maxX: 60, minZ: -130, maxZ: -90, height: 45 },
-  { minX: 5, maxX: 55, minZ: -168, maxZ: -155, height: 27 },
+  { minX: 2, maxX: 13.5, minZ: -168, maxZ: -155, height: 27 },
+  { minX: 27, maxX: 55, minZ: -168, maxZ: -155, height: 27 },
   { minX: -46, maxX: -34, minZ: -96, maxZ: -60, height: 36 },
   { minX: 62, maxX: 74, minZ: -72, maxZ: -46, height: 24 },
 ];

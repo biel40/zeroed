@@ -4021,7 +4021,7 @@ html.touch-controls-enabled #intro-skip small {
  * letterbox and grain, a cut in from black, the title card over the closing
  * crane shot (a bookend of the intro's), then the fade to black and the
  * credits with the run's record. Times follow EVACUATION_ENDING_TIMELINE
- * (title 11 s, fade-out 15.4 s, credits 16.2 s). Same rule as the nuclear
+ * (title 12.8 s, fade-out 18 s, credits 18.8 s). Same rule as the nuclear
  * layers: base styles are the final frame, here black behind the credits.
  */
 .evacuation-card,
@@ -4054,9 +4054,9 @@ html.touch-controls-enabled #intro-skip small {
   background: #020303;
 }
 
-/* 16.2 s: black for the cut, the film from 1.5 s, black again from 15.4 s. */
+/* 18.8 s: black for the cut, the film from 1.5 s, black again from 18 s. */
 #ending-screen.ending[data-presentation='evacuation'] .ending-blackout {
-  animation: evacuation-blackout 16.2s linear both;
+  animation: evacuation-blackout 18.8s linear both;
 }
 
 #ending-screen[data-presentation='evacuation'] .evacuation-card {
@@ -4104,30 +4104,30 @@ html.touch-controls-enabled #intro-skip small {
 }
 
 #ending-screen.ending[data-presentation='evacuation'] .evacuation-card {
-  animation: evacuation-card 4.4s ease-out 11s both;
+  animation: evacuation-card 5.2s ease-out 12.8s both;
 }
 
 #ending-screen.ending[data-presentation='evacuation'] .evacuation-map {
   animation:
-    intro-name 1.1s cubic-bezier(0.16, 0.84, 0.3, 1) 11.1s both,
-    intro-glint 1.2s ease-in-out 12s both;
+    intro-name 1.1s cubic-bezier(0.16, 0.84, 0.3, 1) 12.9s both,
+    intro-glint 1.2s ease-in-out 13.8s both;
 }
 
 #ending-screen.ending[data-presentation='evacuation'] .evacuation-rule {
-  animation: intro-rule 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) 11.6s both;
+  animation: intro-rule 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) 13.4s both;
 }
 
 #ending-screen.ending[data-presentation='evacuation'] .evacuation-headline {
-  animation: intro-rise 0.8s ease-out 11.9s both;
+  animation: intro-rise 0.8s ease-out 13.7s both;
 }
 
 #ending-screen.ending[data-presentation='evacuation'] .evacuation-radio {
-  animation: evacuation-radio 3.4s linear 12s both;
+  animation: evacuation-radio 3.4s linear 13.8s both;
 }
 
 #ending-screen.ending[data-presentation='evacuation'] .credits-panel,
 #ending-screen.ending[data-presentation='evacuation'] .credits-panel h1 {
-  animation-delay: 16.2s;
+  animation-delay: 18.8s;
 }
 
 #ending-screen[data-presentation='evacuation'] .credits-outcome {
@@ -4149,9 +4149,9 @@ html.touch-controls-enabled #intro-skip small {
 
 @keyframes evacuation-blackout {
   0% { opacity: 1; }
-  4.9% { opacity: 1; }
-  9.3% { opacity: 0; }
-  95.1% { opacity: 0; }
+  4.3% { opacity: 1; }
+  8% { opacity: 0; }
+  95.7% { opacity: 0; }
 }
 
 @keyframes evacuation-card {

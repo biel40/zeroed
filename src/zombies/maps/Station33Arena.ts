@@ -22,6 +22,7 @@ import { buildConsigna } from './station33/ConsignaBuilder';
 import { buildDoorFrames } from './station33/DoorFrames';
 import { buildEscalatorHead } from './station33/EscalatorHeadBuilder';
 import { buildEscapeRoute, escapeStairTransitions } from './station33/EscapeRouteBuilder';
+import { HighlandCathedral } from './station33/HighlandCathedral';
 import { buildMilicia } from './station33/MiliciaBuilder';
 import { Protocol33 } from './station33/Protocol33';
 import { buildServicePassages } from './station33/ServicePassageBuilder';
@@ -36,12 +37,16 @@ import { buildSubestacion } from './station33/SubestacionBuilder';
 import type { EscapeDeparture } from './station33/EscapeDeparture';
 import { buildSurface } from './station33/SurfaceBuilder';
 import { SurfaceMood } from './station33/SurfaceMood';
+import { StationBlaze } from './station33/StationBlaze';
 import { SurfaceSnowfall } from './station33/SurfaceSnowfall';
 import { buildTaller } from './station33/TallerBuilder';
 import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
+  PROTOCOL33_BLAZE,
+  PROTOCOL33_HIGHLANDS,
   PROTOCOL33_HORDE_ZONES,
+  PROTOCOL33_STAIRHEAD_FLOOD_LIGHT,
   PROTOCOL33_SURFACE_Y,
   STATION33_AMBIENCE,
   STATION33_AMMO_REFILLS,
@@ -168,6 +173,9 @@ export class Station33Arena implements ZombieArena {
   private readonly snowfall: SurfaceSnowfall;
   /** The truck leaving through the gate in the filmed ending. */
   private readonly departure: EscapeDeparture;
+  /** The fire that razes the station behind it, and the cathedral on the mountains ahead. */
+  private readonly blaze: StationBlaze;
+  private readonly highlands: HighlandCathedral;
   /** Seconds into the intro while its cues are pending, else null. */
   private introTime: number | null = null;
   private nextIntroCue = 0;
@@ -214,6 +222,9 @@ export class Station33Arena implements ZombieArena {
     this.evacuation = new Protocol33(context, this.lighting, this.power, surface.solids, () => this.onEvacuationLayout());
     this.atmosphere = new Station33Atmosphere(context, this.lighting);
     this.snowfall = new SurfaceSnowfall(this.group, profile.quality);
+    this.blaze = new StationBlaze(this.group, PROTOCOL33_BLAZE, PROTOCOL33_SURFACE_Y, profile.quality,
+      this.lighting.pointLight(PROTOCOL33_STAIRHEAD_FLOOD_LIGHT));
+    this.highlands = new HighlandCathedral(this.group, PROTOCOL33_HIGHLANDS);
     context.batch.build(this.group, 'station33-static', { castShadow: !profile.useReducedEffects, receiveShadow: true });
     this.hemisphere = createAmbienceHemisphereLight(this.ambience, profile.useReducedEffects);
     this.group.add(this.hemisphere);
@@ -265,6 +276,7 @@ export class Station33Arena implements ZombieArena {
     this.powerSwitch.update(dt);
     this.evacuation.update(dt);
     this.departure.update(dt);
+    this.blaze.update(dt);
     this.updateTicketAmbush(observerPosition);
     this.ticketShutters.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
@@ -284,6 +296,8 @@ export class Station33Arena implements ZombieArena {
     this.powerSwitch.reset();
     this.evacuation.reset();
     this.departure.reset();
+    this.blaze.reset();
+    this.highlands.hide();
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
@@ -313,9 +327,15 @@ export class Station33Arena implements ZombieArena {
     this.lighting.finishPowerUp();
   }
 
-  /** The filmed escape (`PROTOCOL33_ENDING`): the truck rams the gate and drives off into the fog. */
+  /**
+   * The filmed escape (`PROTOCOL33_ENDING`): the truck rams the gate and
+   * drives off towards the cathedral on the mountains while the station
+   * burns behind it.
+   */
   startEnding(): void {
     this.departure.start();
+    this.blaze.start();
+    this.highlands.show();
   }
 
   /**

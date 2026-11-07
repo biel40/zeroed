@@ -11,9 +11,14 @@ import { GuardianEntrance } from '../zombies/guardians/GuardianEntrance';
 import type { ArenaEvacuationGuardian, ArenaGuardianEntrance } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 
-/** Camera jolt of its landing and of a charge crashing nearby, at point blank. */
+/** Camera jolt of its landing (and its fall), of a charge crashing and of each charging stride nearby, at point blank. */
 const LANDING_TRAUMA = 0.7;
 const CRASH_TRAUMA = 0.45;
+const STRIDE_TRAUMA = 0.12;
+/** Seconds its duel's theme takes to fade out once it falls. */
+const THEME_FADE_SECONDS = 3;
+/** The dropped shield's clang is heard from this impact speed up (m/s). */
+const CLANG_FROM = 0.8;
 /** Each tick of flame jolts it lightly: a stream keeps it writhing without a full flinch per tick. */
 const BURN_FLINCH = 0.35;
 /** Beyond this distance its landing and crashes no longer shake the view. */
@@ -71,6 +76,9 @@ export class ZombiesGuardian {
   private registered = false;
   private note: ObjectiveNote | null = null;
   private notePhase = 0;
+  /** Its duel's theme is playing; while it fades out, the seconds left, else null. */
+  private themePlaying = false;
+  private themeFade: number | null = null;
   /** The filmed entrance: its beats, its clock and its camera; null when it leaps straight in. */
   private readonly entrance: {
     readonly config: ArenaGuardianEntrance;
@@ -120,6 +128,8 @@ export class ZombiesGuardian {
     else this.brain.update(dt, this.player);
     this.processEvents();
     this.view.update(dt, this.brain, this.guardian.groundY, this.leapFrom);
+    this.presentBody();
+    this.fadeTheme(dt);
     this.showBar();
   }
 
@@ -142,7 +152,7 @@ export class ZombiesGuardian {
       if (part === 'head') this.ctx.audio.playHeadshotHit();
       else this.ctx.audio.playZombieHit();
       this.ctx.effects.puff(point, 0x4a1410, 0.24);
-      this.view.flash();
+      this.view.hurt(1, part, point);
     }
     this.processEvents();
     return true;
@@ -157,7 +167,7 @@ export class ZombiesGuardian {
     selectFlameTargets(origin, direction, flame.range, this.flameCandidates, flame, this.flameHits);
     if (this.flameHits.length === 0) return;
     // The flamethrower's reward: fire wraps around the shield, every tick lands.
-    if (this.brain.takeBurn(damage) !== 'ignored') this.view.flash(BURN_FLINCH);
+    if (this.brain.takeBurn(damage) !== 'ignored') this.view.hurt(BURN_FLINCH);
     this.processEvents();
   }
 
@@ -181,6 +191,7 @@ export class ZombiesGuardian {
     this.entrance?.clock.reset();
     this.entrance?.film.stop();
     this.ctx.hud.hideBossIntro();
+    this.stopTheme();
     this.brain.reset();
     this.view.reset();
     this.unregister();
@@ -209,8 +220,13 @@ export class ZombiesGuardian {
     return this.ctx.player.floor === floor && x > trigger.minX && x < trigger.maxX && z > trigger.minZ && z < trigger.maxZ;
   }
 
-  /** The player stepped onto its ground: its entrance starts on the perch, or it leaps straight in. */
+  /** The player stepped onto its ground: its theme takes over, its entrance starts on the perch, or it leaps straight in. */
   private wake(): void {
+    if (this.guardian.music) {
+      this.ctx.audio.startDuelTheme(this.guardian.music);
+      this.themePlaying = true;
+      this.themeFade = null;
+    }
     if (!this.entrance) {
       this.awaken(true);
       return;
@@ -233,7 +249,7 @@ export class ZombiesGuardian {
     clock.update(dt);
     if (clock.due.roar) {
       this.view.roar();
-      this.ctx.audio.playZombieSpawn(this.cueAt(this.leapFrom.x, this.leapFrom.y + ROAR_HEIGHT, this.leapFrom.z));
+      this.ctx.audio.playGuardianRoar(this.cueAt(this.leapFrom.x, this.leapFrom.y + ROAR_HEIGHT, this.leapFrom.z), 0);
     }
     if (clock.due.leap) this.awaken(false);
     if (this.brain.state === 'arriving') this.brain.update(dt, this.player);
@@ -254,20 +270,17 @@ export class ZombiesGuardian {
     for (const event of this.brain.pendingEvents) {
       switch (event.type) {
         case 'arrived':
-          // Filmed, its title card names it and the camera is not the player's.
-          if (!this.filming) {
-            this.ctx.hud.showRoundBanner(this.name(), t('guardian.arrivalSub'));
-            this.shakeNear(LANDING_TRAUMA);
-          }
-          this.ctx.audio.playBarrierBreak(this.cueAtBoss(0.2));
-          this.ctx.audio.playZombieSpawn(this.cueAtBoss(ROAR_HEIGHT));
+          // Filmed, its title card names it. The slam itself is the body's cue, on the frame it lands.
+          if (!this.filming) this.ctx.hud.showRoundBanner(this.name(), t('guardian.arrivalSub'));
+          this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), 0);
           break;
         case 'phase':
           this.ctx.hud.showRoundBanner(this.name(), t(PHASE_BANNERS[event.phase]));
-          this.ctx.audio.playZombieSpawn(this.cueAtBoss(1.9));
+          this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), event.phase === 3 ? 1 : 0.5);
           break;
         case 'chargeWindup':
-          this.ctx.audio.playZombieSpawn(this.cueAtBoss(1.9));
+          // A bellow over the scraping hoof: the charge's warning.
+          this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), 0.4);
           break;
         case 'shieldThrown':
           this.ctx.audio.playKnifeSwing();
@@ -277,6 +290,7 @@ export class ZombiesGuardian {
           break;
         case 'chargeEnded':
           if (!event.crashed) break;
+          this.view.crash();
           this.ctx.audio.playBarrierBreak(this.cueAtBoss(1.2));
           this.shakeNear(CRASH_TRAUMA);
           break;
@@ -287,6 +301,7 @@ export class ZombiesGuardian {
           this.unregister();
           this.ctx.hud.showRoundBanner(t('guardian.defeatedBanner', { name: this.name() }), t('guardian.defeatedSub'));
           this.ctx.audio.playRoundEndCue();
+          if (this.themePlaying) this.themeFade = THEME_FADE_SECONDS;
           break;
         case 'bashWindup':
         case 'throwWindup':
@@ -296,6 +311,38 @@ export class ZombiesGuardian {
       }
     }
     this.brain.clearEvents();
+  }
+
+  /** Its body's weight, heard and felt: footfalls (a charge's strides shake the view), its slams and falls, the dropped shield. */
+  private presentBody(): void {
+    const { cues } = this.view;
+    if (cues.footfall > 0) {
+      this.ctx.audio.playGuardianFootfall(this.cueAt(cues.foot.x, cues.foot.y, cues.foot.z), cues.footfall);
+      if (this.brain.state === 'charging') this.shakeNear(STRIDE_TRAUMA * cues.footfall);
+    }
+    if (cues.impact > 0) {
+      const at = this.cueAt(cues.impactAt.x, cues.impactAt.y, cues.impactAt.z);
+      this.ctx.audio.playGuardianFootfall(at, 1);
+      this.ctx.audio.playBarrierBreak(at);
+      // Filmed, the entrance's camera shakes on its own.
+      if (!this.filming) this.shakeNear(LANDING_TRAUMA * cues.impact);
+    }
+    if (cues.clang >= CLANG_FROM) this.ctx.audio.playImpact('metal');
+  }
+
+  /** Once it falls, its theme fades out and the map's music returns. */
+  private fadeTheme(dt: number): void {
+    if (this.themeFade === null) return;
+    this.themeFade = Math.max(0, this.themeFade - Math.max(0, dt));
+    this.ctx.audio.setDuelThemeLevel(this.themeFade / THEME_FADE_SECONDS);
+    if (this.themeFade === 0) this.stopTheme();
+  }
+
+  private stopTheme(): void {
+    this.themeFade = null;
+    if (!this.themePlaying) return;
+    this.themePlaying = false;
+    this.ctx.audio.stopDuelTheme();
   }
 
   private showBar(): void {

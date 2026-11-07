@@ -3,7 +3,7 @@ import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/Wea
 import { HANDLE_RELEASE_FRACTION } from '../weapons/ReloadAnimator';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
 import { FlameStreamLoop } from './FlameStreamLoop';
-import { MusicManager, type EndingAudioId } from './MusicManager';
+import { MusicManager, type EndingAudioId, type MusicTrackName } from './MusicManager';
 import { RING_JINGLE_TUNES, renderRingJingle, type RingJingleId } from './RingJingleTunes';
 import { muffleCutoff, type SpatialCue } from './SpatialCue';
 import { AmbientBed, type AmbientBedId } from './AmbientBed';
@@ -313,11 +313,25 @@ export class AudioSystem {
     if (id !== 'evacuation') return;
     this.playTruckDeparture();
     this.playEscapeHorde();
+    this.playStationBlaze();
     this.playRadioSignOff(ESCAPE_RADIO_DELAY);
   }
 
   public stopEndingAudio(): void {
     this.music.stopEndingAudio();
+  }
+
+  /** A boss duel's theme over the paused map bed (`MusicManager.startDuelTheme`). */
+  public startDuelTheme(track: MusicTrackName): void {
+    this.music.startDuelTheme(track);
+  }
+
+  public setDuelThemeLevel(level: number): void {
+    this.music.setDuelThemeLevel(level);
+  }
+
+  public stopDuelTheme(): void {
+    this.music.stopDuelTheme();
   }
 
   /** Closes this run's AudioContext; the shared MusicManager keeps the menu theme. */
@@ -1075,6 +1089,47 @@ export class AudioSystem {
   }
 
   /**
+   * The station going up behind the escape: a deep blast as the stairhead
+   * bursts, then the roar of the fire spreading over the station, its
+   * crackle and the dull thump of drums and shafts going off, fading under
+   * the title as the truck leaves it behind.
+   */
+  private playStationBlaze(): void {
+    const audio = this.context();
+    if (!audio) return;
+    const { ctx, master, noise } = audio;
+    const at = (beat: number): number => ctx.currentTime + beat;
+    const blast = ESCAPE_BEAT.blaze;
+    this.sweep(0, 'sine', 72, 24, 0.5, 1.8, at(blast));
+    this.tick(blast, 110, 0.6, 0.7, 1.5);
+    this.tick(blast + 0.02, 900, 0.22, 2, 0.6);
+    for (const thump of [0.8, 1.9, 3.1]) this.tick(blast + thump, 150, 0.28, 0.9, 0.9);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(380, at(blast));
+    filter.frequency.linearRampToValueAtTime(720, at(blast + 2));
+    filter.frequency.linearRampToValueAtTime(300, at(ESCAPE_BEAT.title));
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, at(blast));
+    gain.gain.exponentialRampToValueAtTime(0.16, at(blast + 1.2));
+    gain.gain.setValueAtTime(0.16, at(ESCAPE_BEAT.title - 1.5));
+    gain.gain.exponentialRampToValueAtTime(0.05, at(ESCAPE_BEAT.title));
+    gain.gain.exponentialRampToValueAtTime(0.0001, at(ESCAPE_BEAT.fadeOut + 0.6));
+    const roar = ctx.createBufferSource();
+    roar.buffer = noise;
+    roar.loop = true;
+    roar.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    roar.start(at(blast));
+    roar.stop(at(ESCAPE_BEAT.fadeOut + 0.7));
+    const span = ESCAPE_BEAT.title - blast;
+    for (let crackle = 0; crackle < 28; crackle++) {
+      this.tick(blast + 0.4 + Math.random() * span, 2200 + Math.random() * 2400, 0.03 + Math.random() * 0.05, 3, 0.04);
+    }
+  }
+
+  /**
    * The last call from the surface over a dying radio: a squelch, three
    * garbled phrases (the ending card prints their words) through a narrow
    * band, then the carrier drops into static.
@@ -1522,6 +1577,39 @@ export class AudioSystem {
     this.sweep(0, 'sawtooth', 620, 1180, 0.32, 0.55, t, output);
     this.sweep(0, 'square', 655, 1240, 0.16, 0.5, t, output);
     this.sweep(0.05, 'sawtooth', 110, 52, 0.4, 0.8, t + 0.05, output);
+  }
+
+  /**
+   * A giant's footfall, `weight` 0..1: a low thump through the ground under
+   * the crunch of what it lands on. Its landing slam and its fall use it at
+   * full weight.
+   */
+  public playGuardianFootfall(cue: SpatialCue, weight: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue);
+    const t = audio.ctx.currentTime;
+    const level = clamp(weight, 0, 1);
+    this.sweep(0, 'sine', 95, 36, 0.08 + 0.34 * level, 0.22 + 0.14 * level, t, output);
+    this.tick(0, 170, 0.05 + 0.22 * level, 1.2, 0.08 + 0.05 * level, output);
+    this.tick(0.012, 900, 0.06 * level, 2.5, 0.03, output);
+  }
+
+  /**
+   * A boss's roar: a deep sawtooth bellow that swells and breaks over a
+   * rasping throat; `fury` 0..1 roughens and deepens it. Heard from afar.
+   */
+  public playGuardianRoar(cue: SpatialCue, fury: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue, 0.35);
+    const t = audio.ctx.currentTime;
+    const rage = clamp(fury, 0, 1);
+    this.sweep(0, 'sawtooth', 72, 118, 0.24, 0.55, t, output);
+    this.sweep(0.45, 'sawtooth', 120, 50, 0.22, 0.7, t + 0.45, output);
+    this.sweep(0, 'square', 54 + rage * 12, 38, 0.1 + 0.06 * rage, 1.15, t, output);
+    this.sweep(0.05, 'triangle', 150, 240, 0.07 + 0.05 * rage, 0.6, t + 0.05, output);
+    for (let rasp = 0; rasp < 6; rasp++) this.tick(rasp * 0.15, 340 + rasp * 25, 0.09 + 0.05 * rage, 1.4, 0.2, output);
   }
 
   /**

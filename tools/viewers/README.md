@@ -34,6 +34,13 @@ Inícialas con `npm run dev` y abre las rutas indicadas en el navegador.
 
 Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas ni la medición de rendimiento en un dispositivo físico.
 
+## Visor del CAPITÁN URSS
+
+`http://localhost:5173/tools/viewers/guardian-viewer.html` reproduce en bucle un combate guionizado del jefe de Station 33 sobre nieve, con cámara orbital que lo sigue: poste, rugido, salto, marcha, golpe de escudo, lanzamiento, carga, choque, aturdimiento y muerte con el escudo cayendo. La cabecera muestra estado, draw calls y triángulos.
+
+- `?state=bashWindup` repite un solo estado donde está (`stalking`, `throwWindup`, `chargeWindup`, `charging`, `stunned`, `defeated`…).
+- `?phase=3` lo muestra en furia roja (venas y vapor), `?slow=4` lo ralentiza, `?close=1` encuadra la cara y `?shadows=0` usa el perfil de efectos reducidos.
+
 ## Visor del compañero
 
 `http://localhost:5173/tools/viewers/player-viewer.html` compara el soldado GLB

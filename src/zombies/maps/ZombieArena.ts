@@ -181,6 +181,12 @@ export interface ArenaEvacuationGuardian {
   readonly trigger: GroundRect;
   /** Optional filmed entrance; without one it leaps straight in. */
   readonly entrance?: ArenaGuardianEntrance;
+  /**
+   * Optional theme of the duel: it replaces the map's music from the moment
+   * the guardian wakes and fades out when it falls. Without its file the
+   * map's music keeps playing.
+   */
+  readonly music?: MusicTrackName;
 }
 
 /**
