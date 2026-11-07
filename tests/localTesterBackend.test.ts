@@ -6,6 +6,8 @@ import { PRODUCT_IDS } from '../src/config/products';
 
 function remoteBackend(): AccountBackend & { [K in keyof AccountBackend]: ReturnType<typeof vi.fn> } {
   return {
+    signInWithPassword: vi.fn(async () => ({ token: 'remote-session', email: 'player@example.com' })),
+    signInWithGoogle: vi.fn(async () => ({ token: 'google-session', email: 'player@gmail.com' })),
     requestLogin: vi.fn(async () => 'sent' as const),
     verifyLogin: vi.fn(async () => ({ token: 'remote-session', email: 'player@example.com' })),
     fetchEntitlements: vi.fn(async () => ({ email: 'player@example.com', products: [], beta: false })),
@@ -23,25 +25,19 @@ function memoryStorage(): AccountStorage {
 }
 
 describe('local tester backend', () => {
-  it('issues login tokens only for local testers, ignoring case and spaces', () => {
-    const backend = new LocalTesterBackend(remoteBackend(), ['tester@example.com']);
-    expect(backend.loginTokenFor(' Tester@Example.com ')).not.toBeNull();
-    expect(backend.loginTokenFor('player@example.com')).toBeNull();
-  });
-
-  it('signs a local tester in with every product and the beta badge without the account server', async () => {
+  it('signs a local tester in with any password, every product and the beta badge without the account server', async () => {
     const remote = remoteBackend();
     const backend = new LocalTesterBackend(remote, ['tester@example.com']);
     const storage = memoryStorage();
-    const account = new WebAccount(backend, storage, backend);
+    const account = new WebAccount(backend, storage);
 
-    expect(await account.requestLogin('tester@example.com', 'es')).toBe('signed-in');
+    expect(await account.signInWithPassword(' Tester@Example.com ', 'whatever')).toBe('signed-in');
     expect(account.getEmail()).toBe('tester@example.com');
     expect(account.isBetaTester()).toBe(true);
     for (const product of PRODUCT_IDS) expect(account.owns(product)).toBe(true);
 
     // A reload keeps the session: refreshing it never asks the server.
-    const restored = new WebAccount(backend, storage, backend);
+    const restored = new WebAccount(backend, storage);
     await restored.refresh();
     expect(restored.owns('map.station-33')).toBe(true);
 
@@ -50,26 +46,23 @@ describe('local tester backend', () => {
     for (const method of Object.values(remote)) expect(method).not.toHaveBeenCalled();
   });
 
-  it('forwards every other player to the account server', async () => {
+  it('forwards every other player and every Google or link sign-in to the account server', async () => {
     const remote = remoteBackend();
     const backend = new LocalTesterBackend(remote, ['tester@example.com']);
-    const account = new WebAccount(backend, memoryStorage(), backend);
+    const account = new WebAccount(backend, memoryStorage());
 
-    expect(await account.requestLogin('player@example.com', 'en')).toBe('sent');
-    expect(remote.requestLogin).toHaveBeenCalledWith('player@example.com', 'en');
-    expect(await account.completeLogin('link-1')).toBe('signed-in');
-    expect(remote.verifyLogin).toHaveBeenCalledWith('link-1');
+    expect(await account.signInWithPassword('player@example.com', 'secret password')).toBe('signed-in');
+    expect(remote.signInWithPassword).toHaveBeenCalledWith('player@example.com', 'secret password');
     expect(remote.fetchEntitlements).toHaveBeenCalledWith('remote-session');
     expect(account.owns('map.station-33')).toBe(false);
     await account.signOut();
     expect(remote.logout).toHaveBeenCalledWith('remote-session');
-  });
 
-  it('keeps the mailed link flow when no local login is given', async () => {
-    const remote = remoteBackend();
-    const backend = new LocalTesterBackend(remote, ['tester@example.com']);
-    const account = new WebAccount(backend, memoryStorage());
+    expect(await account.signInWithGoogle('credential')).toBe('signed-in');
+    expect(remote.signInWithGoogle).toHaveBeenCalledWith('credential');
     expect(await account.requestLogin('tester@example.com', 'en')).toBe('sent');
-    expect(account.getEmail()).toBeNull();
+    expect(remote.requestLogin).toHaveBeenCalledWith('tester@example.com', 'en');
+    expect(await account.completeLogin('link-1')).toBe('signed-in');
+    expect(remote.verifyLogin).toHaveBeenCalledWith('link-1');
   });
 });

@@ -33,7 +33,7 @@ sufra tirones de compilacion de shaders.
 | `src/modes/ZombiesMode.ts` | Run, rondas, economia, salud, armas y progresion |
 | `src/modes/coop/` | Cooperativo: `CoopWorld` (mapa compartido), `CoopHostMode` (autoridad), `CoopGuestMode` (replica) |
 | `src/network/` + `server/` + `cloudflare/` | Protocolo validado, interpolacion, validacion de disparos y relays |
-| `cloudflare/api/` | API de cuentas web (Worker con Hono y D1): enlace magico, sesiones y permisos; ver [API de cuentas](../cloudflare/api/README.md) |
+| `cloudflare/api/` | API de cuentas web (Worker con Hono y D1): contraseña, Google, enlace de recuperacion, sesiones y permisos; ver [API de cuentas](../cloudflare/api/README.md) |
 | `src/rendering/RemotePlayer*` | Compañero como entidad de mundo: interpolacion y cuerpo animado |
 | `src/rendering/CoopSpectator.ts` | Camara cooperativa desde la vista interpolada del compañero, separada del rig local |
 | `src/config/zombieMaps.ts` | Registro de mapas: visibilidad, nombre, cooperativo y factoria de arena |
@@ -69,8 +69,9 @@ sufra tirones de compilacion de shaders.
   [API de cuentas](../cloudflare/api/README.md) mediante un `AccountBackend`
   (`AccountApi`; en `npm run dev`, `LocalTesterBackend` lo envuelve y da
   entrada inmediata a los testers locales). `main.ts`
-  canjea el enlace de acceso (`#login=`) al arrancar y entrega la cuenta a
-  `HUD`, cuyo `MapUnlockDialog` pide el enlace o permite cerrar sesion. La
+  canjea el enlace de recuperacion (`#login=`) al arrancar y entrega la cuenta a
+  `HUD`, cuyo `MapUnlockDialog` inicia sesion con contraseña o con Google
+  (`GoogleSignInButton`, que `main.ts` solo crea en web) o permite cerrar sesion. La
   comprobacion final sigue en el cliente; ver [acceso de beta](../public/beta/README.md).
 
 - `ZombieMapDefinition.weapons` es el `WeaponCatalog` con que el mapa nombra y

@@ -8,7 +8,7 @@ export interface LoginTokenRecord {
   readonly expiresAt: number;
 }
 
-export interface RecentLoginRequests {
+export interface RecentAttempts {
   readonly byEmail: number;
   readonly byRequester: number;
 }
@@ -24,18 +24,23 @@ export interface SessionRecord {
   readonly expiresAt: number;
 }
 
-/** Login links are kept past expiry for this long so rate limits still count them. */
-const LOGIN_TOKEN_RETENTION_MS = 60 * 60 * 1000;
+export interface UserCredentials {
+  readonly userId: string;
+  readonly passwordHash: string | null;
+}
+
+/** Login links are kept past expiry for this long so rate limits still count them; password failures as long. */
+const RATE_LIMIT_RETENTION_MS = 60 * 60 * 1000;
 
 /** Every SQL query of the account API. Callers pass hashes, never raw tokens. */
 export class AccountStore {
   public constructor(private readonly database: SqlDatabase) {}
 
-  public async countLoginRequestsSince(email: string, requesterHash: string, since: number): Promise<RecentLoginRequests> {
+  public async countLoginRequestsSince(email: string, requesterHash: string, since: number): Promise<RecentAttempts> {
     const row = await this.database.prepare(`
       SELECT COALESCE(SUM(email = ?1), 0) AS byEmail, COALESCE(SUM(requester_hash = ?2), 0) AS byRequester
       FROM login_tokens WHERE created_at >= ?3 AND (email = ?1 OR requester_hash = ?2)
-    `).bind(email, requesterHash, since).first<RecentLoginRequests>();
+    `).bind(email, requesterHash, since).first<RecentAttempts>();
     return { byEmail: row?.byEmail ?? 0, byRequester: row?.byRequester ?? 0 };
   }
 
@@ -64,6 +69,37 @@ export class AccountStore {
     `).bind(newId, email, now).first<{ id: string }>();
     if (!row) throw new Error('User upsert returned no row');
     return row.id;
+  }
+
+  /** The account and its password hash, which is null until one is set; null when the address has no account. */
+  public async findCredentials(email: string): Promise<UserCredentials | null> {
+    return this.database.prepare('SELECT id AS userId, password_hash AS passwordHash FROM users WHERE email = ?')
+      .bind(email).first<UserCredentials>();
+  }
+
+  /** Sets the first password of an account; false when one was set meanwhile. */
+  public async claimPassword(userId: string, passwordHash: string): Promise<boolean> {
+    const result = await this.database.prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash IS NULL')
+      .bind(passwordHash, userId).run();
+    return result.meta.changes > 0;
+  }
+
+  /** The next password used with this address becomes its password again. */
+  public async clearPassword(userId: string): Promise<void> {
+    await this.database.prepare('UPDATE users SET password_hash = NULL WHERE id = ?').bind(userId).run();
+  }
+
+  public async countPasswordFailuresSince(email: string, requesterHash: string, since: number): Promise<RecentAttempts> {
+    const row = await this.database.prepare(`
+      SELECT COALESCE(SUM(email = ?1), 0) AS byEmail, COALESCE(SUM(requester_hash = ?2), 0) AS byRequester
+      FROM password_failures WHERE created_at >= ?3 AND (email = ?1 OR requester_hash = ?2)
+    `).bind(email, requesterHash, since).first<RecentAttempts>();
+    return { byEmail: row?.byEmail ?? 0, byRequester: row?.byRequester ?? 0 };
+  }
+
+  public async recordPasswordFailure(email: string, requesterHash: string, now: number): Promise<void> {
+    await this.database.prepare('INSERT INTO password_failures (email, requester_hash, created_at) VALUES (?, ?, ?)')
+      .bind(email, requesterHash, now).run();
   }
 
   public async createSession(tokenHash: string, userId: string, now: number, expiresAt: number): Promise<void> {
@@ -98,7 +134,8 @@ export class AccountStore {
 
   public async purgeExpired(now: number): Promise<void> {
     await this.database.batch([
-      this.database.prepare('DELETE FROM login_tokens WHERE expires_at < ?').bind(now - LOGIN_TOKEN_RETENTION_MS),
+      this.database.prepare('DELETE FROM login_tokens WHERE expires_at < ?').bind(now - RATE_LIMIT_RETENTION_MS),
+      this.database.prepare('DELETE FROM password_failures WHERE created_at < ?').bind(now - RATE_LIMIT_RETENTION_MS),
       this.database.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(now),
     ]);
   }

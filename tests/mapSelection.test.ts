@@ -127,7 +127,11 @@ describe('Zombies map selection flow', () => {
       'beta-unlock': new FakeDialog(),
       'beta-access-form': new FakeElement(),
       'beta-email': new FakeElement(),
-      'beta-email-field': new FakeElement(),
+      'beta-password': new FakeElement(),
+      'beta-forgot': new FakeElement(),
+      'beta-signin-fields': new FakeElement(),
+      'beta-google-field': new FakeElement(),
+      'beta-google-button': new FakeElement(),
       'beta-message': new FakeElement(),
       'beta-unlock-map': new FakeElement(),
       'beta-unlock-hint': new FakeElement(),
@@ -187,17 +191,20 @@ describe('Zombies map selection flow', () => {
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
-      // Signed out, the card stays listed but locked behind the login-link prompt.
+      // Signed out, the card stays listed but locked behind the sign-in prompt.
       mansion.focused = false;
       let accountEmail: string | null = null;
       let betaTester = false;
-      const requestLogin = vi.fn(async (email: string) => (email.includes('@') ? 'sent' as const : 'invalid-email' as const));
+      const signInWithPassword = vi.fn(async (email: string, _password: string) => (email.includes('@') ? 'wrong-password' as const : 'invalid-email' as const));
       const onAccountChanged = vi.fn();
       ui.setMapUnlockAccount({
         getEmail: () => accountEmail,
         isBetaTester: () => betaTester,
-        requestLogin,
+        signInWithPassword,
+        signInWithGoogle: async () => 'rejected',
+        requestRecovery: async () => 'sent',
         signOut: async () => { accountEmail = null; },
+        google: null,
       }, onAccountChanged);
       ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts);
       expect(station.classList.contains('hidden')).toBe(false);
@@ -209,7 +216,8 @@ describe('Zombies map selection flow', () => {
       expect(unlockDialog.open).toBe(true);
       expect(elements['beta-unlock-map'].textContent).toBe('STATION 33');
       expect(elements['beta-unlock-hint'].dataset.i18n).toBe('account.unlockHint');
-      expect(elements['beta-email-field'].classList.contains('hidden')).toBe(false);
+      expect(elements['beta-signin-fields'].classList.contains('hidden')).toBe(false);
+      expect(elements['beta-google-field'].classList.contains('hidden')).toBe(true);
       expect(elements['beta-signout'].classList.contains('hidden')).toBe(true);
       expect(mapSelect.classList.contains('hidden')).toBe(false);
 
@@ -218,16 +226,17 @@ describe('Zombies map selection flow', () => {
       };
       const submit = async (email: string): Promise<void> => {
         elements['beta-email'].value = email;
+        elements['beta-password'].value = 'password1';
         elements['beta-access-form'].onsubmit?.({ preventDefault: () => undefined });
         await flush();
       };
       await submit('not-an-email');
       expect(elements['beta-message'].dataset.i18n).toBe('account.invalidEmail');
 
-      // The link is mailed; the map unlocks only when the player opens it.
+      // A failed sign-in keeps the map locked and the dialog open.
       await submit('  Bielet40@Gmail.com ');
-      expect(requestLogin).toHaveBeenLastCalledWith('bielet40@gmail.com');
-      expect(elements['beta-message'].textContent).toContain('bielet40@gmail.com');
+      expect(signInWithPassword).toHaveBeenLastCalledWith('bielet40@gmail.com', 'password1');
+      expect(elements['beta-message'].dataset.i18n).toBe('account.wrongPassword');
       expect(unlockDialog.open).toBe(true);
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
@@ -236,7 +245,7 @@ describe('Zombies map selection flow', () => {
       accountEmail = 'player@example.com';
       station.onclick?.();
       expect(elements['beta-unlock-hint'].textContent).toContain('player@example.com');
-      expect(elements['beta-email-field'].classList.contains('hidden')).toBe(true);
+      expect(elements['beta-signin-fields'].classList.contains('hidden')).toBe(true);
       expect(elements['beta-unlock-submit'].classList.contains('hidden')).toBe(true);
       expect(elements['beta-signout'].classList.contains('hidden')).toBe(false);
       elements['beta-signout'].onclick?.();

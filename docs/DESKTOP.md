@@ -23,7 +23,7 @@ gameplay ni assets propios. Web, PWA, Android y escritorio comparten codigo.
 
 ```powershell
 npm run desktop:build      # tsc + vite build --mode desktop en dist/
-npm run desktop:build -- --testers # build interno: testers locales sin enlace
+npm run desktop:build -- --testers # build interno: testers locales sin API
 npm run desktop:start      # abre dist/ en Electron (F12 = DevTools sin empaquetar)
 npm run desktop:pack       # build + releases/desktop/win-unpacked/Zeroed.exe
 npm run desktop:pack:linux # build + releases/desktop/linux-unpacked (Steam Deck/Linux)

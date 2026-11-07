@@ -3,6 +3,8 @@ import { createAccountApp } from '../cloudflare/api/src/app';
 import { buildBetaSeedSql } from '../cloudflare/api/src/betaSeed';
 import type { LoginEmail, LoginMailer } from '../cloudflare/api/src/LoginMailer';
 import { AccountStore } from '../cloudflare/api/src/AccountStore';
+import { GoogleIdTokenVerifier } from '../cloudflare/api/src/googleIdToken';
+import { createGoogleSigner, GOOGLE_CLIENT_ID, type GoogleSigner } from './support/googleIdTokens';
 import { PRODUCT_IDS } from '../src/config/products';
 import { createMigratedDatabase, type SqliteDatabase } from './support/sqliteDatabase';
 
@@ -32,13 +34,19 @@ describe('account API', () => {
   let mailer: RecordingMailer;
   let now: number;
   let app: ReturnType<typeof createAccountApp>;
+  let google: GoogleSigner;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     database = createMigratedDatabase();
     mailer = new RecordingMailer();
     now = Date.UTC(2026, 10, 3, 12);
+    google = await createGoogleSigner();
+    app = createApp(new GoogleIdTokenVerifier(GOOGLE_CLIENT_ID, google.keys, () => now));
+  });
+
+  function createApp(googleVerifier: GoogleIdTokenVerifier | null): ReturnType<typeof createAccountApp> {
     let calls = 0;
-    app = createAccountApp({
+    return createAccountApp({
       database,
       mailer,
       now: () => now,
@@ -50,8 +58,9 @@ describe('account API', () => {
       },
       appUrl: APP_URL,
       allowedOrigins: [ORIGIN],
+      google: googleVerifier,
     });
-  });
+  }
 
   function post(path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
     return Promise.resolve(app.request(path, {
@@ -64,6 +73,10 @@ describe('account API', () => {
   function getEntitlements(sessionToken?: string): Promise<Response> {
     const headers: Record<string, string> = sessionToken ? { authorization: `Bearer ${sessionToken}` } : {};
     return Promise.resolve(app.request('/me/entitlements', { headers }));
+  }
+
+  function signInWithPassword(email: string, password: string): Promise<Response> {
+    return post('/auth/password', { email, password });
   }
 
   async function signIn(email = 'player@example.com'): Promise<string> {
@@ -194,6 +207,103 @@ describe('account API', () => {
 
     const denied = await app.request('/me/entitlements', { method: 'OPTIONS', headers: { origin: 'https://evil.test', 'access-control-request-method': 'GET' } });
     expect(denied.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  describe('password sign-in', () => {
+    it('creates the account the first time an address is used, then requires that password', async () => {
+      const created = await signInWithPassword(' New@Example.com ', 'correct horse');
+      expect(created.status).toBe(200);
+      const session = (await created.json()) as { token: string; email: string; created: boolean };
+      expect(session).toMatchObject({ email: 'new@example.com', created: true });
+      expect(mailer.sent).toHaveLength(0);
+      expect(await (await getEntitlements(session.token)).json()).toEqual({ email: 'new@example.com', products: [], beta: false });
+
+      const again = await signInWithPassword('new@example.com', 'correct horse');
+      expect(again.status).toBe(200);
+      expect(await again.json()).toMatchObject({ email: 'new@example.com', created: false });
+      expect((await signInWithPassword('new@example.com', 'wrong horse')).status).toBe(401);
+    });
+
+    it('lets a seeded beta tester choose a password and get every product', async () => {
+      database.exec(buildBetaSeedSql(['tester@example.com'], now));
+      const response = await signInWithPassword('tester@example.com', 'tester-password');
+      const session = (await response.json()) as { token: string; created: boolean };
+      expect(session.created).toBe(false);
+      expect(await (await getEntitlements(session.token)).json()).toEqual({ email: 'tester@example.com', products: [...PRODUCT_IDS], beta: true });
+    });
+
+    it('rejects malformed addresses and passwords outside 8 to 128 characters', async () => {
+      expect((await signInWithPassword('no-at-sign', 'long enough')).status).toBe(400);
+      expect((await signInWithPassword('a@example.com', 'short')).status).toBe(400);
+      expect((await signInWithPassword('a@example.com', 'x'.repeat(129))).status).toBe(400);
+      expect((await post('/auth/password', { email: 'a@example.com', password: 12345678 })).status).toBe(400);
+      const users = await database.prepare('SELECT COUNT(*) AS count FROM users').first<{ count: number }>();
+      expect(users?.count).toBe(0);
+    });
+
+    it('stores only a salted hash of the password', async () => {
+      await signInWithPassword('a@example.com', 'same password');
+      await signInWithPassword('b@example.com', 'same password');
+      const { results } = await database.prepare('SELECT password_hash AS hash FROM users ORDER BY email').all<{ hash: string }>();
+      expect(results.map(({ hash }) => hash.startsWith('pbkdf2-sha256$100000$'))).toEqual([true, true]);
+      expect(results[0].hash).not.toBe(results[1].hash);
+      expect(results.some(({ hash }) => hash.includes('same password'))).toBe(false);
+    });
+
+    it('locks an address for an hour after ten wrong passwords', async () => {
+      await signInWithPassword('a@example.com', 'right password');
+      for (let i = 0; i < 10; i++) expect((await signInWithPassword('a@example.com', `guess ${i} wrong`)).status).toBe(401);
+      expect((await signInWithPassword('a@example.com', 'right password')).status).toBe(429);
+      now += 61 * MINUTE;
+      expect((await signInWithPassword('a@example.com', 'right password')).status).toBe(200);
+    });
+
+    it('lets a recovery link reset a forgotten password', async () => {
+      await signInWithPassword('a@example.com', 'forgotten one');
+      await post('/auth/request', { email: 'a@example.com' });
+      expect((await post('/auth/verify', { token: mailer.lastToken() })).status).toBe(200);
+
+      expect((await signInWithPassword('a@example.com', 'brand new one')).status).toBe(200);
+      expect((await signInWithPassword('a@example.com', 'forgotten one')).status).toBe(401);
+    });
+  });
+
+  describe('Google sign-in', () => {
+    it('signs in the verified address of a credential issued to this game', async () => {
+      database.exec(buildBetaSeedSql(['tester@gmail.com'], now));
+      const response = await post('/auth/google', { credential: await google.sign({ email: 'Tester@Gmail.com' }, now) });
+      expect(response.status).toBe(200);
+      const session = (await response.json()) as { token: string; email: string };
+      expect(session.email).toBe('tester@gmail.com');
+      expect(await (await getEntitlements(session.token)).json()).toEqual({ email: 'tester@gmail.com', products: [...PRODUCT_IDS], beta: true });
+    });
+
+    it('joins the password account of the same address and keeps its password', async () => {
+      await signInWithPassword('player@gmail.com', 'my password');
+      expect((await post('/auth/google', { credential: await google.sign({ email: 'player@gmail.com' }, now) })).status).toBe(200);
+      const users = await database.prepare('SELECT COUNT(*) AS count FROM users').first<{ count: number }>();
+      expect(users?.count).toBe(1);
+      expect((await signInWithPassword('player@gmail.com', 'my password')).status).toBe(200);
+    });
+
+    it('rejects credentials for another app, expired, unverified, forged or malformed', async () => {
+      const rejected = [
+        await google.sign({ email: 'a@gmail.com', aud: 'another-app' }, now),
+        await google.sign({ email: 'a@gmail.com', iss: 'https://evil.test' }, now),
+        await google.sign({ email: 'a@gmail.com' }, now - 2 * 60 * MINUTE),
+        await google.sign({ email: 'a@gmail.com', email_verified: false }, now),
+        await google.sign({ email: 'a@gmail.com' }, now, 'unknown-key'),
+        (await google.sign({ email: 'a@gmail.com' }, now)).replace(/\.[^.]+$/, '.AAAA'),
+        'not-a-token',
+      ];
+      for (const credential of rejected) expect((await post('/auth/google', { credential })).status).toBe(401);
+      expect((await post('/auth/google', {})).status).toBe(401);
+    });
+
+    it('is unavailable when no Google client id is configured', async () => {
+      app = createApp(null);
+      expect((await post('/auth/google', { credential: await google.sign({ email: 'a@gmail.com' }, now) })).status).toBe(404);
+    });
   });
 
   it('purges expired login links and sessions', async () => {

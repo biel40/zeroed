@@ -247,7 +247,7 @@
     </div>
   </div>
 
-  <!-- Opened from a locked map card or the account button; MapUnlockDialog mails a login link or offers to sign out. -->
+  <!-- Opened from a locked map card or the account button; MapUnlockDialog signs in (Google or email and password) or offers to sign out. -->
   <dialog id="beta-unlock" class="beta-unlock" aria-labelledby="beta-unlock-map" aria-describedby="beta-unlock-hint">
     <form id="beta-access-form" class="beta-unlock-form">
       <p id="beta-unlock-kicker" class="beta-unlock-kicker">
@@ -256,15 +256,23 @@
       </p>
       <h2 id="beta-unlock-map" class="beta-unlock-map"></h2>
       <p id="beta-unlock-hint" class="beta-unlock-hint" data-i18n="account.unlockHint"></p>
-      <div id="beta-email-field">
+      <div id="beta-signin-fields" class="beta-signin-fields">
+        <div id="beta-google-field" class="beta-google-field hidden">
+          <div id="beta-google-button" class="beta-google-button"></div>
+          <p class="beta-divider"><span data-i18n="account.orEmail"></span></p>
+        </div>
         <label for="beta-email" data-i18n="account.email"></label>
-        <input id="beta-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="beta-message" />
+        <input id="beta-email" name="email" type="email" autocomplete="username email" maxlength="254" required aria-describedby="beta-message" />
+        <label for="beta-password" data-i18n="account.password"></label>
+        <input id="beta-password" name="password" type="password" autocomplete="current-password" maxlength="128" required aria-describedby="beta-message beta-password-hint" />
+        <p id="beta-password-hint" class="beta-password-hint" data-i18n="account.passwordHint"></p>
+        <button type="button" id="beta-forgot" class="beta-forgot" data-i18n="account.forgotPassword"></button>
       </div>
       <p id="beta-message" role="status" aria-live="polite"></p>
       <div class="beta-unlock-actions">
         <button type="button" id="beta-unlock-cancel" data-i18n="beta.cancel"></button>
         <button type="button" id="beta-signout" class="hidden" data-i18n="account.signOut"></button>
-        <button type="submit" id="beta-unlock-submit" data-i18n="account.sendLink"></button>
+        <button type="submit" id="beta-unlock-submit" data-i18n="account.signInSubmit"></button>
       </div>
     </form>
   </dialog>

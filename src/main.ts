@@ -1,5 +1,7 @@
 import './style.css';
+import { Capacitor } from '@capacitor/core';
 import { AccountApi, DEFAULT_ACCOUNT_API_URL } from './account/AccountApi';
+import { GoogleIdentityButton, type GoogleSignInButton } from './account/GoogleIdentityButton';
 import { readLoginToken } from './account/loginLink';
 import { WebAccount, type AccountStorage, type LoginCompletion } from './account/WebAccount';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
@@ -231,9 +233,12 @@ class ZeroedBoot {
       this.hud.setMapUnlockAccount({
         getEmail: () => this.entitlements.getEmail(),
         isBetaTester: () => this.entitlements.isBetaTester(),
-        requestLogin: (email) => this.entitlements.requestLogin(email, getLanguage()),
+        signInWithPassword: (email, password) => this.entitlements.signInWithPassword(email, password),
+        signInWithGoogle: (credential) => this.entitlements.signInWithGoogle(credential),
+        requestRecovery: (email) => this.entitlements.requestLogin(email, getLanguage()),
         signOut: () => this.entitlements.signOut(),
-      }, () => this.showMapMenu());
+        google: createGoogleButton(),
+      }, () => this.showMenuAfterAccountChange());
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
       const desktop = getDesktopShell();
       if (desktop) this.hud.enableQuit(() => desktop.quit());
@@ -253,7 +258,14 @@ class ZeroedBoot {
     }
   }
 
-  /** Signs in from the opening login link, or refreshes the remembered products. Never rejects. */
+  /** A beta tester who just signed in is thanked before the menu; signing out goes straight back to it. */
+  private showMenuAfterAccountChange(): void {
+    const email = this.entitlements.getEmail();
+    if (email && this.entitlements.isBetaTester()) this.hud.showBetaThanks(email, () => this.showMapMenu());
+    else this.showMapMenu();
+  }
+
+  /** Signs in from an opened recovery link, or refreshes the remembered products. Never rejects. */
   private async syncAccount(): Promise<LoginCompletion | null> {
     if (this.loginToken) return this.entitlements.completeLogin(this.loginToken);
     await this.entitlements.refresh();
@@ -290,15 +302,24 @@ async function boot(): Promise<void> {
 
 /**
  * Dev servers and internal desktop builds (`npm run desktop:build -- --testers`) also sign local
- * testers in without a mailed link; other builds never include that backend.
+ * testers in with any password and without the account server; other builds never include that backend.
  */
 async function createAccount(): Promise<WebAccount> {
   const api = new AccountApi(import.meta.env.VITE_ACCOUNT_API_URL?.trim() || DEFAULT_ACCOUNT_API_URL);
   if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TESTERS === 'true') {
     const { LocalTesterBackend, LOCAL_TESTER_EMAILS } = await import('./account/LocalTesterBackend');
-    const backend = new LocalTesterBackend(api, LOCAL_TESTER_EMAILS);
-    return new WebAccount(backend, getAccountStorage(), backend);
+    return new WebAccount(new LocalTesterBackend(api, LOCAL_TESTER_EMAILS), getAccountStorage());
   }
   return new WebAccount(api, getAccountStorage());
+}
+
+/**
+ * Google sign-in needs `VITE_GOOGLE_CLIENT_ID` and a real browser: Google refuses it inside
+ * the Android and desktop apps, which keep email and password.
+ */
+function createGoogleButton(): GoogleSignInButton | null {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+  if (!clientId || getDesktopShell() || Capacitor.isNativePlatform()) return null;
+  return new GoogleIdentityButton(clientId, getLanguage);
 }
 void boot();

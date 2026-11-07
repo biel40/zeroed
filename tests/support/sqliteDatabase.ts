@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import type { SqlDatabase, SqlRunResult, SqlStatement, SqlValue } from '../../cloudflare/api/src/SqlDatabase';
 
-const MIGRATIONS = ['0001_accounts.sql'];
+const MIGRATIONS = ['0001_accounts.sql', '0002_passwords.sql'];
 
 /** An in-memory SQLite database behind the D1 subset the account API uses, with every migration applied. */
 export function createMigratedDatabase(): SqliteDatabase {

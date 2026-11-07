@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { AccountService, type AuthenticatedSession } from './AccountService';
 import { AccountStore } from './AccountStore';
+import type { GoogleIdTokenVerifier } from './googleIdToken';
 import { toEmailLanguage } from './loginEmail';
 import type { LoginMailer } from './LoginMailer';
 import type { SqlDatabase } from './SqlDatabase';
@@ -14,6 +15,7 @@ export interface AccountAppOptions {
   readonly randomBytes: RandomBytes;
   readonly appUrl: string;
   readonly allowedOrigins: readonly string[];
+  readonly google: GoogleIdTokenVerifier | null;
 }
 
 type AppEnv = { Variables: { session: AuthenticatedSession } };
@@ -28,6 +30,7 @@ export function createAccountApp(options: AccountAppOptions): Hono<AppEnv> {
     now: options.now,
     randomBytes: options.randomBytes,
     appUrl: options.appUrl,
+    google: options.google,
   });
   const app = new Hono<AppEnv>();
 
@@ -40,9 +43,7 @@ export function createAccountApp(options: AccountAppOptions): Hono<AppEnv> {
 
   app.post('/auth/request', async (c) => {
     const body = await readJsonObject(c);
-    // Cloudflare sets this header on every request; it only feeds the rate limit, hashed.
-    const requester = c.req.header('cf-connecting-ip') ?? 'unknown';
-    const result = await accounts.requestLogin(body.email, requester, toEmailLanguage(body.language));
+    const result = await accounts.requestLogin(body.email, requesterOf(c), toEmailLanguage(body.language));
     if (result === 'invalid-email') return c.json({ error: 'invalid_email' }, 400);
     if (result === 'rate-limited') return c.json({ error: 'rate_limited' }, 429);
     if (result === 'mail-failed') return c.json({ error: 'email_unavailable' }, 502);
@@ -54,6 +55,29 @@ export function createAccountApp(options: AccountAppOptions): Hono<AppEnv> {
     if (typeof token !== 'string' || token.length === 0) return c.json({ error: 'missing_token' }, 400);
     const session = await accounts.verifyLogin(token);
     return session ? c.json(session) : c.json({ error: 'invalid_token' }, 401);
+  });
+
+  app.post('/auth/password', async (c) => {
+    const { email, password } = await readJsonObject(c);
+    const result = await accounts.signInWithPassword(email, password, requesterOf(c));
+    if (result === 'invalid-email') return c.json({ error: 'invalid_email' }, 400);
+    if (result === 'weak-password') return c.json({ error: 'weak_password' }, 400);
+    if (result === 'wrong-password') return c.json({ error: 'wrong_password' }, 401);
+    if (result === 'rate-limited') return c.json({ error: 'rate_limited' }, 429);
+    return c.json({ ...result.session, created: result.created });
+  });
+
+  app.post('/auth/google', async (c) => {
+    const { credential } = await readJsonObject(c);
+    let session;
+    try {
+      session = await accounts.signInWithGoogle(credential);
+    } catch (error) {
+      console.error('Google sign-in failed', error);
+      return c.json({ error: 'google_unavailable' }, 502);
+    }
+    if (session === 'unconfigured') return c.json({ error: 'google_disabled' }, 404);
+    return session ? c.json(session) : c.json({ error: 'invalid_credential' }, 401);
   });
 
   app.use('/me/*', async (c, next) => {
@@ -78,6 +102,11 @@ export function createAccountApp(options: AccountAppOptions): Hono<AppEnv> {
   }
 
   return app;
+}
+
+/** Cloudflare sets this header on every request; it only feeds rate limits, hashed. */
+function requesterOf(c: Context<AppEnv>): string {
+  return c.req.header('cf-connecting-ip') ?? 'unknown';
 }
 
 async function readJsonObject(c: Context<AppEnv>): Promise<Record<string, unknown>> {

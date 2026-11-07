@@ -2094,7 +2094,46 @@ html.coop-guest #pause-restart {
   text-transform: uppercase;
 }
 
-#beta-email {
+.beta-google-button { display: flex; justify-content: center; min-height: 44px; }
+
+.beta-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 14px;
+  color: #8e968a;
+  font: 700 10px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.beta-divider::before,
+.beta-divider::after { content: ''; flex: 1; height: 1px; background: #56606b80; }
+
+.beta-signin-fields input + label { margin-top: 12px; }
+
+.beta-password-hint { margin: 6px 0 0; color: #8e968a; font-size: 12px; }
+
+.beta-forgot {
+  margin-top: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  color: #d9b469;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.beta-forgot:hover,
+.beta-forgot:focus-visible { color: #f0d39b; }
+.beta-forgot:focus-visible { outline: 2px solid #e3b552; outline-offset: 2px; }
+.beta-forgot:disabled { cursor: default; opacity: 0.6; }
+
+#beta-email,
+#beta-password {
   width: 100%;
   min-height: 46px;
   padding: 10px 12px;
@@ -2105,7 +2144,8 @@ html.coop-guest #pause-restart {
   font: inherit;
 }
 
-#beta-email:focus-visible { border-color: #e3b552; outline: 2px solid #e3b552; outline-offset: 2px; }
+#beta-email:focus-visible,
+#beta-password:focus-visible { border-color: #e3b552; outline: 2px solid #e3b552; outline-offset: 2px; }
 #beta-message { min-height: 1.5em; margin: 8px 0 0; color: #e9aa9f; font-size: 13px; }
 
 .beta-unlock-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }

@@ -1,19 +1,13 @@
 import { isProductId, type ProductId } from '../config/products';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import type { Language } from '../i18n/i18n';
-import type { AccountBackend, LoginRequestOutcome } from './AccountApi';
+import type { AccountBackend, IssuedSession, LoginRequestOutcome, PasswordRejection } from './AccountApi';
 
 export type AccountStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export type LoginCompletion = 'signed-in' | 'invalid-link' | 'unavailable';
-
-/** A login request either mails a link or, for a local tester, signs in at once. */
-export type LoginAttempt = LoginRequestOutcome | 'signed-in';
-
-/** Issues a login token without mailing a link; only local development provides one. */
-export interface LocalLogin {
-  loginTokenFor(email: string): string | null;
-}
+export type PasswordSignIn = 'signed-in' | PasswordRejection | 'unavailable';
+export type GoogleSignIn = 'signed-in' | 'rejected' | 'unavailable';
 
 interface SavedAccount {
   readonly sessionToken: string;
@@ -35,7 +29,6 @@ export class WebAccount implements EntitlementProvider {
   public constructor(
     private readonly api: AccountBackend,
     private readonly storage: AccountStorage | undefined,
-    private readonly localLogin: LocalLogin | null = null,
   ) {
     this.saved = this.load();
   }
@@ -52,14 +45,38 @@ export class WebAccount implements EntitlementProvider {
     return this.saved?.beta ?? false;
   }
 
-  /** Never rejects. */
-  public async requestLogin(email: string, language: Language): Promise<LoginAttempt> {
-    const localToken = this.localLogin?.loginTokenFor(email) ?? null;
-    if (!localToken) return this.api.requestLogin(email, language);
-    return (await this.completeLogin(localToken)) === 'signed-in' ? 'signed-in' : 'unavailable';
+  /** Never rejects. Signs in, or creates the account the first time the address is used. */
+  public async signInWithPassword(email: string, password: string): Promise<PasswordSignIn> {
+    let result;
+    try {
+      result = await this.api.signInWithPassword(email, password);
+    } catch {
+      return 'unavailable';
+    }
+    if (typeof result === 'string') return result;
+    await this.adopt(result);
+    return 'signed-in';
   }
 
-  /** Never rejects. A signed-in account whose products could not load yet owns none until the next refresh. */
+  /** Never rejects. */
+  public async signInWithGoogle(credential: string): Promise<GoogleSignIn> {
+    let session;
+    try {
+      session = await this.api.signInWithGoogle(credential);
+    } catch {
+      return 'unavailable';
+    }
+    if (!session) return 'rejected';
+    await this.adopt(session);
+    return 'signed-in';
+  }
+
+  /** Never rejects. Mails a recovery link for a forgotten password. */
+  public requestLogin(email: string, language: Language): Promise<LoginRequestOutcome> {
+    return this.api.requestLogin(email, language);
+  }
+
+  /** Never rejects. Signs in from an opened recovery link. */
   public async completeLogin(loginToken: string): Promise<LoginCompletion> {
     let session;
     try {
@@ -68,8 +85,7 @@ export class WebAccount implements EntitlementProvider {
       return 'unavailable';
     }
     if (!session) return 'invalid-link';
-    this.update({ sessionToken: session.token, email: session.email, products: [], beta: false });
-    await this.refresh();
+    await this.adopt(session);
     return 'signed-in';
   }
 
@@ -96,6 +112,12 @@ export class WebAccount implements EntitlementProvider {
     } catch {
       // The server session simply expires.
     }
+  }
+
+  /** A new session owns nothing until its products load; if they cannot, until the next refresh. */
+  private async adopt(session: IssuedSession): Promise<void> {
+    this.update({ sessionToken: session.token, email: session.email, products: [], beta: false });
+    await this.refresh();
   }
 
   private update(account: SavedAccount | null): void {

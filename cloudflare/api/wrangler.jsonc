@@ -14,8 +14,11 @@
   "triggers": { "crons": ["17 4 * * *"] },
   "vars": {
     // zeroed.es redirects to www, so the game runs on the www origin; the bare domain stays allowed.
+    // https://localhost is the Android (Capacitor) app and app://zeroed the desktop app.
     "APP_URL": "https://www.zeroed.es",
-    "ALLOWED_ORIGINS": "https://www.zeroed.es,https://zeroed.es",
+    "ALLOWED_ORIGINS": "https://www.zeroed.es,https://zeroed.es,https://localhost,app://zeroed",
+    // Web client id from Google Cloud Console (public); empty disables Google sign-in.
+    "GOOGLE_CLIENT_ID": "",
     "EMAIL_FROM": "Zeroed <login@zeroed.es>"
   }
 }

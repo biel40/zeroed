@@ -2,3 +2,5 @@
 APP_URL=http://localhost:5173
 ALLOWED_ORIGINS=http://localhost:5173
 MAIL_TRANSPORT=console
+# Same web client id as VITE_GOOGLE_CLIENT_ID; leave empty to hide Google sign-in.
+GOOGLE_CLIENT_ID=

@@ -14,6 +14,9 @@ export interface IssuedSession {
   readonly email: string;
 }
 
+/** Why the server refused a password sign-in. */
+export type PasswordRejection = 'invalid-email' | 'weak-password' | 'wrong-password' | 'rate-limited';
+
 export interface AccountEntitlements {
   readonly email: string;
   readonly products: ProductId[];
@@ -25,6 +28,11 @@ export interface AccountEntitlements {
  * mean the server rejected the token; network and server errors reject.
  */
 export interface AccountBackend {
+  /** Signs in, or creates the account the first time the address is used. */
+  signInWithPassword(email: string, password: string): Promise<IssuedSession | PasswordRejection>;
+  /** `credential` is a Google Identity Services ID token. */
+  signInWithGoogle(credential: string): Promise<IssuedSession | null>;
+  /** Mails a recovery link that signs in and lets the next password used replace the old one. */
   requestLogin(email: string, language: Language): Promise<LoginRequestOutcome>;
   verifyLogin(loginToken: string): Promise<IssuedSession | null>;
   fetchEntitlements(sessionToken: string): Promise<AccountEntitlements | null>;
@@ -39,6 +47,23 @@ export class AccountApi implements AccountBackend {
 
   public constructor(baseUrl: string, private readonly fetchFn: FetchFn = (input, init) => fetch(input, init)) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
+  }
+
+  public async signInWithPassword(email: string, password: string): Promise<IssuedSession | PasswordRejection> {
+    const response = await this.post('/auth/password', { email, password });
+    if (response.status === 401) return 'wrong-password';
+    if (response.status === 429) return 'rate-limited';
+    if (response.status === 400) {
+      const { error } = await response.json().catch(() => ({})) as { error?: unknown };
+      return error === 'weak_password' ? 'weak-password' : 'invalid-email';
+    }
+    return AccountApi.readSession(response);
+  }
+
+  public async signInWithGoogle(credential: string): Promise<IssuedSession | null> {
+    const response = await this.post('/auth/google', { credential });
+    if (response.status === 400 || response.status === 401) return null;
+    return AccountApi.readSession(response);
   }
 
   public async requestLogin(email: string, language: Language): Promise<LoginRequestOutcome> {
@@ -56,9 +81,7 @@ export class AccountApi implements AccountBackend {
   public async verifyLogin(loginToken: string): Promise<IssuedSession | null> {
     const response = await this.post('/auth/verify', { token: loginToken });
     if (response.status === 400 || response.status === 401) return null;
-    const body = await AccountApi.readJson(response);
-    if (typeof body.token !== 'string' || typeof body.email !== 'string') throw new Error('Malformed session');
-    return { token: body.token, email: body.email };
+    return AccountApi.readSession(response);
   }
 
   public async fetchEntitlements(sessionToken: string): Promise<AccountEntitlements | null> {
@@ -79,6 +102,12 @@ export class AccountApi implements AccountBackend {
 
   private request(path: string, init: RequestInit): Promise<Response> {
     return this.fetchFn(`${this.baseUrl}${path}`, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  }
+
+  private static async readSession(response: Response): Promise<IssuedSession> {
+    const body = await AccountApi.readJson(response);
+    if (typeof body.token !== 'string' || typeof body.email !== 'string') throw new Error('Malformed session');
+    return { token: body.token, email: body.email };
   }
 
   private static async readJson(response: Response): Promise<Record<string, unknown>> {

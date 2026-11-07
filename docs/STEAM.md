@@ -10,7 +10,7 @@
 - Build interno con testers locales (`npm run desktop:build -- --testers` y
   `npm run desktop:start`): los correos de
   [LocalTesterBackend](../src/account/LocalTesterBackend.ts) desbloquean
-  Station 33 sin enlace. Solo para pruebas propias; no se empaqueta ni se reparte.
+  Station 33 con cualquier contraseña. Solo para pruebas propias; no se empaqueta ni se reparte.
 
 ## Pendiente
 
@@ -27,8 +27,9 @@
 
 ## Limitaciones actuales
 
-- En el build normal, Station 33 esta bloqueado y el login por correo no
-  funciona (la API de cuentas no admite el origen `app://zeroed`).
+- En el build normal, Station 33 esta bloqueado hasta entrar con correo y
+  contraseña; la API admite `app://zeroed` desde que se despliegue con ese
+  origen. Google no esta disponible en escritorio.
 - Sin validar: Linux/Steam Deck, rendimiento en otros equipos, Steam Input y
   overlay.
 - Repartir el ZIP de `win-unpacked` fuera de Steam funciona en Windows x64,

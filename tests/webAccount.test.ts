@@ -82,6 +82,78 @@ describe('account API client', () => {
     expect(entitlements).toEqual({ email: 'a@example.com', products: ['map.station-33'], beta: false });
     expect(server.requests[0].headers.get('authorization')).toBe('Bearer session-1');
   });
+
+  it('maps password sign-in responses to a session or the reason it was refused', async () => {
+    const server = new FakeServer();
+    const api = new AccountApi(API, server.fetch);
+    const cases: [Route, unknown][] = [
+      [{ status: 200, body: { token: 'session-1', email: 'a@example.com', created: true } }, { token: 'session-1', email: 'a@example.com' }],
+      [{ status: 400, body: { error: 'invalid_email' } }, 'invalid-email'],
+      [{ status: 400, body: { error: 'weak_password' } }, 'weak-password'],
+      [{ status: 401, body: { error: 'wrong_password' } }, 'wrong-password'],
+      [{ status: 429, body: { error: 'rate_limited' } }, 'rate-limited'],
+    ];
+    for (const [route, result] of cases) {
+      server.routes['POST /auth/password'] = route;
+      expect(await api.signInWithPassword('a@example.com', 'password1')).toEqual(result);
+    }
+    expect(server.requests[0].body).toEqual({ email: 'a@example.com', password: 'password1' });
+
+    server.routes['POST /auth/password'] = { status: 500 };
+    await expect(api.signInWithPassword('a@example.com', 'password1')).rejects.toThrow();
+  });
+
+  it('maps Google sign-in responses to a session, a rejection or an error', async () => {
+    const server = new FakeServer({ 'POST /auth/google': { status: 200, body: { token: 'session-1', email: 'a@gmail.com' } } });
+    const api = new AccountApi(API, server.fetch);
+    expect(await api.signInWithGoogle('credential')).toEqual({ token: 'session-1', email: 'a@gmail.com' });
+    expect(server.requests[0].body).toEqual({ credential: 'credential' });
+
+    server.routes['POST /auth/google'] = { status: 401 };
+    expect(await api.signInWithGoogle('forged')).toBeNull();
+    server.routes['POST /auth/google'] = { status: 404 };
+    await expect(api.signInWithGoogle('credential')).rejects.toThrow();
+  });
+});
+
+describe('web account sign-in', () => {
+  it('signs in with a password, loads its products and remembers them', async () => {
+    const server = new FakeServer({
+      'POST /auth/password': { status: 200, body: { token: 'session-1', email: 'tester@example.com', created: false } },
+      'GET /me/entitlements': ENTITLED,
+    });
+    const storage = memoryStorage();
+    const account = new WebAccount(new AccountApi(API, server.fetch), storage);
+    expect(await account.signInWithPassword('tester@example.com', 'password1')).toBe('signed-in');
+    expect(account.owns('map.station-33')).toBe(true);
+    expect(account.isBetaTester()).toBe(true);
+    expect(new WebAccount(new AccountApi(API, new FakeServer().fetch), storage).getEmail()).toBe('tester@example.com');
+  });
+
+  it('reports refused passwords and network failures without signing in', async () => {
+    const server = new FakeServer({ 'POST /auth/password': { status: 401 } });
+    const account = new WebAccount(new AccountApi(API, server.fetch), memoryStorage());
+    expect(await account.signInWithPassword('a@example.com', 'password1')).toBe('wrong-password');
+    server.offline = true;
+    expect(await account.signInWithPassword('a@example.com', 'password1')).toBe('unavailable');
+    expect(account.getEmail()).toBeNull();
+  });
+
+  it('signs in with Google and reports rejected credentials and failures', async () => {
+    const server = new FakeServer({
+      'POST /auth/google': { status: 401 },
+      'GET /me/entitlements': ENTITLED,
+    });
+    const account = new WebAccount(new AccountApi(API, server.fetch), memoryStorage());
+    expect(await account.signInWithGoogle('forged')).toBe('rejected');
+    server.routes['POST /auth/google'] = { status: 502 };
+    expect(await account.signInWithGoogle('credential')).toBe('unavailable');
+    expect(account.getEmail()).toBeNull();
+
+    server.routes['POST /auth/google'] = { status: 200, body: { token: 'session-1', email: 'tester@example.com' } };
+    expect(await account.signInWithGoogle('credential')).toBe('signed-in');
+    expect(account.owns('map.station-33')).toBe(true);
+  });
 });
 
 describe('web account', () => {
