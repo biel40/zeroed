@@ -1,4 +1,4 @@
-/** Seconds of a roar: on landing and on entering each new phase. */
+/** Seconds of a roar: on its perch and on landing. */
 export const ROAR_SECONDS = 1.1;
 /** Share of a roar spent rearing up into it, and letting go of it. */
 const ROAR_RISE = 0.2;

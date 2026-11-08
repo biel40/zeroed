@@ -27,6 +27,8 @@ export interface CaptainUssrTuning {
   readonly openingDelay: number;
   /** Health ratios at or under which phases 2 and 3 begin. */
   readonly phaseThresholds: readonly [number, number];
+  /** The fit of rage at each new phase: how long it stands screaming, and the seconds from then to its next attack. */
+  readonly rage: { readonly seconds: number; readonly attackDelay: number };
   readonly walkSpeed: PhaseValues;
   /** Radians per second it turns towards the player. */
   readonly turnRate: PhaseValues;
@@ -60,6 +62,7 @@ export const CAPTAIN_USSR: CaptainUssrTuning = {
   arrivalSeconds: 1.5,
   openingDelay: 0.5,
   phaseThresholds: [0.6, 0.3],
+  rage: { seconds: 1.9, attackDelay: 0.4 },
   walkSpeed: [1.9, 2.3, 2.9],
   turnRate: [2.6, 3.2, 4.2],
   cooldown: { min: [2.6, 2.1, 1.4], spread: 1.2 },
@@ -80,10 +83,11 @@ export const CAPTAIN_USSR: CaptainUssrTuning = {
  * the player between attacks: a bash, a shield throw (`throwWindup`, then
  * `shieldFlight` until it catches the shield) or a charge that ends
  * `stunned`. Every attack ends `recovering` or `stunned` before the next.
+ * Each new phase stops it `enraged`, screaming with its guard down.
  */
 export type CaptainUssrState =
   | 'dormant' | 'arriving' | 'stalking' | 'bashWindup' | 'throwWindup' | 'shieldFlight'
-  | 'chargeWindup' | 'charging' | 'stunned' | 'recovering' | 'defeated';
+  | 'chargeWindup' | 'charging' | 'stunned' | 'recovering' | 'enraged' | 'defeated';
 
 export type CaptainUssrAttack = 'bash' | 'shield' | 'charge';
 export type CaptainUssrHitPart = 'head' | 'torso' | 'shield';
@@ -92,7 +96,6 @@ export type CaptainUssrHitResult = 'ignored' | 'blocked' | 'hurt' | 'killed';
 
 export type CaptainUssrEvent =
   | { readonly type: 'arrived' }
-  | { readonly type: 'phase'; readonly phase: 2 | 3 }
   | { readonly type: 'bashWindup' }
   | { readonly type: 'throwWindup' }
   | { readonly type: 'shieldThrown' }
@@ -111,7 +114,9 @@ export interface CaptainUssrTarget {
 }
 
 /** States that last a set time; `stateProgress` runs 0..1 through them. */
-const TIMED: ReadonlySet<CaptainUssrState> = new Set(['arriving', 'bashWindup', 'throwWindup', 'chargeWindup', 'stunned', 'recovering']);
+const TIMED: ReadonlySet<CaptainUssrState> = new Set(['arriving', 'bashWindup', 'throwWindup', 'chargeWindup', 'stunned', 'recovering', 'enraged']);
+/** States a fit of rage can break into; it waits out a shield in the air, a charge under way and a stun. */
+const RAGE_BREAKS_INTO: ReadonlySet<CaptainUssrState> = new Set(['stalking', 'bashWindup', 'throwWindup', 'chargeWindup', 'recovering']);
 
 /**
  * CAPITÁN URSS, the zombified Soviet super-soldier guarding an extraction.
@@ -124,6 +129,8 @@ export class CaptainUssrBrain {
   public readonly pendingEvents: CaptainUssrEvent[] = [];
   private current: CaptainUssrState = 'dormant';
   private currentPhase: 1 | 2 | 3 = 1;
+  /** A new phase began: the fit of rage plays as soon as it can break in. */
+  private rageDue = false;
   private hp = 0;
   private maxHp = 0;
   private readonly pos = { x: 0, z: 0 };
@@ -208,7 +215,7 @@ export class CaptainUssrBrain {
 
   /** Its shield covers its front right now: raised while it walks, bashes or charges. */
   public get blocking(): boolean {
-    return this.holdingShield && this.engaged && this.current !== 'throwWindup' && this.current !== 'stunned';
+    return this.holdingShield && this.engaged && this.current !== 'throwWindup' && this.current !== 'stunned' && this.current !== 'enraged';
   }
 
   /** Lands it facing the player, at full health for `round`; once until a reset. */
@@ -230,6 +237,11 @@ export class CaptainUssrBrain {
     this.moved = 0;
     if (this.current === 'dormant' || this.current === 'defeated') return;
     this.stateTime += step;
+    if (this.rageDue && RAGE_BREAKS_INTO.has(this.current)) {
+      this.rageDue = false;
+      this.enter('enraged', this.tuning.rage.seconds);
+      return;
+    }
     switch (this.current) {
       case 'arriving':
         if (this.stateTime < this.stateDuration) return;
@@ -263,13 +275,19 @@ export class CaptainUssrBrain {
       case 'recovering':
         if (this.stateTime >= this.stateDuration) this.enter('stalking', 0);
         return;
+      case 'enraged':
+        this.turnTowards(player, step);
+        if (this.stateTime < this.stateDuration) return;
+        this.cooldown = this.tuning.rage.attackDelay;
+        this.enter('stalking', 0);
+        return;
     }
   }
 
   /**
    * A shot from (`fromX`, `fromZ`): the shield (held or flying) stops it,
    * so does its raised front; anything else hurts, the head and a stunned
-   * body more. Crossing a phase threshold or dying is an event.
+   * body more.
    */
   public takeHit(damage: number, part: CaptainUssrHitPart, fromX: number, fromZ: number): CaptainUssrHitResult {
     if (!this.engaged) return 'ignored';
@@ -286,6 +304,17 @@ export class CaptainUssrBrain {
     return this.applyDamage(damage, 'torso');
   }
 
+  /**
+   * A bolt of an energy weapon (VORTEX-9, ZEUS-77): it goes through the
+   * shield on its arm as a body hit, from any side. The shield in flight
+   * has no body behind it, so a bolt that strikes it is spent.
+   */
+  public takeBolt(damage: number, part: CaptainUssrHitPart): CaptainUssrHitResult {
+    if (!this.engaged) return 'ignored';
+    if (part === 'shield' && !this.holdingShield) return 'blocked';
+    return this.applyDamage(damage, part === 'shield' ? 'torso' : part);
+  }
+
   /** A grenade blast: like fire, it wraps around the shield and lands as a body hit. */
   public takeBlast(damage: number): CaptainUssrHitResult {
     return this.takeBurn(damage);
@@ -299,6 +328,7 @@ export class CaptainUssrBrain {
   public reset(): void {
     this.current = 'dormant';
     this.currentPhase = 1;
+    this.rageDue = false;
     this.hp = 0;
     this.maxHp = 0;
     this.pos.x = this.field.landing.x;
@@ -316,7 +346,7 @@ export class CaptainUssrBrain {
     this.pendingEvents.length = 0;
   }
 
-  /** Damage that got through: the head and a stunned body take more; crossing a threshold or dying is an event. */
+  /** Damage that got through: the head and a stunned body take more; crossing a threshold enrages it, dying is an event. */
   private applyDamage(damage: number, part: CaptainUssrHitPart): CaptainUssrHitResult {
     const scale = (part === 'head' ? this.tuning.headMultiplier : 1) * (this.current === 'stunned' ? this.tuning.stunMultiplier : 1);
     this.hp = Math.max(0, this.hp - Math.max(0, damage) * scale);
@@ -472,11 +502,11 @@ export class CaptainUssrBrain {
     const ratio = this.healthRatio;
     if (this.currentPhase === 1 && ratio <= second) {
       this.currentPhase = 2;
-      this.pendingEvents.push({ type: 'phase', phase: 2 });
+      this.rageDue = true;
     }
     if (this.currentPhase === 2 && ratio <= third) {
       this.currentPhase = 3;
-      this.pendingEvents.push({ type: 'phase', phase: 3 });
+      this.rageDue = true;
     }
   }
 

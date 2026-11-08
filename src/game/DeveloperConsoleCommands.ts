@@ -10,6 +10,8 @@ export interface DeveloperConsoleActions {
   infiniteAmmo(): void;
   equipped(): WeaponId;
   invincible(enabled: boolean): void;
+  /** Jumps to the map's boss fight; false when the run has none left to start. */
+  boss(): boolean;
 }
 
 /** Explicit commands only: never evaluates JavaScript or mutates shared weapon definitions. */
@@ -60,6 +62,9 @@ export class DeveloperConsoleCommands {
         if (args.length !== 1 || (value !== 'on' && value !== 'off')) break;
         actions.invincible(value === 'on');
         return t('dev.ok');
+      case 'boss':
+        if (args.length) break;
+        return t(actions.boss() ? 'dev.ok' : 'dev.unavailable');
     }
     return t('dev.invalid');
   }

@@ -35,6 +35,8 @@ export const PAW_RATE = 2.3;
 export const PAW_LIFT = 0.4;
 /** Share of the leap spent in the air; the rest is the slam and the rise. */
 export const LEAP_FLIGHT = 0.8;
+/** The fit of rage, as shares of its length: it seethes until `bellow`, screams until `release`, then drops back into its guard. */
+export const RAGE = { bellow: 0.24, release: 0.84 } as const;
 
 /** How fast the body chases its pose: snappy strikes, normal moves. */
 const AGILITY = { strike: 2.6, fling: 2.3, leap: 1.8, charge: 1.6, fall: 2.2, stagger: 1.6 } as const;
@@ -81,6 +83,9 @@ export function choreograph(input: ChoreographyInput, out: Pose): number {
       break;
     case 'stunned':
       blendTowards(out, 1 - smooth((input.progress - 0.7) / 0.3), input.crashed ? floored : winded, input);
+      break;
+    case 'enraged':
+      agility = enrage(out, input);
       break;
     case 'defeated':
       agility = fall(out, input);
@@ -400,6 +405,50 @@ function roar(out: Pose, input: ChoreographyInput): void {
   out[POSE.footX[0]] = 0.27;
   out[POSE.footX[1]] = -0.27;
   shield(out, 0.52, 0.42, 0.22, 1.05, 0, 0.2);
+}
+
+/** A new phase: it hunches over, seething, rears up and screams at the sky shaking its fist, then drops back into its guard. */
+function enrage(out: Pose, input: ChoreographyInput): number {
+  const p = input.progress;
+  const settle = 1 - smooth((p - RAGE.release) / (1 - RAGE.release));
+  blendTowards(out, smooth(p / 0.12) * settle, seethe, input);
+  blendTowards(out, smooth((p - RAGE.bellow) / 0.08) * settle, scream, input);
+  return p >= RAGE.bellow && p < RAGE.bellow + 0.1 ? AGILITY.strike : 1.2;
+}
+
+/** Hunched and shaking, its heaving chest low, its fist clenched at its side, glaring at its prey. */
+function seethe(out: Pose, input: ChoreographyInput): void {
+  const { time } = input;
+  out[POSE.drop] = -0.26;
+  out[POSE.pitch] = 0.3;
+  out[POSE.twist] = 0;
+  out[POSE.spinePitch] = 0.3 + Math.sin(time * 13) * 0.03;
+  out[POSE.spineYaw] = 0;
+  lookAhead(out, 0.05);
+  out[POSE.jaw] = 0.12;
+  arm(out, 1, -0.35, -0.45 + Math.sin(time * 31) * 0.04, -1.7);
+  foot(out, 0, 0.27, 0.14);
+  foot(out, 1, -0.27, -0.2);
+  shield(out, 0.3 + Math.sin(time * 27) * 0.012, 0.05, 0.35, 0.7, 0.1, 0);
+}
+
+/** Reared up, the head thrown back and shaking, the jaw at its widest, the fist brandished overhead, the shield flung wide. */
+function scream(out: Pose, input: ChoreographyInput): void {
+  const { time } = input;
+  const fury = input.phase === 3 ? 1 : 0;
+  out[POSE.drop] = -0.1;
+  out[POSE.pitch] = -0.1;
+  out[POSE.twist] = 0;
+  out[POSE.spinePitch] = -0.32 + Math.sin(time * 10) * 0.03;
+  out[POSE.spineYaw] = 0;
+  out[POSE.spineRoll] = Math.sin(time * 7) * 0.05;
+  out[POSE.headPitch] = -0.8;
+  out[POSE.headYaw] = Math.sin(time * 12) * 0.1;
+  out[POSE.jaw] = 0.7 + 0.1 * fury;
+  arm(out, 1, -2.35 - 0.25 * fury + Math.sin(time * 15) * 0.18, -0.5, -1.3);
+  foot(out, 0, 0.29, 0.16);
+  foot(out, 1, -0.29, -0.2);
+  shield(out, 0.55, 0.4 + Math.sin(time * 27) * 0.015, 0.2, 1.1, 0, 0.2);
 }
 
 /** The head cancels the body's lean and turn to keep its eyes on its prey, `chin` radians down. */

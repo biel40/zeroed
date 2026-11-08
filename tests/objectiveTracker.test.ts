@@ -224,6 +224,18 @@ describe('ObjectiveTracker', () => {
     expect(leaving(corner)).toHaveLength(0);
   });
 
+  it('does not bring back an old corner note when objectives return after being hidden', () => {
+    const { tracker, corner } = harness();
+    tracker.update([crystal], false);
+    vi.advanceTimersByTime(10_000);
+
+    tracker.update([], false);
+    tracker.update([guardian], true);
+
+    expect(leaving(corner)).toHaveLength(0);
+    expect(corner.children[0].children[0].textContent).toBe('GUARDIAN');
+  });
+
   it('clears every fade at once on a new run', () => {
     const { tracker, corner, spotlight } = harness();
     tracker.update([crystal, guardian], false);

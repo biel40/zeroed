@@ -212,7 +212,10 @@ en un desplegable avanzado y utiliza la misma validacion.
 `help`, `weapons` y `rings` muestran la ayuda y los catalogos actuales.
 `weapon <id>` equipa incluso con las ranuras fijadas por modo Dios;
 `ring <id>` (alias `drink`) concede o recarga los anillos sin consumir
-compras ni exigir maquinas del mapa. `ammo full|infinite` afecta al arma
+compras ni exigir maquinas del mapa. `boss` (tambien con boton) abre gratis
+la salida del mapa y coloca al jugador donde despierta su guardian; la
+entrada, el duelo, la extraccion y el final son los reales, y solo funciona
+mientras el guardian duerme. `ammo full|infinite` afecta al arma
 equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
 VORTEX-9 y cadenas ZEUS) y `invincible on|off` permite probar salud y
 resurreccion. No es un sistema de mejora comprable: son ajustes temporales
@@ -506,7 +509,8 @@ existente a `MOTDRULES`.
   no atacan el panel. Al completarse la compuerta sube (deja de ser solida al
   instante) y empiezan 60 s para subir por el pasillo y la escalera (planta 1,
   `escapeStairTransitions`) al patio de la superficie, que los zombis tambien
-  recorren, y usar el camion. Durante la huida `EscapeAlarm` mantiene la
+  recorren, y usar el camion. Al llegar a esa planta, el objetivo del HUD
+  pasa de subir a la superficie a llegar al camion. Durante la huida `EscapeAlarm` mantiene la
   sirena sin pausa, repite la megafonia y, en los ultimos 25 s, suma un
   claxon cada vez mas rapido; fuera de la planta del panel se oyen lejanas y
   amortiguadas. Lo logrado lleva al final del mapa; si se acaba
@@ -530,7 +534,9 @@ existente a `MOTDRULES`.
   arco frontal y cualquier impacto en el propio escudo; la cabeza recibe el
   doble y aturdido recibe mas. Las llamas del ФАКЕЛ nunca se bloquean
   (`CaptainUssrBrain.takeBurn`): queman desde cualquier lado, como premio a
-  tenerlo. Su cuerpo se anima con fisica: la coreografia pura
+  tenerlo. Los proyectiles de VORTEX-9 y ZEUS-77 atraviesan el escudo que
+  lleva en el brazo (`takeBolt`, cuentan como impacto al cuerpo), pero no le
+  hacen dano si dan al escudo mientras vuela. Su cuerpo se anima con fisica: la coreografia pura
   (`CaptainUssrChoreography`) fija cada pose y muelles amortiguados
   (`CaptainUssrPose`) le dan peso e inercia y encajan los impactos como
   sacudidas segun el lado y la parte alcanzada; las piernas se resuelven por
@@ -538,8 +544,7 @@ existente a `MOTDRULES`.
   el brazo del escudo sobre su asa. Aterriza del salto con una rodilla y el
   puño en el suelo, tensa cada ataque (el aro del escudo destella justo antes
   de soltarlo), rasca el suelo antes de embestir, rebota contra lo que choca,
-  ruge al aterrizar y en cada fase, echa vaho y en la fase 3 humea y le
-  brillan las venas. Al morir se tambalea, cae de rodillas y se desploma de
+  ruge al aterrizar, echa vaho y en la fase 3 humea y le brillan las venas. Al morir se tambalea, cae de rodillas y se desploma de
   bruces; el escudo se le escapa, rebota y se asienta vibrando como una
   moneda (`DroppedShield`). Pisadas, golpes contra el suelo y el escudo
   suenan y, cerca, sacuden la camara. Su tema de duelo
@@ -549,11 +554,16 @@ existente a `MOTDRULES`.
   lanzamiento del escudo (vuela hasta donde estaba el jugador y vuelve; sin
   el queda expuesto de frente) y, desde la fase 2, la carga en linea recta,
   que si choca con la valla o un solido lo deja aturdido. Fases al 60 % y al
-  30 % de vida, con cartel, consejo propio en la nota y ritmo mas agresivo.
+  30 % de vida, con consejo propio en la nota y ritmo mas agresivo; sin
+  cartel: al cruzarlas entra en un ataque de ira (`enraged`), se encorva
+  temblando, grita al cielo agitando el puno y con las venas y los ojos
+  encendidos, con la guardia baja. Si estaba con el escudo en el aire, en
+  plena carga o aturdido, espera a terminar.
   Barra con nombre y marcas de fase arriba en el centro (`HUD.setBossBar`);
-  su nota `ObjectiveNote` va antes de la del protocolo. Le afectan balas,
-  VORTEX-9, Tesla y llamas, pero no el cuchillo ni la salpicadura. Al caer, la
-  horda y el reloj siguen y se puede subir al camion. Valores en
+  su objetivo ocupa el lugar del Protocolo 33 durante el duelo. Tras abatir al
+  guardian, vuelve la indicacion del camion con el tiempo restante y se puede
+  subir mientras la horda y el reloj se reanudan. Le afectan balas,
+  VORTEX-9, Tesla y llamas, pero no el cuchillo ni la salpicadura. Valores en
   `CAPTAIN_USSR`.
 - Puertas de pago de Station 33: la misma `PointDoorView`/`BuyableDoorVisual`
   que la mansion con chapas de acero en lugar de tablones y superficie de

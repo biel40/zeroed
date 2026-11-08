@@ -359,25 +359,7 @@ export class ZombiesMode implements GameMode {
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
     this.arena.update(dt, playerPos);
-    const notes = this.objectiveNotes;
-    notes.length = 0;
-    const urgent = this.runAcceptsInput() && (this.evacuation?.isActive ?? false);
-    if (this.runAcceptsInput()) {
-      // A running evacuation is the only note; otherwise both quests share the corner.
-      if (!urgent) {
-        for (const recovery of this.crystalRecoveries) {
-          const crystal = recovery.objective();
-          if (crystal === null) continue;
-          notes.push(crystal);
-          break;
-        }
-      }
-      const guardian = this.evacuation?.guardianObjective() ?? null;
-      if (guardian !== null) notes.push(guardian);
-      const evacuation = this.evacuation?.objective() ?? null;
-      if (evacuation !== null) notes.push(evacuation);
-    }
-    this.ctx.hud.setObjective?.(notes, urgent);
+    this.pushObjectives();
     if (this.box && this.boxView) {
       this.box.update(dt);
       this.boxView.update(dt, this.box);
@@ -388,6 +370,27 @@ export class ZombiesMode implements GameMode {
     this.updateCameraShake(dt);
     this.updateGameOverReveal();
     this.pushHudState();
+  }
+
+  private pushObjectives(): void {
+    const notes = this.objectiveNotes;
+    notes.length = 0;
+    const live = this.runAcceptsInput();
+    const urgent = live && (this.evacuation?.isActive ?? false);
+    if (live) {
+      // An active evacuation takes over the corner from side objectives.
+      if (!urgent) {
+        for (const recovery of this.crystalRecoveries) {
+          const crystal = recovery.objective();
+          if (crystal === null) continue;
+          notes.push(crystal);
+          break;
+        }
+      }
+      const evacuation = this.evacuation?.objective() ?? null;
+      if (evacuation !== null) notes.push(evacuation);
+    }
+    this.ctx.hud.setObjective?.(notes, urgent);
   }
 
   onTargetHit(
@@ -554,6 +557,7 @@ export class ZombiesMode implements GameMode {
   private updateFilmedGuardian(dt: number): void {
     this.evacuation?.update(dt);
     this.arena.update(dt, this.ctx.player.rig.position);
+    if (!this.evacuation?.filming) this.pushObjectives();
     this.pushHudState();
   }
 
@@ -1242,6 +1246,7 @@ export class ZombiesMode implements GameMode {
       infiniteAmmo: () => { this.ctx.setWeaponInfiniteReserve(this.ctx.getEquippedWeaponId()); },
       equipped: () => this.ctx.getEquippedWeaponId(),
       invincible: (enabled) => this.health.setInvincible(enabled),
+      boss: () => this.evacuation?.jumpToGuardian() ?? false,
     });
   }
 
@@ -1323,7 +1328,7 @@ export class ZombiesMode implements GameMode {
 
     // A bolt into the guardian spends itself on it: no chain, no splash.
     const boltDamage = isTesla ? CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla') : WEAPON_DEFINITIONS.vortex9.damage * this.weaponDamageScale('vortex9');
-    if (object && this.evacuation?.guardian?.hit(object, boltDamage, point, distance)) {
+    if (object && this.evacuation?.guardian?.bolt(object, boltDamage, point, distance)) {
       if (isTesla) this.ctx.audio.playTeslaShot();
       else this.ctx.audio.playRayImpact();
       return;

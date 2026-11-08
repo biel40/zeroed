@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { cameraSpatialCue, type SpatialCue } from '../audio/SpatialCue';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import { t } from '../i18n/i18n';
+import { EYE_HEIGHT } from '../player/PlayerController';
 import { actionKey } from '../ui/InteractionPrompts';
 import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 import { ESCAPE_ALARM, EscapeAlarm } from '../zombies/evacuation/EscapeAlarm';
@@ -94,6 +95,23 @@ export class ZombiesEvacuation {
     this.developerExit = true;
   }
 
+  /**
+   * Developer console: opens the exit for free, if still shut, and places the
+   * player where stepping onto the guardian's ground wakes it, so the real
+   * entrance, duel, boarding and ending follow. False without a sleeping guardian.
+   */
+  public jumpToGuardian(): boolean {
+    const arenaGuardian = this.evacuation.guardian;
+    if (!arenaGuardian || !this.guardian?.dormant) return false;
+    if (this.protocol.stage !== 'escaping' && !this.protocol.skipToEscape()) return false;
+    const { x, z, yaw } = arenaGuardian.approach;
+    const player = this.ctx.player;
+    player.teleport(x, arenaGuardian.groundY + EYE_HEIGHT, z, arenaGuardian.floor);
+    player.face(yaw);
+    this.processEvents();
+    return true;
+  }
+
   public update(dt: number): void {
     this.syncPower();
     if (this.protocol.stage === 'defending') {
@@ -150,17 +168,18 @@ export class ZombiesEvacuation {
 
   /** The persistent HUD note: what to do next, and the clocks while it runs. */
   public objective(): ObjectiveNote | null {
-    const signature = this.objectiveKey();
+    const duel = this.guardian?.objective() ?? null;
+    if (duel !== null) return duel;
+
+    const headingToTruck = this.protocol.stage === 'escaping'
+      && (this.ctx.player.floor === this.evacuation.extraction.floor || this.guardian?.blocksExtraction === false);
+    // The title can change even when the clock, bearing and distance stay the same.
+    const signature = this.objectiveKey() * 2 + Number(headingToTruck);
     if (signature !== this.objectiveSignature) {
       this.objectiveSignature = signature;
-      this.objectiveNote = this.buildObjective();
+      this.objectiveNote = this.buildObjective(headingToTruck);
     }
     return this.objectiveNote;
-  }
-
-  /** The guardian's note while its duel lasts, shown before the protocol's own. */
-  public guardianObjective(): ObjectiveNote | null {
-    return this.guardian?.objective() ?? null;
   }
 
   public reset(): void {
@@ -350,7 +369,7 @@ export class ZombiesEvacuation {
     return stage * 1e7 + restored;
   }
 
-  private buildObjective(): ObjectiveNote | null {
+  private buildObjective(headingToTruck: boolean): ObjectiveNote | null {
     const { rules } = this.evacuation;
     switch (this.protocol.stage) {
       case 'exploration': {
@@ -377,7 +396,8 @@ export class ZombiesEvacuation {
         // The clock is progress, not the task: in the details it never re-announces.
         const arrow = BEARING_ARROWS[this.extractionBearing];
         const details = `${clock(this.protocol.escapeRemaining)} · ${arrow} ${this.extractionMetres} m`;
-        return { kicker: KICKER, title: t('evacuation.objectiveEscape'), details };
+        const title = t(headingToTruck ? 'evacuation.objectiveExtract' : 'evacuation.objectiveEscape');
+        return { kicker: KICKER, title, details };
       }
       default:
         return null;

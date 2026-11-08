@@ -93,6 +93,23 @@ describe('Captain USSR view', () => {
     expect(footfalls).toBeGreaterThanOrEqual(6);
   });
 
+  it('bellows once per fit of rage, a cue that is louder in red fury', () => {
+    const bellows = (phase: 2 | 3): number[] => {
+      const view = new CaptainUssrView(false);
+      const rage = boss({ state: 'enraged', phase });
+      const heard: number[] = [];
+      for (let frame = 0; frame < 120; frame++) {
+        rage.stateProgress = frame / 119;
+        view.update(DT, rage, GROUND, LEAP_FROM);
+        if (view.cues.bellow > 0) heard.push(view.cues.bellow);
+      }
+      return heard;
+    };
+    expect(bellows(2)).toHaveLength(1);
+    expect(bellows(3)).toHaveLength(1);
+    expect(bellows(3)[0]).toBeGreaterThan(bellows(2)[0]);
+  });
+
   it('drops its shield as it dies; the shield rings on the ground and comes to rest flat, face up', () => {
     const view = new CaptainUssrView(false);
     const dying = boss();
@@ -115,7 +132,7 @@ describe('Captain USSR view', () => {
     view.roar();
     const states: readonly [CaptainUssrState, number][] = [
       ['dormant', 1.5], ['arriving', 1.5], ['stalking', 1], ['bashWindup', 0.55], ['recovering', 0.6], ['throwWindup', 0.75],
-      ['shieldFlight', 1.2], ['recovering', 0.45], ['chargeWindup', 1], ['charging', 1], ['stunned', 3], ['stalking', 1], ['defeated', 4],
+      ['shieldFlight', 1.2], ['recovering', 0.45], ['chargeWindup', 1], ['charging', 1], ['stunned', 3], ['enraged', 1.9], ['stalking', 1], ['defeated', 4],
     ];
     for (const [state, seconds] of states) {
       fight.state = state;

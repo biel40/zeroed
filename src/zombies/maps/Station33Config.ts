@@ -733,6 +733,8 @@ export const PROTOCOL33_GUARDIAN = {
   landing: { x: 14.0, z: -91.0 },
   leapFrom: { x: PROTOCOL33_POWER_LINE.x, y: PROTOCOL33_SURFACE_Y + PROTOCOL33_POWER_LINE.height, z: PROTOCOL33_POWER_LINE.fromZ },
   awakenDepth: 1.6,
+  /** Just out of the stairhead's doorway, past `awakenDepth`, looking north across the yard. */
+  approach: { x: 15, z: -81, yaw: 0 },
 } as const;
 
 /**

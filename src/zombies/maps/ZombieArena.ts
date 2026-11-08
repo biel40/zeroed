@@ -192,6 +192,8 @@ export interface ArenaEvacuationGuardian {
   /** Where its leap starts: its perch, where the entrance shows it before the leap. */
   readonly leapFrom: { readonly x: number; readonly y: number; readonly z: number };
   readonly trigger: GroundRect;
+  /** Where a player is standing, inside `trigger`, as they walk onto its ground; yaw as in `PlayerController.face`. */
+  readonly approach: { readonly x: number; readonly z: number; readonly yaw: number };
   /** Optional filmed entrance; without one it leaps straight in. */
   readonly entrance?: ArenaGuardianEntrance;
   /**

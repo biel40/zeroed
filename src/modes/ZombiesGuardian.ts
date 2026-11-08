@@ -5,7 +5,7 @@ import { t, type TranslationKey } from '../i18n/i18n';
 import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 import type { Weapon } from '../weapons/Weapon';
 import { selectFlameTargets, type FlameHit } from '../zombies/FlameTargeting';
-import { CAPTAIN_USSR, CaptainUssrBrain, type CaptainUssrHitPart } from '../zombies/guardians/CaptainUssrBrain';
+import { CAPTAIN_USSR, CaptainUssrBrain, type CaptainUssrHitPart, type CaptainUssrHitResult } from '../zombies/guardians/CaptainUssrBrain';
 import { CaptainUssrView } from '../zombies/guardians/CaptainUssrView';
 import { GuardianEntrance } from '../zombies/guardians/GuardianEntrance';
 import type { ArenaEvacuationGuardian, ArenaGuardianEntrance } from '../zombies/maps/ZombieArena';
@@ -17,6 +17,8 @@ import { guardianBlastDamage } from '../zombies/grenades/GrenadeBlast';
 const LANDING_TRAUMA = 0.7;
 const CRASH_TRAUMA = 0.45;
 const STRIDE_TRAUMA = 0.12;
+/** Camera jolt of the scream in a fit of rage in red fury, at point blank. */
+const BELLOW_TRAUMA = 0.5;
 /** Seconds its duel's theme takes to fade out once it falls. */
 const THEME_FADE_SECONDS = 3;
 /** The dropped shield's clang is heard from this impact speed up (m/s). */
@@ -37,10 +39,6 @@ const HINTS: Readonly<Record<1 | 2 | 3, TranslationKey>> = {
   1: 'guardian.captainUssr.hint1',
   2: 'guardian.captainUssr.hint2',
   3: 'guardian.captainUssr.hint3',
-};
-const PHASE_BANNERS: Readonly<Record<2 | 3, TranslationKey>> = {
-  2: 'guardian.captainUssr.phase2',
-  3: 'guardian.captainUssr.phase3',
 };
 
 /** What the guardian needs from the run that hosts it. */
@@ -114,6 +112,11 @@ export class ZombiesGuardian {
     return this.entrance && this.filming ? this.entrance.film.camera : null;
   }
 
+  /** Still asleep: nothing has woken it this run. */
+  public get dormant(): boolean {
+    return this.brain.state === 'dormant' && !this.filming;
+  }
+
   /** Not yet beaten: nobody boards. */
   public get blocksExtraction(): boolean {
     return this.brain.state !== 'defeated';
@@ -145,20 +148,15 @@ export class ZombiesGuardian {
     const part = object.userData.guardianPart as CaptainUssrHitPart | undefined;
     if (!part) return false;
     this.ctx.player.camera.getWorldPosition(this.camera);
-    const result = this.brain.takeHit(damage, part, this.camera.x, this.camera.z);
-    if (result === 'blocked') {
-      this.view.block();
-      this.ctx.audio.playImpact('metal');
-      this.ctx.effects.puff(point, 0xffcf8a, 0.12);
-    } else if (result !== 'ignored') {
-      this.ctx.stats.registerHit(distance);
-      this.ctx.hud.showHitmarker(part === 'head');
-      if (part === 'head') this.ctx.audio.playHeadshotHit();
-      else this.ctx.audio.playZombieHit();
-      this.ctx.effects.puff(point, 0x4a1410, 0.24);
-      this.view.hurt(1, part, point);
-    }
-    this.processEvents();
+    this.presentHit(this.brain.takeHit(damage, part, this.camera.x, this.camera.z), part, point, distance);
+    return true;
+  }
+
+  /** A VORTEX-9 or ZEUS-77 bolt struck `object`: like `hit`, but it goes through the shield. */
+  public bolt(object: THREE.Object3D, damage: number, point: THREE.Vector3, distance: number): boolean {
+    const part = object.userData.guardianPart as CaptainUssrHitPart | undefined;
+    if (!part) return false;
+    this.presentHit(this.brain.takeBolt(damage, part), part, point, distance);
     return true;
   }
 
@@ -287,6 +285,23 @@ export class ZombiesGuardian {
     if (scare) this.ctx.audio.playAmbushScare(this.cueAt(this.leapFrom.x, this.leapFrom.y, this.leapFrom.z));
   }
 
+  /** What a hit on `part` looks and sounds like, by what the brain made of it. */
+  private presentHit(result: CaptainUssrHitResult, part: CaptainUssrHitPart, point: THREE.Vector3, distance: number): void {
+    if (result === 'blocked') {
+      this.view.block();
+      this.ctx.audio.playImpact('metal');
+      this.ctx.effects.puff(point, 0xffcf8a, 0.12);
+    } else if (result !== 'ignored') {
+      this.ctx.stats.registerHit(distance);
+      this.ctx.hud.showHitmarker(part === 'head');
+      if (part === 'head') this.ctx.audio.playHeadshotHit();
+      else this.ctx.audio.playZombieHit();
+      this.ctx.effects.puff(point, 0x4a1410, 0.24);
+      this.view.hurt(1, part, point);
+    }
+    this.processEvents();
+  }
+
   private processEvents(): void {
     for (const event of this.brain.pendingEvents) {
       switch (event.type) {
@@ -294,10 +309,6 @@ export class ZombiesGuardian {
           // Filmed, its title card names it. The slam itself is the body's cue, on the frame it lands.
           if (!this.filming) this.ctx.hud.showRoundBanner(this.name(), t('guardian.arrivalSub'));
           this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), 0);
-          break;
-        case 'phase':
-          this.ctx.hud.showRoundBanner(this.name(), t(PHASE_BANNERS[event.phase]));
-          this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), event.phase === 3 ? 1 : 0.5);
           break;
         case 'chargeWindup':
           // A bellow over the scraping hoof: the charge's warning.
@@ -349,6 +360,10 @@ export class ZombiesGuardian {
       if (!this.filming) this.shakeNear(LANDING_TRAUMA * cues.impact);
     }
     if (cues.clang >= CLANG_FROM) this.ctx.audio.playImpact('metal');
+    if (cues.bellow > 0) {
+      this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), cues.bellow);
+      this.shakeNear(BELLOW_TRAUMA * cues.bellow);
+    }
   }
 
   /** Once it falls, its theme fades out and the map's music returns. */

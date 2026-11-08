@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { HitTarget } from '../../shooting/HitTarget';
 import type { CaptainUssrBrain, CaptainUssrHitPart, CaptainUssrState } from './CaptainUssrBrain';
-import { choreograph, DEATH, LEAP_FLIGHT, PAW_LIFT, PAW_RATE, type ChoreographyInput } from './CaptainUssrChoreography';
+import { choreograph, DEATH, LEAP_FLIGHT, PAW_LIFT, PAW_RATE, RAGE, type ChoreographyInput } from './CaptainUssrChoreography';
 import { Gait, solveLeg, type LegAngles } from './CaptainUssrGait';
 import { buildCaptainUssr, type CaptainUssrRig } from './CaptainUssrModel';
 import { ROAR_SECONDS, roarWeight, smooth } from './CaptainUssrMotion';
@@ -24,6 +24,8 @@ export interface CaptainUssrCues {
   readonly impactAt: THREE.Vector3;
   /** The dropped shield struck the ground: how hard (m/s), 0 when it did not. */
   clang: number;
+  /** It screamed in a fit of rage: how furious (0..1), 0 when it did not. */
+  bellow: number;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -53,6 +55,8 @@ const CATCH_REACH = 3.5;
 const TURN_SHUFFLE = { perRadian: 0.35, maxTurn: 4 } as const;
 /** Its eyes: base glow, more per phase, and the flare as an attack is loaded. */
 const EYES = { base: 0.55, perPhase: 0.2, flare: 0.6 } as const;
+/** How much a fit of rage kindles its eyes and burns in its veins. */
+const RAGE_GLOW = { eyes: 1.6, veins: 1.1, pulse: 0.3 } as const;
 /** Seconds between breaths, by how hard it works. */
 const BREATH_EVERY = { rest: 1.9, march: 1.1, winded: 0.5, fury: 0.8 } as const;
 /** Seconds between wisps of steam off its shoulders in red fury. */
@@ -84,7 +88,7 @@ function loadsAttack(state: CaptainUssrState): boolean {
 export class CaptainUssrView {
   public readonly group = new THREE.Group();
   public readonly hitboxes: readonly THREE.Mesh[];
-  public readonly cues: CaptainUssrCues = { footfall: 0, foot: new THREE.Vector3(), impact: 0, impactAt: new THREE.Vector3(), clang: 0 };
+  public readonly cues: CaptainUssrCues = { footfall: 0, foot: new THREE.Vector3(), impact: 0, impactAt: new THREE.Vector3(), clang: 0, bellow: 0 };
   private readonly rig: CaptainUssrRig;
   private readonly hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
   private readonly target = createPose();
@@ -141,7 +145,6 @@ export class CaptainUssrView {
   private flashLeft = 0;
   /** Seconds into the current roar; `ROAR_SECONDS` or more when none plays. */
   private roarTime = ROAR_SECONDS;
-  private lastPhase = 1;
   /** 0..1: how firmly the shield arm holds the grip (or reaches for the returning shield). */
   private armReach = 1;
   private wasHeld = true;
@@ -243,6 +246,7 @@ export class CaptainUssrView {
     this.cues.footfall = 0;
     this.cues.impact = 0;
     this.cues.clang = 0;
+    this.cues.bellow = 0;
     this.group.visible = boss.state !== 'dormant' || this.perched;
     if (!this.group.visible) {
       this.shown = false;
@@ -253,8 +257,6 @@ export class CaptainUssrView {
       this.snapPose = true;
     }
     if (boss.state !== this.previous) this.enter(boss, leapFrom);
-    if (boss.phase > this.lastPhase && boss.state !== 'defeated') this.roarTime = 0;
-    this.lastPhase = boss.phase;
     this.roarTime += step;
     this.stateTime += step;
     this.time += step;
@@ -266,6 +268,7 @@ export class CaptainUssrView {
     this.placeShield(step, boss, groundY);
     this.animateDetails(step, boss);
     this.emitPuffs(step, boss, groundY);
+    this.bellowInRage(boss, groundY);
     this.puffs.update(step);
     this.previous = boss.state;
     this.lastProgress = boss.stateProgress;
@@ -282,7 +285,6 @@ export class CaptainUssrView {
     this.lastProgress = 0;
     this.flashLeft = 0;
     this.roarTime = ROAR_SECONDS;
-    this.lastPhase = 1;
     this.armReach = 1;
     this.wasHeld = true;
     this.catchLeft = 0;
@@ -300,6 +302,7 @@ export class CaptainUssrView {
     this.cues.footfall = 0;
     this.cues.impact = 0;
     this.cues.clang = 0;
+    this.cues.bellow = 0;
     this.group.visible = false;
   }
 
@@ -332,7 +335,6 @@ export class CaptainUssrView {
     if (from === 'stunned') this.crashed = false;
     if (to === 'arriving') {
       this.leapStart.set(leapFrom.x, leapFrom.y, leapFrom.z);
-      this.lastPhase = boss.phase;
       this.lastHeading = boss.heading;
     }
     // Landed: it rears up and roars.
@@ -601,8 +603,7 @@ export class CaptainUssrView {
     const glow = this.eyeGlow(boss);
     rig.eyes.color.setRGB(glow, glow * 0.14, glow * 0.08);
     rig.halo.opacity = 0.3 * Math.min(1.6, glow);
-    const fury = boss.state === 'defeated' ? 0 : boss.phase === 3 ? 0.6 + Math.sin(this.time * 5) * 0.3 : boss.phase === 2 ? 0.2 : 0;
-    rig.skin.emissiveIntensity = fury;
+    rig.skin.emissiveIntensity = this.veinGlow(boss);
     // A glint runs round the rim as an attack is about to be let loose: the player's cue to move.
     const progress = boss.stateProgress;
     const glint = loadsAttack(boss.state) ? smooth((progress - 0.55) / 0.15) * (1 - smooth((progress - 0.8) / 0.15)) : 0;
@@ -612,12 +613,21 @@ export class CaptainUssrView {
     for (const material of rig.fabric) material.emissive.setRGB(flash * 0.55, flash * 0.06, flash * 0.03);
   }
 
-  /** Brighter with each phase and as an attack loads, flickering while stunned, dying out as it falls. */
+  /** Its veins: lit by the later phases, burning at their brightest through a fit of rage. */
+  private veinGlow(boss: CaptainUssrSnapshot): number {
+    if (boss.state === 'defeated') return 0;
+    if (boss.state === 'enraged') return RAGE_GLOW.veins + Math.sin(this.time * 14) * RAGE_GLOW.pulse;
+    if (boss.phase === 3) return 0.6 + Math.sin(this.time * 5) * 0.3;
+    return boss.phase === 2 ? 0.2 : 0;
+  }
+
+  /** Brighter with each phase, as an attack loads and in a fit of rage, flickering while stunned, dying out as it falls. */
   private eyeGlow(boss: CaptainUssrSnapshot): number {
     if (boss.state === 'defeated') return 0.9 * (1 - smooth((this.stateTime - DEATH.kneel) / (DEATH.down + 0.5 - DEATH.kneel)));
     let glow = EYES.base + boss.phase * EYES.perPhase + Math.sin(this.time * 9) * 0.08;
     if (loadsAttack(boss.state)) glow *= 1 + EYES.flare * smooth(boss.stateProgress / 0.8);
     if (boss.state === 'charging') glow *= 1 + EYES.flare;
+    if (boss.state === 'enraged') glow *= RAGE_GLOW.eyes;
     if (boss.state === 'stunned') glow *= 0.3 + 0.25 * Math.max(0, Math.sin(this.time * 23));
     return glow;
   }
@@ -650,7 +660,7 @@ export class CaptainUssrView {
         this.burst(this.point, 2, PUFF_STYLES.dust, 0.9, 0.7);
       }
     }
-    if (boss.phase === 3 && boss.state !== 'defeated') {
+    if ((boss.phase === 3 && boss.state !== 'defeated') || boss.state === 'enraged') {
       this.steamClock += step;
       if (this.steamClock >= STEAM_EVERY) {
         this.steamClock = 0;
@@ -673,8 +683,17 @@ export class CaptainUssrView {
     }
   }
 
+  /** The moment a fit of rage turns to a scream: a cue for the mode, a cloud of breath and snow blown off its feet. */
+  private bellowInRage(boss: CaptainUssrSnapshot, groundY: number): void {
+    if (boss.state !== 'enraged' || this.lastProgress >= RAGE.bellow || boss.stateProgress < RAGE.bellow) return;
+    this.cues.bellow = boss.phase === 3 ? 1 : 0.5;
+    for (let puff = 0; puff < 5; puff++) this.exhale(PUFF_STYLES.roar, 1.6, 1 + puff * 0.2, puff - 2);
+    this.rig.body.getWorldPosition(this.point).setY(groundY + 0.05);
+    this.burst(this.point, 8, PUFF_STYLES.dust, 1.8, 1);
+  }
+
   private breathEvery(boss: CaptainUssrSnapshot): number {
-    if (boss.state === 'stunned' || boss.state === 'chargeWindup') return BREATH_EVERY.winded;
+    if (boss.state === 'stunned' || boss.state === 'chargeWindup' || boss.state === 'enraged') return BREATH_EVERY.winded;
     if (boss.phase === 3) return BREATH_EVERY.fury;
     return this.gait.weight > 0.5 ? BREATH_EVERY.march : BREATH_EVERY.rest;
   }

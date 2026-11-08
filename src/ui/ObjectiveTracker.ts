@@ -65,6 +65,7 @@ export class ObjectiveTracker {
     this.corner.classList.toggle('urgent', visible && urgent);
     if (!visible) {
       this.cancelSpotlight();
+      for (const note of this.notes) note.root.classList.add('hidden');
       return;
     }
     if (this.phase === 'idle' || this.phase === 'leaving') this.announce(notes);
@@ -102,7 +103,6 @@ export class ObjectiveTracker {
       copy.remove();
     }
     this.leavingNotes.clear();
-    for (const note of this.notes) note.root.classList.add('hidden');
   }
 
   private announce(notes: readonly ObjectiveNote[]): void {

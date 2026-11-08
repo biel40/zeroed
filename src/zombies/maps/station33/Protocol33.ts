@@ -213,7 +213,7 @@ function buildFan(context: Station33BuildContext, config: Protocol33Switch): THR
 /** CAPITÁN URSS on the yard: its whole floor, its solids, awakened (and filmed leaping in) a few steps out of the stairhead. */
 function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>): ArenaEvacuationGuardian {
   const { yard } = PROTOCOL33_SURFACE;
-  const { landing, leapFrom, awakenDepth } = PROTOCOL33_GUARDIAN;
+  const { landing, leapFrom, awakenDepth, approach } = PROTOCOL33_GUARDIAN;
   return {
     kind: 'captain-ussr',
     floor: 1,
@@ -221,6 +221,7 @@ function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>): ArenaEvacuat
     field: { bounds: yard, obstacles: yardSolids, landing },
     leapFrom,
     trigger: { minX: yard.minX, maxX: yard.maxX, minZ: yard.minZ, maxZ: yard.maxZ - awakenDepth },
+    approach,
     entrance: PROTOCOL33_GUARDIAN_ENTRANCE,
     music: 'captain_ussr_theme',
   };

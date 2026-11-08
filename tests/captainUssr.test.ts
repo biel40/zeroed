@@ -127,6 +127,32 @@ describe('Captain USSR brain', () => {
     expect(brain.radius).toBe(CAPTAIN_USSR.radius);
   });
 
+  it('takes energy bolts through its raised shield, the shield counting as a body hit', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    expect(brain.blocking).toBe(true);
+    expect(brain.takeBolt(100, 'torso')).toBe('hurt');
+    expect(brain.takeBolt(100, 'shield')).toBe('hurt');
+    expect(brain.takeBolt(100, 'head')).toBe('hurt');
+    expect(brain.health).toBe(brain.maxHealth - 200 - 100 * CAPTAIN_USSR.headMultiplier);
+  });
+
+  it('does not bleed from a bolt that strikes its shield in flight', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    until(brain, player, 'shieldFlight');
+    expect(brain.takeBolt(100, 'shield')).toBe('blocked');
+    expect(brain.health).toBe(brain.maxHealth);
+    expect(brain.takeBolt(100, 'torso')).toBe('hurt');
+  });
+
+  it('ignores bolts before it has landed', () => {
+    const brain = brainWith();
+    brain.awaken(ROUND, 15, 25);
+    expect(brain.takeBolt(100, 'torso')).toBe('ignored');
+    expect(brain.health).toBe(brain.maxHealth);
+  });
+
   it('ignores flames before it has landed', () => {
     const brain = brainWith();
     expect(brain.takeBurn(100)).toBe('ignored');
@@ -188,9 +214,67 @@ describe('Captain USSR brain', () => {
     expect(brain.phase).toBe(2);
     behind(brain.maxHealth * 0.3);
     expect(brain.phase).toBe(3);
-    behind(1);
-    expect(types(brain.pendingEvents)).toEqual(['phase', 'phase']);
-    expect(brain.pendingEvents.map((event) => (event.type === 'phase' ? event.phase : 0))).toEqual([2, 3]);
+  });
+
+  it('stops in a fit of rage as it crosses a threshold, its guard down, then comes on again', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    brain.takeHit(brain.maxHealth * 0.45, 'torso', 15, 5);
+    brain.update(DT, player);
+    expect(brain.state).toBe('enraged');
+    expect(brain.blocking).toBe(false);
+    expect(brain.takeHit(100, 'torso', player.x, player.z)).toBe('hurt');
+    const { x, z } = brain.position;
+    expect(run(brain, player, CAPTAIN_USSR.rage.seconds - 2 * DT)).toEqual([]);
+    expect(brain.state).toBe('enraged');
+    expect(brain.position).toEqual({ x, z });
+    // The frame count rounds down: a few more frames cover the rest of the fit, short of its next attack.
+    run(brain, player, 4 * DT);
+    expect(brain.state).toBe('stalking');
+    expect(brain.blocking).toBe(true);
+  });
+
+  it('rages again at the next threshold, but once when one blow crosses both', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    brain.takeHit(brain.maxHealth * 0.75, 'torso', 15, 5);
+    expect(brain.phase).toBe(3);
+    until(brain, player, 'enraged', 1);
+    until(brain, player, 'stalking', CAPTAIN_USSR.rage.seconds + 1);
+    brain.update(DT, player);
+    expect(brain.state).toBe('stalking');
+  });
+
+  it('breaks off a windup to rage', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    until(brain, player, 'throwWindup');
+    brain.takeHit(brain.maxHealth * 0.45, 'torso', player.x, player.z);
+    brain.update(DT, player);
+    expect(brain.state).toBe('enraged');
+  });
+
+  it('finishes a throw before it rages: the shield is caught first', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    until(brain, player, 'shieldFlight');
+    brain.takeHit(brain.maxHealth * 0.45, 'torso', player.x, player.z);
+    until(brain, player, 'recovering', 5);
+    expect(brain.shieldHeld).toBe(true);
+    until(brain, player, 'enraged', 1);
+  });
+
+  it('keeps a stun whole before it rages', () => {
+    const player = { x: 15, z: 27, reachable: true };
+    const brain = fighting(player);
+    brain.takeHit(brain.maxHealth * 0.45, 'torso', 15, 5);
+    until(brain, player, 'stunned');
+    brain.takeHit(brain.maxHealth * 0.2, 'torso', player.x, player.z);
+    expect(brain.phase).toBe(3);
+    brain.update(DT, player);
+    expect(brain.state).toBe('stunned');
+    until(brain, player, 'stalking', CAPTAIN_USSR.charge.wallStunSeconds + 1);
+    until(brain, player, 'enraged', 1);
   });
 
   it('charges from phase two, crashes into the fence and stays stunned and exposed', () => {
@@ -259,7 +343,7 @@ describe('Captain USSR brain', () => {
     expect(brain.takeHit(brain.maxHealth * 2, 'torso', 15, 5)).toBe('killed');
     expect(brain.state).toBe('defeated');
     expect(brain.health).toBe(0);
-    expect(types(brain.pendingEvents)).toEqual(['phase', 'phase', 'defeated']);
+    expect(types(brain.pendingEvents)).toEqual(['defeated']);
     expect(brain.takeHit(100, 'torso', 15, 5)).toBe('ignored');
     brain.clearEvents();
     expect(run(brain, player, 2)).toEqual([]);

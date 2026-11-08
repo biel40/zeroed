@@ -370,9 +370,17 @@ describe('Protocol 33 through the mode', () => {
     expect(zombies.aliveCount).toBe(0);
   });
 
-  it('wakes CAPITÁN URSS in the yard and holds the clock, the horde and the truck until he falls', () => {
+  it('hands off the objective in the yard and holds the clock, the horde and the truck until CAPITÁN URSS falls', () => {
     const run = escapingRun();
+    stand(run.side, 15.0, PROTOCOL33_ESCAPE.stairTopZ, FACE_NORTH);
     advance(run, 10);
+    expect(objectiveText(run, true)).toContain(t('evacuation.objectiveEscape'));
+    stand(run.side, 15.0, PROTOCOL33_ESCAPE.stairTopZ, FACE_NORTH, 1);
+    run.mode.update(STEP);
+    const surface = objectiveText(run, true);
+    expect(surface).not.toContain(t('evacuation.objectiveEscape'));
+    expect(surface).toContain(t('evacuation.objectiveExtract'));
+
     const name = t('guardian.captainUssr');
     expect(run.side.hud.setBossBar).not.toHaveBeenCalledWith(expect.objectContaining({ name }));
     const guardian = confrontGuardian(run);
@@ -385,10 +393,9 @@ describe('Protocol 33 through the mode', () => {
     );
     expect(run.side.ctx.hitColliders).toEqual(expect.arrayContaining([...guardian.view.hitboxes]));
     const corner = objectiveText(run, true);
-    expect(corner.startsWith(`${name}
+    expect(corner).toBe(`${name}
 ${t('guardian.objective')}
-${t('guardian.captainUssr.hint1')}`)).toBe(true);
-    expect(corner).toContain('ПРОТОКОЛ 33');
+${t('guardian.captainUssr.hint1')}`);
 
     // Well past the escape's 60 s, the duel still holds the clock and the horde.
     const spawned = run.spawns.mock.calls.length;
@@ -406,6 +413,15 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     for (const hitbox of guardian.view.hitboxes) expect(run.side.ctx.hitColliders).not.toContain(hitbox);
     run.mode.update(STEP);
     expect(run.side.hud.setBossBar).toHaveBeenLastCalledWith(null);
+    const extraction = objectiveText(run, true);
+    expect(extraction).not.toContain(t('evacuation.objectiveEscape'));
+    expect(extraction).toContain(t('evacuation.objectiveExtract'));
+    expect(extraction).toMatch(/\n0:50 · .+ \d+ m$/u);
+    advance(run, 1);
+    expect(objectiveText(run, true)).toContain('0:49 · ');
+    atPanel(run);
+    run.mode.update(STEP);
+    expect(objectiveText(run, true)).toContain(t('evacuation.objectiveExtract'));
     atTruck(run);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.boardPrompt', { key: KEY }));
     run.mode.onInteract();
@@ -419,7 +435,7 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     const entrance = PROTOCOL33_GUARDIAN_ENTRANCE;
     run.internals.health.setInvincible(false);
     advance(run, 5);
-    const clock = objectiveText(run, true);
+    const clock = objectiveText(run, true).split('\n').at(-1)!.split(' · ')[0];
     stand(run.side, 15.0, -84.0, FACE_NORTH, 1);
     run.mode.update(STEP);
     // Filmed through its own camera, the player and the run on hold.
@@ -427,6 +443,7 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     expect(camera).not.toBeNull();
     expect(run.mode.isGameplayInputEnabled()).toBe(false);
     expect(run.side.hud.showBossIntro).toHaveBeenCalledOnce();
+    expect(objectiveText(run, false)).toBe('');
     expect(brain.state).toBe('dormant');
     expect((view as unknown as { group: THREE.Group }).group.visible).toBe(true);
     const spawned = run.spawns.mock.calls.length;
@@ -447,12 +464,15 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     expect(zombies.aliveCount).toBe(alive);
     expect(run.internals.health.hp).toBe(hp);
     expect(run.side.hud.hideBossIntro).not.toHaveBeenCalled();
-    advance(run, 2 * STEP);
+    run.mode.update(STEP);
     expect(run.mode.getCinematicCamera()).toBeNull();
     expect(run.side.hud.hideBossIntro).toHaveBeenCalledOnce();
     expect(run.mode.isGameplayInputEnabled()).toBe(true);
+    expect(objectiveText(run, true)).toContain(t('guardian.objective'));
     // The escape clock never moved while it was filmed.
-    expect(objectiveText(run, true)).toContain(clock.split('\n').at(-1)!.split(' · ')[0]);
+    defeatGuardian(run);
+    run.mode.update(STEP);
+    expect(objectiveText(run, true)).toContain(`${clock} · `);
   });
 
   it('cuts a playing entrance back to first person on restart', () => {
@@ -576,6 +596,38 @@ ${t('guardian.captainUssr.hint1')}`)).toBe(true);
     run.mode.onRestartRequested();
     atPanel(run);
     expect(run.mode.getInteractPrompt()).toBe(t('evacuation.panelNeedsPower'));
+  });
+
+  it('lets the god mode boss command go straight to the duel, free, and on to the real ending', () => {
+    const run = startRun();
+    expect(run.mode.executeDeveloperCommand('boss')).toBe(t('dev.unavailable'));
+    for (const key of 'MOTDRULES') run.mode.onKeyInput(key);
+    fund(run.internals.economy, COST);
+
+    expect(run.mode.executeDeveloperCommand('boss')).toBe(t('dev.ok'));
+    expect(run.internals.economy.points).toBe(COST);
+    expect(run.side.player.floor).toBe(1);
+    expect(run.side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('evacuation.escapeBanner', { seconds: 60 }), 'ПРОТОКОЛ 33');
+
+    run.mode.update(STEP);
+    expect(run.mode.getCinematicCamera()).not.toBeNull();
+    advance(run, PROTOCOL33_GUARDIAN_ENTRANCE.duration + STEP);
+    expect(guardianOf(run).brain.state).not.toBe('dormant');
+    expect(run.mode.executeDeveloperCommand('boss')).toBe(t('dev.unavailable'));
+
+    defeatGuardian(run);
+    expect(run.mode.executeDeveloperCommand('boss')).toBe(t('dev.unavailable'));
+    atTruck(run);
+    run.mode.onInteract();
+    expect(run.side.hud.showEnding).toHaveBeenCalledOnce();
+  });
+
+  it('refuses the boss command on maps without a guardian', () => {
+    const side = makeContext();
+    const mode = new ZombiesMode('burned-mansion');
+    mode.init(side.ctx);
+    for (const key of 'MOTDRULES') mode.onKeyInput(key);
+    expect(mode.executeDeveloperCommand('boss')).toBe(t('dev.unavailable'));
   });
 
   it('leaves Burned Mansion without any evacuation', () => {

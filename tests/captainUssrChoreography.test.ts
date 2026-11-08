@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptainUssrState } from '../src/zombies/guardians/CaptainUssrBrain';
-import { choreograph, type ChoreographyInput } from '../src/zombies/guardians/CaptainUssrChoreography';
+import { choreograph, RAGE, type ChoreographyInput } from '../src/zombies/guardians/CaptainUssrChoreography';
 import { CAPTAIN_USSR_BODY as B, createPose, POSE, type Pose } from '../src/zombies/guardians/CaptainUssrPose';
 
 const GUARD: ChoreographyInput = {
@@ -16,7 +16,7 @@ function pose(input: Partial<ChoreographyInput> = {}): Pose {
 
 const STATES: readonly CaptainUssrState[] = [
   'dormant', 'arriving', 'stalking', 'bashWindup', 'throwWindup', 'shieldFlight',
-  'chargeWindup', 'charging', 'stunned', 'recovering', 'defeated',
+  'chargeWindup', 'charging', 'stunned', 'recovering', 'enraged', 'defeated',
 ];
 
 describe('Captain USSR choreography', () => {
@@ -96,6 +96,25 @@ describe('Captain USSR choreography', () => {
     expect(down[POSE.pitch]).toBeGreaterThan(1.2);
     expect(down[POSE.drop]).toBeLessThan(-0.75);
     expect([...pose({ state: 'defeated', stateTime: 12 })]).toEqual([...down]);
+  });
+
+  it('seethes hunched over, then screams with its head back and its fist in the air', () => {
+    const guard = pose();
+    const seething = pose({ state: 'enraged', progress: RAGE.bellow - 0.01 });
+    const screaming = pose({ state: 'enraged', progress: (RAGE.bellow + RAGE.release) / 2 });
+    expect(seething[POSE.drop]).toBeLessThan(guard[POSE.drop] - 0.1);
+    expect(seething[POSE.pitch]).toBeGreaterThan(guard[POSE.pitch] + 0.15);
+    expect(screaming[POSE.headPitch]).toBeLessThan(guard[POSE.headPitch] - 0.4);
+    expect(screaming[POSE.jaw]).toBeGreaterThan(guard[POSE.jaw] + 0.5);
+    expect(screaming[POSE.shoulderPitch[1]]).toBeLessThan(-2);
+    expect(screaming[POSE.shieldX]).toBeGreaterThan(guard[POSE.shieldX] + 0.3);
+  });
+
+  it('is back in its guard as the fit of rage ends', () => {
+    const guard = pose();
+    const spent = pose({ state: 'enraged', progress: 1 });
+    expect(spent[POSE.jaw]).toBeCloseTo(guard[POSE.jaw], 6);
+    expect(spent[POSE.headPitch]).toBeCloseTo(guard[POSE.headPitch], 6);
   });
 
   it('throws its head back, opens its jaw and its chest to roar', () => {
