@@ -197,6 +197,11 @@ export class CaptainUssrBrain {
   }
 
   /** In the fight: it can be hurt and can hurt. */
+  /** Radius of its body, metres. */
+  public get radius(): number {
+    return this.tuning.radius;
+  }
+
   public get engaged(): boolean {
     return this.current !== 'dormant' && this.current !== 'arriving' && this.current !== 'defeated';
   }
@@ -279,6 +284,11 @@ export class CaptainUssrBrain {
   public takeBurn(damage: number): CaptainUssrHitResult {
     if (!this.engaged) return 'ignored';
     return this.applyDamage(damage, 'torso');
+  }
+
+  /** A grenade blast: like fire, it wraps around the shield and lands as a body hit. */
+  public takeBlast(damage: number): CaptainUssrHitResult {
+    return this.takeBurn(damage);
   }
 
   public clearEvents(): void {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BILLBOARD_NOISE, BillboardLayer, type BillboardParticle } from '../rendering/BillboardParticles';
 
 /** Pool sizes at full quality; reduced-effects profiles keep half. */
 const FIRE_POOL = 140;
@@ -25,40 +26,6 @@ const SPLASH = { tangent: 6, back: 1.2, growth: 1.6 } as const;
 const SMOKE = { chance: 0.32, rise: [0.7, 1.4], size: [0.5, 0.8], growth: [1.2, 1.8], life: [1.4, 2.2] } as const;
 const SPARK = { speed: [14, 30], spread: 0.22, gravity: 7, life: [0.35, 0.85], streak: 0.028 } as const;
 
-const BILLBOARD_VERTEX = /* glsl */ `
-  attribute vec3 aOffset;
-  attribute float aAge;
-  attribute float aSize;
-  attribute float aSeed;
-  attribute float aSpin;
-  varying vec2 vUv;
-  varying float vAge;
-  varying float vSeed;
-  void main() {
-    vUv = uv;
-    vAge = aAge;
-    vSeed = aSeed;
-    vec4 view = viewMatrix * vec4(aOffset, 1.0);
-    float c = cos(aSpin);
-    float s = sin(aSpin);
-    view.xy += mat2(c, -s, s, c) * position.xy * aSize;
-    gl_Position = projectionMatrix * view;
-  }
-`;
-
-const NOISE = /* glsl */ `
-  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-  }
-  float fbm(vec2 p) {
-    return noise(p) * 0.55 + noise(p * 2.1 + 1.7) * 0.3 + noise(p * 4.3 + 3.1) * 0.15;
-  }
-`;
-
 /**
  * A rolling fireball: a ragged, churning ball of flame that starts as a
  * white-hot jet with a blue root, burns orange and dies dark red. One in
@@ -69,7 +36,7 @@ const FIRE_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
   varying float vAge;
   varying float vSeed;
-  ${NOISE}
+  ${BILLBOARD_NOISE}
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
     float n = fbm(p * 1.9 + vec2(vSeed * 13.1, vSeed * 7.3 - uTime * 3.1));
@@ -90,7 +57,7 @@ const SMOKE_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
   varying float vAge;
   varying float vSeed;
-  ${NOISE}
+  ${BILLBOARD_NOISE}
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
     float n = fbm(p * 1.4 + vec2(vSeed * 9.0, vSeed * 4.0 - uTime * 0.6));
@@ -101,16 +68,7 @@ const SMOKE_FRAGMENT = /* glsl */ `
   }
 `;
 
-interface Particle {
-  readonly position: THREE.Vector3;
-  readonly velocity: THREE.Vector3;
-  age: number;
-  life: number;
-  size: number;
-  growth: number;
-  seed: number;
-  spin: number;
-  spinRate: number;
+interface Particle extends BillboardParticle {
   /** Metres it may travel before hitting the wall that cut the stream; Infinity in the open. */
   travelLeft: number;
 }
@@ -122,71 +80,6 @@ function makePool(size: number): Particle[] {
     position: new THREE.Vector3(), velocity: new THREE.Vector3(),
     age: 0, life: 0, size: 0, growth: 0, seed: 0, spin: 0, spinRate: 0, travelLeft: Infinity,
   }));
-}
-
-/** Camera-facing quads, one instance per live particle, packed and drawn in a single call. */
-class BillboardLayer {
-  readonly mesh: THREE.Mesh<THREE.InstancedBufferGeometry, THREE.ShaderMaterial>;
-  private readonly offsets: Float32Array;
-  private readonly ages: Float32Array;
-  private readonly sizes: Float32Array;
-  private readonly seeds: Float32Array;
-  private readonly spins: Float32Array;
-  private readonly attributes: THREE.InstancedBufferAttribute[];
-
-  constructor(name: string, capacity: number, fragmentShader: string, additive: boolean) {
-    const quad = new THREE.PlaneGeometry(1, 1);
-    const geometry = new THREE.InstancedBufferGeometry();
-    geometry.index = quad.index;
-    geometry.setAttribute('position', quad.getAttribute('position'));
-    geometry.setAttribute('uv', quad.getAttribute('uv'));
-    this.offsets = new Float32Array(capacity * 3);
-    this.ages = new Float32Array(capacity);
-    this.sizes = new Float32Array(capacity);
-    this.seeds = new Float32Array(capacity);
-    this.spins = new Float32Array(capacity);
-    const attribute = (array: Float32Array, size: number): THREE.InstancedBufferAttribute =>
-      new THREE.InstancedBufferAttribute(array, size).setUsage(THREE.DynamicDrawUsage);
-    this.attributes = [attribute(this.offsets, 3), attribute(this.ages, 1), attribute(this.sizes, 1), attribute(this.seeds, 1), attribute(this.spins, 1)];
-    ['aOffset', 'aAge', 'aSize', 'aSeed', 'aSpin'].forEach((key, index) => geometry.setAttribute(key, this.attributes[index]));
-    geometry.instanceCount = 0;
-    this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
-      name,
-      uniforms: { uTime: { value: 0 } },
-      vertexShader: BILLBOARD_VERTEX,
-      fragmentShader,
-      transparent: true,
-      depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-    }));
-    this.mesh.name = name;
-    // World-space particles drawn from the origin; their spread has no static bounds.
-    this.mesh.frustumCulled = false;
-  }
-
-  /** Uploads the live particles of `pool` (age < life). */
-  write(pool: readonly Particle[], time: number): number {
-    let count = 0;
-    for (const particle of pool) {
-      if (particle.age >= particle.life) continue;
-      particle.position.toArray(this.offsets, count * 3);
-      this.ages[count] = particle.age / particle.life;
-      this.sizes[count] = particle.size + particle.growth * particle.age;
-      this.seeds[count] = particle.seed;
-      this.spins[count] = particle.spin;
-      count++;
-    }
-    this.mesh.geometry.instanceCount = count;
-    this.mesh.material.uniforms.uTime.value = time;
-    for (const attribute of this.attributes) attribute.needsUpdate = true;
-    this.mesh.visible = count > 0;
-    return count;
-  }
-
-  dispose(): void {
-    this.mesh.geometry.dispose();
-    this.mesh.material.dispose();
-  }
 }
 
 /**

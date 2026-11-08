@@ -1,13 +1,16 @@
 import { isProductId, type ProductId } from '../config/products';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import type { Language } from '../i18n/i18n';
-import type { AccountBackend, IssuedSession, LoginRequestOutcome, PasswordRejection } from './AccountApi';
+import type { AccountBackend, IssuedSession, LoginRequestOutcome, RegistrationRejection, SignInRejection } from './AccountApi';
 
 export type AccountStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export type LoginCompletion = 'signed-in' | 'invalid-link' | 'unavailable';
-export type PasswordSignIn = 'signed-in' | PasswordRejection | 'unavailable';
+export type Registration = 'signed-in' | RegistrationRejection | 'unavailable';
+export type PasswordSignIn = 'signed-in' | SignInRejection | 'unavailable';
 export type GoogleSignIn = 'signed-in' | 'rejected' | 'unavailable';
+/** `signed-out`: the session had expired, so the player must sign in again. */
+export type PasswordChange = 'changed' | 'weak-password' | 'signed-out' | 'unavailable';
 
 interface SavedAccount {
   readonly sessionToken: string;
@@ -45,30 +48,34 @@ export class WebAccount implements EntitlementProvider {
     return this.saved?.beta ?? false;
   }
 
-  /** Never rejects. Signs in, or creates the account the first time the address is used. */
-  public async signInWithPassword(email: string, password: string): Promise<PasswordSignIn> {
-    let result;
-    try {
-      result = await this.api.signInWithPassword(email, password);
-    } catch {
-      return 'unavailable';
-    }
-    if (typeof result === 'string') return result;
-    await this.adopt(result);
-    return 'signed-in';
+  /** Never rejects. Creates the account and signs it in. */
+  public register(email: string, password: string): Promise<Registration> {
+    return this.startSession(() => this.api.register(email, password));
   }
 
   /** Never rejects. */
-  public async signInWithGoogle(credential: string): Promise<GoogleSignIn> {
-    let session;
+  public signInWithPassword(email: string, password: string): Promise<PasswordSignIn> {
+    return this.startSession(() => this.api.signInWithPassword(email, password));
+  }
+
+  /** Never rejects. */
+  public signInWithGoogle(credential: string): Promise<GoogleSignIn> {
+    return this.startSession(async () => (await this.api.signInWithGoogle(credential)) ?? 'rejected');
+  }
+
+  /** Never rejects. Sets a new password for the signed-in account. */
+  public async changePassword(password: string): Promise<PasswordChange> {
+    const saved = this.saved;
+    if (!saved) return 'signed-out';
+    let result;
     try {
-      session = await this.api.signInWithGoogle(credential);
+      result = await this.api.changePassword(saved.sessionToken, password);
     } catch {
       return 'unavailable';
     }
-    if (!session) return 'rejected';
-    await this.adopt(session);
-    return 'signed-in';
+    if (result !== null) return result;
+    if (this.saved === saved) this.update(null);
+    return 'signed-out';
   }
 
   /** Never rejects. Mails a recovery link for a forgotten password. */
@@ -112,6 +119,21 @@ export class WebAccount implements EntitlementProvider {
     } catch {
       // The server session simply expires.
     }
+  }
+
+  /** Adopts the session a request returns; a string is the server's reason for refusing. */
+  private async startSession<Rejection extends string>(
+    request: () => Promise<IssuedSession | Rejection>,
+  ): Promise<'signed-in' | Rejection | 'unavailable'> {
+    let result;
+    try {
+      result = await request();
+    } catch {
+      return 'unavailable';
+    }
+    if (typeof result === 'string') return result;
+    await this.adopt(result);
+    return 'signed-in';
   }
 
   /** A new session owns nothing until its products load; if they cannot, until the next refresh. */

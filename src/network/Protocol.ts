@@ -6,6 +6,8 @@ import type { MysteryBoxSnapshot } from '../zombies/MysteryBox';
 import { isZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from '../zombies/ZombieDeath';
 import type { SecretRoomSnapshot } from '../zombies/secret-room/SecretRoomSystem';
 import { isPlayerStance, stanceEyeOffset, type PlayerStance } from '../player/PlayerStance';
+import { GRENADE_DEFINITIONS } from '../config/grenades';
+import type { GrenadeLaunch } from '../zombies/grenades/ThrownGrenades';
 
 /**
  * Wire contract of the two-player co-op. The relay only pairs sockets and
@@ -70,6 +72,8 @@ export interface ZombieNetState {
   readonly hp: number;
   readonly maxHp: number;
   readonly state: ZombieState;
+  /** Legs blown off: it crawls. Omitted while standing (and by older hosts). */
+  readonly crippled?: boolean;
 }
 
 export interface BarrierNetState {
@@ -108,13 +112,17 @@ export type GuestMessage =
   | { readonly type: 'doorPurchase'; readonly doorId: string }
   | { readonly type: 'wallBuyPurchase'; readonly wallBuyId: string; readonly refill: boolean; readonly equippedWeapon: WeaponId }
   | { readonly type: 'boxUse'; readonly action: 'activate' | 'pickup'; readonly equippedWeapon: WeaponId }
-  | { readonly type: 'mapUse'; readonly kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'completion'; readonly id: string;
-    readonly equippedWeapon: WeaponId; readonly code?: string };
+  | { readonly type: 'mapUse'; readonly kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'grenades' | 'completion'; readonly id: string;
+    readonly equippedWeapon: WeaponId; readonly code?: string }
+  /** A grenade left the guest's hand (or went off in it, `fuse` 0); the host replays it and resolves its blast. */
+  | { readonly type: 'grenadeThrow'; readonly launch: GrenadeLaunch };
 
 export type HostMessage =
   | { readonly type: 'matchState'; readonly state: MatchState }
   | { readonly type: 'reviveCompleted'; readonly target: CoopPlayerId }
   | { readonly type: 'playerShoot'; readonly weapon: WeaponId; readonly origin: Vec3; readonly direction: Vec3 }
+  /** The host threw a grenade: the guest replays its flight and blast for show. */
+  | { readonly type: 'grenadeThrow'; readonly launch: GrenadeLaunch }
   | {
     readonly type: 'teslaChain';
     /** Muzzle, then the chest of every electrocuted zombie in arc order. */
@@ -152,9 +160,9 @@ export type HostMessage =
   | { readonly type: 'wallBuyDelivered'; readonly weapon: WeaponId; readonly refill: boolean }
   | { readonly type: 'wallBuyFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'ammoFull' }
   | { readonly type: 'boxGranted'; readonly weapon: WeaponId }
-  | { readonly type: 'mapUsed'; readonly kind: 'lamp' | 'ritual' | 'pickup' | 'ammo'; readonly id: string;
+  | { readonly type: 'mapUsed'; readonly kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'grenades'; readonly id: string;
     readonly buyer: CoopPlayerId; readonly weapon?: WeaponId }
-  | { readonly type: 'mapUseFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'ammoFull' }
+  | { readonly type: 'mapUseFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'ammoFull' | 'grenadesFull' }
   | { readonly type: 'boxFailed'; readonly reason: 'unavailable' | 'insufficientPoints' | 'reserved' }
   | { readonly type: 'playerDamaged'; readonly damage: number; readonly attackerId?: number }
   | { readonly type: 'matchRestart' };
@@ -216,6 +224,35 @@ function isWeaponId(value: unknown): value is WeaponId {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(WEAPON_DEFINITIONS, value);
 }
 
+/** What dealt a blow on the wire: the knife, a weapon or a lethal grenade. */
+function isKillSource(value: unknown): value is ZombieKillSource {
+  return value === 'knife' || isWeaponId(value)
+    || (typeof value === 'string' && Object.prototype.hasOwnProperty.call(GRENADE_DEFINITIONS, value));
+}
+
+/** Longest fuse any grenade can have left; anything beyond is malformed. */
+const MAX_GRENADE_FUSE = Math.max(...Object.values(GRENADE_DEFINITIONS).map((definition) => definition.fuseSeconds));
+
+function isGrenadeLaunch(value: unknown): value is GrenadeLaunch {
+  if (!isObject(value) || !isVec3(value.from) || !isVec3(value.origin) || !isVec3(value.aim)) return false;
+  const aim = value.aim as Vec3;
+  const length = Math.hypot(aim.x, aim.y, aim.z);
+  return length > 0.8 && length < 1.2
+    && isFiniteNumber(value.fuse) && value.fuse >= 0 && value.fuse <= MAX_GRENADE_FUSE
+    && isCoordinate(value.floorY);
+}
+
+function grenadeLaunch(value: GrenadeLaunch): GrenadeLaunch {
+  const { from, origin, aim } = value;
+  return {
+    from: { x: from.x, y: from.y, z: from.z },
+    origin: { x: origin.x, y: origin.y, z: origin.z },
+    aim: { x: aim.x, y: aim.y, z: aim.z },
+    fuse: value.fuse,
+    floorY: value.floorY,
+  };
+}
+
 export function isPlayerNetState(value: unknown): value is PlayerNetState {
   return isObject(value)
     && isFiniteNumber(value.t)
@@ -249,7 +286,8 @@ export function isZombieNetState(value: unknown): value is ZombieNetState {
     && isFiniteNumber(value.yaw) && Number.isInteger(value.floor)
     && isFiniteNumber(value.scale) && value.scale > 0
     && isFiniteNumber(value.hp) && isFiniteNumber(value.maxHp)
-    && typeof value.state === 'string' && ZOMBIE_STATES.has(value.state);
+    && typeof value.state === 'string' && ZOMBIE_STATES.has(value.state)
+    && (value.crippled === undefined || typeof value.crippled === 'boolean');
 }
 
 function isBarrierState(value: unknown): value is BarrierNetState {
@@ -323,9 +361,11 @@ export function parseGuestMessage(message: IncomingMessage): GuestMessage | null
     case 'boxUse':
       return (raw.action === 'activate' || raw.action === 'pickup') && isWeaponId(raw.equippedWeapon)
         ? { type: 'boxUse', action: raw.action, equippedWeapon: raw.equippedWeapon } : null;
+    case 'grenadeThrow':
+      return isGrenadeLaunch(raw.launch) ? { type: 'grenadeThrow', launch: grenadeLaunch(raw.launch) } : null;
     case 'mapUse':
       return (raw.kind === 'lamp' || raw.kind === 'ritual' || raw.kind === 'pickup'
-        || raw.kind === 'ammo' || raw.kind === 'completion') && isId(raw.id) && isWeaponId(raw.equippedWeapon)
+        || raw.kind === 'ammo' || raw.kind === 'grenades' || raw.kind === 'completion') && isId(raw.id) && isWeaponId(raw.equippedWeapon)
         && (raw.code === undefined || (raw.kind === 'pickup' && typeof raw.code === 'string' && /^[0-9]{4}$/.test(raw.code)))
         ? { type: 'mapUse', kind: raw.kind, id: raw.id, equippedWeapon: raw.equippedWeapon,
           ...(raw.code === undefined ? {} : { code: raw.code as string }) } : null;
@@ -346,6 +386,8 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
       return isWeaponId(raw.weapon) && isVec3(raw.origin) && isVec3(raw.direction)
         ? { type: 'playerShoot', weapon: raw.weapon, origin: raw.origin, direction: raw.direction }
         : null;
+    case 'grenadeThrow':
+      return isGrenadeLaunch(raw.launch) ? { type: 'grenadeThrow', launch: grenadeLaunch(raw.launch) } : null;
     case 'teslaChain':
       return Array.isArray(raw.points) && raw.points.length <= CHAIN_MAX_TARGETS + 1 && raw.points.every(isVec3)
         ? {
@@ -366,7 +408,7 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
         ? {
           type: 'zombieHit', zombieId: raw.zombieId as number, headshot: raw.headshot,
           amount: raw.amount, fromX: raw.fromX, fromZ: raw.fromZ,
-          ...(raw.source === 'knife' || isWeaponId(raw.source) ? { source: raw.source } : {}),
+          ...(isKillSource(raw.source) ? { source: raw.source } : {}),
         }
         : null;
     case 'zombieDeath':
@@ -376,7 +418,7 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
           type: 'zombieDeath', zombieId: raw.zombieId as number, killer: raw.killer,
           style: isZombieDeathStyle(raw.style) ? raw.style : 'knockback',
           ...(raw.headshot === true ? { headshot: true } : {}),
-          ...(raw.source === 'knife' || isWeaponId(raw.source) ? { source: raw.source } : {}),
+          ...(isKillSource(raw.source) ? { source: raw.source } : {}),
           impactX: isFiniteNumber(raw.impactX) ? Math.max(-1, Math.min(1, raw.impactX)) : 0,
           impactZ: isFiniteNumber(raw.impactZ) ? Math.max(-1, Math.min(1, raw.impactZ)) : -1,
         }
@@ -401,12 +443,13 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
     case 'boxGranted':
       return isWeaponId(raw.weapon) ? { type: 'boxGranted', weapon: raw.weapon } : null;
     case 'mapUsed':
-      return (raw.kind === 'lamp' || raw.kind === 'ritual' || raw.kind === 'pickup' || raw.kind === 'ammo')
+      return (raw.kind === 'lamp' || raw.kind === 'ritual' || raw.kind === 'pickup' || raw.kind === 'ammo' || raw.kind === 'grenades')
         && isId(raw.id) && isPlayerId(raw.buyer) && (raw.weapon === undefined || isWeaponId(raw.weapon))
         ? { type: 'mapUsed', kind: raw.kind, id: raw.id, buyer: raw.buyer, weapon: raw.weapon as WeaponId | undefined }
         : null;
     case 'mapUseFailed':
       return raw.reason === 'unavailable' || raw.reason === 'insufficientPoints' || raw.reason === 'ammoFull'
+        || raw.reason === 'grenadesFull'
         ? { type: 'mapUseFailed', reason: raw.reason } : null;
     case 'boxFailed':
       return raw.reason === 'unavailable' || raw.reason === 'insufficientPoints' || raw.reason === 'reserved'

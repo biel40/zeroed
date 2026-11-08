@@ -32,7 +32,7 @@ const CANISTER_AWAY = new THREE.Vector3(-0.07, -0.3, 0.1);
 const CANISTER_AWAY_TILT = -0.7;
 /** Share of the unscrew and screw-on windows spent turning the bayonet. */
 const CANISTER_TWIST_SHARE = 0.35;
-/** Locked-open pistol slide: the hand tugs it this share past the lock before letting go. */
+/** Action held open on empty: the hand tugs it this share past the lock before letting go. */
 const SLIDE_SLINGSHOT_OVERTRAVEL = 0.12;
 /** Magazine lengths a box magazine travels past its well depth to hang fully clear. */
 const BOX_CLEAR = 0.35;
@@ -416,8 +416,8 @@ export class ReloadAnimator {
       handle.position.z -= HANDLE_TRAVEL * (1 - ramp(p, c.charge, this.actionHomeAt()));
       return;
     }
-    // An emptied pistol stays open on its slide stop until the slide is released.
-    const lockedOpen = workAction && c.style === 'pistol';
+    // An action that holds open on the last round stays there until released.
+    const lockedOpen = workAction && c.locksOpenWhenEmpty === true;
     if (lockedOpen && p < c.charge) {
       restoreHome(handle, this.handleHome);
       handle.position.z += HANDLE_TRAVEL;

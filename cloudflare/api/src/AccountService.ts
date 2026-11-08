@@ -25,9 +25,8 @@ const ALL_PREMIUM = '*';
 
 export type LoginRequestResult = 'sent' | 'invalid-email' | 'rate-limited' | 'mail-failed';
 
-export type PasswordSignInResult =
-  | { readonly session: IssuedSession; readonly created: boolean }
-  | 'invalid-email' | 'weak-password' | 'wrong-password' | 'rate-limited';
+export type PasswordSignInResult = IssuedSession | 'invalid-email' | 'no-account' | 'wrong-password' | 'rate-limited';
+export type RegistrationResult = IssuedSession | 'invalid-email' | 'weak-password' | 'exists';
 
 export interface IssuedSession {
   readonly token: string;
@@ -58,9 +57,10 @@ export interface AccountServiceOptions {
 }
 
 /**
- * Web accounts keyed by email: password, Google and recovery-link sign-in,
- * bearer sessions and entitlement lookup. Addresses are not verified for
- * passwords: the first password used with an address becomes its password.
+ * Web accounts keyed by email: registration, password, Google and
+ * recovery-link sign-in, bearer sessions and entitlement lookup. Registering
+ * does not verify the address: any address without a password can register,
+ * including seeded beta testers who have not signed in yet.
  */
 export class AccountService {
   public constructor(private readonly options: AccountServiceOptions) {}
@@ -99,27 +99,36 @@ export class AccountService {
     }
   }
 
-  /**
-   * Exchanges a recovery link token for a session; null when the link is unknown, used or expired.
-   * Opening the link proves the address, so it also clears the password: the next one used becomes the new one.
-   */
+  /** Exchanges a recovery link token for a session; null when the link is unknown, used or expired. */
   public async verifyLogin(loginToken: string): Promise<IssuedSession | null> {
     const { store, now: clock, randomBytes } = this.options;
     const email = await store.consumeLoginToken(await hashSecret(loginToken), clock());
+    
     if (!email) return null;
-
-    const userId = await store.upsertUser(email, generateId(randomBytes), clock());
-    await store.clearPassword(userId);
-    return this.issueSession(userId, email);
+    return this.issueSession(await store.upsertUser(email, generateId(randomBytes), clock()), email);
   }
 
-  /** Signs in with the account's password, or sets it when the address has none yet (creating the account if needed). */
-  public async signInWithPassword(rawEmail: unknown, password: unknown, requester: string): Promise<PasswordSignInResult> {
+  /** Creates the account, or gives a password to one that has none (seeded, Google or link sign-ins). */
+  public async register(rawEmail: unknown, password: unknown): Promise<RegistrationResult> {
     const email = normalizeEmail(rawEmail);
     if (!email) return 'invalid-email';
     if (!isAcceptablePassword(password)) return 'weak-password';
 
     const { store, now: clock, randomBytes } = this.options;
+    const credentials = await store.findCredentials(email);
+    if (credentials?.passwordHash) return 'exists';
+    const userId = credentials?.userId ?? await store.upsertUser(email, generateId(randomBytes), clock());
+    // Another registration may have set the password meanwhile.
+    if (!(await store.claimPassword(userId, await hashPassword(password, randomBytes)))) return 'exists';
+    return this.issueSession(userId, email);
+  }
+
+  /** Unknown addresses and accounts without a password count as failures too, so guessing either is rate limited. */
+  public async signInWithPassword(rawEmail: unknown, password: unknown, requester: string): Promise<PasswordSignInResult> {
+    const email = normalizeEmail(rawEmail);
+    if (!email) return 'invalid-email';
+
+    const { store, now: clock } = this.options;
     const requesterHash = await hashSecret(requester);
     const failures = await store.countPasswordFailuresSince(email, requesterHash, clock() - RATE_WINDOW_MS);
     if (failures.byEmail >= MAX_PASSWORD_FAILURES_PER_EMAIL || failures.byRequester >= MAX_PASSWORD_FAILURES_PER_REQUESTER) {
@@ -127,21 +136,19 @@ export class AccountService {
     }
 
     const credentials = await store.findCredentials(email);
-    if (credentials?.passwordHash) {
-      if (await verifyPassword(password, credentials.passwordHash)) {
-        return { session: await this.issueSession(credentials.userId, email), created: false };
-      }
-      await store.recordPasswordFailure(email, requesterHash, clock());
-      return 'wrong-password';
+    if (credentials?.passwordHash && typeof password === 'string' && await verifyPassword(password, credentials.passwordHash)) {
+      return this.issueSession(credentials.userId, email);
     }
+    await store.recordPasswordFailure(email, requesterHash, clock());
+    return credentials?.passwordHash ? 'wrong-password' : 'no-account';
+  }
 
-    const userId = credentials?.userId ?? await store.upsertUser(email, generateId(randomBytes), clock());
-    // Another request may have set the first password meanwhile; this one then counts as a wrong guess.
-    if (!(await store.claimPassword(userId, await hashPassword(password, randomBytes)))) {
-      await store.recordPasswordFailure(email, requesterHash, clock());
-      return 'wrong-password';
-    }
-    return { session: await this.issueSession(userId, email), created: credentials === null };
+  /** Sets a new password for a signed-in account, e.g. after a recovery link; false when it is not acceptable. */
+  public async changePassword(session: AuthenticatedSession, password: unknown): Promise<boolean> {
+    if (!isAcceptablePassword(password)) return false;
+    const { store, randomBytes } = this.options;
+    await store.setPassword(session.userId, await hashPassword(password, randomBytes));
+    return true;
   }
 
   /** 'unconfigured' without a Google client id; null for a credential Google did not issue to this game. */

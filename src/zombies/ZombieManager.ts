@@ -38,6 +38,9 @@ import {
 import { refreshGibWalls, type GibWalls } from './GibWalls';
 import { Zombie } from './Zombie';
 import type { ZombieKillSource } from './ZombieDeath';
+import type { GrenadeBlastConfig } from '../config/grenades';
+import { resolveBlastOutcome } from './grenades/GrenadeBlast';
+import { arenaFloorHeight } from './maps/ArenaFloors';
 export type { ZombieKillSource } from './ZombieDeath';
 import { ZombiePool } from './ZombiePool';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from './ZombieSpawner';
@@ -742,6 +745,40 @@ export class ZombieManager {
         this.kill(zombie, false, source);
       }
     }
+  }
+
+  /**
+   * A grenade going off at `center`: damage falls off with horizontal
+   * distance (GrenadeBlast) within `blast.verticalReach`, `inSight` lets
+   * walls shield a body, kills at the feet blow apart and some survivors lose
+   * their legs (`rng` rolls it). Returns how many bodies it hurt and left alive.
+   */
+  public applyExplosion(
+    center: THREE.Vector3,
+    blast: GrenadeBlastConfig,
+    source: ZombieKillSource,
+    damageScale: number,
+    inSight: (zombie: Zombie) => boolean,
+    rng: () => number = this.rng,
+  ): number {
+    let survivors = 0;
+    for (const zombie of this.pool.actives) {
+      if (!zombie.isAlive || Math.abs(zombie.position.y - center.y) > blast.verticalReach) continue;
+      const distance = Math.hypot(zombie.position.x - center.x, zombie.position.z - center.z);
+      if (distance >= blast.radius || !inSight(zombie)) continue;
+      const outcome = resolveBlastOutcome(blast, distance, damageScale, zombie.hp, zombie.canCripple, rng);
+      const before = Math.max(0, zombie.hp);
+      const lethal = zombie.applyExplosion(outcome.damage, center.x, center.z, source, outcome.gib);
+      const removed = before - Math.max(0, zombie.hp);
+      if (removed > 0) this.onZombieDamaged?.(removed);
+      if (lethal) {
+        this.kill(zombie, false, source);
+        continue;
+      }
+      survivors++;
+      if (outcome.cripple) zombie.cripple();
+    }
+    return survivors;
   }
 
   private applyTrackedDamage(
@@ -2326,10 +2363,7 @@ export class ZombieManager {
 
   /** Physical elevation of a floor: navigation bounds first, portal as fallback. */
   private floorBaseY(floor: number): number {
-    const bounds = this.navigationBounds.find((entry) => entry.floor === floor);
-    if (bounds?.baseY !== undefined) return bounds.baseY;
-    const portal = this.floorTransitions.find((transition) => transition.targetFloor === floor);
-    return portal ? portal.targetY - EYE_HEIGHT : 0;
+    return arenaFloorHeight(this.navigationBounds, this.floorTransitions, floor);
   }
 
   private kill(zombie: Zombie, headshot: boolean, source: ZombieKillSource | undefined): void {

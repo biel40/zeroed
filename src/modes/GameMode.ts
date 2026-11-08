@@ -149,6 +149,8 @@ export interface GameMode {
   onInteract?(): void;
   /** True when a quick melee starts; the shell then cancels the equipped weapon's reload. */
   onMeleeAttack?(): boolean;
+  /** Lethal (G) pressed: true when a grenade throw starts, which cancels the reload like a melee. */
+  onLethalThrow?(): boolean;
   /**
    * The pause menu's RESTART action. The mode resets its own run state
    * (health, rounds, kills, economy, arsenal) and resumes play. Optional:

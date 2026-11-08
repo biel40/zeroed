@@ -70,7 +70,7 @@ sufra tirones de compilacion de shaders.
   (`AccountApi`; en `npm run dev`, `LocalTesterBackend` lo envuelve y da
   entrada inmediata a los testers locales). `main.ts`
   canjea el enlace de recuperacion (`#login=`) al arrancar y entrega la cuenta a
-  `HUD`, cuyo `MapUnlockDialog` inicia sesion con contraseña o con Google
+  `HUD`, cuyo `MapUnlockDialog` inicia sesion o registra con contraseña, o entra con Google,
   (`GoogleSignInButton`, que `main.ts` solo crea en web) o permite cerrar sesion. La
   comprobacion final sigue en el cliente; ver [acceso de beta](../public/beta/README.md).
 
@@ -100,6 +100,21 @@ sufra tirones de compilacion de shaders.
   shell interrumpe la recarga mediante `Weapon.cancelReload()`, sin transferir
   municion, y la vuelve a solicitar al terminar el melee si el arma sigue
   equipada y vacia. Los modos no duplican la politica de interrupcion.
+- La granada letal es datos (`GrenadeDefinition`), no un arma del inventario.
+  `GameMode.onLethalThrow()` es al lanzamiento lo que `onMeleeAttack()` al
+  cuchillo: el shell interrumpe la recarga con la misma politica; pulsar y
+  mantener usan los mismos `LETHAL_INPUT_CODES`. `modes/grenades/` comparte
+  las piezas entre individual y cooperativo: `GrenadeHand` (bolsa
+  `LethalGrenadeStock`, lanzamiento `GrenadeThrow`, un `MeleeArmDriver` que
+  comparte `ArmChain` con el cuchillo, y cocinado) entrega cada lanzamiento
+  como `GrenadeLaunch` (numeros planos); `GrenadeBlasts` lo pone en el mundo
+  (`ThrownGrenades` sobre `GrenadeFlight` y `GibWallFrame`) y muestra, suena
+  y sacude cada explosion (`CameraShake`); `BlastSight` da la linea de
+  vision. Lo que hace una explosion es del modo: `ZombiesGrenades` en
+  individual (incluido el guardian) y el anfitrion en cooperativo
+  (`CoopGrenades` reune las piezas de ambos roles). `ZombieManager.applyExplosion`
+  resuelve dano, despiece y mutilacion con aleatoriedad inyectable. `BillboardLayer` (`rendering/BillboardParticles`) comparte
+  las particulas instanciadas entre el fuego y la explosion.
 - `ViewArms` es un servicio compartido de primera persona; `WeaponHands` adapta los agarres declarados por cada arma. Para sus restricciones visuales y motivos, consulta [agarres naturales](changes/natural-grips.md).
 - Logica determinista y vistas Three.js permanecen separadas para poder probar
   en Node. Points solo se mutan mediante `PlayerEconomy` y la reserva de
@@ -117,7 +132,7 @@ sufra tirones de compilacion de shaders.
   puertas o muros cambian la topologia. Las capacidades propias de un mapa
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
-  `ammoRefills`, `mysteryBoxPlacement`, `ringMachines`, `evacuation`).
+  `ammoRefills`, `grenadeBuys`, `mysteryBoxPlacement`, `ringMachines`, `evacuation`).
   `ArenaEvacuation` (el Protocolo 33 de Station 33) declara reglas, puntos de
   uso, interruptores (`ArenaPowerSwitch`) y final; `ZombiesEvacuation`
   ejecuta el estado puro `EvacuationProtocol` y el ritmo de `EvacuationHorde`
@@ -166,7 +181,9 @@ sufra tirones de compilacion de shaders.
 
 ## Extension
 
-Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nuevo anillo:
+Nueva arma: `WeaponId` + `WeaponDefinition` + preload/orden. Nueva granada:
+`LethalGrenadeId` + `GrenadeDefinition`, su estilo de muerte en
+`WEAPON_DEATH_STYLES` y su modelo (hoy `F1GrenadeModel`). Nuevo anillo:
 `RingId` + `RingDefinition` (dedo libre, efecto como dato), su gancho en
 `ZombiesRings`, claves `ring.*` y una maquina en las `ringMachines` de un
 mapa; entra solo en la condicion del anillo blanco (`RING_IDS`), que ocupa el

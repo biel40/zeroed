@@ -1,6 +1,6 @@
 import type { ShotVariation } from '../audio/ShotVariation';
 
-export type WeaponId = 'm4a1' | 'ak47' | 'm60' | 'l96' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+export type WeaponId = 'm4a1' | 'ak47' | 'm14' | 'm60' | 'l96' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -235,6 +235,11 @@ export interface ReloadAnimConfig {
   /** Action/charging-handle window; set charge < 0 to skip (cell style). */
   readonly charge: number;
   readonly chargeEnd: number;
+  /**
+   * The last round holds the action open: an empty reload starts with the
+   * handle at the rear, tugs it off the stop at `charge` and lets it slam home.
+   */
+  readonly locksOpenWhenEmpty?: boolean;
   /** Belt-fed only: feed-cover open/close fractions (the cover slams shut at coverClose). */
   readonly coverOpen?: number;
   readonly coverClose?: number;
@@ -394,9 +399,10 @@ export interface ViewModelConfig {
    * stock, perforated jacket and drum-fed PPSh-41; 'barrett' builds the heavy
    * semiautomatic .50 rifle with a ventilated shroud and muzzle brake; 'ptrs41' builds
    * its Station 33 look, the Soviet PTRS-41 (long bare barrel, wooden stock, box brake); 'fakel' builds the
-   * ФАКЕЛ-33 flamethrower (caged red core crystal, fuel tank, petal nozzle). Default: generic long gun.
+   * ФАКЕЛ-33 flamethrower (caged red core crystal, fuel tank, petal nozzle); 'm14' builds the
+   * walnut-stocked M14 (open-top receiver, right-side operating rod, aperture sight). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'l96' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'm14' | 'l96' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */

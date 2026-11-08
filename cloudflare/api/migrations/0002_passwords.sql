@@ -1,6 +1,6 @@
 -- Password and Google sign-in. Times are Unix milliseconds.
 
--- `passwords.ts` format; null until the account sets a password (seeded testers, link or Google sign-ins).
+-- `passwords.ts` format; null until the account registers a password (seeded testers, link or Google sign-ins).
 ALTER TABLE users ADD COLUMN password_hash TEXT;
 
 -- Wrong passwords, kept only for rate limiting; requester_hash is a hash of the client IP.

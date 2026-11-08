@@ -152,6 +152,10 @@ export const ZOMBIE_SEPARATION_RADIUS = 1.15;
 // --- Zombie state timings (seconds) ---
 /** Rise-from-the-ground spawn sequence. */
 export const ZOMBIE_SPAWN_DURATION = 1.1;
+/** A crippled body drops onto its hands this long before it crawls on. */
+export const ZOMBIE_CRIPPLE_COLLAPSE = 0.75;
+/** Share of its walking speed a crippled zombie keeps while it crawls. */
+export const ZOMBIE_CRAWLER_SPEED_FACTOR = 0.32;
 /** Full attack lunge; the damage lands at the hit moment below. */
 export const ZOMBIE_ATTACK_DURATION = 0.75;
 /**
@@ -189,6 +193,7 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   vector: 240,
   ppsh41: 284,
   ak47: 300,
+  m14: 64,
   m60: 500,
   l96: 60,
   barrett: 40,

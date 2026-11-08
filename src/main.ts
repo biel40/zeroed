@@ -233,8 +233,10 @@ class ZeroedBoot {
       this.hud.setMapUnlockAccount({
         getEmail: () => this.entitlements.getEmail(),
         isBetaTester: () => this.entitlements.isBetaTester(),
+        register: (email, password) => this.entitlements.register(email, password),
         signInWithPassword: (email, password) => this.entitlements.signInWithPassword(email, password),
         signInWithGoogle: (credential) => this.entitlements.signInWithGoogle(credential),
+        changePassword: (password) => this.entitlements.changePassword(password),
         requestRecovery: (email) => this.entitlements.requestLogin(email, getLanguage()),
         signOut: () => this.entitlements.signOut(),
         google: createGoogleButton(),
@@ -247,12 +249,9 @@ class ZeroedBoot {
         this.profile = getDeviceProfile(undefined, quality);
       });
 
-      const email = this.entitlements.getEmail();
-      if (login === 'signed-in' && email && this.entitlements.isBetaTester()) {
-        this.hud.showBetaThanks(email, () => this.openRequestedMap());
-      } else {
-        this.openRequestedMap();
-      }
+      this.openRequestedMap();
+      // Recovery links are only sent for forgotten passwords, so the next step is choosing a new one.
+      if (login === 'signed-in') this.hud.askForNewPassword();
     } catch (error: unknown) {
       this.hud.setError(error instanceof Error ? t('start.initFailed', { message: error.message }) : t('start.initFailedGeneric'));
     }
@@ -319,6 +318,7 @@ async function createAccount(): Promise<WebAccount> {
  */
 function createGoogleButton(): GoogleSignInButton | null {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+  if (!clientId && import.meta.env.DEV) console.info('Google sign-in hidden: set VITE_GOOGLE_CLIENT_ID (see cloudflare/api/README.md).');
   if (!clientId || getDesktopShell() || Capacitor.isNativePlatform()) return null;
   return new GoogleIdentityButton(clientId, getLanguage);
 }

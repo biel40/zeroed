@@ -3,6 +3,8 @@ import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/Wea
 import { HANDLE_RELEASE_FRACTION } from '../weapons/ReloadAnimator';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
 import { FlameStreamLoop } from './FlameStreamLoop';
+import { playCookTick, playGrenadeBounce, playPinPull, playProceduralExplosion, playSampledExplosion, playThrowWhoosh } from './ExplosionSound';
+import type { GrenadeAudioConfig } from '../config/grenades';
 import { MusicManager, type EndingAudioId, type MusicTrackName } from './MusicManager';
 import { RING_JINGLE_TUNES, renderRingJingle, type RingJingleId } from './RingJingleTunes';
 import { muffleCutoff, type SpatialCue } from './SpatialCue';
@@ -161,6 +163,8 @@ export interface AmbientCuePlayback {
   readonly sampleFile?: string;
 }
 
+/** A grenade going off is heard across the map, however far. */
+const EXPLOSION_MIN_ATTENUATION = 0.3;
 /** Ambient cues set the mood of the whole map, so distance never buries them. */
 const AMBIENT_CUE_MIN_ATTENUATION = 0.35;
 /** The evacuation siren fills the whole station. */
@@ -436,6 +440,49 @@ export class AudioSystem {
     osc.stop(t + 0.11);
 
     if (config.crack) this.tick(0, 4600, config.crack * scale, 0.7, 0.028, output);
+  }
+
+  /**
+   * A grenade going off where `cue` places it: its optional MP3
+   * (`GrenadeAudioConfig.explosionSampleFile`) once decoded, otherwise the
+   * procedural blast. `proximity` (0..1) adds the ringing of a close call.
+   */
+  public playGrenadeExplosion(config: GrenadeAudioConfig, cue: SpatialCue, proximity: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue, EXPLOSION_MIN_ATTENUATION);
+    const sample = config.explosionSampleFile ? this.optionalSample(config.explosionSampleFile) : null;
+    if (sample) playSampledExplosion(audio.ctx, output, sample, config.explosionVolume);
+    else playProceduralExplosion(audio.ctx, output, audio.noise, config.explosionVolume, proximity);
+  }
+
+  /** Starts decoding a grenade's optional explosion MP3 so the first blast already uses it. */
+  public preloadGrenadeAudio(config: GrenadeAudioConfig): void {
+    if (config.explosionSampleFile) this.optionalSample(config.explosionSampleFile);
+  }
+
+  /** The thrower pulls the pin. */
+  public playGrenadePinPull(): void {
+    const audio = this.context();
+    if (audio) playPinPull(audio.ctx, audio.master, audio.noise);
+  }
+
+  /** Every second a pulled grenade cooks in the hand. */
+  public playGrenadeCookTick(): void {
+    const audio = this.context();
+    if (audio) playCookTick(audio.ctx, audio.master, audio.noise);
+  }
+
+  /** The grenade leaves the hand. */
+  public playGrenadeThrow(): void {
+    const audio = this.context();
+    if (audio) playThrowWhoosh(audio.ctx, audio.master, audio.noise);
+  }
+
+  /** A live grenade bouncing where `cue` places it; `strength` 0..1. */
+  public playGrenadeBounce(cue: SpatialCue, strength: number): void {
+    const audio = this.context();
+    if (audio) playGrenadeBounce(audio.ctx, this.spatialBus(audio, cue), audio.noise, strength);
   }
 
   /** Starts decoding a weapon's optional shot MP3 so the first trigger pull already uses it. */

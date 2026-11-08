@@ -32,6 +32,7 @@ import type { MusicTrackName } from '../../audio/MusicManager';
 import { voicePoint } from '../../audio/SpatialCue';
 import { RoundCueGate } from '../../audio/RoundCueGate';
 import { CoopWorld } from './CoopWorld';
+import { CoopGrenades } from './CoopGrenades';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { isDownedBodyInRange } from './CoopRevive';
 
@@ -86,6 +87,8 @@ export class CoopGuestMode implements GameMode {
   private readonly knifeCombat = new KnifeCombat();
   private readonly knifeOrigin = new THREE.Vector3();
   private readonly knifeDirection = new THREE.Vector3();
+  /** Local hand and the shared world's grenades; the host resolves every blast. */
+  private grenades!: CoopGrenades;
 
   public constructor(private readonly connection: CoopConnection) {}
 
@@ -99,7 +102,10 @@ export class CoopGuestMode implements GameMode {
     const castShadows = !ctx.profile.useReducedEffects;
     this.replica = new ZombieReplica(ctx.assets.getZombieModels(), castShadows, ctx.hitColliders);
     this.replica.setEffectColliders(this.world.arena.colliders);
-    this.world.onTopologyChanged = () => this.replica.setEffectColliders(this.world.arena.colliders);
+    this.world.onTopologyChanged = () => {
+      this.replica.setEffectColliders(this.world.arena.colliders);
+      this.grenades.syncTopology();
+    };
     ctx.player.setBodyColliders(this.replica.actives);
     ctx.scene.add(this.replica.group);
     this.energy = new EnergyProjectiles(ctx.hitColliders, ctx.scene);
@@ -111,6 +117,7 @@ export class CoopGuestMode implements GameMode {
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyKnifeImpact();
     ctx.player.camera.add(this.knife.root);
+    this.grenades = new CoopGrenades(ctx, this.world, 'guest', (launch) => this.send({ type: 'grenadeThrow', launch }));
     this.hostAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(),
       castShadows, (id) => ctx.assets.getWeaponModel(id)));
     ctx.scene.add(this.hostAvatar.root);
@@ -144,6 +151,7 @@ export class CoopGuestMode implements GameMode {
     this.knife.setEnabled(this.knife.isAttacking);
     this.knife.update(dt, false, this.ctx.player.speed01);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
+    this.grenades.update(dt, this.isGameplayInputEnabled() && this.isCombatInputEnabled());
     this.boxView.update(dt, this.box);
     this.replica.update(dt, this.world.arena.barriers);
     this.energy.update(dt);
@@ -273,6 +281,12 @@ export class CoopGuestMode implements GameMode {
       this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon });
       return;
     }
+    const grenadeBuy = this.grenades.facingBuy();
+    if (grenadeBuy) {
+      if (this.grenades.hand.isFull) { this.ctx.hud.showRoundBanner(t('banner.grenadesFull')); return; }
+      this.send({ type: 'mapUse', kind: 'grenades', id: grenadeBuy.id, equippedWeapon });
+      return;
+    }
     const refill = this.world.findFacingAmmoRefill();
     if (refill) {
       if (!this.ctx.canRefillEquippedWeaponAmmo()) { this.ctx.hud.showRoundBanner(t('banner.ammoFull')); return; }
@@ -288,19 +302,27 @@ export class CoopGuestMode implements GameMode {
     }
   }
 
-  public usesFallbackAttack(): boolean { return this.isGameplayInputEnabled() && this.knife.isAttacking; }
+  public usesFallbackAttack(): boolean {
+    return this.isGameplayInputEnabled() && (this.knife.isAttacking || this.grenades.isThrowing);
+  }
 
-  public getMeleeArm(): MeleeArmDriver | null { return this.knife.enabled ? this.knife : null; }
+  public getMeleeArm(): MeleeArmDriver | null { return this.knife.enabled ? this.knife : this.grenades.armDriver; }
 
   public getFallbackWeaponName(): string | null {
     return this.match?.stats.guest.life === 'downed' ? t('hud.downed')
-      : this.match?.stats.host.reviver === 'guest' ? t('hud.reviving') : this.usesFallbackAttack() ? t('hud.knife') : null;
+      : this.match?.stats.host.reviver === 'guest' ? t('hud.reviving')
+        : this.isGameplayInputEnabled() && this.knife.isAttacking ? t('hud.knife') : null;
   }
 
   public onMeleeAttack(): boolean {
-    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled()) return false;
+    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled() || this.grenades.isThrowing) return false;
     this.knife.setEnabled(true);
     return this.knife.trigger();
+  }
+
+  public onLethalThrow(): boolean {
+    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled() || this.knife.isAttacking) return false;
+    return this.grenades.hand.throw();
   }
 
   public getInteractPrompt(): string | null {
@@ -317,6 +339,8 @@ export class CoopGuestMode implements GameMode {
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
     const pickup = this.world.findFacingPickup();
     if (pickup) return weaponCasePrompt(pickup, this.match?.stats.guest.kills ?? 0, this.ctx.profile.useTouchControls);
+    const grenadeBuy = this.grenades.facingBuy();
+    if (grenadeBuy) return this.grenades.buyPrompt(grenadeBuy);
     const refill = this.world.findFacingAmmoRefill();
     if (refill) return t('prompt.pickup', { label: refill.interactionLabel, key: key });
     const completion = this.world.findFacingCompletion();
@@ -332,6 +356,7 @@ export class CoopGuestMode implements GameMode {
   public onExit(): void {
     this.chestInteraction.dispose();
     this.knife.reset();
+    this.grenades.exit();
     this.ctx.hud.setHostPauseVisible(false);
     this.gesture.dispose();
     this.connection.dispose();
@@ -369,6 +394,9 @@ export class CoopGuestMode implements GameMode {
             WEAPON_DEFINITIONS[message.weapon].energy!);
         }
         break;
+      case 'grenadeThrow':
+        this.grenades.replay(message.launch, 'host');
+        break;
       case 'teslaChain':
         this.chain.discharge(message.points.map((point) => new THREE.Vector3(point.x, point.y, point.z)));
         this.replica.electrify(message.zombieIds);
@@ -391,6 +419,8 @@ export class CoopGuestMode implements GameMode {
         this.round = message.round;
         this.ctx.hud.showRoundBanner(t('banner.round', { round: message.round }));
         if (this.roundCues.claim('start', message.round)) this.ctx.audio.playRoundStartCue();
+        // Mirrors the host's count of this pouch: full for round 1, topped up after.
+        if (message.round > 1) this.grenades.hand.grantRound();
         break;
       case 'roundEnd':
         this.ctx.hud.showRoundBanner(t('banner.roundComplete', { round: message.round }));
@@ -443,11 +473,15 @@ export class CoopGuestMode implements GameMode {
         } else if (message.kind === 'ammo') {
           this.world.arena.ammoRefills.find((entry) => entry.id === message.id)?.activate();
           if (message.buyer === 'guest' && message.weapon) this.ctx.refillWeaponAmmo(message.weapon);
+        } else if (message.kind === 'grenades' && message.buyer === 'guest') {
+          this.grenades.hand.refill();
+          this.ctx.audio.playMysteryBoxPickup();
         }
         break;
       case 'mapUseFailed':
         if (message.reason === 'insufficientPoints') this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'));
         else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
+        else if (message.reason === 'grenadesFull') this.ctx.hud.showRoundBanner(t('banner.grenadesFull'));
         else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
         break;
       case 'playerDamaged': {
@@ -473,6 +507,7 @@ export class CoopGuestMode implements GameMode {
     if (respawned) {
       this.world.placeLocalPlayer('guest');
       this.ctx.resetArsenal();
+      this.grenades.hand.reset();
       this.send({ type: 'playerState', state: this.world.localPlayerState() });
     }
     for (const pickup of this.world.arena.weaponPickups) pickup.setKillProgress?.(state.stats.guest.kills);
@@ -536,6 +571,7 @@ export class CoopGuestMode implements GameMode {
     this.revivePending = 0;
     this.box.reset();
     this.energy.reset();
+    this.grenades.reset();
     this.replica.reset();
     this.world.reset();
     this.world.placeLocalPlayer('guest');

@@ -209,6 +209,8 @@ export class ZombieReplica {
 
   private replicateState(entry: ReplicaEntry, state: ZombieNetState): void {
     const zombie = entry.zombie;
+    // Retried every snapshot until the body has risen enough to drop onto its hands.
+    if (state.crippled && !zombie.isCrippled) zombie.cripple();
     if (state.state === 'death') {
       this.kill(entry.id);
     } else if (state.state === 'barrierAttack' && zombie.state === 'walk') {

@@ -128,6 +128,11 @@ describe('Zombies map selection flow', () => {
       'beta-access-form': new FakeElement(),
       'beta-email': new FakeElement(),
       'beta-password': new FakeElement(),
+      'beta-email-field': new FakeElement(),
+      'beta-password-hint': new FakeElement(),
+      'beta-confirm-field': new FakeElement(),
+      'beta-confirm-password': new FakeElement(),
+      'beta-mode': new FakeElement(),
       'beta-forgot': new FakeElement(),
       'beta-signin-fields': new FakeElement(),
       'beta-google-field': new FakeElement(),
@@ -200,8 +205,10 @@ describe('Zombies map selection flow', () => {
       ui.setMapUnlockAccount({
         getEmail: () => accountEmail,
         isBetaTester: () => betaTester,
+        register: async () => 'exists',
         signInWithPassword,
         signInWithGoogle: async () => 'rejected',
+        changePassword: async () => 'changed',
         requestRecovery: async () => 'sent',
         signOut: async () => { accountEmail = null; },
         google: null,
@@ -268,12 +275,15 @@ describe('Zombies map selection flow', () => {
       expect(elements['account-avatar'].textContent).toBe('P');
       expect(elements['account-badge'].classList.contains('hidden')).toBe(true);
       betaTester = true;
+      accountEmail = `${'player'.repeat(10)}@example.com`;
       ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
+      expect(elements['account-label'].textContent).toBe(accountEmail);
       expect(elements['account-badge'].classList.contains('hidden')).toBe(false);
       expect(elements['account-badge'].dataset.i18n).toBe('betaThanks.tester');
       elements['account-button'].onclick?.();
       expect(unlockDialog.open).toBe(true);
       expect(elements['beta-unlock-map'].dataset.i18n).toBe('account.title');
+      expect(elements['beta-unlock-hint'].textContent).toContain(accountEmail);
       expect(elements['beta-signout'].classList.contains('hidden')).toBe(false);
     } finally {
       vi.unstubAllGlobals();

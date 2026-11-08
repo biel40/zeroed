@@ -1,6 +1,7 @@
 import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
+import { grenadeCookDial, grenadeIcon } from './GrenadeHudPresentation';
 import { formatNumber, onLanguageChange, setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
@@ -94,7 +95,12 @@ export class HUD {
   private readonly root: HTMLElement = mustGet('hud');
   private readonly weaponName: HTMLElement = mustGet('hud-weapon-name');
   private readonly ammo: HTMLElement = mustGet('hud-ammo');
-  private readonly mode: HTMLElement = mustGet('hud-mode');
+  private readonly lethal: HTMLElement = mustGet('hud-lethal');
+  private readonly grenadeCook: HTMLElement = mustGet('grenade-cook');
+  private readonly grenadeCookFuse: HTMLElement = mustGet('grenade-cook-fuse');
+  private readonly grenadeCookSeconds: HTMLElement = mustGet('grenade-cook-seconds');
+  private lastGrenadeCook = '';
+  private lastLethal = '';
   private readonly crosshair: HTMLElement = mustGet('crosshair');
   private readonly scope: HTMLElement = mustGet('scope-overlay');
   private readonly hitmarker: HTMLElement = mustGet('hitmarker');
@@ -150,7 +156,6 @@ export class HUD {
 
   private lastWeapon: string = '';
   private lastAmmo: string = '';
-  private lastMode: string = '';
   private lastZombies: string = '';
   private lastRound = -1;
   private lastLamps = '';
@@ -182,9 +187,14 @@ export class HUD {
     signInFields: mustGet('beta-signin-fields'),
     googleField: mustGet('beta-google-field'),
     googleButton: mustGet('beta-google-button'),
+    emailField: mustGet('beta-email-field'),
     email: mustGet('beta-email') as HTMLInputElement,
     password: mustGet('beta-password') as HTMLInputElement,
+    passwordHint: mustGet('beta-password-hint'),
+    confirmField: mustGet('beta-confirm-field'),
+    confirmPassword: mustGet('beta-confirm-password') as HTMLInputElement,
     forgotButton: mustGet('beta-forgot') as HTMLButtonElement,
+    modeButton: mustGet('beta-mode') as HTMLButtonElement,
     message: mustGet('beta-message'),
     cancelButton: mustGet('beta-unlock-cancel'),
     submitButton: mustGet('beta-unlock-submit') as HTMLButtonElement,
@@ -219,7 +229,7 @@ export class HUD {
     new LanguagePicker(mustGet('language-select'), mustGet('language-toggle'), mustGet('language-options'));
     onLanguageChange(() => {
       // Cached HUD texts were rendered in the previous language.
-      this.lastWeapon = this.lastAmmo = this.lastMode = this.lastZombies = this.lastLamps = this.lastRings = '';
+      this.lastWeapon = this.lastAmmo = this.lastZombies = this.lastLamps = this.lastRings = '';
       this.lastRound = -1;
       this.lastPrompt = null;
       this.refreshStartHint();
@@ -441,6 +451,11 @@ export class HUD {
     this.account = account;
     this.mapUnlock.setAccount(account, onAccountChanged);
     this.accountButton.onclick = () => this.mapUnlock.open(null);
+  }
+
+  /** After a recovery link signs the player in, asks for their new password. */
+  public askForNewPassword(): void {
+    this.mapUnlock.openNewPassword();
   }
 
   private updateAccountButton(): void {
@@ -713,6 +728,38 @@ export class HUD {
     this.gasMaskOverlay.classList.toggle('worn', rounded >= 1);
   }
 
+  /**
+   * Lethal grenades carried, as icons under the ammo.
+   * `max` 0 hides the row (modes without grenades). Polled freely; the DOM
+   * is only touched when something changed.
+   */
+  public setLethalGrenades(count: number, max: number): void {
+    const key = `${count}|${max}`;
+    if (key === this.lastLethal) return;
+    this.lastLethal = key;
+    this.lethal.classList.toggle('hidden', max <= 0);
+    const pips = this.lethal.querySelector('.lethal-pips');
+    if (pips) pips.innerHTML = Array.from({ length: max }, (_, index) => grenadeIcon(index < count)).join('');
+    this.lethal.setAttribute('aria-label', t('hud.lethalLabel', { count, max }));
+  }
+
+  /**
+   * The dial around the crosshair while a grenade cooks: the ring and the
+   * seconds of fuse left; `null` hides it. Polled every frame; the DOM is
+   * only touched when something changed.
+   */
+  public setGrenadeCook(secondsLeft: number | null, fuseSeconds: number): void {
+    const dial = secondsLeft === null ? null : grenadeCookDial(secondsLeft, fuseSeconds);
+    const key = dial ? `${dial.remaining}|${dial.label}` : '';
+    if (key === this.lastGrenadeCook) return;
+    this.lastGrenadeCook = key;
+    this.grenadeCook.classList.toggle('hidden', dial === null);
+    if (!dial) return;
+    this.grenadeCook.classList.toggle('urgent', dial.urgent);
+    this.grenadeCookFuse.style.strokeDashoffset = `${1 - dial.remaining}`;
+    this.grenadeCookSeconds.textContent = dial.label;
+  }
+
   /** Brief flash over the whole view: cold when a ring fires, white when the white ring lights up. */
   public flashRing(tone: 'cold' | 'radiant' = 'cold'): void {
     this.ringFlash.classList.remove('active');
@@ -911,11 +958,6 @@ export class HUD {
         this.ammo.textContent = melee;
         this.lastAmmo = melee;
       }
-      const blade = t('hud.blade');
-      if (this.lastMode !== blade) {
-        this.mode.textContent = blade;
-        this.lastMode = blade;
-      }
       this.crosshair.style.setProperty('--gap', '10.0px');
       this.crosshair.style.opacity = '1';
       this.scope.style.opacity = '0';
@@ -935,11 +977,6 @@ export class HUD {
     if (ammoText !== this.lastAmmo) {
       this.ammo.textContent = ammoText;
       this.lastAmmo = ammoText;
-    }
-    const mode = t(weapon.fireMode === 'auto' ? 'hud.fireMode.auto' : 'hud.fireMode.semi');
-    if (mode !== this.lastMode) {
-      this.mode.textContent = mode;
-      this.lastMode = mode;
     }
     this.crosshair.style.setProperty('--gap', `${spreadPixels.toFixed(1)}px`);
     this.crosshair.style.opacity = (1 - weapon.adsAlpha).toFixed(2);

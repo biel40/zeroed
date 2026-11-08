@@ -1,4 +1,5 @@
 import { buildAmmoRefill } from './shared/AmmoRefill';
+import { buildGrenadeWallBuy } from './shared/GrenadeWallBuy';
 import * as THREE from 'three';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import { WindowBarrier } from '../barriers/WindowBarrier';
@@ -70,6 +71,7 @@ import {
   STATION33_SPAWNS,
   STATION33_START_ZONE,
   STATION33_WALL_BUYS,
+  STATION33_GRENADE_BUYS,
   STATION33_WALL_THICKNESS,
   STATION33_ZOMBIE_EYES,
   STATION33_ZOMBIE_SKINS,
@@ -79,7 +81,7 @@ import {
   type Station33ZoneId,
 } from './Station33Config';
 import { createStation33Materials } from './Station33Materials';
-import type { ArenaAmmoRefill, ArenaAmbientCue, ArenaAmbush, ArenaRingMachine, ZombieArena } from './ZombieArena';
+import type { ArenaAmmoRefill, ArenaGrenadeBuy, ArenaAmbientCue, ArenaAmbush, ArenaRingMachine, ZombieArena } from './ZombieArena';
 
 /** Seconds the motor-generators shake the station as they spin up. */
 const MAINS_SPIN_UP = 2.5;
@@ -109,10 +111,10 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * `Station33Atmosphere` keep it alive, and gameplay objects come from the
  * shared barrier, door, wall-buy and Mystery Box systems.
  *
- * Phase 1 is the entrance vestibule with four entrances and the PPSh-41
+ * Phase 1 is the entrance vestibule with four entrances and the M14
  * wall buy; the escalator north of it is the sealed frontier.
  * Phase 2 is the luggage office behind the first paid door: two more
- * entrances, the MP5, the Mystery Box and the locker that sells the
+ * entrances, the PPSh-41, the Mystery Box and the locker that sells the
  * Resurrection ring. Phase 3 is the train sheds behind the second door:
  * two abandoned trains, three more entrances, the M60 and the crew locker
  * that sells the Sleight of Hand ring once the power is on. Phase 4 is the
@@ -139,6 +141,7 @@ export class Station33Arena implements ZombieArena {
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;
   public readonly ammoRefills: ReadonlyArray<ArenaAmmoRefill>;
+  public readonly grenadeBuys: ReadonlyArray<ArenaGrenadeBuy>;
   readonly ringMachines: ReadonlyArray<ArenaRingMachine>;
   readonly weaponStations: ReadonlyArray<WeaponStation>;
   readonly weaponPickups: ReadonlyArray<CodeWeaponChest>;
@@ -255,6 +258,7 @@ export class Station33Arena implements ZombieArena {
 
     this.wallBuys = STATION33_WALL_BUYS.map((config) => new WallBuy(config));
     for (const wallBuy of this.wallBuys) new WallBuyView(wallBuy, STATION33_WEAPONS[wallBuy.weaponId], this.group);
+    this.grenadeBuys = STATION33_GRENADE_BUYS.map((placement) => buildGrenadeWallBuy(this.group, placement));
 
     this.refreshZones();
   }

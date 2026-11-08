@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AK47_PROFILE, ak47MagazineFloorplate, ak47MagazineOutline } from '../../weapons/AK47ViewModel';
 import { L96_PROFILE } from '../../weapons/L96ViewModel';
+import { M14_PROFILE } from '../../weapons/M14ViewModel';
 import { M60_PROFILE, m60BipodLeg, m60FrontSight, m60HeatShieldSlots, m60LeafTop } from '../../weapons/M60ViewModel';
 import { MP5_PROFILE } from '../../weapons/MP5ViewModel';
 import { PPSH41_PROFILE, ppsh41ShroudSlots } from '../../weapons/PPSH41ViewModel';
@@ -8,7 +9,8 @@ import { VECTOR_PROFILE } from '../../weapons/VectorViewModel';
 import type { WeaponDefinition } from '../../weapons/WeaponTypes';
 import type { WallBuy } from './WallBuy';
 
-const MATERIAL = new THREE.MeshStandardMaterial({
+/** The luminous chalk every wall outline is drawn with (weapons and grenades). */
+export const WALL_BUY_OUTLINE_MATERIAL = new THREE.MeshStandardMaterial({
   color: 0xd7dde0,
   emissive: 0xb9c8ce,
   emissiveIntensity: 1.15,
@@ -40,6 +42,9 @@ export class WallBuyView {
     } else if (definition.id === 'm1911') {
       this.buildM1911Silhouette();
       this.group.userData.silhouette = 'm1911';
+    } else if (definition.id === 'm14') {
+      this.buildM14Silhouette(view.sightHeight);
+      this.group.userData.silhouette = 'm14';
     } else if (definition.id === 'l96') {
       this.buildL96Silhouette(view.sightHeight);
       this.group.userData.silhouette = 'l96';
@@ -367,6 +372,51 @@ export class WallBuyView {
   }
 
   /**
+   * M14 profile traced from the same M14_PROFILE as the view model: walnut
+   * stock with its semi-pistol grip, upper handguard, receiver, operating-rod
+   * handle, box magazine, gas cylinder, barrel and pronged flash suppressor.
+   * +X points toward the muzzle.
+   */
+  private buildM14Silhouette(sightHeight: number): void {
+    const scale = 1.33;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.204) * scale, (y + 0.08) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): THREE.Shape =>
+      outline([[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]]);
+    const profile = M14_PROFILE;
+
+    this.addShape(outline(profile.stock), 'm14-wall-stock');
+    this.addShape(outline(profile.buttplate), 'm14-wall-buttplate');
+    this.addShape(outline(profile.upperHandguard), 'm14-wall-handguard');
+    this.addShape(outline(profile.receiver), 'm14-wall-receiver');
+    const guard = outline(profile.triggerGuard);
+    guard.holes.push(new THREE.Path(profile.triggerOpening.map(toWall)));
+    this.addShape(guard, 'm14-wall-trigger-guard');
+
+    const magazine = profile.magazine;
+    const toWeapon = ([z, y]: readonly [number, number]): readonly [number, number] => [z + magazine.seat[2], y + magazine.seat[1]];
+    this.addShape(outline(magazine.outline.map(toWeapon)), 'm14-wall-magazine');
+    this.addShape(outline(magazine.floorplate.map(toWeapon)), 'm14-wall-magazine');
+
+    const rod = profile.operatingRod;
+    this.addShape(rect(rod.handleZ + 0.012, rod.handleZ - 0.012, rod.y + 0.011, rod.y - 0.011), 'm14-wall-operating-rod');
+    this.addShape(rect(profile.rearSightZ + 0.024, profile.rearSightZ - 0.024, sightHeight + 0.0085, 0.016), 'm14-wall-rear-sight');
+    const frontZ = profile.frontSightZ;
+    this.addShape(rect(frontZ + 0.009, frontZ - 0.009, sightHeight + 0.004, 0.008), 'm14-wall-front-sight');
+
+    const gas = profile.gasCylinder;
+    this.addShape(rect(gas.rearZ, gas.frontZ, gas.y + gas.radius, gas.y - gas.radius), 'm14-wall-gas-cylinder');
+    const barrel = profile.barrel;
+    this.addShape(outline([
+      [barrel.rearZ, barrel.rearRadius], [barrel.frontZ, barrel.frontRadius],
+      [barrel.frontZ, -barrel.frontRadius], [barrel.rearZ, -barrel.rearRadius],
+    ]), 'm14-wall-barrel');
+    const suppressor = profile.flashSuppressor;
+    this.addShape(rect(suppressor.rearZ, suppressor.muzzleZ, suppressor.radius, -suppressor.radius), 'm14-wall-flash-suppressor');
+  }
+
+  /**
    * L96A1 profile traced from the same L96_PROFILE as the view model:
    * thumbhole stock, action, long barrel, scope with both bells, bolt knob,
    * box magazine and folded bipod. +X points toward the muzzle.
@@ -507,14 +557,14 @@ export class WallBuyView {
   private addShape(shape: THREE.Shape, name: string): THREE.Mesh {
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false });
     geometry.translate(0, 0, -0.0125);
-    const mesh = new THREE.Mesh(geometry, MATERIAL);
+    const mesh = new THREE.Mesh(geometry, WALL_BUY_OUTLINE_MATERIAL);
     mesh.name = name;
     this.group.add(mesh);
     return mesh;
   }
 
   private addPart(width: number, height: number, x: number, y: number, rotation = 0): THREE.Mesh {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.025), MATERIAL);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.025), WALL_BUY_OUTLINE_MATERIAL);
     mesh.position.set(x, y, 0);
     mesh.rotation.z = rotation;
     this.group.add(mesh);

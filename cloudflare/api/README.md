@@ -8,18 +8,21 @@ no la usan. El cliente la usa mediante `WebAccount`; aun no esta desplegada.
 - Rutas en [app.ts](src/app.ts); reglas (caducidades, limites, concesion `*`)
   en [AccountService](src/AccountService.ts); SQL en
   [AccountStore](src/AccountStore.ts) y esquema en [migrations/](migrations/).
-- Contraseña (`POST /auth/password`): sin verificacion de correo, por decision
-  del usuario. La primera contraseña usada con un correo sin contraseña crea la
-  cuenta o la reclama (tambien las de testers sembrados). Hash PBKDF2-SHA256 en
+- Registro (`POST /auth/register`): crea la cuenta con contraseña, sin
+  verificar el correo por decision del usuario. Tambien da contraseña a una
+  cuenta que no tiene (testers sembrados, Google o enlace); 409 si ya la tiene.
+- Entrada (`POST /auth/password`): nunca crea cuentas; 404 si el correo no
+  tiene contraseña y 401 si no coincide. Hash PBKDF2-SHA256 en
   [passwords.ts](src/passwords.ts); 10 fallos por correo o 30 por IP bloquean
   una hora.
+- Cambio de contraseña (`POST /me/password`) con la sesion.
 - Google (`POST /auth/google`): el cliente envia el ID token de Google Identity
   Services y [googleIdToken.ts](src/googleIdToken.ts) comprueba firma, `aud`,
   emisor, caducidad y correo verificado. Se une a la cuenta del mismo correo.
   Sin `GOOGLE_CLIENT_ID` responde 404 y el juego oculta el boton.
 - Recuperacion: `POST /auth/request` envia un enlace de un solo uso; al
-  canjearlo (`/auth/verify`) se inicia sesion y se borra la contraseña, de modo
-  que la siguiente que se use pasa a ser la nueva.
+  canjearlo (`/auth/verify`) se inicia sesion y el juego pide una contraseña
+  nueva, que guarda con `/me/password`.
 - `*` concede todos los productos premium, presentes y futuros; se usa para los
   testers de la beta cerrada.
 - `ALLOWED_ORIGINS` incluye la web, la app Android (`https://localhost`) y la de

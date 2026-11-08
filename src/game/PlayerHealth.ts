@@ -73,10 +73,11 @@ export class PlayerHealth {
   /**
    * Applies damage unless the player is dead or still inside the
    * invulnerability window. Returns true when the hit actually landed.
-   * A landed hit also restarts the regeneration delay.
+   * A landed hit also restarts the regeneration delay. `piercing` damage
+   * (an explosion) ignores the post-hit window.
    */
-  damage(amount: number): boolean {
-    if (this.invincible || this.isDead || this.isInvulnerable) return false;
+  damage(amount: number, piercing = false): boolean {
+    if (this.invincible || this.isDead || (this.isInvulnerable && !piercing)) return false;
     this.hp = Math.max(0, this.hp - amount);
     this.invulnTimer = this.invulnDuration;
     this.regenTimer = 0;

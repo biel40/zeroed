@@ -10,6 +10,8 @@ import { CaptainUssrView } from '../zombies/guardians/CaptainUssrView';
 import { GuardianEntrance } from '../zombies/guardians/GuardianEntrance';
 import type { ArenaEvacuationGuardian, ArenaGuardianEntrance } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
+import type { GrenadeBlastConfig } from '../config/grenades';
+import { guardianBlastDamage } from '../zombies/grenades/GrenadeBlast';
 
 /** Camera jolt of its landing (and its fall), of a charge crashing and of each charging stride nearby, at point blank. */
 const LANDING_TRAUMA = 0.7;
@@ -21,6 +23,8 @@ const THEME_FADE_SECONDS = 3;
 const CLANG_FROM = 0.8;
 /** Each tick of flame jolts it lightly: a stream keeps it writhing without a full flinch per tick. */
 const BURN_FLINCH = 0.35;
+/** A grenade going off at its feet staggers it more than a flame tick. */
+const BLAST_FLINCH = 0.8;
 /** Beyond this distance its landing and crashes no longer shake the view. */
 const TRAUMA_REACH = 14;
 /** The player still counts as within its reach this far outside its field. */
@@ -169,6 +173,23 @@ export class ZombiesGuardian {
     // The flamethrower's reward: fire wraps around the shield, every tick lands.
     if (this.brain.takeBurn(damage) !== 'ignored') this.view.hurt(BURN_FLINCH);
     this.processEvents();
+  }
+
+  /**
+   * A grenade going off at `position`: on its floor and within the blast,
+   * the explosion wraps around the shield (`guardianBlastDamage`, scaled by
+   * `damageScale`). True when it hurt the guardian.
+   */
+  public blast(position: THREE.Vector3, blast: GrenadeBlastConfig, damageScale: number): boolean {
+    if (!this.brain.engaged || Math.abs(position.y - this.guardian.groundY) > blast.verticalReach) return false;
+    const { x, z } = this.brain.position;
+    const distance = Math.max(0, Math.hypot(x - position.x, z - position.z) - this.brain.radius);
+    const damage = guardianBlastDamage(blast, distance) * damageScale;
+    if (damage <= 0 || this.brain.takeBlast(damage) === 'ignored') return false;
+    this.ctx.hud.showHitmarker(false);
+    this.view.hurt(BLAST_FLINCH);
+    this.processEvents();
+    return true;
   }
 
   /** The note while the duel lasts: beat it, with the phase's advice. */

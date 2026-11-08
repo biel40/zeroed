@@ -11,22 +11,25 @@ base de datos con `npm run api:seed-beta` desde un archivo fuera del
 repositorio.
 
 Flujo: la tarjeta bloqueada abre [MapUnlockDialog](../../src/ui/MapUnlockDialog.ts),
-que ofrece "Continuar con Google" (solo en web, si hay id de cliente) y correo
-con contraseña. Sin ir al correo: la primera contraseña usada con un correo crea
-su cuenta, o la de un tester sembrado; despues se pide esa misma. Al entrar, el
-juego carga los productos y, si la cuenta es de beta, muestra
+que ofrece "Continuar con Google" (solo en web, si hay id de cliente) y entrar
+con correo y contraseña. "Crear cuenta" cambia al formulario de registro, con la
+contraseña repetida; un tester sembrado tambien se registra ahi, sin ir al
+correo. Entrar con un correo sin cuenta lleva al registro, y registrar uno que
+ya la tiene lleva a entrar, conservando el correo escrito. Al entrar, el juego
+carga los productos y, si la cuenta es de beta, muestra
 [BetaThanksScreen](../../src/ui/BetaThanksScreen.ts) antes del menu. "¿Has
-olvidado la contraseña?" envia un enlace que inicia sesion y permite elegir una
-nueva. Una cuenta sin el mapa ve su correo y puede cerrar sesion. El boton de
+olvidado la contraseña?" envia un enlace; al abrirlo, el juego inicia sesion y
+pide una contraseña nueva. Una cuenta sin el mapa ve su correo y puede cerrar sesion. El boton de
 cuenta, arriba a la derecha del menu, muestra la inicial y el correo, con la
-placa "BETA TESTER" en cuentas de beta (o "Iniciar sesion"), y abre el mismo
-dialogo para entrar o cerrar sesion. `?map=station-33` sin permiso muestra el
-menu con la tarjeta bloqueada.
+placa "BETA TESTER" en cuentas de beta (o "Iniciar sesion"). Si falta espacio,
+el correo se acorta con puntos suspensivos. El boton abre el dialogo para
+entrar o cerrar sesion, donde se ve la direccion completa de la cuenta.
+`?map=station-33` sin permiso muestra el menu con la tarjeta bloqueada.
 
 Limites: el codigo de Station 33 sigue en el paquete del juego, asi que un
-cliente modificado puede abrirlo. Como la contraseña no verifica el correo,
-quien conozca el correo de un tester que aun no ha entrado puede reclamar su
-cuenta antes que el; el tester lo recupera con Google o con el enlace de
+cliente modificado puede abrirlo. Como el registro no verifica el correo,
+quien conozca el correo de un tester que aun no se ha registrado puede hacerlo
+antes que el; el tester lo recupera con Google o con el enlace de
 recuperacion. Las apps Android y de escritorio solo ofrecen correo y
 contraseña.
 
@@ -34,14 +37,15 @@ contraseña.
 
 Pruebas en local: con `npm run dev`, los correos de
 [LocalTesterBackend](../../src/account/LocalTesterBackend.ts) entran al momento
-con cualquier contraseña, sin API, con todo el contenido premium y la placa de
+con cualquier contraseña, al entrar o al registrarse, sin API, con todo el contenido premium y la placa de
 beta; el resto de correos sigue el flujo normal. Los builds de produccion no
 incluyen ese modulo.
 
 Validacion manual (con la API local o desplegada): en una sesion nueva,
 Burned Mansion funciona y Station 33 aparece bloqueado y no abre por enlace
-directo; entrar con un correo de tester y una contraseña nueva, ver el
-agradecimiento y jugar; recargar; cerrar sesion y comprobar que una contraseña
-distinta se rechaza y la correcta entra; probar Google con una cuenta de tester;
-pedir el enlace de recuperacion y elegir otra contraseña; probar un correo sin
+directo; entrar con un correo de tester sin registrar y comprobar que lleva a
+"Crear cuenta"; registrarlo con la contraseña repetida, ver el agradecimiento y
+jugar; recargar; cerrar sesion y comprobar que una contraseña distinta se
+rechaza y la correcta entra; probar Google con una cuenta de tester; pedir el
+enlace de recuperacion, abrirlo y guardar otra contraseña; probar un correo sin
 concesion. Repetir en movil, PWA instalada y app Android.

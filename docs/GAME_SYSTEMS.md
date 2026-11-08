@@ -41,7 +41,9 @@ levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
 recarga vacia. La AK-47 suma a cada disparo el golpe del portacerrojo y su
 recarga bascula el cargador sobre el teton delantero con foley propio. La
 M1911 queda con la corredera abierta tras la ultima bala y su recarga vacia la
-suelta de ese bloqueo; el cargador vaciado cae sin su bala superior.
+suelta de ese bloqueo; el cargador vaciado cae sin su bala superior. El M14
+(`locksOpenWhenEmpty`) hace lo mismo con su varilla de operaciones, que ademas
+se mueve con cada disparo, y bascula su cargador recto como la AK-47.
 La PPSh-41 intercambia su tambor de 71 balas con la misma coreografia; al
 recargar vacia tira del cerrojo hasta engancharlo atras, sin un cierre hacia delante.
 Toda recarga sigue la misma vitrina (`ReloadAnimator`), ajustada por arma en
@@ -171,7 +173,8 @@ ADS. Las acciones usan los mismos handlers y validaciones del shell y los modos.
 Las asignaciones se mantienen en
 [GamepadBindings](../src/player/GamepadBindings.ts): X/□ recarga y LB/L1
 interactua. Tienen botones separados para conservar la reparacion mantenida y la
-reanimacion existentes. No hay sprint ni granadas en el juego.
+reanimacion existentes. La cruceta derecha lanza la granada letal (G en
+teclado). No hay sprint.
 
 Cruceta o stick izquierdo recorren los controles visibles del menu o dialogo
 activo; confirmar activa el control nativo, volver cancela el dialogo o regresa
@@ -355,6 +358,45 @@ existente a `MOTDRULES`.
   destello azul en la piel, vivo o ya caido en el suelo. Es solo visual (un
   draw call por cuerpo cargado, sin luces) y el anfitrion envia los IDs
   alcanzados en `teslaChain`.
+- Granada letal (individual y cooperativo): la F-1 sovietica, definida como datos en
+  [granadas](../src/config/grenades.ts). La run empieza con 2, cada ronda
+  nueva suma 2 y se llevan 4 como mucho; una pared de granadas del mapa llena
+  la bolsa. G, el boton GRAN tactil o la cruceta derecha la lanzan: como el
+  cuchillo, el arma baja, la mano derecha saca la granada, quita la anilla y
+  la lanza por encima del hombro (`GrenadeThrow`); interrumpe la recarga, no
+  se combina con el cuchillo ni con ponerse un anillo o la mascara, y solo se
+  gasta al soltarla. La espoleta arde desde que sale la anilla (3,6 s): una
+  pulsacion la lanza con unos 3,2 s por delante; mantener el boton deja el
+  brazo armado mientras se cocina, con un tic por segundo y un dial alrededor
+  de la mira con los segundos que quedan (rojo en el ultimo), y soltarlo la
+  lanza con lo que le quede (`GrenadeHand`). Si se agota en la mano, estalla ahi.
+  Rebota en los solidos del mapa (los mismos `GibWalls` de la sangre) y rueda
+  hasta pararse (`GrenadeFlight`). El dano cae con la distancia horizontal (`GrenadeBlast`), las
+  paredes y puertas cerradas protegen, y los anillos de dano lo escalan. Una
+  baja a sus pies revienta el cuerpo (`shatter`); las demas lo lanzan por los
+  aires de espaldas (`blown`). Cada superviviente dentro del radio de
+  mutilacion tiene un 40 % de quedarse sin piernas; los Brutus nunca. Paga un
+  impacto por superviviente, sacude la camara segun la distancia y tambien
+  hiere a quien la lanzo (nunca al compañero): a menos de 0,9 m, o si se agota
+  en la mano, lo mata de golpe aunque acabe de recibir otro impacto (en
+  cooperativo lo deja abatido; un anillo de Resurreccion lo salva). Al guardian del Protocolo 33 le
+  rodea el escudo como el fuego y le quita hasta `guardianDamage` (1500 en el
+  centro, con la misma caida), mucho mas que a un zombi. Explosion (`GrenadeExplosionView`, sin luces
+  reales): destello cegador, bola de fuego con columna, onda de choque y
+  resplandor falso sobre el suelo, metralla incandescente, polvo rasante,
+  humo que sube varios segundos y una quemadura que dura unos 20 s en el
+  suelo. El sonido es procedural (chasquido, estampido, subgrave, cascotes,
+  cola y pitido de oidos si fue cerca) salvo que exista
+  `public/assets/audio/f1_explosion.mp3` (`GrenadeAudioConfig.explosionSampleFile`),
+  que lo sustituye. En cooperativo cada jugador lleva su bolsa; consulta
+  [cooperativo](MULTIPLAYER.md#alcance-y-límites).
+- Zombis tullidos (`Zombie.cripple`): caen sobre las manos y siguen
+  arrastrandose con el clip `ZombieCrawl` del GLB (el mismo de la aparicion)
+  al 32 % de su velocidad, sincronizado con el avance. Atacan y golpean
+  barricadas zarpando desde el suelo, cruzan las ventanas sin la trepada de
+  pie y, al morir, se quedan boca abajo donde estaban. La cabeza y el torso
+  siguen a los huesos, asi que sus hitboxes bajan con ellos. El invitado
+  cooperativo los ve arrastrarse igual.
 
 ## Mapas e interacciones
 
@@ -387,7 +429,8 @@ existente a `MOTDRULES`.
 - `Station33Arena`: individual y premium, se construye por fases y crece hacia
   el norte y hacia abajo segun el plan de ejes de `Station33Config`. La Fase 1
   es el vestibulo: cuatro entradas con chapas de acero (escalera de superficie,
-  puerta de servicio y dos rejillas), la PPSh-41 (1250 / 625) en pared
+  puerta de servicio y dos rejillas), el M14 (800 / 625) en pared, la
+  pared de granadas F-1 del muro este (250, llena la bolsa; `grenadeBuys`)
   y la escalera mecanica sellada. Junto al muro sur hay una caja de municion
   reutilizable por 800 Points, con la misma compra y feedback que la de
   Burned Mansion (`shared/AmmoRefill`). Easter egg del vestibulo: al acercarse a
@@ -397,7 +440,7 @@ existente a `MOTDRULES`.
   de la ronda (`shared/AmbushTrigger`, `ZombieArena.onAmbush`).
   La Fase 2 es la consigna, tras una puerta de pago de chapa (750) en
   el muro este: dos entradas mas, que solo generan zombis con la puerta
-  abierta, la MP5 (1000 / 500) en
+  abierta, la PPSh-41 (1250 / 625) en
   pared, la Mystery Box y la taquilla del
   anillo de Resurreccion. Las rejillas este del vestibulo se separaron para
   dejar un pasillo de 5,8 m. La Fase 3 son las cocheras, tras una puerta de
@@ -556,7 +599,7 @@ existente a `MOTDRULES`.
   geometria, colliders, spawns, barreras y puertas.
 - Barreras: HP autoritativo, rotura visual independiente y reparacion limitada
   por ronda. Puertas y wall buys cobran de forma atomica. La sala de inicio
-  ofrece la M1911 (500) y la L96 (1250) en su pared norte.
+  ofrece la M1911 (500) y el M14 (800) en su pared norte.
 - Cada barrera conoce la altura de su alfeizar (`WindowBarrierConfig.sill`;
   0 en las puertas de Station 33). Un zombi que empieza a cruzar desde fuera
   una ventana abierta con alfeizar la trepa (`WindowVault`): se encorva, apoya

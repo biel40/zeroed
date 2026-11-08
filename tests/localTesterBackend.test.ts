@@ -6,6 +6,8 @@ import { PRODUCT_IDS } from '../src/config/products';
 
 function remoteBackend(): AccountBackend & { [K in keyof AccountBackend]: ReturnType<typeof vi.fn> } {
   return {
+    register: vi.fn(async () => ({ token: 'new-session', email: 'new@example.com' })),
+    changePassword: vi.fn(async () => 'changed' as const),
     signInWithPassword: vi.fn(async () => ({ token: 'remote-session', email: 'player@example.com' })),
     signInWithGoogle: vi.fn(async () => ({ token: 'google-session', email: 'player@gmail.com' })),
     requestLogin: vi.fn(async () => 'sent' as const),
@@ -31,7 +33,9 @@ describe('local tester backend', () => {
     const storage = memoryStorage();
     const account = new WebAccount(backend, storage);
 
-    expect(await account.signInWithPassword(' Tester@Example.com ', 'whatever')).toBe('signed-in');
+    expect(await account.register(' Tester@Example.com ', 'whatever')).toBe('signed-in');
+    expect(await account.signInWithPassword('tester@example.com', 'anything else')).toBe('signed-in');
+    expect(await account.changePassword('new one')).toBe('changed');
     expect(account.getEmail()).toBe('tester@example.com');
     expect(account.isBetaTester()).toBe(true);
     for (const product of PRODUCT_IDS) expect(account.owns(product)).toBe(true);
@@ -58,6 +62,10 @@ describe('local tester backend', () => {
     await account.signOut();
     expect(remote.logout).toHaveBeenCalledWith('remote-session');
 
+    expect(await account.register('new@example.com', 'secret password')).toBe('signed-in');
+    expect(remote.register).toHaveBeenCalledWith('new@example.com', 'secret password');
+    expect(await account.changePassword('another one')).toBe('changed');
+    expect(remote.changePassword).toHaveBeenCalledWith('new-session', 'another one');
     expect(await account.signInWithGoogle('credential')).toBe('signed-in');
     expect(remote.signInWithGoogle).toHaveBeenCalledWith('credential');
     expect(await account.requestLogin('tester@example.com', 'en')).toBe('sent');

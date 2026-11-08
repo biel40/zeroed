@@ -5,6 +5,12 @@ import { MobileInput } from './MobileInput';
 import { GamepadControls } from './GamepadControls';
 import { getInputDevice } from './InputPresentation';
 
+/**
+ * Key codes of the lethal grenade action: G, the touch GRAN button and the
+ * bound pad button (which reports KeyG). Pressed throws, held cooks.
+ */
+export const LETHAL_INPUT_CODES = ['KeyG', 'TouchGrenade'] as const;
+
 const DESKTOP_PROFILE: DeviceProfile = {
   isMobile: false,
   isTouch: false,

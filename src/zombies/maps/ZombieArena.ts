@@ -73,6 +73,19 @@ export interface ArenaAmmoRefill {
 }
 
 /**
+ * A wall that refills the lethal grenades: the map places it and draws it;
+ * the price is the map's, the pouch and its cap belong to the mode.
+ */
+export interface ArenaGrenadeBuy {
+  readonly id: string;
+  readonly cost: number;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+}
+
+/**
  * A map's special-weapon station (an equipment cabinet rather than a chalk
  * outline): like a wall buy it sells its weapon once and then refills that
  * weapon's ammunition for its owner, but it may wait for the map's power.
@@ -392,6 +405,8 @@ export interface ZombieArena {
   readonly wallBuys: ReadonlyArray<WallBuy>;
   readonly weaponPickups?: ReadonlyArray<ArenaWeaponPickup>;
   readonly ammoRefills?: ReadonlyArray<ArenaAmmoRefill>;
+  /** Optional: walls that refill the lethal grenades; maps without one only hand them out per round. */
+  readonly grenadeBuys?: ReadonlyArray<ArenaGrenadeBuy>;
   readonly soulLampInteractions?: ReadonlyArray<ArenaSoulLampInteraction>;
   readonly ritualInteraction?: ArenaRitualInteraction;
   /** Optional: machines selling the rings (perks); maps without them omit it. */

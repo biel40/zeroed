@@ -19,7 +19,7 @@ codigo: actualiza la guia.
   Debe notarse superior a Burned Mansion desde el primer segundo, sin
   degradar el modo individual ni introducir dependencias del modo con el mapa.
 - Se construye por fases. La Fase 1, el vestibulo, es una partida completa:
-  cuatro entradas con chapas de acero, la PPSh-41 (1250 / 625) en pared
+  cuatro entradas con chapas de acero, el M14 (800 / 625) en pared
   y la escalera mecanica sellada. La Fase 2 abre la consigna tras la primera
   puerta de pago, la Fase 3 las cocheras tras la segunda y la Fase 4 la sala
   de maquinas (la subestacion) tras la tercera. La escalera mecanica sigue
@@ -62,7 +62,7 @@ codigo: actualiza la guia.
   muro este; con ella cerrada la sala no existe para el jugador ni para los
   zombis. Al abrirla despiertan sus dos entradas (escalera de mozos sepultada
   y una rejilla), la Mystery Box y la taquilla del anillo. El arma de pared
-  de la consigna es la MP5 (1000 / 500), en el muro norte del pasillo.
+  de la consigna es la PPSh-41 (1250 / 625), en el muro norte del pasillo.
 - La taquilla del anillo, bajo la placa "БЮРО НАХОДОК" (objetos perdidos), es
   el foco al final del eje del pasillo: abierta, con un cojin de terciopelo y
   la alianza brillando con su propio esmalte. Tras la compra queda vacia y

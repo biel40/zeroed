@@ -71,6 +71,39 @@ export function cylinderZ(rearRadius: number, frontRadius: number, length: numbe
   return geometry;
 }
 
+/**
+ * Replaces the UVs with a box projection in metres, one axis per triangle, so
+ * texture detail keeps its real size on any part however small. The long
+ * texture axis follows the bore on flanks and top faces. Returns a non-indexed
+ * geometry; the offset (metres) keeps parts of one material from matching.
+ */
+export function projectMetricUVs(source: THREE.BufferGeometry, offsetU = 0, offsetV = 0): THREE.BufferGeometry {
+  const geometry = source.index ? source.toNonIndexed() : source;
+  const position = geometry.attributes.position;
+  const uv = new Float32Array(position.count * 2);
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  for (let first = 0; first + 2 < position.count; first += 3) {
+    a.fromBufferAttribute(position, first);
+    b.fromBufferAttribute(position, first + 1);
+    c.fromBufferAttribute(position, first + 2);
+    normal.subVectors(b, a).cross(c.sub(a));
+    const x = Math.abs(normal.x);
+    const y = Math.abs(normal.y);
+    const z = Math.abs(normal.z);
+    for (let vertex = first; vertex < first + 3; vertex++) {
+      const along = z > x && z > y ? position.getX(vertex) : position.getZ(vertex);
+      const across = y > x && y >= z ? position.getX(vertex) : position.getY(vertex);
+      uv[vertex * 2] = along + offsetU;
+      uv[vertex * 2 + 1] = across + offsetV;
+    }
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geometry;
+}
+
 /** Cylinder spanning two points (bolt arm, bipod braces). */
 export function strut(from: THREE.Vector3, to: THREE.Vector3, radius: number): THREE.CylinderGeometry {
   const direction = to.clone().sub(from);

@@ -118,6 +118,15 @@ describe('Captain USSR brain', () => {
     expect(brain.takeBurn(100)).toBe('ignored');
   });
 
+  it('takes grenade blasts through its raised shield, like fire', () => {
+    const player = { x: 15, z: 25, reachable: true };
+    const brain = fighting(player);
+    expect(brain.blocking).toBe(true);
+    expect(brain.takeBlast(900)).toBe('hurt');
+    expect(brain.health).toBe(brain.maxHealth - 900);
+    expect(brain.radius).toBe(CAPTAIN_USSR.radius);
+  });
+
   it('ignores flames before it has landed', () => {
     const brain = brainWith();
     expect(brain.takeBurn(100)).toBe('ignored');

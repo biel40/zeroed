@@ -1,12 +1,13 @@
+import type { LethalGrenadeId } from '../config/grenades';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import { shapePreservingTangent } from './ZombieAttackMotion';
 
 /** What dealt the lethal blow. Rewards only distinguish the knife. */
-export type ZombieKillSource = WeaponId | 'knife';
+export type ZombieKillSource = WeaponId | 'knife' | LethalGrenadeId;
 
 /** Deaths the body performs by falling: each has a profile and a baked clip. */
 export const ZOMBIE_FALL_STYLES = [
-  'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock', 'burn',
+  'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock', 'burn', 'blown',
 ] as const;
 export type ZombieFallStyle = typeof ZOMBIE_FALL_STYLES[number];
 
@@ -19,6 +20,7 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   knife: 'slash',
   m1911: 'knockback',
   l96: 'knockback',
+  m14: 'knockback',
   barrett: 'shatter',
   m4a1: 'riddled',
   mp5: 'riddled',
@@ -30,6 +32,8 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   tesla: 'shock',
   // Burnt alive: thrashes in the fire, kneels and collapses curled up, charred (ZombieVisual.incinerate).
   fakel: 'burn',
+  // A grenade hurls the body off its feet; one at its feet blows it apart (Zombie.applyExplosion).
+  f1: 'blown',
 };
 
 /**
@@ -45,8 +49,8 @@ export function resolveZombieDeathStyle(
   const style = source ? WEAPON_DEATH_STYLES[source] : 'knockback';
   // Nothing is left standing to fall, whatever the round hit.
   if (style === 'shatter') return style;
-  if (headshot && style !== 'slash' && style !== 'shock' && style !== 'burn') return 'headshot';
-  if ((style === 'knockback' || style === 'blast') && pushZ > 0.35) return 'stumble';
+  if (headshot && style !== 'slash' && style !== 'shock' && style !== 'burn' && style !== 'blown') return 'headshot';
+  if ((style === 'knockback' || style === 'blast' || style === 'blown') && pushZ > 0.35) return 'stumble';
   return style;
 }
 
@@ -320,6 +324,25 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieFallStyle, ZombieDeathProfile> 
       knees: curve([0, 0], [0.3, 0.25], [0.7, 0.1], [1, 0.08]),
     },
     hand: handPath([[0.2, 0.24], [0.5, 0.34], [1, 0.34]], [[0.2, 0.62], [0.5, 0.85], [1, 0.8]], [[0.2, 0.3], [0.5, 0.15], [1, 0.02]]),
+  },
+  // Grenade: the blast lifts it off its feet and hurls it a body length back, limbs flung wide.
+  blown: {
+    duration: 1.05,
+    fall: 'back',
+    followsImpact: true,
+    channels: {
+      drop: curve([0, 0], [0.15, -0.06], [0.32, -0.08], [0.55, 0.5], [0.66, 0.9, IMPACT], [0.74, 0.82], [0.84, 0.87, IMPACT], [1, 0.86]),
+      travel: curve([0, 0], [0.15, -0.25], [0.45, -0.72], [0.66, -0.92], [0.8, -0.98], [1, -1]),
+      pitch: curve([0, 0], [0.15, -0.5], [0.45, -1.25], [0.66, -1.55, IMPACT], [0.76, -1.42], [1, -1.52]),
+      roll: curve([0, 0], [0.4, 0.22], [1, 0.16]),
+      yaw: curve([0, 0], [0.5, 0.28], [1, 0.32]),
+      spine: curve([0, 0], [0.1, -0.45], [0.4, 0.3], [0.66, -0.08], [1, 0.04]),
+      nod: curve([0, 0], [0.1, 0.55], [0.4, -0.35], [0.66, 0.3], [0.78, -0.12], [1, 0.06]),
+      tilt: curve([0.7, 0], [1, 0.3]),
+      plant: curve([0, 1], [0.06, 0.4], [0.2, 0]),
+      knees: curve([0, 0], [0.25, 0.35], [0.66, 0.12], [1, 0.1]),
+    },
+    hand: handPath([[0.15, 0.4], [0.45, 0.42], [1, 0.36]], [[0.15, 0.75], [0.45, 0.9], [1, 0.82]], [[0.15, 0.25], [0.5, 0.1], [1, 0.02]]),
   },
   // ФАКЕЛ-33: burnt alive. It claws at its burning face and writhes, the knees
   // give, it pitches onto its face and draws its limbs in like a charred corpse.

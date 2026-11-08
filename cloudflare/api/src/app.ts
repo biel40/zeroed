@@ -57,14 +57,23 @@ export function createAccountApp(options: AccountAppOptions): Hono<AppEnv> {
     return session ? c.json(session) : c.json({ error: 'invalid_token' }, 401);
   });
 
+  app.post('/auth/register', async (c) => {
+    const { email, password } = await readJsonObject(c);
+    const result = await accounts.register(email, password);
+    if (result === 'invalid-email') return c.json({ error: 'invalid_email' }, 400);
+    if (result === 'weak-password') return c.json({ error: 'weak_password' }, 400);
+    if (result === 'exists') return c.json({ error: 'account_exists' }, 409);
+    return c.json(result, 201);
+  });
+
   app.post('/auth/password', async (c) => {
     const { email, password } = await readJsonObject(c);
     const result = await accounts.signInWithPassword(email, password, requesterOf(c));
     if (result === 'invalid-email') return c.json({ error: 'invalid_email' }, 400);
-    if (result === 'weak-password') return c.json({ error: 'weak_password' }, 400);
+    if (result === 'no-account') return c.json({ error: 'no_account' }, 404);
     if (result === 'wrong-password') return c.json({ error: 'wrong_password' }, 401);
     if (result === 'rate-limited') return c.json({ error: 'rate_limited' }, 429);
-    return c.json({ ...result.session, created: result.created });
+    return c.json(result);
   });
 
   app.post('/auth/google', async (c) => {
@@ -88,6 +97,11 @@ export function createAccountApp(options: AccountAppOptions): Hono<AppEnv> {
   });
 
   app.get('/me/entitlements', async (c) => c.json(await accounts.getEntitlements(c.get('session'))));
+
+  app.post('/me/password', async (c) => {
+    const { password } = await readJsonObject(c);
+    return (await accounts.changePassword(c.get('session'), password)) ? c.body(null, 204) : c.json({ error: 'weak_password' }, 400);
+  });
 
   app.post('/auth/logout', async (c) => {
     const session = await authenticate(c);

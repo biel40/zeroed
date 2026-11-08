@@ -8,7 +8,6 @@ import { buildProceduralViewModel } from '../src/weapons/WeaponView';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
 import { MYSTERY_BOX_POOL } from '../src/zombies/MysteryBox';
 import { ZOMBIE_BASE_HP, ZOMBIES_RESERVE_AMMO } from '../src/zombies/ZombieConfig';
-import { STATION33_WALL_BUYS } from '../src/zombies/maps/Station33Config';
 import { WallBuy } from '../src/zombies/wallbuys/WallBuy';
 import { WallBuyView } from '../src/zombies/wallbuys/WallBuyView';
 
@@ -29,9 +28,8 @@ describe('MP5 definition', () => {
     expect(definition.projectile.muzzleVelocity).toBeLessThan(WEAPON_DEFINITIONS.m4a1.projectile.muzzleVelocity);
   });
 
-  it('is a standard Mystery Box pull and a Station 33 wall buy', () => {
+  it('is a standard Mystery Box pull', () => {
     expect(MYSTERY_BOX_POOL.find((entry) => entry.weaponId === 'mp5')).toMatchObject({ rarity: 'standard' });
-    expect(STATION33_WALL_BUYS.find((wallBuy) => wallBuy.weaponId === 'mp5')).toMatchObject({ price: 1000, ammoPrice: 500 });
   });
 });
 
@@ -102,7 +100,9 @@ describe('MP5A3 view model', () => {
 
 describe('MP5 wall-buy silhouette', () => {
   it('draws the MP5A3 profile instead of the generic long gun', () => {
-    const wallBuy = new WallBuy(STATION33_WALL_BUYS.find((config) => config.weaponId === 'mp5')!);
+    const wallBuy = new WallBuy({
+      id: 'test-mp5', weaponId: 'mp5', price: 1000, ammoPrice: 500, position: { x: 0, y: 0, z: 0 }, yaw: 0, floor: 0,
+    });
     const wall = new WallBuyView(wallBuy, definition, new THREE.Group());
     expect(wall.group.userData.silhouette).toBe('mp5');
     for (const part of ['stock', 'receiver', 'lower', 'grip', 'trigger-guard', 'magazine', 'handguard', 'rear-sight', 'front-sight', 'barrel']) {

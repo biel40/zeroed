@@ -256,6 +256,12 @@ body {
 #touch-controls #btn-crouch { --arc-x: -0.906; --arc-y: -0.423; }
 #touch-controls #btn-reload { --arc-x: -0.559; --arc-y: 0.829; }
 #touch-controls #btn-knife { --arc-x: 0.105; --arc-y: 0.995; }
+/* Outer ring, beside WEAPON: a throw is deliberate, never a slip of the firing thumb. */
+#touch-controls #btn-grenade {
+  --arc-r: calc(var(--arc-inner) + var(--touch-secondary-size) + var(--touch-arc-gap));
+  --arc-x: -0.616;
+  --arc-y: 0.788;
+}
 
 #touch-controls #btn-aim {
   --size: var(--touch-aim-size);
@@ -296,6 +302,13 @@ body {
   background: rgba(60, 78, 96, 0.7);
   filter: brightness(1.15);
   transform: scale(0.94);
+}
+
+#touch-controls #btn-grenade {
+  color: #eef2d6;
+  border-color: rgba(190, 204, 126, 0.55);
+  background: rgba(52, 60, 30, 0.55);
+  font-size: 9px;
 }
 
 #touch-controls #btn-knife {
@@ -368,6 +381,61 @@ body {
   font-weight: 700;
   margin: 2px 0 6px;
 }
+
+/* Lethal grenades carried: one cast-iron pip each, hollow once thrown. */
+.hud-lethal { margin-top: 4px; justify-content: flex-start; }
+.lethal-pips { display: inline-flex; gap: 3px; align-items: center; }
+.lethal-pip {
+  width: 18px;
+  height: 23px;
+  overflow: visible;
+  fill: none;
+  stroke: rgba(214, 226, 168, 0.32);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lethal-pip .f1-groove, .lethal-pip .f1-shine { display: none; }
+.lethal-pip.full { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85)); stroke: #e6edc2; }
+.lethal-pip.full .f1-body { fill: #7c8a45; stroke: #dfe8b6; }
+.lethal-pip.full .f1-metal { fill: #b9b39b; stroke: #ece8d6; }
+.lethal-pip.full .f1-spoon { stroke: #d4d0ba; stroke-width: 2; }
+.lethal-pip.full .f1-ring { stroke: #e9dfa8; stroke-width: 1.4; }
+.lethal-pip.full .f1-groove { display: inline; stroke: #2f3719; stroke-width: 1.15; }
+.lethal-pip.full .f1-shine { display: inline; fill: rgba(240, 246, 205, 0.55); stroke: none; }
+
+/* Fuse left on a cooking grenade: a ring round the crosshair that burns away. */
+#grenade-cook {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+#grenade-cook svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+#grenade-cook circle { fill: none; stroke-width: 4; }
+#grenade-cook .cook-track { stroke: rgba(0, 0, 0, 0.45); }
+#grenade-cook-fuse {
+  stroke: #ffc65c;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  filter: drop-shadow(0 0 3px rgba(255, 170, 60, 0.8));
+}
+#grenade-cook-seconds {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 2px;
+  color: #ffd98f;
+  font: 700 15px 'Segoe UI', sans-serif;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+#grenade-cook.urgent #grenade-cook-fuse { stroke: #ff4b3a; filter: drop-shadow(0 0 4px rgba(255, 60, 40, 0.95)); }
+#grenade-cook.urgent #grenade-cook-seconds { color: #ff7a6b; }
 
 /* ---------- Zombies mode ---------- */
 
@@ -1490,7 +1558,8 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 /* Main-menu header: brand on the left, language and account on the right. */
 .menu-header {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: wrap-reverse;
+  align-items: start;
   justify-content: space-between;
   gap: 12px 24px;
   margin-bottom: clamp(18px, 3.5dvh, 34px);
@@ -1499,7 +1568,9 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 /* Top-right menu controls: language, then account. */
 .menu-corner {
   display: flex;
-  align-items: flex-start;
+  /* Keep enough room for both controls before sharing a row with the title. */
+  flex: 1 1 min(264px, 100%);
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
 }
@@ -1507,6 +1578,7 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 .language-picker {
   position: relative;
   z-index: 2;
+  display: flex;
   flex: none;
 }
 
@@ -1526,18 +1598,27 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 
 .account-button,
 .language-toggle {
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 10px;
 }
 
 .account-button {
+  min-width: 0;
   max-width: 100%;
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
+.account-details {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  min-width: 0;
+  text-align: left;
+}
+
 .account-label {
   overflow-wrap: anywhere;
-  text-align: left;
 }
 
 .account-icon {
@@ -1568,6 +1649,15 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
   color: #efe3c4;
   box-shadow: inset 0 0 14px rgba(227, 181, 82, 0.08);
 }
+
+.account-button[data-signed-in="true"] .account-label {
+  max-width: 32ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  letter-spacing: 0.03em;
+}
+
 /* Signed in, the email's initial replaces the generic icon. */
 .account-avatar { display: none; }
 .account-button[data-signed-in="true"] .account-icon { display: none; }
@@ -1587,13 +1677,14 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 }
 .account-badge {
   flex: none;
-  padding: 2px 5px;
+  max-width: 100%;
+  padding: 1px 4px;
   border: 1px solid rgba(227, 181, 82, 0.6);
   background: rgba(227, 181, 82, 0.14);
   color: #e3b552;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
 }
 .account-button[data-signed-in="true"]::after {
   content: '';
@@ -1639,7 +1730,7 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 .language-options {
   position: absolute;
   top: calc(100% + 4px);
-  right: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   min-width: 150px;
@@ -1687,16 +1778,27 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 @media (max-width: 600px) {
   .menu-header {
     flex-direction: column-reverse;
+    flex-wrap: nowrap;
     align-items: stretch;
   }
 
   .menu-corner {
     align-self: flex-end;
+    flex: 0 1 auto;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
     max-width: 100%;
-    margin: -6px -6px 0 0;
   }
+
+  .account-button,
+  .language-toggle {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  /* Only separate the controls when the account would lose its readable width. */
+  .account-button { flex: 1 1 min(136px, 100%); }
+  .account-button[data-signed-in="true"]::after { display: none; }
 }
 
 .coop-lobby-content {
@@ -2083,7 +2185,7 @@ html.coop-guest #pause-restart {
   letter-spacing: 0.06em;
 }
 
-.beta-unlock-hint { margin: 0 0 18px; color: #b9bdb4; }
+.beta-unlock-hint { margin: 0 0 18px; color: #b9bdb4; overflow-wrap: anywhere; }
 
 .beta-unlock-form label {
   display: block;
@@ -2110,12 +2212,13 @@ html.coop-guest #pause-restart {
 .beta-divider::before,
 .beta-divider::after { content: ''; flex: 1; height: 1px; background: #56606b80; }
 
-.beta-signin-fields input + label { margin-top: 12px; }
+.beta-field + .beta-field { margin-top: 12px; }
 
 .beta-password-hint { margin: 6px 0 0; color: #8e968a; font-size: 12px; }
 
-.beta-forgot {
-  margin-top: 6px;
+.beta-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin-top: 8px; }
+
+.beta-link {
   padding: 4px 0;
   cursor: pointer;
   border: 0;
@@ -2127,13 +2230,14 @@ html.coop-guest #pause-restart {
   text-underline-offset: 3px;
 }
 
-.beta-forgot:hover,
-.beta-forgot:focus-visible { color: #f0d39b; }
-.beta-forgot:focus-visible { outline: 2px solid #e3b552; outline-offset: 2px; }
-.beta-forgot:disabled { cursor: default; opacity: 0.6; }
+.beta-link:hover,
+.beta-link:focus-visible { color: #f0d39b; }
+.beta-link:focus-visible { outline: 2px solid #e3b552; outline-offset: 2px; }
+.beta-link:disabled { cursor: default; opacity: 0.6; }
 
 #beta-email,
-#beta-password {
+#beta-password,
+#beta-confirm-password {
   width: 100%;
   min-height: 46px;
   padding: 10px 12px;
@@ -2145,7 +2249,8 @@ html.coop-guest #pause-restart {
 }
 
 #beta-email:focus-visible,
-#beta-password:focus-visible { border-color: #e3b552; outline: 2px solid #e3b552; outline-offset: 2px; }
+#beta-password:focus-visible,
+#beta-confirm-password:focus-visible { border-color: #e3b552; outline: 2px solid #e3b552; outline-offset: 2px; }
 #beta-message { min-height: 1.5em; margin: 8px 0 0; color: #e9aa9f; font-size: 13px; }
 
 .beta-unlock-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
@@ -2276,6 +2381,7 @@ html.coop-guest #pause-restart {
 .beta-thanks-card {
   position: relative;
   width: min(100%, 600px);
+  container-type: inline-size;
   padding: clamp(24px, 5vmin, 44px) clamp(20px, 5vmin, 44px) clamp(22px, 4vmin, 36px);
   border: 1px solid rgba(227, 181, 82, 0.22);
   border-left: 3px solid var(--thanks-red);
@@ -2353,13 +2459,23 @@ html.coop-guest #pause-restart {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  font: 900 clamp(52px, min(14vw, 14dvh), 108px) Impact, 'Arial Narrow', sans-serif;
-  line-height: 0.9;
+  font: 900 min(10vw, 14vh, 72px)/1 Impact, 'Arial Narrow', sans-serif;
+  /* Fit the card's inner width, including wider fallback fonts. */
+  font-size: min(14cqi, 14dvh);
   letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   filter: blur(0) drop-shadow(3px 4px 0 rgba(0, 0, 0, 0.75)) drop-shadow(0 0 22px rgba(201, 67, 58, 0.55));
   animation:
     beta-thanks-title 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s both,
     beta-thanks-flicker 9s linear 3s infinite;
+}
+
+/* The shorter Spanish and Catalan titles can fill more of the card. */
+.beta-thanks-title:lang(es),
+.beta-thanks-title:lang(ca) {
+  font-size: min(18cqi, 14vw, 14dvh);
 }
 
 .beta-thanks-tester {
@@ -2501,7 +2617,6 @@ html.coop-guest #pause-restart {
 @keyframes beta-thanks-title {
   from {
     opacity: 0;
-    letter-spacing: 0.5em;
     filter: blur(10px) drop-shadow(3px 4px 0 rgba(0, 0, 0, 0.75)) drop-shadow(0 0 22px rgba(201, 67, 58, 0.55));
   }
 }
@@ -4822,7 +4937,6 @@ html.touch-controls-enabled .start-panel {
     line-height: 1.25;
   }
 
-  html.touch-controls-enabled .hud-row-secondary { display: none; }
   html.touch-controls-enabled .hud-row { gap: 8px; font-size: 10px; }
   html.touch-controls-enabled .hud-label { font-size: 8px; }
   html.touch-controls-enabled #hud-weapon-name { font-size: 10px; letter-spacing: 0.08em; }
@@ -4842,7 +4956,6 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled .mode-hint { margin: 8px 0 14px; }
   html.touch-controls-enabled .pwa-actions { min-height: 24px; margin-top: 8px; }
   html.touch-controls-enabled .hud-panel { padding: 4px 7px; }
-  html.touch-controls-enabled .hud-row-secondary { display: none; }
   html.touch-controls-enabled .hud-row { font-size: 10px; }
   html.touch-controls-enabled #hud-ammo { font-size: 15px; margin: 0; }
   html.touch-controls-enabled #joystick { width: 96px; height: 96px; }

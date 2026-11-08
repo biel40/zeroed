@@ -9,7 +9,7 @@ import { DynamicResolution } from '../core/DynamicResolution';
 import { Stats } from '../game/Stats';
 import { WeaponInventory } from '../game/WeaponInventory';
 import type { GameMode } from '../modes/GameMode';
-import { Input } from '../player/Input';
+import { Input, LETHAL_INPUT_CODES } from '../player/Input';
 import type { GamepadControls } from '../player/GamepadControls';
 import { PlayerController } from '../player/PlayerController';
 import { BarrelSmoke } from '../rendering/BarrelSmoke';
@@ -760,6 +760,18 @@ export class Game {
     weapon.clearEvents();
   }
 
+  /**
+   * A mode action that borrows the right arm (the knife, a grenade throw):
+   * it ends the inspection and, once started, interrupts the reload, which
+   * resumes afterwards if the magazine was left empty.
+   */
+  private startModeArmAction(weapon: Weapon, start: () => boolean): void {
+    weapon.cancelInspect();
+    if (!start()) return;
+    weapon.cancelReload();
+    this.meleeReloadWeapon = weapon.ammoInMagazine === 0 ? weapon : null;
+  }
+
   private updateDebug(dt: number): void {
     if (!this.debugElement) return;
     this.fpsEstimate += (1 / Math.max(dt, 1e-4) - this.fpsEstimate) * 0.05;
@@ -824,11 +836,10 @@ export class Game {
         this.input.wasPressed('Numpad3') ||
         this.input.wasPressed('TouchKnife')
       )) {
-        weapon.cancelInspect();
-        if (this.mode.onMeleeAttack?.()) {
-          weapon.cancelReload();
-          this.meleeReloadWeapon = weapon.ammoInMagazine === 0 ? weapon : null;
-        }
+        this.startModeArmAction(weapon, () => this.mode.onMeleeAttack?.() ?? false);
+      }
+      if (allowCombatInput && LETHAL_INPUT_CODES.some((code) => this.input.wasPressed(code))) {
+        this.startModeArmAction(weapon, () => this.mode.onLethalThrow?.() ?? false);
       }
       allowGameplayInput =
         !this.paused &&

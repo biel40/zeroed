@@ -8,7 +8,7 @@ interface DamageFeedbackInternals {
     player: { camera: THREE.PerspectiveCamera };
     hud: { flashDamage: () => void };
   };
-  trauma: number;
+  shake: { trauma: number };
   onPlayerHit(damage: number): void;
   updateCameraShake(dt: number): void;
 }
@@ -21,13 +21,13 @@ describe('player damage feedback', () => {
     mode.ctx = { player: { camera }, hud: { flashDamage } };
 
     mode.onPlayerHit(25);
-    const traumaBeforeUpdate = mode.trauma;
+    const traumaBeforeUpdate = mode.shake.trauma;
     mode.updateCameraShake(1 / 60);
 
     const angularImpulse = Math.hypot(camera.rotation.x, camera.rotation.y, camera.rotation.z);
     expect(flashDamage).toHaveBeenCalledOnce();
     expect(traumaBeforeUpdate).toBeGreaterThan(0);
-    expect(mode.trauma).toBeLessThan(traumaBeforeUpdate);
+    expect(mode.shake.trauma).toBeLessThan(traumaBeforeUpdate);
     expect(angularImpulse).toBeGreaterThan(0.008);
     expect(angularImpulse).toBeLessThan(0.03);
   });

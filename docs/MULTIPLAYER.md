@@ -156,6 +156,17 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   el anfitrión continúa solo y los zombis cambian de objetivo; si entra otro
   invitado recibe el estado completo. Si sale el anfitrión, la sala termina y
   el invitado conserva el menú para salir. Volver al menú no recarga la página.
+- Granadas: cada jugador lanza y cocina las suyas en local y envía el
+  lanzamiento (`grenadeThrow`: origen, punteria, espoleta restante y suelo);
+  ambos clientes simulan el mismo vuelo con los mismos solidos. El anfitrion
+  lleva la cuenta de la bolsa del invitado (2 al empezar, +2 por ronda, 4 como
+  maximo, se repone al reaparecer) y solo reproduce un lanzamiento que sale de
+  sus ojos y con granada disponible. Resuelve cada explosion en su
+  simulacion: bajas, puntos y tullidos son de quien la lanzo y solo hiere a
+  ese jugador (`playerDamaged` para el invitado). Una pared de granadas se
+  compra con `mapUse` de tipo `grenades`. El invitado ve los tullidos por
+  `ZombieNetState.crippled` y la baja con su origen `f1`. Es una ampliacion
+  compatible del protocolo 6; un invitado antiguo ignora los mensajes nuevos.
 - No hay migración de anfitrión ni recuperación de inventario del invitado
   tras una desconexión. La munición del invitado se ejecuta en su cliente; el
   anfitrión valida cadencia y propiedad de armas, pero no replica cargadores.

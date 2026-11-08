@@ -53,6 +53,11 @@ export interface ZombieModelConfig {
   readonly walkReferenceSpeed: number;
   /** Standing-still clip candidates; drives real joint motion while stalled at a barrier (optional: not every asset has one). */
   readonly idleClip?: readonly string[];
+  /**
+   * Prone crawl a crippled body moves with: clip candidates and its ground
+   * speed at timeScale 1. Models without it never lose their legs.
+   */
+  readonly crawl?: { readonly clip: readonly string[]; readonly referenceSpeed: number };
   /** Per-instance body tints picked at spawn (deteriorated skin/cloth). */
   readonly tints: readonly number[];
   readonly eyes: ZombieEyeColors;
@@ -79,6 +84,8 @@ export const ZOMBIE_MODELS: Record<ZombieModelId, ZombieModelConfig> = {
     },
     walkReferenceSpeed: 1.35,
     idleClip: ['ZombieIdle', 'Idle'],
+    // Hand travel of the authored crawl, measured on the normalized rig.
+    crawl: { clip: ['ZombieCrawl', 'Crawl'], referenceSpeed: 0.44 },
     tints: [0xb0aca8],
     eyes: { glow: 0xffb31a, core: 0xffe27a },
     anchors: {
@@ -126,6 +133,16 @@ const DEATH_MOMENTUM_SECONDS = 0.1;
  * share them across the pool.
  */
 const restClipCache = new WeakMap<readonly THREE.AnimationClip[], ZombieRestClips | null>();
+/** The standing pose melts into the crawl over this window as the legs give. */
+const CRIPPLE_BLEND_SECONDS = 0.55;
+/** Slowest crawl clock, so a stalled crawler still claws at the floor. */
+const CRAWL_MIN_RATE = 0.35;
+/** Crawl clock while it claws at the player or a barrier. */
+const CRAWL_CLAW_RATE = 1.6;
+/** A crawler shot dead keeps clawing this long, slowing to a stop on its belly. */
+const CRAWL_DEATH_SPASM = 0.6;
+/** Forward tip of the clipless fallback rig once crippled, radians. */
+const CRAWL_FALLBACK_PITCH = 1.35;
 /** Largest body-yaw the fall turns towards the impact side, radians. */
 const DEATH_MAX_TWIST = 0.8;
 /** Below this ground speed the zombie is treated as stationary (stalled at a barrier). */
@@ -545,6 +562,9 @@ export class ZombieVisual {
   private currentAction: THREE.AnimationAction | null = null;
   /** Authored standing-still clip (e.g. "ZombieIdle"); null when the asset has none. */
   private readonly idleAction: THREE.AnimationAction | null = null;
+  /** The model's prone crawl, null when it has none. */
+  private readonly crawlAction: THREE.AnimationAction | null = null;
+  private crippled = false;
   private locomotionAction: THREE.AnimationAction | null = null;
   /** True while the idle clip (not the frozen walk clip) is driving the pose. */
   private idleActive = false;
@@ -704,6 +724,8 @@ export class ZombieVisual {
         action.clampWhenFinished = true;
         this.deathActions.set(style, action);
       }
+      const crawlClip = this.modelConfig.crawl ? resolveClip(source.clips, this.modelConfig.crawl.clip) : null;
+      if (crawlClip) this.crawlAction = this.mixer.clipAction(crawlClip);
       const idleClip = restClips?.idle ?? (this.modelConfig.idleClip
         ? resolveClip(source.clips, this.modelConfig.idleClip)
         : null);
@@ -828,6 +850,7 @@ export class ZombieVisual {
     this.reactionAge = 1;
     this.deathTime = this.deathLean = this.deathSide = this.deathTwist = 0;
     this.deathStyle = 'knockback';
+    this.crippled = false;
     this.groundOffset = this.attackReach = 0;
     this.clearWindowVault();
     Object.assign(this.vaultPose, this.vaultGoal);
@@ -939,6 +962,54 @@ export class ZombieVisual {
     this.vaultGoal.lift = this.vaultGoal.rootPitch = this.vaultGoal.torsoPitch = this.vaultGoal.roll = this.vaultGoal.reach = 0;
   }
 
+  /**
+   * The legs are gone: the standing pose melts into the prone crawl, which
+   * then drives every living state (claws for strikes, slows with speed).
+   */
+  public setCrippled(crippled: boolean): void {
+    if (this.crippled === crippled) return;
+    this.crippled = crippled;
+    if (!crippled) return;
+    this.clearWindowVault();
+    for (let i = 0; i < this.poseBones.length; i++) {
+      this.poseFrom[i].copy(this.poseBones[i].quaternion);
+      this.positionFrom[i].copy(this.poseBones[i].position);
+    }
+    this.transitionTime = 0;
+    this.transitionDuration = CRIPPLE_BLEND_SECONDS;
+    this.startCrawl();
+  }
+
+  private startCrawl(): void {
+    const crawl = this.crawlAction;
+    if (!crawl) return;
+    // The pose-space blend carries the standing pose down; a mixer
+    // crossfade on top would keep the walk stepping as the body drops.
+    for (const action of this.actions.values()) if (action !== crawl) action.enabled = false;
+    if (this.idleAction) this.idleAction.enabled = false;
+    crawl.reset();
+    crawl.setLoop(THREE.LoopRepeat, Infinity);
+    crawl.enabled = true;
+    crawl.timeScale = 1;
+    crawl.play();
+    this.currentAction = crawl;
+    this.locomotionAction = crawl;
+    this.idleActive = false;
+  }
+
+  /** The crawl clock: speed-synced on the move, fast while clawing, dying out after death. */
+  private driveCrawl(speed: number): void {
+    const crawl = this.crawlAction;
+    const config = this.modelConfig.crawl;
+    if (!crawl || !config) return;
+    if (this.state === 'death') {
+      crawl.timeScale = Math.max(0, 1 - this.deathTime / CRAWL_DEATH_SPASM) * CRAWL_MIN_RATE * 2;
+      return;
+    }
+    const clawing = this.state === 'attack' || this.state === 'barrierAttack' || this.state === 'barrierBreak';
+    crawl.timeScale = clawing ? CRAWL_CLAW_RATE : Math.max(CRAWL_MIN_RATE, speed / config.referenceSpeed);
+  }
+
   setBarrierBreakDuration(seconds: number): void {
     this.barrierBreakDuration = seconds;
   }
@@ -981,6 +1052,10 @@ export class ZombieVisual {
         ? this.transitionDuration : 0;
     }
     if (state === 'walk' && previous === 'walk' && this.idleActive) return;
+    if (this.crippled && state !== 'spawn') {
+      this.enterCrawlState(state, previous);
+      return;
+    }
     this.state = state;
     if (previous !== state) this.idleActive = false;
     if ((state === 'barrierAttack' || state === 'attack') && previous !== state) {
@@ -1077,6 +1152,19 @@ export class ZombieVisual {
     if (this.currentAction && state !== 'death') next.crossFadeFrom(this.currentAction, CROSSFADE_SECONDS, false);
     next.play();
     this.currentAction = next;
+  }
+
+  /** A crawler's state changes all keep the crawl; its death slumps where it lies. */
+  private enterCrawlState(state: ZombieState, previous: ZombieState): void {
+    this.state = state;
+    this.idleActive = false;
+    if (state === 'death' && previous !== 'death') {
+      if (this.shinyStars) this.shinyStars.points.visible = false;
+      this.deathTime = 0;
+      this.deathStartPitch = this.deathStartRoll = this.deathStartForward = 0;
+      this.deathTravel = this.deathLean = this.deathSide = this.deathTwist = 0;
+    }
+    if (this.crawlAction && this.currentAction !== this.crawlAction) this.startCrawl();
   }
 
   /** Red emissive pulse on bullet impact. */
@@ -1233,11 +1321,14 @@ export class ZombieVisual {
     const leadSide = this.walkPhase < 0.5 ? 1 : -1;
     this.root.position.y += this.vaultPose.lift;
     this.root.rotation.x += this.vaultPose.rootPitch;
+    if (this.crippled && !this.crawlAction) this.root.rotation.x += CRAWL_FALLBACK_PITCH;
     this.root.rotation.z += this.vaultPose.roll * leadSide;
 
     if (this.mixer) {
-      const walk = this.actions.get('walk');
-      const stationary = this.state === 'walk' && speed <= STATIONARY_SPEED && this.collapse <= 0;
+      // A crawler's clip owns the whole body; the walk/idle switching stays out of it.
+      if (this.crippled) this.driveCrawl(speed);
+      const walk = this.crippled ? undefined : this.actions.get('walk');
+      const stationary = !this.crippled && this.state === 'walk' && speed <= STATIONARY_SPEED && this.collapse <= 0;
       if (this.idleAction) {
         if (stationary && !this.idleActive) {
           // The walk clip freezes mid-cycle at zero ground speed (e.g.
@@ -1312,7 +1403,7 @@ export class ZombieVisual {
     // Two cached ankle anchors, no raycasts or per-vertex bounds. Preserve
     // the authored swing foot while seating the lower support foot.
     let groundTarget = 0;
-    if (this.state === 'walk' && this.feet.length === 2) {
+    if (this.state === 'walk' && this.feet.length === 2 && !this.crippled) {
       let support = Infinity;
       for (let i = 0; i < this.feet.length; i++) {
         this.feet[i].getWorldPosition(this.footPosition);
@@ -1475,6 +1566,8 @@ export class ZombieVisual {
   /** Compact spatially aimed strikes. Locomotion remains owned by the authored
    * clips so procedural correction cannot destabilize the legs or wrists. */
   private applyLimbMotion(): void {
+    // A crawler claws with its crawl; standing strikes would lift its arms off the floor.
+    if (this.crippled) return;
     const melee = this.state === 'attack';
     if (!melee && this.state !== 'barrierAttack' && this.state !== 'barrierBreak') return;
 
@@ -1584,7 +1677,7 @@ export class ZombieVisual {
 
   private applyAttackBodyPose(progress: number): void {
     const rig = this.barrierRig;
-    if (!rig) return;
+    if (!rig || this.crippled) return;
     const side = this.barrierStrikeSide;
     const melee = this.state === 'attack';
     if (melee && this.currentAction === this.actions.get('attack') && this.currentAction) return;

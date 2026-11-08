@@ -9,7 +9,7 @@
   tactiles y representacion del compañero. Consulta [controles](GAME_SYSTEMS.md#shell-compartido)
   y [replica cooperativa](MULTIPLAYER.md#alcance-y-límites).
 - Burned Mansion tiene acceso publico individual y cooperativo. Station 33 es individual y premium de presentacion; aparece bloqueado en el menu y temporalmente requiere entrar (Google o correo y contraseña) con una cuenta de la beta para abrirse, tambien por enlace directo. La contraseña no verifica la titularidad del correo: consulta [acceso de beta](../public/beta/README.md). Direccion artistica en [Station 33](STATION_33.md). Su final es el easter egg de evacuacion Protocolo 33, hasta la superficie, donde el guardian CAPITAN URSS cierra el paso al camion; consulta [evacuacion](GAME_SYSTEMS.md#mapas-e-interacciones).
-- Combate, rondas, economia, progresion, enemigos y anillos estan disponibles en individual; el alcance cooperativo se detalla en [MULTIPLAYER.md](MULTIPLAYER.md#alcance-y-límites). Consulta [zombies](GAME_SYSTEMS.md#zombies) y [anillos](GAME_SYSTEMS.md#anillos).
+- Combate, rondas, economia, progresion, enemigos y anillos estan disponibles en individual, y la granada letal F-1 (cocinable, con zombis tullidos) en individual y cooperativo; el alcance cooperativo se detalla en [MULTIPLAYER.md](MULTIPLAYER.md#alcance-y-límites). Consulta [zombies](GAME_SYSTEMS.md#zombies) y [anillos](GAME_SYSTEMS.md#anillos).
 - PWA instalable y distribucion Android preparada; consulta [PWA](PWA.md) y [Android](ANDROID_DOCS.md).
 - App de escritorio Electron empaquetable para Windows y Linux, sin Steamworks todavia; consulta [escritorio](DESKTOP.md) y [Steam](STEAM.md).
 - El relay cooperativo local y el Worker de Cloudflare estan preparados; consulta [despliegue](MULTIPLAYER.md#despliegue-gratuito-vercel--cloudflare).
@@ -22,6 +22,9 @@
 
 - No hay pruebas de WebGL, DOM real, Pointer Lock, fullscreen, audio real ni
   flujo end-to-end. PWA y offline requieren validacion manual en HTTPS.
+- Granada letal y zombis tullidos: lanzamiento, cocinado, explosion, arrastre,
+  audio y la partida cooperativa real estan pendientes de validacion visual,
+  sonora y con latencia en el juego. Detalles en [zombies](GAME_SYSTEMS.md#zombies).
 - El Protocolo 33 es solo individual, como Station 33: su estado no se
   replica ni existe en cooperativo. La salida, la superficie, su ambiente y
   el rendimiento movil con la horda del evento estan pendientes de validacion

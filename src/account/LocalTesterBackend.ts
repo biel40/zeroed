@@ -1,6 +1,8 @@
 import { PRODUCT_IDS } from '../config/products';
 import type { Language } from '../i18n/i18n';
-import type { AccountBackend, AccountEntitlements, IssuedSession, LoginRequestOutcome, PasswordRejection } from './AccountApi';
+import type {
+  AccountBackend, AccountEntitlements, IssuedSession, LoginRequestOutcome, RegistrationRejection, SignInRejection,
+} from './AccountApi';
 
 /** Testers who sign in at once on a local dev server (`npm run dev`). */
 export const LOCAL_TESTER_EMAILS: readonly string[] = ['bielet40@gmail.com'];
@@ -9,9 +11,9 @@ export const LOCAL_TESTER_EMAILS: readonly string[] = ['bielet40@gmail.com'];
 const LOCAL_TOKEN_PREFIX = 'local-tester:';
 
 /**
- * Development-only account backend. Local testers sign in with any password
- * and own every product with the beta badge, all without the account server;
- * anyone else goes to `remote`. `main.ts` loads it only in dev builds.
+ * Development-only account backend. Local testers sign in or register with
+ * any password and own every product with the beta badge, all without the
+ * account server; anyone else goes to `remote`. `main.ts` loads it only in dev builds.
  */
 export class LocalTesterBackend implements AccountBackend {
   private readonly testers: ReadonlySet<string>;
@@ -20,10 +22,17 @@ export class LocalTesterBackend implements AccountBackend {
     this.testers = new Set(testerEmails.map(LocalTesterBackend.normalize));
   }
 
-  public async signInWithPassword(email: string, password: string): Promise<IssuedSession | PasswordRejection> {
-    const normalized = LocalTesterBackend.normalize(email);
-    if (!this.testers.has(normalized)) return this.remote.signInWithPassword(email, password);
-    return { token: `${LOCAL_TOKEN_PREFIX}${normalized}`, email: normalized };
+  public async register(email: string, password: string): Promise<IssuedSession | RegistrationRejection> {
+    return this.localSessionFor(email) ?? this.remote.register(email, password);
+  }
+
+  public async signInWithPassword(email: string, password: string): Promise<IssuedSession | SignInRejection> {
+    return this.localSessionFor(email) ?? this.remote.signInWithPassword(email, password);
+  }
+
+  /** A local tester's password is never stored, so changing it always succeeds. */
+  public async changePassword(sessionToken: string, password: string): Promise<'changed' | 'weak-password' | null> {
+    return this.localTesterOf(sessionToken) ? 'changed' : this.remote.changePassword(sessionToken, password);
   }
 
   public signInWithGoogle(credential: string): Promise<IssuedSession | null> {
@@ -45,6 +54,11 @@ export class LocalTesterBackend implements AccountBackend {
 
   public async logout(sessionToken: string): Promise<void> {
     if (!this.localTesterOf(sessionToken)) await this.remote.logout(sessionToken);
+  }
+
+  private localSessionFor(email: string): IssuedSession | null {
+    const normalized = LocalTesterBackend.normalize(email);
+    return this.testers.has(normalized) ? { token: `${LOCAL_TOKEN_PREFIX}${normalized}`, email: normalized } : null;
   }
 
   private localTesterOf(token: string): string | null {

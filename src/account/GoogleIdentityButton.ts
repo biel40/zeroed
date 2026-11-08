@@ -35,11 +35,12 @@ export class GoogleIdentityButton implements GoogleSignInButton {
     if (!accountsId) return false;
     host.replaceChildren();
     accountsId.renderButton(host, {
+      // Google's familiar white pill with the "G" logo, which stands out on the dark dialog.
       type: 'standard',
-      theme: 'filled_black',
+      theme: 'outline',
       size: 'large',
       text: 'continue_with',
-      shape: 'rectangular',
+      shape: 'pill',
       logo_alignment: 'center',
       width: Math.min(MAX_BUTTON_WIDTH, host.clientWidth || FALLBACK_BUTTON_WIDTH),
       locale: this.locale(),

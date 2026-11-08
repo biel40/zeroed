@@ -84,9 +84,8 @@ export class AccountStore {
     return result.meta.changes > 0;
   }
 
-  /** The next password used with this address becomes its password again. */
-  public async clearPassword(userId: string): Promise<void> {
-    await this.database.prepare('UPDATE users SET password_hash = NULL WHERE id = ?').bind(userId).run();
+  public async setPassword(userId: string, passwordHash: string): Promise<void> {
+    await this.database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, userId).run();
   }
 
   public async countPasswordFailuresSince(email: string, requesterHash: string, since: number): Promise<RecentAttempts> {

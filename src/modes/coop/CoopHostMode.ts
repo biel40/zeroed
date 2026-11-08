@@ -49,6 +49,12 @@ import type { MusicTrackName } from '../../audio/MusicManager';
 import { voicePoint } from '../../audio/SpatialCue';
 import { RoundCueGate } from '../../audio/RoundCueGate';
 import { CoopWorld } from './CoopWorld';
+import { CoopGrenades } from './CoopGrenades';
+import { BlastSight } from '../grenades/BlastSight';
+import { LETHAL_GRENADE_LOADOUT, type GrenadeDefinition } from '../../config/grenades';
+import { LethalGrenadeStock } from '../../game/LethalGrenadeStock';
+import { GRENADE_THROW_DURATION } from '../../weapons/GrenadeThrow';
+import type { GrenadeLaunch } from '../../zombies/grenades/ThrownGrenades';
 import { COOP_STARTING_WEAPONS, COOP_WEAPONS, coopReserveAmmo } from './CoopWeapons';
 import { CoopRevive, isDownedBodyInRange, REVIVE_DURATION, REVIVE_HEALTH_PERCENT } from './CoopRevive';
 
@@ -57,6 +63,10 @@ const MATCH_STATE_INTERVAL = 1 / 15;
 const MAX_REMOTE_SPEED = 9;
 const MOVEMENT_SLACK = 0.75;
 const BOUNDS_MARGIN = 1;
+/** A guest throw's hand may start this far from the host's view of its eyes, metres. */
+const GRENADE_FROM_SLACK = 1.5;
+/** And the grenade leaves the hand this close to where the hand started. */
+const GRENADE_RELEASE_REACH = 1;
 
 interface PlayerRecord {
   readonly health: PlayerHealth;
@@ -148,6 +158,11 @@ export class CoopHostMode implements GameMode {
   private readonly knifeCombat = new KnifeCombat();
   private readonly knifeOrigin = new THREE.Vector3();
   private lastGuestKnife = -Infinity;
+  private grenades!: CoopGrenades;
+  private sight!: BlastSight;
+  /** The guest's pouch as the host counts it: a throw is only replayed while it has one. */
+  private readonly guestGrenades = new LethalGrenadeStock(LETHAL_GRENADE_LOADOUT);
+  private lastGuestThrow = -Infinity;
   private phase: MatchPhase = 'waiting';
   private hostPaused = false;
   private hostStarted = false;
@@ -186,6 +201,7 @@ export class CoopHostMode implements GameMode {
       this.zombies.setBarriers(arena.barriers);
       this.zombies.registerColliders(ctx.hitColliders);
       this.zombies.setEffectColliders(arena.colliders);
+      this.grenades.syncTopology();
     };
     this.zombies.onZombieSpawned = (zombie) => {
       this.send({ type: 'zombieSpawn', zombie: this.zombieState(zombie) });
@@ -206,6 +222,9 @@ export class CoopHostMode implements GameMode {
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyLocalKnifeImpact();
     ctx.player.camera.add(this.knife.root);
+    this.sight = new BlastSight(() => arena.colliders);
+    this.grenades = new CoopGrenades(ctx, this.world, 'host', (launch) => this.send({ type: 'grenadeThrow', launch }));
+    this.grenades.blasts.onDetonate = (position, definition, owner) => this.resolveBlast(position, definition, owner);
 
     this.guestAvatar = new RemotePlayer(createRemoteAvatar(ctx.assets.getPlayerModel(),
       !ctx.profile.useReducedEffects, (id) => ctx.assets.getWeaponModel(id)));
@@ -229,6 +248,7 @@ export class CoopHostMode implements GameMode {
     this.knife.setEnabled(this.knife.isAttacking);
     this.knife.update(dt, false, this.ctx.player.speed01);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
+    this.grenades.update(dt, this.isGameplayInputEnabled() && this.isCombatInputEnabled());
     this.box.update(dt);
     this.boxView.update(dt, this.box);
     this.processBoxEvents();
@@ -349,6 +369,8 @@ export class CoopHostMode implements GameMode {
       this.useMap('host', 'pickup', pickup.id, equipped);
       return;
     }
+    const grenadeBuy = this.grenades.facingBuy();
+    if (grenadeBuy) { this.useMap('host', 'grenades', grenadeBuy.id, equipped); return; }
     const refill = this.world.findFacingAmmoRefill();
     if (refill) { this.useMap('host', 'ammo', refill.id, equipped); return; }
     const completion = this.world.findFacingCompletion();
@@ -356,19 +378,27 @@ export class CoopHostMode implements GameMode {
     if (this.world.isLocalInBoxRange()) this.useBox('host', this.box.state === 'awaitingPickup' ? 'pickup' : 'activate', equipped);
   }
 
-  public usesFallbackAttack(): boolean { return this.isGameplayInputEnabled() && this.knife.isAttacking; }
+  public usesFallbackAttack(): boolean {
+    return this.isGameplayInputEnabled() && (this.knife.isAttacking || this.grenades.isThrowing);
+  }
 
-  public getMeleeArm(): MeleeArmDriver | null { return this.knife.enabled ? this.knife : null; }
+  public getMeleeArm(): MeleeArmDriver | null { return this.knife.enabled ? this.knife : this.grenades.armDriver; }
 
   public getFallbackWeaponName(): string | null {
     return this.players.host.life.state === 'downed' ? t('hud.downed')
-      : this.players.guest.life.reviver === 'host' ? t('hud.reviving') : this.usesFallbackAttack() ? t('hud.knife') : null;
+      : this.players.guest.life.reviver === 'host' ? t('hud.reviving')
+        : this.isGameplayInputEnabled() && this.knife.isAttacking ? t('hud.knife') : null;
   }
 
   public onMeleeAttack(): boolean {
-    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled()) return false;
+    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled() || this.grenades.isThrowing) return false;
     this.knife.setEnabled(true);
     return this.knife.trigger();
+  }
+
+  public onLethalThrow(): boolean {
+    if (!this.isGameplayInputEnabled() || !this.isCombatInputEnabled() || this.knife.isAttacking) return false;
+    return this.grenades.hand.throw();
   }
 
   public getInteractPrompt(): string | null {
@@ -385,6 +415,8 @@ export class CoopHostMode implements GameMode {
     if (wallBuy) return this.world.wallBuyPrompt(wallBuy, this.ctx.hasWeapon(wallBuy.weaponId));
     const pickup = this.world.findFacingPickup();
     if (pickup) return weaponCasePrompt(pickup, this.players.host.kills, this.ctx.profile.useTouchControls);
+    const grenadeBuy = this.grenades.facingBuy();
+    if (grenadeBuy) return this.grenades.buyPrompt(grenadeBuy);
     const refill = this.world.findFacingAmmoRefill();
     if (refill) return t('prompt.pickup', { label: refill.interactionLabel, key: tapKey });
     const completion = this.world.findFacingCompletion();
@@ -403,6 +435,7 @@ export class CoopHostMode implements GameMode {
   public onExit(): void {
     this.chestInteraction.dispose();
     this.knife.reset();
+    this.grenades.exit();
     this.gesture.dispose();
     this.connection.dispose();
     this.guestAvatar.dispose();
@@ -468,6 +501,9 @@ export class CoopHostMode implements GameMode {
         break;
       case 'knifeHitClaim':
         this.acceptKnifeClaim(message.zombieId);
+        break;
+      case 'grenadeThrow':
+        this.acceptGrenadeThrow(message.launch);
         break;
       case 'doorPurchase':
         this.purchaseDoor('guest', message.doorId);
@@ -559,6 +595,11 @@ export class CoopHostMode implements GameMode {
         for (const barrier of this.world.arena.barriers) barrier.resetRoundCap();
         this.ctx.hud.showRoundBanner(t('banner.round', { round: event.round }));
         if (this.roundCues.claim('start', event.round)) this.ctx.audio.playRoundStartCue();
+        // Both pouches start full for round 1 and top up every later round; the guest mirrors its own.
+        if (event.round > 1) {
+          this.grenades.hand.grantRound();
+          this.guestGrenades.grantRound();
+        }
         this.send({ type: 'roundStart', round: event.round });
       } else if (event.type === 'spawnDue') {
         const anchor = this.spawnAnchor();
@@ -580,6 +621,7 @@ export class CoopHostMode implements GameMode {
       host.health.reset();
       this.world.placeLocalPlayer('host');
       this.ctx.resetArsenal();
+      this.grenades.hand.reset();
       respawned = true;
     }
     const guest = this.players.guest;
@@ -589,6 +631,7 @@ export class CoopHostMode implements GameMode {
       this.guestInventory.reset(COOP_STARTING_WEAPONS);
       for (const validator of this.shots.values()) validator.reset();
       this.lastGuestKnife = -Infinity;
+      this.guestGrenades.reset();
       this.guestState = null;
       this.lastGuestStateAt = -Infinity;
       this.guestAvatar.clear();
@@ -697,6 +740,55 @@ export class CoopHostMode implements GameMode {
     this.applyKnifeDamage('guest', zombie);
   }
 
+  /**
+   * A guest grenade: replayed only while the guest is alive, has one left
+   * and the throw starts at its eyes; its fuse is the guest's, its floor the
+   * host's own reading of where the guest stands.
+   */
+  private acceptGrenadeThrow(launch: GrenadeLaunch): void {
+    const state = this.guestState;
+    if (this.phase !== 'playing' || !state || this.players.guest.life.state !== 'alive') return;
+    const now = defaultNow();
+    if (now - this.lastGuestThrow < GRENADE_THROW_DURATION * 0.5) return;
+    const eyeY = state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance));
+    const { from, origin } = launch;
+    if (Math.hypot(from.x - state.x, from.y - eyeY, from.z - state.z) > GRENADE_FROM_SLACK
+      || Math.hypot(origin.x - from.x, origin.y - from.y, origin.z - from.z) > GRENADE_RELEASE_REACH) return;
+    if (!this.guestGrenades.consume()) return;
+    this.lastGuestThrow = now;
+    this.grenades.replay({ ...launch, floorY: this.world.floorHeight(state.floor) }, 'guest');
+  }
+
+  /**
+   * A blast resolved by the authority for whoever threw it: zombies in sight
+   * take its damage (kills, points and crippled survivors are the thrower's),
+   * the guest sees every surviving wound, and the thrower alone can be hurt.
+   */
+  private resolveBlast(position: THREE.Vector3, definition: GrenadeDefinition, owner: CoopPlayerId): void {
+    if (this.phase !== 'playing') return;
+    const before = new Map<Zombie, number>();
+    for (const zombie of this.zombies.actives) if (zombie.isAlive) before.set(zombie, zombie.hp);
+    this.sight.aimFrom(position);
+    this.shooter = owner;
+    const survivors = this.zombies.applyExplosion(position, definition.blast, definition.id, 1,
+      (zombie) => !this.sight.shields(zombie));
+    this.shooter = 'host';
+    for (let index = 0; index < survivors; index++) this.players[owner].economy.awardHit(false);
+    if (owner === 'host' && survivors > 0) this.ctx.hud.showHitmarker(false);
+    for (const [zombie, hp] of before) {
+      if (!zombie.isAlive || zombie.hp >= hp) continue;
+      this.send({ type: 'zombieHit', zombieId: this.zombies.networkIdOf(zombie), headshot: false,
+        amount: hp - zombie.hp, source: definition.id, fromX: quantize(position.x), fromZ: quantize(position.z) });
+    }
+    const thrower = owner === 'host' ? this.ctx.player.rig.position : this.guestState;
+    if (thrower) {
+      const damage = this.sight.playerDamage(definition.blast, position, thrower.x, thrower.y, thrower.z);
+      if (damage > 0) this.onPlayerAttacked(damage, owner, undefined, true);
+    }
+    // Crippled bodies reach the guest with the snapshot; send it now rather than in up to 66 ms.
+    if (survivors > 0) this.sendMatchState();
+  }
+
   private applyKnifeDamage(shooter: CoopPlayerId, zombie: Zombie): void {
     this.shooter = shooter;
     const damage = knifeDamageForRound(zombie.maxHp, this.rounds.round);
@@ -797,9 +889,9 @@ export class CoopHostMode implements GameMode {
     this.sendMatchState();
   }
 
-  private onPlayerAttacked(damage: number, target: CoopPlayerId, attacker?: Zombie): void {
+  private onPlayerAttacked(damage: number, target: CoopPlayerId, attacker?: Zombie, piercing = false): void {
     if (target === 'guest') {
-      if (this.guestConnected && this.players.guest.life.state === 'alive' && this.players.guest.health.damage(damage)) {
+      if (this.guestConnected && this.players.guest.life.state === 'alive' && this.players.guest.health.damage(damage, piercing)) {
         this.send({
           type: 'playerDamaged',
           damage,
@@ -810,7 +902,7 @@ export class CoopHostMode implements GameMode {
       }
       return;
     }
-    if (this.players.host.life.state === 'alive' && this.players.host.health.damage(damage)) {
+    if (this.players.host.life.state === 'alive' && this.players.host.health.damage(damage, piercing)) {
       this.ctx.hud.flashDamage();
       if (this.players.host.health.isDead) this.players.host.life.down();
       this.sendMatchState();
@@ -910,7 +1002,7 @@ export class CoopHostMode implements GameMode {
     }
   }
 
-  private useMap(buyer: CoopPlayerId, kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'completion',
+  private useMap(buyer: CoopPlayerId, kind: 'lamp' | 'ritual' | 'pickup' | 'ammo' | 'grenades' | 'completion',
       id: string, equippedWeapon: WeaponId, code?: string): void {
     const remote = buyer === 'guest';
     const state = this.guestState;
@@ -920,11 +1012,13 @@ export class CoopHostMode implements GameMode {
       : kind === 'ritual' ? this.world.arena.ritualInteraction.id === id ? this.world.arena.ritualInteraction : null
         : kind === 'pickup' ? this.world.arena.weaponPickups.find((entry) => entry.id === id)
           : kind === 'ammo' ? this.world.arena.ammoRefills.find((entry) => entry.id === id)
-            : this.world.arena.completionInteraction.id === id ? this.world.arena.completionInteraction : null;
+            : kind === 'grenades' ? (this.world.arena.grenadeBuys ?? []).find((entry) => entry.id === id)
+              : this.world.arena.completionInteraction.id === id ? this.world.arena.completionInteraction : null;
     const facing = kind === 'lamp' ? this.world.findFacingSoulLamp()
       : kind === 'ritual' ? this.world.findFacingRitual()
         : kind === 'pickup' ? this.world.findFacingPickup()
-          : kind === 'ammo' ? this.world.findFacingAmmoRefill() : this.world.findFacingCompletion();
+          : kind === 'ammo' ? this.world.findFacingAmmoRefill()
+            : kind === 'grenades' ? this.grenades.facingBuy() : this.world.findFacingCompletion();
     const reachable = !!item && (remote ? !!state && this.world.isRemoteInReach(item, state)
       : facing?.id === id);
     if (!reachable || !validWeapon || this.phase !== 'playing' || record.life.state !== 'alive') {
@@ -977,6 +1071,21 @@ export class CoopHostMode implements GameMode {
       if (!remote) this.ctx.refillEquippedWeaponAmmo();
       this.ctx.audio.playMysteryBoxPickup();
       this.send({ type: 'mapUsed', kind, id, buyer, weapon: equippedWeapon });
+    } else if (kind === 'grenades') {
+      const buy = (this.world.arena.grenadeBuys ?? []).find((entry) => entry.id === id)!;
+      const pouch = remote ? this.guestGrenades : this.grenades.hand;
+      if (pouch.isFull) {
+        if (remote) this.send({ type: 'mapUseFailed', reason: 'grenadesFull' });
+        else this.ctx.hud.showRoundBanner(t('banner.grenadesFull'));
+        return;
+      }
+      if (!record.economy.spend(buy.cost)) {
+        this.mapDenied(remote, buy.cost);
+        return;
+      }
+      pouch.refill();
+      if (!remote) this.ctx.audio.playMysteryBoxPickup();
+      this.send({ type: 'mapUsed', kind, id, buyer });
     } else {
       const completion = this.world.arena.completionInteraction;
       if (completion.requiredDoorId && this.world.findDoor(completion.requiredDoorId)?.isLocked) return;
@@ -1134,6 +1243,9 @@ export class CoopHostMode implements GameMode {
     this.chestInteraction.dispose();
     this.knife.reset();
     this.lastGuestKnife = -Infinity;
+    this.grenades.reset();
+    this.guestGrenades.reset();
+    this.lastGuestThrow = -Infinity;
     this.rounds.reset();
     this.roundCues.reset();
     this.runFlow.reset();
@@ -1171,6 +1283,7 @@ export class CoopHostMode implements GameMode {
       hp: zombie.hp,
       maxHp: zombie.maxHp,
       state: zombie.state,
+      ...(zombie.isCrippled ? { crippled: true } : {}),
     };
   }
 

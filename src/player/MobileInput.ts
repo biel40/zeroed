@@ -46,6 +46,9 @@ export function applyMobileAction(state: InputState, action: string, pressed: bo
     case 'knife':
       state.setKey('TouchKnife', pressed);
       break;
+    case 'grenade':
+      state.setKey('TouchGrenade', pressed);
+      break;
     case 'crouch':
       state.setKey('KeyC', pressed);
       break;

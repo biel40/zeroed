@@ -659,16 +659,16 @@ describe('Burned Mansion topology', () => {
 
   it('places each standard wall buy in its intended progression zone', () => {
     const arena = makeArena();
-    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'l96', 'ak47', 'vector', 'm4a1', 'm60']);
-    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 1250, 1750, 1200, 1500, 2500]);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'm14', 'ak47', 'vector', 'm4a1', 'm60']);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 800, 1750, 1200, 1500, 2500]);
     expect(MANSION_WALL_BUYS.every((buy) => buy.ammoPrice > 0)).toBe(true);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm1911')!.position.z).toBeGreaterThan(2);
-    // The L96 shares the starting-room wall without overlapping the pistol or the paid door.
-    const l96 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'l96')!;
-    expect(l96.position.z).toBeGreaterThan(2);
-    expect(l96.floor).toBe(0);
-    expect(l96.position.x - 0.9).toBeGreaterThan(0);
-    expect(l96.position.x + 0.9).toBeLessThan(MANSION_EAST_WALL_X);
+    // The M14 shares the starting-room wall without overlapping the pistol or the paid door.
+    const m14 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm14')!;
+    expect(m14.position.z).toBeGreaterThan(2);
+    expect(m14.floor).toBe(0);
+    expect(m14.position.x - 0.9).toBeGreaterThan(0);
+    expect(m14.position.x + 0.9).toBeLessThan(MANSION_EAST_WALL_X);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'ak47')!.position.x).toBeLessThan(0);
     // The Vector hangs inside the banquet hall, north of the old facade.
     const vector = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'vector')!;

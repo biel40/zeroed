@@ -75,6 +75,10 @@ describe('account API', () => {
     return Promise.resolve(app.request('/me/entitlements', { headers }));
   }
 
+  function register(email: string, password: string): Promise<Response> {
+    return post('/auth/register', { email, password });
+  }
+
   function signInWithPassword(email: string, password: string): Promise<Response> {
     return post('/auth/password', { email, password });
   }
@@ -209,60 +213,82 @@ describe('account API', () => {
     expect(denied.headers.get('access-control-allow-origin')).toBeNull();
   });
 
-  describe('password sign-in', () => {
-    it('creates the account the first time an address is used, then requires that password', async () => {
-      const created = await signInWithPassword(' New@Example.com ', 'correct horse');
-      expect(created.status).toBe(200);
-      const session = (await created.json()) as { token: string; email: string; created: boolean };
-      expect(session).toMatchObject({ email: 'new@example.com', created: true });
+  describe('accounts with a password', () => {
+    it('registers an account explicitly, then signs in only with that password', async () => {
+      const created = await register(' New@Example.com ', 'correct horse');
+      expect(created.status).toBe(201);
+      const session = (await created.json()) as { token: string; email: string };
+      expect(session.email).toBe('new@example.com');
       expect(mailer.sent).toHaveLength(0);
       expect(await (await getEntitlements(session.token)).json()).toEqual({ email: 'new@example.com', products: [], beta: false });
 
       const again = await signInWithPassword('new@example.com', 'correct horse');
       expect(again.status).toBe(200);
-      expect(await again.json()).toMatchObject({ email: 'new@example.com', created: false });
+      expect(await again.json()).toMatchObject({ email: 'new@example.com' });
       expect((await signInWithPassword('new@example.com', 'wrong horse')).status).toBe(401);
     });
 
-    it('lets a seeded beta tester choose a password and get every product', async () => {
+    it('never creates an account or sets a password when signing in', async () => {
+      expect((await signInWithPassword('nobody@example.com', 'any password')).status).toBe(404);
       database.exec(buildBetaSeedSql(['tester@example.com'], now));
-      const response = await signInWithPassword('tester@example.com', 'tester-password');
-      const session = (await response.json()) as { token: string; created: boolean };
-      expect(session.created).toBe(false);
+      expect((await signInWithPassword('tester@example.com', 'any password')).status).toBe(404);
+      const { results } = await database.prepare('SELECT email, password_hash AS hash FROM users').all<{ email: string; hash: string | null }>();
+      expect(results).toEqual([{ email: 'tester@example.com', hash: null }]);
+    });
+
+    it('refuses to register an address that already has a password', async () => {
+      await register('a@example.com', 'first password');
+      expect((await register('A@example.com', 'second password')).status).toBe(409);
+      expect((await signInWithPassword('a@example.com', 'first password')).status).toBe(200);
+      expect((await signInWithPassword('a@example.com', 'second password')).status).toBe(401);
+    });
+
+    it('lets a seeded beta tester register and get every product', async () => {
+      database.exec(buildBetaSeedSql(['tester@example.com'], now));
+      const response = await register('tester@example.com', 'tester-password');
+      expect(response.status).toBe(201);
+      const session = (await response.json()) as { token: string };
       expect(await (await getEntitlements(session.token)).json()).toEqual({ email: 'tester@example.com', products: [...PRODUCT_IDS], beta: true });
     });
 
     it('rejects malformed addresses and passwords outside 8 to 128 characters', async () => {
+      expect((await register('no-at-sign', 'long enough')).status).toBe(400);
+      expect((await register('a@example.com', 'short')).status).toBe(400);
+      expect((await register('a@example.com', 'x'.repeat(129))).status).toBe(400);
+      expect((await post('/auth/register', { email: 'a@example.com', password: 12345678 })).status).toBe(400);
       expect((await signInWithPassword('no-at-sign', 'long enough')).status).toBe(400);
-      expect((await signInWithPassword('a@example.com', 'short')).status).toBe(400);
-      expect((await signInWithPassword('a@example.com', 'x'.repeat(129))).status).toBe(400);
-      expect((await post('/auth/password', { email: 'a@example.com', password: 12345678 })).status).toBe(400);
       const users = await database.prepare('SELECT COUNT(*) AS count FROM users').first<{ count: number }>();
       expect(users?.count).toBe(0);
     });
 
     it('stores only a salted hash of the password', async () => {
-      await signInWithPassword('a@example.com', 'same password');
-      await signInWithPassword('b@example.com', 'same password');
+      await register('a@example.com', 'same password');
+      await register('b@example.com', 'same password');
       const { results } = await database.prepare('SELECT password_hash AS hash FROM users ORDER BY email').all<{ hash: string }>();
       expect(results.map(({ hash }) => hash.startsWith('pbkdf2-sha256$100000$'))).toEqual([true, true]);
       expect(results[0].hash).not.toBe(results[1].hash);
       expect(results.some(({ hash }) => hash.includes('same password'))).toBe(false);
     });
 
-    it('locks an address for an hour after ten wrong passwords', async () => {
-      await signInWithPassword('a@example.com', 'right password');
+    it('locks an address for an hour after ten failed sign-ins', async () => {
+      await register('a@example.com', 'right password');
       for (let i = 0; i < 10; i++) expect((await signInWithPassword('a@example.com', `guess ${i} wrong`)).status).toBe(401);
       expect((await signInWithPassword('a@example.com', 'right password')).status).toBe(429);
       now += 61 * MINUTE;
       expect((await signInWithPassword('a@example.com', 'right password')).status).toBe(200);
     });
 
-    it('lets a recovery link reset a forgotten password', async () => {
-      await signInWithPassword('a@example.com', 'forgotten one');
+    it('changes the password of a signed-in account, e.g. after a recovery link', async () => {
+      await register('a@example.com', 'forgotten one');
       await post('/auth/request', { email: 'a@example.com' });
-      expect((await post('/auth/verify', { token: mailer.lastToken() })).status).toBe(200);
+      const recovered = (await (await post('/auth/verify', { token: mailer.lastToken() })).json()) as { token: string };
+      // The link alone changes nothing.
+      expect((await signInWithPassword('a@example.com', 'forgotten one')).status).toBe(200);
 
+      const auth = { authorization: `Bearer ${recovered.token}` };
+      expect((await post('/me/password', { password: 'short' }, auth)).status).toBe(400);
+      expect((await post('/me/password', { password: 'brand new one' }, auth)).status).toBe(204);
+      expect((await post('/me/password', { password: 'brand new one' })).status).toBe(401);
       expect((await signInWithPassword('a@example.com', 'brand new one')).status).toBe(200);
       expect((await signInWithPassword('a@example.com', 'forgotten one')).status).toBe(401);
     });
@@ -279,7 +305,7 @@ describe('account API', () => {
     });
 
     it('joins the password account of the same address and keeps its password', async () => {
-      await signInWithPassword('player@gmail.com', 'my password');
+      await register('player@gmail.com', 'my password');
       expect((await post('/auth/google', { credential: await google.sign({ email: 'player@gmail.com' }, now) })).status).toBe(200);
       const users = await database.prepare('SELECT COUNT(*) AS count FROM users').first<{ count: number }>();
       expect(users?.count).toBe(1);

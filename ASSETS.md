@@ -19,6 +19,7 @@ https://creativecommons.org/publicdomain/zero/1.0/
 | M4A1 | Builder procedural dedicado `buildM4A1` en `src/weapons/M4A1ViewModel.ts` | Original del proyecto | 1984 | Sin descarga |
 | L96 | Builder procedural dedicado `buildL96` (frame `'l96'`) en `src/weapons/L96ViewModel.ts` | Original del proyecto | ~4.5k | Sin descarga |
 | AK-47 | Builder procedural dedicado `buildAk47` (frame `'ak47'`) en `src/weapons/AK47ViewModel.ts` | Original del proyecto | ~5.7k | Sin descarga |
+| M14 | Builder procedural dedicado `buildM14` (frame `'m14'`) en `src/weapons/M14ViewModel.ts` | Original del proyecto | ~6.4k | Sin descarga |
 | M60 | Builder procedural dedicado `buildM60` (frame `'lmg'`) en `src/weapons/M60ViewModel.ts` | Original del proyecto | ~7.2k | Sin descarga |
 | M1911 | — (modelo procedural detallado bajo `m1911-root` en `WeaponView.ts`; sin GLB CC0 adecuado) | — | primitivas low-poly | — |
 | VORTEX-9 | Builder procedural dedicado `buildVortex9` en `src/weapons/Vortex9ViewModel.ts` | Original del proyecto | ~7k | Sin descarga |

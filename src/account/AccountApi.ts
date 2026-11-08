@@ -14,8 +14,10 @@ export interface IssuedSession {
   readonly email: string;
 }
 
-/** Why the server refused a password sign-in. */
-export type PasswordRejection = 'invalid-email' | 'weak-password' | 'wrong-password' | 'rate-limited';
+/** Why the server refused a password sign-in; `no-account` also covers accounts that never set a password. */
+export type SignInRejection = 'invalid-email' | 'no-account' | 'wrong-password' | 'rate-limited';
+/** Why the server refused to create an account; `exists` means the address already has a password. */
+export type RegistrationRejection = 'invalid-email' | 'weak-password' | 'exists';
 
 export interface AccountEntitlements {
   readonly email: string;
@@ -28,11 +30,14 @@ export interface AccountEntitlements {
  * mean the server rejected the token; network and server errors reject.
  */
 export interface AccountBackend {
-  /** Signs in, or creates the account the first time the address is used. */
-  signInWithPassword(email: string, password: string): Promise<IssuedSession | PasswordRejection>;
+  /** Creates the account and signs it in. */
+  register(email: string, password: string): Promise<IssuedSession | RegistrationRejection>;
+  signInWithPassword(email: string, password: string): Promise<IssuedSession | SignInRejection>;
   /** `credential` is a Google Identity Services ID token. */
   signInWithGoogle(credential: string): Promise<IssuedSession | null>;
-  /** Mails a recovery link that signs in and lets the next password used replace the old one. */
+  /** Null when the session was rejected. */
+  changePassword(sessionToken: string, password: string): Promise<'changed' | 'weak-password' | null>;
+  /** Mails a recovery link that signs in, so the player can then choose a new password. */
   requestLogin(email: string, language: Language): Promise<LoginRequestOutcome>;
   verifyLogin(loginToken: string): Promise<IssuedSession | null>;
   fetchEntitlements(sessionToken: string): Promise<AccountEntitlements | null>;
@@ -49,15 +54,32 @@ export class AccountApi implements AccountBackend {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
-  public async signInWithPassword(email: string, password: string): Promise<IssuedSession | PasswordRejection> {
+  public async register(email: string, password: string): Promise<IssuedSession | RegistrationRejection> {
+    const response = await this.post('/auth/register', { email, password });
+    if (response.status === 409) return 'exists';
+    if (response.status === 400) return (await AccountApi.readError(response)) === 'weak_password' ? 'weak-password' : 'invalid-email';
+    return AccountApi.readSession(response);
+  }
+
+  public async signInWithPassword(email: string, password: string): Promise<IssuedSession | SignInRejection> {
     const response = await this.post('/auth/password', { email, password });
+    if (response.status === 400) return 'invalid-email';
+    if (response.status === 404) return 'no-account';
     if (response.status === 401) return 'wrong-password';
     if (response.status === 429) return 'rate-limited';
-    if (response.status === 400) {
-      const { error } = await response.json().catch(() => ({})) as { error?: unknown };
-      return error === 'weak_password' ? 'weak-password' : 'invalid-email';
-    }
     return AccountApi.readSession(response);
+  }
+
+  public async changePassword(sessionToken: string, password: string): Promise<'changed' | 'weak-password' | null> {
+    const response = await this.request('/me/password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify({ password }),
+    });
+    if (response.status === 204) return 'changed';
+    if (response.status === 400) return 'weak-password';
+    if (response.status === 401) return null;
+    throw new Error(`Account API responded ${response.status}`);
   }
 
   public async signInWithGoogle(credential: string): Promise<IssuedSession | null> {
@@ -102,6 +124,11 @@ export class AccountApi implements AccountBackend {
 
   private request(path: string, init: RequestInit): Promise<Response> {
     return this.fetchFn(`${this.baseUrl}${path}`, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  }
+
+  private static async readError(response: Response): Promise<unknown> {
+    const body: unknown = await response.json().catch(() => null);
+    return body !== null && typeof body === 'object' ? (body as { error?: unknown }).error : undefined;
   }
 
   private static async readSession(response: Response): Promise<IssuedSession> {

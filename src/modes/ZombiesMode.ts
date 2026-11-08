@@ -58,11 +58,13 @@ import { ZombiesGasMask } from './ZombiesGasMask';
 import { ZombiesPowerSwitch } from './ZombiesPowerSwitch';
 import { ZombiesRings } from './ZombiesRings';
 import { ZombiesFlames } from './ZombiesFlames';
+import { ZombiesGrenades } from './ZombiesGrenades';
 import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
 import { ZombiesEvacuation } from './ZombiesEvacuation';
 import { cameraSpatialCue, voicePoint, type SpatialCue } from '../audio/SpatialCue';
 import { RoundCueGate } from '../audio/RoundCueGate';
 import { EYE_HEIGHT } from '../player/PlayerController';
+import { CameraShake } from '../rendering/CameraShake';
 import { EndingCinematic } from '../rendering/EndingCinematic';
 import { IntroCinematic } from '../rendering/IntroCinematic';
 import { CodeLockDialog } from '../ui/CodeLockDialog';
@@ -72,8 +74,6 @@ import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 const HIT_TRAUMA = 0.55;
 /** Camera jolt of a map ambush: the player flinches before anything hits. */
 const AMBUSH_TRAUMA = 0.45;
-const TRAUMA_DECAY = 2.1;
-const SHAKE_MAX_ANGLE = 0.04;
 /** Distant moans drift in every few seconds, never on a fixed rhythm. */
 const MOAN_MIN_DELAY = 6;
 const MOAN_SPREAD = 9;
@@ -111,6 +111,8 @@ export class ZombiesMode implements GameMode {
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
   private flames!: ZombiesFlames;
+  /** The lethal grenades: pouch, throw, live grenades and their blasts. */
+  private grenades: ZombiesGrenades | null = null;
   private footsteps!: ZombieFootsteps;
   private box: MysteryBoxMachine | null = null;
   private boxView: MysteryBoxView | null = null;
@@ -151,8 +153,7 @@ export class ZombiesMode implements GameMode {
   private endingHordeChase: ArenaEnding['hordeChase'] | null = null;
   /** Arena colliders currently registered in `ctx.hitColliders`. */
   private arenaStaticColliders = new Set<THREE.Object3D>();
-  private trauma = 0;
-  private shakeSeed = 0;
+  private readonly shake = new CameraShake();
   private moanTimer = MOAN_MIN_DELAY;
   private readonly roundCues = new RoundCueGate();
   /** Barrier the player is currently repairing, if any. */
@@ -237,7 +238,7 @@ export class ZombiesMode implements GameMode {
       this.arena.onRitualScare = (position) =>
         ctx.audio.playRitualScare(this.spatialCueFor(position), RITUAL_SCARE_TIMELINE);
       this.arena.onRitualImpact = () => {
-        this.trauma = 1;
+        this.shake.add(1);
       };
     }
 
@@ -247,6 +248,12 @@ export class ZombiesMode implements GameMode {
     this.chain = new ChainLightning(ctx.scene);
     this.flames = new ZombiesFlames(ctx, this.zombies, this.economy, () => this.arena.colliders,
       (id) => this.weaponDamageScale(id));
+    this.grenades = new ZombiesGrenades(ctx, this.zombies, this.economy, this.arena, {
+      damageScale: () => this.rings?.damageScale ?? 1,
+      hurtPlayer: (damage) => this.onPlayerHit(damage, true),
+      shake: (amount) => this.shake.add(amount),
+      blastGuardian: (position, blast, scale) => this.evacuation?.guardian?.blast(position, blast, scale) ?? false,
+    });
     this.footsteps = new ZombieFootsteps(ctx.scene, ctx.player.camera);
     this.knife.onSwing = () => ctx.audio.playKnifeSwing();
     this.knife.onImpact = () => this.applyKnifeImpact();
@@ -267,7 +274,7 @@ export class ZombiesMode implements GameMode {
         escaped: (ending) => this.escape(ending),
         failed: () => this.endGame(),
         hurtPlayer: (damage) => this.onPlayerHit(damage),
-        shake: (amount) => { this.trauma = Math.min(1, this.trauma + amount); },
+        shake: (amount) => this.shake.add(amount),
       })
       : null;
 
@@ -296,6 +303,7 @@ export class ZombiesMode implements GameMode {
     // The view model must never survive a transition that stops gameplay.
     // Some of these states return before the normal end-of-swing cleanup.
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
+    if (!this.isGameplayInputEnabled() && this.grenades?.isThrowing) this.grenades.cancelThrow();
     if (this.runFlow.state === 'ENDING') {
       this.arena.update(dt, this.ctx.player?.rig.position);
       if (this.ctx.player) this.endingCinematic?.update(dt, this.ctx.player.camera);
@@ -346,6 +354,7 @@ export class ZombiesMode implements GameMode {
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.energy.update(dt);
     this.flames.update(dt, this.runAcceptsInput());
+    this.grenades?.update(dt, this.runAcceptsInput());
     for (const station of this.arena.weaponStations ?? []) station.setOwned(this.ctx.hasWeapon(station.weaponId));
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
@@ -426,7 +435,7 @@ export class ZombiesMode implements GameMode {
     return true;
   }
 
-  /** The knife, or the hands putting the gas mask or a ring on, withhold fire and ADS. */
+  /** The knife, a grenade throw, or the hands putting the gas mask or a ring on, withhold fire and ADS. */
   usesFallbackAttack(): boolean {
     return this.isGameplayInputEnabled() && !!this.ctx
       && (this.knife.isAttacking || this.handsBusy());
@@ -437,12 +446,19 @@ export class ZombiesMode implements GameMode {
   }
 
   getMeleeArm(): MeleeArmDriver | null {
-    return this.knife.enabled ? this.knife : (this.gasMask?.armDriver ?? this.rings?.armDriver ?? null);
+    return this.knife.enabled ? this.knife
+      : (this.grenades?.armDriver ?? this.gasMask?.armDriver ?? this.rings?.armDriver ?? null);
   }
 
-  /** The hands are putting the gas mask or a new ring on. */
+  /** The hands are throwing a grenade or putting the gas mask or a new ring on. */
   private handsBusy(): boolean {
-    return (this.gasMask?.isAnimating ?? false) || (this.rings?.isDonning ?? false);
+    return (this.grenades?.isThrowing ?? false) || (this.gasMask?.isAnimating ?? false) || (this.rings?.isDonning ?? false);
+  }
+
+  /** G: throws a lethal grenade when one is left and the hands are free. */
+  public onLethalThrow(): boolean {
+    if (!this.isGameplayInputEnabled() || this.knife.isAttacking || this.handsBusy()) return false;
+    return this.grenades?.throw() ?? false;
   }
 
   public onMeleeAttack(): boolean {
@@ -511,6 +527,8 @@ export class ZombiesMode implements GameMode {
   onExit(): void {
     this.codeLockDialog?.dispose();
     this.codeLockDialog = null;
+    // The HUD outlives the run: no grenade row in the menu or a later co-op match.
+    this.grenades?.exit();
   }
 
   /** Shell gate for movement, weapons and interactions: closed while getting back up. */
@@ -634,6 +652,8 @@ export class ZombiesMode implements GameMode {
       return;
     }
 
+    if (this.grenades?.interact()) return;
+
     const ammoRefill = this.findFacingAmmoRefill();
     if (ammoRefill) {
       this.purchaseAmmoRefill(ammoRefill);
@@ -723,6 +743,9 @@ export class ZombiesMode implements GameMode {
 
     const pickup = this.findFacingWeaponPickup();
     if (pickup) return weaponCasePrompt(pickup, this.kills, this.ctx.profile.useTouchControls);
+
+    const grenadePrompt = this.grenades?.prompt();
+    if (grenadePrompt) return grenadePrompt;
 
     const ammoRefill = this.findFacingAmmoRefill();
     if (ammoRefill) return t('prompt.pickup', { label: ammoRefill.interactionLabel, key });
@@ -1111,6 +1134,7 @@ export class ZombiesMode implements GameMode {
     this.zombies.setBarriers(this.arena.barriers);
     this.zombies.registerColliders(this.ctx.hitColliders);
     this.zombies.setEffectColliders(this.arena.colliders);
+    this.grenades?.syncTopology();
   }
 
   private processRoundEvents(): void {
@@ -1126,6 +1150,8 @@ export class ZombiesMode implements GameMode {
           if (this.arena) {
             for (const barrier of this.arena.barriers) barrier.resetRoundCap();
           }
+          // The run starts with its pouch; every later round tops it up.
+          if (event.round > 1) this.grenades?.grantRound();
           break;
         case 'spawnDue':
           if (
@@ -1235,16 +1261,16 @@ export class ZombiesMode implements GameMode {
       return false;
     }
     this.ctx.audio.playAmbushScare(this.spatialCueFor(ambush.position));
-    this.trauma = Math.min(1, this.trauma + AMBUSH_TRAUMA);
+    this.shake.add(AMBUSH_TRAUMA);
     return true;
   }
 
-  private onPlayerHit(damage: number): void {
+  private onPlayerHit(damage: number, piercing = false): void {
     if (!this.runAcceptsInput()) return;
-    if (!this.health.damage(damage)) return;
+    if (!this.health.damage(damage, piercing)) return;
     this.ctx.hud.flashDamage();
     // Trauma-based shake: offsets pile up and decay smoothly.
-    this.trauma = Math.min(1, this.trauma + HIT_TRAUMA);
+    this.shake.add(HIT_TRAUMA);
     if (!this.health.isDead) return;
     // A charged Resurrection ring takes the death instead: the run goes on,
     // and the horde ignores the player for as long as they are protected.
@@ -1253,7 +1279,7 @@ export class ZombiesMode implements GameMode {
       this.endGame();
       return;
     }
-    this.trauma = 1;
+    this.shake.add(1);
     this.zombies.ignoreHost(protectedFor);
   }
 
@@ -1262,14 +1288,7 @@ export class ZombiesMode implements GameMode {
    * has written its recoil pose (mode.update runs later in the frame).
    */
   private updateCameraShake(dt: number): void {
-    if (this.trauma <= 0) return;
-    this.trauma = Math.max(0, this.trauma - TRAUMA_DECAY * dt);
-    this.shakeSeed += dt * 34;
-    const amount = this.trauma * this.trauma * SHAKE_MAX_ANGLE;
-    const camera = this.ctx.player.camera;
-    camera.rotation.x += Math.sin(this.shakeSeed * 1.1) * amount;
-    camera.rotation.y += Math.sin(this.shakeSeed * 0.9 + 1.7) * amount;
-    camera.rotation.z += Math.sin(this.shakeSeed * 1.3 + 3.1) * amount * 0.6;
+    this.shake.update(dt, this.ctx.player.camera);
   }
 
   private updateAmbience(dt: number): void {
@@ -1417,6 +1436,7 @@ export class ZombiesMode implements GameMode {
     this.roundCues.reset();
     this.energy?.reset();
     this.flames?.reset();
+    this.grenades?.reset();
     for (const recovery of this.crystalRecoveries) recovery.reset();
     this.evacuation?.reset();
     this.ctx.hud.resetObjectives?.();

@@ -19,6 +19,8 @@ import {
   ZOMBIE_VORTEX9_DEATH_DURATION,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_ATTACK_DAMAGE,
+  ZOMBIE_CRAWLER_SPEED_FACTOR,
+  ZOMBIE_CRIPPLE_COLLAPSE,
   ZOMBIE_TYPE_CONFIGS,
   type ZombieTypeId,
 } from './ZombieConfig';
@@ -108,6 +110,8 @@ export class Zombie implements HitTarget {
   floor = 0;
   /** Fall chosen by the killing blow; replicated so co-op guests see the same death. */
   deathStyle: ZombieDeathStyle = 'knockback';
+  /** Legs blown off by a grenade: it crawls on, slower and low, until it dies. */
+  private crippled = false;
 
   private stateTimer = 0;
   private attackCooldown = 0;
@@ -169,6 +173,15 @@ export class Zombie implements HitTarget {
     return this.group.position;
   }
 
+  public get isCrippled(): boolean {
+    return this.crippled;
+  }
+
+  /** A living walker that has finished rising can still lose its legs; brutes never do. */
+  public get canCripple(): boolean {
+    return this.isAlive && !this.crippled && this.state !== 'spawn' && this.typeId !== 'brute';
+  }
+
   /** Standing movement volume, without the animated attack lunge or death pose. */
   get bodyHeight(): number {
     return ZOMBIE_MODELS[this.visual.modelId].height * this.group.scale.y;
@@ -201,6 +214,7 @@ export class Zombie implements HitTarget {
     this.previousYaw = 0;
     this.deathGroundY = y;
     this.deathStyle = 'knockback';
+    this.crippled = false;
     this.attackCooldown = 0;
     this.attackApplied = false;
     this.vaultOpening = null;
@@ -258,6 +272,46 @@ export class Zombie implements HitTarget {
     sourceZ?: number,
     source?: ZombieKillSource | 'normal',
   ): boolean {
+    return this.takeDamage(amount, headshot, sourceX, sourceZ, source, false);
+  }
+
+  /**
+   * Grenade blast from (sourceX, sourceZ). Returns true when lethal; a
+   * lethal blast with `shatter` (at the body's feet) blows it apart instead
+   * of hurling it down.
+   */
+  public applyExplosion(amount: number, sourceX: number, sourceZ: number, source: ZombieKillSource, shatter: boolean): boolean {
+    return this.takeDamage(amount, false, sourceX, sourceZ, source, shatter);
+  }
+
+  /**
+   * The legs are gone: the body collapses onto its hands and crawls on at a
+   * fraction of its speed. A swing in progress is lost. False when it
+   * cannot (see `canCripple`).
+   */
+  public cripple(): boolean {
+    if (!this.canCripple) return false;
+    this.crippled = true;
+    this.speed *= ZOMBIE_CRAWLER_SPEED_FACTOR;
+    this.attackApplied = true;
+    this.vaultOpening = null;
+    this.visual.clearWindowVault();
+    this.state = 'hit';
+    this.stateTimer = ZOMBIE_CRIPPLE_COLLAPSE;
+    this.visual.setState('hit');
+    // After the state change, so its longer blend carries the body down.
+    this.visual.setCrippled(true);
+    return true;
+  }
+
+  private takeDamage(
+    amount: number,
+    headshot: boolean,
+    sourceX: number | undefined,
+    sourceZ: number | undefined,
+    source: ZombieKillSource | 'normal' | undefined,
+    shatter: boolean,
+  ): boolean {
     if (!this.isAlive) return false;
     this.hp -= amount;
     this.visual.hitFlash();
@@ -265,7 +319,7 @@ export class Zombie implements HitTarget {
     this.bleed(amount, headshot, source, this.hp <= 0);
     if (this.hp <= 0) {
       const killSource = source === 'normal' ? undefined : source;
-      const style = resolveZombieDeathStyle(killSource, headshot, this.impact.y);
+      const style = shatter ? 'shatter' : resolveZombieDeathStyle(killSource, headshot, this.impact.y);
       this.enterDeath(style, killSource === 'vortex9' ? 'vortex9' : deathKindOf(style), headshot);
       return true;
     }
@@ -292,7 +346,8 @@ export class Zombie implements HitTarget {
       );
     }
     const inferredSource = style === 'slash' ? 'knife' : style === 'shatter' ? 'barrett'
-      : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'vortex9' : undefined;
+      : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'vortex9'
+        : style === 'blown' ? 'f1' : undefined;
     this.bleed(1, headshot, source ?? inferredSource, true);
     this.enterDeath(style);
   }
@@ -458,6 +513,8 @@ export class Zombie implements HitTarget {
    * update(). Purely visual: movement never waits for the climb.
    */
   trackWindowVault(openings: ReadonlyArray<VaultOpening>): void {
+    // A crawler drags itself over the sill without the standing climb.
+    if (this.crippled) return;
     if (this.isAlive && !this.vaultOpening) this.vaultOpening = findVaultStart(openings, this.position.x, this.position.z, this.floor);
     const opening = this.vaultOpening;
     const depth = opening && this.isAlive && opening.floor === this.floor ? openingDepth(opening, this.position.x, this.position.z) : null;

@@ -108,6 +108,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         magSeat: 0.68,
         charge: 0.74,
         chargeEnd: 0.9,
+        locksOpenWhenEmpty: true,
         // Up to the screen center, left flank to the eye; a softer turn for the slide release.
         swapPose: { shift: [-0.09, 0.18, 0.03], yaw: 0.65, roll: -0.3, tilt: 0.12 },
         rackPose: { shift: [-0.06, 0.08, 0.02], yaw: 0.35, roll: -0.12, tilt: 0.15 },
@@ -604,6 +605,111 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
         magSize: [0.03, 0.19, 0.059],
         // Blued stamped-steel 30-round magazine, a shade lighter than the receiver.
         magColor: 0x404347,
+      },
+    },
+  },
+
+  /**
+   * M14 — the 7.62x51 battle rifle (853 m/s), here semi-automatic on a short
+   * 8-round magazine with 64 in reserve. The first-room wall rifle: two torso
+   * hits on a round-1 zombie and a one-shot headshot, paid for with a small
+   * magazine, a stiff kick and few total rounds. Its reload rocks the
+   * box in and slams the locked-open operating rod home.
+   */
+  m14: {
+    id: 'm14',
+    name: 'M14',
+    fireModes: ['semi'],
+    defaultFireMode: 'semi',
+    rpm: 300,
+    magazineSize: 8,
+    reloadTime: 3,
+    tacticalReloadTime: 2.4,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 65,
+    recoil: {
+      verticalKick: 0.032,
+      horizontalKick: 0.006,
+      horizontalBias: 0.08,
+      kickVariance: 0.2,
+      recoverySpeed: 7,
+      recoveryDelay: 0.12,
+      cameraShare: 0.75,
+      adsRecoilMultiplier: 0.85,
+    },
+    spread: {
+      hipBase: 0.02,
+      adsBase: 0.001,
+      bloomPerShot: 0.006,
+      maxBloom: 0.03,
+      bloomRecovery: 0.05,
+    },
+    ads: { fov: 52, speed: 7, sensitivity: 0.65 },
+    projectile: { muzzleVelocity: 853, gravity: 9.8, maxDistance: 500, drag: 0.04 },
+    moveSpeedMultiplier: 0.93,
+    equipTime: 0.48,
+    // Full-power 7.62 crack over the long operating rod slamming home; m14_shot.mp3 replaces it once present.
+    audio: {
+      volume: 0.78, duration: 0.2, lowpass: 2200, thump: 86, crack: 0.36, tail: 0.7, mechanism: 0.22,
+      sampleFile: 'm14_shot.mp3', variation: { pitch: 0.025, volume: 0.05 },
+    },
+    view: {
+      // No GLB: dedicated builder traced from a reference photo (see M14ViewModel.ts).
+      frame: 'm14',
+      hip: [0.19, -0.2, -0.4],
+      ads: [0, 0, -0.3],
+      sway: 1.05,
+      bob: 0.95,
+      visualRecoil: { kickImpulse: 1.4, pitchImpulse: 3, rollImpulse: 0.9, stiffness: 140, damping: 14 },
+      scale: 1,
+      // Parkerized steel + oiled walnut (grain is procedural).
+      bodyColor: 0x33373b,
+      accentColor: 0x965229,
+      barrelLength: 0.519,
+      barrelRadius: 0.0115,
+      receiverLength: 0.283,
+      stockLength: 0.31,
+      magazine: 'box',
+      optic: 'irons',
+      // Tip of the winged front post, seen through the rear aperture.
+      sightHeight: 0.042,
+      bulk: 1.05,
+      hands: {
+        // Around the semi-pistol grip of the walnut wrist, the index reaching into the guard.
+        right: {
+          position: [0, -0.066, 0.104], axis: [0, 0.97, -0.24], palm: [-1, -0.1, 0.2], pose: 'stockGrip',
+          hold: { size: [0.036, 0.065], axis: [0, 0.97, -0.24] }, trigger: [0, -0.088, 0],
+        },
+        // Under the forend, fingers up the handguard ahead of the magazine.
+        left: {
+          position: [0, -0.0205, -0.34], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+          hold: { size: [0.044, 0.0735], axis: [0, 0, -1] },
+        },
+        // The handle rides the right flank: the shooting hand releases it.
+        action: { position: [0.037, 0.004, -0.002], axis: [0, 1, 0], palm: [-1, 0, 0], pose: 'boltPinch' },
+        // Cupped under the floorplate of the straight box.
+        magazine: {
+          position: [0, -0.064, 0], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
+          hold: { size: [0.032, 0.11], axis: [0, 0, 1] },
+        },
+      },
+      reloadAnim: {
+        style: 'rock',
+        magOut: 0.07,
+        magDrop: 0.2,
+        magIn: 0.33,
+        magSeat: 0.6,
+        charge: 0.66,
+        chargeEnd: 0.9,
+        locksOpenWhenEmpty: true,
+        // Well turned to the eye; then the right flank up for the operating rod handle.
+        swapPose: { shift: [-0.1, 0.14, 0.06], yaw: 0.42, roll: -0.27, tilt: 0.12 },
+        rackPose: { shift: [-0.06, 0.1, 0.08], yaw: -0.32, roll: 0.42, tilt: 0.05 },
+        wellDepth: 0.17,
+        magSize: [0.028, 0.143, 0.091],
+        magColor: 0x24272a,
       },
     },
   },
@@ -1165,7 +1271,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm60', 'l96', 'barrett', 'm1911', 'fakel'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm14', 'm60', 'l96', 'barrett', 'm1911', 'fakel'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
@@ -1184,6 +1290,7 @@ export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'vector',
   'ppsh41',
   'ak47',
+  'm14',
   'm60',
   'l96',
   'barrett',

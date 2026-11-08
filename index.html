@@ -50,6 +50,11 @@
       <span class="arm arm-left"></span>
     </div>
     <div id="scope-overlay"></div>
+    <div id="grenade-cook" class="hidden" aria-hidden="true">
+      <svg viewBox="0 0 64 64"><circle class="cook-track" cx="32" cy="32" r="27"/><circle id="grenade-cook-fuse" cx="32" cy="32" r="27" pathLength="1"/></svg>
+      <span id="grenade-cook-seconds"></span>
+    </div>
+
     <div id="hitmarker">
       <span></span><span></span><span></span><span></span>
     </div>
@@ -67,6 +72,7 @@
         <button type="button" data-action="crouch" id="btn-crouch" data-i18n-aria-label="controls.crouch" data-i18n="touch.crouch"></button>
         <button type="button" data-action="reload" id="btn-reload" data-i18n-aria-label="touch.reloadLabel" data-i18n="touch.reload"></button>
         <button type="button" data-action="knife" id="btn-knife" data-i18n-aria-label="touch.knifeLabel" data-i18n="touch.knife"></button>
+        <button type="button" data-action="grenade" id="btn-grenade" data-i18n-aria-label="touch.grenadeLabel" data-i18n="touch.grenade"></button>
         <button type="button" data-action="swap-weapon" id="btn-weapon" data-i18n-aria-label="touch.weaponLabel" data-i18n="touch.weapon"></button>
       </div>
     </div>
@@ -74,7 +80,7 @@
     <div id="hud-weapon" class="hud-panel">
       <div id="hud-weapon-name">M4A1</div>
       <div id="hud-ammo">30 / ∞</div>
-      <div class="hud-row hud-row-secondary"><span class="hud-label" data-i18n="hud.mode"></span><span id="hud-mode">AUTO</span></div>
+      <div id="hud-lethal" class="hud-row hud-lethal hidden"><span class="lethal-pips" aria-hidden="true"></span></div>
     </div>
 
     <div id="hud-zombies" class="hud-panel hidden">
@@ -147,8 +153,10 @@
           <button type="button" id="account-button" class="account-button">
             <svg class="account-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.2" r="3.6" /><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" /></svg>
             <span id="account-avatar" class="account-avatar" aria-hidden="true"></span>
-            <span id="account-label" class="account-label"></span>
-            <span id="account-badge" class="account-badge hidden"></span>
+            <span class="account-details">
+              <span id="account-label" class="account-label"></span>
+              <span id="account-badge" class="account-badge hidden"></span>
+            </span>
           </button>
         </div>
       </header>
@@ -261,12 +269,23 @@
           <div id="beta-google-button" class="beta-google-button"></div>
           <p class="beta-divider"><span data-i18n="account.orEmail"></span></p>
         </div>
-        <label for="beta-email" data-i18n="account.email"></label>
-        <input id="beta-email" name="email" type="email" autocomplete="username email" maxlength="254" required aria-describedby="beta-message" />
-        <label for="beta-password" data-i18n="account.password"></label>
-        <input id="beta-password" name="password" type="password" autocomplete="current-password" maxlength="128" required aria-describedby="beta-message beta-password-hint" />
-        <p id="beta-password-hint" class="beta-password-hint" data-i18n="account.passwordHint"></p>
-        <button type="button" id="beta-forgot" class="beta-forgot" data-i18n="account.forgotPassword"></button>
+        <div id="beta-email-field" class="beta-field">
+          <label for="beta-email" data-i18n="account.email"></label>
+          <input id="beta-email" name="email" type="email" autocomplete="username email" maxlength="254" required aria-describedby="beta-message" />
+        </div>
+        <div class="beta-field">
+          <label for="beta-password" data-i18n="account.password"></label>
+          <input id="beta-password" name="password" type="password" autocomplete="current-password" maxlength="128" required aria-describedby="beta-message beta-password-hint" />
+          <p id="beta-password-hint" class="beta-password-hint hidden" data-i18n="account.passwordHint"></p>
+        </div>
+        <div id="beta-confirm-field" class="beta-field hidden">
+          <label for="beta-confirm-password" data-i18n="account.confirmPassword"></label>
+          <input id="beta-confirm-password" name="confirm-password" type="password" autocomplete="new-password" maxlength="128" aria-describedby="beta-message" />
+        </div>
+        <div class="beta-links">
+          <button type="button" id="beta-forgot" class="beta-link" data-i18n="account.forgotPassword"></button>
+          <button type="button" id="beta-mode" class="beta-link" data-i18n="account.noAccountYet"></button>
+        </div>
       </div>
       <p id="beta-message" role="status" aria-live="polite"></p>
       <div class="beta-unlock-actions">
@@ -604,6 +623,7 @@
         <span data-coop-hidden><kbd>X</kbd></span><span data-coop-hidden data-i18n="controls.fireMode"></span>
         <span><kbd>E</kbd></span><span data-i18n="controls.interact"></span>
         <span data-coop-hidden><kbd>3</kbd> / <kbd>NUM 3</kbd></span><span data-coop-hidden data-i18n="controls.knife"></span>
+        <span><kbd>G</kbd></span><span data-i18n="controls.grenade"></span>
         <span><kbd data-i18n="controls.space"></kbd></span><span data-i18n="controls.jump"></span>
         <span><kbd>C</kbd></span><span data-i18n="controls.crouch"></span>
         <span><kbd>Z</kbd></span><span data-i18n="controls.prone"></span>
@@ -622,6 +642,7 @@
         <span><kbd data-gamepad-binding="crouch"></kbd></span><span data-i18n="controls.crouch"></span>
         <span><kbd data-gamepad-binding="prone"></kbd></span><span data-i18n="controls.prone"></span>
         <span><kbd data-gamepad-binding="knife"></kbd></span><span data-i18n="controls.knife"></span>
+        <span><kbd data-gamepad-binding="grenade"></kbd></span><span data-i18n="controls.grenade"></span>
         <span><kbd data-gamepad-binding="fireMode"></kbd></span><span data-i18n="controls.fireMode"></span>
         <span><kbd data-gamepad-binding="inspect"></kbd></span><span data-i18n="controls.inspect"></span>
         <span><kbd data-gamepad-binding="pause"></kbd></span><span data-i18n="touch.pauseLabel"></span>

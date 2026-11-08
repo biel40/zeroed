@@ -33,6 +33,11 @@ export function doorPrompt(door: PointDoor, touch: boolean): string {
   return t('prompt.unlockDoor', { door: name, key: actionKey(touch), cost: door.cost });
 }
 
+/** A grenade wall: fills the pouch of `grenade` for `cost`. */
+export function grenadeBuyPrompt(grenade: string, cost: number, touch: boolean): string {
+  return t('prompt.buyGrenades', { key: actionKey(touch), grenade, cost });
+}
+
 export function wallBuyPrompt(weapon: string, owned: boolean, wallBuy: { readonly price: number; readonly ammoPrice: number },
   touch: boolean, ammoPromptKey: TranslationKey = 'prompt.weaponAmmo'): string {
   const key = actionKey(touch);

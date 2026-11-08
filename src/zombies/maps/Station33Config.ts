@@ -9,6 +9,7 @@ import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
+import type { GrenadeWallBuyPlacement } from './shared/GrenadeWallBuy';
 import type { WeaponStationPlacement } from './shared/WeaponStation';
 import { PTRS41_RESKIN, reskinWeapons } from '../../config/weaponReskins';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
@@ -465,20 +466,20 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
 /** Weapon outlines 2 cm in front of the wall face, with map-specific prices. */
 export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   {
-    // The cheap automatic waits down the luggage-office corridor, clear of its blood stain.
-    id: 'consigna-mp5',
-    weaponId: 'mp5',
-    price: 1000,
-    ammoPrice: 500,
+    // The Soviet drum gun waits down the luggage-office corridor, clear of its blood stain.
+    id: 'consigna-ppsh41',
+    weaponId: 'ppsh41',
+    price: 1250,
+    ammoPrice: 625,
     position: { x: 11.2, y: 1.45, z: CONSIGNA.corridor.minZ + 0.02 },
     yaw: 0,
     floor: 0,
   },
   {
     // Available from the start on the east wall, clear of the vent and posters.
-    id: 'vestibule-ppsh41',
-    weaponId: 'ppsh41',
-    price: 1250,
+    id: 'vestibule-m14',
+    weaponId: 'm14',
+    price: 800,
     ammoPrice: 625,
     position: { x: EAST_WALL_X - 0.17, y: 1.45, z: 2.0 },
     yaw: -Math.PI / 2,
@@ -503,6 +504,19 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     position: { x: -11.0, y: 1.62, z: MILICIA.hall.minZ + 0.02 },
     yaw: 0,
     floor: 0,
+  },
+];
+
+/** The F-1 refill on the vestibule's east wall, between the civil-defence sign and the south vent. */
+export const STATION33_GRENADE_BUYS: ReadonlyArray<GrenadeWallBuyPlacement> = [
+  {
+    id: 'vestibule-f1',
+    cost: 250,
+    position: { x: EAST_WALL_X - 0.17, y: 1.5, z: 13.85 },
+    yaw: -Math.PI / 2,
+    floor: 0,
+    useRange: 2.2,
+    lookDotMin: 0.5,
   },
 ];
 

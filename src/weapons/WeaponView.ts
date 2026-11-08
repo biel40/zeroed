@@ -10,6 +10,7 @@ import { buildAk47 } from './AK47ViewModel';
 import { buildL96 } from './L96ViewModel';
 import { buildBarrett } from './BarrettViewModel';
 import { buildPTRS41 } from './PTRS41ViewModel';
+import { buildM14 } from './M14ViewModel';
 import { buildM4A1 } from './M4A1ViewModel';
 import { buildMP5 } from './MP5ViewModel';
 import { buildVector } from './VectorViewModel';
@@ -166,7 +167,7 @@ export interface BuiltProcedural {
   energyFlow?: THREE.Texture;
   /** Reload parts the animator drives (magazine, feed cover, handle, cell). */
   reloadParts?: Partial<ReloadParts>;
-  /** Pistol slide: kicks back per shot and is racked by the reload charge. */
+  /** Reciprocating action (pistol slide, M14 operating rod): kicks back per shot and is racked by the reload charge. */
   slide?: THREE.Object3D;
   /** Open-bolt action: home is cocked at the rear, empty rests forward. */
   openBolt?: THREE.Object3D;
@@ -1132,6 +1133,7 @@ export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural
   if (view.frame === 'pistol') return buildPistol(view);
   if (view.frame === 'lmg') return buildM60(view);
   if (view.frame === 'ak47') return buildAk47(view);
+  if (view.frame === 'm14') return buildM14(view);
   if (view.frame === 'm4a1') return buildM4A1(view);
   if (view.frame === 'mp5') return buildMP5(view);
   if (view.frame === 'vector') return buildVector(view);

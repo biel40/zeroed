@@ -14,6 +14,8 @@ const BULLET_BURSTS: readonly BloodBurstProfile[] = [
   { drops: 16, radius: 0.014, force: 6.2, spread: 1.2 },
   { drops: 20, radius: 0.015, force: 6.5, spread: 1.4 },
 ];
+/** A grenade tears the body open from below: a wide, heavy spray. */
+const BLAST_BURST: BloodBurstProfile = { drops: 36, radius: 0.018, force: 6.8, spread: 2.2 };
 const RAPID_HIT_WINDOW = 0.45;
 
 /** Only confirmed wounds drive this cosmetic cadence; health and rewards stay elsewhere. */
@@ -24,6 +26,7 @@ export class ZombieBleeding {
   public hit(source: ZombieKillSource | 'normal' | undefined, lethal: boolean): BloodBurstProfile | null {
     if (source === 'fakel' || source === 'vortex9' || source === 'tesla' || (source === 'barrett' && lethal)) return null;
     if (source === 'knife') return KNIFE_BURST;
+    if (source === 'f1') return BLAST_BURST;
     if (this.quietTime >= RAPID_HIT_WINDOW) this.consecutiveHits = 0;
     const burst = BULLET_BURSTS[Math.min(this.consecutiveHits, BULLET_BURSTS.length - 1)];
     this.consecutiveHits++;

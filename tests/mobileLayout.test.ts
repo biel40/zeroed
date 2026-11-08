@@ -12,6 +12,19 @@ function ruleIndex(selector: string): number {
 }
 
 describe('mobile stylesheet cascade', () => {
+  it('lets the beta badge wrap separately from the signed-in email', () => {
+    const header = css.match(/\.menu-header \{([^}]*)\}/)?.[1];
+    const details = css.match(/\.account-details \{([^}]*)\}/)?.[1];
+    const email = css.match(/\.account-button\[data-signed-in="true"\] \.account-label \{([^}]*)\}/)?.[1];
+
+    expect(html).toMatch(/class="account-details">\s*<span id="account-label"[^>]*><\/span>\s*<span id="account-badge"/);
+    expect(header).toContain('flex-wrap: wrap-reverse;');
+    expect(details).toContain('min-width: 0;');
+    expect(details).toContain('flex-wrap: wrap;');
+    expect(email).toContain('white-space: nowrap;');
+    expect(email).toContain('text-overflow: ellipsis;');
+  });
+
   it('shows both segmented health and current / maximum HP', () => {
     expect(html).toContain('id="z-hp-bar"');
     expect(html).toContain('id="z-hp"');
@@ -65,15 +78,15 @@ describe('mobile stylesheet cascade', () => {
     expect(css).toMatch(/#touch-controls button \{[^}]*touch-action: none/);
   });
 
-  it('keeps the required mobile actions with dedicated fire, aim and knife buttons', () => {
+  it('keeps the required mobile actions with dedicated fire, aim, knife and grenade buttons', () => {
     const touchControls = html.slice(html.indexOf('<div id="touch-controls"'), html.indexOf('<div id="hud-weapon"'));
     for (const id of ['btn-jump', 'btn-mode', 'btn-prone', 'btn-interact']) {
       expect(touchControls).not.toContain(`id="${id}"`);
     }
-    for (const action of ['fire', 'aim', 'knife', 'reload', 'swap-weapon', 'pause', 'crouch']) {
+    for (const action of ['fire', 'aim', 'knife', 'grenade', 'reload', 'swap-weapon', 'pause', 'crouch']) {
       expect(touchControls).toContain(`data-action="${action}"`);
     }
-    expect(touchControls.match(/data-action=/g)).toHaveLength(7);
+    expect(touchControls.match(/data-action=/g)).toHaveLength(8);
     expect(touchControls).toMatch(/id="btn-aim"[^>]*aria-pressed="false"/);
   });
 

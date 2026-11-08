@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { PPSH41_PROFILE, ppsh41ShroudSlots } from '../src/weapons/PPSH41ViewModel';
-import { STATION33_WALL_BUYS } from '../src/zombies/maps/Station33Config';
+import { CONSIGNA, STATION33_WALL_BUYS } from '../src/zombies/maps/Station33Config';
 import { WallBuy } from '../src/zombies/wallbuys/WallBuy';
 import { WallBuyView } from '../src/zombies/wallbuys/WallBuyView';
 
@@ -16,12 +16,13 @@ function buildWall(): WallBuyView {
 }
 
 describe('PPSh-41 wall buy', () => {
-  it('offers the PPSh in the former Vector location for 1250 points and 625 ammunition', () => {
+  it('offers the PPSh down the luggage-office corridor for 1250 points and 625 ammunition', () => {
     const buy = STATION33_WALL_BUYS.find((entry) => entry.weaponId === 'ppsh41');
     expect(buy).toMatchObject({
-      id: 'vestibule-ppsh41', price: 1250, ammoPrice: 625,
-      position: { y: 1.45, z: 2 }, yaw: -Math.PI / 2, floor: 0,
+      id: 'consigna-ppsh41', price: 1250, ammoPrice: 625,
+      position: { x: 11.2, y: 1.45, z: CONSIGNA.corridor.minZ + 0.02 }, yaw: 0, floor: 0,
     });
+    expect(STATION33_WALL_BUYS.some((entry) => entry.weaponId === 'mp5')).toBe(false);
     expect(STATION33_WALL_BUYS.some((entry) => entry.weaponId === 'vector')).toBe(false);
   });
 

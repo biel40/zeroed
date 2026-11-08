@@ -14,13 +14,16 @@ export const GAMEPAD_BINDINGS = {
   pause: { button: 9, code: null },
   prone: { button: 10, code: 'KeyZ' },
   knife: { button: 11, code: 'TouchKnife' },
+  grenade: { button: 15, code: 'KeyG' },
 } as const;
 
 export type GamepadAction = keyof typeof GAMEPAD_BINDINGS;
 export const GAMEPAD_ACTIONS: readonly (typeof GAMEPAD_BINDINGS)[GamepadAction][] = Object.values(GAMEPAD_BINDINGS);
 export const GAMEPAD_MENU_BINDINGS = { confirm: 0, back: 1, pause: 9, up: 12, down: 13, left: 14, right: 15 } as const;
-const XBOX = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'L3', 'R3'];
-const PLAYSTATION = ['×', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Share/Create', 'Options', 'L3', 'R3'];
+/** The D-pad reads the same on every family. */
+const DPAD = ['↑', '↓', '←', '→'];
+const XBOX = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'L3', 'R3', ...DPAD];
+const PLAYSTATION = ['×', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Share/Create', 'Options', 'L3', 'R3', ...DPAD];
 
 export function controllerFamily(id: string): ControllerFamily {
   if (/playstation|dualshock|dualsense|sony|054c/i.test(id)) return 'playstation';

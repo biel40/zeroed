@@ -6,7 +6,8 @@ import { defaultNow } from '../../network/Interpolation';
 import type { BarrierNetState, CoopPlayerId, PlayerNetState } from '../../network/Protocol';
 import type { PointDoor } from '../../zombies/doors/PointDoor';
 import type { WallBuy } from '../../zombies/wallbuys/WallBuy';
-import { hasSoulRitual, type ArenaAmmoRefill, type ArenaCompletionInteraction, type ArenaRitualInteraction,
+import { arenaFloorHeight } from '../../zombies/maps/ArenaFloors';
+import { hasSoulRitual, type ArenaAmmoRefill, type ArenaGrenadeBuy, type ArenaCompletionInteraction, type ArenaRitualInteraction,
   type ArenaSoulLampInteraction, type ArenaWeaponPickup, type SoulRitualArena,
   type ZombieArena } from '../../zombies/maps/ZombieArena';
 import type { WindowBarrier } from '../../zombies/barriers/WindowBarrier';
@@ -203,6 +204,15 @@ export class CoopWorld {
     const completion = this.arena.completionInteraction;
     return !completion.requiredDoorId || this.findDoor(completion.requiredDoorId)?.isLocked === false
       ? this.findFacing([completion]) : null;
+  }
+
+  public findFacingGrenadeBuy(): ArenaGrenadeBuy | null {
+    return this.findFacing(this.arena.grenadeBuys ?? []);
+  }
+
+  /** Floor height under a player on `floor`, where its grenades come to rest. */
+  public floorHeight(floor: number): number {
+    return arenaFloorHeight(this.arena.navigationBounds, this.arena.floorTransitions, floor);
   }
 
   public isRemoteInReach(item: { readonly position: { readonly x: number; readonly z: number };

@@ -87,9 +87,9 @@ describe('account API client', () => {
     const server = new FakeServer();
     const api = new AccountApi(API, server.fetch);
     const cases: [Route, unknown][] = [
-      [{ status: 200, body: { token: 'session-1', email: 'a@example.com', created: true } }, { token: 'session-1', email: 'a@example.com' }],
+      [{ status: 200, body: { token: 'session-1', email: 'a@example.com' } }, { token: 'session-1', email: 'a@example.com' }],
       [{ status: 400, body: { error: 'invalid_email' } }, 'invalid-email'],
-      [{ status: 400, body: { error: 'weak_password' } }, 'weak-password'],
+      [{ status: 404, body: { error: 'no_account' } }, 'no-account'],
       [{ status: 401, body: { error: 'wrong_password' } }, 'wrong-password'],
       [{ status: 429, body: { error: 'rate_limited' } }, 'rate-limited'],
     ];
@@ -101,6 +101,36 @@ describe('account API client', () => {
 
     server.routes['POST /auth/password'] = { status: 500 };
     await expect(api.signInWithPassword('a@example.com', 'password1')).rejects.toThrow();
+  });
+
+  it('maps registration responses to a session or the reason it was refused', async () => {
+    const server = new FakeServer();
+    const api = new AccountApi(API, server.fetch);
+    const cases: [Route, unknown][] = [
+      [{ status: 201, body: { token: 'session-1', email: 'a@example.com' } }, { token: 'session-1', email: 'a@example.com' }],
+      [{ status: 400, body: { error: 'invalid_email' } }, 'invalid-email'],
+      [{ status: 400, body: { error: 'weak_password' } }, 'weak-password'],
+      [{ status: 409, body: { error: 'account_exists' } }, 'exists'],
+    ];
+    for (const [route, result] of cases) {
+      server.routes['POST /auth/register'] = route;
+      expect(await api.register('a@example.com', 'password1')).toEqual(result);
+    }
+    expect(server.requests[0].body).toEqual({ email: 'a@example.com', password: 'password1' });
+  });
+
+  it('changes the password with the session token', async () => {
+    const server = new FakeServer({ 'POST /me/password': { status: 204 } });
+    const api = new AccountApi(API, server.fetch);
+    expect(await api.changePassword('session-1', 'new password')).toBe('changed');
+    expect(server.requests[0].headers.get('authorization')).toBe('Bearer session-1');
+    expect(server.requests[0].body).toEqual({ password: 'new password' });
+    server.routes['POST /me/password'] = { status: 400 };
+    expect(await api.changePassword('session-1', 'short')).toBe('weak-password');
+    server.routes['POST /me/password'] = { status: 401 };
+    expect(await api.changePassword('expired', 'new password')).toBeNull();
+    server.routes['POST /me/password'] = { status: 500 };
+    await expect(api.changePassword('session-1', 'new password')).rejects.toThrow();
   });
 
   it('maps Google sign-in responses to a session, a rejection or an error', async () => {
@@ -119,7 +149,7 @@ describe('account API client', () => {
 describe('web account sign-in', () => {
   it('signs in with a password, loads its products and remembers them', async () => {
     const server = new FakeServer({
-      'POST /auth/password': { status: 200, body: { token: 'session-1', email: 'tester@example.com', created: false } },
+      'POST /auth/password': { status: 200, body: { token: 'session-1', email: 'tester@example.com' } },
       'GET /me/entitlements': ENTITLED,
     });
     const storage = memoryStorage();
@@ -137,6 +167,32 @@ describe('web account sign-in', () => {
     server.offline = true;
     expect(await account.signInWithPassword('a@example.com', 'password1')).toBe('unavailable');
     expect(account.getEmail()).toBeNull();
+  });
+
+  it('registers and signs the new account in', async () => {
+    const server = new FakeServer({
+      'POST /auth/register': { status: 201, body: { token: 'session-1', email: 'new@example.com' } },
+      'GET /me/entitlements': { status: 200, body: { email: 'new@example.com', products: [], beta: false } },
+    });
+    const account = new WebAccount(new AccountApi(API, server.fetch), memoryStorage());
+    expect(await account.register('new@example.com', 'password1')).toBe('signed-in');
+    expect(account.getEmail()).toBe('new@example.com');
+    server.routes['POST /auth/register'] = { status: 409 };
+    expect(await account.register('new@example.com', 'password1')).toBe('exists');
+  });
+
+  it('changes the password, and signs out when the session has expired', async () => {
+    const server = new FakeServer({ 'POST /me/password': { status: 204 } });
+    const account = new WebAccount(new AccountApi(API, server.fetch), memoryStorage(savedAccount()));
+    expect(await account.changePassword('new password')).toBe('changed');
+    server.offline = true;
+    expect(await account.changePassword('new password')).toBe('unavailable');
+    expect(account.getEmail()).toBe('tester@example.com');
+    server.offline = false;
+    server.routes['POST /me/password'] = { status: 401 };
+    expect(await account.changePassword('new password')).toBe('signed-out');
+    expect(account.getEmail()).toBeNull();
+    expect(await account.changePassword('new password')).toBe('signed-out');
   });
 
   it('signs in with Google and reports rejected credentials and failures', async () => {
