@@ -21,7 +21,13 @@ import {
   COCHERAS_TRACKS,
   COCHERAS_TRAIN_CARS,
   ESCALATOR_PORTAL,
+  KOVKA,
+  KOVKA_CORE_COLOR,
+  KOVKA_CORRIDOR,
+  KOVKA_REACTOR,
+  KOVKA_UPGRADE_SITE,
   MILICIA,
+  PROTOCOL33_SURFACE_Y,
   SERVICE_PASSAGE,
   STATION33_BARRIERS,
   STATION33_DOORS,
@@ -44,6 +50,7 @@ import {
   type Station33ZoneId,
 } from '../src/zombies/maps/Station33Config';
 import { circuitLevel } from '../src/zombies/maps/station33/Station33Lighting';
+import { KOVKA_VAULT } from '../src/zombies/maps/station33/VaultProfile';
 import type { ArenaAmbientCue, ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { installCanvasDocument, makeContext, TEST_PROFILE } from './coopHarness';
 
@@ -53,7 +60,7 @@ vi.mock('../src/ui/CodeLockDialog', () => ({
 
 const DT = 1 / 60;
 const ZOMBIE_BAND = { bottom: 0.05, top: 1.8 } as const;
-const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall, MILICIA.hall, TALLER.hall] as const;
+const ROOMS = [VESTIBULE, CONSIGNA.corridor, CONSIGNA.hall, COCHERAS.hall, SUBESTACION.gallery, SUBESTACION.hall, MILICIA.hall, TALLER.hall, KOVKA.hall] as const;
 
 let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
@@ -211,6 +218,7 @@ const DOORS_TO: Readonly<Record<Station33ZoneId, ReadonlyArray<Station33ZoneId>>
   subestacion: ['cocheras', 'subestacion'],
   milicia: ['milicia'],
   taller: ['cocheras', 'subestacion', 'taller'],
+  kovka: ['cocheras', 'subestacion', 'kovka'],
   // Behind Protocol 33's blast door, not a paid door.
   evacuacion: ['cocheras', 'subestacion', 'taller'],
   superficie: ['cocheras', 'subestacion', 'taller'],
@@ -243,6 +251,15 @@ function chaseUntilHit(arena: Station33Arena, spawn: ZombieSpawnPoint, playerX: 
   return { hit, path };
 }
 
+/** The zombies' navigation over the arena's current solids, as the manager builds it. */
+function navigationOf(arena: ZombieArena): ZombieNavigationService {
+  const navigation = new ZombieNavigationService(0.35, 0.42);
+  const volumes = arena.colliders.map((collider) => new THREE.Box3().setFromObject(collider))
+    .map(({ min, max }) => ({ minX: min.x, minY: min.y, minZ: min.z, maxX: max.x, maxY: max.y, maxZ: max.z }));
+  navigation.rebuild(arena.navigationBounds.map((bounds) => ({ floor: bounds.floor, bounds, baseY: bounds.baseY })), volumes);
+  return navigation;
+}
+
 const idleInput = {
   isDown: () => false,
   wasPressed: () => false,
@@ -273,6 +290,7 @@ function walk(arena: ZombieArena, x: number, z: number, yaw: number, seconds: nu
 const FACE_EAST = -Math.PI / 2;
 const FACE_NORTH = 0;
 const FACE_WEST = Math.PI / 2;
+const FACE_SOUTH = Math.PI;
 
 describe('Station 33 layout', () => {
 
@@ -313,7 +331,7 @@ describe('Station 33 layout', () => {
     const arena: ZombieArena = makeArena();
     expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
       ['to-consigna', 750, true], ['to-cocheras', 1250, true], ['to-subestacion', 1500, true], ['to-milicia', 3000, true],
-      ['to-taller', 2000, true],
+      ['to-taller', 2000, true], ['to-kovka', 3500, true],
     ]);
     expect(arena.activateDoor('escalator')).toBe(false);
     expect(arena.completionInteraction).toBeUndefined();
@@ -700,11 +718,8 @@ describe('Station 33 machine room', () => {
 describe('Station 33 maintenance workshop', () => {
   it('routes the horde from every window of the open station to the deepest ring lockers', () => {
     const arena = makeArena();
-    for (const zone of ['consigna', 'milicia', 'cocheras', 'subestacion', 'taller'] as const) openDoorTo(arena, zone);
-    const navigation = new ZombieNavigationService(0.35, 0.42);
-    const volumes = arena.colliders.map((collider) => new THREE.Box3().setFromObject(collider))
-      .map(({ min, max }) => ({ minX: min.x, minY: min.y, minZ: min.z, maxX: max.x, maxY: max.y, maxZ: max.z }));
-    navigation.rebuild(arena.navigationBounds.map((bounds) => ({ floor: bounds.floor, bounds, baseY: bounds.baseY })), volumes);
+    for (const zone of ['consigna', 'milicia', 'cocheras', 'subestacion', 'taller', 'kovka'] as const) openDoorTo(arena, zone);
+    const navigation = navigationOf(arena);
     for (const locker of STATION33_RING_LOCKERS.filter((candidate) => candidate.zone === 'consigna' || candidate.zone === 'taller')) {
       const front = { x: locker.x + locker.facingX * 1.2, z: locker.z + locker.facingZ * 1.2 };
       for (const spawn of arena.spawnPoints as ReadonlyArray<ZombieSpawnPoint>) {
@@ -787,6 +802,160 @@ describe('Station 33 maintenance workshop', () => {
     const first = hook.rotation.z;
     arena.update(1.1);
     expect(hook.rotation.z).not.toBe(first);
+  });
+});
+
+describe('Station 33 KOVKA chamber', () => {
+  const { hall, pit } = KOVKA;
+  const hatch = STATION33_DOORS.find((door) => door.zone === 'kovka')!;
+
+  /** Inside the machine room, in front of the hatch. */
+  const beforeHatch = { x: SUBESTACION.hall.minX + 1, z: hatch.z } as const;
+
+  it('keeps the vestibule to its own doors and opens from the machine room only', () => {
+    expect(hatch.outwardX).toBe(-1);
+    expect(station33ZoneAt(beforeHatch.x, beforeHatch.z)).toBe('subestacion');
+    expect(STATION33_DOORS.filter((door) => station33ZoneAt(door.x - door.outwardX, door.z - door.outwardZ) === 'vestibule')).toHaveLength(3);
+    expect(KOVKA_CORRIDOR.minZ).toBeGreaterThan(SUBESTACION.hall.minZ);
+    expect(KOVKA_CORRIDOR.maxZ).toBeLessThan(SUBESTACION.hall.maxZ);
+    expect(KOVKA_CORRIDOR.minZ).toBeGreaterThan(pit.maxZ);
+    expect(KOVKA_CORRIDOR.maxZ).toBeLessThan(hall.maxZ);
+  });
+
+  it('stays sealed behind its hatch until bought, then wakes its own entrances', () => {
+    const arena = makeArena();
+    openWayTo(arena, 'subestacion');
+    expect(walk(arena, beforeHatch.x, beforeHatch.z, FACE_WEST, 3).x).toBeGreaterThan(SUBESTACION.hall.minX);
+    expect(arena.spawnPoints.some((point) => (point as ZombieSpawnPoint).barrierId?.startsWith('kovka'))).toBe(false);
+    openDoorTo(arena, 'kovka');
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(barrierIdsOf('vestibule', 'cocheras', 'subestacion', 'kovka'));
+    expect(arena.spawnPoints).toEqual([...STATION33_SPAWNS.vestibule, ...STATION33_SPAWNS.cocheras, ...STATION33_SPAWNS.subestacion, ...STATION33_SPAWNS.kovka]);
+    // Down the corridor, across the escalator axis and onto the deck before the reactor.
+    expect(walk(arena, beforeHatch.x, beforeHatch.z, FACE_WEST, 5).x).toBeLessThan(hall.maxX - 2);
+    for (const barrier of arena.barriers) {
+      while (!barrier.isOpen) barrier.damage(100);
+    }
+    const gate = STATION33_BARRIERS.find((barrier) => barrier.zone === 'kovka' && barrier.kind === 'gate')!;
+    expect(walk(arena, gate.x, hall.minZ + 1.6, FACE_NORTH, 3).z).toBeGreaterThan(hall.minZ);
+    arena.reset();
+    expect(arena.doors.find((door) => door.id === hatch.id)!.isLocked).toBe(true);
+    expect(arena.spawnPoints).toEqual(STATION33_SPAWNS.vestibule);
+  });
+
+  it('stays west of the escalator shaft, off every other room and passage, and under the surface', () => {
+    expect(hall.maxX + STATION33_WALL_THICKNESS).toBeLessThan(ESCALATOR_PORTAL.centerX - ESCALATOR_PORTAL.width / 2 - 0.3);
+    const walls = new THREE.Box3(
+      new THREE.Vector3(hall.minX - STATION33_WALL_THICKNESS, 0, hall.minZ - STATION33_WALL_THICKNESS),
+      new THREE.Vector3(hall.maxX + STATION33_WALL_THICKNESS, 3, hall.maxZ),
+    ).expandByScalar(-0.01);
+    for (const barrier of STATION33_BARRIERS.filter((candidate) => candidate.zone !== 'kovka')) {
+      expect(walls.intersectsBox(passageBox(barrier)), barrier.id).toBe(false);
+    }
+    for (const room of ROOMS.filter((candidate) => candidate !== hall)) {
+      expect(walls.intersectsBox(new THREE.Box3(new THREE.Vector3(room.minX, 0, room.minZ), new THREE.Vector3(room.maxX, 3, room.maxZ)))).toBe(false);
+    }
+    // The surface's snow lies over everything north of z = -30, 12 cm thick.
+    expect(KOVKA_VAULT.heightAt(KOVKA_VAULT.centerX)).toBeCloseTo(KOVKA.vaultApexY);
+    expect(KOVKA.vaultApexY).toBeLessThan(PROTOCOL33_SURFACE_Y - 0.12);
+    expect(KOVKA.vaultApexY - pit.floorY).toBeGreaterThanOrEqual(12);
+    for (const x of [hall.minX + 1, KOVKA_REACTOR.x, hall.maxX - 1]) expect(station33ZoneAt(x, (hall.minZ + hall.maxZ) / 2)).toBe('kovka');
+    expect(station33ZoneAt(hall.maxX - 1, hall.minZ + 0.5)).toBe('kovka');
+    // The corridor crosses the escalator axis far north of the incline, clear of every passage.
+    const corridor = new THREE.Box3(
+      new THREE.Vector3(KOVKA_CORRIDOR.minX, 0, KOVKA_CORRIDOR.minZ - STATION33_WALL_THICKNESS),
+      new THREE.Vector3(KOVKA_CORRIDOR.maxX, KOVKA_CORRIDOR.height, KOVKA_CORRIDOR.maxZ + STATION33_WALL_THICKNESS),
+    ).expandByScalar(-0.01);
+    expect(corridor.max.z).toBeLessThan(COCHERAS.hall.minZ - 5);
+    for (const barrier of STATION33_BARRIERS) expect(corridor.intersectsBox(passageBox(barrier)), barrier.id).toBe(false);
+    expect(station33ZoneAt(0, (KOVKA_CORRIDOR.minZ + KOVKA_CORRIDOR.maxZ) / 2)).toBe('kovka');
+  });
+
+  it('keeps the reactor in its pit and under the vault, solid to bullets, with the pit railed off floor 0', () => {
+    const { x, axisY, radius, frontZ, backZ } = KOVKA_REACTOR;
+    expect(x - radius).toBeGreaterThan(pit.minX);
+    expect(x + radius).toBeLessThan(pit.maxX);
+    expect(axisY - radius).toBeGreaterThan(pit.floorY);
+    expect(backZ).toBeGreaterThan(pit.minZ);
+    expect(frontZ).toBeLessThan(pit.maxZ);
+    expect(axisY + radius).toBeLessThan(KOVKA_VAULT.heightAt(x) - 0.8);
+    const arena = makeArena();
+    openDoorTo(arena, 'kovka');
+    const shot = new THREE.Raycaster(new THREE.Vector3(x, EYE_HEIGHT, hall.maxZ - 1), new THREE.Vector3(0, 0, -1));
+    const hit = shot.intersectObjects([...arena.colliders], false)[0];
+    expect(hit.object.name).toMatch(/^kovka-reactor-/);
+    expect(hit.point.z).toBeGreaterThan(frontZ - 0.1);
+    expect(walk(arena, x, pit.maxZ + 3, FACE_NORTH, 3).z).toBeGreaterThan(pit.maxZ);
+    expect(walk(arena, x, pit.minZ - 3, FACE_SOUTH, 3).z).toBeLessThan(pit.minZ);
+    expect(walk(arena, pit.minX - 2.5, (pit.minZ + pit.maxZ) / 2, FACE_EAST, 3).x).toBeLessThan(pit.minX);
+    expect(walk(arena, pit.maxX + 2.5, (pit.minZ + pit.maxZ) / 2, FACE_WEST, 3).x).toBeGreaterThan(pit.maxX);
+  });
+
+  it('runs a lane down each side of the pit, so the horde can be circled round the reactor', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'kovka');
+    for (const x of [pit.minX - 2.4, pit.maxX + 2.4]) {
+      const end = walk(arena, x, hall.maxZ - 1, FACE_NORTH, 10);
+      expect(end.z, `lane at x = ${x}`).toBeLessThan(hall.minZ + 1);
+    }
+    const navigation = navigationOf(arena);
+    const front = { x: KOVKA_REACTOR.x, z: (pit.maxZ + hall.maxZ) / 2 };
+    const back = { x: KOVKA_REACTOR.x, z: (hall.minZ + pit.minZ) / 2 };
+    const route = navigation.findPath(0, front.x, front.z, back.x, back.z)!;
+    expect(route).not.toBeNull();
+    expect(route.every((point) => point.x < pit.minX || point.x > pit.maxX || point.z < pit.minZ || point.z > pit.maxZ)).toBe(true);
+  });
+
+  it('keeps the upgrade site clear in front of the reactor and reachable from the hatch and every entrance', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'kovka');
+    const { x, z, width, depth, approach, facingZ } = KOVKA_UPGRADE_SITE;
+    expect(facingZ).toBe(1);
+    expect(z - depth / 2).toBeGreaterThan(pit.maxZ);
+    expect(z + depth / 2 + approach).toBeLessThan(hall.maxZ);
+    const site = new THREE.Box3(
+      new THREE.Vector3(x - width / 2, ZOMBIE_BAND.bottom, z - depth / 2),
+      new THREE.Vector3(x + width / 2, ZOMBIE_BAND.top, z + depth / 2 + approach),
+    );
+    expect(solidBoxes(arena).some((box) => box.intersectsBox(site))).toBe(false);
+    const stand = { x, z: z + depth / 2 + approach / 2 };
+    const navigation = navigationOf(arena);
+    expect(navigation.findPath(0, beforeHatch.x, beforeHatch.z, stand.x, stand.z)).not.toBeNull();
+    for (const spawn of STATION33_SPAWNS.kovka) {
+      expect(navigation.findPath(0, spawn.breachX!, spawn.breachZ!, stand.x, stand.z), spawn.barrierId).not.toBeNull();
+    }
+  });
+
+  it('lets its own horde reach the player at the hatch round the pit', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'kovka');
+    const spawn = STATION33_SPAWNS.kovka.find((point) => point.barrierId === 'kovka-cable-gallery')!;
+    openBarrier(arena, spawn.barrierId!);
+    expect(chaseUntilHit(arena, spawn, hall.maxX - 1.2, hatch.z, 60).hit).toBe(true);
+  });
+
+  it('gives the chamber its own lights and wakes the reactor core with the mains', () => {
+    const arena = makeArena({ ...TEST_PROFILE, quality: 'low' });
+    const inside = new THREE.Vector3(-12, EYE_HEIGHT, KOVKA.hall.maxZ - 5);
+    const core = arena.group.children.find((object) => object instanceof THREE.PointLight && object.color.getHex() === KOVKA_CORE_COLOR) as THREE.PointLight;
+    const glow = (): number => {
+      let brightness = -1;
+      arena.group.traverse((object) => {
+        const material = (object as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (material?.name === 'station33_kovka_core') brightness = material.color.r + material.color.g + material.color.b;
+      });
+      return brightness;
+    };
+    arena.update(0.5, inside);
+    const visible = arena.group.children.filter((object): object is THREE.PointLight => object instanceof THREE.PointLight && object.visible);
+    expect(visible).toHaveLength(POINT_LIGHT_BUDGET.low);
+    for (const light of visible) expect(station33ZoneAt(light.position.x, light.position.z)).toBe('kovka');
+    expect(core.visible).toBe(true);
+    expect(core.intensity).toBe(0);
+    expect(glow()).toBe(0);
+    arena.switchOnPower();
+    for (let step = 0; step < 20; step++) arena.update(0.5, inside);
+    expect(core.intensity).toBeGreaterThan(1);
+    expect(glow()).toBeGreaterThan(0.5);
   });
 });
 

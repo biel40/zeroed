@@ -59,6 +59,12 @@ import type {
  *   of nothing but the vestibule service door's passage.
  * - The maintenance workshop (`taller`) continues north of the substation,
  *   west of the cable-tunnel spawn passage and clear of the escalator axis.
+ * - The KOVKA chamber (`kovka`, built) is the only zone west of the
+ *   escalator axis, x < -4.1 and z in [-70.8, -40.2]: a corridor from a hatch
+ *   in the machine room's west wall crosses the axis at z ~ -45, far north
+ *   of the escalator's incline, so the platform below must keep its vault
+ *   under floor 0 there. The surface caps the chamber's vault under y = 7,
+ *   so its reactor lies in a pit sunk below floor 0.
  * - Phase 5 opens the escalator: an incline from z = 0 down to the mezzanine
  *   (floor -1), joined with `floorTransitions` like the mansion stairs.
  * - Phase 6 is the central platform (floor -2) with tracks along Z further
@@ -200,7 +206,7 @@ export interface Station33Barrier {
  * with a paid door, and have no entrances of their own.
  */
 export type Station33ZoneId =
-  | 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia' | 'taller' | 'evacuacion' | 'superficie';
+  | 'vestibule' | 'consigna' | 'cocheras' | 'subestacion' | 'milicia' | 'taller' | 'kovka' | 'evacuacion' | 'superficie';
 
 export const STATION33_START_ZONE: Station33ZoneId = 'vestibule';
 
@@ -244,6 +250,53 @@ export const MILICIA = {
   ceilingHeight: 3.4,
 } as const;
 
+/**
+ * The KOVKA chamber, the station's secret: a Soviet experimental weapons
+ * forge west of the escalator axis, level with the machine room that feeds
+ * it, reached from there through `KOVKA_CORRIDOR`. One hall under a great
+ * concrete barrel vault, interior faces like VESTIBULE; its east wall stays
+ * west of the escalator shaft. The surface's ground caps every ceiling under
+ * y = 7, so the height comes from below: the reactor lies in a pit sunk
+ * into the middle of the hall (rim on floor 0, bottom at `pit.floorY`), and
+ * a deck on floor 0 runs all round it for the horde.
+ */
+export const KOVKA = {
+  hall: { minX: -26.4, maxX: -4.4, minZ: -70.5, maxZ: -40.5 },
+  wallHeight: 4.6,
+  vaultApexY: 6.75,
+  pit: { minX: -21.6, maxX: -9.2, minZ: -64.5, maxZ: -48.5, floorY: -5.3 },
+} as const;
+
+/**
+ * The dormant reactor lying in the pit: a horizontal drum of yoke wheels
+ * whose axis runs along Z through (`x`, `axisY`), its high-voltage face at
+ * `frontZ` turned to the deck the corridor opens onto, its back at `backZ`.
+ */
+export const KOVKA_REACTOR = {
+  x: (KOVKA.pit.minX + KOVKA.pit.maxX) / 2,
+  axisY: 0.6,
+  radius: 4.9,
+  frontZ: KOVKA.pit.maxZ - 0.9,
+  backZ: KOVKA.pit.minZ + 1.4,
+} as const;
+
+/**
+ * Deck kept free for the weapon upgrade machine to come: a `width` x
+ * `depth` footprint centred on (`x`, `z`), on the reactor's axis with its
+ * back to the pit rail and its front to the chamber's south wall, and `approach` metres of
+ * clear deck in front of it where the player will stand. Nothing stands
+ * there yet.
+ */
+export const KOVKA_UPGRADE_SITE = {
+  x: KOVKA_REACTOR.x,
+  z: KOVKA.pit.maxZ + 1.1,
+  facingX: 0,
+  facingZ: 1,
+  width: 2.4,
+  depth: 1.4,
+  approach: 1.8,
+} as const;
+
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
 /** Station 33 presents the Barrett .50 as the Soviet PTRS-41 everywhere: box, chest, HUD and prompts. */
 export const STATION33_WEAPONS = reskinWeapons({ barrett: PTRS41_RESKIN });
@@ -277,6 +330,22 @@ export const SUBESTACION = {
 } as const;
 
 const SUBESTACION_NORTH_WALL_Z = SUBESTACION.hall.minZ - STATION33_WALL_THICKNESS / 2;
+const KOVKA_NORTH_WALL_Z = KOVKA.hall.minZ - STATION33_WALL_THICKNESS / 2;
+
+/**
+ * The cable gallery from the machine room to the KOVKA chamber, interior
+ * faces: west from the hatch in the machine room's west wall, between its
+ * north wall and the west motor-generator (the oil drums keep the south
+ * corner), across the escalator axis, into the chamber's east wall on the
+ * deck in front of the reactor. Flat concrete ceiling.
+ */
+export const KOVKA_CORRIDOR = {
+  minX: KOVKA.hall.maxX + STATION33_WALL_THICKNESS,
+  maxX: SUBESTACION.hall.minX - STATION33_WALL_THICKNESS,
+  minZ: -46.2,
+  maxZ: -43.6,
+  height: 3,
+} as const;
 const SUBESTACION_EAST_WALL_X = SUBESTACION.hall.maxX + STATION33_WALL_THICKNESS / 2;
 
 /**
@@ -363,7 +432,8 @@ export const COCHERAS_TRAIN_CARS: ReadonlyArray<Station33TrainCar> = [
  * Zombie entrances: the vestibule's surface stairs, service door and two
  * vents, the luggage office's porters' stairs and grille, then the train
  * sheds' blast-gate wicket, grille and substation door, then the machine
- * room's grille and cable-tunnel door, and the militia post's back door.
+ * room's grille and cable-tunnel door, the militia post's back door, the
+ * workshop's service door and the KOVKA chamber's cable gallery and duct.
  * Each zone's entrances only wake once its door is bought.
  */
 export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
@@ -382,6 +452,9 @@ export const STATION33_BARRIERS: ReadonlyArray<Station33Barrier> = [
   // The post's own way up to the street, east of its holding cell.
   { id: 'milicia-back-door', x: -10.2, z: SOUTH_WALL_Z, outwardX: 0, outwardZ: 1, kind: 'gate', zone: 'milicia' },
   { id: 'taller-service-door', x: 11.8, z: TALLER.hall.minZ - STATION33_WALL_THICKNESS / 2, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'taller' },
+  // Behind the reactor, either side of its axis, so the horde rounds the pit both ways.
+  { id: 'kovka-cable-gallery', x: KOVKA_REACTOR.x - 5.2, z: KOVKA_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, kind: 'gate', zone: 'kovka' },
+  { id: 'kovka-duct', x: KOVKA_REACTOR.x + 5.2, z: KOVKA_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, kind: 'vent', zone: 'kovka' },
 ];
 
 export interface Station33Door {
@@ -405,6 +478,8 @@ export interface Station33Door {
  * the west train; the third opens the machine room's gallery between the
  * sheds' dead tunnel and blast gate. The militia post's door (3000), the
  * vestibule's third way out, sits in the west wall, in line with the turnstiles.
+ * The KOVKA hatch (3500), the dearest, sits in the machine room's west wall,
+ * north of its motor-generator, at the end of the corridor to the chamber.
  */
 export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
   { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna', plate: 'luggage-office' },
@@ -415,6 +490,10 @@ export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
   },
   { id: 'to-milicia', x: WEST_WALL_X, z: 9.45, outwardX: -1, outwardZ: 0, cost: 3000, zone: 'milicia', plate: 'militia' },
   { id: 'to-taller', x: 5.8, z: SUBESTACION_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, cost: 2000, zone: 'taller', plate: 'maintenance' },
+  {
+    id: 'to-kovka', x: SUBESTACION.hall.minX - STATION33_WALL_THICKNESS / 2, z: (KOVKA_CORRIDOR.minZ + KOVKA_CORRIDOR.maxZ) / 2,
+    outwardX: -1, outwardZ: 0, cost: 3500, zone: 'kovka', plate: 'kovka',
+  },
 ];
 
 /** Dead-end service passage behind every entrance, where its zombies appear. */
@@ -458,6 +537,7 @@ export const STATION33_SPAWNS: Readonly<Record<Station33ZoneId, ReadonlyArray<Zo
   subestacion: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'subestacion').map(spawnBehind),
   milicia: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'milicia').map(spawnBehind),
   taller: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'taller').map(spawnBehind),
+  kovka: STATION33_BARRIERS.filter((barrier) => barrier.zone === 'kovka').map(spawnBehind),
   // The horde follows the players up from the station.
   evacuacion: [],
   superficie: [],
@@ -1030,7 +1110,7 @@ export const STATION33_PLAYER_SPAWN = { x: 0, y: 1.72, z: 15.2, floor: 0 } as co
  * walkable. It reaches the stair's top landing, behind the blast door.
  */
 export const STATION33_PLAYER_BOUNDS: PlayerBounds = {
-  minX: MILICIA.hall.minX + 0.4,
+  minX: KOVKA.hall.minX + 0.4,
   maxX: CONSIGNA.hall.maxX - 0.4,
   minZ: PROTOCOL33_SURFACE.yard.maxZ,
   maxZ: VESTIBULE.maxZ - 0.4,
@@ -1048,11 +1128,12 @@ export const PROTOCOL33_SURFACE_BOUNDS: PlayerBounds = {
  * Every room plus every entrance passage on the vestibule level, out to
  * the stairhead's doorway (no further: the yard is floor 1); then the
  * surface yard and the stair it reaches. Walls longer than the zombie
- * obstacle limit (20 m) are built in pieces, so the empty ground west of
- * the train sheds stays walled off.
+ * obstacle limit (20 m) are built in pieces, so the empty ground between
+ * the KOVKA chamber and the train sheds stays walled off. The chamber's
+ * pit is no floor of its own: its rails fence it off floor 0.
  */
 export const STATION33_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
-  { floor: 0, minX: -19.1, maxX: 27.8, minZ: PROTOCOL33_SURFACE.yard.maxZ, maxZ: 24.7, baseY: 0 },
+  { floor: 0, minX: KOVKA.hall.minX - STATION33_WALL_THICKNESS - 0.6, maxX: 27.8, minZ: PROTOCOL33_SURFACE.yard.maxZ, maxZ: 24.7, baseY: 0 },
   {
     floor: 1,
     minX: PROTOCOL33_SURFACE.yard.minX - 0.3,
@@ -1126,6 +1207,11 @@ export const EMERGENCY_COLOR = 0xff2a12;
 export const MILICIA_STAR_COLOR = 0xff3a26;
 /** Cold mercury floodlight over the stairhead on the surface. */
 export const SURFACE_FLOOD_COLOR = 0xbfd2e2;
+/** Cold electric blue of the KOVKA reactor's core, fed by the substation's mains. */
+export const KOVKA_CORE_COLOR = 0x5aa8ff;
+/** Where the KOVKA chamber's lamps hang: over the deck before the reactor, and along both lanes beside the pit. */
+const KOVKA_DECK_LAMP_Z = KOVKA.hall.maxZ - 4.3;
+const KOVKA_LANE_ZS = [KOVKA.pit.maxZ - 2.7, (KOVKA.pit.minZ + KOVKA.pit.maxZ) / 2, KOVKA.pit.minZ + 2.3] as const;
 
 /**
  * The station's main switch: a knife-switch lever on the machine room's
@@ -1154,12 +1240,15 @@ export const STATION33_MAINS = {
 } as const;
 
 /**
- * Zone holding a floor point: the workshop's north wall separates the
- * escape (and, past the stairhead, the surface), the sheds' north wall the
+ * Zone holding a floor point: beyond the vestibule's north wall, the west
+ * walls of the sheds and the machine room part the KOVKA chamber and its
+ * corridor (west) from the rest; the workshop's north wall separates the
+ * escape (and, past the stairhead, the surface); the sheds' north wall the
  * machine room, the vestibule's north wall the train sheds, its east wall
  * the luggage office and its west wall the militia post.
  */
 export function station33ZoneAt(x: number, z: number): Station33ZoneId {
+  if (z < NORTH_WALL_Z && x < SUBESTACION.hall.minX - STATION33_WALL_THICKNESS / 2) return 'kovka';
   if (z < TALLER_NORTH_WALL_Z) return z < PROTOCOL33_SURFACE.yard.maxZ ? 'superficie' : 'evacuacion';
   if (z < SUBESTACION_NORTH_WALL_Z && x < TALLER.hall.maxX + STATION33_WALL_THICKNESS / 2) return 'taller';
   if (z < COCHERAS_NORTH_WALL_Z) return 'subestacion';
@@ -1227,6 +1316,17 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
     id: PROTOCOL33_STAIRHEAD_FLOOD_LIGHT,
   },
   { x: 6.2, y: PROTOCOL33_SURFACE_Y + 5.4, z: -94.5, color: AMBER_LAMP_COLOR, intensity: 6, distance: 16, circuit: 'amber', zone: 'superficie' },
+  // The KOVKA chamber: a work light over the deck, the battery beacon between its entrances
+  // and, once the mains feed it, the reactor's blue core; then the lanes and the south wall.
+  { x: -12, y: 3.85, z: KOVKA_DECK_LAMP_Z, color: FLUORESCENT_COLOR, intensity: 9, distance: 13, circuit: 'steady', zone: 'kovka' },
+  { x: KOVKA_REACTOR.x, y: 3.4, z: KOVKA.hall.minZ + 0.6, color: EMERGENCY_COLOR, intensity: 4.5, distance: 9, circuit: 'emergency', zone: 'kovka' },
+  {
+    x: KOVKA_REACTOR.x, y: KOVKA_REACTOR.axisY + 1.2, z: KOVKA_REACTOR.frontZ + 0.6,
+    color: KOVKA_CORE_COLOR, intensity: 8, distance: 13, circuit: 'mains', zone: 'kovka',
+  },
+  { x: -23.9, y: 3.85, z: KOVKA_LANE_ZS[1], color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing', zone: 'kovka' },
+  { x: -10, y: 2.6, z: KOVKA.hall.maxZ - 0.6, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6.5, circuit: 'amber', zone: 'kovka' },
+  { x: -6.9, y: 3.85, z: KOVKA_LANE_ZS[2], color: FLUORESCENT_COLOR, intensity: 7, distance: 10, circuit: 'mains', zone: 'kovka' },
 ];
 
 /**
@@ -1271,6 +1371,16 @@ export const FLUORESCENT_FIXTURES: ReadonlyArray<{ readonly x: number; readonly 
   { x: 13.8, z: -50.6, circuit: 'dead' },
   { x: 9.4, z: -56.6, circuit: 'failing' },
   { x: 13.8, z: -56.6, circuit: 'mains' },
+  // KOVKA: over the deck, both lanes beside the pit and the deck behind the reactor.
+  { x: -12, z: KOVKA_DECK_LAMP_Z, circuit: 'steady' },
+  { x: -19, z: KOVKA_DECK_LAMP_Z, circuit: 'mains' },
+  { x: -23.9, z: KOVKA_LANE_ZS[0], circuit: 'mains' },
+  { x: -23.9, z: KOVKA_LANE_ZS[1], circuit: 'failing' },
+  { x: -23.9, z: KOVKA_LANE_ZS[2], circuit: 'dead' },
+  { x: -6.9, z: KOVKA_LANE_ZS[0], circuit: 'unstable' },
+  { x: -6.9, z: KOVKA_LANE_ZS[1], circuit: 'dead' },
+  { x: -6.9, z: KOVKA_LANE_ZS[2], circuit: 'mains' },
+  { x: KOVKA_REACTOR.x, z: KOVKA.hall.minZ + 2.8, circuit: 'mains' },
 ];
 
 /** A fitting mounted on a wall face at (x, z), `facing` into its room. */
@@ -1282,7 +1392,8 @@ export interface Station33WallFitting {
 }
 
 /**
- * Caged bulkhead lamps of the train sheds and the machine room. `dead`
+ * Caged bulkhead lamps of the train sheds, the machine room, the workshop,
+ * the escape and the KOVKA chamber's south wall and corridor. `dead`
  * globes are smashed; `mains` ones light only once the main switch is thrown.
  */
 export const STATION33_WALL_LAMPS: ReadonlyArray<Station33WallFitting & { readonly circuit: Station33LightCircuit | 'dead' }> = [
@@ -1297,19 +1408,23 @@ export const STATION33_WALL_LAMPS: ReadonlyArray<Station33WallFitting & { readon
   { x: TALLER.hall.minX, z: -57.0, facingX: 1, facingZ: 0, circuit: 'amber' },
   { x: TALLER.hall.maxX, z: -57.0, facingX: -1, facingZ: 0, circuit: 'dead' },
   { x: PROTOCOL33_ESCAPE.minX, z: -62.4, facingX: 1, facingZ: 0, circuit: 'emergency' },
+  { x: -10, z: KOVKA.hall.maxZ, facingX: 0, facingZ: -1, circuit: 'amber' },
+  { x: -20.8, z: KOVKA.hall.maxZ, facingX: 0, facingZ: -1, circuit: 'dead' },
+  { x: 0, z: KOVKA_CORRIDOR.maxZ, facingX: 0, facingZ: -1, circuit: 'amber' },
 ];
 
 /**
  * Red battery beacons at 3.4 m: over the sheds' blast gate, beside the
  * wicket the horde breaks through, over the machine room's main switch,
- * beside the workshop's service door (and the blast door) and over the
- * evacuation panel.
+ * beside the workshop's service door (and the blast door), over the
+ * evacuation panel and between the KOVKA chamber's two entrances.
  */
 export const STATION33_BEACONS: ReadonlyArray<Station33WallFitting> = [
   { x: 13.0, z: COCHERAS.hall.minZ, facingX: 0, facingZ: 1 },
   { x: POWER_LEVER.x, z: SUBESTACION.hall.minZ, facingX: 0, facingZ: 1 },
   { x: 13.6, z: TALLER.hall.minZ, facingX: 0, facingZ: 1 },
   { x: PROTOCOL33_PANEL.x, z: PROTOCOL33_PANEL.z, facingX: -1, facingZ: 0 },
+  { x: KOVKA_REACTOR.x, z: KOVKA.hall.minZ, facingX: 0, facingZ: 1 },
 ];
 
 /** Amber glass sconces on the side walls; `yaw` faces the hall. */

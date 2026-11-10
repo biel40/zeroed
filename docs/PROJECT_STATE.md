@@ -29,6 +29,10 @@
   replica ni existe en cooperativo. La salida, la superficie, su ambiente y
   el rendimiento movil con la horda del evento estan pendientes de validacion
   manual en el juego.
+- La camara KOVKA de Station 33 tiene geometria, reactor e iluminacion
+  basica; la mision de desbloqueo y la maquina de mejora de armas estan
+  pendientes, y de momento se abre con una puerta de pago. Su aspecto, su
+  combate y el rendimiento movil estan pendientes de validacion manual.
 - Antes del primer START la simulacion puede avanzar; game over tactil aun
   puede recibir movimiento/disparo.
 - Barreras totalmente destruidas no siempre entran en reparacion; el cambio de

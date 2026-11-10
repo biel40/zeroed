@@ -43,13 +43,14 @@ export type SignId =
   | 'ventilation'
   | 'security'
   | 'protocol-33'
-  | 'emergency-exit';
+  | 'emergency-exit'
+  | 'kovka';
 
 const ATLAS_WIDTH = 1024;
 /**
  * Two 128 px rows below the original square (the machine room's plates, then
- * the militia post's), a 384 px band of the post's red corner, then a row of
- * Protocol 33's lightboxes.
+ * the militia post's), a 384 px band of the post's red corner, a row of
+ * plates ending in the KOVKA hatch's, then a row of Protocol 33's lightboxes.
  */
 const ATLAS_HEIGHT = 1920;
 
@@ -90,6 +91,7 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   maintenance: [0, 1664, 256, 128],
   ventilation: [256, 1664, 256, 128],
   security: [512, 1664, 256, 128],
+  kovka: [768, 1664, 256, 128],
   'protocol-33': [0, 1792, 512, 128],
   'emergency-exit': [512, 1792, 512, 128],
 };
@@ -283,6 +285,8 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   paintMilitiaSigns(context, random);
   enamelPlate(context, 'maintenance', '#d7b842', '#302a16', '#302a16', ['МАСТЕРСКАЯ'], 30, random);
   paintProtocolSigns(context, random);
+  // The secret object's hatch: a restricted plate, red like the no-entry one.
+  enamelPlate(context, 'kovka', '#9a1f16', '#e8e2d2', '#f1ead8', ['ОБЪЕКТ', '«КОВКА»'], 36, random);
 }
 
 /**

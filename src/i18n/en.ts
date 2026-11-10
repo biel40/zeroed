@@ -240,6 +240,7 @@ export const en = {
   'door.to-subestacion': 'THE SUBSTATION',
   'door.to-milicia': 'THE MILITIA POST',
   'door.to-taller': 'THE MAINTENANCE WORKSHOP',
+  'door.to-kovka': 'THE KOVKA CHAMBER',
   'door.openBunker': 'Open sealed bunker',
   'door.bunkerRequired': '{cost} PTS REQUIRED',
   'arena.refillAmmo': 'REFILL AMMO — {cost}',

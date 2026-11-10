@@ -662,7 +662,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     equipTime: 0.4,
     audio: {
       volume: 0.66, duration: 0.12, lowpass: 2300, thump: 104, crack: 0.24, tail: 0.42, mechanism: 0.2,
-      sampleFile: 'ak47_single_shot.wav', autoSampleFile: 'ak47_auto_shot.wav',
+      sampleFile: 'ak47_single_report.wav', autoSampleFile: 'ak47_auto_report.wav',
       variation: { pitch: 0.025, volume: 0.05 },
     },
     view: {

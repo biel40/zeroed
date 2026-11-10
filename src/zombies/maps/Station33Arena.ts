@@ -24,6 +24,7 @@ import { buildDoorFrames } from './station33/DoorFrames';
 import { buildEscalatorHead } from './station33/EscalatorHeadBuilder';
 import { buildEscapeRoute, escapeStairTransitions } from './station33/EscapeRouteBuilder';
 import { HighlandCathedral } from './station33/HighlandCathedral';
+import { buildKovka } from './station33/KovkaBuilder';
 import { buildMilicia } from './station33/MiliciaBuilder';
 import { Protocol33 } from './station33/Protocol33';
 import { buildServicePassages } from './station33/ServicePassageBuilder';
@@ -123,7 +124,11 @@ const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
  * post, the vestibule's third way out behind its dearest door, sells the
  * AK-47 and, once the power is on, the Armour ring. The yellow maintenance
  * workshop beyond the substation sells Double Tap and has its own entrance.
- * Its blast door is the way out: Protocol 33 (`evacuation`), once the
+ * The KOVKA chamber west of the escalator, behind the dearest hatch in the
+ * machine room's west wall and the corridor beyond it, holds
+ * the dormant reactor and two entrances of its own; the weapon upgrade
+ * machine it was built for is still to come. The workshop's blast door is
+ * the way out: Protocol 33 (`evacuation`), once the
  * power is on, leads up the emergency stair to the surface yard (floor 1).
  */
 export class Station33Arena implements ZombieArena {
@@ -209,6 +214,7 @@ export class Station33Arena implements ZombieArena {
     buildSubestacion(context, this.lighting);
     buildTaller(context, this.lighting);
     buildMilicia(context, this.lighting);
+    buildKovka(context, this.lighting);
     this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST, STATION33_WEAPONS)];
     buildDoorFrames(context);
     buildServicePassages(context, this.lighting, STATION33_BARRIERS);

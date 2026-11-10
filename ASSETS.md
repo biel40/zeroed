@@ -197,6 +197,7 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `m1911_shot.mp3` | Disparo de la M1911: mono, 44,1 kHz, 96 kbps, ~1,2 s con cola (con fallback procedural) |
+| `ak47_single_report.wav`, `ak47_auto_report.wav` | Grabación de un disparo de AK-47 por ninebilly, editada para ambos modos (CC0). [Fuente](https://freesound.org/people/ninebilly/sounds/520934/) |
 | `mp5_single_shot.wav`, `mp5_auto_shot.wav` | Disparo de MP5 grabado por Pierre-Etienne Courtejoie para el U.S. Army (dominio público) |
 | `ppsh41_single_shot.wav`, `ppsh41_auto_shot.wav` | Disparos de PPSh-41 de The Free Firearm Sound Library (CC0) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |

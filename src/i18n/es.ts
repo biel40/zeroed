@@ -238,6 +238,7 @@ export const es: Record<TranslationKey, string> = {
   'door.to-subestacion': 'LA SUBESTACIÓN',
   'door.to-milicia': 'EL PUESTO DE MILICIA',
   'door.to-taller': 'EL TALLER DE MANTENIMIENTO',
+  'door.to-kovka': 'LA CÁMARA KOVKA',
   'door.openBunker': 'Abrir el búnker sellado',
   'door.bunkerRequired': 'SE NECESITAN {cost} PTS',
   'arena.refillAmmo': 'RECARGAR MUNICIÓN — {cost}',

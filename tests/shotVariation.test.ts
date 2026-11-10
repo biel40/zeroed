@@ -25,7 +25,7 @@ describe('shot variation', () => {
 });
 
 describe.each([
-  ['AK-47', 'ak47', 'ak47_single_shot.wav', 'ak47_auto_shot.wav'],
+  ['AK-47', 'ak47', 'ak47_single_report.wav', 'ak47_auto_report.wav'],
   ['MP5', 'mp5', 'mp5_single_shot.wav', 'mp5_auto_shot.wav'],
   ['PPSh-41', 'ppsh41', 'ppsh41_single_shot.wav', 'ppsh41_auto_shot.wav'],
 ] as const)('%s samples by fire mode', (_name, id, singleFile, autoFile) => {

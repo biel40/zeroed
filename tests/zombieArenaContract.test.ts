@@ -22,9 +22,10 @@ const ARENA_BUDGETS: Record<ZombieMapId, Pick<ArenaMetrics, BudgetMetric>> = {
     drawables: 710, visibleDrawables: 430, triangles: 91_000, visibleTriangles: 60_000,
     geometryMiB: 6, materials: 215, colliders: 100, wallBoxes: 85, navCells: 15_000,
   },
+  // The KOVKA chamber and its corridor widened floor 0's navigation westwards and added their own solids and invisible proxies.
   'station-33': {
-    drawables: 1_025, visibleDrawables: 780, triangles: 200_000, visibleTriangles: 185_000,
-    geometryMiB: 17, materials: 250, colliders: 300, wallBoxes: 215, navCells: 52_000,
+    drawables: 1_100, visibleDrawables: 800, triangles: 200_000, visibleTriangles: 185_000,
+    geometryMiB: 17, materials: 250, colliders: 340, wallBoxes: 235, navCells: 56_000,
   },
 };
 

@@ -24,7 +24,9 @@ codigo: actualiza la guia.
   puerta de pago, la Fase 3 las cocheras tras la segunda y la Fase 4 la sala
   de maquinas (la subestacion) tras la tercera. La escalera mecanica sigue
   sellada: bajarla es la fase siguiente. Aparte de las fases, el puesto de
-  milicia (la puerta mas cara, 3000) es la tercera salida del vestibulo. Cada fase
+  milicia (3000) es la tercera salida del vestibulo; el vestibulo no admite
+  mas puertas. La compuerta de la camara KOVKA (la puerta mas cara, 3500)
+  esta en la sala de maquinas. Cada fase
   debe ser jugable por si misma y nunca abrir puertas hacia el vacio. El plan
   de ejes (hacia el norte y hacia abajo) esta documentado al principio de
   `Station33Config.ts`.
@@ -199,6 +201,47 @@ codigo: actualiza la guia.
   de dano con armas. Una entrada de mantenimiento propia despierta al
   abrir la puerta, bajo la placa «МАСТЕРСКАЯ» sobre las taquillas.
 
+## La camara KOVKA
+
+- El secreto de la estacion: «ОБЪЕКТ «КОВКА»» (forja), una instalacion
+  sovietica experimental de mejora de armamento, unica zona al oeste del
+  eje de la escalera. La alimenta la subestacion y por ella se entra: una
+  compuerta con franjas de peligro y la placa roja de acceso restringido en
+  el muro oeste de la sala de maquinas, entre el muro norte y el
+  motor-generador oeste, abre una galeria de cables de hormigon que cruza
+  bajo el eje de la escalera y desemboca en la cubierta, delante del
+  reactor. Es una zona tardia: exige haber abierto cocheras y subestacion.
+- Es la sala mas monumental del mapa (unos 22 x 30 m): hormigon desnudo con
+  zocalo pintado bajo una gran boveda de cañon con nervios sobre pilastras.
+  La superficie impide subir la boveda, asi que la altura viene de abajo: el
+  reactor yace en un foso de 5,3 m en medio de la nave y, desde el fondo del
+  foso hasta la clave, hay unos 12 m. Alrededor, una cubierta de hormigon
+  aceitoso en la planta de la estacion: delante del reactor, detras y un
+  carril de unos 4,5 m a cada lado, para dar vueltas a la horda. Barandillas
+  de minio cierran el foso; pasarelas de servicio con escaleras de gato
+  enjauladas recorren los muros laterales, una escalera de acero baja al
+  foso y tuberias y un conducto de ventilacion corren por los muros. Todo
+  eso es decorado: no se sube ni se baja.
+- El reactor horizontal, inspirado en los grandes detectores de particulas,
+  descansa en cunas: ruedas de yugo de esmalte azul gris desvaido con
+  bobinados de cobre entre ellas y, hacia la cubierta, la cara de alta
+  tension como un iris: anillo de celosia con bobinas y electrodos, placas
+  radiales escalonadas y un anima que se estrecha hasta el nucleo. Dos
+  mastiles de celosia con aisladores de porcelana lo alimentan por barras de
+  cobre, cada uno con un brazo articulado que apunta a la cara. Esta dormido:
+  el nucleo azul electrico (el unico acento azul del mapa) solo se enciende,
+  con su luz, cuando el interruptor general devuelve la red.
+- Dos entradas propias en el muro norte, detras del reactor, a cada lado de
+  su eje. Delante de la cara, en el eje y de espaldas a la barandilla, queda
+  libre una placa de acero con franjas de peligro y su cable de
+  alimentacion: el sitio de la futura maquina de mejora de armas
+  (`KOVKA_UPGRADE_SITE`). La mision de desbloqueo y las mejoras estan
+  pendientes; hasta entonces la compuerta es una puerta de pago.
+- Luz economica: un fluorescente de trabajo sobre la cubierta, la baliza
+  roja entre las entradas, el nucleo con la red, un tubo que falla en un
+  carril, un aplique ambar en el muro sur y otro en la galeria; lo demas brilla con
+  materiales emisivos. Nada de descargas animadas ni luces nuevas por efecto.
+
 ## Protocolo 33 (la salida)
 
 - La evacuacion que fracaso tenia un plan de emergencia que nadie llego a
@@ -316,7 +359,8 @@ codigo: actualiza la guia.
   electricidad); corazon, Armadura (vida maxima doble, en el puesto de
   milicia, exige electricidad). Previstos: indice, Doble
   impacto (dano y cadencia); pulgar, un anillo de utilidad (por ejemplo,
-  tercera arma). La siguiente maquina prevista es el Pack-a-Punch.
+  tercera arma). La siguiente maquina prevista es el Pack-a-Punch, en la
+  camara KOVKA.
 - Cada taquilla toca la melodia de su anillo. Las de ahora son provisionales
   y procedurales (`RingJingleTunes.ts`); un MP3 libre de derechos con el
   nombre de su `sampleFile` en `public/assets/audio/` sustituye a cada una.
@@ -351,7 +395,9 @@ codigo: actualiza la guia.
   verde militar desconchado hasta el oxido, bronce en marcos y barandillas.
   En las cocheras: dovelas de hierro fundido, solera de hormigon con manchas
   de aceite, balasto oscuro, esmalte azul desvaido de los vagones y franjas
-  de peligro gastadas en toperas y germozatvor.
+  de peligro gastadas en toperas y germozatvor. En la camara KOVKA: hormigon
+  de servicio, acero con imprimacion de minio, esmalte azul gris del reactor
+  y cobre desnudo; su nucleo azul electrico es el unico azul vivo del mapa.
 - Todas las texturas se generan en codigo (`Station33Materials.ts`); el mapa no
   depende de assets externos. Mantenerlo asi salvo decision explicita.
 
@@ -433,6 +479,10 @@ codigo: actualiza la guia.
   escenario puede mostrar.
 - Ningun solido puede superar 20 m de planta (el filtro de obstaculos de los
   zombis lo ignoraria y abriria un paso fantasma): parte los muros largos.
+- Ningun techo subterraneo puede asomar sobre la superficie (y = 7): su
+  nieve, de 12 cm, cubre lo que queda al norte de z = -30, y lo que
+  sobresalga se veria desde el patio. Para ganar altura, hunde la sala (como
+  el foso de KOVKA) y cierra el hueco con solidos bajos en la planta 0.
 - Valida con `npm run typecheck` y `npm test` (`tests/station33.test.ts` y
   `tests/mapIntro.test.ts` cubren disposicion, puertas, rutas, luces,
   ambiente e intro). Para revisar una zona sin jugar hasta ella usa el visor

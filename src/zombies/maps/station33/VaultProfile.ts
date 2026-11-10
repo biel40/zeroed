@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  COCHERAS, CONSIGNA, MILICIA, PROTOCOL33_ESCAPE, PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, station33ZoneAt, SUBESTACION, TALLER, VESTIBULE,
+  COCHERAS, CONSIGNA, KOVKA, MILICIA, PROTOCOL33_ESCAPE, PROTOCOL33_SURFACE, PROTOCOL33_SURFACE_Y, station33ZoneAt, SUBESTACION, TALLER, VESTIBULE,
 } from '../Station33Config';
 
 /**
@@ -45,6 +45,7 @@ export function segmentalVault(minX: number, maxX: number, springY: number, apex
 
 export const VESTIBULE_VAULT = segmentalVault(VESTIBULE.minX, VESTIBULE.maxX, VESTIBULE.wallHeight, VESTIBULE.vaultApexY);
 export const COCHERAS_VAULT = segmentalVault(COCHERAS.hall.minX, COCHERAS.hall.maxX, COCHERAS.wallHeight, COCHERAS.vaultApexY);
+export const KOVKA_VAULT = segmentalVault(KOVKA.hall.minX, KOVKA.hall.maxX, KOVKA.wallHeight, KOVKA.vaultApexY);
 
 /** Underside of whatever ceiling covers a floor point: a vault, or a flat slab (luggage office, machine room). */
 export function ceilingHeightAt(x: number, z: number): number {
@@ -56,6 +57,7 @@ export function ceilingHeightAt(x: number, z: number): number {
     case 'superficie': return PROTOCOL33_SURFACE_Y + PROTOCOL33_SURFACE.kiosk.height;
     case 'subestacion': return z > SUBESTACION.hall.maxZ ? SUBESTACION.galleryHeight : SUBESTACION.hallHeight;
     case 'cocheras': return COCHERAS_VAULT.heightAt(x);
+    case 'kovka': return KOVKA_VAULT.heightAt(x);
     default: return VESTIBULE_VAULT.heightAt(x);
   }
 }

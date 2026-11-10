@@ -95,9 +95,9 @@ Barrett lo usa: cuatro disparos seguidos (menos de 0.6 s entre ellos) lo
 bloquean hasta enfriarse. `audio.sampleFile` sustituye el disparo procedural por
 una grabacion de `public/assets/audio/`. La L96 salta la entrada del clip
 (`audio.sampleOffset`) para alinear el estampido con el disparo. La AK-47 usa
-una toma de Tunetank con una cola mas larga en semiautomatico y un golpe
-aislado de la rafaga original (`audio.autoSampleFile`) por cada bala en
-automatico. La M14 usa un disparo de G3 del mismo calibre con la cola
+una grabacion de tiro unico con una cola mas larga en semiautomatico y un
+corte corto (`audio.autoSampleFile`) por cada bala en automatico. La M14 usa
+un disparo de G3 del mismo calibre con la cola
 atenuada para el tiro semiautomatico rapido. [Grabacion CC0 de areniporgen](https://freesound.org/people/areniporgen/sounds/712577/).
 La MP5 y la PPSh-41 tambien usan disparos grabados. En automatico reproducen
 un golpe corto por bala para que la cola no se acumule.
@@ -528,7 +528,14 @@ existente a `MOTDRULES`.
   el muro norte de electricidad abre el taller de mantenimiento: sala amarilla
   con banco de trabajo, taquillas, el anillo de Tiro doble, la M40 (2000 / 1000)
   en el muro oeste y una entrada propia
-  que solo genera zombis al abrir la zona. Un unico rectangulo de
+  que solo genera zombis al abrir la zona. Una compuerta de 3500 en el muro
+  oeste de electricidad abre una galeria que cruza el eje de la escalera
+  hasta la camara KOVKA (`KOVKA_CORRIDOR`): nave
+  abovedada con un reactor horizontal dormido en un foso, una cubierta en la
+  planta 0 a su alrededor (barandillas solidas cierran el foso; pasarelas y
+  escaleras son decorado), dos entradas propias y el sitio reservado de la
+  futura maquina de mejora de armas (`KOVKA_UPGRADE_SITE`); el nucleo del
+  reactor solo brilla con la electricidad. Un unico rectangulo de
   `playerBounds` y de navegacion cubre todas las salas: muros, trenes y
   puertas cerradas son lo que impide el paso, y la arena para al jugador en
   cada entrada de tipo puerta para que ningun pasadizo de spawn sea
