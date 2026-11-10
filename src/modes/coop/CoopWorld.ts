@@ -15,6 +15,7 @@ import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import { COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS } from '../../config/zombieMaps';
 import { RITUAL_SCARE_TIMELINE } from '../../zombies/secret-room/SecretRoomSystem';
 import type { ModeContext } from '../GameMode';
+import { SoulLampTargeting } from '../SoulLampTargeting';
 import { cameraSpatialCue, type SpatialCue } from '../../audio/SpatialCue';
 
 const GUEST_SPAWN_OFFSET_Z = -1.8;
@@ -55,6 +56,7 @@ export class CoopWorld {
   public onTopologyChanged: (() => void) | null = null;
 
   private mapColliders: ReadonlySet<THREE.Object3D>;
+  private readonly soulLampTargeting = new SoulLampTargeting();
   private readonly tmpDirection = new THREE.Vector3();
   private readonly observerPosition = new THREE.Vector3();
 
@@ -157,7 +159,12 @@ export class CoopWorld {
   }
 
   public findFacingSoulLamp(): ArenaSoulLampInteraction | null {
-    return this.findFacing(this.arena.soulLampInteractions.filter((lamp) => !lamp.activated));
+    return this.soulLampTargeting.findFacing(this.arena, this.ctx.player);
+  }
+
+  public isSoulLampVisibleToRemote(lamp: ArenaSoulLampInteraction, state: PlayerNetState): boolean {
+    const eyeY = state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance));
+    return this.soulLampTargeting.isVisibleFrom(this.arena, lamp, state.x, eyeY, state.z);
   }
 
   public findRepairableBarrier(): WindowBarrier | null {

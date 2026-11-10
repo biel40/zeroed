@@ -32,6 +32,8 @@ export interface RecoilConfig {
   readonly cameraJolt?: number;
   /** Optional backward shove of the player per shot (m/s), damped out by movement; heavy rifles only. */
   readonly playerPush?: number;
+  /** Optional cap of the accumulated climb, radians (DEFAULT_MAX_RECOIL_CLIMB otherwise). */
+  readonly maxClimb?: number;
 }
 
 export interface SpreadConfig {
@@ -48,8 +50,9 @@ export interface SpreadConfig {
 }
 
 /**
- * Barrel overheating under sustained full-auto fire (automatic weapons
- * only): the muzzle glows orange, smokes more and the spread grows.
+ * Barrel overheating under sustained rapid fire (automatics, and
+ * semi-automatics through `coolDelay`): the muzzle glows orange, smokes
+ * more and the spread grows.
  */
 export interface BarrelHeatConfig {
   /** Consecutive rapid shots that take a cold barrel to full heat. */
@@ -146,12 +149,14 @@ export interface WeaponAudioConfig {
   /** Optional volume of the reciprocating carrier slamming home after each shot. */
   readonly mechanism?: number;
   /**
-   * Optional MP3 in `public/assets/audio/` that replaces the procedural
+   * Optional clip in `public/assets/audio/` that replaces the procedural
    * report once decoded, played at `volume`; a missing file keeps the
    * procedural shot.
    */
   readonly sampleFile?: string;
-  /** Optional subtle pitch and gain jitter per shot of `sampleFile`; omitted plays it verbatim. */
+  /** Overrides the default clip in automatic mode. Still contains only one shot. */
+  readonly autoSampleFile?: string;
+  /** Optional subtle pitch and gain jitter per sampled shot. */
   readonly variation?: ShotVariation;
   /**
    * Energy weapons get a sci-fi synth shot instead of a powder report; the

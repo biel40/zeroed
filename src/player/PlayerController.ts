@@ -82,6 +82,8 @@ export class PlayerController {
   private readonly pitchNode = new THREE.Group();
   private readonly velocity = new THREE.Vector3();
   private readonly wish = new THREE.Vector3();
+  /** Look movement taken back out of the weapon recoil this frame (see RecoilController.absorbCompensation). */
+  private readonly recoilCompensation = { pitch: 0, yaw: 0 };
   private yaw = 0;
   private pitch = 0;
   private fov = getSettings().fieldOfView;
@@ -98,7 +100,10 @@ export class PlayerController {
   private downedCamera = false;
   /** Seconds into the death collapse; null while alive. */
   private deathFallElapsed: number | null = null;
+  /** Aim jolt of heavy weapons (part of their recoil): it moves where the next shots go. */
   private cameraImpulse = 0;
+  /** Purely visual nudge (weapon rumble, revive), applied after shots by `applyViewEffects`. */
+  private viewImpulse = 0;
   private currentStance: PlayerStance = 'standing';
   private readonly stanceTransition = new StanceTransition();
   private deathStartY = 0;
@@ -183,8 +188,23 @@ export class PlayerController {
   /** True from the death until the next teleport (the view model stays hidden). */
   get isDying(): boolean { return this.deathFallElapsed !== null; }
   get deathFallFinished(): boolean { return (this.deathFallElapsed ?? 0) >= DEATH_FALL_DURATION; }
-  public playReviveImpulse(): void { this.cameraImpulse = 0.035; }
+  public playReviveImpulse(): void { this.viewImpulse = 0.035; }
+  /** Aim-affecting jolt; weapon recoil only (`recoil.cameraJolt`). */
   public playShotImpulse(strength = 0.012): void { this.cameraImpulse += strength; }
+  /** Visual-only camera nudge, scaled by the camera-shake setting; never deflects aim. */
+  public playViewImpulse(strength: number): void { this.viewImpulse += strength; }
+
+  /**
+   * Layers this frame's visual nudge on the camera. The owner calls it after
+   * the frame's shots are resolved; the next `update` rewrites the camera
+   * pose, so the nudge never reaches the aim.
+   */
+  public applyViewEffects(dt: number): void {
+    if (this.viewImpulse === 0) return;
+    this.viewImpulse *= Math.exp(-18 * dt);
+    if (Math.abs(this.viewImpulse) < 1e-5) this.viewImpulse = 0;
+    if (this.deathFallElapsed === null) this.camera.rotation.x += this.viewImpulse * getSettings().cameraShake;
+  }
   /** Nudges the player backwards along the view; movement damping eats it within a fraction of a second. */
   public applyShotPush(speed: number): void {
     this.velocity.x += Math.sin(this.yaw) * speed;
@@ -219,11 +239,18 @@ export class PlayerController {
     const pitchSign = settings.invertY ? -1 : 1;
     const controllerAds = lerp(1, definition.ads.sensitivity * settings.gamepadAdsSensitivity, weapon.adsAlpha);
     const controllerScale = Math.PI / 180 * dt * controllerAds;
+    const previousYaw = this.yaw;
+    const previousPitch = this.pitch;
     this.yaw -= allowLook ? input.mouseDeltaX * sensitivity
       + (input.gamepadLookX ?? 0) * settings.gamepadLookHorizontal * controllerScale : 0;
     this.pitch = clamp(this.pitch - (allowLook ? input.mouseDeltaY * sensitivity * pitchSign
       + (input.gamepadLookY ?? 0) * settings.gamepadLookVertical * controllerScale * (settings.gamepadInvertY ? -1 : 1) : 0),
     -PITCH_LIMIT, PITCH_LIMIT);
+    // Pulling against the kick spends the pending recoil instead of stacking
+    // with its later recovery: the view stays put now and never overshoots.
+    weapon.recoil.absorbCompensation(this.pitch - previousPitch, this.yaw - previousYaw, this.recoilCompensation);
+    this.pitch += this.recoilCompensation.pitch;
+    this.yaw += this.recoilCompensation.yaw;
     this.rig.rotation.y = this.yaw;
     this.pitchNode.rotation.x = this.pitch;
     this.cameraImpulse *= Math.exp(-18 * dt);

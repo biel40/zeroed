@@ -28,6 +28,22 @@ muerto ni con los controles bloqueados. El comportamiento es compartido entre
 individual y cooperativo. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga. La M1911 tiene una patada vertical marcada, con un golpe
 visual de elevacion y retroceso y una recuperacion que deja sentir cada disparo.
+El recoil de camara (`RecoilController`) se acumula hasta un tope
+(`recoil.maxClimb`, `DEFAULT_MAX_RECOIL_CLIMB` si falta): una rafaga larga sin
+compensar se estabiliza en vez de llevar la vista al techo. Mover la vista contra
+el retroceso (raton, tactil o mando) consume el recoil pendiente sin cambiar la
+vista de ese frame, asi la recuperacion nunca baja la mira por debajo de donde la
+llevo el jugador. El muelle visual del arma (`SpringRecoil`) integra en subpasos
+fijos y se asienta igual a cualquier tasa de frames. En fuego automatico
+sostenido cada bala lo patea algo mas (`SustainedFireKick`, hasta un tope) y el
+extra se disipa suavemente al soltar el gatillo.
+El recoil de apuntado (incluido `recoil.cameraJolt`) mueve la camara antes de
+resolver los disparos; los efectos solo visuales (`CameraShake`, vibracion del
+lanzallamas, destello de las armas de energia, empujon al reanimar) se aplican
+despues, asi que nunca desvian la punteria. En Ajustes > Accesibilidad,
+`cameraShake` escala o desactiva esos efectos visuales y `weaponKick` la
+sacudida del arma en las manos; ninguno cambia recoil de apuntado, dispersion ni
+dano.
 En individual y cooperativo, cada jugador empieza con seis cargadores de ocho
 balas para la M1911, incluido el que lleva puesto.
 `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
@@ -38,8 +54,8 @@ profundidad (`applyViewModelDepth`) para no atravesar paredes al pegarse a
 ellas; sus materiales no deben compartirse con objetos del mundo. Las armas de cerrojo (L96) expulsan el
 casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
 levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
-recarga vacia. La AK-47 suma a cada disparo el golpe del portacerrojo y su
-recarga bascula el cargador sobre el teton delantero con foley propio. La
+recarga vacia. La recarga de la AK-47 bascula el cargador sobre el teton
+delantero con foley propio. La
 M1911 queda con la corredera abierta tras la ultima bala y su recarga vacia la
 suelta de ese bloqueo; el cargador vaciado cae sin su bala superior. El M14
 (`locksOpenWhenEmpty`) hace lo mismo con su varilla de operaciones, que ademas
@@ -72,12 +88,16 @@ hasta `maxSpreadBonus`. Se enfria tras una breve pausa sin disparar y vuelve a
 frio al equipar o reiniciar la municion. Es solo local: el companero no lo ve.
 Un `heat.lockout` bloquea el gatillo al llegar al maximo hasta enfriarse del
 todo (evento `overheated`: siseo y chasquido en cada intento); `heat.coolDelay`
-retiene el calor entre disparos para que un semiautomatico lo acumule. El
+retiene el calor entre disparos para que un semiautomatico lo acumule. La M14
+lo usa sin bloqueo: un cargador disparado muy seguido (menos de 0.4 s entre
+disparos) la calienta, y el tiro pausado no. El
 Barrett lo usa: cuatro disparos seguidos (menos de 0.6 s entre ellos) lo
-bloquean hasta enfriarse. Un `audio.sampleFile` sustituye el disparo procedural por
-un MP3 de `public/assets/audio/` (el Barrett usa `barrett_shot.mp3` y la M1911 `m1911_shot.mp3`, con
-`audio.variation`: tono ±3 % y ganancia 95–100 % por disparo); sin
-el archivo suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
+bloquean hasta enfriarse. `audio.sampleFile` sustituye el disparo procedural por
+una grabacion de `public/assets/audio/`. La AK-47 usa una toma de Tunetank con
+una cola mas larga en semiautomatico y un golpe aislado de la rafaga original
+(`audio.autoSampleFile`) por cada bala en automatico. `audio.variation` permite
+variar ligeramente el tono y la ganancia por disparo. Si el clip aun no esta
+disponible, suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
 anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
 del jugador (el Barrett, unos 12 cm por disparo). `muzzleSmoke` suelta nubes
 de humo a ambos lados de la boca (fuera de la linea de mira), mas duraderas,
@@ -203,7 +223,8 @@ Protocolo 33 ofrece ademas abrir la salida al momento por su precio (10000),
 sin electricidad, interruptores ni defensa: empieza la huida con su reloj y
 hay que subir al patio, vencer al guardian y usar el camion
 (`EvacuationProtocol.skipToEscape`).
-Tras activarlo, F2 abre una consola local de desarrollador que pausa la
+Al activarlo aparece el HUD de rendimiento. Reiniciar lo oculta salvo si la
+URL incluye `?debug`. F2 abre una consola local de desarrollador que pausa la
 partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
 El panel ofrece selectores de armas y anillos, botones de municion y
 proteccion, y un multiplicador de dano con restauracion. Cada accion
@@ -316,7 +337,39 @@ existente a `MOTDRULES`.
   tras el impacto. La ultima tabla continua el ataque sin reiniciar la mezcla.
   Salir del area del golpe durante la anticipacion permite esquivarlo.
 - Los cambios de estado mezclan posicion y rotacion desde la pose visible.
-  Los impactos leves son aditivos y breves. El steering frena los cambios de
+  Los impactos leves son aditivos y breves. Las balas propias acentuan ademas la
+  parte alcanzada (`ZombieHitAccent`): la cabeza da un tiron, el hombro del
+  brazo alcanzado se echa atras y el torso cede hacia la pierna herida, con mas
+  fuerza cuanto mayor el dano base del arma. Son muelles criticamente
+  amortiguados y acotados: no reinician clips ni ataques y nunca tocan las
+  piernas.
+- Todo golpe que hace dano (bala, cuchillo, explosion; tambien replicado en
+  cooperativo) hace tambalearse al zombi (`ZombieStagger`), solo con el
+  esqueleto: la columna por encima de las caderas se dobla y gira con el
+  impacto, la cabeza da un latigazo y los brazos se abren buscando el
+  equilibrio. La raiz, las caderas y las piernas siguen el clip, asi que el
+  cuerpo nunca resbala ni hunde los pies. La fuerza (`staggerForce`) crece con
+  el peso del arma (mismo escalado logaritmico por dano base que las heridas),
+  con la parte de vida que se lleva el golpe y en la cabeza: un subfusil solo
+  provoca un respingo; un fusil de precision, un tambaleo claro. Solo los
+  golpes fuertes cuestan paso (la perdida crece con el cuadrado de la fuerza y
+  nunca baja del 45 %), y la marcha se frena con el desplazamiento real. El
+  bruto lo nota la mitad (`staggerScale`) y un reptante solo se estremece. Los
+  impactos seguidos acumulan resistencia, asi que el fuego automatico no apila
+  la pose ni deja al zombi clavado, y nunca cancela un ataque.
+- El golpe mortal siempre se encaja antes de caer: su reaccion (al menos 0.8 de
+  fuerza, tambien en el invitado al recibir `zombieDeath`) se superpone durante
+  0.45 s al inicio del crossfade de muerte, que de otro modo la anularia.
+- Cada bala propia que alcanza a un zombi vivo deja un orificio de entrada
+  donde el rayo encuentra la piel animada: agujero oscuro, borde rojo humedo y un
+  reguero que cae segun la gravedad en el momento del impacto, de 7 a 12 cm para
+  leerse a media distancia (`SkinSurfaceSampler`), unido
+  al hueso que la mueve (`ZombieWounds`); su tamaño crece con el dano base del
+  arma. Hay como maximo `ZOMBIE_WOUND_LIMIT` por cuerpo (se reutiliza el mas
+  antiguo), se encogen con el desvanecimiento del cadaver, desaparecen con la
+  vaporizacion del VORTEX-9 o al reciclar el cuerpo, y no se crean si el disparo
+  solo roza el hitbox sin tocar la piel ni en el cuerpo procedural de respaldo.
+  Las cabezadas y el tipo de muerte siguen decidiendolos los hitboxes. El steering frena los cambios de
   direccion, manteniendo las restricciones de paredes y rampas.
 - Muertes segun el golpe letal (`ZombieDeath`), sin ragdoll: cuchillo (gira,
   se sujeta el corte y cae de lado), pistola y L96 (retrocede y cae de
@@ -651,15 +704,16 @@ existente a `MOTDRULES`.
   Es un francotirador pesado semiautomatico,
   con mira telescopica, mayor dano y retroceso que la L96 y menor movilidad;
   cada bala atraviesa hasta cinco zombis en linea (`projectile.maxTargets`),
-  con dano completo a cada uno; una pared la detiene;
+  con dano completo a cada uno; una pared la detiene (la L96 atraviesa hasta tres);
   reutiliza la recarga de fusil y no necesita accionar el cerrojo entre disparos.
   La VORTEX-9 se obtiene exclusivamente en la caja; ZEUS-77 es una tirada
   legendaria de aproximadamente 1 % y encadena objetivos. Ambas usan
   proyectiles de energia. Su cuerpo bloquea al jugador con un collider fijo
   ajustado al tamano y orientacion de la caja, tanto en individual como en
   cooperativo; la tapa animada y el arma flotante no alteran ese volumen.
-- La sala secreta activa tres lamparas con USE, reserva almas en vuelo y abre
-  una pared una sola vez por run. Su circulo ritual dispara un susto unico:
+- Los tres faroles de la sala secreta se encienden con USE al mirarlos de cerca
+  con linea de vision libre. Al llenarlos de almas se abre una pared una sola
+  vez por run. Su circulo ritual dispara un susto unico:
   las velas se apagan, el circulo estalla en rojo y una aparicion emerge y se
   lanza contra la camara local antes de desaparecer de golpe. El sonido sigue
   los mismos tiempos (`RITUAL_SCARE_TIMELINE`); en individual el impacto
@@ -868,6 +922,19 @@ muerte (`rendering/FadeMaterials.ts`); `Game.prepare` precompila esa variante.
 Asi una horda solapada en la escalera conserva el descarte por profundidad.
 
 ## HUD y estadisticas de partida
+
+El hitmarker solo aparece con impactos confirmados. El headshot es dorado y,
+cuando el modo ya sabe que el impacto mato (individual y anfitrion), el
+marcador es mas grueso y dura algo mas. Los impactos a menos de 50 ms se funden
+en uno (`HitmarkerThrottle`) salvo que el nuevo sea mas fuerte, de modo que el
+fuego automatico, las balas perforantes o las cadenas no saturan la pantalla.
+
+Al recibir un golpe con atacante conocido (zombi en individual y cooperativo,
+via el `attackerId` que el anfitrion ya enviaba), ademas del destello rojo un
+arco rojo alrededor de la mira apunta hacia el atacante y gira con la vista
+(`DamageDirections`). Hasta cuatro a la vez; los golpes repetidos del mismo
+atacante refrescan su arco, que se desvanece en algo mas de un segundo. Los
+golpes sin origen (jefe, evacuacion) solo muestran el destello.
 
 Al volver al menu se limpian los anuncios, destellos y la proteccion azul del
 HUD compartido para que no reaparezcan al empezar otro mapa.

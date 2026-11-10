@@ -677,7 +677,7 @@ const forwardInput = {
 const weaponStub = {
   definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
   adsAlpha: 0,
-  recoil: { pitch: 0, yaw: 0 },
+  recoil: { pitch: 0, yaw: 0, absorbCompensation: () => undefined },
 } as unknown as Weapon;
 
 /** A player with the arena's walls, bounds and stair, walking forward along `yaw` for `seconds`. */

@@ -150,7 +150,7 @@ describe('AK-47 wall-buy silhouette', () => {
 });
 
 describe('AK-47 audio', () => {
-  it('layers crack, room tail and the carrier slamming home over the report', () => {
+  it('layers crack, room tail and the carrier over the procedural fallback', () => {
     const audio = new AudioSystem() as any;
     const param = () => ({ value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() });
     const node = () => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn() });
@@ -165,6 +165,7 @@ describe('AK-47 audio', () => {
       master: {},
       noise: {},
     }));
+    vi.spyOn(audio, 'optionalSample').mockReturnValue(null);
     vi.spyOn(audio, 'tick').mockImplementation(() => {});
     const clang = vi.spyOn(audio, 'metalClang').mockImplementation(() => {});
     const tail = vi.spyOn(audio, 'playShotTail').mockImplementation(() => {});

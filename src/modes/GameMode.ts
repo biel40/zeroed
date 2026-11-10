@@ -63,6 +63,8 @@ export interface ModeContext {
   resetArsenal(): void;
   /** Leaves the current run through the shell's established main-menu route. */
   returnToMainMenu(): void;
+  /** Requests the performance overlay for this run. The shell also honors its URL flag. */
+  setDebugStatsEnabled?(enabled: boolean): void;
 }
 
 /**

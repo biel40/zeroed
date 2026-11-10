@@ -110,18 +110,25 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   (`zombieSpawn`, `zombieAttack`, `zombieHit`, `zombieDeath`, `roundStart`,
   `roundEnd`, `doorOpened`, `playerDamaged`, `matchRestart`) llevan IDs
   únicos por spawn; los que refieren entidades desaparecidas se ignoran.
+  `playerShoot` incluye un selector de tiro opcional para elegir el clip
+  posicional del compañero. Si falta, se usa el clip base del arma.
   `zombieDeath` incluye el estilo de muerte y el lado del impacto; si faltan
   o no son válidos, el invitado usa la caída por defecto.
   `zombieHit` y `zombieDeath` incluyen opcionalmente el origen del dano para
   reproducir la sangre de cuchillo y balas sin duplicar las salpicaduras del
   Barrett ni añadirlas a fuego o energia. Las manchas son locales a cada vista
   y no forman parte de las instantaneas para quienes se unen mas tarde.
+  Las heridas de bala y el acento por zona solo los crea quien dispara, a partir
+  de su propio rayo (con la misma confianza que su hitmarker); no se envian, asi
+  que los disparos del compañero solo muestran la reaccion replicada.
   En espera, final y créditos se envían solo cambios puntuales; una sala sin
   invitado no envía estados periódicos al relay.
 - Combate: el anfitrión aplica todo el daño. Las balas del invitado vuelan en
   local (impactos y hitmarker inmediatos), pero un impacto a zombi es una
-  reclamación que el anfitrión acepta una sola vez por disparo validado
-  (`ShotValidator`: cadencia máxima y un crédito por disparo, según el arma).
+  reclamación que el anfitrión acepta por disparo validado
+  (`ShotValidator`: cadencia máxima del arma y tantos créditos por disparo como
+  zombis atraviesa su bala, `projectile.maxTargets`, cada uno a un zombi distinto;
+  así la L96 y el Barrett del invitado penetran igual que los del anfitrión).
   El cuchillo reutiliza el ataque del modo individual; el anfitrión valida
   alcance, arco frontal, altura, obstáculos, cadencia, daño y puntos de cada
   impacto del invitado con la misma selección de cuerpos que el modo individual.
@@ -140,7 +147,8 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
   abiertas sin pagar. Las tablas de barricada se replican del anfitrión.
 - Burned Mansion: la reparación de barricadas se valida por alcance y premia
   al jugador que repara. Las lámparas, almas, pared secreta, ritual y vitrinas
-  del búnker forman parte del estado compartido. Las vitrinas solo se compran
+  del búnker forman parte del estado compartido. El anfitrión comprueba la
+  línea de visión del invitado al encender un farol. Las vitrinas solo se compran
   una vez y cobran al comprador: solo queda ZEUS-77, que exige 300 bajas
   personales y 10000 Points. El anfitrion valida ambos
   requisitos. El desbloqueo visual refleja las bajas locales y la apertura se

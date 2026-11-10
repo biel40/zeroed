@@ -176,7 +176,7 @@ function movementInput(code: 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD'): Input {
 const weaponStub = {
   definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
   adsAlpha: 0,
-  recoil: { pitch: 0, yaw: 0 },
+  recoil: { pitch: 0, yaw: 0, absorbCompensation: () => undefined },
 } as unknown as Weapon;
 
 describe('Burned Mansion topology', () => {
@@ -1093,6 +1093,28 @@ describe('Burned Mansion topology', () => {
 
     expect(definition.position.z - window.z).toBeGreaterThan(2.5);
     expect(new THREE.Box3().setFromObject(lamp).intersectsBox(windowOpening)).toBe(false);
+  });
+
+  it.each([false, true])('only lights the Mystery Box lamp from the visible side (touch: %s)', (touch) => {
+    const { ctx, player } = makeContext();
+    const mode = new ZombiesMode('burned-mansion');
+    mode.init({ ...ctx, profile: { ...ctx.profile, useTouchControls: touch } });
+    const arena = (mode as unknown as { arena: BurnedMansionArena }).arena;
+    const lamp = arena.soulLampInteractions.find((entry) => entry.id === 'mystery-box-room')!;
+    const prompt = t('prompt.lightLamp', { key: actionKey(touch) });
+
+    player.teleport(lamp.position.x, EYE_HEIGHT, MANSION_BANQUET_HALL.chinaCabinet.z - 0.6);
+    player.face(Math.PI);
+    expect(mode.getInteractPrompt()).not.toBe(prompt);
+    mode.onInteract();
+    expect(lamp.activated).toBe(false);
+
+    player.teleport(lamp.position.x, EYE_HEIGHT, lamp.position.z + 1);
+    expect(mode.getInteractPrompt()).not.toBe(prompt);
+    player.face(0);
+    expect(mode.getInteractPrompt()).toBe(prompt);
+    mode.onInteract();
+    expect(lamp.activated).toBe(true);
   });
 
   it('centers a dimensional ritual set with a distressed decal, candles and debris', () => {

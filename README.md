@@ -48,5 +48,6 @@ npm run build      # Comprobación y build de producción
 - [Cambios recientes](docs/changes/)
 - [Sistemas de juego](docs/GAME_SYSTEMS.md)
 - [Arquitectura](docs/ARCHITECTURE.md)
+- [Línea base de rendimiento](docs/PERFORMANCE_BASELINE.md)
 - [Cooperativo y servidor](docs/MULTIPLAYER.md)
 - [PWA](docs/PWA.md) · [Android](docs/ANDROID_DOCS.md)

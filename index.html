@@ -114,6 +114,7 @@
       <div id="banner-sub"></div>
     </div>
     <div id="damage-overlay"></div>
+    <div id="damage-directions" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <div id="protection-overlay" aria-hidden="true"></div>
     <div id="radiance-overlay" aria-hidden="true"></div>
     <div id="ring-flash"></div>
@@ -413,6 +414,12 @@
         <div class="settings-row settings-toggle"><label for="setting-showInteractionPrompts" data-i18n="settings.showInteractionPrompts"></label>
           <input id="setting-showInteractionPrompts" type="checkbox" data-setting="showInteractionPrompts" aria-describedby="setting-interactionPrompts-hint" /></div>
         <p id="setting-interactionPrompts-hint" class="settings-help" data-i18n="settings.interactionPromptsHint"></p>
+        <div class="settings-row"><label for="setting-cameraShake" data-i18n="settings.cameraShake"></label>
+          <input id="setting-cameraShake" type="range" data-setting="cameraShake" aria-describedby="setting-cameraShake-hint" /><output for="setting-cameraShake"></output></div>
+        <p id="setting-cameraShake-hint" class="settings-help" data-i18n="settings.cameraShakeHint"></p>
+        <div class="settings-row"><label for="setting-weaponKick" data-i18n="settings.weaponKick"></label>
+          <input id="setting-weaponKick" type="range" data-setting="weaponKick" aria-describedby="setting-weaponKick-hint" /><output for="setting-weaponKick"></output></div>
+        <p id="setting-weaponKick-hint" class="settings-help" data-i18n="settings.weaponKickHint"></p>
       </fieldset>
       <div class="settings-actions">
         <button type="button" id="settings-reset" data-i18n="settings.reset"></button>

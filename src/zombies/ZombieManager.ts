@@ -1390,6 +1390,9 @@ export class ZombieManager {
       seekX = (seekX / seekSpeed) * maxMoveSpeed;
       seekZ = (seekZ / seekSpeed) * maxMoveSpeed;
     }
+    // A freshly hit body loses its pace for a moment; the walk clip slows with it.
+    seekX *= zombie.paceScale;
+    seekZ *= zombie.paceScale;
 
     // The explicit stair corridor already supplies a valid route. Reactive
     // wall rounding near its lip can mistake the stairwell edge for a wall

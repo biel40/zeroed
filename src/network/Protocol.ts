@@ -1,7 +1,7 @@
 import type { ZombieState } from '../zombies/Zombie';
 import { CHAIN_MAX_TARGETS, ZOMBIE_TYPE_CONFIGS, type ZombieTypeId } from '../zombies/ZombieConfig';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
-import type { WeaponId } from '../weapons/WeaponTypes';
+import type { FireMode, WeaponId } from '../weapons/WeaponTypes';
 import type { MysteryBoxSnapshot } from '../zombies/MysteryBox';
 import { isZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource } from '../zombies/ZombieDeath';
 import type { SecretRoomSnapshot } from '../zombies/secret-room/SecretRoomSystem';
@@ -101,12 +101,20 @@ export interface MatchState {
 export type HitPart = 'head' | 'torso';
 export type DoorFailureReason = 'insufficientPoints' | 'unavailable';
 
+interface PlayerShootMessage {
+  readonly type: 'playerShoot';
+  readonly weapon: WeaponId;
+  readonly origin: Vec3;
+  readonly direction: Vec3;
+  readonly fireMode?: FireMode;
+}
+
 export type GuestMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'reviveStart'; readonly target: CoopPlayerId }
   | { readonly type: 'reviveCancel'; readonly target: CoopPlayerId }
   | { readonly type: 'playerState'; readonly state: PlayerNetState }
-  | { readonly type: 'playerShoot'; readonly weapon: WeaponId; readonly origin: Vec3; readonly direction: Vec3 }
+  | PlayerShootMessage
   | { readonly type: 'zombieHitClaim'; readonly weapon: WeaponId; readonly zombieId: number; readonly part: HitPart }
   | { readonly type: 'knifeHitClaim'; readonly zombieId: number }
   | { readonly type: 'doorPurchase'; readonly doorId: string }
@@ -120,7 +128,7 @@ export type GuestMessage =
 export type HostMessage =
   | { readonly type: 'matchState'; readonly state: MatchState }
   | { readonly type: 'reviveCompleted'; readonly target: CoopPlayerId }
-  | { readonly type: 'playerShoot'; readonly weapon: WeaponId; readonly origin: Vec3; readonly direction: Vec3 }
+  | PlayerShootMessage
   /** The host threw a grenade: the guest replays its flight and blast for show. */
   | { readonly type: 'grenadeThrow'; readonly launch: GrenadeLaunch }
   | {
@@ -330,6 +338,14 @@ function isMatchState(value: unknown): value is MatchState {
     && (value.unlockedPickupIds === undefined || (Array.isArray(value.unlockedPickupIds) && value.unlockedPickupIds.every(isId)));
 }
 
+function parsePlayerShoot(raw: Loose): PlayerShootMessage | null {
+  const { weapon, origin, direction, fireMode } = raw;
+  if (!isWeaponId(weapon) || !isVec3(origin) || !isVec3(direction)) return null;
+  if (fireMode === undefined) return { type: 'playerShoot', weapon, origin, direction };
+  if (fireMode !== 'auto' && fireMode !== 'semi') return null;
+  return { type: 'playerShoot', weapon, origin, direction, fireMode };
+}
+
 /** Host-side boundary: a guest payload is either a well-formed request or dropped. */
 export function parseGuestMessage(message: IncomingMessage): GuestMessage | null {
   const raw = message as Loose;
@@ -342,9 +358,7 @@ export function parseGuestMessage(message: IncomingMessage): GuestMessage | null
     case 'playerState':
       return isPlayerNetState(raw.state) ? { type: 'playerState', state: raw.state } : null;
     case 'playerShoot':
-      return isWeaponId(raw.weapon) && isVec3(raw.origin) && isVec3(raw.direction)
-        ? { type: 'playerShoot', weapon: raw.weapon, origin: raw.origin, direction: raw.direction }
-        : null;
+      return parsePlayerShoot(raw);
     case 'zombieHitClaim':
       return isWeaponId(raw.weapon) && Number.isInteger(raw.zombieId) && (raw.part === 'head' || raw.part === 'torso')
         ? { type: 'zombieHitClaim', weapon: raw.weapon, zombieId: raw.zombieId as number, part: raw.part }
@@ -383,9 +397,7 @@ export function parseHostMessage(message: IncomingMessage): HostMessage | null {
     case 'reviveCompleted':
       return isPlayerId(raw.target) ? { type: 'reviveCompleted', target: raw.target } : null;
     case 'playerShoot':
-      return isWeaponId(raw.weapon) && isVec3(raw.origin) && isVec3(raw.direction)
-        ? { type: 'playerShoot', weapon: raw.weapon, origin: raw.origin, direction: raw.direction }
-        : null;
+      return parsePlayerShoot(raw);
     case 'grenadeThrow':
       return isGrenadeLaunch(raw.launch) ? { type: 'grenadeThrow', launch: grenadeLaunch(raw.launch) } : null;
     case 'teslaChain':

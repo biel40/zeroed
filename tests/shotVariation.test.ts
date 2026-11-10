@@ -23,6 +23,53 @@ describe('shot variation', () => {
   });
 });
 
+describe('AK-47 samples by fire mode', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const config = WEAPON_DEFINITIONS.ak47.audio;
+
+  it('precaches both takes and plays one sample per shot in the selected mode', () => {
+    const audio = new AudioSystem();
+    const system = audio as any;
+    const single = { duration: 0.56 };
+    const automatic = { duration: 0.096 };
+    const optionalSample = vi.spyOn(system, 'optionalSample')
+      .mockImplementation((file) => file === 'ak47_auto_shot.wav' ? automatic : single);
+    vi.spyOn(system, 'context').mockReturnValue({ master: {} });
+    const playSample = vi.spyOn(system, 'playSample').mockImplementation(() => {});
+
+    audio.preloadShotSample(config);
+    expect(optionalSample.mock.calls.flat()).toEqual(['ak47_single_shot.wav', 'ak47_auto_shot.wav']);
+
+    audio.playShot(config, 'auto');
+    audio.playShot(config, 'auto');
+    audio.playShot(config, 'semi');
+
+    expect(playSample.mock.calls.map(([, sample]) => sample)).toEqual([automatic, automatic, single]);
+  });
+
+  it('routes the remote take through the spatial bus and falls back to the report while it loads', () => {
+    const audio = new AudioSystem();
+    const system = audio as any;
+    const bus = {};
+    const automatic = { duration: 0.096 };
+    const cue = { pan: 0.5, attenuation: 0.4, muffle: 0 };
+    const parts = { master: {} };
+    vi.spyOn(system, 'context').mockReturnValue(parts);
+    vi.spyOn(system, 'spatialBus').mockReturnValue(bus);
+    const optionalSample = vi.spyOn(system, 'optionalSample').mockReturnValueOnce(automatic).mockReturnValue(null);
+    const playSample = vi.spyOn(system, 'playSample').mockImplementation(() => {});
+    const playReport = vi.spyOn(system, 'playReport').mockImplementation(() => {});
+
+    audio.playRemoteShot(config, cue, 'auto');
+    audio.playRemoteShot(config, cue, 'auto');
+
+    expect(optionalSample).toHaveBeenCalledWith('ak47_auto_shot.wav');
+    expect(playSample).toHaveBeenCalledExactlyOnceWith(parts, automatic, expect.any(Number), 0, bus, expect.any(Number));
+    expect(playReport).toHaveBeenCalledExactlyOnceWith(parts, config, expect.any(Number), bus);
+  });
+});
+
 describe('M1911 sampled shot', () => {
   afterEach(() => vi.restoreAllMocks());
 

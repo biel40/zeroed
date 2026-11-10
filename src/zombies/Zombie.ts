@@ -22,6 +22,7 @@ import {
   ZOMBIE_CRAWLER_SPEED_FACTOR,
   ZOMBIE_CRIPPLE_COLLAPSE,
   ZOMBIE_TYPE_CONFIGS,
+  type ZombieHitPart,
   type ZombieTypeId,
 } from './ZombieConfig';
 import { ZOMBIE_MODELS, ZombieVisual } from './ZombieVisual';
@@ -29,6 +30,11 @@ import { resolveZombieDeathStyle, type ZombieDeathStyle, type ZombieKillSource }
 import type { GibWalls } from './GibWalls';
 import { ZombieGibs } from './ZombieGibs';
 import { ZombieBloodPool } from './ZombieBloodPool';
+import { prepareSkinSurface, SkinSurfaceSampler, type SkinSurfaceHit } from './wounds/SkinSurfaceSampler';
+import { ZombieWounds } from './wounds/ZombieWounds';
+import { ZombieStagger } from './ZombieStagger';
+import { locateBone, type ZombieBodyLocation } from './wounds/ZombieBodyRegion';
+import { bulletImpactWeight, bulletWoundRadius, ZOMBIE_WOUND_LIMIT } from './wounds/WoundConfig';
 
 /** Metres ahead of the feet where a body burnt to death lies on its chest. */
 const BURN_POOL_FORWARD = 0.6;
@@ -41,6 +47,20 @@ export type ZombieState =
   | 'death'
   | 'barrierAttack'
   | 'barrierBreak';
+
+/** Smallest reel of a killing blow: the body always visibly takes it before it folds. */
+const STAGGER_LETHAL_FORCE = 0.8;
+
+/**
+ * How hard one hit rocks a body (0..1, before its type's `staggerScale`):
+ * light rounds only flinch it, heavy rounds and blows that take a large
+ * share of its health stagger it, a head hit adds a jolt.
+ */
+export function staggerForce(amount: number, maxHp: number, headshot: boolean, lethal: boolean): number {
+  const share = Math.min(1, amount / Math.max(1, maxHp));
+  const force = 0.12 + 0.5 * bulletImpactWeight(amount) + 0.6 * share + (headshot ? 0.2 : 0);
+  return Math.min(1, lethal ? Math.max(force, STAGGER_LETHAL_FORCE) : force);
+}
 
 /** Lifecycle of the death: a fallen corpse, the VORTEX-9 dissolve, or a body blown into gibs. */
 export type ZombieDeathKind = 'normal' | 'vortex9' | 'shatter';
@@ -133,6 +153,15 @@ export class Zombie implements HitTarget {
   private readonly bloodFloor = new THREE.Vector3();
   /** Body-local unit direction of the latest impact (x: its left, y: forward). */
   readonly impact = new THREE.Vector2();
+  /** Bullet entry wounds riding the skinned body; cleared whenever the body is recycled. */
+  private readonly wounds: ZombieWounds;
+  /** Built on the first bullet; null when the body has no skinned mesh (procedural fallback). */
+  private surfaceSampler: SkinSurfaceSampler | null = null;
+  private readonly surfaceHit: SkinSurfaceHit = { bone: null, position: new THREE.Vector3(), normal: new THREE.Vector3() };
+  private readonly hitLocation: ZombieBodyLocation = { region: 'torso', side: 0 };
+  private readonly tmpShotDirection = new THREE.Vector3();
+  /** Reel and brief loss of pace of the latest hits (bullets, knife, blasts). */
+  private readonly stagger = new ZombieStagger();
 
   /** `gibWalls` is the map wall set shared by the pool; a shattered body's pieces bounce off it. */
   constructor(visual?: ZombieVisual, private readonly gibWalls: GibWalls = { boxes: [] }, private readonly blood?: ZombieBlood) {
@@ -148,6 +177,8 @@ export class Zombie implements HitTarget {
     this.headHitbox = new THREE.Mesh(getHeadGeometry(), getHitboxMaterial());
 
     this.group.add(this.visual.root);
+    this.wounds = new ZombieWounds(this.visual.root, ZOMBIE_WOUND_LIMIT);
+    if (this.visual.skinnedBody) prepareSkinSurface(this.visual.skinnedBody);
     this.hat = ZombieHat.create(this.visual.root, this.group, this.gibWalls);
     this.visual.attachHitboxes(this.torsoHitbox, this.headHitbox);
     this.torsoBaseScale.copy(this.torsoHitbox.scale);
@@ -180,6 +211,11 @@ export class Zombie implements HitTarget {
   /** A living walker that has finished rising can still lose its legs; brutes never do. */
   public get canCripple(): boolean {
     return this.isAlive && !this.crippled && this.state !== 'spawn' && this.typeId !== 'brute';
+  }
+
+  /** Share of its walking pace a hit-stunned body keeps (1 when unhurt); steering scales by it. */
+  public get paceScale(): number {
+    return this.isAlive ? this.stagger.paceScale : 1;
   }
 
   /** Standing movement volume, without the animated attack lunge or death pose. */
@@ -230,6 +266,8 @@ export class Zombie implements HitTarget {
     this.bloodPool?.hide();
     this.hat?.reset();
     this.bleeding.reset();
+    this.wounds.clear();
+    this.stagger.reset();
     this.visual.setState('spawn');
     this.group.visible = true;
   }
@@ -252,6 +290,40 @@ export class Zombie implements HitTarget {
   /** Ends the ground rise at once: the body appears standing (a map ambush). */
   skipSpawnRise(): void {
     if (this.state === 'spawn') this.setWalk();
+  }
+
+  /**
+   * Cosmetic side of a confirmed bullet from `origin` that struck this living
+   * body at `point`: an entry wound where the shot meets the animated skin
+   * and a flinch of the struck part. Damage, rewards and hitboxes are
+   * untouched; `damage` (the weapon's base damage) only scales the look.
+   * No wound is fabricated when the shot passes the visible skin.
+   */
+  public registerBulletImpact(origin: THREE.Vector3, point: THREE.Vector3, damage: number, part: ZombieHitPart): void {
+    if (!this.isAlive || !this.group.visible) return;
+    this.updateImpact(origin.x, origin.z);
+    const direction = this.tmpShotDirection.subVectors(point, origin);
+    if (direction.lengthSq() === 0) return;
+    direction.normalize();
+    this.group.updateWorldMatrix(true, false);
+    this.group.updateMatrixWorld(true);
+
+    const location = this.hitLocation;
+    location.region = part === 'head' ? 'head' : 'torso';
+    location.side = 0;
+    const body = this.visual.skinnedBody;
+    if (body && !this.surfaceSampler) this.surfaceSampler = new SkinSurfaceSampler(body);
+    const hit = this.surfaceHit;
+    if (this.surfaceSampler?.locate(origin, direction, hit) && hit.bone) {
+      this.wounds.add(hit.bone, hit.position, hit.normal, bulletWoundRadius(damage));
+      // The hitbox decides headshots; the skin only refines where a body shot landed.
+      if (part !== 'head') locateBone(hit.bone.name, location);
+    }
+    if (location.region === 'torso') {
+      const local = this.group.worldToLocal(this.tmpImpactOrigin.copy(point));
+      location.side = local.x > 0.04 ? 1 : local.x < -0.04 ? -1 : 0;
+    }
+    this.visual.accentHit(location.region, location.side, this.impact.x, this.impact.y, bulletImpactWeight(damage));
   }
 
   /** HitTarget hook: pure visual feedback; damage arrives via applyDamage. */
@@ -315,7 +387,7 @@ export class Zombie implements HitTarget {
     if (!this.isAlive) return false;
     this.hp -= amount;
     this.visual.hitFlash();
-    this.reactToDamage(amount, headshot, sourceX, sourceZ);
+    this.reactToDamage(amount, headshot, sourceX, sourceZ, this.hp <= 0);
     this.bleed(amount, headshot, source, this.hp <= 0);
     if (this.hp <= 0) {
       const killSource = source === 'normal' ? undefined : source;
@@ -349,6 +421,8 @@ export class Zombie implements HitTarget {
       : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'vortex9'
         : style === 'blown' ? 'f1' : undefined;
     this.bleed(1, headshot, source ?? inferredSource, true);
+    // The host decided the kill; the replica still takes the fatal blow before it falls.
+    this.stagger.hit(STAGGER_LETHAL_FORCE * ZOMBIE_TYPE_CONFIGS[this.typeId].staggerScale, impactX, impactZ);
     this.enterDeath(style);
   }
 
@@ -372,8 +446,10 @@ export class Zombie implements HitTarget {
     this.visual.setState(kind);
   }
 
-  private reactToDamage(amount: number, headshot: boolean, sourceX?: number, sourceZ?: number): void {
+  private reactToDamage(amount: number, headshot: boolean, sourceX?: number, sourceZ?: number, lethal = false): void {
     this.updateImpact(sourceX, sourceZ);
+    if (amount > 0) this.stagger.hit(staggerForce(amount, this.maxHp, headshot, lethal) * ZOMBIE_TYPE_CONFIGS[this.typeId].staggerScale,
+      this.impact.x, this.impact.y);
     if (headshot && amount > 0) this.hat?.detach(sourceX, sourceZ);
     this.visual.reactToHit(
       this.impact.x,
@@ -441,6 +517,8 @@ export class Zombie implements HitTarget {
       this.bloodPool.bleed(BURN_POOL_FORWARD * ZOMBIE_TYPE_CONFIGS[this.typeId].bodyScale[2]);
     }
     if (deathKind === 'vortex9') {
+      // The body disintegrates; wounds riding it would float in the glow.
+      this.wounds.clear();
       this.stateTimer = ZOMBIE_VORTEX9_DEATH_DURATION;
       this.tmpImpactOrigin.set(0, headshot ? 1.55 : 1.05, 0);
       this.visual.setDissolveProgress(0.01, this.tmpImpactOrigin);
@@ -618,10 +696,14 @@ export class Zombie implements HitTarget {
         break;
     }
 
+    this.stagger.update(dt);
+    this.visual.setStagger(this.stagger.amount, this.stagger.directionX, this.stagger.directionZ);
     if (!visualUpdated) this.visual.update(dt, visualSpeed);
+    this.wounds.update(this.visual.currentOpacity);
   }
 
   public dispose(): void {
+    this.wounds.dispose();
     this.hat?.dispose();
     this.visual.dispose();
     this.bloodPool?.dispose();

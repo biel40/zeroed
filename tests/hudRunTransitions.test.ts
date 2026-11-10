@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HUD } from '../src/ui/HUD';
+import { DamageDirectionTracker } from '../src/ui/DamageDirections';
 
 class HudElement {
   public textContent = '';
@@ -31,6 +32,11 @@ function hudHarness(): { hud: HUD; element: (name: string) => HudElement; object
   const objectives = { update: vi.fn() };
   // A boss bar was up when the run ended.
   Object.assign(hud, { lastProtection: 0, lastRadiance: 0, objectives, pointsPopups: { reset: vi.fn() }, lastBossBar: 'CAPTAIN USSR|0.6,0.3' });
+  const marks = [element('damageDirection0'), element('damageDirection1'), element('damageDirection2'), element('damageDirection3')];
+  Object.assign(hud, {
+    damageDirections: new DamageDirectionTracker(), damageDirectionMarks: marks,
+    damageDirectionWritten: new Float32Array(marks.length * 2).fill(-1), damageDirectionsShown: false,
+  });
   return { hud, element, objectives };
 }
 

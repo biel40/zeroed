@@ -14,6 +14,8 @@ import { ZombieElectricArcs } from './ZombieElectricArcs';
 import { ZombieFlames } from './ZombieFlames';
 import { installZombieChar, setZombieChar } from '../rendering/ZombieCharShader';
 import { ZombieLimb } from './ZombieLimb';
+import { AccentChannel, ZombieHitAccent } from './ZombieHitAccent';
+import type { ZombieBodyRegion } from './wounds/ZombieBodyRegion';
 import { buildZombieRestClips, type ZombieRestClips } from './ZombieMotionClips';
 import { ZOMBIE_DEATH_PROFILES, type ZombieFallStyle } from './ZombieDeath';
 import { sampleMeleeMotion, sampleWindowMotion, boardPullProgress,
@@ -481,12 +483,38 @@ const anchorTmpB = new THREE.Vector3();
 const anchorTmpC = new THREE.Vector3();
 const anchorTmpD = new THREE.Vector3();
 
+/**
+ * Full-reel pose, radians, spread over the spine above the hips: the chest
+ * is thrown back (pitch), leans (roll) and turns (twist) with the round;
+ * the head lags behind the chest; the arms swing out for balance. Hips and
+ * legs keep their clip, so the feet stay planted and never slide.
+ */
+const STAGGER_SPINE_PITCH = 0.6;
+const STAGGER_SPINE_ROLL = 0.3;
+const STAGGER_SPINE_TWIST = 0.22;
+const STAGGER_HEAD_LAG = 0.35;
+const STAGGER_ARM_LIFT = 0.32;
+/** A crawler's spine carries its weight: it only shudders. */
+const STAGGER_CRAWLER_SHARE = 0.35;
+/** Seconds the fatal blow's reaction stays layered over the start of the fall. */
+const DEATH_REACTION_SECONDS = 0.45;
+
 function findByName(root: THREE.Object3D, names: readonly string[]): THREE.Object3D | null {
   for (const name of names) {
     const found = root.getObjectByName(name);
     if (found) return found;
   }
   return null;
+}
+
+/** The body: the skinned mesh with the most vertices (props such as eyes are never skinned). */
+function findSkinnedBody(root: THREE.Object3D): THREE.SkinnedMesh | null {
+  let body: THREE.SkinnedMesh | null = null;
+  root.traverse((object) => {
+    if (!(object instanceof THREE.SkinnedMesh)) return;
+    if (!body || object.geometry.getAttribute('position').count > body.geometry.getAttribute('position').count) body = object;
+  });
+  return body;
 }
 
 function smoothStep(value: number): number {
@@ -532,6 +560,8 @@ export class ZombieVisual {
   readonly torsoAnchor: THREE.Object3D;
   /** Animated anchor the head hitbox rides (Head bone / head group / root). */
   readonly headAnchor: THREE.Object3D;
+  /** The skinned body mesh of a GLB rig (wounds sample its surface); null on the procedural fallback. */
+  public readonly skinnedBody: THREE.SkinnedMesh | null;
 
   private readonly mixer: THREE.AnimationMixer | null = null;
   private readonly actions = new Map<ZombieState, THREE.AnimationAction>();
@@ -541,6 +571,8 @@ export class ZombieVisual {
   private readonly materialBases: MaterialBase[] = [];
   private readonly rig: ProceduralRig | null = null;
   private barrierRig: BarrierRig | null = null;
+  /** Spine bones between hips and neck that share the reel, lowest first. */
+  private readonly staggerSpine: THREE.Object3D[] = [];
 
   private readonly barrierEuler = new THREE.Euler();
   private readonly barrierQuaternion = new THREE.Quaternion();
@@ -604,6 +636,11 @@ export class ZombieVisual {
   private reactionX = 0;
   private reactionZ = 0;
   private reactionAge = 1;
+  private readonly accent = new ZombieHitAccent();
+  /** Whole-body reel of the latest hits (see ZombieStagger), set by the owner each frame. */
+  private staggerAmount = 0;
+  private staggerX = 0;
+  private staggerZ = -1;
   private deathLean = 0;
   private deathSide = 0;
   private deathTime = 0;
@@ -697,6 +734,7 @@ export class ZombieVisual {
         object.material = Array.isArray(object.material) ? cloned : cloned[0];
       });
       this.root.add(model);
+      this.skinnedBody = findSkinnedBody(model);
       this.torsoAnchor = findByName(model, this.modelConfig.anchors.torso) ?? this.root;
       this.headAnchor = findByName(model, this.modelConfig.anchors.head) ?? this.root;
       this.headTop = findByName(model, this.modelConfig.anchors.headTop);
@@ -706,6 +744,10 @@ export class ZombieVisual {
         shoulderL: findByName(model, ['LeftShoulder']),
         shoulderR: findByName(model, ['RightShoulder']),
       };
+      for (const name of ['Spine', 'Spine1', 'Spine2']) {
+        const bone = findByName(model, [name]);
+        if (bone) this.staggerSpine.push(bone);
+      }
 
 
       this.mixer = new THREE.AnimationMixer(model);
@@ -739,6 +781,7 @@ export class ZombieVisual {
         ? buildProceduralBrute(tint, castShadow)
         : buildProceduralHumanoid(tint, castShadow);
       this.rig = built.rig;
+      this.skinnedBody = null;
       this.materials.push(...built.materials);
       this.root.add(built.root);
       this.torsoAnchor = built.rig.hips;
@@ -747,6 +790,7 @@ export class ZombieVisual {
         torso: built.rig.torso, head: built.rig.head,
         shoulderL: built.rig.armL, shoulderR: built.rig.armR,
       };
+      this.staggerSpine.push(built.rig.torso);
 
     }
 
@@ -848,6 +892,7 @@ export class ZombieVisual {
     this.motionSpeed = this.lean = this.turnLean = 0;
     this.reactionX = this.reactionZ = 0;
     this.reactionAge = 1;
+    this.accent.reset();
     this.deathTime = this.deathLean = this.deathSide = this.deathTwist = 0;
     this.deathStyle = 'knockback';
     this.crippled = false;
@@ -1199,6 +1244,34 @@ export class ZombieVisual {
     this.reactionAge = 0;
   }
 
+  /**
+   * Localized cosmetic flinch of a confirmed bullet (see ZombieHitAccent):
+   * `side` +1 is the body's left, travel is the body-local direction the
+   * round moves, `weight` its heft 0..1. Layered over the clip; never
+   * restarts it, never stops the body.
+   */
+  public accentHit(region: ZombieBodyRegion, side: -1 | 0 | 1, travelX: number, travelZ: number, weight: number): void {
+    if (this.state === 'death') return;
+    this.accent.hit(region, side, travelX, travelZ, weight);
+  }
+
+  /**
+   * Whole-body reel, 0..1, pushed along body-local (x: its left, z: forward):
+   * the body sways with the hit, gives a step's worth of ground and its knees
+   * dip, then recovers. Layered on the root after the clip, so locomotion,
+   * attacks and hitboxes keep running underneath.
+   */
+  public setStagger(amount: number, directionX: number, directionZ: number): void {
+    this.staggerAmount = amount;
+    this.staggerX = directionX;
+    this.staggerZ = directionZ;
+  }
+
+  /** Fade of a dying body, 1 while alive (wounds shrink with it). */
+  public get currentOpacity(): number {
+    return this.opacity;
+  }
+
   /** Actual collision-resolved speed and angular velocity, supplied by the owner. */
   setMotion(dt: number, speed: number, turnRate: number): void {
     if (dt <= 0 || this.state === 'death') return;
@@ -1260,6 +1333,7 @@ export class ZombieVisual {
     this.restoreBasePose();
     this.transitionTime += dt;
     this.reactionAge += dt;
+    this.accent.update(dt);
     if (this.state === 'death') this.deathTime += dt;
     // Spawn rise and death collapse apply to the visual root in both paths.
     this.heavyBobPhase += dt * Math.max(0.4, speed) * 2.1;
@@ -1391,6 +1465,8 @@ export class ZombieVisual {
       this.applyAttackBodyPose(this.barrierProgress());
     }
     this.applyInertia(dt);
+    // Living reactions go under the vault and strike solvers, which keep their contact targets.
+    if (this.state !== 'death') this.applyHitReactions(1);
     this.applyWindowVaultPose();
     this.applyLimbMotion();
     const blend = smoothStep(Math.min(1, this.transitionTime / this.transitionDuration));
@@ -1400,6 +1476,9 @@ export class ZombieVisual {
         this.poseBones[i].position.lerp(this.positionFrom[i], 1 - blend);
       }
     }
+    // The fatal blow lands on top of the death crossfade (which would smother
+    // it), so the body visibly takes the hit before it folds.
+    if (this.state === 'death') this.applyHitReactions(Math.max(0, 1 - this.deathTime / DEATH_REACTION_SECONDS));
     // Two cached ankle anchors, no raycasts or per-vertex bounds. Preserve
     // the authored swing foot while seating the lower support foot.
     let groundTarget = 0;
@@ -1633,6 +1712,48 @@ export class ZombieVisual {
     const decay = Math.exp(-dt * 6);
     this.reactionX *= decay;
     this.reactionZ *= decay;
+  }
+
+  /** Localized flinch and whole-spine reel of the latest hits, scaled by `fade` (0..1). */
+  private applyHitReactions(fade: number): void {
+    if (!this.barrierRig || this.state === 'spawn' || fade <= 0) return;
+    if (this.accent.active) this.applyHitAccent(fade);
+    if (this.staggerAmount > 0) this.applyStaggerPose(this.staggerAmount * fade * (this.crippled ? STAGGER_CRAWLER_SHARE : 1));
+  }
+
+  /**
+   * The reel as a skeletal pose: the spine above the hips bends with the
+   * round, the head lags and the arms swing out. Nothing moves the root, so
+   * the body never slides and its feet keep the clip's footwork.
+   */
+  private applyStaggerPose(reel: number): void {
+    const rig = this.barrierRig!;
+    const spine = this.staggerSpine;
+    if (spine.length === 0) return;
+    // Travelling backwards (z < 0) bends the chest back; sideways rounds lean and turn it with them.
+    const pitch = this.staggerZ * reel * STAGGER_SPINE_PITCH;
+    const roll = -this.staggerX * reel * STAGGER_SPINE_ROLL;
+    // The struck side is thrown back: a round travelling to +X turns the chest by a negative yaw.
+    const twist = -this.staggerX * reel * STAGGER_SPINE_TWIST;
+    const share = 1 / spine.length;
+    for (const bone of spine) this.rotateBarrierBone(bone, pitch * share, twist * share, roll * share);
+    this.rotateBarrierBone(rig.head, -pitch * STAGGER_HEAD_LAG, 0, -roll * STAGGER_HEAD_LAG);
+    // Arms flung out and back for balance: positive roll lifts its left (+X) arm, negative its right.
+    const lift = reel * STAGGER_ARM_LIFT;
+    this.rotateBarrierBone(rig.shoulderL, -this.staggerZ * lift * 0.6, 0, lift);
+    this.rotateBarrierBone(rig.shoulderR, -this.staggerZ * lift * 0.6, 0, -lift);
+  }
+
+  /** Bone-local flinch of the latest bullets. */
+  private applyHitAccent(alive: number): void {
+    const rig = this.barrierRig!;
+    const accent = this.accent;
+    this.rotateBarrierBone(rig.torso, accent.value(AccentChannel.TorsoPitch) * alive, 0, accent.value(AccentChannel.TorsoRoll) * alive);
+    this.rotateBarrierBone(rig.head, accent.value(AccentChannel.HeadPitch) * alive, 0, accent.value(AccentChannel.HeadRoll) * alive);
+    this.rotateBarrierBone(rig.shoulderL, accent.value(AccentChannel.LeftShoulderPitch) * alive, 0,
+      accent.value(AccentChannel.LeftShoulderRoll) * alive);
+    this.rotateBarrierBone(rig.shoulderR, accent.value(AccentChannel.RightShoulderPitch) * alive, 0,
+      accent.value(AccentChannel.RightShoulderRoll) * alive);
   }
 
   private easeWindowVault(dt: number): void {

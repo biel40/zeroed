@@ -29,7 +29,7 @@ function weapon(adsAlpha: number): Weapon {
   return {
     definition: { ads: { fov: 50, sensitivity: 0.5 }, moveSpeedMultiplier: 1 },
     adsAlpha,
-    recoil: { pitch: 0, yaw: 0 },
+    recoil: { pitch: 0, yaw: 0, absorbCompensation: () => undefined },
   } as unknown as Weapon;
 }
 

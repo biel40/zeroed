@@ -1,5 +1,5 @@
 import type { SurfaceType } from '../shooting/HitTarget';
-import type { ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
+import type { FireMode, ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../weapons/WeaponTypes';
 import { HANDLE_RELEASE_FRACTION } from '../weapons/ReloadAnimator';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
 import { FlameStreamLoop } from './FlameStreamLoop';
@@ -357,7 +357,7 @@ export class AudioSystem {
     if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => undefined);
   }
 
-  public playShot(config: WeaponAudioConfig): void {
+  public playShot(config: WeaponAudioConfig, fireMode?: FireMode): void {
     if (config.energy === 'vortex9') {
       this.playVortex9Shot(config);
       return;
@@ -368,7 +368,7 @@ export class AudioSystem {
     }
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
-    const sample = config.sampleFile ? this.optionalSample(config.sampleFile) : null;
+    const sample = this.shotSample(config, fireMode);
     if (sample) {
       this.playSampledShot(audio, sample, config, config.volume, audio.master);
       return;
@@ -386,7 +386,7 @@ export class AudioSystem {
    * A teammate's shot heard from where they stand: the report alone, without
    * the mechanism foley or room tail that belong to the player's own gun.
    */
-  public playRemoteShot(config: WeaponAudioConfig, cue: SpatialCue): void {
+  public playRemoteShot(config: WeaponAudioConfig, cue: SpatialCue, fireMode?: FireMode): void {
     const audio: AudioContextParts | null = this.context();
     if (!audio) return;
     const output = this.spatialBus(audio, cue, REMOTE_SHOT_MIN_ATTENUATION);
@@ -397,9 +397,14 @@ export class AudioSystem {
       this.tick(0, 3900, volume * 0.18, 6, 0.05, output);
       return;
     }
-    const sample = config.sampleFile ? this.optionalSample(config.sampleFile) : null;
+    const sample = this.shotSample(config, fireMode);
     if (sample) this.playSampledShot(audio, sample, config, volume, output);
     else this.playReport(audio, config, REMOTE_SHOT_GAIN, output);
+  }
+
+  private shotSample(config: WeaponAudioConfig, fireMode: FireMode | undefined): AudioBuffer | null {
+    const file = (fireMode === 'auto' ? config.autoSampleFile : undefined) ?? config.sampleFile;
+    return file ? this.optionalSample(file) : null;
   }
 
   /**
@@ -485,9 +490,10 @@ export class AudioSystem {
     if (audio) playGrenadeBounce(audio.ctx, this.spatialBus(audio, cue), audio.noise, strength);
   }
 
-  /** Starts decoding a weapon's optional shot MP3 so the first trigger pull already uses it. */
+  /** Starts decoding a weapon's shot clips ahead of the first trigger pull. */
   public preloadShotSample(config: WeaponAudioConfig): void {
     if (config.sampleFile) this.optionalSample(config.sampleFile);
+    if (config.autoSampleFile) this.optionalSample(config.autoSampleFile);
   }
 
   /**
@@ -2191,7 +2197,7 @@ export class AudioSystem {
     oscillator.stop(at + duration + 0.02);
   }
 
-  /** Decodes an optional MP3; null keeps the caller on its procedural fallback. */
+  /** Decodes an optional clip; null keeps the caller on its procedural fallback. */
   private async loadSample(url: string): Promise<AudioBuffer | null> {
     const ctx: AudioContext = this.ensureGraph();
     try {

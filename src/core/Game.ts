@@ -81,7 +81,8 @@ export class Game {
   /** Scales the drawing buffer below the profile's pixel ratio while frames run slow. */
   private readonly dynamicResolution = new DynamicResolution();
 
-  private readonly debugElement: HTMLElement | null = null;
+  private readonly debugFromUrl = new URLSearchParams(window.location.search).has('debug');
+  private debugElement: HTMLElement | null = null;
   private debugTimer = 0;
   private fpsEstimate = 60;
   /**
@@ -270,6 +271,7 @@ export class Game {
       },
       resetArsenal: () => this.resetArsenal(),
       returnToMainMenu: () => this.returnToMainMenu(),
+      setDebugStatsEnabled: (enabled) => this.setDebugStatsEnabled(enabled),
     });
 
     this.input.onLockChange = (locked) => this.handlePointerLockChange(locked);
@@ -324,11 +326,7 @@ export class Game {
       });
     }
 
-    if (new URLSearchParams(window.location.search).has('debug')) {
-      this.debugElement = document.createElement('div');
-      this.debugElement.id = 'debug-stats';
-      document.body.appendChild(this.debugElement);
-    }
+    if (this.debugFromUrl) this.setDebugStatsEnabled(true);
 
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('orientationchange', this.handleResize);
@@ -677,11 +675,11 @@ export class Game {
     }
 
     // A flame stream roars on its own loop (setFlameStream) instead of a report per tick.
-    if (!flame) this.audio.playShot(weapon.definition.audio);
+    if (!flame) this.audio.playShot(weapon.definition.audio, weapon.fireMode);
     const { cameraJolt, playerPush } = weapon.definition.recoil;
     if (cameraJolt) this.player.playShotImpulse(cameraJolt);
     if (playerPush) this.player.applyShotPush(playerPush);
-    view.onShot();
+    view.onShot(weapon.fireMode === 'auto');
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
     if (flame) {
@@ -689,7 +687,7 @@ export class Game {
       // burns so it lights the room ahead; no shells, no powder smoke.
       this.player.camera.getWorldDirection(this.tmpRight);
       this.flashLight.position.addScaledVector(this.tmpRight, FLAME_LIGHT.ahead);
-      this.player.playShotImpulse((Math.random() * 2 - 1) * FLAME_RUMBLE);
+      this.player.playViewImpulse((Math.random() * 2 - 1) * FLAME_RUMBLE);
       this.flashLight.color.setHex(FLAME_LIGHT.color);
       this.flashLight.intensity = FLAME_LIGHT.intensity * (0.75 + Math.random() * 0.5);
       this.flashLightDecay = FLAME_LIGHT_DECAY;
@@ -700,7 +698,7 @@ export class Game {
     this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
 
     if (energy) {
-      this.player.playShotImpulse(0.014);
+      this.player.playViewImpulse(0.014);
       this.effects.puff(this.tmpMuzzle, energy.color, 0.2);
     } else {
       this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
@@ -770,6 +768,21 @@ export class Game {
     if (!start()) return;
     weapon.cancelReload();
     this.meleeReloadWeapon = weapon.ammoInMagazine === 0 ? weapon : null;
+  }
+
+  private setDebugStatsEnabled(enabledByMode: boolean): void {
+    if (!enabledByMode && !this.debugFromUrl) {
+      this.debugElement?.remove();
+      this.debugElement = null;
+      return;
+    }
+    if (this.debugElement) return;
+
+    this.debugElement = document.createElement('div');
+    this.debugElement.id = 'debug-stats';
+    document.body.appendChild(this.debugElement);
+    this.debugTimer = 0;
+    this.fpsEstimate = 60;
   }
 
   private updateDebug(dt: number): void {
@@ -878,6 +891,8 @@ export class Game {
       this.processWeaponEvents();
       this.ballistics.update(dt);
     }
+    // Visual-only camera motion goes on after this frame's shots have taken their aim.
+    this.player.applyViewEffects(dt);
     // Only a flame weapon drives the stream's roar; a switch away gets one last call to silence it.
     const flameWeapon = weapon.definition.flame !== undefined;
     if (flameWeapon || this.flameStreamDriven) {
@@ -886,6 +901,8 @@ export class Game {
     this.flameStreamDriven = flameWeapon;
 
     this.mode.update(dt);
+    const rig = this.player.rig;
+    this.hud.updateDamageDirections(dt, rig.position.x, rig.position.z, rig.rotation.y);
     const fallbackName = this.mode.getFallbackWeaponName?.() ?? null;
     const melee = this.mode.getMeleeArm?.() ?? null;
     // A cinematic camera films the world, not the first-person weapon and arms.

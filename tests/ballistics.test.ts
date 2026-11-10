@@ -97,7 +97,7 @@ describe('Barrett penetration', () => {
     return [torso, head];
   }
 
-  function fire(weaponId: 'barrett' | 'l96', colliders: THREE.Object3D[]): number[] {
+  function fire(weaponId: 'barrett' | 'l96' | 'm14', colliders: THREE.Object3D[]): number[] {
     const ballistics = new BallisticsSystem(colliders, new THREE.Group());
     const hitZombies: number[] = [];
     ballistics.onTargetHit = (_target, _distance, _point, _normal, object) => {
@@ -123,8 +123,22 @@ describe('Barrett penetration', () => {
     expect(fire('barrett', line)).toEqual([0, 1, -1]);
   });
 
+  it('lets the L96 pass through up to three zombies, fewer than the Barrett', () => {
+    const line = Array.from({ length: 5 }, (_, index) => zombieAt(-3 - index * 1.2, index)).flat();
+    expect(WEAPON_DEFINITIONS.l96.projectile.maxTargets).toBe(3);
+    expect(fire('l96', line)).toEqual([0, 1, 2]);
+  });
+
+  it('stops the L96 at a wall like the Barrett', () => {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2));
+    wall.position.z = -3.6;
+    wall.updateMatrixWorld(true);
+    const line = [zombieAt(-3, 0), [wall], zombieAt(-4.2, 1)].flat();
+    expect(fire('l96', line)).toEqual([0, -1]);
+  });
+
   it('leaves every other weapon stopping at the first zombie', () => {
     const line = [zombieAt(-3, 0), zombieAt(-4.2, 1)].flat();
-    expect(fire('l96', line)).toEqual([0]);
+    expect(fire('m14', line)).toEqual([0]);
   });
 });

@@ -17,6 +17,8 @@ import { SettingsPanel } from './SettingsPanel';
 import { getControllerFamily, getInputDevice, onInputDeviceChange } from '../player/InputPresentation';
 import { gamepadMenuButtonLabel } from '../player/GamepadBindings';
 import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
+import { HitmarkerThrottle } from './HitmarkerThrottle';
+import { DamageDirectionTracker, damageDirectionAngle, damageDirectionOpacity } from './DamageDirections';
 
 /** Live state shown on the Zombies mode panel. */
 /** The menu's account: what the unlock dialog needs plus the beta-tester badge. */
@@ -104,6 +106,7 @@ export class HUD {
   private readonly crosshair: HTMLElement = mustGet('crosshair');
   private readonly scope: HTMLElement = mustGet('scope-overlay');
   private readonly hitmarker: HTMLElement = mustGet('hitmarker');
+  private readonly hitmarkerThrottle = new HitmarkerThrottle();
   private readonly startScreen: HTMLElement = mustGet('start-screen');
   private readonly startHint: HTMLElement = mustGet('start-hint');
   private readonly loadingBar: HTMLElement = mustGet('loading-bar');
@@ -119,6 +122,11 @@ export class HUD {
   private readonly bannerTitle: HTMLElement = mustGet('banner-title');
   private readonly bannerSub: HTMLElement = mustGet('banner-sub');
   private readonly damageOverlay: HTMLElement = mustGet('damage-overlay');
+  private readonly damageDirectionMarks = Array.from(mustGet('damage-directions').children) as HTMLElement[];
+  private readonly damageDirections = new DamageDirectionTracker();
+  /** Last angle and opacity written per mark: the DOM is only touched when they change. */
+  private readonly damageDirectionWritten = new Float32Array(this.damageDirectionMarks.length * 2).fill(-1);
+  private damageDirectionsShown = false;
   private readonly ringFlash: HTMLElement = mustGet('ring-flash');
   private readonly protectionOverlay: HTMLElement = mustGet('protection-overlay');
   private lastProtection = 0;
@@ -295,6 +303,8 @@ export class HUD {
       this.bannerSub.textContent = '';
       this.ringFlash.classList.remove('active');
       this.damageOverlay.classList.remove('active');
+      this.damageDirections.clear();
+      this.updateDamageDirections(0, 0, 0, 0);
       this.zPoints.classList.remove('denied');
       this.pointsPopups.reset();
       this.setObjective(null);
@@ -787,6 +797,39 @@ export class HUD {
     this.roundBannerShownAt = performance.now();
   }
 
+  /** Points an edge marker at a hit's world source (x, z) for a moment; repeated hits refresh it. */
+  public showDamageDirection(sourceX: number, sourceZ: number): void {
+    this.damageDirections.add(sourceX, sourceZ);
+  }
+
+  /**
+   * Turns the damage markers with the player's view (x, z, rig yaw) and fades
+   * them out. Idle, with no DOM writes, once every marker has faded.
+   */
+  public updateDamageDirections(dt: number, x: number, z: number, yaw: number): void {
+    const tracker = this.damageDirections;
+    if (!tracker.active && !this.damageDirectionsShown) return;
+    tracker.update(dt);
+    const written = this.damageDirectionWritten;
+    for (let slot = 0; slot < this.damageDirectionMarks.length; slot++) {
+      const entry = tracker.entries[slot];
+      const visible = entry !== undefined && entry.age !== Infinity;
+      const opacity = visible ? damageDirectionOpacity(entry.age) : 0;
+      const mark = this.damageDirectionMarks[slot];
+      if (Math.abs(opacity - written[slot * 2 + 1]) > 0.01 || (opacity === 0 && written[slot * 2 + 1] !== 0)) {
+        written[slot * 2 + 1] = opacity;
+        mark.style.opacity = opacity.toFixed(2);
+      }
+      if (!visible) continue;
+      const angle = damageDirectionAngle(x, z, yaw, entry.x, entry.z);
+      if (Math.abs(angle - written[slot * 2]) > 0.01) {
+        written[slot * 2] = angle;
+        mark.style.transform = `rotate(${angle.toFixed(3)}rad)`;
+      }
+    }
+    this.damageDirectionsShown = tracker.active;
+  }
+
   /** Brief red vignette when the player takes a hit. */
   public flashDamage(): void {
     this.damageOverlay.classList.remove('active');
@@ -930,9 +973,12 @@ export class HUD {
     mustGet('pause-menu-btn').onclick = handlers.onMainMenu;
   }
 
-  public showHitmarker(headshot = false): void {
+  /** A confirmed hit; `lethal` only when the caller already knows this hit killed. */
+  public showHitmarker(headshot = false, lethal = false): void {
+    if (!this.hitmarkerThrottle.accept({ headshot, lethal }, performance.now() / 1000)) return;
     this.hitmarker.classList.remove('active');
     this.hitmarker.classList.toggle('headshot', headshot);
+    this.hitmarker.classList.toggle('kill', lethal);
     // Force reflow so the CSS animation restarts on rapid consecutive hits.
     void this.hitmarker.offsetWidth;
     this.hitmarker.classList.add('active');

@@ -206,7 +206,7 @@ describe('Radiant ring in a Zombies run', () => {
     const splash = vi.spyOn(internals.zombies, 'applySplash').mockImplementation(() => {});
     vi.spyOn(internals.zombies, 'damageZombie').mockReturnValue(false);
     const object = new THREE.Object3D();
-    object.userData.zombie = { isAlive: true };
+    object.userData.zombie = { isAlive: true, registerBulletImpact: () => undefined };
     const weapon = new Weapon(WEAPON_DEFINITIONS.m1911);
     const hit = (): void => run.mode.onTargetHit({} as HitTarget, 5, POINT, POINT, object, weapon);
 

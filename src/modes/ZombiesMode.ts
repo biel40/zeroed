@@ -54,6 +54,7 @@ import type {
 } from '../zombies/maps/ZombieArena';
 import { ZombiesRunFlow } from '../zombies/ZombiesRunFlow';
 import type { GameMode, ModeContext } from './GameMode';
+import { SoulLampTargeting } from './SoulLampTargeting';
 import { ZombiesGasMask } from './ZombiesGasMask';
 import { ZombiesPowerSwitch } from './ZombiesPowerSwitch';
 import { ZombiesRings } from './ZombiesRings';
@@ -107,6 +108,7 @@ export class ZombiesMode implements GameMode {
 
   private ctx!: ModeContext;
   private arena!: ZombieArena;
+  private readonly soulLampTargeting = new SoulLampTargeting();
   private zombies!: ZombieManager;
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
@@ -163,6 +165,7 @@ export class ZombiesMode implements GameMode {
   /** The HUD objective notes, refilled every frame. */
   private readonly objectiveNotes: ObjectiveNote[] = [];
   private readonly tmpAudioPosition = new THREE.Vector3();
+  private readonly tmpShotOrigin = new THREE.Vector3();
   private readonly knife = new Knife();
   private readonly knifeCombat = new KnifeCombat();
 
@@ -216,7 +219,7 @@ export class ZombiesMode implements GameMode {
       );
     };
     this.zombies.onZombieDamaged = (damage) => { this.totalDamage += damage; };
-    this.zombies.onPlayerAttack = (damage) => this.onPlayerHit(damage);
+    this.zombies.onPlayerAttack = (damage, _target, attacker) => this.onPlayerHit(damage, false, attacker.position);
     this.zombies.onZombieSpawned = (zombie) => ctx.audio.playZombieSpawn(this.spatialCueFor(voicePoint(zombie.position)));
     this.zombies.onBarrierImpact = (barrier) => ctx.audio.playBarrierBreak(
       this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
@@ -411,11 +414,13 @@ export class ZombiesMode implements GameMode {
     const part = (object.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
     const headshot = part === 'head';
     this.ctx.stats.registerHit(distance);
-    this.ctx.hud.showHitmarker(headshot);
     if (headshot) this.ctx.audio.playHeadshotHit();
     else this.ctx.audio.playZombieHit();
     this.ctx.effects.puff(point, 0x6e1d16, 0.2);
+    // Cosmetic wound and flinch before the damage, while the body is still alive.
+    zombie.registerBulletImpact(this.ctx.player.camera.getWorldPosition(this.tmpShotOrigin), point, weapon.definition.damage, part);
     const lethal = this.zombies.damageZombie(zombie, part, damage, weapon.definition.id);
+    this.ctx.hud.showHitmarker(headshot, lethal);
     // A surviving headshot pays 150 here; lethal hits pay through the kill
     // callback instead, so a direct hit is rewarded exactly once.
     if (!lethal) this.economy.awardHit(headshot);
@@ -876,26 +881,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private findFacingSoulLamp(): ArenaSoulLampInteraction | null {
-    const lamps = this.arena?.soulLampInteractions ?? [];
-    if (lamps.length === 0) return null;
-    const playerPos = this.ctx.player.rig.position;
-    const forward = this.ctx.player.camera.getWorldDirection(this.tmpDirection);
-    let best: ArenaSoulLampInteraction | null = null;
-    let bestDot = -1;
-    for (const lamp of lamps) {
-      if (lamp.activated || lamp.floor !== this.ctx.player.floor) continue;
-      const dx = lamp.position.x - playerPos.x;
-      const dz = lamp.position.z - playerPos.z;
-      const distSq = dx * dx + dz * dz;
-      if (distSq > lamp.useRange * lamp.useRange) continue;
-      const distance = Math.sqrt(distSq);
-      const dot = distance < 1e-3 ? 1 : (forward.x * dx + forward.z * dz) / distance;
-      if (dot >= lamp.lookDotMin && dot > bestDot) {
-        bestDot = dot;
-        best = lamp;
-      }
-    }
-    return best;
+    return this.arena ? this.soulLampTargeting.findFacing(this.arena, this.ctx.player) : null;
   }
 
   private findFacingRitualCircle(): ArenaRitualInteraction | null {
@@ -1217,6 +1203,7 @@ export class ZombiesMode implements GameMode {
 
   private activateGodMode(): void {
     this.godModeEnabled = true;
+    this.ctx.setDebugStatsEnabled?.(true);
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
     if (hasSoulRitual(this.arena)) this.arena.unlockSecretRoom();
@@ -1270,10 +1257,12 @@ export class ZombiesMode implements GameMode {
     return true;
   }
 
-  private onPlayerHit(damage: number, piercing = false): void {
+  /** `source`: the attacker's world position, when the hit has one, for the direction marker. */
+  private onPlayerHit(damage: number, piercing = false, source?: THREE.Vector3): void {
     if (!this.runAcceptsInput()) return;
     if (!this.health.damage(damage, piercing)) return;
     this.ctx.hud.flashDamage();
+    if (source) this.ctx.hud.showDamageDirection(source.x, source.z);
     // Trauma-based shake: offsets pile up and decay smoothly.
     this.shake.add(HIT_TRAUMA);
     if (!this.health.isDead) return;
@@ -1379,10 +1368,10 @@ export class ZombiesMode implements GameMode {
       const part = (object?.userData.hitPart as ZombieHitPart | undefined) ?? 'torso';
       const headshot = part === 'head';
       this.ctx.stats.registerHit(distance);
-      this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
       const lethal = this.zombies.damageZombie(zombie, part,
         vortex9.damage * this.weaponDamageScale('vortex9'), 'vortex9');
+      this.ctx.hud.showHitmarker(headshot, lethal);
       if (!lethal) this.economy.awardHit(headshot);
     }
     // Splash includes the directly-hit zombie: the VORTEX-9 fantasy is that
@@ -1430,6 +1419,7 @@ export class ZombiesMode implements GameMode {
     this.totalDamage = 0;
     this.kills = 0;
     this.headshots = 0;
+    if (this.godModeEnabled) this.ctx.setDebugStatsEnabled?.(false);
     this.godModeEnabled = false;
     this.developerCommands.reset();
     this.godModeCommand.reset();

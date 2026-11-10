@@ -24,7 +24,9 @@ import { installCanvasDocument, makeContext, makeMatch, placePlayer, type CoopMa
 import { CodeLockDialog } from '../src/ui/CodeLockDialog';
 import { cameraSpatialCue } from '../src/audio/SpatialCue';
 import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
-import { MANSION_BUNKER_Y } from '../src/zombies/maps/BurnedMansionConfig';
+import { MANSION_BANQUET_HALL, MANSION_BUNKER_Y } from '../src/zombies/maps/BurnedMansionConfig';
+import { t } from '../src/i18n/i18n';
+import { actionKey } from '../src/ui/InteractionPrompts';
 import type { RemotePlayer } from '../src/rendering/RemotePlayer';
 
 vi.mock('../src/ui/CodeLockDialog', () => ({
@@ -263,11 +265,15 @@ describe('co-op session', () => {
     placePlayer(match.guestSide.player, 4, 0);
     match.step(0.05, 4);
     const origin = { x: -6, y: 1.7, z: 0 };
-    match.relay.guest.onMessage?.({ type: 'playerShoot', weapon: 'm1911', origin, direction: { x: 0, y: 0, z: -1 } });
+    const weapon = new Weapon(WEAPON_DEFINITIONS.ak47);
+    weapon.cycleFireMode();
+    match.host.onWeaponFired(weapon, new THREE.Vector3(origin.x, origin.y, origin.z), NORMAL);
+    match.relay.flush();
     const guestAudio = match.guestSide.ctx.audio as unknown as Record<string, ReturnType<typeof vi.fn>>;
     expect(guestAudio.playRemoteShot).toHaveBeenCalledOnce();
-    const [config, cue] = guestAudio.playRemoteShot.mock.calls[0];
-    expect(config).toBe(WEAPON_DEFINITIONS.m1911.audio);
+    const [config, cue, fireMode] = guestAudio.playRemoteShot.mock.calls[0];
+    expect(config).toBe(WEAPON_DEFINITIONS.ak47.audio);
+    expect(fireMode).toBe('semi');
     // Ten meters to the side: clearly panned and quieter than at arm's length.
     expect(cue).toEqual(cameraSpatialCue(match.guestSide.player.camera, origin));
     expect(Math.abs(cue.pan)).toBeGreaterThan(0.5);
@@ -298,6 +304,8 @@ describe('co-op combat authority', () => {
     match.guest.onWeaponFired(weapon, ORIGIN, NORMAL);
     match.guest.onTargetHit(replica, 5, ORIGIN, NORMAL, replica.torsoHitbox, weapon);
     match.step();
+    expect(match.hostSide.ctx.audio.playRemoteShot)
+      .toHaveBeenCalledWith(weapon.definition.audio, expect.anything(), 'auto');
     expect(zombie.hp).toBe(hp - WEAPON_DEFINITIONS.ak47.damage);
     expect(host(match).players.guest.economy.points).toBe(10);
   });
@@ -569,6 +577,35 @@ describe('co-op special weapons', () => {
 });
 
 describe('co-op Burned Mansion interactions', () => {
+  it('blocks the Mystery Box lamp through the dining room wall on both guest and host', () => {
+    const match = startedMatch();
+    const { world } = host(match);
+    const lamp = world.arena.soulLampInteractions.find((entry) => entry.id === 'mystery-box-room')!;
+    const player = match.guestSide.player;
+    const prompt = t('prompt.lightLamp', { key: actionKey(false) });
+
+    placePlayer(player, lamp.position.x, MANSION_BANQUET_HALL.chinaCabinet.z - 0.6);
+    player.face(Math.PI);
+    match.step(1 / 30, 60);
+    expect(match.guest.getInteractPrompt()).not.toBe(prompt);
+    match.guest.onInteract();
+    expect(match.relay.sent('guest', 'mapUse')).toHaveLength(0);
+
+    match.relay.host.onMessage?.({ type: 'mapUse', kind: 'lamp', id: lamp.id, equippedWeapon: 'm1911' });
+    match.relay.flush();
+    expect(lamp.activated).toBe(false);
+    expect(match.relay.sent('host', 'mapUseFailed')).toContainEqual({ type: 'mapUseFailed', reason: 'unavailable' });
+
+    placePlayer(player, lamp.position.x, lamp.position.z + 1);
+    player.face(0);
+    match.step(1 / 30, 12);
+    expect(match.guest.getInteractPrompt()).toBe(prompt);
+    match.guest.onInteract();
+    match.relay.flush();
+    expect(lamp.activated).toBe(true);
+    expect(guest(match).world.arena.soulLampInteractions.find((entry) => entry.id === lamp.id)?.activated).toBe(true);
+  });
+
   it('lets the guest activate a soul lamp and replicates it to both views', () => {
     const match = startedMatch();
     const lamp = host(match).world.arena.soulLampInteractions[0];

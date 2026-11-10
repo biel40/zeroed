@@ -2,8 +2,30 @@ import { describe, expect, it, vi } from 'vitest';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { WeaponId } from '../src/weapons/WeaponTypes';
 import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
+import { installCanvasDocument, makeContext } from './coopHarness';
 
 describe('Zombies GOD_MODE developer command', () => {
+  it('enables debug stats once per activation and clears them on restart', () => {
+    const restoreDocument = installCanvasDocument();
+    try {
+      const mode = new ZombiesMode();
+      const setDebugStatsEnabled = vi.fn();
+      mode.init({ ...makeContext().ctx, setDebugStatsEnabled });
+
+      for (const key of 'MOTDRULE') mode.onKeyInput(key);
+      expect(setDebugStatsEnabled).not.toHaveBeenCalled();
+      mode.onKeyInput('S');
+      for (const key of 'MOTDRULES') mode.onKeyInput(key);
+      expect(setDebugStatsEnabled.mock.calls).toEqual([[true]]);
+
+      mode.onRestartRequested();
+      for (const key of 'MOTDRULES') mode.onKeyInput(key);
+      expect(setDebugStatsEnabled.mock.calls).toEqual([[true], [false], [true]]);
+    } finally {
+      restoreDocument();
+    }
+  });
+
   it('gates console execution, overrides pinned grants and keeps tools available with invincibility off', () => {
     const mode = new ZombiesMode();
     const grantWeapon = vi.fn(() => true);

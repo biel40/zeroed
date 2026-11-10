@@ -25,6 +25,13 @@ export interface PlayerSettings {
   readonly showInteractionPrompts: boolean;
   /** Hip-fire vertical field of view in degrees; aiming keeps each weapon's zoom. */
   readonly fieldOfView: number;
+  /**
+   * 0..1 scale of purely visual camera motion (explosion and hit rattle,
+   * weapon rumble, revive nudge); 0 disables it. Aim recoil is not included.
+   */
+  readonly cameraShake: number;
+  /** 0..1 scale of the weapon's visual kick in the hands; aim recoil and accuracy are unchanged. */
+  readonly weaponKick: number;
 }
 
 export type NumericSetting = {
@@ -50,6 +57,8 @@ export const SETTING_RANGES: Readonly<Record<NumericSetting, SettingRange>> = {
   lookSensitivity: { min: 0.1, max: 3, step: 0.05 },
   adsSensitivity: { min: 0.1, max: 2, step: 0.05 },
   fieldOfView: { min: 65, max: 95, step: 1 },
+  cameraShake: { min: 0, max: 1, step: 0.05 },
+  weaponKick: { min: 0, max: 1, step: 0.05 },
   gamepadLookHorizontal: { min: 30, max: 360, step: 5 },
   gamepadLookVertical: { min: 30, max: 270, step: 5 },
   gamepadMoveDeadZone: { min: 0.05, max: 0.5, step: 0.01 },
@@ -73,6 +82,8 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   gamepadAdsSensitivity: 1,
   showInteractionPrompts: true,
   fieldOfView: 75,
+  cameraShake: 1,
+  weaponKick: 1,
 };
 
 const STORAGE_KEY = 'zeroed.settings';

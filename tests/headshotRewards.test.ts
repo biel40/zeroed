@@ -17,7 +17,7 @@ function hitZombie(weaponId: WeaponId, part: ZombieHitPart, lethal: boolean) {
   const mode = new ZombiesMode();
   const economy = new PlayerEconomy();
   const calls: Array<{ part: ZombieHitPart; damage: number }> = [];
-  const zombie = {} as Zombie;
+  const zombie = { registerBulletImpact: () => undefined } as unknown as Zombie;
   const showHitmarker = vi.fn();
   const playZombieHit = vi.fn();
   const playHeadshotHit = vi.fn();
@@ -29,6 +29,7 @@ function hitZombie(weaponId: WeaponId, part: ZombieHitPart, lethal: boolean) {
     hud: { showHitmarker },
     audio: { playZombieHit, playHeadshotHit, playZombieDeath },
     effects: { puff: () => undefined },
+    player: { camera: new THREE.Object3D() },
   };
   (mode as unknown as { zombies: unknown }).zombies = {
     damageZombie: (_zombie: Zombie, hitPart: ZombieHitPart, damage: number) => {
@@ -63,7 +64,7 @@ describe('global firearm headshot rewards', () => {
     expect(result.calls).toEqual([{ part: 'head', damage: WEAPON_DEFINITIONS[weaponId].damage }]);
     expect(result.points).toBe(HEADSHOT_POINTS);
     expect(result.showHitmarker).toHaveBeenCalledOnce();
-    expect(result.showHitmarker).toHaveBeenCalledWith(true);
+    expect(result.showHitmarker).toHaveBeenCalledWith(true, false);
     expect(result.playZombieHit).not.toHaveBeenCalled();
     expect(result.playHeadshotHit).toHaveBeenCalledOnce();
   });
@@ -72,7 +73,7 @@ describe('global firearm headshot rewards', () => {
     const result = hitZombie('m4a1', 'torso', false);
     expect(result.points).toBe(10);
     expect(result.showHitmarker).toHaveBeenCalledOnce();
-    expect(result.showHitmarker).toHaveBeenCalledWith(false);
+    expect(result.showHitmarker).toHaveBeenCalledWith(false, false);
     expect(result.playZombieHit).toHaveBeenCalledOnce();
     expect(result.playHeadshotHit).not.toHaveBeenCalled();
   });
@@ -81,7 +82,7 @@ describe('global firearm headshot rewards', () => {
     const result = hitZombie('m4a1', 'head', true);
     expect(result.points).toBe(HEADSHOT_POINTS);
     expect(result.showHitmarker).toHaveBeenCalledOnce();
-    expect(result.showHitmarker).toHaveBeenCalledWith(true);
+    expect(result.showHitmarker).toHaveBeenCalledWith(true, true);
     expect(result.playHeadshotHit).toHaveBeenCalledOnce();
     expect(result.playZombieDeath).not.toHaveBeenCalled();
   });

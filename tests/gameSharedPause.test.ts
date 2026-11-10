@@ -41,7 +41,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     mode: { id: 'zombies', sharedSimulation, update: vi.fn(), isGameplayInputEnabled: () => true },
     renderer: { render: vi.fn() },
     scene: {},
-    player: { camera: { fov: 75 }, update: vi.fn(), speed01: 0 },
+    player: { camera: { fov: 75 }, update: vi.fn(), applyViewEffects: vi.fn(), speed01: 0, rig: { position: { x: 0, z: 0 }, rotation: { y: 0 } } },
     input: {
       updateGamepad: vi.fn(), suppressGamepad: vi.fn(), blockingMenu: false,
       endFrame: vi.fn(), pointerLocked: true, wasPressed: () => false,
@@ -59,7 +59,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     viewArms: { root: { visible: true }, update: vi.fn() },
     flashLight: { intensity: 0 },
     viewportHeight: 100,
-    hud: { update: vi.fn(), setInteractionPrompt: vi.fn() },
+    hud: { update: vi.fn(), setInteractionPrompt: vi.fn(), updateDamageDirections: vi.fn() },
     debugElement: null,
     dynamicResolution: new DynamicResolution(),
   });
@@ -338,6 +338,25 @@ describe('cinematic first-person visibility', () => {
     view.update.mockImplementation(() => { view.root.visible = false; });
     prototype.frame.call(game);
     expect(view.root.visible).toBe(false);
+  });
+});
+
+describe('debug stats', () => {
+  it.each([false, true])('honors the URL flag when the mode clears its request (%s)', (debugFromUrl) => {
+    const { game } = stubGame(false, false);
+    game.debugFromUrl = debugFromUrl;
+    const debugElement = { id: '', remove: vi.fn() };
+    const appendChild = vi.fn();
+    vi.stubGlobal('document', { createElement: () => debugElement, body: { appendChild } });
+
+    prototype.setDebugStatsEnabled.call(game, true);
+    prototype.setDebugStatsEnabled.call(game, true);
+    expect(debugElement.id).toBe('debug-stats');
+    expect(appendChild).toHaveBeenCalledExactlyOnceWith(debugElement);
+
+    prototype.setDebugStatsEnabled.call(game, false);
+    expect(debugElement.remove).toHaveBeenCalledTimes(debugFromUrl ? 0 : 1);
+    expect(game.debugElement).toBe(debugFromUrl ? debugElement : null);
   });
 });
 

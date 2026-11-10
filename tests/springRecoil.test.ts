@@ -83,4 +83,27 @@ describe('SpringRecoil', () => {
     expect(spring.pitch).toBe(0);
     expect(spring.roll).toBe(0);
   });
+
+  it('settles along the same curve at 30 fps and 240 fps', () => {
+    const config = WEAPON_DEFINITIONS.barrett.view.visualRecoil;
+    const fast = new SpringRecoil(config, () => 0.5);
+    const slow = new SpringRecoil(config, () => 0.5);
+    fast.kick();
+    slow.kick();
+    for (let frame = 0; frame < 6; frame++) {
+      for (let i = 0; i < 8; i++) fast.update(1 / 240);
+      slow.update(1 / 30);
+      expect(slow.offset).toBeCloseTo(fast.offset, 4);
+      expect(slow.pitch).toBeCloseTo(fast.pitch, 4);
+    }
+  });
+
+  it('stays stable through a long frame hitch', () => {
+    const spring = new SpringRecoil(WEAPON_DEFINITIONS.m1911.view.visualRecoil, () => 0.5);
+    spring.kick();
+    spring.update(0.25);
+    expect(Math.abs(spring.pitch)).toBeLessThan(WEAPON_DEFINITIONS.m1911.view.visualRecoil.pitchImpulse);
+    simulate(spring, 1.5);
+    expect(Math.abs(spring.pitch)).toBeLessThan(1e-3);
+  });
 });

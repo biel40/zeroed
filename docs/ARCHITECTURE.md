@@ -49,6 +49,9 @@ sufra tirones de compilacion de shaders.
 
 ## Contratos
 
+- `Game` gestiona el HUD de rendimiento. El modo puede solicitarlo para la
+  partida mediante `ModeContext.setDebugStatsEnabled`.
+
 - `Input` combina el estado desktop/tactil con el estado aislado de
   `GamepadInput`; el adaptador solo acepta el mapeo estandar del navegador y
   reutiliza las acciones existentes. `GamepadControls` vive durante el arranque
@@ -163,6 +166,11 @@ sufra tirones de compilacion de shaders.
   `HitTarget` desacopla balistica de blancos.
 - Pools y temporales reutilizables limitan allocations por frame. Los tipos
   zombie (`normal`, `shiny`, `brute`) pueden compartir modelo sin duplicar IA.
+- `Zombie.registerBulletImpact` es la entrada cosmetica de una bala local
+  confirmada (herida y acento de la parte alcanzada); el modo la llama antes de
+  aplicar el dano y no afecta a vida, puntos ni hitboxes. Cada zombi posee sus
+  heridas (`ZombieWounds`, una llamada instanciada con geometria y material
+  compartidos) y las limpia al reaparecer.
 - `ZombieManager` y `ZombieReplica` poseen cada uno el pool de sangre de su run
   (`ZombieBlood`), separado de los cuerpos reciclables. `ZombieBleeding` resuelve
   la intensidad de las heridas; `BloodDropMotion` comparte simulacion y manchas

@@ -42,7 +42,8 @@ describe('M14 definition', () => {
     expect(definition.magazineSize).toBe(8);
     expect(ZOMBIES_RESERVE_AMMO.m14).toBe(64);
     expect(definition.projectile.muzzleVelocity).toBe(853);
-    expect(definition.heat).toBeUndefined();
+    expect(definition.heat).toBeDefined();
+    expect(definition.heat!.lockout).toBeUndefined();
   });
 
   it('hits hard, two torso shots on a round-1 zombie, without outclassing the box rifles per magazine', () => {

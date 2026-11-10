@@ -22,6 +22,8 @@ import { InspectAnimator } from './InspectAnimator';
 import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
 import { SpringRecoil } from './SpringRecoil';
 import { WeaponHands } from './WeaponHands';
+import { SustainedFireKick } from './SustainedFireKick';
+import { getSettings } from '../core/PlayerSettings';
 import type { Weapon } from './Weapon';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
@@ -1214,6 +1216,7 @@ export class WeaponView {
   /** Overheated barrel tip; only weapons with a heat config get one. */
   private readonly barrelGlow: BarrelGlow | null = null;
   private readonly spring: SpringRecoil;
+  private readonly sustainedKick = new SustainedFireKick();
   private readonly hipPosition: THREE.Vector3;
   private readonly adsPosition: THREE.Vector3;
   private readonly animator: ReloadAnimator | null = null;
@@ -1478,8 +1481,8 @@ export class WeaponView {
     this.inspector.onPhase = handler;
   }
 
-  /** Called by Game on every shot event. */
-  onShot(): void {
+  /** Called by Game on every shot event; `automatic` when the weapon fires in full-auto. */
+  public onShot(automatic = false): void {
     const isEnergy = this.definition.view.energyColor !== undefined;
     this.flashTime = isEnergy ? ENERGY_FLASH_DURATION : FLASH_DURATION;
     this.flash.scale.setScalar((isEnergy ? 0.95 + Math.random() * 0.35 : 0.8 + Math.random() * 0.5)
@@ -1487,7 +1490,7 @@ export class WeaponView {
     this.flash.rotation.z = Math.random() * Math.PI * 2;
     this.flash.visible = true;
     this.heavyFlash?.trigger();
-    this.spring.kick();
+    this.spring.kick(this.sustainedKick.onShot(automatic) * getSettings().weaponKick);
     // Pistol slide cycles with every shot.
     if (this.slide) this.slideBlowback = 1;
     if (this.openBolt) this.openBoltCycle = 1;
@@ -1500,6 +1503,7 @@ export class WeaponView {
     this.animator?.reset();
     this.hands.reset();
     this.spring.reset();
+    this.sustainedKick.reset();
     this.flashTime = 0;
     this.flash.visible = false;
     this.heavyFlash?.reset();
@@ -1561,6 +1565,7 @@ export class WeaponView {
 
     // 4. Independent visual recoil layer (spring).
     this.spring.update(dt);
+    this.sustainedKick.update(dt);
     this.root.position.z += this.spring.offset;
     this.root.rotation.x += this.spring.pitch;
     this.root.rotation.z += this.spring.roll;

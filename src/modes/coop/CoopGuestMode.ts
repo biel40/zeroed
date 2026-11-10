@@ -66,6 +66,7 @@ export class CoopGuestMode implements GameMode {
   private chain!: ChainLightning;
   private hostAvatar!: RemotePlayer;
   private readonly spectator = new CoopSpectator();
+  private readonly tmpShotOrigin = new THREE.Vector3();
   private gesture!: ReviveGesture;
   private readonly box = new MysteryBoxMachine(MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING);
   private boxView!: MysteryBoxView;
@@ -184,21 +185,24 @@ export class CoopGuestMode implements GameMode {
     this.pushHud();
   }
 
-  public onTargetHit(_target: HitTarget, distance: number, _point: THREE.Vector3,
+  public onTargetHit(_target: HitTarget, distance: number, point: THREE.Vector3,
     _normal: THREE.Vector3, object: THREE.Object3D, weapon: Weapon): void {
     const zombie = object.userData.zombie as Zombie | undefined;
     const zombieId = zombie ? this.replica.networkIdOf(zombie) : null;
-    if (zombieId === null || this.hostLost) return;
+    if (!zombie || zombieId === null || this.hostLost) return;
     const headshot = object.userData.hitPart === 'head';
     this.ctx.stats.registerHit(distance);
     this.ctx.hud.showHitmarker(headshot);
+    // Same trust as the hitmarker: the guest's own raycast, shown locally, never sent.
+    zombie.registerBulletImpact(this.ctx.player.camera.getWorldPosition(this.tmpShotOrigin), point,
+      weapon.definition.damage, headshot ? 'head' : 'torso');
     this.send({ type: 'zombieHitClaim', weapon: weapon.definition.id, zombieId, part: headshot ? 'head' : 'torso' });
   }
 
   /** Local shots render immediately; the host owns all special-weapon damage. */
   public onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
     this.send({
-      type: 'playerShoot', weapon: weapon.definition.id,
+      type: 'playerShoot', weapon: weapon.definition.id, fireMode: weapon.fireMode,
       origin: { x: origin.x, y: origin.y, z: origin.z },
       direction: { x: direction.x, y: direction.y, z: direction.z },
     });
@@ -387,7 +391,8 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'playerShoot':
         this.hostAvatar.playFire();
-        this.ctx.audio.playRemoteShot(WEAPON_DEFINITIONS[message.weapon].audio, this.world.spatialCueFor(message.origin));
+        this.ctx.audio.playRemoteShot(WEAPON_DEFINITIONS[message.weapon].audio,
+          this.world.spatialCueFor(message.origin), message.fireMode);
         if (WEAPON_DEFINITIONS[message.weapon].energy) {
           this.energy.fire(new THREE.Vector3(message.origin.x, message.origin.y, message.origin.z),
             new THREE.Vector3(message.direction.x, message.direction.y, message.direction.z),
@@ -486,6 +491,9 @@ export class CoopGuestMode implements GameMode {
         break;
       case 'playerDamaged': {
         this.ctx.hud.flashDamage();
+        // The host already names the attacker; its replica gives the direction.
+        const attacker = message.attackerId === undefined ? null : this.replica.zombieOf(message.attackerId);
+        if (attacker) this.ctx.hud.showDamageDirection(attacker.position.x, attacker.position.z);
         break;
       }
       case 'matchRestart':

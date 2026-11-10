@@ -78,7 +78,7 @@ describe('Double Tap ring', () => {
     const run = startRun();
     buyRing(run);
     const damage = vi.spyOn(run.internals.zombies, 'damageZombie').mockReturnValue(false);
-    const zombie = { isAlive: true };
+    const zombie = { isAlive: true, registerBulletImpact: () => undefined };
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     for (const id of ['m1911', 'ak47', 'barrett'] as const) {
@@ -100,7 +100,7 @@ describe('Double Tap ring', () => {
     const chain = vi.spyOn(run.internals.zombies, 'applyChainLightning').mockReturnValue([]);
     const damage = vi.spyOn(run.internals.zombies, 'damageZombie').mockReturnValue(false);
     const splash = vi.spyOn(run.internals.zombies, 'applySplash').mockImplementation(() => {});
-    const zombie = { isAlive: true };
+    const zombie = { isAlive: true, registerBulletImpact: () => undefined };
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     run.internals.onEnergyImpact(POINT, WEAPON_DEFINITIONS.tesla.energy!, object, 5);

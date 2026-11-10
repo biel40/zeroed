@@ -257,7 +257,7 @@ const forwardInput = { ...idleInput, isDown: (code: string) => code === 'KeyW' }
 const weaponStub = {
   definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
   adsAlpha: 0,
-  recoil: { pitch: 0, yaw: 0 },
+  recoil: { pitch: 0, yaw: 0, absorbCompensation: () => undefined },
 } as unknown as Weapon;
 
 /** Walks the player forward from (x, z) along `yaw` for `seconds` and returns where they ended. */

@@ -14,7 +14,7 @@ const DT = 1 / 60;
 const BOUNDS = { minX: -20, maxX: 20, minZ: -20, maxZ: 20 };
 const weapon = {
   definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
-  adsAlpha: 0, recoil: { pitch: 0, yaw: 0 },
+  adsAlpha: 0, recoil: { pitch: 0, yaw: 0, absorbCompensation: () => undefined },
 } as unknown as Weapon;
 
 function input(...keys: string[]): Input {

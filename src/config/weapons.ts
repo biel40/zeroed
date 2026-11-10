@@ -549,9 +549,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 715, gravity: 9.8, maxDistance: 400, drag: 0.05 },
     moveSpeedMultiplier: 0.96,
     equipTime: 0.4,
-    // 7.62x39 bark: lower and heavier than the 5.56 M4, a short crack, the
-    // long-stroke carrier slamming home and a brief room echo.
-    audio: { volume: 0.66, duration: 0.12, lowpass: 2300, thump: 104, crack: 0.24, tail: 0.42, mechanism: 0.2 },
+    audio: {
+      volume: 0.66, duration: 0.12, lowpass: 2300, thump: 104, crack: 0.24, tail: 0.42, mechanism: 0.2,
+      sampleFile: 'ak47_single_shot.wav', autoSampleFile: 'ak47_auto_shot.wav',
+      variation: { pitch: 0.025, volume: 0.05 },
+    },
     view: {
       // No GLB: dedicated AK-47 Type 3 builder (see AK47ViewModel.ts).
       hip: [0.19, -0.195, -0.4],
@@ -648,6 +650,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
     ads: { fov: 52, speed: 7, sensitivity: 0.65 },
     projectile: { muzzleVelocity: 853, gravity: 9.8, maxDistance: 500, drag: 0.04 },
+    // Rapid semi fire (under 0.4 s between shots) stacks heat: a magazine dumped
+    // that fast glows the suppressor; paced, aimed shots never warm it. No lockout.
+    heat: { shotsToOverheat: 10, coolTime: 4.5, coolDelay: 0.4, maxSpreadBonus: 0.01 },
     moveSpeedMultiplier: 0.93,
     equipTime: 0.48,
     // Full-power 7.62 crack over the long operating rod slamming home; m14_shot.mp3 replaces it once present.
@@ -836,11 +841,16 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       bloomRecovery: 0.02,
     },
     ads: { fov: 16, speed: 5, sensitivity: 0.35 },
-    projectile: { muzzleVelocity: 900, gravity: 9.8, maxDistance: 600, drag: 0.03 },
+    // A 7.62 round punches through up to three zombies in a line (the Barrett, five).
+    projectile: { muzzleVelocity: 900, gravity: 9.8, maxDistance: 600, drag: 0.03, maxTargets: 3 },
     moveSpeedMultiplier: 0.9,
     equipTime: 0.5,
-    // Full-power 7.62 report: supersonic crack, heavy body and a room echo.
-    audio: { volume: 0.85, duration: 0.3, lowpass: 2100, thump: 82, crack: 0.42, tail: 0.9 },
+    // Full-power 7.62 report: supersonic crack, heavy body and a room echo;
+    // l96_shot.mp3 replaces it once present.
+    audio: {
+      volume: 0.85, duration: 0.3, lowpass: 2100, thump: 82, crack: 0.42, tail: 0.9,
+      sampleFile: 'l96_shot.mp3', variation: { pitch: 0.025, volume: 0.05 },
+    },
     view: {
       // No GLB: dedicated L96A1 builder (see L96ViewModel.ts).
       frame: 'l96',

@@ -9,8 +9,8 @@ import type { WeaponDefinition } from '../src/weapons/WeaponTypes';
 
 const DT = 1 / 120;
 const ALL = Object.values(WEAPON_DEFINITIONS) as WeaponDefinition[];
-/** Semi-automatics whose barrel redlines and locks the trigger. */
-const SEMI_AUTO_LOCKOUT: readonly string[] = ['barrett'];
+/** Semi-automatics whose barrel heats under rapid fire. */
+const HEATED_SEMI_AUTOS: readonly string[] = ['barrett', 'm14'];
 const originalDocument = globalThis.document;
 
 // The muzzle flash textures are drawn on a canvas.
@@ -46,14 +46,24 @@ function rest(weapon: Weapon, seconds: number): void {
   for (let t = 0; t < seconds; t += DT) weapon.update(DT, { trigger: false, ads: false });
 }
 
+/** Fires `shots` semi-automatic rounds `gap` seconds apart, never reloading. */
+function tapTrigger(weapon: Weapon, shots: number, gap: number): void {
+  for (let i = 0; i < shots; i++) {
+    weapon.ammoInMagazine = weapon.definition.magazineSize;
+    weapon.update(DT, { trigger: true, ads: false });
+    weapon.clearEvents();
+    rest(weapon, gap - DT);
+  }
+}
+
 function findGlow(view: WeaponView): THREE.Mesh | undefined {
   return view.root.getObjectByName('barrel-heat-glow') as THREE.Mesh | undefined;
 }
 
 describe('Barrel overheating', () => {
-  it('is configured on every automatic weapon and the lockout semi-autos, nowhere else', () => {
+  it('is configured on every automatic weapon and the heated semi-autos, nowhere else', () => {
     for (const definition of ALL) {
-      const heated = definition.fireModes.includes('auto') || SEMI_AUTO_LOCKOUT.includes(definition.id);
+      const heated = definition.fireModes.includes('auto') || HEATED_SEMI_AUTOS.includes(definition.id);
       expect(definition.heat !== undefined, definition.id).toBe(heated);
     }
   });
@@ -142,8 +152,29 @@ describe('Barrel overheating', () => {
     expect(findGlow(new WeaponView(WEAPON_DEFINITIONS.barrett, null))).toBeDefined();
   });
 
+  it('heats the M14 within one magazine of rapid fire, without locking the trigger', () => {
+    const definition = WEAPON_DEFINITIONS.m14;
+    const weapon = new Weapon(definition, () => 0.5);
+    const view = new WeaponView(definition, null);
+    rest(weapon, definition.equipTime + 0.1);
+    tapTrigger(weapon, definition.magazineSize, 0.25);
+    expect(weapon.heat.intensity).toBeGreaterThan(0.5);
+    expect(weapon.heat.overheated).toBe(false);
+    view.update(DT, weapon, 0, 0, 0);
+    expect(findGlow(view)!.visible).toBe(true);
+    rest(weapon, definition.heat!.coolTime + 0.5);
+    expect(weapon.heat.level).toBe(0);
+  });
+
+  it('keeps the M14 cold under paced, aimed fire', () => {
+    const weapon = new Weapon(WEAPON_DEFINITIONS.m14, () => 0.5);
+    rest(weapon, weapon.definition.equipTime + 0.1);
+    tapTrigger(weapon, 30, 1.2);
+    expect(weapon.heat.intensity).toBe(0);
+  });
+
   it('semi-automatic and energy weapons have no barrel glow', () => {
-    for (const id of ['m1911', 'm14', 'l96', 'vortex9', 'tesla'] as const) {
+    for (const id of ['m1911', 'l96', 'vortex9', 'tesla'] as const) {
       expect(findGlow(new WeaponView(WEAPON_DEFINITIONS[id], null)), id).toBeUndefined();
     }
   });

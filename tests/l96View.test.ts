@@ -170,6 +170,12 @@ describe('L96A1 wall-buy silhouette', () => {
 });
 
 describe('L96A1 audio', () => {
+  it('uses its own optional shot sample, falling back to the procedural report', () => {
+    expect(definition.audio.sampleFile).toBe('l96_shot.mp3');
+    expect(definition.audio.sampleFile).not.toBe(WEAPON_DEFINITIONS.barrett.audio.sampleFile);
+    expect(definition.audio.variation).toBeDefined();
+  });
+
   it('layers a supersonic crack and a room tail over the report', () => {
     const audio = new AudioSystem() as any;
     const param = () => ({ value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() });
@@ -187,6 +193,8 @@ describe('L96A1 audio', () => {
     }));
     const tick = vi.spyOn(audio, 'tick').mockImplementation(() => {});
     const tail = vi.spyOn(audio, 'playShotTail').mockImplementation(() => {});
+    // Without the MP3 the procedural report plays.
+    audio.optionalSamples.set(definition.audio.sampleFile, null);
 
     audio.playShot(definition.audio);
 

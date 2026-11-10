@@ -22,7 +22,7 @@ function inputStub(keys: ReadonlySet<string>, axes: { x?: number; y?: number } =
 const weaponStub = {
   definition: { ads: { fov: 60, sensitivity: 1 }, moveSpeedMultiplier: 1 },
   adsAlpha: 0,
-  recoil: { pitch: 0, yaw: 0 },
+  recoil: { pitch: 0, yaw: 0, absorbCompensation: () => undefined },
 } as unknown as Weapon;
 
 function step(player: PlayerController, input: Input, seconds: number): void {

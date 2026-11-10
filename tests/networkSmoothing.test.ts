@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { lerpAngle, RemoteClock, SnapshotBuffer, type SampleBracket } from '../src/network/Interpolation';
 import { parseGuestMessage, parseHostMessage, type PlayerNetState } from '../src/network/Protocol';
-import { ShotValidator } from '../src/network/ShotValidator';
+import { ShotValidator, shotHitsPerShot } from '../src/network/ShotValidator';
+import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { RemotePlayer } from '../src/rendering/RemotePlayer';
 import type { RemoteAvatar, RemoteAvatarMotion } from '../src/rendering/RemotePlayerAvatar';
 import { WindowBarrier } from '../src/zombies/barriers/WindowBarrier';
@@ -169,20 +170,66 @@ describe('remote shot validation', () => {
     expect(shots.tryShoot(0)).toBe(true);
     expect(shots.tryShoot(0)).toBe(false);
     expect(shots.tryShoot(1)).toBe(true);
-    expect(shots.tryConsumeHit(1)).toBe(true);
-    expect(shots.tryConsumeHit(1)).toBe(true);
-    expect(shots.tryConsumeHit(1)).toBe(true);
-    expect(shots.tryConsumeHit(1)).toBe(false);
+    expect(shots.tryConsumeHit(1, 1)).toBe(true);
+    expect(shots.tryConsumeHit(1, 2)).toBe(true);
+    expect(shots.tryConsumeHit(1, 3)).toBe(true);
+    expect(shots.tryConsumeHit(1, 4)).toBe(false);
   });
 
   it('expires hit credits that trail their shot for too long', () => {
     const shots = new ShotValidator(4, 4);
     shots.tryShoot(0);
-    expect(shots.tryConsumeHit(10)).toBe(false);
+    expect(shots.tryConsumeHit(10, 1)).toBe(false);
+  });
+
+  it('lets a penetrating shot hit up to its target count, each zombie once', () => {
+    const shots = new ShotValidator(5, 1, 3);
+    shots.tryShoot(0);
+    expect(shots.tryConsumeHit(0.1, 7)).toBe(true);
+    expect(shots.tryConsumeHit(0.1, 7)).toBe(false);
+    expect(shots.tryConsumeHit(0.1, 8)).toBe(true);
+    expect(shots.tryConsumeHit(0.1, 9)).toBe(true);
+    expect(shots.tryConsumeHit(0.1, 10)).toBe(false);
+  });
+
+  it('lets a second shot hit a zombie the first one already pierced', () => {
+    const shots = new ShotValidator(5, 1, 3);
+    shots.tryShoot(0);
+    shots.tryShoot(0);
+    expect(shots.tryConsumeHit(0.1, 7)).toBe(true);
+    expect(shots.tryConsumeHit(0.1, 7)).toBe(true);
+    expect(shots.tryConsumeHit(0.1, 7)).toBe(false);
+  });
+
+  it('forgets pierced targets after a reset', () => {
+    const shots = new ShotValidator(1, 1, 3);
+    shots.tryShoot(0);
+    expect(shots.tryConsumeHit(0, 7)).toBe(true);
+    shots.reset();
+    shots.tryShoot(0);
+    expect(shots.tryConsumeHit(0, 7)).toBe(true);
+  });
+
+  it('grants each coop weapon as many hit credits per shot as its bullet pierces', () => {
+    expect(shotHitsPerShot(WEAPON_DEFINITIONS.l96)).toBe(3);
+    expect(shotHitsPerShot(WEAPON_DEFINITIONS.barrett)).toBe(5);
+    expect(shotHitsPerShot(WEAPON_DEFINITIONS.m14)).toBe(1);
   });
 });
 
 describe('protocol boundary', () => {
+  it.each([parseGuestMessage, parseHostMessage])('preserves the optional shot selector', (parse) => {
+    const shot = {
+      type: 'playerShoot', weapon: 'ak47',
+      origin: { x: 0, y: 1, z: 0 }, direction: { x: 0, y: 0, z: -1 },
+    };
+
+    expect(parse(shot)).toEqual(shot);
+    expect(parse({ ...shot, fireMode: 'semi' })).toEqual({ ...shot, fireMode: 'semi' });
+    expect(parse({ ...shot, fireMode: 'auto' })).toEqual({ ...shot, fireMode: 'auto' });
+    expect(parse({ ...shot, fireMode: 'burst' })).toBeNull();
+  });
+
   it('accepts well-formed guest requests and rejects malformed ones', () => {
     expect(parseGuestMessage({ type: 'doorPurchase', doorId: 'to-dining' })).toEqual({ type: 'doorPurchase', doorId: 'to-dining' });
     expect(parseGuestMessage({ type: 'doorPurchase', doorId: 7 })).toBeNull();

@@ -18,7 +18,7 @@ import {
   type PlayerNetState,
   type ZombieNetState,
 } from '../../network/Protocol';
-import { ShotValidator } from '../../network/ShotValidator';
+import { ShotValidator, shotHitsPerShot } from '../../network/ShotValidator';
 import { EYE_HEIGHT } from '../../player/PlayerController';
 import { stanceEyeOffset } from '../../player/PlayerStance';
 import { RemotePlayer } from '../../rendering/RemotePlayer';
@@ -148,12 +148,14 @@ export class CoopHostMode implements GameMode {
   };
   private readonly guestInventory = new WeaponInventory(COOP_STARTING_WEAPONS, 2);
   private readonly shots = new Map<WeaponId, ShotValidator>(COOP_WEAPONS.map((id) => [
-    id, new ShotValidator(WEAPON_DEFINITIONS[id].magazineSize + 1, WEAPON_DEFINITIONS[id].rpm / 60),
+    id, new ShotValidator(WEAPON_DEFINITIONS[id].magazineSize + 1, WEAPON_DEFINITIONS[id].rpm / 60,
+      shotHitsPerShot(WEAPON_DEFINITIONS[id])),
   ]));
   private readonly targets: ZombiePlayerTarget[] = [];
   private readonly roundCues = new RoundCueGate();
   private readonly guestTarget = { id: 'guest' as const, x: 0, y: EYE_HEIGHT, z: 0, floor: 0 };
   private readonly tmpDirection = new THREE.Vector3();
+  private readonly tmpShotOrigin = new THREE.Vector3();
   private readonly knife = new Knife();
   private readonly knifeCombat = new KnifeCombat();
   private readonly knifeOrigin = new THREE.Vector3();
@@ -289,20 +291,23 @@ export class CoopHostMode implements GameMode {
     this.pushHud();
   }
 
-  public onTargetHit(_target: HitTarget, distance: number, _point: THREE.Vector3,
+  public onTargetHit(_target: HitTarget, distance: number, point: THREE.Vector3,
     _normal: THREE.Vector3, object: THREE.Object3D, weapon: Weapon): void {
     const zombie = object.userData.zombie as Zombie | undefined;
     if (!zombie || this.phase !== 'playing') return;
     const headshot = object.userData.hitPart === 'head';
     this.ctx.stats.registerHit(distance);
-    this.ctx.hud.showHitmarker(headshot);
+    // Only the local shooter knows the exact impact; remote hits keep the replicated flinch alone.
+    zombie.registerBulletImpact(this.ctx.player.camera.getWorldPosition(this.tmpShotOrigin), point,
+      weapon.definition.damage, headshot ? 'head' : 'torso');
     const position = this.ctx.player.rig.position;
-    this.applyBulletDamage('host', zombie, headshot, weapon.definition, position.x, position.z);
+    const lethal = this.applyBulletDamage('host', zombie, headshot, weapon.definition, position.x, position.z);
+    this.ctx.hud.showHitmarker(headshot, lethal);
   }
 
   public onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
     this.send({
-      type: 'playerShoot', weapon: weapon.definition.id,
+      type: 'playerShoot', weapon: weapon.definition.id, fireMode: weapon.fireMode,
       origin: { x: origin.x, y: origin.y, z: origin.z },
       direction: { x: direction.x, y: direction.y, z: direction.z },
     });
@@ -487,7 +492,8 @@ export class CoopHostMode implements GameMode {
           if (!state) break;
           // The guest's eyes, not its claimed origin: the host trusts its own replica.
           const eye = { x: state.x, y: state.y + (state.eyeOffsetY ?? stanceEyeOffset(state.stance)), z: state.z };
-          this.ctx.audio.playRemoteShot(WEAPON_DEFINITIONS[message.weapon].audio, this.world.spatialCueFor(eye));
+          this.ctx.audio.playRemoteShot(WEAPON_DEFINITIONS[message.weapon].audio,
+            this.world.spatialCueFor(eye), message.fireMode);
           const length = Math.hypot(message.direction.x, message.direction.y, message.direction.z);
           if (config && length > 0.8 && length < 1.2) {
             this.energy.fire(new THREE.Vector3(eye.x, eye.y, eye.z),
@@ -700,7 +706,7 @@ export class CoopHostMode implements GameMode {
     if (weapon.energy) return;
     const distance = Math.hypot(zombie.position.x - state.x, zombie.position.z - state.z);
     if (distance > weapon.projectile.maxDistance + 2) return;
-    if (!this.shots.get(weaponId)?.tryConsumeHit(defaultNow())) return;
+    if (!this.shots.get(weaponId)?.tryConsumeHit(defaultNow(), zombieId)) return;
     this.applyBulletDamage('guest', zombie, headshot, weapon, state.x, state.z);
   }
 
@@ -805,19 +811,21 @@ export class CoopHostMode implements GameMode {
   }
 
   /** The single place bullet damage is applied, for both players' shots. */
+  /** True when the bullet killed. */
   private applyBulletDamage(shooter: CoopPlayerId, zombie: Zombie, headshot: boolean,
-    weapon: WeaponDefinition, fromX: number, fromZ: number): void {
+    weapon: WeaponDefinition, fromX: number, fromZ: number): boolean {
     this.shooter = shooter;
     const damage = weapon.damage;
     const lethal = this.zombies.damageZombie(zombie, headshot ? 'head' : 'torso', damage, weapon.id, fromX, fromZ);
     this.shooter = 'host';
-    if (lethal) return;
+    if (lethal) return true;
     this.players[shooter].economy.awardHit(headshot);
     this.send({
       type: 'zombieHit', zombieId: this.zombies.networkIdOf(zombie), headshot,
       source: weapon.id,
       amount: damage, fromX: quantize(fromX), fromZ: quantize(fromZ),
     });
+    return false;
   }
 
   private onEnergyImpact(point: THREE.Vector3, config: EnergyWeaponConfig,
@@ -904,6 +912,7 @@ export class CoopHostMode implements GameMode {
     }
     if (this.players.host.life.state === 'alive' && this.players.host.health.damage(damage, piercing)) {
       this.ctx.hud.flashDamage();
+      if (attacker) this.ctx.hud.showDamageDirection(attacker.position.x, attacker.position.z);
       if (this.players.host.health.isDead) this.players.host.life.down();
       this.sendMatchState();
     }
@@ -1008,7 +1017,8 @@ export class CoopHostMode implements GameMode {
     const state = this.guestState;
     const record = this.players[buyer];
     const validWeapon = remote ? this.guestInventory.has(equippedWeapon) : this.ctx.hasWeapon(equippedWeapon);
-    const item = kind === 'lamp' ? this.world.arena.soulLampInteractions.find((entry) => entry.id === id)
+    const lamp = kind === 'lamp' ? this.world.arena.soulLampInteractions.find((entry) => entry.id === id) : undefined;
+    const item = kind === 'lamp' ? lamp
       : kind === 'ritual' ? this.world.arena.ritualInteraction.id === id ? this.world.arena.ritualInteraction : null
         : kind === 'pickup' ? this.world.arena.weaponPickups.find((entry) => entry.id === id)
           : kind === 'ammo' ? this.world.arena.ammoRefills.find((entry) => entry.id === id)
@@ -1020,15 +1030,15 @@ export class CoopHostMode implements GameMode {
           : kind === 'ammo' ? this.world.findFacingAmmoRefill()
             : kind === 'grenades' ? this.grenades.facingBuy() : this.world.findFacingCompletion();
     const reachable = !!item && (remote ? !!state && this.world.isRemoteInReach(item, state)
+      && (!lamp || this.world.isSoulLampVisibleToRemote(lamp, state))
       : facing?.id === id);
     if (!reachable || !validWeapon || this.phase !== 'playing' || record.life.state !== 'alive') {
       if (remote) this.send({ type: 'mapUseFailed', reason: 'unavailable' });
       return;
     }
-    if (kind === 'lamp') {
-      const lamp = this.world.arena.soulLampInteractions.find((entry) => entry.id === id)!;
+    if (lamp) {
       if (!lamp.activate()) return;
-      this.send({ type: 'mapUsed', kind, id, buyer });
+      this.send({ type: 'mapUsed', kind: 'lamp', id, buyer });
     } else if (kind === 'ritual') {
       if (!this.world.arena.ritualInteraction.activate()) return;
       this.send({ type: 'mapUsed', kind, id, buyer });
