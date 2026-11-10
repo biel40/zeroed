@@ -51,7 +51,7 @@ balas para la M1911, incluido el que lleva puesto.
 comparten una superficie cosida, continua al cambiar de agarre y nivel de detalle.
 Arma, brazos y cuchillo comprimen su
 profundidad (`applyViewModelDepth`) para no atravesar paredes al pegarse a
-ellas; sus materiales no deben compartirse con objetos del mundo. Las armas de cerrojo (L96) expulsan el
+ellas; sus materiales no deben compartirse con objetos del mundo. Las armas de cerrojo (L96 y M40) expulsan el
 casquillo cuando el cerrojo llega atras, no al disparar, y su foley de
 levantar, retroceder, cerrar y bloquear sigue esa misma carrera, tambien en la
 recarga vacia. La recarga de la AK-47 bascula el cargador sobre el teton
@@ -376,7 +376,7 @@ existente a `MOTDRULES`.
   Las cabezadas y el tipo de muerte siguen decidiendolos los hitboxes. El steering frena los cambios de
   direccion, manteniendo las restricciones de paredes y rampas.
 - Muertes segun el golpe letal (`ZombieDeath`), sin ragdoll: cuchillo (gira,
-  se sujeta el corte y cae de lado), pistola y L96 (retrocede y cae de
+  se sujeta el corte y cae de lado), pistola, L96 y M40 (retrocede y cae de
   espaldas), automaticas (sacudidas por cada impacto y se desploma de bruces),
   headshot con arma de fuego (se derrumba inerte), VORTEX-9 (vaporizacion de
   1.0 s con `Vortex9DissolveShader`, borde incandescente verde y cenizas
@@ -471,7 +471,7 @@ existente a `MOTDRULES`.
   unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
   la Mystery Box (salon ampliado al oeste, con la caja en el lateral oeste,
   la taquilla de autorreanimacion en la pared sur y la AK-47 en la pared este,
-  dejando libre el paso central), gran comedor (ala norte con la Vector en pared; mesa,
+  dejando libre el paso central), gran comedor (ala norte con la Vector y la M40 en pared; mesa,
   aparador, vitrina y chimenea solidos, y sobre ella el retrato de un oficial
   aleman cuyas pupilas brillan en rojo y siguen suavemente al jugador local
   dentro de sus cuencas, tambien en cooperativo; easter egg de la Torre Quemada de
@@ -520,7 +520,8 @@ existente a `MOTDRULES`.
   Es exclusiva del mapa: `ZombieMapDefinition.exclusiveWeapons` la precarga
   solo aqui, fuera de la Mystery Box y del cooperativo. Una puerta de 2000 en
   el muro norte de electricidad abre el taller de mantenimiento: sala amarilla
-  con banco de trabajo, taquillas, el anillo de Tiro doble y una entrada propia
+  con banco de trabajo, taquillas, el anillo de Tiro doble, la M40 (2000 / 1000)
+  en el muro oeste y una entrada propia
   que solo genera zombis al abrir la zona. Un unico rectangulo de
   `playerBounds` y de navegacion cubre todas las salas: muros, trenes y
   puertas cerradas son lo que impide el paso, y la arena para al jugador en
@@ -694,6 +695,9 @@ existente a `MOTDRULES`.
 - Mystery Box: 950 Points, revelado a los 5 s; nunca entrega ninguna de las
   dos armas que lleva el comprador al activarla, en individual y cooperativo.
   La PPSh-41 forma parte del arsenal estandar de la caja; la Vector sigue disponible.
+  La M40 (M40A5) comparte todos los atributos de la L96, incluidos disparo y
+  cerrojo, salvo nombre, modelo y un cerrojo algo mas rapido; esta en la caja
+  y en pared en ambos mapas (2000 / 1000).
   El Barrett .50 se obtiene en la caja y gratis en los baules con candado
   numerico: el del puesto de milicia de Station 33 (tras la puerta de 3000)
   y el de Burned Mansion, junto a la pared oeste del bunker, orientado hacia

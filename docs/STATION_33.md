@@ -191,6 +191,9 @@ codigo: actualiza la guia.
   Polvo, goteras, cable colgante, telaranas, sangre desde la entrada de
   servicio y una baliza roja junto a ella. Luz ambar de orientacion y del
   banco; fluorescentes y luz de red al encender la corriente.
+- La M40 (2000 / 1000) cuelga del muro oeste, exterior, entre el tablero de
+  herramientas y la esquina de la puerta de electricidad, lejos del
+  interruptor general del otro lado del muro sur.
 - Entre las taquillas espera Tiro doble: anillo amarillo en el indice,
   compra unica de 3000 con corriente. Duplica la cadencia y suma un 20 %
   de dano con armas. Una entrada de mantenimiento propia despierta al
