@@ -93,19 +93,23 @@ lo usa sin bloqueo: un cargador disparado muy seguido (menos de 0.4 s entre
 disparos) la calienta, y el tiro pausado no. El
 Barrett lo usa: cuatro disparos seguidos (menos de 0.6 s entre ellos) lo
 bloquean hasta enfriarse. `audio.sampleFile` sustituye el disparo procedural por
-una grabacion de `public/assets/audio/`. La AK-47 usa una toma de Tunetank con
-una cola mas larga en semiautomatico y un golpe aislado de la rafaga original
-(`audio.autoSampleFile`) por cada bala en automatico. `audio.variation` permite
-variar ligeramente el tono y la ganancia por disparo. Si el clip aun no esta
+una grabacion de `public/assets/audio/`. La L96 salta la entrada del clip
+(`audio.sampleOffset`) para alinear el estampido con el disparo. La AK-47 usa
+una toma de Tunetank con una cola mas larga en semiautomatico y un golpe
+aislado de la rafaga original (`audio.autoSampleFile`) por cada bala en
+automatico. La M14 usa un disparo de G3 del mismo calibre con la cola
+atenuada para el tiro semiautomatico rapido. [Grabacion CC0 de areniporgen](https://freesound.org/people/areniporgen/sounds/712577/).
+`audio.variation` permite variar ligeramente el tono y la ganancia por disparo. Si el clip aun no esta
 disponible, suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
 anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
-del jugador (el Barrett, unos 12 cm por disparo). `muzzleSmoke` suelta nubes
+del jugador. La L96 levanta el canón con fuerza y desplaza al jugador unos
+9 cm por disparo en reposo. El Barrett lo desplaza unos 12 cm. `muzzleSmoke` suelta nubes
 de humo a ambos lados de la boca (fuera de la linea de mira), mas duraderas,
 y agranda las volutas de recalentamiento; el Barrett lo usa y su bloqueo dura
 unos 4 s.
-`muzzleFlash` anade al Barrett una llamarada frontal y chorros laterales en
-las dos camaras del freno de boca: nucleo brillante, lenguas naranjas que se
-expanden y apagan en 0.14 s y un golpe de luz mas intenso sobre el entorno.
+`muzzleFlash` da a la L96 y al Barrett una llamarada frontal con nucleo
+brillante y un golpe de luz mas intenso sobre el entorno. El Barrett tambien
+lanza chorros laterales por las dos camaras del freno de boca.
 El Barrett expulsa una vaina .50 propia (`shellCasing`), de unos 10 cm,
 con cuello hueco; cae de lado y permanece visible 4 s en el pool de casquillos.
 Un arma de llama (`flame` en la definicion, la ФАКЕЛ-33) no pasa por la
@@ -416,8 +420,9 @@ existente a `MOTDRULES`.
   alcanzados en `teslaChain`.
 - Granada letal (individual y cooperativo): la F-1 sovietica, definida como datos en
   [granadas](../src/config/grenades.ts). La run empieza con 2, cada ronda
-  nueva suma 2 y se llevan 4 como mucho; una pared de granadas del mapa llena
-  la bolsa. G, el boton GRAN tactil o la cruceta derecha la lanzan: como el
+  nueva suma 1 como maximo y se llevan 4 como mucho; una pared de granadas del mapa llena
+  la bolsa. En el HUD, cada granada recuperada cae girando en su hueco con un
+  destello (`lethalPouchIcons`). G, el boton GRAN tactil o la cruceta derecha la lanzan: como el
   cuchillo, el arma baja, la mano derecha saca la granada, quita la anilla y
   la lanza por encima del hombro (`GrenadeThrow`); interrumpe la recarga, no
   se combina con el cuchillo ni con ponerse un anillo o la mascara, y solo se

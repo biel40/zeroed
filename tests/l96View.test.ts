@@ -149,6 +149,20 @@ describe('L96A1 view model', () => {
     weaponView.update(1 / 60, fakeWeapon('cycling', 0.5), 0, 0, 0);
     expect(onBoltEject).toHaveBeenCalledTimes(2);
   });
+
+  it('shows a brief forward flame at the muzzle when fired', () => {
+    const weaponView = new WeaponView(definition, null);
+    const flash = weaponView.root.getObjectByName('heavy-muzzle-flash')!;
+    expect(flash.children.map((jet) => jet.name)).toEqual(['forward-flame']);
+    expect(flash.visible).toBe(false);
+
+    weaponView.onShot();
+    expect(flash.visible).toBe(true);
+    weaponView.update(1 / 15, fakeWeapon('ready', 0), 0, 0, 0);
+    expect(flash.visible).toBe(true);
+    weaponView.update(1 / 15, fakeWeapon('ready', 0), 0, 0, 0);
+    expect(flash.visible).toBe(false);
+  });
 });
 
 describe('L96A1 wall-buy silhouette', () => {

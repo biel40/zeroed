@@ -24,8 +24,9 @@ export function grenadeCookDial(secondsLeft: number, fuseSeconds: number): Grena
  * lattice, the fuse, the spoon down its flank and the pull ring. Colours
  * live in the stylesheet: a carried grenade is filled, a thrown one hollow.
  */
-export function grenadeIcon(carried: boolean): string {
-  return `<svg class="lethal-pip${carried ? ' full' : ''}" viewBox="0 0 28 36">`
+export function grenadeIcon(carried: boolean, gained = false): string {
+  const state = carried ? (gained ? ' full gained' : ' full') : '';
+  return `<svg class="lethal-pip${state}" viewBox="0 0 28 36">`
     + '<circle class="f1-ring" cx="5.6" cy="6.6" r="3.5"/>'
     + '<path class="f1-ring" d="M9.1 6.6H11"/>'
     + '<rect class="f1-metal" x="11.5" y="1.2" width="3.4" height="2.6" rx=".6"/>'
@@ -37,4 +38,18 @@ export function grenadeIcon(carried: boolean): string {
     + '<ellipse class="f1-shine" cx="9" cy="17.6" rx="1.5" ry="3" transform="rotate(24 9 17.6)"/>'
     + '<path class="f1-spoon" d="M15.6 3.4H20.6Q24.4 3.8 24.8 8L25.6 21.5"/>'
     + '</svg>';
+}
+
+/**
+ * The whole pouch row. Grenades between `previousCount` and `count` were just
+ * recovered (round grant or purchase) and carry the `gained` animation;
+ * `previousCount` null (first draw, new pouch size) animates nothing.
+ */
+export function lethalPouchIcons(count: number, max: number, previousCount: number | null): string {
+  const gainedFrom = previousCount === null ? count : Math.min(previousCount, count);
+  let html = '';
+  for (let index = 0; index < max; index++) {
+    html += grenadeIcon(index < count, index >= gainedFrom && index < count);
+  }
+  return html;
 }

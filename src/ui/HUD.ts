@@ -1,7 +1,7 @@
 import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
-import { grenadeCookDial, grenadeIcon } from './GrenadeHudPresentation';
+import { grenadeCookDial, lethalPouchIcons } from './GrenadeHudPresentation';
 import { formatNumber, onLanguageChange, setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
 import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
@@ -103,6 +103,8 @@ export class HUD {
   private readonly grenadeCookSeconds: HTMLElement = mustGet('grenade-cook-seconds');
   private lastGrenadeCook = '';
   private lastLethal = '';
+  private lastLethalCount = 0;
+  private lastLethalMax = -1;
   private readonly crosshair: HTMLElement = mustGet('crosshair');
   private readonly scope: HTMLElement = mustGet('scope-overlay');
   private readonly hitmarker: HTMLElement = mustGet('hitmarker');
@@ -746,10 +748,13 @@ export class HUD {
   public setLethalGrenades(count: number, max: number): void {
     const key = `${count}|${max}`;
     if (key === this.lastLethal) return;
+    const previousCount = max === this.lastLethalMax ? this.lastLethalCount : null;
     this.lastLethal = key;
+    this.lastLethalCount = count;
+    this.lastLethalMax = max;
     this.lethal.classList.toggle('hidden', max <= 0);
     const pips = this.lethal.querySelector('.lethal-pips');
-    if (pips) pips.innerHTML = Array.from({ length: max }, (_, index) => grenadeIcon(index < count)).join('');
+    if (pips) pips.innerHTML = lethalPouchIcons(count, max, previousCount);
     this.lethal.setAttribute('aria-label', t('hud.lethalLabel', { count, max }));
   }
 

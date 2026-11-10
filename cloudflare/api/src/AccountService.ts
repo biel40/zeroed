@@ -104,7 +104,10 @@ export class AccountService {
     const { store, now: clock, randomBytes } = this.options;
     const email = await store.consumeLoginToken(await hashSecret(loginToken), clock());
     
-    if (!email) return null;
+    if (!email) {
+      return null;
+    }
+    
     return this.issueSession(await store.upsertUser(email, generateId(randomBytes), clock()), email);
   }
 

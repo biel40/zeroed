@@ -45,14 +45,16 @@ export class MuzzleFlash {
   private remaining = 0;
   private shotScale = 1;
 
-  constructor(private readonly config: MuzzleFlashConfig) {
+  public constructor(private readonly config: MuzzleFlashConfig) {
     this.root.name = 'heavy-muzzle-flash';
     this.root.visible = false;
     this.addJet('forward-flame', config.length, config.width, Math.PI / 2, 0, 0);
+    const { sideLength } = config;
+    if (!sideLength) return;
     // Both chambers of a heavy muzzle brake vent outwards, behind the crown.
     for (const side of [-1, 1]) {
       for (let chamber = 0; chamber < 2; chamber++) {
-        this.addJet(`brake-flame-${side}-${chamber}`, config.sideLength * (1 - chamber * 0.2),
+        this.addJet(`brake-flame-${side}-${chamber}`, sideLength * (1 - chamber * 0.2),
           config.width * 0.8, side < 0 ? Math.PI : 0, side * 0.025, 0.035 + chamber * 0.05);
       }
     }

@@ -2,6 +2,112 @@ import { CHAIN_ZAP_DAMAGE } from '../zombies/ZombieConfig';
 import type { WeaponDefinition, WeaponId } from '../weapons/WeaponTypes';
 
 /**
+ * Accuracy International L96A1: the scoped bolt-action 7.62 rifle. One
+ * heavy round per bolt cycle that passes through up to three zombies.
+ * The M40 shares all of it but its look and a quicker bolt.
+ */
+const L96_DEFINITION: WeaponDefinition = {
+  id: 'l96',
+  name: 'L96',
+  muzzleFlash: { length: 0.64, width: 0.21, coreScale: 2.1, duration: 0.12, lightIntensity: 25 },
+  fireModes: ['semi'],
+  defaultFireMode: 'semi',
+  rpm: 60,
+  magazineSize: 5,
+  // Unhurried: the rifle is shown whole while the box magazine is swapped.
+  reloadTime: 3,
+  tacticalReloadTime: 2.4,
+  boltAction: true,
+  boltCycleTime: 0.7,
+  scoped: true,
+  damage: 1000,
+  recoil: {
+    verticalKick: 0.135,
+    horizontalKick: 0.010,
+    horizontalBias: 0,
+    kickVariance: 0.15,
+    recoverySpeed: 5,
+    recoveryDelay: 0.25,
+    cameraShare: 0.85,
+    adsRecoilMultiplier: 0.9,
+    cameraJolt: 0.058,
+    playerPush: 1.35,
+  },
+  spread: {
+    hipBase: 0.02,
+    adsBase: 0.0004,
+    bloomPerShot: 0.004,
+    maxBloom: 0.01,
+    bloomRecovery: 0.02,
+  },
+  ads: { fov: 16, speed: 5, sensitivity: 0.35 },
+  // A 7.62 round punches through up to three zombies in a line (the Barrett, five).
+  projectile: { muzzleVelocity: 900, gravity: 9.8, maxDistance: 600, drag: 0.03, maxTargets: 3 },
+  moveSpeedMultiplier: 0.9,
+  equipTime: 0.5,
+  // Full-power 7.62 fallback: supersonic crack, heavy body and a room echo.
+  audio: {
+    volume: 0.85, duration: 0.3, lowpass: 2100, thump: 82, crack: 0.42, tail: 0.9,
+    sampleFile: 'l96_shot.mp3', sampleOffset: 0.085,
+    variation: { pitch: 0.025, volume: 0.05 },
+  },
+  view: {
+    // No GLB: dedicated L96A1 builder (see L96ViewModel.ts).
+    frame: 'l96',
+    hip: [0.16, -0.185, -0.33],
+    ads: [0, 0, -0.32],
+    sway: 1.1,
+    bob: 0.9,
+    visualRecoil: { kickImpulse: 1.1, pitchImpulse: 7.5, rollImpulse: 2.2, stiffness: 110, damping: 15 },
+    scale: 1,
+    // Parkerized action/barrel + Accuracy International olive-green stock.
+    bodyColor: 0x1d2023,
+    accentColor: 0x4f5834,
+    barrelLength: 0.63,
+    barrelRadius: 0.0125,
+    receiverLength: 0.256,
+    stockLength: 0.28,
+    magazine: 'box',
+    optic: 'scope',
+    sightHeight: 0.062,
+    bulk: 1.1,
+    // The thumb of the shooting hand passes through the thumbhole.
+    hands: {
+      right: {
+        position: [0, -0.098, 0.075], axis: [0, 1, -0.035], palm: [-1, -0.1, 0], pose: 'rifleGrip',
+        hold: { size: [0.055, 0.058], axis: [0, 0.97, -0.242] }, trigger: [0, -0.066, -0.002],
+      },
+      left: {
+        position: [0, -0.0295, -0.28], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
+        hold: { size: [0.055, 0.043], axis: [0, 0, -1] },
+      },
+      action: { position: [0.05, -0.014, 0.055], axis: [0, 1, 0], palm: [-1, 0.3, 0], pose: 'boltPinch' },
+      // Cupped under the short box magazine.
+      magazine: {
+        position: [0, -0.0065, 0.002], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
+        hold: { size: [0.033, 0.097], axis: [0, 0, 1] },
+      },
+    },
+    reloadAnim: {
+      style: 'bolt',
+      magOut: 0.1,
+      magDrop: 0.28,
+      magIn: 0.44,
+      magSeat: 0.68,
+      charge: 0.76,
+      chargeEnd: 0.97,
+      // The long rifle swings out across the screen, left flank to the eye,
+      // for the magazine swap, then goes back on the shoulder for the bolt.
+      swapPose: { shift: [-0.07, 0.05, -0.24], yaw: 0.5, roll: -0.24, tilt: -0.08 },
+      rackPose: { shift: [-0.02, 0.03, 0], yaw: -0.1, roll: 0.22, tilt: -0.1 },
+      magSize: [0.028, 0.09, 0.07],
+      // Blued steel 5-round detachable box magazine.
+      magColor: 0x17191b,
+    },
+  },
+};
+
+/**
  * Declarative weapon definitions. Values are tuned for game feel, not for
  * matching real ballistic tables: recoil angles are radians, spread is a
  * cone half-angle in radians, velocities are m/s.
@@ -655,7 +761,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     heat: { shotsToOverheat: 10, coolTime: 4.5, coolDelay: 0.4, maxSpreadBonus: 0.01 },
     moveSpeedMultiplier: 0.93,
     equipTime: 0.48,
-    // Full-power 7.62 crack over the long operating rod slamming home; m14_shot.mp3 replaces it once present.
+    // Procedural fallback layers the 7.62 crack with the operating rod slamming home.
     audio: {
       volume: 0.78, duration: 0.2, lowpass: 2200, thump: 86, crack: 0.36, tail: 0.7, mechanism: 0.22,
       sampleFile: 'm14_shot.mp3', variation: { pitch: 0.025, volume: 0.05 },
@@ -809,101 +915,29 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
 
-  l96: {
-    id: 'l96',
-    name: 'L96',
-    fireModes: ['semi'],
-    defaultFireMode: 'semi',
-    rpm: 60,
-    magazineSize: 5,
-    // Unhurried: the rifle is shown whole while the box magazine is swapped.
-    reloadTime: 3,
-    tacticalReloadTime: 2.4,
-    boltAction: true,
-    boltCycleTime: 0.7,
-    scoped: true,
-    damage: 1000,
-    recoil: {
-      verticalKick: 0.045,
-      horizontalKick: 0.004,
-      horizontalBias: 0,
-      kickVariance: 0.15,
-      recoverySpeed: 5,
-      recoveryDelay: 0.25,
-      cameraShare: 0.85,
-      adsRecoilMultiplier: 0.9,
-    },
-    spread: {
-      hipBase: 0.02,
-      adsBase: 0.0004,
-      bloomPerShot: 0.004,
-      maxBloom: 0.01,
-      bloomRecovery: 0.02,
-    },
-    ads: { fov: 16, speed: 5, sensitivity: 0.35 },
-    // A 7.62 round punches through up to three zombies in a line (the Barrett, five).
-    projectile: { muzzleVelocity: 900, gravity: 9.8, maxDistance: 600, drag: 0.03, maxTargets: 3 },
-    moveSpeedMultiplier: 0.9,
-    equipTime: 0.5,
-    // Full-power 7.62 report: supersonic crack, heavy body and a room echo;
-    // l96_shot.mp3 replaces it once present.
-    audio: {
-      volume: 0.85, duration: 0.3, lowpass: 2100, thump: 82, crack: 0.42, tail: 0.9,
-      sampleFile: 'l96_shot.mp3', variation: { pitch: 0.025, volume: 0.05 },
-    },
+  l96: L96_DEFINITION,
+
+  /**
+   * USMC M40A5: the L96's damage, ballistics, handling, magazine, reload and
+   * audio (shot and bolt) in a McMillan A5 stock over a Remington 700
+   * action, whose smoother bolt cycles a little faster.
+   */
+  m40: {
+    ...L96_DEFINITION,
+    id: 'm40',
+    name: 'M40',
+    rpm: 72,
+    boltCycleTime: 0.58,
     view: {
-      // No GLB: dedicated L96A1 builder (see L96ViewModel.ts).
-      frame: 'l96',
-      hip: [0.16, -0.185, -0.33],
-      ads: [0, 0, -0.32],
-      sway: 1.1,
-      bob: 0.9,
-      visualRecoil: { kickImpulse: 1.1, pitchImpulse: 3.2, rollImpulse: 1.0, stiffness: 110, damping: 15 },
-      scale: 1,
-      // Parkerized action/barrel + Accuracy International olive-green stock.
-      bodyColor: 0x1d2023,
-      accentColor: 0x4f5834,
-      barrelLength: 0.63,
-      barrelRadius: 0.0125,
-      receiverLength: 0.256,
-      stockLength: 0.28,
-      magazine: 'box',
-      optic: 'scope',
-      sightHeight: 0.062,
-      bulk: 1.1,
-      // The thumb of the shooting hand passes through the thumbhole.
-      hands: {
-        right: {
-          position: [0, -0.098, 0.075], axis: [0, 1, -0.035], palm: [-1, -0.1, 0], pose: 'rifleGrip',
-          hold: { size: [0.055, 0.058], axis: [0, 0.97, -0.242] }, trigger: [0, -0.066, -0.002],
-        },
-        left: {
-          position: [0, -0.0295, -0.28], axis: [-0.375, -0.167, -0.912], palm: [-0.53, 0.846, 0.063], pose: 'supportHandguard',
-          hold: { size: [0.055, 0.043], axis: [0, 0, -1] },
-        },
-        action: { position: [0.05, -0.014, 0.055], axis: [0, 1, 0], palm: [-1, 0.3, 0], pose: 'boltPinch' },
-        // Cupped under the short box magazine.
-        magazine: {
-          position: [0, -0.0065, 0.002], axis: [0, 0, -1], palm: [-0.45, 0.89, 0], pose: 'supportHandguard',
-          hold: { size: [0.033, 0.097], axis: [0, 0, 1] },
-        },
-      },
-      reloadAnim: {
-        style: 'bolt',
-        magOut: 0.1,
-        magDrop: 0.28,
-        magIn: 0.44,
-        magSeat: 0.68,
-        charge: 0.76,
-        chargeEnd: 0.97,
-        // The long rifle swings out across the screen, left flank to the eye,
-        // for the magazine swap, then goes back on the shoulder for the bolt.
-        swapPose: { shift: [-0.07, 0.05, -0.24], yaw: 0.5, roll: -0.24, tilt: -0.08 },
-        rackPose: { shift: [-0.02, 0.03, 0], yaw: -0.1, roll: 0.22, tilt: -0.1 },
-        magSize: [0.028, 0.09, 0.07],
-        // Blued steel 5-round detachable box magazine.
-        magColor: 0x17191b,
-      },
+      ...L96_DEFINITION.view,
+      // No GLB: dedicated M40A5 builder (see M40ViewModel.ts).
+      frame: 'm40',
+      // Matte black action and barrel + OD green McMillan A5 stock.
+      bodyColor: 0x16181a,
+      accentColor: 0x5e6646,
+      barrelLength: 0.635,
+      receiverLength: 0.228,
+      stockLength: 0.27,
     },
   },
 
@@ -1281,7 +1315,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
 };
 
-export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm14', 'm60', 'l96', 'barrett', 'm1911', 'fakel'];
+export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm14', 'm60', 'l96', 'm40', 'barrett', 'm1911', 'fakel'];
 
 /**
  * Zombies PRELOADS every weapon it can ever hand out — the M1911 starting
@@ -1303,6 +1337,7 @@ export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [
   'm14',
   'm60',
   'l96',
+  'm40',
   'barrett',
   'vortex9',
   'tesla',

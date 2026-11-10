@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { grenadeCookDial, grenadeIcon } from '../src/ui/GrenadeHudPresentation';
+import { grenadeCookDial, grenadeIcon, lethalPouchIcons } from '../src/ui/GrenadeHudPresentation';
 
 describe('grenade HUD presentation', () => {
   it('empties the cooking dial with the fuse and warns in the last second', () => {
@@ -14,6 +14,16 @@ describe('grenade HUD presentation', () => {
     expect(grenadeIcon(true)).toContain('class="lethal-pip full"');
     expect(grenadeIcon(false)).toContain('class="lethal-pip"');
     expect(grenadeIcon(true)).toContain('f1-groove');
+  });
+
+  it('marks only the grenades just recovered so the pouch can animate them', () => {
+    const gained = (html: string): number => html.split('lethal-pip full gained').length - 1;
+    expect(gained(lethalPouchIcons(3, 4, 2))).toBe(1);
+    expect(lethalPouchIcons(3, 4, 2).indexOf('gained')).toBeGreaterThan(lethalPouchIcons(3, 4, 2).indexOf('full'));
+    expect(gained(lethalPouchIcons(4, 4, 1))).toBe(3);
+    expect(gained(lethalPouchIcons(1, 4, 2))).toBe(0);
+    expect(gained(lethalPouchIcons(2, 4, null))).toBe(0);
+    expect(lethalPouchIcons(2, 4, null).split('<svg').length - 1).toBe(4);
   });
 
   it('no longer shows the fire mode row and has the dial around the crosshair', () => {

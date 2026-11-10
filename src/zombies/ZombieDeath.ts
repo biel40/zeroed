@@ -20,6 +20,7 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   knife: 'slash',
   m1911: 'knockback',
   l96: 'knockback',
+  m40: 'knockback',
   m14: 'knockback',
   barrett: 'shatter',
   m4a1: 'riddled',

@@ -57,7 +57,7 @@ describe('SpringRecoil', () => {
     const m60 = peakPitchAfter(WEAPON_DEFINITIONS.m60.view.visualRecoil);
     const l96 = peakPitchAfter(WEAPON_DEFINITIONS.l96.view.visualRecoil);
     expect(m60).toBeGreaterThan(m4);
-    expect(l96).toBeGreaterThan(m60);
+    expect(l96).toBeGreaterThan(2 * m60);
     // Sanity: everything stays within readable viewmodel angles (< ~20°).
     expect(l96).toBeLessThan(0.35);
   });

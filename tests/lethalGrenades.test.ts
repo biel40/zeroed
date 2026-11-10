@@ -25,9 +25,11 @@ function launch(walls: GibWallFrame, aim = new THREE.Vector3(0, 0, 1)): GrenadeF
 }
 
 describe('lethal grenade stock', () => {
-  it('starts with two, gains two per round and never carries more than four', () => {
+  it('starts with two, gains at most one per round and never carries more than four', () => {
     const stock = new LethalGrenadeStock(LETHAL_GRENADE_LOADOUT);
     expect(stock.count).toBe(2);
+    stock.grantRound();
+    expect(stock.count).toBe(3);
     stock.grantRound();
     expect(stock.count).toBe(4);
     stock.grantRound();

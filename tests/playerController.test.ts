@@ -108,15 +108,18 @@ describe('PlayerController jump action', () => {
 });
 
 describe('PlayerController heavy-rifle shot push', () => {
-  it('rocks the standing player several centimetres straight back from the view', () => {
+  it.each([
+    ['l96', 0.07, 0.10],
+    ['barrett', 0.05, 0.15],
+  ] as const)('rocks the standing player straight back when firing the %s', (id, min, max) => {
     const player = new PlayerController(1);
     const start = player.rig.position.clone();
-    player.applyShotPush(WEAPON_DEFINITIONS.barrett.recoil.playerPush!);
+    player.applyShotPush(WEAPON_DEFINITIONS[id].recoil.playerPush ?? 0);
     step(player, inputStub(new Set()), 1);
     // Facing -z at yaw 0, so "back" is +z.
     const moved = player.rig.position.z - start.z;
-    expect(moved).toBeGreaterThan(0.05);
-    expect(moved).toBeLessThan(0.15);
+    expect(moved).toBeGreaterThan(min);
+    expect(moved).toBeLessThan(max);
     expect(player.rig.position.x).toBeCloseTo(start.x, 6);
   });
 });

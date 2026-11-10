@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AK47_PROFILE, ak47MagazineFloorplate, ak47MagazineOutline } from '../../weapons/AK47ViewModel';
 import { L96_PROFILE } from '../../weapons/L96ViewModel';
 import { M14_PROFILE } from '../../weapons/M14ViewModel';
+import { M40_PROFILE } from '../../weapons/M40ViewModel';
 import { M60_PROFILE, m60BipodLeg, m60FrontSight, m60HeatShieldSlots, m60LeafTop } from '../../weapons/M60ViewModel';
 import { MP5_PROFILE } from '../../weapons/MP5ViewModel';
 import { PPSH41_PROFILE, ppsh41ShroudSlots } from '../../weapons/PPSH41ViewModel';
@@ -48,6 +49,9 @@ export class WallBuyView {
     } else if (definition.id === 'l96') {
       this.buildL96Silhouette(view.sightHeight);
       this.group.userData.silhouette = 'l96';
+    } else if (definition.id === 'm40') {
+      this.buildM40Silhouette(view.sightHeight);
+      this.group.userData.silhouette = 'm40';
     } else if (definition.id === 'm60') {
       this.buildM60Silhouette(view.sightHeight);
       this.group.userData.silhouette = 'm60';
@@ -468,6 +472,65 @@ export class WallBuyView {
     const bipod = L96_PROFILE.bipod;
     this.addShape(rect(bipod.mountZ + 0.017, bipod.mountZ - 0.017, -0.044, -0.066), 'l96-wall-bipod');
     this.addShape(rect(bipod.mountZ, bipod.footZ, bipod.legY + 0.006, bipod.legY - 0.006), 'l96-wall-bipod');
+  }
+
+  /**
+   * M40A5 profile traced from the same M40_PROFILE as the view model: A5
+   * stock with its cheek piece and pad, trigger guard, round action and
+   * rail, long barrel, 50 mm scope, bolt knob, box magazine and folded
+   * bipod. +X points toward the muzzle.
+   */
+  private buildM40Silhouette(sightHeight: number): void {
+    const scale = 1.45;
+    const toWall = ([z, y]: readonly [number, number]): THREE.Vector2 =>
+      new THREE.Vector2(-(z + 0.21) * scale, (y + 0.03) * scale);
+    const outline = (points: ReadonlyArray<readonly [number, number]>): THREE.Shape => new THREE.Shape(points.map(toWall));
+    const rect = (rearZ: number, frontZ: number, topY: number, bottomY: number): THREE.Shape =>
+      outline([[rearZ, topY], [frontZ, topY], [frontZ, bottomY], [rearZ, bottomY]]);
+    const profile = M40_PROFILE;
+
+    this.addShape(outline(profile.stock), 'm40-wall-stock');
+    this.addShape(outline(profile.cheekPiece), 'm40-wall-cheek-piece');
+    const butt = profile.butt;
+    this.addShape(rect(butt.padZ + 0.01, butt.spacerZ - 0.006, butt.centerY + butt.height / 2, butt.centerY - butt.height / 2), 'm40-wall-buttpad');
+    const guard = outline(profile.triggerGuard.outline);
+    const opening = profile.triggerGuard.opening;
+    const center = toWall([opening.z, opening.y]);
+    const hole = new THREE.Path();
+    hole.absellipse(center.x, center.y, opening.radiusZ * scale, opening.radiusY * scale, 0, Math.PI * 2, true);
+    guard.holes.push(hole);
+    this.addShape(guard, 'm40-wall-trigger-guard');
+
+    const receiver = profile.receiver;
+    this.addShape(rect(receiver.rearZ, receiver.frontZ, receiver.railTop, -receiver.radius), 'm40-wall-receiver');
+    const barrel = profile.barrel;
+    this.addShape(outline([
+      [barrel.rearZ, barrel.rearRadius], [barrel.muzzleZ, barrel.muzzleRadius],
+      [barrel.muzzleZ, -barrel.muzzleRadius], [barrel.rearZ, -barrel.rearRadius],
+    ]), 'm40-wall-barrel');
+
+    const scope = profile.scope;
+    this.addShape(outline([
+      ...scope.map(([radius, z]) => [z, sightHeight + radius] as const),
+      ...[...scope].reverse().map(([radius, z]) => [z, sightHeight - radius] as const),
+    ]), 'm40-wall-scope');
+    const turretZ = profile.turretZ;
+    this.addShape(rect(turretZ + 0.0155, turretZ - 0.0155, sightHeight + 0.051, sightHeight), 'm40-wall-turret');
+    for (const z of profile.ringZ) this.addShape(rect(z + 0.009, z - 0.009, sightHeight, receiver.railTop), 'm40-wall-scope-mount');
+
+    const knob = profile.boltKnob;
+    this.addShape(rect(0.13, receiver.rearZ, 0.0115, -0.0115), 'm40-wall-bolt-shroud');
+    this.addShape(outline([[0.065, 0.004], [knob.z, knob.y + 0.004], [knob.z, knob.y - 0.004], [0.065, -0.004]]), 'm40-wall-bolt-handle');
+    const knobCenter = toWall([knob.z, knob.y]);
+    const knobShape = new THREE.Shape();
+    knobShape.absarc(knobCenter.x, knobCenter.y, knob.radius * scale, 0, Math.PI * 2, false);
+    this.addShape(knobShape, 'm40-wall-bolt-knob');
+
+    const magazine = profile.magazine;
+    this.addShape(rect(magazine.z + magazine.depth / 2, magazine.z - magazine.depth / 2, -0.055, magazine.bottomY), 'm40-wall-magazine');
+    const bipod = profile.bipod;
+    this.addShape(rect(bipod.mountZ + 0.015, bipod.mountZ - 0.015, -0.046, -0.07), 'm40-wall-bipod');
+    this.addShape(rect(bipod.mountZ, bipod.footZ, bipod.legY + 0.006, bipod.legY - 0.006), 'm40-wall-bipod');
   }
 
   /**

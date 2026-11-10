@@ -119,5 +119,5 @@ export const GRENADE_DEFINITIONS: Readonly<Record<LethalGrenadeId, GrenadeDefini
 /** The lethal every Zombies run starts with. */
 export const STARTING_LETHAL_GRENADE: LethalGrenadeId = 'f1';
 
-/** As in the classic rounds: two to start, two more every new round, four at most. */
-export const LETHAL_GRENADE_LOADOUT: LethalGrenadeLoadout = { starting: 2, perRound: 2, max: 4 };
+/** Two to start, at most one more every new round, four at most. */
+export const LETHAL_GRENADE_LOADOUT: LethalGrenadeLoadout = { starting: 2, perRound: 1, max: 4 };

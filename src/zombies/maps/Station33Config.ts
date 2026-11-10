@@ -505,6 +505,18 @@ export const STATION33_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     yaw: 0,
     floor: 0,
   },
+  {
+    // The workshop's west wall, an outer wall, between the tool board over
+    // the bench and the corner by the substation door; the machine room's
+    // switch behind the south wall stays out of its reach.
+    id: 'taller-m40',
+    weaponId: 'm40',
+    price: 2000,
+    ammoPrice: 1000,
+    position: { x: TALLER.hall.minX + 0.02, y: 1.45, z: -49.0 },
+    yaw: Math.PI / 2,
+    floor: 0,
+  },
 ];
 
 /** The F-1 refill on the vestibule's east wall, between the civil-defence sign and the south vent. */

@@ -26,6 +26,7 @@ import {
   MANSION_BOX_ROOM,
   MANSION_DOOR_COSTS,
   MANSION_EAST_WALL_X,
+  MANSION_WINDOW_OPENING,
   MANSION_GROUND_BOUNDS,
   MANSION_PLAYER_SPAWN,
   MANSION_RESURRECTION_LOCKER,
@@ -659,8 +660,8 @@ describe('Burned Mansion topology', () => {
 
   it('places each standard wall buy in its intended progression zone', () => {
     const arena = makeArena();
-    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'm14', 'ak47', 'vector', 'm4a1', 'm60']);
-    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 800, 1750, 1200, 1500, 2500]);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.weaponId)).toEqual(['m1911', 'm14', 'ak47', 'vector', 'm40', 'm4a1', 'm60']);
+    expect(MANSION_WALL_BUYS.map((buy) => buy.price)).toEqual([500, 800, 1750, 1200, 2000, 1500, 2500]);
     expect(MANSION_WALL_BUYS.every((buy) => buy.ammoPrice > 0)).toBe(true);
     expect(MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm1911')!.position.z).toBeGreaterThan(2);
     // The M14 shares the starting-room wall without overlapping the pistol or the paid door.
@@ -682,8 +683,16 @@ describe('Burned Mansion topology', () => {
     expect(m4a1.position.x - 0.35).toBeGreaterThan(2.2);
     expect(MANSION_BUNKER_DIVIDER_X).toBe(4.2);
     expect(MANSION_EAST_WALL_X - MANSION_BUNKER_DIVIDER_X).toBeCloseTo(4.95);
-    expect(arena.wallBuys).toHaveLength(6);
-    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(6);
+    // The M40 shares the banquet hall, on its outer north wall between the sideboard portrait and the east window.
+    const m40 = MANSION_WALL_BUYS.find((buy) => buy.weaponId === 'm40')!;
+    expect(m40.floor).toBe(0);
+    expect(m40.position.z).toBeCloseTo(MANSION_BANQUET_HALL.northZ + 0.17);
+    const portraitEdge = MANSION_BANQUET_HALL.sideboard.x + 0.95 / 2;
+    const eastWindow = MANSION_BARRIERS.find((barrier) => barrier.id === 'banquet-north-east')!;
+    expect(m40.position.x - 0.85).toBeGreaterThan(portraitEdge + 0.3);
+    expect(m40.position.x + 0.85).toBeLessThan(eastWindow.x - MANSION_WINDOW_OPENING.width / 2 - 0.3);
+    expect(arena.wallBuys).toHaveLength(7);
+    expect(arena.group.children.filter((child) => child.userData.mapRole === 'wall-buy')).toHaveLength(7);
   });
 
   it('mounts the bunker M60 on a visible wall reachable from the stairs', () => {

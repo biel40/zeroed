@@ -133,12 +133,12 @@ describe('lethal grenades in a Zombies run', () => {
     expect(mode.onLethalThrow()).toBe(false);
   });
 
-  it('a new round tops the pouch up and a restart brings back the starting two with nothing live', () => {
+  it('a new round gives back a single grenade and a restart brings back the starting two with nothing live', () => {
     const { mode, internals } = startRun();
     mode.onLethalThrow();
     advance(internals.grenades, GRENADE_THROW_DURATION);
     internals.grenades.grantRound();
-    expect(internals.grenades.hand.count).toBe(LETHAL_GRENADE_LOADOUT.max - 1);
+    expect(internals.grenades.hand.count).toBe(LETHAL_GRENADE_LOADOUT.starting);
     mode.onRestartRequested();
     expect(internals.grenades.hand.count).toBe(LETHAL_GRENADE_LOADOUT.starting);
     expect(internals.grenades.blasts.liveCount).toBe(0);

@@ -557,6 +557,31 @@ describe('AudioSystem sampled effects', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    ['l96', 0.085],
+    ['barrett', 0],
+  ] as const)('starts the %s sample at the expected offset for local and remote shots', (id, offset) => {
+    const config = WEAPON_DEFINITIONS[id].audio;
+    const audio = new AudioSystem() as any;
+    const start = vi.fn();
+    const currentTime = 2;
+    vi.spyOn(audio, 'context').mockReturnValue({
+      ctx: {
+        currentTime,
+        createBufferSource: () => ({ playbackRate: { value: 1 }, connect: vi.fn(), start }),
+        createGain: () => ({ gain: { value: 0 }, connect: vi.fn() }),
+      },
+      master: {},
+    });
+    vi.spyOn(audio, 'spatialBus').mockReturnValue({});
+    audio.optionalSamples.set(config.sampleFile, {});
+
+    audio.playShot(config);
+    audio.playRemoteShot(config, { pan: 0.5, attenuation: 0.8, muffle: 0 });
+
+    expect(start.mock.calls).toEqual([[currentTime, offset], [currentTime, offset]]);
+  });
+
   it('loads and plays the mystery-box and dry-fire MP3 assets', async () => {
     const starts: Array<{ source: string; buffer: AudioBuffer | null }> = [];
 

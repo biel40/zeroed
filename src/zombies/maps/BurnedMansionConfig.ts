@@ -417,6 +417,17 @@ export const MANSION_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     floor: 0,
   },
   {
+    // Banquet hall north (outer) wall, between the portrait over the
+    // sideboard and the east window, facing the long table.
+    id: 'banquet-m40',
+    weaponId: 'm40',
+    price: 2000,
+    ammoPrice: 1000,
+    position: { x: 0.3, y: 1.45, z: MANSION_BANQUET_HALL.northZ + 0.17 },
+    yaw: 0,
+    floor: 0,
+  },
+  {
     id: 'east-hall-m4a1',
     weaponId: 'm4a1',
     price: 1500,

@@ -32,6 +32,7 @@ describe('zombie death style resolution', () => {
     ['knife', false, 'slash'],
     ['m1911', false, 'knockback'],
     ['l96', false, 'knockback'],
+    ['m40', false, 'knockback'],
     ['m14', false, 'knockback'],
     ['m4a1', false, 'riddled'],
     ['ppsh41', false, 'riddled'],

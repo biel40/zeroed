@@ -167,7 +167,7 @@ autenticación ni cifrado adicional. No se guardan cuentas ni partidas.
 - Granadas: cada jugador lanza y cocina las suyas en local y envía el
   lanzamiento (`grenadeThrow`: origen, punteria, espoleta restante y suelo);
   ambos clientes simulan el mismo vuelo con los mismos solidos. El anfitrion
-  lleva la cuenta de la bolsa del invitado (2 al empezar, +2 por ronda, 4 como
+  lleva la cuenta de la bolsa del invitado (2 al empezar, +1 por ronda, 4 como
   maximo, se repone al reaparecer) y solo reproduce un lanzamiento que sale de
   sus ojos y con granada disponible. Resuelve cada explosion en su
   simulacion: bajas, puntos y tullidos son de quien la lanzo y solo hiere a

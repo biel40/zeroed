@@ -1,6 +1,6 @@
 import type { ShotVariation } from '../audio/ShotVariation';
 
-export type WeaponId = 'm4a1' | 'ak47' | 'm14' | 'm60' | 'l96' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+export type WeaponId = 'm4a1' | 'ak47' | 'm14' | 'm60' | 'l96' | 'm40' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -101,7 +101,8 @@ export interface MuzzleSmokeConfig {
 export interface MuzzleFlashConfig {
   readonly length: number;
   readonly width: number;
-  readonly sideLength: number;
+  /** Lateral flame length for a muzzle brake. */
+  readonly sideLength?: number;
   readonly coreScale: number;
   readonly duration: number;
   readonly lightIntensity: number;
@@ -156,6 +157,8 @@ export interface WeaponAudioConfig {
   readonly sampleFile?: string;
   /** Overrides the default clip in automatic mode. Still contains only one shot. */
   readonly autoSampleFile?: string;
+  /** Seconds of lead-in to skip in the recorded shot. Defaults to zero. */
+  readonly sampleOffset?: number;
   /** Optional subtle pitch and gain jitter per sampled shot. */
   readonly variation?: ShotVariation;
   /**
@@ -398,7 +401,8 @@ export interface ViewModelConfig {
    * 'lmg' uses the dedicated M60 builder (belt pouch, feed cover, bipod);
    * 'ak47' uses the dedicated Type-3 AK builder (milled receiver, lacquered
    * wood, gas tube, curved magazine); 'l96' uses the dedicated L96A1 builder (thumbhole
-   * stock, scope, liftable bolt); 'mp5' uses the MP5A3 builder (drum sight,
+   * stock, scope, liftable bolt); 'm40' uses the M40A5 builder (McMillan A5 stock with a raised
+   * cheek piece, round Remington 700 action, long 50 mm scope); 'mp5' uses the MP5A3 builder (drum sight,
    * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
    * ("Super V" lower, full rail, folding sights); 'ppsh41' uses the wooden
    * stock, perforated jacket and drum-fed PPSh-41; 'barrett' builds the heavy
@@ -407,7 +411,7 @@ export interface ViewModelConfig {
    * ФАКЕЛ-33 flamethrower (caged red core crystal, fuel tank, petal nozzle); 'm14' builds the
    * walnut-stocked M14 (open-top receiver, right-side operating rod, aperture sight). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'm14' | 'l96' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'm14' | 'l96' | 'm40' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */

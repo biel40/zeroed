@@ -65,7 +65,9 @@ describe('AK-47 samples by fire mode', () => {
     audio.playRemoteShot(config, cue, 'auto');
 
     expect(optionalSample).toHaveBeenCalledWith('ak47_auto_shot.wav');
-    expect(playSample).toHaveBeenCalledExactlyOnceWith(parts, automatic, expect.any(Number), 0, bus, expect.any(Number));
+    expect(playSample).toHaveBeenCalledExactlyOnceWith(
+      parts, automatic, expect.any(Number), 0, bus, expect.any(Number), undefined,
+    );
     expect(playReport).toHaveBeenCalledExactlyOnceWith(parts, config, expect.any(Number), bus);
   });
 });

@@ -2211,10 +2211,6 @@ export class AudioSystem {
   }
 
   /**
-   * `lead` starts the sample slightly in the past to compensate for browser
-   * scheduling latency, so it lands on the moment the player pressed USE.
-   */
-  /**
    * A decoded gunshot recording: a fresh one-shot source per trigger pull,
    * so rapid fire overlaps the earlier tails instead of cutting them.
    */
@@ -2226,9 +2222,10 @@ export class AudioSystem {
     output: AudioNode,
   ): void {
     const gain = volume * shotGainScale(config.variation);
-    this.playSample(audio, sample, gain, 0, output, shotPlaybackRate(config.variation));
+    this.playSample(audio, sample, gain, 0, output, shotPlaybackRate(config.variation), config.sampleOffset);
   }
 
+  /** `lead` adjusts scheduling time. `offset` skips into the clip. */
   private playSample(
     audio: AudioContextParts,
     buffer: AudioBuffer,
@@ -2236,6 +2233,7 @@ export class AudioSystem {
     lead: number = 0,
     output: AudioNode = audio.master,
     playbackRate: number = 1,
+    offset: number = 0,
   ): void {
     const source: AudioBufferSourceNode = audio.ctx.createBufferSource();
     const gain: GainNode = audio.ctx.createGain();
@@ -2244,7 +2242,7 @@ export class AudioSystem {
     gain.gain.value = volume;
     source.connect(gain);
     gain.connect(output);
-    source.start(Math.max(0, audio.ctx.currentTime - lead));
+    source.start(Math.max(0, audio.ctx.currentTime - lead), offset);
   }
 
   /** One context per run: master and ambience buses, the shared noise buffer and any pending bed. */

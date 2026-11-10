@@ -202,6 +202,7 @@ export const ZOMBIES_RESERVE_AMMO: Readonly<Record<string, number>> = {
   m14: 64,
   m60: 500,
   l96: 60,
+  m40: 60,
   barrett: 40,
   vortex9: 160,
 };
