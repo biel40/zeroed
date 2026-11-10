@@ -1,4 +1,5 @@
-export const QUALITY_LEVELS = ['low', 'medium', 'high'] as const;
+/** Ultra is opt-in: never detected, and offered only where High is (see `getAvailableQualityLevels`). */
+export const QUALITY_LEVELS = ['low', 'medium', 'high', 'ultra'] as const;
 export type QualityLevel = (typeof QUALITY_LEVELS)[number];
 
 export interface DeviceProfile {
@@ -21,10 +22,16 @@ type DeviceNavigator = Partial<Navigator> & {
 
 type QualitySettings = Pick<DeviceProfile, 'pixelRatioLimit' | 'shadowQuality' | 'useReducedEffects' | 'anisotropyLimit'>;
 
+type DetectedDevice = Pick<DeviceProfile, 'isMobile' | 'isTouch' | 'isLowMemory' | 'useTouchControls'> & {
+  readonly detectedQuality: Exclude<QualityLevel, 'ultra'>;
+};
+
 const QUALITY_SETTINGS: Record<QualityLevel, QualitySettings> = {
   low: { pixelRatioLimit: 1, shadowQuality: 0, useReducedEffects: true, anisotropyLimit: 2 },
   medium: { pixelRatioLimit: 1.5, shadowQuality: 1, useReducedEffects: true, anisotropyLimit: 2 },
   high: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8 },
+  // Ultra renders like High; maps spend its headroom on extra lights and effects.
+  ultra: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8 },
 };
 
 const QUALITY_STORAGE_KEY = 'zeroed.quality';
@@ -49,10 +56,33 @@ export function setQualityPreference(quality: QualityLevel): void {
   } catch { /* The choice still applies to this session. */ }
 }
 
+/** Tiers the settings offer on this device: Ultra only where High is detected. */
+export function getAvailableQualityLevels(
+  navigatorLike: DeviceNavigator = navigator as DeviceNavigator,
+): readonly QualityLevel[] {
+  return detectDevice(navigatorLike).detectedQuality === 'high'
+    ? QUALITY_LEVELS
+    : QUALITY_LEVELS.filter((level) => level !== 'ultra');
+}
+
 export function getDeviceProfile(
   navigatorLike: DeviceNavigator = navigator as DeviceNavigator,
   preferredQuality: QualityLevel | null = null,
 ): DeviceProfile {
+  const { detectedQuality, ...device } = detectDevice(navigatorLike);
+  // A saved Ultra choice never reaches a device that is not offered it.
+  const quality = preferredQuality === 'ultra' && detectedQuality !== 'high'
+    ? 'high'
+    : preferredQuality ?? detectedQuality;
+
+  return {
+    ...device,
+    quality,
+    ...QUALITY_SETTINGS[quality],
+  };
+}
+
+function detectDevice(navigatorLike: DeviceNavigator): DetectedDevice {
   const userAgent = navigatorLike.userAgent ?? '';
   const touchPoints = navigatorLike.maxTouchPoints ?? 0;
   const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(userAgent);
@@ -70,17 +100,8 @@ export function getDeviceProfile(
   const hardwareConcurrency = navigatorLike.hardwareConcurrency ?? 8;
   const isLowMemory = deviceMemory <= 6 || hardwareConcurrency <= 4;
   const isTouch = touchPoints > 0 || coarsePointer;
-  const detectedQuality: QualityLevel = isMobile && isLowMemory
+  const detectedQuality = isMobile && isLowMemory
     ? 'low'
     : isMobile || isLowMemory || reducedMotion ? 'medium' : 'high';
-  const quality = preferredQuality ?? detectedQuality;
-
-  return {
-    isMobile,
-    isTouch,
-    isLowMemory,
-    quality,
-    ...QUALITY_SETTINGS[quality],
-    useTouchControls,
-  };
+  return { isMobile, isTouch, isLowMemory, useTouchControls, detectedQuality };
 }

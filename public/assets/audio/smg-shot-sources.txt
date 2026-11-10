@@ -1,0 +1,23 @@
+MP5
+
+«Healthcare Soldier Shoots with MP5 and M11 in PSD postures»
+Pierre-Etienne Courtejoie, U.S. Army. Public domain.
+https://www.dvidshub.net/video/400111/healthcare-soldier-shoots-with-mp5-and-m11-psd-postures
+
+Both MP5 clips use one report from the MP5 take starting at 251.162 s.
+The automatic edit fades earlier to fit between shots.
+
+DVIDS reuse notice
+https://www.dvidshub.net/about/copyright
+“The appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.”
+
+PPSh-41
+
+The Free Firearm Sound Library by Ben Jaszczak and the recording team.
+https://opengameart.org/content/the-free-firearm-sound-library
+CC0 1.0 Universal. https://creativecommons.org/publicdomain/zero/1.0/
+
+The semi-automatic clip uses one report from P_30P.wav at 4.3855 s.
+The automatic clip uses one report from P_32P.wav at 0.8880 s.
+
+The game clips are cropped, filtered, level-matched and faded to mono PCM WAV.

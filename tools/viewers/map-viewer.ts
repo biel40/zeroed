@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { isZombieMapId, ZOMBIE_MAPS } from '../../src/config/zombieMaps';
-import { getDeviceProfile } from '../../src/core/DeviceProfile';
+import { getDeviceProfile, isQualityLevel } from '../../src/core/DeviceProfile';
 import type { ZombieArena } from '../../src/zombies/maps/ZombieArena';
 
 /**
@@ -11,14 +11,15 @@ import type { ZombieArena } from '../../src/zombies/maps/ZombieArena';
  * playing up to it. The arena keeps animating (flicker, dust, drips).
  *
  *   /tools/viewers/map-viewer.html?map=station-33&cam=11,1.7,-3&look=11,1.6,-20
- *   &quality=low|medium|high picks the device tier; &doors=0 keeps doors shut;
+ *   &quality=low|medium|high|ultra picks the device tier; &doors=0 keeps doors shut;
  *   &power=1 throws the map's main switch (when it has one).
  */
 
 const params = new URLSearchParams(location.search);
 const requested = params.get('map');
 const mapId = isZombieMapId(requested) ? requested : 'station-33';
-const quality = (['low', 'medium', 'high'] as const).find((level) => level === params.get('quality')) ?? 'high';
+const requestedQuality = params.get('quality');
+const quality = isQualityLevel(requestedQuality) ? requestedQuality : 'high';
 
 function vectorParam(key: string, fallback: readonly number[]): THREE.Vector3 {
   const parts = (params.get(key) ?? '').split(',').map(Number);
@@ -60,7 +61,7 @@ if (params.get('power') === '1') arena.powerSwitch?.activate();
 for (let step = 0; step < 150; step++) arena.update(1 / 30, camera.position);
 
 const status = document.getElementById('status')!;
-status.textContent = `${mapId} · ${quality} · cam ${camera.position.toArray().map((value) => value.toFixed(1)).join(',')}`;
+status.textContent = `${mapId} · ${profile.quality} · cam ${camera.position.toArray().map((value) => value.toFixed(1)).join(',')}`;
 
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {

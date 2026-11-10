@@ -489,13 +489,21 @@ export class HUD {
     this.betaThanks.show(email, onClose);
   }
 
-  /** Settings quality buttons (main menu only); the choice applies from the next match. */
-  public setQualitySelect(current: QualityLevel, onSelect: (quality: QualityLevel) => void): void {
+  /**
+   * Settings quality buttons (main menu only), showing only the tiers this
+   * device is offered; the choice applies from the next match.
+   */
+  public setQualitySelect(
+    current: QualityLevel,
+    available: readonly QualityLevel[],
+    onSelect: (quality: QualityLevel) => void,
+  ): void {
     const buttons = mustGet('quality-select').querySelectorAll<HTMLButtonElement>('[data-quality]');
     const sync = (selected: QualityLevel): void => {
       for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.quality === selected));
     };
     for (const button of buttons) {
+      button.hidden = !available.some((level) => level === button.dataset.quality);
       button.onclick = () => {
         if (!isQualityLevel(button.dataset.quality)) return;
         sync(button.dataset.quality);

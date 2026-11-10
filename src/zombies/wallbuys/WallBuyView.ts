@@ -476,8 +476,8 @@ export class WallBuyView {
 
   /**
    * M40A5 profile traced from the same M40_PROFILE as the view model: A5
-   * stock with its cheek piece and pad, trigger guard, round action and
-   * rail, long barrel, 50 mm scope, bolt knob, box magazine and folded
+   * stock with its cheek-piece block and spacer stack, trigger guard, round
+   * action and rail, long barrel, 56 mm scope with its high turret, bolt knob, box magazine and folded
    * bipod. +X points toward the muzzle.
    */
   private buildM40Silhouette(sightHeight: number): void {
@@ -492,7 +492,7 @@ export class WallBuyView {
     this.addShape(outline(profile.stock), 'm40-wall-stock');
     this.addShape(outline(profile.cheekPiece), 'm40-wall-cheek-piece');
     const butt = profile.butt;
-    this.addShape(rect(butt.padZ + 0.01, butt.spacerZ - 0.006, butt.centerY + butt.height / 2, butt.centerY - butt.height / 2), 'm40-wall-buttpad');
+    this.addShape(rect(butt.shellZ + butt.spacerDepth + butt.padDepth, butt.shellZ, butt.centerY + butt.height / 2, butt.centerY - butt.height / 2), 'm40-wall-buttpad');
     const guard = outline(profile.triggerGuard.outline);
     const opening = profile.triggerGuard.opening;
     const center = toWall([opening.z, opening.y]);
@@ -514,8 +514,8 @@ export class WallBuyView {
       ...scope.map(([radius, z]) => [z, sightHeight + radius] as const),
       ...[...scope].reverse().map(([radius, z]) => [z, sightHeight - radius] as const),
     ]), 'm40-wall-scope');
-    const turretZ = profile.turretZ;
-    this.addShape(rect(turretZ + 0.0155, turretZ - 0.0155, sightHeight + 0.051, sightHeight), 'm40-wall-turret');
+    const turret = profile.turret;
+    this.addShape(rect(turret.z + 0.0195, turret.z - 0.0195, sightHeight + turret.elevationTop, sightHeight), 'm40-wall-turret');
     for (const z of profile.ringZ) this.addShape(rect(z + 0.009, z - 0.009, sightHeight, receiver.railTop), 'm40-wall-scope-mount');
 
     const knob = profile.boltKnob;

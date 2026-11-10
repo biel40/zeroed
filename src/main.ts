@@ -8,7 +8,13 @@ import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } f
 import { MusicManager } from './audio/MusicManager';
 import { canAccessZombieMap, COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
-import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
+import {
+  getAvailableQualityLevels,
+  getDeviceProfile,
+  getQualityPreference,
+  setQualityPreference,
+  type DeviceProfile,
+} from './core/DeviceProfile';
 import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
 import { getDesktopShell } from './platform/DesktopShell';
@@ -244,7 +250,7 @@ class ZeroedBoot {
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
       const desktop = getDesktopShell();
       if (desktop) this.hud.enableQuit(() => desktop.quit());
-      this.hud.setQualitySelect(this.profile.quality, (quality) => {
+      this.hud.setQualitySelect(this.profile.quality, getAvailableQualityLevels(), (quality) => {
         setQualityPreference(quality);
         this.profile = getDeviceProfile(undefined, quality);
       });

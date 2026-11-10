@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getDeviceProfile } from '../src/core/DeviceProfile';
+import { getAvailableQualityLevels, getDeviceProfile } from '../src/core/DeviceProfile';
 
 describe('Device profile compatibility', () => {
   it('reduces GPU cost automatically on mobile devices', () => {
@@ -76,6 +76,37 @@ describe('Device profile compatibility', () => {
     const highPhone = getDeviceProfile(phone, 'high');
     expect(highPhone.useReducedEffects).toBe(false);
     expect(highPhone.useTouchControls).toBe(true);
+  });
+
+  it('offers the opt-in Ultra tier only where High is detected, and never detects it', () => {
+    const desktop = {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      maxTouchPoints: 0,
+      hardwareConcurrency: 16,
+      deviceMemory: 16,
+      matchMedia: () => ({ matches: false }),
+    };
+    const modestDesktop = { ...desktop, hardwareConcurrency: 4 };
+    const phone = {
+      userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile',
+      maxTouchPoints: 5,
+      hardwareConcurrency: 8,
+      deviceMemory: 8,
+      matchMedia: (query: string) => ({ matches: query === '(pointer: coarse)' }),
+    };
+
+    expect(getDeviceProfile(desktop).quality).toBe('high');
+    expect(getAvailableQualityLevels(desktop)).toEqual(['low', 'medium', 'high', 'ultra']);
+    expect(getAvailableQualityLevels(modestDesktop)).toEqual(['low', 'medium', 'high']);
+    expect(getAvailableQualityLevels(phone)).toEqual(['low', 'medium', 'high']);
+
+    const ultra = getDeviceProfile(desktop, 'ultra');
+    expect(ultra.quality).toBe('ultra');
+    expect(ultra.useReducedEffects).toBe(false);
+    expect(ultra.pixelRatioLimit).toBeGreaterThanOrEqual(getDeviceProfile(desktop, 'high').pixelRatioLimit);
+    // A saved Ultra choice never reaches a device that is not offered it.
+    expect(getDeviceProfile(phone, 'ultra').quality).toBe('high');
+    expect(getDeviceProfile(modestDesktop, 'ultra').quality).toBe('high');
   });
 
   it('keeps mouse controls on a fine-pointer desktop with a touch screen', () => {

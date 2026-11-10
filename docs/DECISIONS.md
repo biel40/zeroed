@@ -53,7 +53,9 @@
   renderizar y los datos del mapa guardan claves, no frases. La eleccion se
   recuerda en `localStorage`; sin ella se usa el idioma del navegador.
 - **Calidad grafica por niveles y resolucion dinamica.** El jugador elige
-  Baja/Media/Alta en Ajustes, solo cuando lo abre desde el menu principal
+  Baja/Media/Alta en Ajustes (y Ultra, opcional y nunca detectada, solo en
+  equipos detectados como Alta: reserva los efectos mas caros sin
+  degradar al resto), solo cuando lo abre desde el menu principal
   (desde pausa esa fila se oculta); sin eleccion manda la deteccion del
   dispositivo. La resolucion se adapta sola al tiempo de frame dentro del
   limite de la calidad, sin tocar el numero de luces durante la partida para

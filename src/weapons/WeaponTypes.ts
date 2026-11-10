@@ -401,8 +401,8 @@ export interface ViewModelConfig {
    * 'lmg' uses the dedicated M60 builder (belt pouch, feed cover, bipod);
    * 'ak47' uses the dedicated Type-3 AK builder (milled receiver, lacquered
    * wood, gas tube, curved magazine); 'l96' uses the dedicated L96A1 builder (thumbhole
-   * stock, scope, liftable bolt); 'm40' uses the M40A5 builder (McMillan A5 stock with a raised
-   * cheek piece, round Remington 700 action, long 50 mm scope); 'mp5' uses the MP5A3 builder (drum sight,
+   * stock, scope, liftable bolt); 'm40' uses the M40A5 builder (speckled McMillan A5 stock with a grey
+   * cheek-piece block, round Remington 700 action, long 56 mm scope); 'mp5' uses the MP5A3 builder (drum sight,
    * cocking tube, retractable stock); 'vector' uses the KRISS Vector builder
    * ("Super V" lower, full rail, folding sights); 'ppsh41' uses the wooden
    * stock, perforated jacket and drum-fed PPSh-41; 'barrett' builds the heavy

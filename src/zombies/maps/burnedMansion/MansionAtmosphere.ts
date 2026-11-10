@@ -12,10 +12,10 @@ import {
 import { CHAR_EMBER_INTENSITY } from '../BurnedMansionMaterials';
 import type { MansionBuildContext } from './MansionBuildContext';
 
-const ASH_COUNT: Readonly<Record<QualityLevel, number>> = { low: 40, medium: 70, high: 110 };
-const EMBER_COUNT: Readonly<Record<QualityLevel, number>> = { low: 8, medium: 14, high: 22 };
-const SMOKE_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 3, medium: 5, high: 8 };
-const BUNKER_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 20, medium: 35, high: 50 };
+const ASH_COUNT: Readonly<Record<QualityLevel, number>> = { low: 40, medium: 70, high: 110, ultra: 260 };
+const EMBER_COUNT: Readonly<Record<QualityLevel, number>> = { low: 8, medium: 14, high: 22, ultra: 44 };
+const SMOKE_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 3, medium: 5, high: 8, ultra: 12 };
+const BUNKER_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 20, medium: 35, high: 50, ultra: 90 };
 
 /** Ground-floor air volume, inside the outer walls. */
 const HOUSE = { minX: -6.8, maxX: MANSION_EAST_WALL_X - 0.4, minZ: -7.8, maxZ: 9.8 } as const;
@@ -55,7 +55,7 @@ interface SmokePuff {
 }
 
 /** Soft round alpha spot shared by ash, embers, dust and smoke. */
-function makeSoftSpot(size: number): THREE.DataTexture {
+export function makeSoftSpot(size: number): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {

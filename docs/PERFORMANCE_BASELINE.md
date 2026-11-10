@@ -15,7 +15,7 @@ Ejecutar la sonda sin otros builds o pruebas en paralelo y repetir en el mismo e
 
 ### Escena y construcción
 
-La sonda de arenas usa los mapas del registro, los tres perfiles de calidad reales, una semilla fija por escenario y el observador en el spawn. Toma una muestra al inicio y otra con las puertas comprables desbloqueadas y sus animaciones avanzadas, antes de la evacuación y los finales. `buildMs` mide una construcción y `init`. `updateMs` promedia 120 llamadas al `update` de la arena tras 30 de calentamiento. `refreshMs` promedia 30 pares de `refreshColliders` y `refreshSpawnPoints`. Los dos promedios usan el estado desbloqueado. [Sonda de arenas](../tests/zombieArenaContract.test.ts)
+La sonda de arenas usa los mapas del registro, los cuatro perfiles de calidad reales, una semilla fija por escenario y el observador en el spawn. Toma una muestra al inicio y otra con las puertas comprables desbloqueadas y sus animaciones avanzadas, antes de la evacuación y los finales. `buildMs` mide una construcción y `init`. `updateMs` promedia 120 llamadas al `update` de la arena tras 30 de calentamiento. `refreshMs` promedia 30 pares de `refreshColliders` y `refreshSpawnPoints`. Los dos promedios usan el estado desbloqueado. [Sonda de arenas](../tests/zombieArenaContract.test.ts)
 
 El recuento abarca el grupo del mapa. «Elegible» exige visibilidad propia, de ancestros y de algún material, además de capa 0, antes del frustum. Los triángulos nominales de malla incluyen instancias y usan los índices o vértices completos. Los MiB de geometría suman atributos e índices por geometría única. Las llamadas y triángulos de `renderer.info` se recogen en la prueba manual. [Recuento](../tests/arenaMetrics.ts)
 
@@ -72,7 +72,7 @@ Quedan pendientes todas las trazas de navegador y Android, los FPS y percentiles
 
 ## Presupuestos provisionales
 
-Los techos automatizados usan ambos estados de puertas y los tres perfiles. Parten de los máximos medidos en cada arena y dejan margen de aproximadamente un 10–13 % para el contenido existente. El test es la fuente de esos valores. Si un mapa añade contenido a propósito, revisar el delta y el perfil manual antes de elevar su techo. [Presupuestos de regresión](../tests/zombieArenaContract.test.ts)
+Los techos automatizados usan ambos estados de puertas y los cuatro perfiles. Parten de los máximos medidos en cada arena y dejan margen de aproximadamente un 10–13 % para el contenido existente. El test es la fuente de esos valores. Si un mapa añade contenido a propósito, revisar el delta y el perfil manual antes de elevar su techo. [Presupuestos de regresión](../tests/zombieArenaContract.test.ts)
 
 | Presupuesto por partida | Escritorio / Android medio | Android bajo |
 | --- | ---: | ---: |

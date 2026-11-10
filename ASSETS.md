@@ -197,7 +197,12 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `m1911_shot.mp3` | Disparo de la M1911: mono, 44,1 kHz, 96 kbps, ~1,2 s con cola (con fallback procedural) |
+| `mp5_single_shot.wav`, `mp5_auto_shot.wav` | Disparo de MP5 grabado por Pierre-Etienne Courtejoie para el U.S. Army (dominio público) |
+| `ppsh41_single_shot.wav`, `ppsh41_auto_shot.wav` | Disparos de PPSh-41 de The Free Firearm Sound Library (CC0) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |
+
+Las fuentes, los cortes y las condiciones de reutilización de la MP5 y la
+PPSh-41 se distribuyen con el juego. [Créditos de los disparos](public/assets/audio/smg-shot-sources.txt).
 
 Los fondos ambientales, los eventos de mapa y los cues de fin de ronda son
 sintesis Web Audio propia, sin archivos. Cualquier evento ambiental admite un

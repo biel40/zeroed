@@ -328,3 +328,44 @@ export function woodGrainTexture(): THREE.CanvasTexture | null {
   }
   return woodGrain;
 }
+
+let mouldedWeb: THREE.CanvasTexture | null | undefined;
+
+/**
+ * Moulded fibreglass "web" finish of a McMillan stock, tinted by the
+ * material colour: a mottled field with dark strands and flecks of the
+ * second resin colour. Extrusion UVs are in metres; one tile covers 15 cm.
+ */
+export function mouldedWebTexture(): THREE.CanvasTexture | null {
+  if (mouldedWeb !== undefined) return mouldedWeb;
+  const random = seededRandom(1971);
+  mouldedWeb = canvasTexture(256, 256, (ctx) => {
+    ctx.fillStyle = '#f2f2ee';
+    ctx.fillRect(0, 0, 256, 256);
+    for (let blotch = 0; blotch < 60; blotch++) {
+      ctx.fillStyle = `rgba(70, 72, 60, ${0.04 + random() * 0.06})`;
+      ctx.fillRect(random() * 256, random() * 256, 10 + random() * 40, 8 + random() * 30);
+    }
+    // Strands: short chains of dark flecks wandering across the tile.
+    for (let strand = 0; strand < 90; strand++) {
+      let x = random() * 256;
+      let y = random() * 256;
+      const alpha = 0.35 + random() * 0.45;
+      for (let fleck = 0; fleck < 6 + random() * 10; fleck++) {
+        ctx.fillStyle = `rgba(22, 23, 20, ${alpha})`;
+        ctx.fillRect(x, y, 1 + random() * 2.5, 1 + random() * 2);
+        x += (random() - 0.5) * 7;
+        y += (random() - 0.5) * 7;
+      }
+    }
+    for (let fleck = 0; fleck < 500; fleck++) {
+      ctx.fillStyle = `rgba(30, 30, 26, ${0.2 + random() * 0.5})`;
+      ctx.fillRect(random() * 256, random() * 256, 0.8 + random() * 1.4, 0.8 + random() * 1.4);
+    }
+  });
+  if (mouldedWeb) {
+    mouldedWeb.colorSpace = THREE.SRGBColorSpace;
+    mouldedWeb.repeat.set(1 / 0.15, 1 / 0.15);
+  }
+  return mouldedWeb;
+}

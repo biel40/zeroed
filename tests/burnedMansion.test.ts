@@ -41,9 +41,11 @@ import {
   MANSION_SOUL_LAMPS,
   MANSION_SPECIAL_WEAPON_CASES,
   SOUL_LAMP_REQUIRED_SOULS,
+  MANSION_SMOULDERING_FIRES,
   MANSION_WALL_BUYS,
   isOutsideMansion,
 } from '../src/zombies/maps/BurnedMansionConfig';
+import { POINT_LIGHT_BUDGET } from '../src/zombies/maps/shared/PointLightBudget';
 import { BurnedMansionArena } from '../src/zombies/maps/BurnedMansionArena';
 import { STATION33_WEAPON_CHEST } from '../src/zombies/maps/Station33Config';
 import { RITUAL_SCARE_TIMELINE } from '../src/zombies/secret-room/SecretRoomSystem';
@@ -106,8 +108,18 @@ afterAll(() => {
   });
 });
 
-function makeArena(): BurnedMansionArena {
-  return new BurnedMansionArena(new THREE.Scene(), profile);
+function makeArena(arenaProfile: DeviceProfile = profile): BurnedMansionArena {
+  return new BurnedMansionArena(new THREE.Scene(), arenaProfile);
+}
+
+const ULTRA_PROFILE: DeviceProfile = { ...profile, quality: 'ultra' };
+
+function pointLightsOf(arena: BurnedMansionArena): THREE.PointLight[] {
+  const lights: THREE.PointLight[] = [];
+  arena.group.traverse((object) => {
+    if (object instanceof THREE.PointLight) lights.push(object);
+  });
+  return lights;
 }
 
 function canWalk(
@@ -2159,6 +2171,62 @@ describe('Burned Mansion topology', () => {
 
     for (let frame = 0; frame < 600; frame++) arena.update(1 / 60, stair);
     expect(pointLights.filter((light) => light.visible)).toEqual(active);
+  });
+
+  it('keeps its smouldering fires and their firelight for Ultra only', () => {
+    const high = makeArena();
+    expect(high.group.getObjectByName('mansion-fires')).toBeUndefined();
+    expect(pointLightsOf(high).some((light) => light.name.startsWith('mansion-firelight:'))).toBe(false);
+
+    const ultra = makeArena(ULTRA_PROFILE);
+    const fires = ultra.group.getObjectByName('mansion-fires');
+    expect(fires).toBeDefined();
+    for (const fire of MANSION_SMOULDERING_FIRES) {
+      expect(fires?.getObjectByName(`mansion-fire-flames:${fire.id}`)).toBeInstanceOf(THREE.Points);
+    }
+    const firelights = pointLightsOf(ultra).filter((light) => light.name.startsWith('mansion-firelight:'));
+    expect(firelights).toHaveLength(MANSION_SMOULDERING_FIRES.filter((fire) => fire.light !== null).length);
+    expect(firelights.every((light) => !light.castShadow)).toBe(true);
+    // Fires are dressing: nothing to shoot, walk on or block a zombie.
+    expect(ultra.colliders.some((object) => fires?.getObjectById(object.id))).toBe(false);
+    expect(pointLightsOf(ultra).filter((light) => light.visible)).toHaveLength(POINT_LIGHT_BUDGET.ultra);
+  });
+
+  it('lights the banquet hearth with flickering firelight that never reorders the light budget', () => {
+    const arena = makeArena(ULTRA_PROFILE);
+    const hearth = MANSION_SMOULDERING_FIRES.find((fire) => fire.id === 'banquet-hearth');
+    expect(hearth?.light).not.toBeNull();
+    const firelight = arena.group.getObjectByName('mansion-firelight:banquet-hearth') as THREE.PointLight;
+    const lights = pointLightsOf(arena);
+    const observer = new THREE.Vector3((hearth?.x ?? 0) - 2, 1.7, hearth?.z ?? 0);
+    arena.update(1 / 60, observer);
+    const active = lights.filter((light) => light.visible);
+    expect(active).toContain(firelight);
+
+    const intensities = new Set<number>();
+    for (let frame = 0; frame < 600; frame++) {
+      arena.update(1 / 60, observer);
+      intensities.add(Number(firelight.intensity.toFixed(3)));
+      expect(firelight.intensity).toBeLessThanOrEqual(hearth?.light?.intensity ?? 0);
+    }
+    expect(intensities.size).toBeGreaterThan(20);
+    expect(lights.filter((light) => light.visible)).toEqual(active);
+
+    arena.reset();
+    const restarted = firelight.intensity;
+    arena.update(0, observer);
+    expect(firelight.intensity).toBe(restarted);
+  });
+
+  it('places every smouldering fire inside the house, off the floor where it burns nothing in the way', () => {
+    for (const fire of MANSION_SMOULDERING_FIRES) {
+      expect(fire.x).toBeGreaterThan(MANSION_BANQUET_HALL.minX);
+      expect(fire.x).toBeLessThan(MANSION_EAST_WALL_X);
+      expect(isOutsideMansion(fire.x, fire.z)).toBe(false);
+      expect(fire.y).toBeGreaterThan(0.1);
+      expect(fire.radius).toBeGreaterThan(0);
+      expect(fire.height).toBeGreaterThan(0);
+    }
   });
 
   it('restores doors, active zones, colliders and barrier state on restart', () => {

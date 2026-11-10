@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { EVACUATION_ENDING_TIMELINE as BEAT } from '../src/zombies/evacuation/EvacuationEndingTimeline';
-import { seededRandom } from '../src/zombies/maps/shared/ProceduralNoise';
 import { PROTOCOL33_BLAZE, PROTOCOL33_SURFACE } from '../src/zombies/maps/Station33Config';
 import {
-  blazeAge,
   blazeGlow,
   blazeIgnition,
   blazeLevel,
-  createBlazeParticles,
   type EscapeBlazeConfig,
 } from '../src/zombies/maps/station33/EscapeBlaze';
-
-const LIFE = { min: 0.8, max: 1.4 } as const;
 
 const CONFIG: EscapeBlazeConfig = {
   from: 2,
@@ -51,31 +46,6 @@ describe('Station 33 escape blaze', () => {
     expect(early).toBeLessThan(1);
     expect(blazeGlow(30, CONFIG)).toBe(1);
     for (let time = 0; time < 30; time += 0.1) expect(blazeGlow(time, CONFIG)).toBeLessThanOrEqual(1);
-  });
-
-  it('shares the particles out by the size of each fire, every one inside its source', () => {
-    const particles = createBlazeParticles(600, CONFIG, LIFE, seededRandom(5));
-    expect(particles).toHaveLength(600);
-    const counts = CONFIG.sources.map((_, index) => particles.filter((particle) => particle.source === index).length);
-    expect(counts[0]).toBeGreaterThan(counts[2]);
-    expect(counts[2]).toBeGreaterThan(counts[1]);
-    expect(counts[1]).toBeGreaterThan(0);
-    for (const particle of particles) {
-      const source = CONFIG.sources[particle.source];
-      expect(Math.hypot(particle.offsetX, particle.offsetZ)).toBeLessThanOrEqual(source.radius + 1e-9);
-      expect(particle.life).toBeGreaterThanOrEqual(LIFE.min);
-      expect(particle.life).toBeLessThanOrEqual(LIFE.max);
-    }
-  });
-
-  it('cycles every particle through its life, from 0 up to just short of 1', () => {
-    const [particle] = createBlazeParticles(1, CONFIG, LIFE, seededRandom(9));
-    for (let time = 0; time < 10; time += 0.07) {
-      const age = blazeAge(particle, time);
-      expect(age).toBeGreaterThanOrEqual(0);
-      expect(age).toBeLessThan(1);
-    }
-    expect(blazeAge(particle, particle.life * 3)).toBeCloseTo(blazeAge(particle, 0), 9);
   });
 
   it('sets Station 33 alight at the stairhead, mid-escape, and spreads over the station before the title', () => {

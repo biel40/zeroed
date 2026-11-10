@@ -99,6 +99,9 @@ una toma de Tunetank con una cola mas larga en semiautomatico y un golpe
 aislado de la rafaga original (`audio.autoSampleFile`) por cada bala en
 automatico. La M14 usa un disparo de G3 del mismo calibre con la cola
 atenuada para el tiro semiautomatico rapido. [Grabacion CC0 de areniporgen](https://freesound.org/people/areniporgen/sounds/712577/).
+La MP5 y la PPSh-41 tambien usan disparos grabados. En automatico reproducen
+un golpe corto por bala para que la cola no se acumule.
+[Fuentes de audio](../ASSETS.md#audio-publicassetsaudio).
 `audio.variation` permite variar ligeramente el tono y la ganancia por disparo. Si el clip aun no esta
 disponible, suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
 anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
@@ -481,7 +484,10 @@ existente a `MOTDRULES`.
   un bunker de defensa civil: papel damasco, zocalo de nogal y parquet
   carbonizados, vigas a la vista, madera que aun humea (brillo emisivo que
   respira), lamparas de laton arriba y apliques enjaulados abajo, ceniza,
-  brasas y humo bajo el techo, y un jardin muerto con arboles, tumbas y verja
+  brasas y humo bajo el techo (mas densos en Ultra, que ademas mantiene fuegos
+  vivos en la chimenea del banquete, sobre el armario carbonizado del pasillo
+  este y en la mesa, con chispas, halo y luz calida parpadeante
+  [`MANSION_SMOULDERING_FIRES`]), y un jardin muerto con arboles, tumbas y verja
   tras las ventanas. Las texturas se hornean en codigo
   (`shared/ProceduralSurface`, compartido con Station 33) con UV ancladas al
   mundo para que el patron continue entre trozos de muro. La arena orquesta;
@@ -891,10 +897,12 @@ El alcance, la autoridad, el combate, la pausa y los limites de red se describen
 Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 24,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
 
-`DeviceProfile` fija una calidad Baja/Media/Alta: la elegida en Ajustes
+`DeviceProfile` fija una calidad Baja/Media/Alta/Ultra: la elegida en Ajustes
 desde el menu principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
 moviles con poca memoria, Media en moviles, equipos modestos o con movimiento
-reducido, Alta en el resto). La calidad decide pixel ratio maximo (1/1,5/2),
+reducido, Alta en el resto). Ultra nunca se detecta: solo se ofrece, y solo se
+aplica, donde se detecta Alta; renderiza como Alta y los mapas gastan su margen
+en mas luces y efectos. La calidad decide pixel ratio maximo (1/1,5/2/2),
 efectos reducidos, anisotropia y luces puntuales; los controles tactiles
 siguen dependiendo solo del dispositivo. Se aplica al empezar la siguiente
 partida. Durante el juego, `DynamicResolution` baja la resolucion por pasos
@@ -912,9 +920,9 @@ mostrador, carro y bancos chocan con proxies AABB invisibles.
 
 Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene
-un presupuesto local estable de luces puntuales segun la calidad: seis en
-Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
-parpadeo) por alcance y distancia, con histeresis, para iluminar el hueco
+un presupuesto local estable de luces puntuales segun la calidad: ocho en
+Ultra, seis en Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
+parpadeo de bombillas ni fuegos) por alcance y distancia, con histeresis, para iluminar el hueco
 desde ambas plantas sin intercambios bruscos. Su decoracion estatica se
 fusiona por material y por planta (`MansionDecorBatch`); cada malla guarda su
 particion para que la ocultacion por plantas siga funcionando.

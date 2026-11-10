@@ -362,9 +362,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 400, gravity: 9.8, maxDistance: 200, drag: 0.08 },
     moveSpeedMultiplier: 1.03,
     equipTime: 0.3,
-    // Pistol-calibre report: higher and drier than the rifles, with the
-    // roller-delayed bolt clacking back after each shot.
-    audio: { volume: 0.44, duration: 0.07, lowpass: 3900, thump: 190, mechanism: 0.12 },
+    audio: {
+      volume: 0.44, duration: 0.07, lowpass: 3900, thump: 190, mechanism: 0.12,
+      sampleFile: 'mp5_single_shot.wav', autoSampleFile: 'mp5_auto_shot.wav',
+      variation: { pitch: 0.025, volume: 0.05 },
+    },
     view: {
       frame: 'mp5',
       hip: [0.18, -0.18, -0.38],
@@ -567,8 +569,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectile: { muzzleVelocity: 488, gravity: 9.8, maxDistance: 150, drag: 0.1 },
     moveSpeedMultiplier: 0.98,
     equipTime: 0.38,
-    // Sharp pistol-calibre report over a distinctly heavier open-bolt clatter.
-    audio: { volume: 0.43, duration: 0.06, lowpass: 4600, thump: 195, mechanism: 0.16, tail: 0.07 },
+    audio: {
+      volume: 0.43, duration: 0.06, lowpass: 4600, thump: 195, mechanism: 0.16, tail: 0.07,
+      sampleFile: 'ppsh41_single_shot.wav', autoSampleFile: 'ppsh41_auto_shot.wav',
+      variation: { pitch: 0.025, volume: 0.05 },
+    },
     view: {
       frame: 'ppsh41',
       hip: [0.19, -0.19, -0.52],
@@ -932,12 +937,23 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       ...L96_DEFINITION.view,
       // No GLB: dedicated M40A5 builder (see M40ViewModel.ts).
       frame: 'm40',
-      // Matte black action and barrel + OD green McMillan A5 stock.
-      bodyColor: 0x16181a,
-      accentColor: 0x5e6646,
+      // Matte black action and barrel + pale sage McMillan A5 stock.
+      bodyColor: 0x141516,
+      accentColor: 0x7a8160,
       barrelLength: 0.635,
       receiverLength: 0.228,
       stockLength: 0.27,
+      // The long 56 mm scope rides on tall rings.
+      sightHeight: 0.074,
+      hands: {
+        ...L96_DEFINITION.view.hands,
+        // Cupped under the taller, wider beavertail forend.
+        left: {
+          ...L96_DEFINITION.view.hands.left!,
+          position: [0, -0.029, -0.28],
+          hold: { size: [0.064, 0.056], axis: [0, 0, -1] },
+        },
+      },
     },
   },
 

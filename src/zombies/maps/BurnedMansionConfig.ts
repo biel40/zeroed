@@ -223,6 +223,47 @@ export const MANSION_AREA_LIGHTS: ReadonlyArray<MansionAreaLight> = [
   { x: -4.8, y: MANSION_BUNKER_Y + 2.4, z: -6.6, intensity: 0.95, distance: 6, floor: -1 },
 ];
 
+/** Charred cabinet standing in the east hall, by its centre on the floor. */
+export const MANSION_CHARRED_CABINET = { x: 0.4, z: -6.1, width: 0.45, height: 1.4, depth: 1.2 } as const;
+
+export interface MansionSmoulderingFire {
+  readonly id: string;
+  /** Centre of the fire's root; `y` is where its flames start. */
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  /** Metres around the centre its flames rise from. */
+  readonly radius: number;
+  /** Metres its flames stand. */
+  readonly height: number;
+  /** Firelight it throws on the room, or null when too small to light anything. */
+  readonly light: { readonly intensity: number; readonly distance: number } | null;
+}
+
+/**
+ * Ultra quality only: the spots where the fire never quite went out. Logs
+ * still burning on the banquet hearth, low flames on the top of the east
+ * hall's charred cabinet and a lick where a candle fell on the banquet
+ * table. All of them are out of reach and off the walkable floor.
+ */
+export const MANSION_SMOULDERING_FIRES: ReadonlyArray<MansionSmoulderingFire> = [
+  {
+    id: 'banquet-hearth',
+    x: MANSION_BANQUET_HALL.chimney.frontX - 0.24, y: 0.26, z: MANSION_BANQUET_HALL.chimney.z,
+    radius: 0.22, height: 0.45, light: { intensity: 2.4, distance: 6.5 },
+  },
+  {
+    id: 'east-hall-cabinet',
+    x: MANSION_CHARRED_CABINET.x, y: MANSION_CHARRED_CABINET.height + 0.01, z: MANSION_CHARRED_CABINET.z,
+    radius: 0.16, height: 0.26, light: { intensity: 1, distance: 3.8 },
+  },
+  {
+    id: 'banquet-table-candle',
+    x: MANSION_BANQUET_HALL.table.x + 1.2, y: 0.785, z: MANSION_BANQUET_HALL.table.z + 0.1,
+    radius: 0.12, height: 0.1, light: null,
+  },
+];
+
 export const MANSION_RITUAL_CIRCLE = {
   id: 'secret-room-ritual-circle',
   position: {

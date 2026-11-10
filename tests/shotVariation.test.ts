@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { shotGainScale, shotPlaybackRate } from '../src/audio/ShotVariation';
@@ -23,10 +24,24 @@ describe('shot variation', () => {
   });
 });
 
-describe('AK-47 samples by fire mode', () => {
+describe.each([
+  ['AK-47', 'ak47', 'ak47_single_shot.wav', 'ak47_auto_shot.wav'],
+  ['MP5', 'mp5', 'mp5_single_shot.wav', 'mp5_auto_shot.wav'],
+  ['PPSh-41', 'ppsh41', 'ppsh41_single_shot.wav', 'ppsh41_auto_shot.wav'],
+] as const)('%s samples by fire mode', (_name, id, singleFile, autoFile) => {
   afterEach(() => vi.restoreAllMocks());
 
-  const config = WEAPON_DEFINITIONS.ak47.audio;
+  const config = WEAPON_DEFINITIONS[id].audio;
+
+  it('ships both configured WAV files', () => {
+    expect(config.sampleFile).toBe(singleFile);
+    expect(config.autoSampleFile).toBe(autoFile);
+    for (const file of [singleFile, autoFile]) {
+      const wave = readFileSync(new URL(`../public/assets/audio/${file}`, import.meta.url));
+      expect(wave.toString('ascii', 0, 4)).toBe('RIFF');
+      expect(wave.toString('ascii', 8, 12)).toBe('WAVE');
+    }
+  });
 
   it('precaches both takes and plays one sample per shot in the selected mode', () => {
     const audio = new AudioSystem();
@@ -34,12 +49,12 @@ describe('AK-47 samples by fire mode', () => {
     const single = { duration: 0.56 };
     const automatic = { duration: 0.096 };
     const optionalSample = vi.spyOn(system, 'optionalSample')
-      .mockImplementation((file) => file === 'ak47_auto_shot.wav' ? automatic : single);
+      .mockImplementation((file) => file === autoFile ? automatic : single);
     vi.spyOn(system, 'context').mockReturnValue({ master: {} });
     const playSample = vi.spyOn(system, 'playSample').mockImplementation(() => {});
 
     audio.preloadShotSample(config);
-    expect(optionalSample.mock.calls.flat()).toEqual(['ak47_single_shot.wav', 'ak47_auto_shot.wav']);
+    expect(optionalSample.mock.calls.flat()).toEqual([singleFile, autoFile]);
 
     audio.playShot(config, 'auto');
     audio.playShot(config, 'auto');
@@ -64,7 +79,7 @@ describe('AK-47 samples by fire mode', () => {
     audio.playRemoteShot(config, cue, 'auto');
     audio.playRemoteShot(config, cue, 'auto');
 
-    expect(optionalSample).toHaveBeenCalledWith('ak47_auto_shot.wav');
+    expect(optionalSample).toHaveBeenCalledWith(autoFile);
     expect(playSample).toHaveBeenCalledExactlyOnceWith(
       parts, automatic, expect.any(Number), 0, bus, expect.any(Number), undefined,
     );

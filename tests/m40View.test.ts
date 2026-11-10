@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER, ZOMBIES_WEAPON_PRELOAD } from '../src/config/weapons';
+import { L96_PROFILE } from '../src/weapons/L96ViewModel';
 import { M40_PROFILE } from '../src/weapons/M40ViewModel';
 import { BOLT_REAR_FRACTION, ReloadAnimator } from '../src/weapons/ReloadAnimator';
 import { Weapon } from '../src/weapons/Weapon';
@@ -49,10 +50,11 @@ describe('M40 definition', () => {
     // Same shot sample and bolt foley: the audio config and reload style are the L96's.
     expect(m40.audio).toBe(l96.audio);
     expect(view.reloadAnim).toBe(l96.view.reloadAnim);
-    expect(view.hands).toBe(l96.view.hands);
-    expect(view.sightHeight).toBe(l96.view.sightHeight);
+    // Same right hand on the same grip, bolt and magazine; only the support hand fits the wider forend.
+    expect(view.hands.right).toBe(l96.view.hands.right);
+    expect(view.hands.action).toBe(l96.view.hands.action);
+    expect(view.hands.magazine).toBe(l96.view.hands.magazine);
     expect(view.frame).toBe('m40');
-    expect(view.accentColor).not.toBe(l96.view.accentColor);
 
     const cadence = (definition: WeaponDefinition): number => Math.max(60 / definition.rpm, definition.boltCycleTime);
     expect(cadence(m40)).toBeLessThan(cadence(l96));
@@ -93,6 +95,25 @@ describe('M40 definition', () => {
 });
 
 describe('M40A5 view model', () => {
+  it('reads as a different rifle from the L96 at a glance', () => {
+    // Pale sage stock against the L96's dark olive.
+    const luminance = (hex: number): number => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 }).l;
+    expect(luminance(view.accentColor)).toBeGreaterThan(luminance(l96.view.accentColor) + 0.08);
+    // A much longer scope with a wider bell, on taller rings.
+    const length = (scope: ReadonlyArray<readonly [number, number]>): number => scope[scope.length - 1][1] - scope[0][1];
+    const bell = (scope: ReadonlyArray<readonly [number, number]>): number => Math.max(...scope.map(([radius]) => radius));
+    expect(length(M40_PROFILE.scope)).toBeGreaterThan(length(L96_PROFILE.scope) + 0.07);
+    expect(bell(M40_PROFILE.scope)).toBeGreaterThan(bell(L96_PROFILE.scope) + 0.008);
+    expect(view.sightHeight).toBeGreaterThan(l96.view.sightHeight + 0.01);
+    // The grey cheek-piece block stands above the comb; there is no thumbhole.
+    const cheekTop = Math.max(...M40_PROFILE.cheekPiece.map(([, y]) => y));
+    expect(cheekTop).toBeGreaterThan(0.04);
+    expect('thumbhole' in M40_PROFILE).toBe(false);
+    const built = buildProceduralViewModel(view);
+    expect(built.group.getObjectByName('m40-stock')!.children.some((mesh) =>
+      ((mesh as THREE.Mesh).material as THREE.MeshStandardMaterial).color.getHex() === 0x4b4f52)).toBe(true);
+  });
+
   it('builds the dedicated rifle at real proportions within the draw-call budget', () => {
     expect(view.modelUrl).toBeUndefined();
     const built = buildProceduralViewModel(view);
@@ -133,8 +154,8 @@ describe('M40A5 view model', () => {
     // rings and turret saddle in between stay hidden inside the tube.
     const ocular = firstHit(0.3, -1);
     const objective = firstHit(-1, 1);
-    expect(ocular.point.z).toBeCloseTo(0.111, 3);
-    expect(objective.point.z).toBeCloseTo(-0.265, 3);
+    expect(ocular.point.z).toBeCloseTo(M40_PROFILE.ocularLens.z, 3);
+    expect(objective.point.z).toBeCloseTo(M40_PROFILE.objectiveLens.z, 3);
     expect(objective.object).toBe(ocular.object);
     // The objective bell clears the barrel beneath it.
     const bell = Math.max(...M40_PROFILE.scope.map(([radius]) => radius));
@@ -156,7 +177,7 @@ describe('M40A5 view model', () => {
     expect(rear.z - rest.z).toBeGreaterThan(0.08);
     expect(rear.y).toBeGreaterThan(rest.y + 0.03);
     // Past the eyepiece, so only the cheek piece could be in the way: it sits behind the stroke.
-    expect(Math.hypot(rear.x, rear.y - view.sightHeight)).toBeGreaterThan(0.0232 + knob.radius);
+    expect(Math.hypot(rear.x, rear.y - view.sightHeight)).toBeGreaterThan(0.0245 + knob.radius);
     expect(rear.z + knob.radius).toBeLessThan(M40_PROFILE.cheekPiece[0][0] + 0.02);
 
     animator.updateCycling(1);

@@ -28,6 +28,7 @@ import type {
 } from './ZombieArena';
 import { createMansionSurfaceMaterials, type MansionSurfaceMaterials } from './BurnedMansionMaterials';
 import { MansionAtmosphere } from './burnedMansion/MansionAtmosphere';
+import { MansionFires } from './burnedMansion/MansionFires';
 import { MansionBanquetGhost } from './burnedMansion/MansionBanquetGhost';
 import { MansionWatchingPortrait } from './burnedMansion/MansionWatchingPortrait';
 import type { MansionBuildContext } from './burnedMansion/MansionBuildContext';
@@ -69,6 +70,7 @@ import {
   MANSION_BUNKER_Y,
   MANSION_BOX_PLACEMENT,
   MANSION_BOX_ROOM,
+  MANSION_CHARRED_CABINET,
   MANSION_DOOR_OPENING,
   MANSION_DOORS,
   MANSION_EAST_WALL_X,
@@ -110,7 +112,7 @@ const ACTIVE_POINT_LIGHT_HYSTERESIS = 1.3;
 interface RankedPointLight {
   readonly light: THREE.PointLight;
   readonly position: THREE.Vector3;
-  /** Flickering area lights rank by their authored intensity. */
+  /** Flickering area lights and firelight rank by their authored intensity. */
   readonly baseIntensity: number | undefined;
   score: number;
 }
@@ -294,6 +296,8 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   /** Bound once: the scheduler calls it from the frame loop. */
   private readonly playAmbientEvent = (cue: ArenaAmbientCue): void => this.onAmbientCue?.(cue);
   private readonly atmosphere: MansionAtmosphere;
+  /** Ultra quality only. */
+  private readonly fires: MansionFires | null;
   private readonly banquetGhost: MansionBanquetGhost;
   private readonly watchingPortrait: MansionWatchingPortrait;
   private readonly rankedPointLights: RankedPointLight[] = [];
@@ -353,6 +357,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     buildMansionExterior(dressing);
     this.buildLighting(dressing);
     this.atmosphere = new MansionAtmosphere(dressing);
+    this.fires = profile.quality === 'ultra' ? new MansionFires(dressing) : null;
     this.banquetGhost = new MansionBanquetGhost(this.group);
     this.watchingPortrait = new MansionWatchingPortrait(dressing);
     // No mansion light casts shadows; the batch only receives them.
@@ -471,6 +476,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     }
     this.areaLights.update(dt);
     this.atmosphere.update(dt);
+    this.fires?.update(dt);
     this.ambientEvents.update(dt, this.playAmbientEvent);
     this.banquetGhost.update(dt);
     this.watchingPortrait.update(dt, observerPosition);
@@ -490,6 +496,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     for (const machine of this.ringMachines) machine.reset();
     this.secretRoom.reset();
     this.atmosphere.reset();
+    this.fires?.reset();
     this.ambientEvents.reset();
     this.banquetGhost.reset();
     this.watchingPortrait.reset();
@@ -936,7 +943,9 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
 
   private buildProps(): void {
     // Fixed placements keep the spawn and door approaches reproducibly clear.
-    this.addProp('east-hall-charred-cabinet', 0.4, 0.7, -6.1, 0.45, 1.4, 1.2, this.materials.charredWood);
+    const cabinet = MANSION_CHARRED_CABINET;
+    this.addProp('east-hall-charred-cabinet', cabinet.x, cabinet.height / 2, cabinet.z,
+      cabinet.width, cabinet.height, cabinet.depth, this.materials.charredWood);
     // The banquet furniture is dressing; these invisible volumes make it solid.
     // The table box also covers its chairs; the sideboard box rises above its top.
     this.addFurnitureCollider('banquet-table-collider', MANSION_BANQUET_HALL.table, 'none');
@@ -1400,7 +1409,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
       this.rankedPointLights.push({
         light: object,
         position: object.getWorldPosition(new THREE.Vector3()),
-        baseIntensity: this.areaLights.baseIntensityOf(object),
+        baseIntensity: this.areaLights.baseIntensityOf(object) ?? this.fires?.baseIntensityOf(object),
         score: 0,
       });
     });

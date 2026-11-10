@@ -54,7 +54,7 @@ La camara orbital permite comprobar silueta, suelo y orientacion del arma.
 `map-viewer.html` construye un mapa de Zombies con el render del juego, abre todas las puertas de pago y lo muestra desde una cámara fija, con luces, parpadeos y polvo animados. Sirve para revisar una zona sin jugar hasta ella.
 
 - `http://localhost:5173/tools/viewers/map-viewer.html?map=station-33&cam=5.6,1.65,3.5&look=6.5,1.5,-8`: la puerta de las cocheras vista desde el vestíbulo.
-- Parámetros: `map=` (id del registro), `cam=x,y,z` y `look=x,y,z`, `fov=`, `quality=low|medium|high`, `doors=0` para dejar las puertas cerradas y `power=1` para accionar el interruptor general del mapa.
+- Parámetros: `map=` (id del registro), `cam=x,y,z` y `look=x,y,z`, `fov=`, `quality=low|medium|high|ultra` (Ultra solo se aplica si el equipo lo admite), `doors=0` para dejar las puertas cerradas y `power=1` para accionar el interruptor general del mapa.
 
 ## Visor de interacciones
 

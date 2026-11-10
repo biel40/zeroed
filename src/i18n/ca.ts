@@ -91,6 +91,7 @@ export const ca: Record<TranslationKey, string> = {
   'settings.qualityLow': 'BAIXA',
   'settings.qualityMedium': 'MITJANA',
   'settings.qualityHigh': 'ALTA',
+  'settings.qualityUltra': 'ULTRA',
   'menu.settings': 'CONFIGURACIÓ',
   'settings.audio': 'ÀUDIO',
   'settings.masterVolume': 'Volum general',
