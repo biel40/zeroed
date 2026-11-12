@@ -9,6 +9,7 @@ import { installCanvasDocument } from './coopHarness';
 import * as THREE from 'three';
 import { GamepadInput } from '../src/player/GamepadInput';
 import { DEFAULT_SETTINGS } from '../src/core/PlayerSettings';
+import { createDebugDocument } from './debugStatsDom';
 
 let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
@@ -60,7 +61,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     flashLight: { intensity: 0 },
     viewportHeight: 100,
     hud: { update: vi.fn(), setInteractionPrompt: vi.fn(), updateDamageDirections: vi.fn() },
-    debugElement: null,
+    debugStats: null,
     dynamicResolution: new DynamicResolution(),
   });
   return { game, weapon };
@@ -98,6 +99,20 @@ describe('local pause vs shared simulation', () => {
     expect(game.mode.onInteract).not.toHaveBeenCalled();
     expect(game.mode.onMeleeAttack).not.toHaveBeenCalled();
     if (shared) expect(weapon.update).toHaveBeenCalledWith(0.016, expect.objectContaining({ trigger: false, ads: false }));
+  });
+
+  it.each([
+    [false, false], [true, false], [false, true], [true, true],
+  ])('judges automatic quality only on played frames (shared: %s, paused: %s)', (shared, paused) => {
+    const { game } = stubGame(shared, paused);
+    game.qualityGovernor = { sample: vi.fn(), reset: vi.fn() };
+    prototype.frame.call(game);
+    if (paused) {
+      expect(game.qualityGovernor.sample).not.toHaveBeenCalled();
+      expect(game.qualityGovernor.reset).toHaveBeenCalled();
+    } else {
+      expect(game.qualityGovernor.sample).toHaveBeenCalledWith(0.016, game.dynamicResolution.scale);
+    }
   });
 
   it('halts the whole simulation behind the single-player pause menu', () => {
@@ -342,21 +357,58 @@ describe('cinematic first-person visibility', () => {
 });
 
 describe('debug stats', () => {
+  it('passes unclamped wall time to diagnostics while keeping the simulation delta capped', () => {
+    const { game, weapon } = stubGame(false, false);
+    game.clock.getDelta = () => 0.5;
+    game.debugStats = { update: vi.fn(), pause: vi.fn() };
+    game.qualityGovernor = { sample: vi.fn(), reset: vi.fn() };
+    game.renderer.info = { render: { calls: 512 }, memory: {} };
+    game.renderer.domElement = { width: 1920, height: 1080 };
+    prototype.frame.call(game);
+    expect(weapon.update).toHaveBeenCalledWith(0.05, expect.anything());
+    expect(game.debugStats.update).toHaveBeenCalledWith(0.5, game.renderer.info, 1, 1920, 1080);
+    expect(game.debugStats.pause).not.toHaveBeenCalled();
+    expect(game.qualityGovernor.sample).toHaveBeenCalledWith(0.5, game.dynamicResolution.scale);
+  });
+
+  it.each([false, true])('keeps diagnostics alongside the Ultra Max render path (paused: %s)', (paused) => {
+    const { game } = stubGame(false, paused);
+    game.postProcessing = { render: vi.fn() };
+    game.debugStats = { update: vi.fn(), pause: vi.fn() };
+    game.renderer.info = { render: {}, memory: {} };
+    game.renderer.domElement = { width: 1920, height: 1080 };
+    prototype.frame.call(game);
+    expect(game.postProcessing.render).toHaveBeenCalledExactlyOnceWith(game.player.camera);
+    expect(game.renderer.render).not.toHaveBeenCalled();
+    if (paused) expect(game.debugStats.pause).toHaveBeenCalledOnce();
+    else expect(game.debugStats.update).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])('marks diagnostics as paused for a halted simulation (shared: %s)', (shared) => {
+    const { game } = stubGame(shared, !shared);
+    if (shared) game.mode.isSimulationPaused = () => true;
+    game.debugStats = { update: vi.fn(), pause: vi.fn() };
+    prototype.frame.call(game);
+    expect(game.debugStats.pause).toHaveBeenCalledOnce();
+    expect(game.debugStats.update).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])('honors the URL flag when the mode clears its request (%s)', (debugFromUrl) => {
     const { game } = stubGame(false, false);
     game.debugFromUrl = debugFromUrl;
-    const debugElement = { id: '', remove: vi.fn() };
-    const appendChild = vi.fn();
-    vi.stubGlobal('document', { createElement: () => debugElement, body: { appendChild } });
+    const dom = createDebugDocument();
+    vi.stubGlobal('document', dom.document);
 
     prototype.setDebugStatsEnabled.call(game, true);
     prototype.setDebugStatsEnabled.call(game, true);
+    const debugElement = dom.document.body.children[0];
     expect(debugElement.id).toBe('debug-stats');
-    expect(appendChild).toHaveBeenCalledExactlyOnceWith(debugElement);
+    expect(dom.document.body.children).toHaveLength(1);
+    const debugStats = game.debugStats;
 
     prototype.setDebugStatsEnabled.call(game, false);
-    expect(debugElement.remove).toHaveBeenCalledTimes(debugFromUrl ? 0 : 1);
-    expect(game.debugElement).toBe(debugFromUrl ? debugElement : null);
+    expect(debugElement.removed).toBe(!debugFromUrl);
+    expect(game.debugStats).toBe(debugFromUrl ? debugStats : null);
   });
 });
 
@@ -379,15 +431,18 @@ describe('game disposal', () => {
       handleEscapeKey: escape,
       handleResize: resize,
       resizeObserver: { disconnect: vi.fn() },
-      debugElement: null,
+      debugStats: { dispose: vi.fn() },
       audio: { dispose: vi.fn() },
       scene: { environment: { dispose: vi.fn() } },
     });
     const observer = game.resizeObserver;
+    const debugStats = game.debugStats;
     prototype.dispose.call(game);
     prototype.dispose.call(game);
     expect(renderer.setAnimationLoop).toHaveBeenCalledWith(null);
     expect(game.input.dispose).toHaveBeenCalledOnce();
+    expect(debugStats.dispose).toHaveBeenCalledOnce();
+    expect(game.debugStats).toBeNull();
     expect(documentStub.removeEventListener).toHaveBeenCalledWith('keydown', escape);
     expect(windowStub.removeEventListener).toHaveBeenCalledWith('resize', resize);
     expect(windowStub.removeEventListener).toHaveBeenCalledWith('orientationchange', resize);

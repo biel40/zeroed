@@ -28,7 +28,8 @@ export class ZombiesPowerSwitch {
   interact(): boolean {
     if (!this.facingSwitch() || !this.powerSwitch.activate()) return false;
     this.ctx.audio.playPowerSwitch();
-    this.ctx.hud.showRoundBanner(t('banner.powerOn'));
+    const announcement = this.powerSwitch.announcementKey;
+    this.ctx.hud.showRoundBanner(t('banner.powerOn'), announcement ? t(announcement) : '');
     return true;
   }
 

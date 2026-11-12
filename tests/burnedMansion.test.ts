@@ -69,6 +69,7 @@ const profile: DeviceProfile = {
   useReducedEffects: false,
   useTouchControls: false,
   anisotropyLimit: 8,
+  useAdvancedRendering: false,
 };
 
 const previousDocument = globalThis.document;
@@ -112,7 +113,7 @@ function makeArena(arenaProfile: DeviceProfile = profile): BurnedMansionArena {
   return new BurnedMansionArena(new THREE.Scene(), arenaProfile);
 }
 
-const ULTRA_PROFILE: DeviceProfile = { ...profile, quality: 'ultra' };
+const ULTRA_PROFILE: DeviceProfile = { ...profile, quality: 'ultraMax' };
 
 function pointLightsOf(arena: BurnedMansionArena): THREE.PointLight[] {
   const lights: THREE.PointLight[] = [];
@@ -2173,23 +2174,23 @@ describe('Burned Mansion topology', () => {
     expect(pointLights.filter((light) => light.visible)).toEqual(active);
   });
 
-  it('keeps its smouldering fires and their firelight for Ultra only', () => {
+  it('keeps its smouldering fires and their firelight for Ultra Max only', () => {
     const high = makeArena();
     expect(high.group.getObjectByName('mansion-fires')).toBeUndefined();
     expect(pointLightsOf(high).some((light) => light.name.startsWith('mansion-firelight:'))).toBe(false);
 
-    const ultra = makeArena(ULTRA_PROFILE);
-    const fires = ultra.group.getObjectByName('mansion-fires');
+    const ultraMax = makeArena(ULTRA_PROFILE);
+    const fires = ultraMax.group.getObjectByName('mansion-fires');
     expect(fires).toBeDefined();
     for (const fire of MANSION_SMOULDERING_FIRES) {
       expect(fires?.getObjectByName(`mansion-fire-flames:${fire.id}`)).toBeInstanceOf(THREE.Points);
     }
-    const firelights = pointLightsOf(ultra).filter((light) => light.name.startsWith('mansion-firelight:'));
+    const firelights = pointLightsOf(ultraMax).filter((light) => light.name.startsWith('mansion-firelight:'));
     expect(firelights).toHaveLength(MANSION_SMOULDERING_FIRES.filter((fire) => fire.light !== null).length);
     expect(firelights.every((light) => !light.castShadow)).toBe(true);
     // Fires are dressing: nothing to shoot, walk on or block a zombie.
-    expect(ultra.colliders.some((object) => fires?.getObjectById(object.id))).toBe(false);
-    expect(pointLightsOf(ultra).filter((light) => light.visible)).toHaveLength(POINT_LIGHT_BUDGET.ultra);
+    expect(ultraMax.colliders.some((object) => fires?.getObjectById(object.id))).toBe(false);
+    expect(pointLightsOf(ultraMax).filter((light) => light.visible)).toHaveLength(POINT_LIGHT_BUDGET.ultraMax);
   });
 
   it('lights the banquet hearth with flickering firelight that never reorders the light budget', () => {

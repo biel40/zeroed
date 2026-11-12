@@ -25,6 +25,8 @@ import { buildEscalatorHead } from './station33/EscalatorHeadBuilder';
 import { buildEscapeRoute, escapeStairTransitions } from './station33/EscapeRouteBuilder';
 import { HighlandCathedral } from './station33/HighlandCathedral';
 import { buildKovka } from './station33/KovkaBuilder';
+import { KovkaHatchLamp } from './station33/KovkaHatchLamp';
+import type { UpgradeMachine } from './shared/UpgradeMachine';
 import { buildMilicia } from './station33/MiliciaBuilder';
 import { Protocol33 } from './station33/Protocol33';
 import { buildServicePassages } from './station33/ServicePassageBuilder';
@@ -45,6 +47,8 @@ import { buildTaller } from './station33/TallerBuilder';
 import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
+  KOVKA_FORGE_CUE,
+  KOVKA_ROUTE,
   PROTOCOL33_BLAZE,
   PROTOCOL33_HIGHLANDS,
   PROTOCOL33_HORDE_ZONES,
@@ -149,6 +153,7 @@ export class Station33Arena implements ZombieArena {
   public readonly grenadeBuys: ReadonlyArray<ArenaGrenadeBuy>;
   readonly ringMachines: ReadonlyArray<ArenaRingMachine>;
   readonly weaponStations: ReadonlyArray<WeaponStation>;
+  public readonly upgradeMachine: UpgradeMachine;
   readonly weaponPickups: ReadonlyArray<CodeWeaponChest>;
   readonly powerSwitch: PowerLever;
   public readonly evacuation: Protocol33;
@@ -175,6 +180,8 @@ export class Station33Arena implements ZombieArena {
   private readonly power = new MapPower();
   private readonly ambientEvents = new AmbientEventScheduler(STATION33_AMBIENT_EVENTS);
   private readonly ticketShutters: TicketWindowShutters;
+  /** Red while the KOVKA hatch is sealed, green once the power opens it. */
+  private readonly hatchLamp: KovkaHatchLamp;
   private readonly ticketAmbush = new AmbushTrigger(TICKET_WINDOW_AMBUSH_SITES, TICKET_WINDOW_AMBUSH);
   private readonly hemisphere: THREE.HemisphereLight;
   private readonly surfaceMood: SurfaceMood;
@@ -214,7 +221,10 @@ export class Station33Arena implements ZombieArena {
     buildSubestacion(context, this.lighting);
     buildTaller(context, this.lighting);
     buildMilicia(context, this.lighting);
-    buildKovka(context, this.lighting);
+    this.upgradeMachine = buildKovka(context, this.lighting, this.power);
+    this.hatchLamp = new KovkaHatchLamp(context, this.power);
+    // The reactor wails through every forge, wherever the player stands.
+    this.upgradeMachine.onForge = () => this.onAmbientCue?.(KOVKA_FORGE_CUE);
     this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST, STATION33_WEAPONS)];
     buildDoorFrames(context);
     buildServicePassages(context, this.lighting, STATION33_BARRIERS);
@@ -250,7 +260,10 @@ export class Station33Arena implements ZombieArena {
       return view;
     });
 
-    this.doors = STATION33_DOORS.map((door) => new PointDoor(door.id, door.x, door.z, door.outwardX, door.outwardZ, { cost: door.cost }));
+    this.doors = STATION33_DOORS.map((door) => new PointDoor(door.id, door.x, door.z, door.outwardX, door.outwardZ, {
+      cost: door.cost,
+      seal: door.requiresPower ? { isSealed: () => !this.power.on, message: 'prompt.doorNeedsPower' } : undefined,
+    }));
     this.doorViews = this.doors.map((door) => {
       // Steel sheets instead of the mansion planks: same door, same burst.
       const view = new PointDoorView(door, this.group, {
@@ -281,6 +294,8 @@ export class Station33Arena implements ZombieArena {
     for (const view of this.doorViews) view.update(dt);
     for (const locker of this.ringLockers) locker.update(dt);
     for (const station of this.weaponStations) station.update(dt);
+    this.upgradeMachine.update(dt);
+    this.hatchLamp.update(dt);
     for (const pickup of this.weaponPickups) pickup.update(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
     this.powerSwitch.update(dt);
@@ -310,6 +325,8 @@ export class Station33Arena implements ZombieArena {
     this.highlands.hide();
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
+    this.upgradeMachine.reset();
+    this.hatchLamp.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
     this.ticketAmbush.reset();
     this.ticketShutters.reset();
@@ -376,6 +393,22 @@ export class Station33Arena implements ZombieArena {
     this.activeZones.add(door.zone);
     this.refreshZones();
     this.onTopologyChanged?.();
+    return true;
+  }
+
+  /**
+   * Developer console: the station powered at once (the lever still swings)
+   * and every door on `KOVKA_ROUTE` opened for free, so the forge can be
+   * tested straight away.
+   */
+  public prepareUpgradeMachineVisit(): boolean {
+    this.powerSwitch.activate();
+    this.switchOnPower();
+    for (const zone of KOVKA_ROUTE) {
+      const id = STATION33_DOORS.find((door) => door.zone === zone)?.id;
+      const door = this.doors.find((candidate) => candidate.id === id);
+      if (door?.isLocked && door.tryUnlock(() => true).success) this.activateDoor(door.id);
+    }
     return true;
   }
 

@@ -241,7 +241,7 @@ export interface MansionSmoulderingFire {
 }
 
 /**
- * Ultra quality only: the spots where the fire never quite went out. Logs
+ * Ultra Max quality only: the spots where the fire never quite went out. Logs
  * still burning on the banquet hearth, low flames on the top of the east
  * hall's charred cabinet and a lick where a candle fell on the banquet
  * table. All of them are out of reach and off the walkable floor.

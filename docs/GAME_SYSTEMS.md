@@ -230,7 +230,7 @@ Protocolo 33 ofrece ademas abrir la salida al momento por su precio (10000),
 sin electricidad, interruptores ni defensa: empieza la huida con su reloj y
 hay que subir al patio, vencer al guardian y usar el camion
 (`EvacuationProtocol.skipToEscape`).
-Al activarlo aparece el HUD de rendimiento. Reiniciar lo oculta salvo si la
+Al activarlo aparece el [HUD de rendimiento](#hud-de-rendimiento). Reiniciar lo oculta salvo si la
 URL incluye `?debug`. F2 abre una consola local de desarrollador que pausa la
 partida; Esc/F2 cierra y reanuda por el flujo de pointer lock habitual.
 El panel ofrece selectores de armas y anillos, botones de municion y
@@ -243,7 +243,11 @@ en un desplegable avanzado y utiliza la misma validacion.
 compras ni exigir maquinas del mapa. `boss` (tambien con boton) abre gratis
 la salida del mapa y coloca al jugador donde despierta su guardian; la
 entrada, el duelo, la extraccion y el final son los reales, y solo funciona
-mientras el guardian duerme. `ammo full|infinite` afecta al arma
+mientras el guardian duerme. `forge` (alias `kovka`, tambien con boton)
+enciende la electricidad, abre gratis las puertas hasta la maquina de
+mejora del mapa (`ZombieArena.prepareUpgradeMachineVisit`) y coloca al
+jugador delante, mirandola; con `MOTDRULES` forjar no cuesta puntos.
+`ammo full|infinite` afecta al arma
 equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
 VORTEX-9 y cadenas ZEUS) y `invincible on|off` permite probar salud y
 resurreccion. No es un sistema de mejora comprable: son ajustes temporales
@@ -417,7 +421,7 @@ existente a `MOTDRULES`.
   Fuego y armas de energia conservan sus efectos propios. En cooperativo se
   generan desde impactos y bajas confirmados por el anfitrion.
 - Cada zombie alcanzado por la cadena ZEUS-77 queda cargado 2.8 s
-  (`ZombieElectricArcs`): rayos que saltan entre sus articulaciones y un
+  (`ElectricArcRibbons`): rayos que saltan entre sus articulaciones y un
   destello azul en la piel, vivo o ya caido en el suelo. Es solo visual (un
   draw call por cuerpo cargado, sin luces) y el anfitrion envia los IDs
   alcanzados en `teslaChain`.
@@ -484,7 +488,7 @@ existente a `MOTDRULES`.
   un bunker de defensa civil: papel damasco, zocalo de nogal y parquet
   carbonizados, vigas a la vista, madera que aun humea (brillo emisivo que
   respira), lamparas de laton arriba y apliques enjaulados abajo, ceniza,
-  brasas y humo bajo el techo (mas densos en Ultra, que ademas mantiene fuegos
+  brasas y humo bajo el techo (mas densos en Ultra Max, que ademas mantiene fuegos
   vivos en la chimenea del banquete, sobre el armario carbonizado del pasillo
   este y en la mesa, con chispas, halo y luz calida parpadeante
   [`MANSION_SMOULDERING_FIRES`]), y un jardin muerto con arboles, tumbas y verja
@@ -534,7 +538,25 @@ existente a `MOTDRULES`.
   abovedada con un reactor horizontal dormido en un foso, una cubierta en la
   planta 0 a su alrededor (barandillas solidas cierran el foso; pasarelas y
   escaleras son decorado), dos entradas propias y el sitio reservado de la
-  futura maquina de mejora de armas (`KOVKA_UPGRADE_SITE`); el nucleo del
+  la forja: la `UpgradeMachine` compartida (un `ArenaUpgradeMachine` que el
+  modo lleva con `ZombiesWeaponUpgrade`) cobra 5000 por el arma en mano,
+  forja durante `forgeSeconds` (treinta segundos en KOVKA) con esa arma girando en la camara mientras el acabado se pinta sobre ella (y el mapa lo
+  sonoriza con `onForge`: el reactor gime, `forge-wail`) y la deja con el doble de dano (multiplica en
+  `weaponDamageScale`), recargada y con el acabado del mapa
+  (`WeaponFinish`, aplicado por el shell con `setWeaponFinish`); una vez por
+  arma y partida. El acabado pinta el cuerpo del arma con una nebulosa que
+  fluye (shader de ruido en el espacio del arma, con luz propia, venas,
+  estrellas que titilan y un borde brillante), deja el acero brillante como
+  remate pulido y hace saltar arcos electricos entre puntos del arma
+  (`ElectricArcRibbons`), que se atenuan al apuntar. En la camara de la
+  maquina el acabado se pinta poco a poco (`WeaponFinishLayer` con
+  `paint`): el arma entra desnuda y, entre el 10 % y el 85 % de la forja, un
+  frente deshilachado y brillante lo extiende de la culata a la boca; los
+  arcos crecen con el. Con efectos reducidos la
+  nebulosa omite la deformacion del dominio; no anade luces ni draw calls
+  salvo el de los arcos. La compuerta lleva un sello (`PointDoorSeal`): sin
+  electricidad no se vende y lo dice su aviso, un piloto rojo pasa a verde
+  y el aviso de electricidad lo anuncia (`announcementKey`); el nucleo del
   reactor solo brilla con la electricidad. Un unico rectangulo de
   `playerBounds` y de navegacion cubre todas las salas: muros, trenes y
   puertas cerradas son lo que impide el paso, y la arena para al jugador en
@@ -904,19 +926,66 @@ El alcance, la autoridad, el combate, la pausa y los limites de red se describen
 Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 24,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
 
-`DeviceProfile` fija una calidad Baja/Media/Alta/Ultra: la elegida en Ajustes
-desde el menu principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
-moviles con poca memoria, Media en moviles, equipos modestos o con movimiento
-reducido, Alta en el resto). Ultra nunca se detecta: solo se ofrece, y solo se
-aplica, donde se detecta Alta; renderiza como Alta y los mapas gastan su margen
-en mas luces y efectos. La calidad decide pixel ratio maximo (1/1,5/2/2),
+`DeviceProfile` fija una calidad Baja/Media/Alta/Ultra Max: la elegida en Ajustes
+desde el menu principal (guardada en `localStorage`) o, con Auto (por defecto),
+la que decide `AutoQuality`. Ultra Max solo se ofrece y aplica donde la
+clasificacion del dispositivo por navegador permite Alta; las preferencias
+guardadas como `ultra` conservan su eleccion con el nombre `ultraMax`.
+La calidad decide pixel ratio maximo (1/1,5/2),
 efectos reducidos, anisotropia y luces puntuales; los controles tactiles
 siguen dependiendo solo del dispositivo. Se aplica al empezar la siguiente
-partida. Durante el juego, `DynamicResolution` baja la resolucion por pasos
+partida.
+
+Auto clasifica el dispositivo sin benchmark a partir de pistas que pueden
+faltar: tactil o no, memoria y nucleos que exponga el navegador, pixeles de
+pantalla al pixel ratio maximo y un contexto WebGL de prueba (`GraphicsProbe`:
+WebGL2, tamano maximo de textura, si el navegador solo concede WebGL con
+penalizacion grave y si el renderer es por software). Un dato ausente no
+penaliza a un escritorio, pero impide Alta en un movil. Ultra Max nunca se
+elige en Auto. El nivel se guarda con una huella de esas pistas y se reutiliza
+mientras no cambien. En partida, `AutoQualityGovernor` ignora los primeros 10 s
+y los 3 s tras cada pausa, y juzga ventanas de un segundo: una es lenta si va
+por debajo de 48 fps con la resolucion dinamica ya reducida, o si solo
+aguanta con la escala al 60 % o menos. Con 24 lentas de las ultimas 30 pide
+una unica bajada, que se guarda y se aplica en la siguiente partida, sin
+recompilar nada en la actual. Nunca sube de nivel por si sola. Durante el juego, `DynamicResolution` baja la resolucion por pasos
 del 10 % (minimo 50 %) si la media de un segundo cae de 50 fps, y la sube al
 recuperar 57 fps; un intento de subida fallido duplica la espera del
 siguiente y una bajada que no acelera el frame se deshace, porque el cuello
 no era la GPU. `?debug` muestra la escala actual.
+
+Ultra Max (`useAdvancedRendering`) suma a Alta estas capas, todas en
+`src/rendering/`:
+
+- `LampShadows`: sombras en tiempo real de las dos lamparas que mas pesan
+  para el jugador (en los demas niveles ninguna luz proyecta sombra). El
+  numero de lamparas con sombra es fijo, sus mapas se mueven de una lampara a
+  otra y se refrescan por turnos, uno por frame; un relevo exige ir claramente
+  por delante durante un rato, asi que ni el parpadeo ni un fogonazo lo
+  provocan.
+- `PostProcessing`: la escena se dibuja con MSAA en un buffer HDR; despues
+  `AmbientOcclusion` oscurece esquinas y contactos a partir de la profundidad
+  del propio frame (el arma en primera persona queda fuera), la luz intensa
+  florece y `FilmOutputPass` aplica el tone mapping, nitidez, vineta,
+  aberracion cromatica y grano.
+- `ReflectionProbe`: suma al entorno generico una captura cubica de la sala
+  alrededor del jugador, repartida a una cara por frame. Metal y cristal
+  reflejan sus lamparas y su fuego y la sala devuelve luz rebotada, sin perder
+  la luz ambiente con la que se equilibro cada mapa: la intensidad de entorno
+  sigue siendo del mapa y la captura se amplifica para compensarla.
+- `SurfaceDetail`: microrrelieve procedural (normal, rugosidad y cavidades) en
+  los materiales de las armas en primera persona y de los zombis con modelo
+  GLB.
+- `MuzzleFlare` (`src/weapons/`): las armas de polvora cambian los sprites de
+  fogonazo por una llama de 40-80 ms con nucleo blanco amarillento, lenguas
+  naranjas hacia delante y forma distinta en cada disparo, segun el preset de
+  su cartucho (`config/muzzleFlares.ts`; la Barrett suma los chorros laterales
+  del freno). La luz del disparo dura lo mismo que la llama y la sonda de
+  reflejos no la captura. Las armas de energia y el ФАКЕЛ-33 no cambian.
+
+Ademas sube el presupuesto de luces puntuales a ocho, la anisotropia y las
+particulas ambientales. `?gfx-off=shadows,occlusion,reflections,film` apaga
+capas sueltas para comparar su efecto y su coste.
 
 Station 33 mantiene visibles solo las luces puntuales que caben en ese mismo
 presupuesto (`POINT_LIGHT_BUDGET`): las de la sala donde esta el jugador, por
@@ -928,7 +997,7 @@ mostrador, carro y bancos chocan con proxies AABB invisibles.
 Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene
 un presupuesto local estable de luces puntuales segun la calidad: ocho en
-Ultra, seis en Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
+Ultra Max, seis en Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
 parpadeo de bombillas ni fuegos) por alcance y distancia, con histeresis, para iluminar el hueco
 desde ambas plantas sin intercambios bruscos. Su decoracion estatica se
 fusiona por material y por planta (`MansionDecorBatch`); cada malla guarda su
@@ -944,6 +1013,32 @@ activas recompilaria los shaders.
 Los zombis se dibujan opacos y solo pasan a mezcla durante el fundido de
 muerte (`rendering/FadeMaterials.ts`); `Game.prepare` precompila esa variante.
 Asi una horda solapada en la escalera conserva el descarte por profundidad.
+
+### HUD de rendimiento
+
+`MOTDRULES` y `?debug` muestran un panel de diagnostico arriba a la derecha,
+debajo de pausa y separado de las notas de objetivos. Agrupa cadencia, escala
+del perfil con resolucion interna en pixeles, dibujo del ultimo frame y
+recursos registrados por el renderer. Los textos y numeros siguen el idioma
+del juego. Geometrias y texturas son recuentos, no memoria en MB; llamadas y
+triangulos describen carga enviada, no tiempo GPU ni un cuello de botella.
+
+La cadencia usa intervalos reales sin el limite del delta de simulacion,
+incluidos los parones largos. Muestra FPS medios, tiempo medio, P95 y peor
+frame de un historial de hasta 120 frames; su duracion varia con la cadencia.
+P95 es el tiempo que no supera el 95 % de las muestras. La grafica conserva
+el orden de los frames y recorta en 50 ms; el peor frame conserva el valor
+completo. La referencia explicita es 60 FPS / 16,7 ms: el estado acompana los
+FPS redondeados con verde desde 60, ambar de 30 a 59 y rojo por debajo de 30,
+sin afirmar que sea el presupuesto propio de cada dispositivo.
+
+El panel refresca cada 250 ms reales de partida. Al detener la simulacion
+conserva la ultima muestra marcada como pausada; al reanudar descarta el
+intervalo de reanudacion y empieza un historial nuevo. En pantallas bajas
+compacta las filas y omite la grafica y las explicaciones para conservar los valores.
+Fuentes: [medicion](../src/core/FramePerformance.ts) y
+[presentacion](../src/ui/DebugStats.ts). Para medidas comparables entre
+dispositivos, seguir el [protocolo manual](PERFORMANCE_BASELINE.md#protocolo-manual-de-escritorio-y-android).
 
 ## HUD y estadisticas de partida
 
@@ -971,6 +1066,17 @@ En tactil, la tarjeta es el control de usar: tocarla interactua, incluidas las
 acciones mantenidas. En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
 guarda y se aplica al instante, sin desactivar las interacciones del juego, y no
 oculta la tarjeta en tactil.
+
+Los mensajes tienen dos niveles. El anuncio central (`HUD.showRoundBanner`)
+queda para hechos de la partida: rondas, electricidad, evacuacion, jefe,
+compañero y anillo radiante; su tamaño se ajusta al ancho de pantalla y los
+titulos largos se parten en lineas equilibradas. La respuesta a una accion del
+jugador (`HUD.showNotice`: falta de puntos, municion o granadas llenas, compra
+no confirmada, anillo puesto o recargado, maquina cargando, arma mejorada) es
+una tarjeta compacta bajo el aviso de interaccion, roja si se rechaza, que dura
+unos dos segundos y no retrasa los objetivos. Si el propio aviso ya explica por
+que no se puede usar algo (puerta sellada, vitrina con muertes pendientes),
+pulsar no repite el mensaje.
 
 Los objetivos de los modos llegan al HUD como notas estructuradas
 (`ObjectiveNote`: emisor, tarea y progreso vivo). Arriba a la izquierda queda
@@ -1016,5 +1122,8 @@ de la pausa y de los botones de accion, con ronda, puntos, vida y bajas; headsho
 en la pausa para dejar libre la vista de combate.
 
 La pantalla de derrota muestra la ronda alcanzada y permite reintentar el mapa
-o volver al menu principal. En cooperativo solo el anfitrion puede reintentar;
+o volver al menu principal. El titulo adapta su tamano a la pantalla y su
+animacion de entrada mantiene la distribucion del texto, sin cambiar el
+espaciado entre letras. Respeta el movimiento reducido del sistema.
+En cooperativo solo el anfitrion puede reintentar;
 el invitado puede volver al menu o esperar al reinicio del anfitrion.

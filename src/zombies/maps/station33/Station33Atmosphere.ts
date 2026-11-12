@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { COCHERAS, CONSIGNA, MILICIA, SUBESTACION, TALLER, TALLER_CRANE, VESTIBULE } from '../Station33Config';
+import { COCHERAS, CONSIGNA, KOVKA, MILICIA, SUBESTACION, TALLER, TALLER_CRANE, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { ceilingHeightAt, VESTIBULE_VAULT } from './VaultProfile';
@@ -15,16 +15,17 @@ interface DustVolume {
   readonly seed: number;
 }
 
-/** Motes over the vestibule, the luggage-office hall, the train sheds, the machine room, the militia post and the workshop. */
+/** Motes over the vestibule, the luggage-office hall, the train sheds, the machine room, the militia post, the workshop and the KOVKA chamber. */
 const DUST_VOLUMES: ReadonlyArray<DustVolume> = [
-  { room: VESTIBULE, count: { low: 30, medium: 60, high: 90, ultra: 90 }, ceiling: 4.1, seed: 3407 },
-  { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30, ultra: 30 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
-  { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60, ultra: 60 }, ceiling: 4.1, seed: 3419 },
-  { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30, ultra: 30 }, ceiling: 4.1, seed: 3421 },
-  { room: MILICIA.hall, count: { low: 8, medium: 16, high: 24, ultra: 24 }, ceiling: MILICIA.ceilingHeight - 0.2, seed: 3423 },
-  { room: TALLER.hall, count: { low: 10, medium: 20, high: 30, ultra: 30 }, ceiling: TALLER.ceilingHeight - 0.2, seed: 3427 },
+  { room: VESTIBULE, count: { low: 30, medium: 60, high: 90, ultraMax: 135 }, ceiling: 4.1, seed: 3407 },
+  { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30, ultraMax: 45 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
+  { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60, ultraMax: 90 }, ceiling: 4.1, seed: 3419 },
+  { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30, ultraMax: 45 }, ceiling: 4.1, seed: 3421 },
+  { room: MILICIA.hall, count: { low: 8, medium: 16, high: 24, ultraMax: 36 }, ceiling: MILICIA.ceilingHeight - 0.2, seed: 3423 },
+  { room: TALLER.hall, count: { low: 10, medium: 20, high: 30, ultraMax: 45 }, ceiling: TALLER.ceilingHeight - 0.2, seed: 3427 },
+  { room: KOVKA.hall, count: { low: 12, medium: 24, high: 40, ultraMax: 60 }, ceiling: KOVKA.wallHeight, seed: 3431 },
 ];
-const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5, ultra: 5 };
+const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5, ultraMax: 8 };
 /**
  * Seepage points in the ceilings; the third one is the hole the vault
  * plaster fell from, the next two soak the luggage office, three drip from
@@ -45,6 +46,10 @@ const DRIP_SOURCES = [
   { x: 12.7, z: -30.4, interval: 2.2 },
   { x: 7.6, z: -57.2, interval: 2.0 },
   { x: 14.2, z: -51.4, interval: 2.7 },
+  // The KOVKA chamber's vault weeps onto the deck, a lane and the deck behind the reactor.
+  { x: -11.8, z: -43.2, interval: 1.9 },
+  { x: -24.0, z: -58.3, interval: 2.5 },
+  { x: -8.2, z: -67.6, interval: 1.6 },
 ] as const;
 /** Severed cables hanging out of the ceilings: anchor, length and sway phase. */
 const HANGING_CABLES = [
@@ -57,6 +62,9 @@ const HANGING_CABLES = [
   { x: 12.0, z: -44.2, length: 1.3, phase: 0.9 },
   { x: 9.3, z: -31.6, length: 0.7, phase: 2.7 },
   { x: 7.2, z: -53.6, length: 1.0, phase: 1.7 },
+  { x: -13.4, z: -42.8, length: 2.2, phase: 0.6 },
+  { x: -23.6, z: -61.2, length: 2.6, phase: 2.4 },
+  { x: -7.4, z: -52.4, length: 1.8, phase: 4.6 },
 ] as const;
 /** The fluorescent fixture that tore loose from its slot and hangs by one chain. */
 const DANGLING_FIXTURE = { x: 2, z: 6.75, chain: 0.9 } as const;

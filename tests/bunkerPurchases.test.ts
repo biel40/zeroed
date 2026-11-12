@@ -30,6 +30,7 @@ function makeMode(points: number): {
     hud: {
       flashNotEnoughPoints: () => { calls.denied++; },
       showRoundBanner: (title: string) => { calls.banners.push(title); },
+      showNotice: (_tone: string, title: string) => { calls.banners.push(title); },
       updateZombies: () => undefined,
     },
   };

@@ -26,7 +26,7 @@ function hudHarness(): { hud: HUD; element: (name: string) => HudElement; object
     return node;
   };
   const hud = Object.create(HUD.prototype) as HUD;
-  for (const name of ['root', 'roundBanner', 'bannerTitle', 'bannerSub', 'ringFlash', 'protectionOverlay', 'radianceOverlay', 'damageOverlay', 'zPoints', 'bossBar']) {
+  for (const name of ['root', 'roundBanner', 'bannerTitle', 'bannerSub', 'notice', 'noticeTitle', 'noticeDetail', 'ringFlash', 'protectionOverlay', 'radianceOverlay', 'damageOverlay', 'zPoints', 'bossBar']) {
     Object.assign(hud, { [name]: element(name) });
   }
   const objectives = { update: vi.fn() };
@@ -44,7 +44,8 @@ describe('HUD between runs', () => {
   it.each(['recharged', 'activated'])('does not replay a ring %s announcement or flash when another map starts', (event) => {
     const { hud, element, objectives } = hudHarness();
     hud.setHudVisible(true);
-    hud.showRoundBanner('RESURRECTION', event);
+    hud.showRoundBanner('ROUND 4');
+    hud.showNotice('info', 'RESURRECTION', event);
     if (event === 'activated') {
       hud.flashRing();
       hud.setProtection(0.8);
@@ -57,7 +58,7 @@ describe('HUD between runs', () => {
     hud.setHudVisible(false);
     hud.setHudVisible(true);
     expect(element('root').classList.contains('hidden')).toBe(false);
-    for (const name of ['roundBanner', 'ringFlash', 'damageOverlay']) {
+    for (const name of ['roundBanner', 'notice', 'ringFlash', 'damageOverlay']) {
       expect(element(name).classList.contains('active')).toBe(false);
     }
     expect(element('zPoints').classList.contains('denied')).toBe(false);
@@ -71,10 +72,10 @@ describe('HUD between runs', () => {
     expect(element('damageOverlay').classList.contains('protected')).toBe(false);
 
     // A genuine activation in the next run still uses the same effects.
-    hud.showRoundBanner('RESURRECTION', 'activated');
+    hud.showNotice('info', 'RESURRECTION', 'activated');
     hud.flashRing();
     hud.setProtection(0.8);
-    expect(element('roundBanner').classList.contains('active')).toBe(true);
+    expect(element('notice').classList.contains('active')).toBe(true);
     expect(element('ringFlash').classList.contains('active')).toBe(true);
     expect(element('protectionOverlay').style.opacity).toBe('0.8');
   });

@@ -155,7 +155,7 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
 /** Map ambience with a procedural voice in this class. */
 export type AmbientCueSound =
   | 'pa-crackle' | 'distant-train' | 'power-dip' | 'metal-echo' | 'machinery'
-  | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl';
+  | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl' | 'forge-wail';
 
 /** What to play for a map ambient event; `sampleFile` (in `assets/audio/`) replaces the procedural sound. */
 export interface AmbientCuePlayback {
@@ -1735,6 +1735,7 @@ export class AudioSystem {
       case 'wind-gust': this.playWindGust(output, t); break;
       case 'ember-crackle': this.playEmberCrackle(output); break;
       case 'distant-howl': this.playDistantHowl(output, t); break;
+      case 'forge-wail': this.playForgeWail(audio, output, t); break;
     }
   }
 
@@ -1840,6 +1841,36 @@ export class AudioSystem {
     for (let pop = 0; pop < 10; pop++) {
       this.tick(Math.random() * 1.6, 1400 + Math.random() * 2600, 0.03 + Math.random() * 0.04, 3, 0.025, output);
     }
+  }
+
+  /**
+   * A reactor straining through a forge, about three and a half seconds: a
+   * beating sub drone of detuned saws swelling and dying, a voice-like moan
+   * gliding down through it from below, a slow heartbeat in the pit and
+   * the vault's metal groaning.
+   */
+  private playForgeWail(audio: AudioContextParts, output: AudioNode, t: number): void {
+    const swell = [0.05, 0.09, 0.13, 0.16, 0.16, 0.13, 0.09, 0.05];
+    swell.forEach((level, step) => {
+      const at = t + step * 0.42;
+      const root = 41 + step * 1.3;
+      this.sweep(0, 'sawtooth', root, root * 0.97, level, 0.95, at, output);
+      this.sweep(0, 'sawtooth', root * 1.018, root * 0.99, level * 0.8, 0.95, at, output);
+    });
+    const moan = audio.ctx.createBiquadFilter();
+    moan.type = 'bandpass';
+    moan.frequency.value = 520;
+    moan.Q.value = 5;
+    moan.connect(output);
+    for (let breath = 0; breath < 4; breath++) {
+      const pitch = 150 - breath * 14;
+      this.sweep(0, 'sawtooth', pitch, pitch * 0.7, 0.07, 1.1, t + 0.5 + breath * 0.7, moan);
+    }
+    for (let beat = 0; beat < 4; beat++) {
+      this.tick(beat * 0.85, 55, 0.24, 1, 0.3, output);
+      this.tick(beat * 0.85 + 0.2, 46, 0.15, 1, 0.25, output);
+    }
+    for (const at of [0.8, 1.9, 2.9]) this.tick(at, 800 + Math.random() * 600, 0.035, 14, 0.6, output);
   }
 
   /** Something screaming far outside: a rising howl that breaks and falls away. */

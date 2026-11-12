@@ -159,7 +159,7 @@ describe('lethal grenades in a Zombies run', () => {
     expect(internals.economy.points).toBe(buy.cost);
     expect(internals.grenades.hand.count).toBe(LETHAL_GRENADE_LOADOUT.max);
     mode.onInteract();
-    expect(side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('banner.grenadesFull'));
+    expect(side.hud.showNotice).toHaveBeenLastCalledWith('denied', t('banner.grenadesFull'));
     expect(internals.economy.points).toBe(buy.cost);
   });
 });

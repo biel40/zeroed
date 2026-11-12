@@ -35,6 +35,7 @@ function makePurchase(startingPoints: number, owned: boolean, ammoFull = false) 
     hud: {
       flashNotEnoughPoints: () => { calls.denied++; },
       showRoundBanner: (title: string) => { calls.banners.push(title); },
+      showNotice: (_tone: string, title: string) => { calls.banners.push(title); },
       updateZombies: () => undefined,
     },
   };
@@ -109,7 +110,7 @@ describe('Wall Buy', () => {
       canRefillWeaponAmmo: () => false,
       grantWeapon: () => { calls.grants++; return true; },
       refillWeaponAmmo: () => false,
-      hud: { flashNotEnoughPoints: () => undefined, showRoundBanner: () => undefined },
+      hud: { flashNotEnoughPoints: () => undefined, showNotice: () => undefined },
     };
     (mode as unknown as { findFacingDoor(): null }).findFacingDoor = () => null;
     (mode as unknown as { findRepairableBarrier(): { isDamaged: boolean } }).findRepairableBarrier = () => ({ isDamaged: true });

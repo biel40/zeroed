@@ -62,6 +62,7 @@ describe('Mystery Box purchase with Points', () => {
           mock.deniedFlashes++;
         },
         showRoundBanner: () => undefined,
+        showNotice: () => undefined,
       },
     };
     // Bypass the spatial gate: the player is next to the box in these tests.

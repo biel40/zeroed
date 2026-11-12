@@ -49,8 +49,22 @@ sufra tirones de compilacion de shaders.
 
 ## Contratos
 
-- `Game` gestiona el HUD de rendimiento. El modo puede solicitarlo para la
-  partida mediante `ModeContext.setDebugStatsEnabled`.
+- `Game` gestiona la vida y la pausa del HUD de rendimiento; le entrega el
+  intervalo real entre frames, separado del delta limitado de simulacion.
+  [FramePerformance](../src/core/FramePerformance.ts) calcula el historial sin
+  DOM ni Three.js; [DebugStats](../src/ui/DebugStats.ts) lo presenta junto a los
+  contadores del renderer. El modo lo solicita mediante
+  `ModeContext.setDebugStatsEnabled`.
+
+- Mejora de armas: el mapa presenta su maquina (`ArenaUpgradeMachine`, con
+  la `UpgradeMachine` compartida) y su acabado (`WeaponFinish`); el modo
+  cobra y lleva el estado de la partida (`ZombiesWeaponUpgrade`, sobre la
+  logica pura `WeaponUpgrades`) y aplica el dano en `weaponDamageScale`; el
+  shell viste la vista del arma (`ModeContext.setWeaponFinish`,
+  `WeaponFinishLayer`) y la desviste al reiniciar el arsenal. Las copias de
+  material del acabado conservan los parches de shader del original (el
+  rango de profundidad del arma en primera persona) antes de anadir el suyo. Una puerta
+  puede llevar un sello (`PointDoorSeal`) que la saca de la venta.
 
 - `Input` combina el estado desktop/tactil con el estado aislado de
   `GamepadInput`; el adaptador solo acepta el mapeo estandar del navegador y

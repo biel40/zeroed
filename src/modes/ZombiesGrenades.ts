@@ -98,12 +98,12 @@ export class ZombiesGrenades {
     const buy = this.facingBuy();
     if (!buy) return false;
     if (this.hand.isFull) {
-      this.ctx.hud.showRoundBanner(t('banner.grenadesFull'));
+      this.ctx.hud.showNotice('denied', t('banner.grenadesFull'));
       return true;
     }
     if (!this.economy.spend(buy.cost)) {
       this.ctx.hud.flashNotEnoughPoints();
-      this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: buy.cost }));
+      this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: buy.cost }));
       return true;
     }
     this.hand.refill();

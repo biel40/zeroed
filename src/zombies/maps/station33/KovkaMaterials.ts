@@ -17,6 +17,10 @@ export interface KovkaMaterials {
   readonly boreLining: THREE.MeshStandardMaterial;
   /** Bare copper of the coils, busbars and electrodes. */
   readonly copper: THREE.MeshStandardMaterial;
+  /** Dark green-grey oil paint of the dado along the walls. */
+  readonly wallPaint: THREE.MeshStandardMaterial;
+  /** Black, still water flooding the bottom of the pit: no texture, only the lamps' glints. */
+  readonly pitWater: THREE.MeshStandardMaterial;
 }
 
 export function createKovkaMaterials(materials: Station33Materials): KovkaMaterials {
@@ -29,5 +33,7 @@ export function createKovkaMaterials(materials: Station33Materials): KovkaMateri
     reactorSteel: new THREE.MeshStandardMaterial({ name: 'station33_kovka_reactor_steel', color: 0x3b4855, roughness: 0.5, metalness: 0.6 }),
     boreLining: new THREE.MeshStandardMaterial({ name: 'station33_kovka_bore', color: 0x191c1e, roughness: 0.6, metalness: 0.5, side: THREE.DoubleSide }),
     copper: new THREE.MeshStandardMaterial({ name: 'station33_kovka_copper', color: 0x8a4b2c, roughness: 0.38, metalness: 0.85 }),
+    wallPaint: new THREE.MeshStandardMaterial({ name: 'station33_kovka_wall_paint', color: 0x26302a, roughness: 0.8, metalness: 0.05 }),
+    pitWater: new THREE.MeshStandardMaterial({ name: 'station33_kovka_pit_water', color: 0x060a08, roughness: 0.06, metalness: 0.7 }),
   };
 }

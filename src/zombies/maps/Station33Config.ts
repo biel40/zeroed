@@ -11,6 +11,8 @@ import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { GrenadeWallBuyPlacement } from './shared/GrenadeWallBuy';
 import type { WeaponStationPlacement } from './shared/WeaponStation';
+import type { UpgradeMachinePlacement } from './shared/UpgradeMachine';
+import type { WeaponFinish } from '../../weapons/WeaponFinish';
 import { PTRS41_RESKIN, reskinWeapons } from '../../config/weaponReskins';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
@@ -281,11 +283,10 @@ export const KOVKA_REACTOR = {
 } as const;
 
 /**
- * Deck kept free for the weapon upgrade machine to come: a `width` x
- * `depth` footprint centred on (`x`, `z`), on the reactor's axis with its
- * back to the pit rail and its front to the chamber's south wall, and `approach` metres of
- * clear deck in front of it where the player will stand. Nothing stands
- * there yet.
+ * The weapon upgrade machine's deck: a `width` x `depth` footprint centred
+ * on (`x`, `z`), on the reactor's axis with its back to the pit rail and
+ * its front to the chamber's south wall, and `approach` metres of clear
+ * deck in front of it where the player stands to use it.
  */
 export const KOVKA_UPGRADE_SITE = {
   x: KOVKA_REACTOR.x,
@@ -469,6 +470,8 @@ export interface Station33Door {
   readonly zone: Station33ZoneId;
   /** Enamel plate over the door on the side it is bought from. */
   readonly plate: SignId;
+  /** Sealed, not for sale, until the main switch powers the station. */
+  readonly requiresPower?: boolean;
 }
 
 /**
@@ -479,7 +482,8 @@ export interface Station33Door {
  * sheds' dead tunnel and blast gate. The militia post's door (3000), the
  * vestibule's third way out, sits in the west wall, in line with the turnstiles.
  * The KOVKA hatch (3500), the dearest, sits in the machine room's west wall,
- * north of its motor-generator, at the end of the corridor to the chamber.
+ * north of its motor-generator, at the end of the corridor to the chamber;
+ * it stays sealed until the main switch powers the forge.
  */
 export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
   { id: 'to-consigna', x: EAST_WALL_X, z: 8.8, outwardX: 1, outwardZ: 0, cost: 750, zone: 'consigna', plate: 'luggage-office' },
@@ -492,7 +496,7 @@ export const STATION33_DOORS: ReadonlyArray<Station33Door> = [
   { id: 'to-taller', x: 5.8, z: SUBESTACION_NORTH_WALL_Z, outwardX: 0, outwardZ: -1, cost: 2000, zone: 'taller', plate: 'maintenance' },
   {
     id: 'to-kovka', x: SUBESTACION.hall.minX - STATION33_WALL_THICKNESS / 2, z: (KOVKA_CORRIDOR.minZ + KOVKA_CORRIDOR.maxZ) / 2,
-    outwardX: -1, outwardZ: 0, cost: 3500, zone: 'kovka', plate: 'kovka',
+    outwardX: -1, outwardZ: 0, cost: 3500, zone: 'kovka', plate: 'kovka', requiresPower: true,
   },
 ];
 
@@ -910,7 +914,7 @@ export const PROTOCOL33_SNOWFALL = {
     minZ: PROTOCOL33_SURFACE.yard.minZ - 12,
     maxZ: PROTOCOL33_SURFACE.yard.maxZ + 4,
   },
-  flakes: { low: 260, medium: 520, high: 900, ultra: 900 },
+  flakes: { low: 260, medium: 520, high: 900, ultraMax: 1350 },
   fallSpeed: { min: 0.55, max: 1.15 },
   wind: { x: 0.35, z: -0.12 },
   sway: 0.35,
@@ -1209,8 +1213,53 @@ export const MILICIA_STAR_COLOR = 0xff3a26;
 export const SURFACE_FLOOD_COLOR = 0xbfd2e2;
 /** Cold electric blue of the KOVKA reactor's core, fed by the substation's mains. */
 export const KOVKA_CORE_COLOR = 0x5aa8ff;
+
+/**
+ * A weapon forged in KOVKA carries the chamber's captured matter: a violet
+ * and magenta nebula drifting slowly through its body, pale veins and
+ * twinkling stars, its bright steel turned to polished black, and arcs of
+ * the reactor's charge crackling over it.
+ */
+export const KOVKA_WEAPON_FINISH: WeaponFinish = {
+  id: 'kovka',
+  nebula: { deep: 0x0a0318, body: 0x3a0f8c, glow: 0xb32ee0, wisp: 0xffd6ff, scale: 7, flow: 0.12, glowStrength: 0.9 },
+  trim: 0x17131f,
+  arcs: { color: 0xc9a6ff, count: 4 },
+};
+
+/**
+ * The forge on its reserved deck before the reactor: 5000 a weapon, once
+ * per weapon, double damage, thirty seconds of forging, a wait the player
+ * has to earn against the horde; it runs on the mains
+ * like the hatch that leads to it.
+ */
+export const KOVKA_UPGRADE_MACHINE: UpgradeMachinePlacement = {
+  id: 'kovka-forge',
+  x: KOVKA_UPGRADE_SITE.x,
+  z: KOVKA_UPGRADE_SITE.z,
+  facingX: KOVKA_UPGRADE_SITE.facingX,
+  facingZ: KOVKA_UPGRADE_SITE.facingZ,
+  cost: 5000,
+  damageMultiplier: 2,
+  forgeSeconds: 30,
+  requiresPower: true,
+};
+
+/**
+ * What the reactor sounds like while the forge runs: a wail from the pit,
+ * placed at the middle of the drum so it rolls round the whole vault.
+ */
+export const KOVKA_FORGE_CUE: ArenaAmbientCue = {
+  sound: 'forge-wail',
+  position: { x: KOVKA_REACTOR.x, y: KOVKA_REACTOR.axisY, z: (KOVKA_REACTOR.frontZ + KOVKA_REACTOR.backZ) / 2 },
+};
+
+/** Zones whose doors lead from the vestibule to the forge, in order (the developer console opens them). */
+export const KOVKA_ROUTE: ReadonlyArray<Station33ZoneId> = ['cocheras', 'subestacion', 'kovka'];
 /** Where the KOVKA chamber's lamps hang: over the deck before the reactor, and along both lanes beside the pit. */
 const KOVKA_DECK_LAMP_Z = KOVKA.hall.maxZ - 4.3;
+/** Over the test subjects' cells, against the chamber's south wall (see `KovkaDressing`). */
+const KOVKA_CAGE_LAMP_X = KOVKA.hall.minX + 2.45;
 const KOVKA_LANE_ZS = [KOVKA.pit.maxZ - 2.7, (KOVKA.pit.minZ + KOVKA.pit.maxZ) / 2, KOVKA.pit.minZ + 2.3] as const;
 
 /**
@@ -1222,6 +1271,8 @@ export const POWER_LEVER = { x: (SUBESTACION.gallery.minX + SUBESTACION.gallery.
 /** The shared knife switch (`PowerLever`) on that wall, facing into the machine room. */
 export const STATION33_POWER_SWITCH: PowerLeverPlacement = {
   id: 'station33-main-switch', x: POWER_LEVER.x, z: POWER_LEVER.z, facingX: 0, facingZ: 1,
+  // The forge's hatch waits for this: tell the player it is open for business.
+  announcementKey: 'banner.kovkaUnsealed',
 };
 
 /**
@@ -1324,6 +1375,8 @@ export const STATION33_POINT_LIGHTS: ReadonlyArray<Station33PointLight> = [
     x: KOVKA_REACTOR.x, y: KOVKA_REACTOR.axisY + 1.2, z: KOVKA_REACTOR.frontZ + 0.6,
     color: KOVKA_CORE_COLOR, intensity: 8, distance: 13, circuit: 'mains', zone: 'kovka',
   },
+  // The cells' battery lamp: red over the bars, the only light on them before the power.
+  { x: KOVKA_CAGE_LAMP_X, y: 3.2, z: KOVKA.hall.maxZ - 0.6, color: EMERGENCY_COLOR, intensity: 3.5, distance: 6, circuit: 'emergency', zone: 'kovka' },
   { x: -23.9, y: 3.85, z: KOVKA_LANE_ZS[1], color: FLUORESCENT_COLOR, intensity: 5, distance: 9, circuit: 'failing', zone: 'kovka' },
   { x: -10, y: 2.6, z: KOVKA.hall.maxZ - 0.6, color: AMBER_LAMP_COLOR, intensity: 3, distance: 6.5, circuit: 'amber', zone: 'kovka' },
   { x: -6.9, y: 3.85, z: KOVKA_LANE_ZS[2], color: FLUORESCENT_COLOR, intensity: 7, distance: 10, circuit: 'mains', zone: 'kovka' },
@@ -1425,6 +1478,7 @@ export const STATION33_BEACONS: ReadonlyArray<Station33WallFitting> = [
   { x: 13.6, z: TALLER.hall.minZ, facingX: 0, facingZ: 1 },
   { x: PROTOCOL33_PANEL.x, z: PROTOCOL33_PANEL.z, facingX: -1, facingZ: 0 },
   { x: KOVKA_REACTOR.x, z: KOVKA.hall.minZ, facingX: 0, facingZ: 1 },
+  { x: KOVKA_CAGE_LAMP_X, z: KOVKA.hall.maxZ, facingX: 0, facingZ: -1 },
 ];
 
 /** Amber glass sconces on the side walls; `yaw` faces the hall. */
@@ -1504,6 +1558,17 @@ export const STATION33_AMBIENT_EVENTS: ReadonlyArray<Station33AmbientEvent> = [
     initialDelay: 55,
     minInterval: 80,
     maxInterval: 160,
+  },
+  {
+    // The dormant reactor settles in its pit: a metal groan rolling under the KOVKA vault.
+    id: 'kovka-groan',
+    sound: 'metal-echo',
+    position: { x: KOVKA_REACTOR.x, y: -1, z: (KOVKA_REACTOR.frontZ + KOVKA_REACTOR.backZ) / 2 },
+    effect: 'none',
+    duration: 0,
+    initialDelay: 40,
+    minInterval: 50,
+    maxInterval: 110,
   },
 ];
 

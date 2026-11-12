@@ -353,7 +353,7 @@ describe('ФАКЕЛ-33 weapon station', () => {
       grantWeapon: (id: string) => { grants.push(id); return true; },
       canRefillWeaponAmmo: () => true,
       refillWeaponAmmo: () => { refills++; return true; },
-      hud: { flashNotEnoughPoints: () => undefined, showRoundBanner: () => undefined, updateZombies: () => undefined },
+      hud: { flashNotEnoughPoints: () => undefined, showNotice: () => undefined, updateZombies: () => undefined },
     };
     for (const name of ['findFacingDoor', 'findRepairableBarrier', 'findFacingSoulLamp', 'findFacingRitualCircle', 'findFacingWallBuy']) {
       internals[name] = () => null;

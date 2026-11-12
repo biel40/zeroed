@@ -129,7 +129,7 @@ describe('ZEUS-77 temporary power', () => {
 
     internals.onEnergyImpact(impact, ZEUS, null, 8);
     expect(machine.powered).toBe(true);
-    expect(side.hud.showRoundBanner).toHaveBeenLastCalledWith(t(SLEIGHT.nameKey), t('banner.machineCharged', { seconds: ZEUS_MACHINE_CHARGE_SECONDS }));
+    expect(side.hud.showNotice).toHaveBeenLastCalledWith('info', t(SLEIGHT.nameKey), t('banner.machineCharged', { seconds: ZEUS_MACHINE_CHARGE_SECONDS }));
     expect(side.ctx.audio.playTeslaChain).toHaveBeenLastCalledWith(1);
     faceCrewLocker(run);
     expect(mode.getInteractPrompt()).toContain(String(PRICE));

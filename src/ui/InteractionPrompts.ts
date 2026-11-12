@@ -26,11 +26,22 @@ export function actionKey(touch: boolean, hold = false): string {
   return t(touch ? 'prompt.pressTouch' : 'prompt.press');
 }
 
-export function doorPrompt(door: PointDoor, touch: boolean): string {
-  if (door.prompt) return t('prompt.doorAction', { action: t(door.prompt), key: actionKey(touch), cost: door.cost });
+function doorName(door: PointDoor): string {
   const nameKey = `door.${door.id}`;
-  const name = isTranslationKey(nameKey) ? t(nameKey) : door.id.toUpperCase().replace(/-/g, ' ');
-  return t('prompt.unlockDoor', { door: name, key: actionKey(touch), cost: door.cost });
+  return isTranslationKey(nameKey) ? t(nameKey) : door.id.toUpperCase().replace(/-/g, ' ');
+}
+
+export function doorPrompt(door: PointDoor, touch: boolean): string {
+  const sealed = doorSealedMessage(door);
+  if (sealed) return sealed;
+  if (door.prompt) return t('prompt.doorAction', { action: t(door.prompt), key: actionKey(touch), cost: door.cost });
+  return t('prompt.unlockDoor', { door: doorName(door), key: actionKey(touch), cost: door.cost });
+}
+
+/** What a sealed door tells the player instead of its price; null while it is for sale. */
+function doorSealedMessage(door: PointDoor): string | null {
+  const message = door.isSealed ? door.sealMessage : undefined;
+  return message ? t(message, { door: doorName(door) }) : null;
 }
 
 /** A grenade wall: fills the pouch of `grenade` for `cost`. */

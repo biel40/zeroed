@@ -24,7 +24,7 @@ Sigue AGENTS.md; ningun modo depende de un arma concreta.
 | Archivo | Que anadir |
 |---|---|
 | `src/weapons/WeaponTypes.ts` | El id en `WeaponId` y el valor en `ViewModelConfig.frame` (con su linea en el comentario). |
-| `src/config/weapons.ts` | La `WeaponDefinition` (comentario breve: arma real y papel de juego), el id en `WEAPON_ORDER` y en `ZOMBIES_WEAPON_PRELOAD`. Si es automatica, su `heat` (ver 3b). |
+| `src/config/weapons.ts` | La `WeaponDefinition` (comentario breve: arma real y papel de juego), el id en `WEAPON_ORDER` y en `ZOMBIES_WEAPON_PRELOAD`. Si es automatica, su `heat` (ver 3b). Si dispara polvora, su `muzzleFlare` con el preset de `src/config/muzzleFlares.ts` que corresponda a su cartucho (fogonazo de Ultra Max). |
 | `src/weapons/<Arma>ViewModel.ts` | `<ARMA>_PROFILE` exportado + `build<Arma>(config)`. |
 | `src/weapons/WeaponView.ts` | Import y rama en `buildProceduralViewModel`. |
 | `src/zombies/wallbuys/WallBuyView.ts` | Rama en el constructor + `build<Arma>Silhouette` trazada desde el mismo `<ARMA>_PROFILE`. |

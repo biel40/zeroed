@@ -58,3 +58,27 @@ describe('PointDoor pure logic', () => {
     expect(door.isLocked).toBe(true);
   });
 });
+
+describe('PointDoor seal', () => {
+  it('is not for sale while sealed, charges nothing, and sells normally once the seal lifts', () => {
+    let powered = false;
+    const door = new PointDoor('d1', 0, 0, 0, 1, { cost: 3500, seal: { isSealed: () => !powered, message: 'prompt.doorNeedsPower' } });
+    let charged = 0;
+    const spend = (cost: number): boolean => { charged += cost; return true; };
+    expect(door.isSealed).toBe(true);
+    expect(door.sealMessage).toBe('prompt.doorNeedsPower');
+    expect(door.tryUnlock(spend)).toEqual({ cost: 3500, success: false, sealed: true });
+    expect(charged).toBe(0);
+    expect(door.isLocked).toBe(true);
+    powered = true;
+    expect(door.isSealed).toBe(false);
+    expect(door.tryUnlock(spend)).toEqual({ cost: 3500, success: true });
+    expect(charged).toBe(3500);
+  });
+
+  it('never reports a seal on a door without one', () => {
+    const door = new PointDoor('d1', 0, 0, 0, 1, { cost: 750 });
+    expect(door.isSealed).toBe(false);
+    expect(door.sealMessage).toBeUndefined();
+  });
+});

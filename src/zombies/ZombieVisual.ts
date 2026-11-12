@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { ElectricArcRibbons, type ElectricArcStyle } from '../rendering/ElectricArcRibbons';
 import { registerFadeMaterial, setFadeOpacity } from '../rendering/FadeMaterials';
 import {
   installVortex9Dissolve,
@@ -10,9 +11,9 @@ import {
 import type { ZombieState } from './Zombie';
 import { windowVaultPose, type WindowVaultPose } from './barriers/WindowVault';
 import { ShinyStars } from './ShinyStars';
-import { ZombieElectricArcs } from './ZombieElectricArcs';
 import { ZombieFlames } from './ZombieFlames';
 import { installZombieChar, setZombieChar } from '../rendering/ZombieCharShader';
+import { installSurfaceDetail, ZOMBIE_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
 import { ZombieLimb } from './ZombieLimb';
 import { AccentChannel, ZombieHitAccent } from './ZombieHitAccent';
 import type { ZombieBodyRegion } from './wounds/ZombieBodyRegion';
@@ -42,6 +43,8 @@ export interface ZombieModelSource {
   readonly clips: THREE.AnimationClip[];
   /** Map override of the model's eye colors; omitted keeps `ZombieModelConfig.eyes`. */
   readonly eyes?: ZombieEyeColors;
+  /** Layers procedural micro-relief on the body materials (top quality tier). */
+  readonly surfaceDetail?: boolean;
 }
 
 
@@ -156,6 +159,10 @@ const ELECTRIC_COLOR = 0x5fc8ff;
 const ELECTRIC_FADE = 0.8;
 /** Joints the residual arcs jump between, spread head to toe. */
 const ARC_ANCHORS = ['Hips', 'Spine2', 'Head', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
+/** Residual ZEUS-77 charge crawling over a body, in metres. */
+const ZOMBIE_ARC_STYLE: ElectricArcStyle = {
+  arcs: 8, pointsPerArc: 7, rerollInterval: 0.05, halfWidth: 0.017, jitter: 0.1, skinOffset: 0.05, color: 0x9fe0ff, activeChance: 1,
+};
 /**
  * ФАКЕЛ-33 burns: a living body scorches up to SCORCH_ALIVE while it burns;
  * one burnt to death chars completely over CHAR_SECONDS, its embers glow
@@ -604,7 +611,7 @@ export class ZombieVisual {
   private flash = 0;
   /** Seconds of ZEUS-77 charge left on the body; arcs persist through death. */
   private electrified = 0;
-  private readonly electricArcs: ZombieElectricArcs;
+  private readonly electricArcs: ElectricArcRibbons;
   /** Seconds of ФАКЕЛ-33 fire left on the body; it keeps burning through death. */
   private burning = 0;
   private readonly flames: ZombieFlames;
@@ -841,6 +848,7 @@ export class ZombieVisual {
     for (const material of this.materials) {
       installVortex9Dissolve(material, this.modelConfig.height);
       installZombieChar(material);
+      if (source?.surfaceDetail) installSurfaceDetail(material, ZOMBIE_SURFACE_DETAIL);
     }
     this.root.updateMatrixWorld(true);
     placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());
@@ -856,7 +864,8 @@ export class ZombieVisual {
     const arcAnchors = this.rig
       ? Object.values(this.rig)
       : ARC_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
-    this.electricArcs = new ZombieElectricArcs(arcAnchors);
+    this.electricArcs = new ElectricArcRibbons(arcAnchors, ZOMBIE_ARC_STYLE);
+    this.electricArcs.mesh.name = 'zombie-electric-arcs';
     this.root.add(this.electricArcs.mesh);
     const rig = this.rig;
     const flameAnchors = rig

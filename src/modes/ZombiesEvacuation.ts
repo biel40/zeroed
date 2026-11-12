@@ -239,7 +239,7 @@ export class ZombiesEvacuation {
       case 'ready':
         if (!this.run.economy.canAfford(cost)) {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
+          this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
           return true;
         }
         // The protocol starts once; only then is the price taken, so it is paid exactly once.

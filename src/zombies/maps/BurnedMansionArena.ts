@@ -296,7 +296,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
   /** Bound once: the scheduler calls it from the frame loop. */
   private readonly playAmbientEvent = (cue: ArenaAmbientCue): void => this.onAmbientCue?.(cue);
   private readonly atmosphere: MansionAtmosphere;
-  /** Ultra quality only. */
+  /** Ultra Max quality only. */
   private readonly fires: MansionFires | null;
   private readonly banquetGhost: MansionBanquetGhost;
   private readonly watchingPortrait: MansionWatchingPortrait;
@@ -357,7 +357,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     buildMansionExterior(dressing);
     this.buildLighting(dressing);
     this.atmosphere = new MansionAtmosphere(dressing);
-    this.fires = profile.quality === 'ultra' ? new MansionFires(dressing) : null;
+    this.fires = profile.quality === 'ultraMax' ? new MansionFires(dressing) : null;
     this.banquetGhost = new MansionBanquetGhost(this.group);
     this.watchingPortrait = new MansionWatchingPortrait(dressing);
     // No mansion light casts shadows; the batch only receives them.

@@ -133,7 +133,7 @@ function addCatwalk(context: Station33BuildContext, kovka: KovkaMaterials, side:
   const { y } = CATWALK;
   batch.addBox(materials.checkerPlate, centerX, y - 0.03, (minZ + maxZ) / 2, CATWALK.width, 0.06, maxZ - minZ);
   batch.addBox(kovka.primer, outerX, y - 0.1, (minZ + maxZ) / 2, 0.06, 0.14, maxZ - minZ);
-  for (const z of kovkaBayLines()) {
+  for (const z of kovkaBayLines().filter((line) => line > minZ && line < maxZ)) {
     batch.addBox(kovka.primer, centerX, y - 0.14, z, CATWALK.width, 0.1, 0.08);
     const strut = Math.hypot(CATWALK.width, 0.9);
     batch.addBox(kovka.primer, centerX, y - 0.6, z, strut, 0.06, 0.06, 0, 0, inward * Math.atan2(0.9, CATWALK.width));

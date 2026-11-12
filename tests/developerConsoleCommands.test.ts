@@ -7,6 +7,7 @@ function actions(): DeveloperConsoleActions {
   return {
     equip: vi.fn(() => true), ring: vi.fn(() => true), refill: vi.fn(() => true),
     infiniteAmmo: vi.fn(), equipped: () => 'm1911', invincible: vi.fn(), boss: vi.fn(() => true),
+    forge: vi.fn(() => true),
   };
 }
 
@@ -27,7 +28,7 @@ describe('developer console commands', () => {
 
   it.each(['damage', 'damage 0', 'damage -1', 'damage Infinity', 'damage NaN',
     'damage 101', 'damage 2 extra', 'weapon constructor', 'ring __proto__',
-    'weapon nope', 'invincible maybe', 'ammo', 'ammo infinite extra', 'help extra', 'boss extra'])
+    'weapon nope', 'invincible maybe', 'ammo', 'ammo infinite extra', 'help extra', 'boss extra', 'forge extra'])
   ('rejects invalid input without side effects: %s', (line) => {
     const commands = new DeveloperConsoleCommands();
     const target = actions();
@@ -64,6 +65,16 @@ describe('developer console commands', () => {
     expect(target.invincible).toHaveBeenCalledWith(false);
     target.equip = () => false;
     expect(commands.execute('weapon m1911', target)).toBe(t('dev.unavailable'));
+  });
+
+  it('reports whether the forge shortcut could take the player there, also as kovka', () => {
+    const commands = new DeveloperConsoleCommands();
+    const target = actions();
+    expect(commands.execute('forge', target)).toBe(t('dev.ok'));
+    expect(commands.execute('KOVKA', target)).toBe(t('dev.ok'));
+    expect(target.forge).toHaveBeenCalledTimes(2);
+    target.forge = () => false;
+    expect(commands.execute('forge', target)).toBe(t('dev.unavailable'));
   });
 
   it('reports whether the boss shortcut could start', () => {

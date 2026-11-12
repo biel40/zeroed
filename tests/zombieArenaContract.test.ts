@@ -22,10 +22,12 @@ const ARENA_BUDGETS: Record<ZombieMapId, Pick<ArenaMetrics, BudgetMetric>> = {
     drawables: 710, visibleDrawables: 430, triangles: 91_000, visibleTriangles: 60_000,
     geometryMiB: 6, materials: 215, colliders: 100, wallBoxes: 85, navCells: 15_000,
   },
-  // The KOVKA chamber and its corridor widened floor 0's navigation westwards and added their own solids and invisible proxies.
+  // The KOVKA chamber and its corridor widened floor 0's navigation westwards and added their own solids,
+  // invisible proxies and set dressing (about 4k visible triangles of cells, console, stretcher and flood),
+  // then the forge and the hatch lamp (about 1k triangles and five materials).
   'station-33': {
-    drawables: 1_100, visibleDrawables: 800, triangles: 200_000, visibleTriangles: 185_000,
-    geometryMiB: 17, materials: 250, colliders: 340, wallBoxes: 235, navCells: 56_000,
+    drawables: 1_100, visibleDrawables: 800, triangles: 205_000, visibleTriangles: 190_000,
+    geometryMiB: 17.5, materials: 260, colliders: 340, wallBoxes: 235, navCells: 56_000,
   },
 };
 

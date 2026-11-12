@@ -11,7 +11,7 @@ import type { ZombieArena } from '../../src/zombies/maps/ZombieArena';
  * playing up to it. The arena keeps animating (flicker, dust, drips).
  *
  *   /tools/viewers/map-viewer.html?map=station-33&cam=11,1.7,-3&look=11,1.6,-20
- *   &quality=low|medium|high|ultra picks the device tier; &doors=0 keeps doors shut;
+ *   &quality=low|medium|high|ultraMax picks the device tier; &doors=0 keeps doors shut;
  *   &power=1 throws the map's main switch (when it has one).
  */
 

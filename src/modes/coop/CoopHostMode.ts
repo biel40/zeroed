@@ -986,7 +986,7 @@ export class CoopHostMode implements GameMode {
       return;
     }
     if (!remote && owned && !this.ctx.canRefillWeaponAmmo(wallBuy.weaponId)) {
-      this.ctx.hud.showRoundBanner(t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
+      this.ctx.hud.showNotice('denied', t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
       return;
     }
     const cost = owned ? wallBuy.ammoPrice : wallBuy.price;
@@ -994,7 +994,7 @@ export class CoopHostMode implements GameMode {
       if (remote) this.send({ type: 'wallBuyFailed', reason: 'insufficientPoints' });
       else {
         this.ctx.hud.flashNotEnoughPoints();
-        this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
+        this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
       }
       return;
     }
@@ -1052,8 +1052,8 @@ export class CoopHostMode implements GameMode {
       }
       if (pickup.codeLock?.locked) return;
       if (weaponCaseLocked(pickup, record.kills)) {
+        // Locally, the case's prompt already says how many kills it still needs.
         if (remote) this.send({ type: 'mapUseFailed', reason: 'unavailable' });
-        else this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, record.kills, this.ctx.profile.useTouchControls));
         return;
       }
       if (!record.economy.spend(pickup.cost)) {
@@ -1070,7 +1070,7 @@ export class CoopHostMode implements GameMode {
     } else if (kind === 'ammo') {
       const refill = this.world.arena.ammoRefills.find((entry) => entry.id === id)!;
       if (!remote && !this.ctx.canRefillEquippedWeaponAmmo()) {
-        this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
+        this.ctx.hud.showNotice('denied', t('banner.ammoFull'));
         return;
       }
       if (!record.economy.spend(refill.cost)) {
@@ -1086,7 +1086,7 @@ export class CoopHostMode implements GameMode {
       const pouch = remote ? this.guestGrenades : this.grenades.hand;
       if (pouch.isFull) {
         if (remote) this.send({ type: 'mapUseFailed', reason: 'grenadesFull' });
-        else this.ctx.hud.showRoundBanner(t('banner.grenadesFull'));
+        else this.ctx.hud.showNotice('denied', t('banner.grenadesFull'));
         return;
       }
       if (!record.economy.spend(buy.cost)) {
@@ -1112,7 +1112,7 @@ export class CoopHostMode implements GameMode {
     if (remote) this.send({ type: 'mapUseFailed', reason: 'insufficientPoints' });
     else {
       this.ctx.hud.flashNotEnoughPoints();
-      this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
+      this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
     }
   }
 
@@ -1144,7 +1144,7 @@ export class CoopHostMode implements GameMode {
         if (remote) this.send({ type: 'boxFailed', reason: 'insufficientPoints' });
         else {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
+          this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
         }
         return;
       }

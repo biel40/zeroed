@@ -10,6 +10,7 @@ import type { Effects } from '../rendering/Effects';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { HUD } from '../ui/HUD';
 import type { Weapon } from '../weapons/Weapon';
+import type { WeaponFinish } from '../weapons/WeaponFinish';
 import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { HandRings } from '../weapons/HandRings';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
@@ -55,6 +56,8 @@ export interface ModeContext {
   canRefillEquippedWeaponAmmo(): boolean;
   refillEquippedWeaponAmmo(): boolean;
   setWeaponInfiniteReserve(id: WeaponId): boolean;
+  /** Dresses one weapon of the arsenal in a machine's finish (null back to its own look); a reset clears it. */
+  setWeaponFinish(id: WeaponId, finish: WeaponFinish | null): void;
   /** Reload-duration multiplier for every weapon of the arsenal (1 = normal). */
   setReloadTimeScale(scale: number): void;
   /** Fire-rate multiplier for every weapon of the arsenal (1 = normal). */

@@ -7,13 +7,13 @@ import * as THREE from 'three';
  * the scene lights and fog — no second render pass. Only world geometry closer
  * than ~9 cm to the camera could still overlap, which player collision forbids.
  */
-const VIEW_MODEL_DEPTH_RANGE = '0.1';
+export const VIEW_MODEL_DEPTH_SHARE = 0.1;
 
 function compressDepth(shader: THREE.WebGLProgramParametersWithUniforms): void {
   shader.vertexShader = shader.vertexShader.replace(
     '#include <project_vertex>',
     `#include <project_vertex>
-    gl_Position.z = mix(-gl_Position.w, gl_Position.z, ${VIEW_MODEL_DEPTH_RANGE});`,
+    gl_Position.z = mix(-gl_Position.w, gl_Position.z, ${VIEW_MODEL_DEPTH_SHARE.toFixed(3)});`,
   );
 }
 

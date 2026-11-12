@@ -211,6 +211,12 @@ codigo: actualiza la guia.
   motor-generador oeste, abre una galeria de cables de hormigon que cruza
   bajo el eje de la escalera y desemboca en la cubierta, delante del
   reactor. Es una zona tardia: exige haber abierto cocheras y subestacion.
+- Solo se entra cuando se puede usar: la compuerta (3500) esta sellada, no
+  se vende, hasta que el interruptor general da la red a la forja. Sin
+  corriente, su aviso dice que esta sellada y que hay que encender la
+  electricidad, y un piloto sobre la placa late en rojo; con la red, el
+  piloto queda fijo en verde y el aviso de «electricidad activada» añade que
+  la compuerta de KOVKA se ha desbloqueado.
 - Es la sala mas monumental del mapa (unos 22 x 30 m): hormigon desnudo con
   zocalo pintado bajo una gran boveda de cañon con nervios sobre pilastras.
   La superficie impide subir la boveda, asi que la altura viene de abajo: el
@@ -232,15 +238,44 @@ codigo: actualiza la guia.
   el nucleo azul electrico (el unico acento azul del mapa) solo se enciende,
   con su luz, cuando el interruptor general devuelve la red.
 - Dos entradas propias en el muro norte, detras del reactor, a cada lado de
-  su eje. Delante de la cara, en el eje y de espaldas a la barandilla, queda
-  libre una placa de acero con franjas de peligro y su cable de
-  alimentacion: el sitio de la futura maquina de mejora de armas
-  (`KOVKA_UPGRADE_SITE`). La mision de desbloqueo y las mejoras estan
-  pendientes; hasta entonces la compuerta es una puerta de pago.
+  su eje. Delante de la cara, en el eje y de espaldas a la barandilla, esta
+  la forja (`KOVKA_UPGRADE_MACHINE`, la `UpgradeMachine` compartida): un
+  armario de acero con una camara de forja, un tubo que brilla en el azul
+  del nucleo entre dos bobinas de cobre, bajo dos electrodos. Mirandola con
+  un arma en la mano, el aviso pide 5000 para forjarla; pagar hace que la
+  camara se encienda y tartamudee treinta segundos, con el cristal aclarado y
+  el arma girando dentro, que la materia de KOVKA va pintando de la culata
+  a la boca, mientras el reactor gime desde el foso (un dron
+  grave que late, un gemido como de voz y crujidos de la boveda: el evento
+  `KOVKA_FORGE_CUE`) y, al terminar, el arma
+  pega el doble, se recarga entera y lleva el acabado de KOVKA. Cada arma
+  se forja una vez por partida. El acabado (`KOVKA_WEAPON_FINISH`) es la
+  materia capturada por la camara: una nebulosa violeta y magenta que se
+  mueve despacio por dentro del arma, con venas palidas y estrellas, el
+  acero brillante en negro pulido y arcos lilas de la carga del reactor
+  chisporroteando sobre ella. Es un diseño propio inspirado en los camuflajes
+  cosmicos del genero, no una copia de ninguno.
+- El mal rollo lo cuenta la sala, sin texto: en la esquina suroeste, bajo la
+  placa «ИСПЫТУЕМЫЕ», tres celdas de barrotes para los sujetos de prueba. La
+  primera esta reventada desde dentro (puerta abierta de par en par, barrotes
+  doblados hacia fuera) y un rastro de sangre cruza la cubierta hasta la
+  galeria; la segunda, con candado, guarda un jergon, grilletes y arañazos
+  en el muro; la tercera tiene los barrotes partidos. Junto a ellas, una
+  camilla con un saco de cadaver atado y otro saco tirado en el suelo. En la
+  barandilla, el pupitre de los operadores abandonado: diales, un telefono
+  descolgado, la silla volcada y tres monitores sobre su repisa de instrumentos, uno aun parpadeando. El
+  foso esta inundado de agua negra en la que flota otro saco; del techo
+  cuelgan ganchos de carnicero y cables cortados; la cubierta ante la cara
+  del reactor esta quemada, las paredes rezuman y «КОВКА-1» esta pintado con
+  plantilla sobre el sitio de la maquina. En cada mastil, una caja de luz
+  roja «ОПАСНО! ИЗЛУЧЕНИЕ» tartamudea. Un gemido metalico del reactor rueda
+  de vez en cuando bajo la boveda.
 - Luz economica: un fluorescente de trabajo sobre la cubierta, la baliza
-  roja entre las entradas, el nucleo con la red, un tubo que falla en un
-  carril, un aplique ambar en el muro sur y otro en la galeria; lo demas brilla con
-  materiales emisivos. Nada de descargas animadas ni luces nuevas por efecto.
+  roja entre las entradas, el nucleo con la red, una baliza roja sobre las
+  celdas, un tubo que falla en un carril, un aplique ambar en el muro sur y
+  otro en la galeria; lo demas brilla con materiales emisivos. Nada de
+  descargas animadas ni luces nuevas por efecto. El zocalo es pintura al
+  aceite oscura, no el acero verde de la estacion.
 
 ## Protocolo 33 (la salida)
 

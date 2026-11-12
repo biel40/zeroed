@@ -1,18 +1,24 @@
-/** Ultra is opt-in: never detected, and offered only where High is (see `getAvailableQualityLevels`). */
-export const QUALITY_LEVELS = ['low', 'medium', 'high', 'ultra'] as const;
+import { browserQualityStorage, classifyDevice, type DeviceSignals, type GpuSignals, type QualityStorage } from './AutoQuality';
+
+/** `ultraMax` is opt-in only: detection never picks it. */
+export const QUALITY_LEVELS = ['low', 'medium', 'high', 'ultraMax'] as const;
 export type QualityLevel = (typeof QUALITY_LEVELS)[number];
+/** The settings choice: a fixed tier, or `auto` to let the game pick and lower it. */
+export type QualityPreference = QualityLevel | 'auto';
 
 export interface DeviceProfile {
   readonly isMobile: boolean;
   readonly isTouch: boolean;
   readonly isLowMemory: boolean;
-  /** Rendering tier: the player's saved choice, else the one detected for the device. */
+  /** Rendering tier: the player's fixed choice, else the automatic one. */
   readonly quality: QualityLevel;
   readonly pixelRatioLimit: number;
   readonly shadowQuality: 0 | 1 | 2;
   readonly useReducedEffects: boolean;
   readonly useTouchControls: boolean;
   readonly anisotropyLimit: number;
+  /** HDR post-processing, local reflections and procedural surface detail. */
+  readonly useAdvancedRendering: boolean;
 }
 
 type DeviceNavigator = Partial<Navigator> & {
@@ -20,69 +26,102 @@ type DeviceNavigator = Partial<Navigator> & {
   deviceMemory?: number;
 };
 
-type QualitySettings = Pick<DeviceProfile, 'pixelRatioLimit' | 'shadowQuality' | 'useReducedEffects' | 'anisotropyLimit'>;
-
-type DetectedDevice = Pick<DeviceProfile, 'isMobile' | 'isTouch' | 'isLowMemory' | 'useTouchControls'> & {
-  readonly detectedQuality: Exclude<QualityLevel, 'ultra'>;
-};
+type QualitySettings = Pick<DeviceProfile,
+  'pixelRatioLimit' | 'shadowQuality' | 'useReducedEffects' | 'anisotropyLimit' | 'useAdvancedRendering'>;
 
 const QUALITY_SETTINGS: Record<QualityLevel, QualitySettings> = {
-  low: { pixelRatioLimit: 1, shadowQuality: 0, useReducedEffects: true, anisotropyLimit: 2 },
-  medium: { pixelRatioLimit: 1.5, shadowQuality: 1, useReducedEffects: true, anisotropyLimit: 2 },
-  high: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8 },
-  // Ultra renders like High; maps spend its headroom on extra lights and effects.
-  ultra: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8 },
+  low: { pixelRatioLimit: 1, shadowQuality: 0, useReducedEffects: true, anisotropyLimit: 2, useAdvancedRendering: false },
+  medium: { pixelRatioLimit: 1.5, shadowQuality: 1, useReducedEffects: true, anisotropyLimit: 2, useAdvancedRendering: false },
+  high: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8, useAdvancedRendering: false },
+  ultraMax: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 16, useAdvancedRendering: true },
 };
 
+/** Highest pixel ratio any tier renders at. */
+export const MAX_PIXEL_RATIO = Math.max(...QUALITY_LEVELS.map((level) => QUALITY_SETTINGS[level].pixelRatioLimit));
+
 const QUALITY_STORAGE_KEY = 'zeroed.quality';
+
+interface NavigatorTraits {
+  readonly isMobile: boolean;
+  readonly isTouch: boolean;
+  readonly useTouchControls: boolean;
+  readonly reducedMotion: boolean;
+  readonly deviceMemory: number | null;
+  readonly hardwareConcurrency: number | null;
+}
 
 export function isQualityLevel(value: unknown): value is QualityLevel {
   return typeof value === 'string' && (QUALITY_LEVELS as readonly string[]).includes(value);
 }
 
-/** The quality the player picked in the menu, or null to use the detected one. */
-export function getQualityPreference(): QualityLevel | null {
+export function isQualityPreference(value: unknown): value is QualityPreference {
+  return value === 'auto' || isQualityLevel(value);
+}
+
+/** The quality chosen in the menu; Auto when nothing (or nothing valid) was saved. */
+export function getQualityPreference(storage: QualityStorage | null = browserQualityStorage()): QualityPreference {
   try {
-    const value = globalThis.localStorage?.getItem(QUALITY_STORAGE_KEY);
-    return isQualityLevel(value) ? value : null;
+    const value = storage?.getItem(QUALITY_STORAGE_KEY);
+    // The former local Ultra tier now shares Ultra Max's effects and name.
+    if (value === 'ultra') return 'ultraMax';
+    return isQualityPreference(value) ? value : 'auto';
   } catch {
-    return null;
+    return 'auto';
   }
 }
 
-export function setQualityPreference(quality: QualityLevel): void {
+export function setQualityPreference(
+  preference: QualityPreference,
+  storage: QualityStorage | null = browserQualityStorage(),
+): void {
   try {
-    globalThis.localStorage?.setItem(QUALITY_STORAGE_KEY, quality);
+    storage?.setItem(QUALITY_STORAGE_KEY, preference);
   } catch { /* The choice still applies to this session. */ }
 }
 
-/** Tiers the settings offer on this device: Ultra only where High is detected. */
+/** Hardware hints for automatic quality, from the navigator plus the optional GPU and screen probes. */
+export function readDeviceSignals(
+  navigatorLike: DeviceNavigator = navigator as DeviceNavigator,
+  gpu: GpuSignals | null = null,
+  renderPixels: number | null = null,
+): DeviceSignals {
+  const { isMobile, reducedMotion, deviceMemory, hardwareConcurrency } = readNavigatorTraits(navigatorLike);
+  return { isMobile, deviceMemory, hardwareConcurrency, reducedMotion, renderPixels, gpu };
+}
+
+/** Keep the most expensive tier opt-in and limited to devices classified as High. */
 export function getAvailableQualityLevels(
   navigatorLike: DeviceNavigator = navigator as DeviceNavigator,
 ): readonly QualityLevel[] {
-  return detectDevice(navigatorLike).detectedQuality === 'high'
+  return classifyDevice(readDeviceSignals(navigatorLike)) === 'high'
     ? QUALITY_LEVELS
-    : QUALITY_LEVELS.filter((level) => level !== 'ultra');
+    : QUALITY_LEVELS.filter((level) => level !== 'ultraMax');
 }
 
+/** `quality` null classifies the device from the navigator alone. */
 export function getDeviceProfile(
   navigatorLike: DeviceNavigator = navigator as DeviceNavigator,
-  preferredQuality: QualityLevel | null = null,
+  quality: QualityLevel | null = null,
 ): DeviceProfile {
-  const { detectedQuality, ...device } = detectDevice(navigatorLike);
-  // A saved Ultra choice never reaches a device that is not offered it.
-  const quality = preferredQuality === 'ultra' && detectedQuality !== 'high'
+  const traits = readNavigatorTraits(navigatorLike);
+  const memory = traits.deviceMemory ?? 8;
+  const threads = traits.hardwareConcurrency ?? 8;
+  const detectedQuality = classifyDevice(readDeviceSignals(navigatorLike));
+  const level = quality === 'ultraMax' && detectedQuality !== 'high'
     ? 'high'
-    : preferredQuality ?? detectedQuality;
+    : quality ?? detectedQuality;
 
   return {
-    ...device,
-    quality,
-    ...QUALITY_SETTINGS[quality],
+    isMobile: traits.isMobile,
+    isTouch: traits.isTouch,
+    isLowMemory: memory <= 6 || threads <= 4,
+    quality: level,
+    ...QUALITY_SETTINGS[level],
+    useTouchControls: traits.useTouchControls,
   };
 }
 
-function detectDevice(navigatorLike: DeviceNavigator): DetectedDevice {
+function readNavigatorTraits(navigatorLike: DeviceNavigator): NavigatorTraits {
   const userAgent = navigatorLike.userAgent ?? '';
   const touchPoints = navigatorLike.maxTouchPoints ?? 0;
   const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(userAgent);
@@ -91,17 +130,17 @@ function detectDevice(navigatorLike: DeviceNavigator): DetectedDevice {
       ? window.matchMedia.bind(window)
       : undefined);
   const coarsePointer = matchMedia?.('(pointer: coarse)').matches ?? false;
-  const reducedMotion = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   // Capability is authoritative. The UA is only a fallback for old mobile
   // WebViews that report touch points but do not expose pointer media queries.
   const useTouchControls = coarsePointer || (touchPoints > 0 && mobileUserAgent);
-  const isMobile = useTouchControls;
-  const deviceMemory = typeof navigatorLike.deviceMemory === 'number' ? navigatorLike.deviceMemory : 8;
-  const hardwareConcurrency = navigatorLike.hardwareConcurrency ?? 8;
-  const isLowMemory = deviceMemory <= 6 || hardwareConcurrency <= 4;
-  const isTouch = touchPoints > 0 || coarsePointer;
-  const detectedQuality = isMobile && isLowMemory
-    ? 'low'
-    : isMobile || isLowMemory || reducedMotion ? 'medium' : 'high';
-  return { isMobile, isTouch, isLowMemory, useTouchControls, detectedQuality };
+  return {
+    isMobile: useTouchControls,
+    isTouch: touchPoints > 0 || coarsePointer,
+    useTouchControls,
+    reducedMotion: matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+    deviceMemory: typeof navigatorLike.deviceMemory === 'number' ? navigatorLike.deviceMemory : null,
+    hardwareConcurrency: typeof navigatorLike.hardwareConcurrency === 'number' && navigatorLike.hardwareConcurrency > 0
+      ? navigatorLike.hardwareConcurrency
+      : null,
+  };
 }

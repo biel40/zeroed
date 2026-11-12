@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { applyViewModelDepth } from '../rendering/ViewModelDepth';
 import { clamp, damp } from '../utils/math';
 import { BarrelGlow, defaultBarrelGlowSize } from './BarrelGlow';
+import { MuzzleFlare } from './MuzzleFlare';
 import { MuzzleFlash } from './MuzzleFlash';
 import type { MagazineDropPool } from './MagazineDrop';
 import { buildAk47 } from './AK47ViewModel';
@@ -26,6 +27,7 @@ import { WeaponHands } from './WeaponHands';
 import { SustainedFireKick } from './SustainedFireKick';
 import { getSettings } from '../core/PlayerSettings';
 import type { Weapon } from './Weapon';
+import { WeaponFinishLayer, type WeaponFinish } from './WeaponFinish';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
 const FLASH_DURATION = 0.045;
@@ -38,6 +40,8 @@ const SLIDE_RETURN_TIME = 0.09;
 const SWAY_PER_PIXEL = 0.0016;
 const SWAY_LIMIT = 0.02;
 const SWAY_SMOOTHING = 9;
+/** Share of a finish's arc brightness that fades out fully aimed down sights. */
+const FINISH_ARC_ADS_DIM = 0.75;
 
 let flashTexture: THREE.CanvasTexture | null = null;
 let plasmaFlashTexture: THREE.DataTexture | null = null;
@@ -90,6 +94,11 @@ function getPlasmaFlashTexture(): THREE.DataTexture {
   plasmaFlashTexture.minFilter = THREE.LinearFilter;
   plasmaFlashTexture.needsUpdate = true;
   return plasmaFlashTexture;
+}
+
+export interface WeaponViewOptions {
+  /** Top quality tier: weapons with a `muzzleFlare` show it instead of the flash sprites. */
+  readonly cinematicFlash?: boolean;
 }
 
 /**
@@ -1215,6 +1224,8 @@ export class WeaponView {
   private readonly ejectionPort = new THREE.Object3D();
   private readonly flash: THREE.Mesh;
   private readonly heavyFlash: MuzzleFlash | null = null;
+  /** Top quality tier: the gunpowder flame that replaces both flashes above. */
+  private readonly flare: MuzzleFlare | null = null;
   /** Overheated barrel tip; only weapons with a heat config get one. */
   private readonly barrelGlow: BarrelGlow | null = null;
   private readonly spring: SpringRecoil;
@@ -1242,6 +1253,8 @@ export class WeaponView {
   private openBoltCycle = 0;
   private boltEjected = false;
   private liveParts: ViewModelLiveParts | null = null;
+  /** Created on the first finish; null while the weapon never wore one. */
+  private finishLayer: WeaponFinishLayer | null = null;
   /** Wired by Game: bolt-action weapons eject their case mid-cycle, not on the shot. */
   onBoltEject: (() => void) | null = null;
 
@@ -1249,6 +1262,7 @@ export class WeaponView {
     private readonly definition: WeaponDefinition,
     model: THREE.Group | null,
     dropPool: MagazineDropPool | null = null,
+    options: WeaponViewOptions = {},
   ) {
     const view = definition.view;
     this.spring = new SpringRecoil(view.visualRecoil);
@@ -1340,7 +1354,10 @@ export class WeaponView {
     }
     this.flash.visible = false;
     this.muzzle.add(this.flash);
-    if (definition.muzzleFlash) {
+    if (options.cinematicFlash && definition.muzzleFlare) {
+      this.flare = new MuzzleFlare(definition.muzzleFlare);
+      this.muzzle.add(this.flare.root);
+    } else if (definition.muzzleFlash) {
       this.heavyFlash = new MuzzleFlash(definition.muzzleFlash);
       this.muzzle.add(this.heavyFlash.root);
     }
@@ -1485,6 +1502,16 @@ export class WeaponView {
 
   /** Called by Game on every shot event; `automatic` when the weapon fires in full-auto. */
   public onShot(automatic = false): void {
+    if (this.flare) this.flare.trigger();
+    else this.showFlash();
+    this.spring.kick(this.sustainedKick.onShot(automatic) * getSettings().weaponKick);
+    // Pistol slide cycles with every shot.
+    if (this.slide) this.slideBlowback = 1;
+    if (this.openBolt) this.openBoltCycle = 1;
+    this.energySurge = 1;
+  }
+
+  private showFlash(): void {
     const isEnergy = this.definition.view.energyColor !== undefined;
     this.flashTime = isEnergy ? ENERGY_FLASH_DURATION : FLASH_DURATION;
     this.flash.scale.setScalar((isEnergy ? 0.95 + Math.random() * 0.35 : 0.8 + Math.random() * 0.5)
@@ -1492,11 +1519,6 @@ export class WeaponView {
     this.flash.rotation.z = Math.random() * Math.PI * 2;
     this.flash.visible = true;
     this.heavyFlash?.trigger();
-    this.spring.kick(this.sustainedKick.onShot(automatic) * getSettings().weaponKick);
-    // Pistol slide cycles with every shot.
-    if (this.slide) this.slideBlowback = 1;
-    if (this.openBolt) this.openBoltCycle = 1;
-    this.energySurge = 1;
   }
 
   /** Clears every transient pose when this view is hidden or the run resets. */
@@ -1509,6 +1531,7 @@ export class WeaponView {
     this.flashTime = 0;
     this.flash.visible = false;
     this.heavyFlash?.reset();
+    this.flare?.reset();
     this.swayX = 0;
     this.swayY = 0;
     this.slideBlowback = 0;
@@ -1520,6 +1543,16 @@ export class WeaponView {
     if (this.openBolt) this.openBolt.position.z = this.openBoltHomeZ;
     this.root.position.copy(this.hipPosition);
     this.root.rotation.set(0, 0, 0);
+  }
+
+  /**
+   * Dresses the weapon in a machine's finish (null back to its own look);
+   * swaps and resets keep it. `reducedEffects` picks the cheaper nebula the
+   * first time a finish is put on.
+   */
+  public setFinish(finish: WeaponFinish | null, reducedEffects = false): void {
+    this.finishLayer ??= new WeaponFinishLayer(this.root, this.energyMaterials, { reducedEffects, firstPerson: true });
+    this.finishLayer.apply(finish);
   }
 
   getMuzzleWorldPosition(out: THREE.Vector3): THREE.Vector3 {
@@ -1634,6 +1667,7 @@ export class WeaponView {
       this.root.rotation.z += lowering * 0.3;
     }
     this.heavyFlash?.update(dt);
+    this.flare?.update(dt);
     if (this.flashTime > 0) {
       this.flashTime -= dt;
       if (this.flashTime <= 0) this.flash.visible = false;
@@ -1678,6 +1712,9 @@ export class WeaponView {
       for (const material of this.energyMaterials) material.emissiveIntensity = pulse;
       if (this.energyFlow) this.energyFlow.offset.y = (this.pulseTime * 0.22) % 1;
     }
+
+    // The finish's matter keeps drifting; its arcs fade while aiming so the sights stay clear.
+    this.finishLayer?.update(dt, 1 - ads * FINISH_ARC_ADS_DIM);
 
     // Inside a real scope you would not see the rifle body at all.
     this.root.visible = !(this.definition.scoped && ads > 0.86);

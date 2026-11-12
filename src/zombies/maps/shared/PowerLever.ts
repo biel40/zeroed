@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { TranslationKey } from '../../../i18n/i18n';
 import { makeSoftDotTexture } from '../../doors/BuyableDoorVisual';
 import type { ArenaPowerSwitch } from '../ZombieArena';
 import { cobwebGeometry } from './Cobwebs';
@@ -30,6 +31,8 @@ export interface PowerLeverPlacement {
   readonly z: number;
   readonly facingX: number;
   readonly facingZ: number;
+  /** What the power opens on this map, told under the power-on banner. */
+  readonly announcementKey?: TranslationKey;
 }
 
 /** Materials of the switch, named as the maps' material sets name them. */
@@ -64,6 +67,7 @@ export class PowerLever implements ArenaPowerSwitch {
   readonly floor = 0;
   readonly useRange = 2.0;
   readonly lookDotMin = 0.5;
+  readonly announcementKey?: TranslationKey;
   private readonly group = new THREE.Group();
   private readonly blades = new THREE.Group();
   /** Webs in the blades' path, torn as they swing up. */
@@ -81,6 +85,7 @@ export class PowerLever implements ArenaPowerSwitch {
     private readonly onThrown: () => void,
   ) {
     this.id = config.id;
+    this.announcementKey = config.announcementKey;
     this.position = { x: config.x + config.facingX * USE_POINT_OUT, y: 1.5, z: config.z + config.facingZ * USE_POINT_OUT };
     this.group.name = 'power-lever';
     this.group.position.set(config.x, 0, config.z);

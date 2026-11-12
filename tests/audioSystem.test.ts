@@ -529,7 +529,7 @@ describe('AudioSystem zombie impact sounds', () => {
   });
 
   it.each(['pa-crackle', 'distant-train', 'power-dip', 'metal-echo', 'machinery', 'wood-creak', 'distant-knock',
-    'wind-gust', 'ember-crackle', 'distant-howl'] as const)('voices the %s map ambience procedurally from its position', (sound) => {
+    'wind-gust', 'ember-crackle', 'distant-howl', 'forge-wail'] as const)('voices the %s map ambience procedurally from its position', (sound) => {
     const audio = new AudioSystem() as any;
     const formant = { type: '', frequency: { value: 0 }, Q: { value: 0 }, connect: vi.fn() };
     audio.context = vi.fn(() => ({ ctx: { currentTime: 0, createBiquadFilter: () => formant }, master: {}, noise: {} }));

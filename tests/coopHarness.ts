@@ -20,6 +20,7 @@ export const TEST_PROFILE: DeviceProfile = {
   useReducedEffects: true,
   useTouchControls: false,
   anisotropyLimit: 8,
+  useAdvancedRendering: false,
 };
 
 /** Arena views paint labels on canvases; node has no DOM. */
@@ -140,6 +141,7 @@ export function makeContext(): TestContext {
     canRefillEquippedWeaponAmmo: vi.fn(() => false),
     refillEquippedWeaponAmmo: vi.fn(() => false),
     setWeaponInfiniteReserve: vi.fn(() => false),
+    setWeaponFinish: vi.fn(),
     setReloadTimeScale: vi.fn(),
     setFireRateScale: vi.fn((scale: number) => { weapon.fireRateScale = scale; }),
     resetArsenal: vi.fn(),

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { DeviceProfile, QualityLevel } from '../src/core/DeviceProfile';
+import { QUALITY_LEVELS, type DeviceProfile, type QualityLevel } from '../src/core/DeviceProfile';
 import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
 import type { Input } from '../src/player/Input';
 import type { Weapon } from '../src/weapons/Weapon';
@@ -11,7 +11,8 @@ import { ZombieManager } from '../src/zombies/ZombieManager';
 import { ZombieNavigationService } from '../src/zombies/navigation/ZombieNavigationService';
 import type { ZombieSpawnPoint } from '../src/zombies/ZombieSpawner';
 import { t } from '../src/i18n/i18n';
-import { actionKey } from '../src/ui/InteractionPrompts';
+import { actionKey, doorPrompt } from '../src/ui/InteractionPrompts';
+import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import { CodeLockDialog } from '../src/ui/CodeLockDialog';
 import { POINT_LIGHT_BUDGET } from '../src/zombies/maps/shared/PointLightBudget';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
@@ -25,7 +26,11 @@ import {
   KOVKA_CORE_COLOR,
   KOVKA_CORRIDOR,
   KOVKA_REACTOR,
+  KOVKA_UPGRADE_MACHINE,
   KOVKA_UPGRADE_SITE,
+  KOVKA_WEAPON_FINISH,
+  KOVKA_FORGE_CUE,
+  STATION33_WEAPONS,
   MILICIA,
   PROTOCOL33_SURFACE_Y,
   SERVICE_PASSAGE,
@@ -203,8 +208,10 @@ function openBarrier(arena: Station33Arena, id: string): void {
   while (!barrier.isOpen) barrier.damage(barrier.boards[0].maxHp);
 }
 
-function openDoorTo(arena: ZombieArena, zone: Station33ZoneId): void {
+function openDoorTo(arena: Station33Arena, zone: Station33ZoneId): void {
   const config = STATION33_DOORS.find((door) => door.zone === zone)!;
+  // A sealed hatch only sells once the main switch has powered the station.
+  if (config.requiresPower) arena.switchOnPower();
   const door = arena.doors.find((candidate) => candidate.id === config.id)!;
   expect(door.tryUnlock(() => true).success).toBe(true);
   expect(arena.activateDoor(door.id)).toBe(true);
@@ -224,7 +231,7 @@ const DOORS_TO: Readonly<Record<Station33ZoneId, ReadonlyArray<Station33ZoneId>>
   superficie: ['cocheras', 'subestacion', 'taller'],
 };
 
-function openWayTo(arena: ZombieArena, zone: Station33ZoneId): void {
+function openWayTo(arena: Station33Arena, zone: Station33ZoneId): void {
   for (const step of DOORS_TO[zone]) openDoorTo(arena, step);
 }
 
@@ -880,7 +887,8 @@ describe('Station 33 KOVKA chamber', () => {
     expect(axisY + radius).toBeLessThan(KOVKA_VAULT.heightAt(x) - 0.8);
     const arena = makeArena();
     openDoorTo(arena, 'kovka');
-    const shot = new THREE.Raycaster(new THREE.Vector3(x, EYE_HEIGHT, hall.maxZ - 1), new THREE.Vector3(0, 0, -1));
+    // Over the forge standing before the face.
+    const shot = new THREE.Raycaster(new THREE.Vector3(x, 2.6, hall.maxZ - 1), new THREE.Vector3(0, 0, -1));
     const hit = shot.intersectObjects([...arena.colliders], false)[0];
     expect(hit.object.name).toMatch(/^kovka-reactor-/);
     expect(hit.point.z).toBeGreaterThan(frontZ - 0.1);
@@ -894,7 +902,7 @@ describe('Station 33 KOVKA chamber', () => {
     const arena = makeArena();
     openDoorTo(arena, 'kovka');
     for (const x of [pit.minX - 2.4, pit.maxX + 2.4]) {
-      const end = walk(arena, x, hall.maxZ - 1, FACE_NORTH, 10);
+      const end = walk(arena, x, pit.maxZ + 2, FACE_NORTH, 10);
       expect(end.z, `lane at x = ${x}`).toBeLessThan(hall.minZ + 1);
     }
     const navigation = navigationOf(arena);
@@ -905,7 +913,7 @@ describe('Station 33 KOVKA chamber', () => {
     expect(route.every((point) => point.x < pit.minX || point.x > pit.maxX || point.z < pit.minZ || point.z > pit.maxZ)).toBe(true);
   });
 
-  it('keeps the upgrade site clear in front of the reactor and reachable from the hatch and every entrance', () => {
+  it('keeps the forge place in front of the reactor clear to stand at, and reachable from the hatch and every entrance', () => {
     const arena = makeArena();
     openDoorTo(arena, 'kovka');
     const { x, z, width, depth, approach, facingZ } = KOVKA_UPGRADE_SITE;
@@ -913,7 +921,7 @@ describe('Station 33 KOVKA chamber', () => {
     expect(z - depth / 2).toBeGreaterThan(pit.maxZ);
     expect(z + depth / 2 + approach).toBeLessThan(hall.maxZ);
     const site = new THREE.Box3(
-      new THREE.Vector3(x - width / 2, ZOMBIE_BAND.bottom, z - depth / 2),
+      new THREE.Vector3(x - width / 2, ZOMBIE_BAND.bottom, z + depth / 2 + 0.05),
       new THREE.Vector3(x + width / 2, ZOMBIE_BAND.top, z + depth / 2 + approach),
     );
     expect(solidBoxes(arena).some((box) => box.intersectsBox(site))).toBe(false);
@@ -922,6 +930,203 @@ describe('Station 33 KOVKA chamber', () => {
     expect(navigation.findPath(0, beforeHatch.x, beforeHatch.z, stand.x, stand.z)).not.toBeNull();
     for (const spawn of STATION33_SPAWNS.kovka) {
       expect(navigation.findPath(0, spawn.breachX!, spawn.breachZ!, stand.x, stand.z), spawn.barrierId).not.toBeNull();
+    }
+  });
+
+  it('keeps the hatch sealed and off sale until the power, its lamp pulsing red then holding green', () => {
+    const arena = makeArena();
+    openWayTo(arena, 'subestacion');
+    const door = arena.doors.find((candidate) => candidate.id === hatch.id)!;
+    const lamp = (arena.group.getObjectByName('kovka-hatch-lamp') as THREE.Mesh).material as THREE.MeshBasicMaterial;
+    expect(door.isSealed).toBe(true);
+    expect(doorPrompt(door, false)).toBe(t('prompt.doorNeedsPower', { door: t('door.to-kovka') }));
+    expect(door.tryUnlock(() => { throw new Error('a sealed hatch must not charge'); })).toEqual({ cost: 3500, success: false, sealed: true });
+    expect(walk(arena, beforeHatch.x, beforeHatch.z, FACE_WEST, 3).x).toBeGreaterThan(SUBESTACION.hall.minX);
+    arena.update(0.2);
+    expect(lamp.color.r).toBeGreaterThan(lamp.color.g);
+    arena.switchOnPower();
+    arena.update(0.2);
+    expect(door.isSealed).toBe(false);
+    expect(doorPrompt(door, false)).toBe(t('prompt.unlockDoor', { door: t('door.to-kovka'), key: actionKey(false), cost: 3500 }));
+    expect(lamp.color.g).toBeGreaterThan(lamp.color.r);
+    arena.reset();
+    arena.update(0.2);
+    expect(door.isSealed).toBe(true);
+    expect(lamp.color.r).toBeGreaterThan(lamp.color.g);
+  });
+
+  it('stands the forge on its deck, solid, with room in front to use it', () => {
+    const arena = makeArena();
+    openDoorTo(arena, 'kovka');
+    const machine = arena.upgradeMachine;
+    const { x, z, width, depth, approach } = KOVKA_UPGRADE_SITE;
+    expect(machine.position.z).toBeGreaterThan(z + depth / 2 - 0.1);
+    expect(structureBoxes(arena).some((box) => box.containsPoint(new THREE.Vector3(x, 0.5, z)))).toBe(true);
+    const front = new THREE.Box3(
+      new THREE.Vector3(x - width / 2, ZOMBIE_BAND.bottom, z + depth / 2 + 0.05),
+      new THREE.Vector3(x + width / 2, ZOMBIE_BAND.top, z + depth / 2 + approach),
+    );
+    expect(solidBoxes(arena).some((box) => box.intersectsBox(front))).toBe(false);
+  });
+
+  it('forges the weapon in hand once the power is on: price, a long forge, double damage, refill and finish', () => {
+    const forgeSeconds = KOVKA_UPGRADE_MACHINE.forgeSeconds;
+    expect(forgeSeconds).toBeGreaterThanOrEqual(20);
+    const side = makeContext();
+    const mode = new ZombiesMode('station-33');
+    mode.init(side.ctx);
+    const arena = (mode as unknown as { arena: Station33Arena }).arena;
+    const economy = (mode as unknown as { economy: PlayerEconomy }).economy;
+    const damageScale = (): number => (mode as unknown as { weaponDamageScale(id: string): number }).weaponDamageScale('m1911');
+    const machine = arena.upgradeMachine;
+    side.player.teleport(machine.position.x, EYE_HEIGHT, machine.position.z + 0.8, 0);
+    side.player.face(FACE_NORTH);
+    side.player.rig.updateMatrixWorld(true);
+    const weapon = STATION33_WEAPONS.m1911.name;
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeNeedsPower'));
+    mode.onInteract();
+    expect(machine.busy).toBe(false);
+
+    arena.switchOnPower();
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeWeapon', { weapon, key: actionKey(false), cost: 5000 }));
+    mode.onInteract();
+    expect(side.hud.flashNotEnoughPoints).toHaveBeenCalled();
+    expect(machine.busy).toBe(false);
+
+    economy.setUnlimitedSpending(true);
+    mode.onInteract();
+    expect(machine.busy).toBe(true);
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeForging', { weapon }));
+    const upgrade = mode as unknown as { weaponUpgrade: { update(): void } };
+    arena.update(forgeSeconds - 0.5);
+    upgrade.weaponUpgrade.update();
+    expect(machine.busy).toBe(true);
+    expect(damageScale()).toBe(1);
+    arena.update(0.6);
+    upgrade.weaponUpgrade.update();
+    expect(machine.busy).toBe(false);
+    expect(damageScale()).toBe(2);
+    expect(side.ctx.refillWeaponAmmo).toHaveBeenCalledWith('m1911');
+    expect(side.ctx.setWeaponFinish).toHaveBeenCalledWith('m1911', KOVKA_WEAPON_FINISH);
+    expect(side.hud.showNotice).toHaveBeenLastCalledWith('info', t('banner.weaponUpgraded', { weapon }));
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeDone', { weapon }));
+    mode.onInteract();
+    expect(machine.busy).toBe(false);
+
+    mode.onRestartRequested();
+    expect(damageScale()).toBe(1);
+    expect(side.ctx.resetArsenal).toHaveBeenCalled();
+  });
+
+  it('takes a MOTDRULES player straight to a powered forge from the developer console, ready to forge for free', () => {
+    const side = makeContext();
+    const mode = new ZombiesMode('station-33');
+    mode.init(side.ctx);
+    const arena = (mode as unknown as { arena: Station33Arena }).arena;
+    expect(mode.executeDeveloperCommand('forge')).toBe(t('dev.unavailable'));
+    for (const key of 'MOTDRULES') mode.onKeyInput(key);
+    expect(mode.executeDeveloperCommand('forge')).toBe(t('dev.ok'));
+    expect(arena.powerSwitch.isOn).toBe(true);
+    expect(arena.upgradeMachine.powered).toBe(true);
+    for (const zone of ['cocheras', 'subestacion', 'kovka'] as const) {
+      const door = STATION33_DOORS.find((candidate) => candidate.zone === zone)!;
+      expect(arena.doors.find((candidate) => candidate.id === door.id)!.isLocked, zone).toBe(false);
+    }
+    side.player.rig.updateMatrixWorld(true);
+    expect(station33ZoneAt(side.player.rig.position.x, side.player.rig.position.z)).toBe('kovka');
+    const weapon = STATION33_WEAPONS[side.ctx.getEquippedWeaponId()].name;
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeWeapon', { weapon, key: actionKey(false), cost: 5000 }));
+    mode.onInteract();
+    expect(arena.upgradeMachine.busy).toBe(true);
+    // Once the forge is on its way, the shortcut is still harmless.
+    expect(mode.executeDeveloperCommand('forge')).toBe(t('dev.ok'));
+  });
+
+  it('shows the weapon in the forge chamber while it forges and wails from the reactor as it starts', () => {
+    const arena = makeArena();
+    arena.switchOnPower();
+    const cues: ArenaAmbientCue[] = [];
+    arena.onAmbientCue = (cue) => cues.push(cue);
+    const shown = (): THREE.Object3D | undefined => arena.group.getObjectByName('upgrade-machine-weapon');
+    expect(shown()?.visible ?? false).toBe(false);
+    arena.upgradeMachine.forge('m14');
+    expect(cues).toEqual([KOVKA_FORGE_CUE]);
+    const weapon = shown()!;
+    expect(weapon.visible).toBe(true);
+    arena.group.updateMatrixWorld(true);
+    const inside = new THREE.Box3().setFromObject(weapon).getCenter(new THREE.Vector3());
+    expect(Math.hypot(inside.x - KOVKA_UPGRADE_SITE.x, inside.z - KOVKA_UPGRADE_SITE.z)).toBeLessThan(0.3);
+    expect(inside.y).toBeGreaterThan(1.1);
+    const turn = weapon.rotation.x;
+    arena.update(1);
+    expect(weapon.rotation.x).not.toBe(turn);
+    arena.update(KOVKA_UPGRADE_MACHINE.forgeSeconds);
+    expect(arena.upgradeMachine.busy).toBe(false);
+    expect(weapon.visible).toBe(false);
+    arena.upgradeMachine.forge('ak47');
+    expect(shown()!.visible).toBe(true);
+    arena.reset();
+    expect(arena.group.getObjectByName('upgrade-machine-weapon')?.visible ?? false).toBe(false);
+  });
+
+  it('paints the KOVKA finish onto the weapon in the chamber as it forges, from bare to fully dressed', () => {
+    const arena = makeArena();
+    arena.switchOnPower();
+    arena.upgradeMachine.forge('m14');
+    const weapon = arena.group.getObjectByName('upgrade-machine-weapon')!;
+    const dressed: THREE.Mesh[] = [];
+    weapon.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (mesh.isMesh && !Array.isArray(mesh.material) && mesh.material.name.endsWith(`:${KOVKA_WEAPON_FINISH.id}`)) dressed.push(mesh);
+    });
+    expect(dressed.length).toBeGreaterThan(0);
+    const shader = {
+      vertexShader: THREE.ShaderLib.physical.vertexShader,
+      fragmentShader: THREE.ShaderLib.physical.fragmentShader,
+      uniforms: {},
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    (dressed[0].material as THREE.Material).onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    expect(shader.fragmentShader).toContain('#define FINISH_PAINT');
+    const reveal = shader.uniforms.uFinishReveal as THREE.IUniform<number>;
+    expect(reveal.value).toBe(0);
+
+    const forgeSeconds = KOVKA_UPGRADE_MACHINE.forgeSeconds;
+    arena.update(forgeSeconds * 0.05);
+    expect(reveal.value).toBe(0);
+    arena.update(forgeSeconds * 0.4);
+    expect(reveal.value).toBeGreaterThan(0.2);
+    expect(reveal.value).toBeLessThan(0.8);
+    const midway = reveal.value;
+    arena.update(forgeSeconds * 0.1);
+    expect(reveal.value).toBeGreaterThan(midway);
+    arena.update(forgeSeconds * 0.4);
+    expect(arena.upgradeMachine.busy).toBe(true);
+    expect(reveal.value).toBe(1);
+
+    // A later forge of the same weapon (after a restart) starts bare again.
+    arena.reset();
+    arena.switchOnPower();
+    arena.upgradeMachine.forge('m14');
+    expect(reveal.value).toBe(0);
+  });
+
+  it('keeps its solid props (cells, stretcher, console) on the deck, off the corridor, the upgrade site and the pit', () => {
+    const arena = makeArena();
+    arena.group.updateMatrixWorld(true);
+    const props = arena.colliders.filter((collider) => ['kovka-cages', 'kovka-cage-door', 'kovka-gurney', 'kovka-console'].includes(collider.name));
+    expect(props).toHaveLength(4);
+    const { x, z, width, depth, approach } = KOVKA_UPGRADE_SITE;
+    const keepClear = [
+      new THREE.Box3(new THREE.Vector3(x - width / 2, 0, z - depth / 2), new THREE.Vector3(x + width / 2, 2, z + depth / 2 + approach)),
+      new THREE.Box3(new THREE.Vector3(hall.maxX - 3, 0, KOVKA_CORRIDOR.minZ), new THREE.Vector3(KOVKA_CORRIDOR.maxX, 2, KOVKA_CORRIDOR.maxZ)),
+      new THREE.Box3(new THREE.Vector3(pit.minX, -6, pit.minZ), new THREE.Vector3(pit.maxX, 2, pit.maxZ)),
+    ];
+    for (const prop of props) {
+      const box = new THREE.Box3().setFromObject(prop);
+      expect(box.min.x, prop.name).toBeGreaterThanOrEqual(hall.minX);
+      expect(box.max.z, prop.name).toBeLessThanOrEqual(hall.maxZ + 1e-4);
+      expect(box.min.z, prop.name).toBeGreaterThan(pit.maxZ);
+      for (const area of keepClear) expect(box.intersectsBox(area), prop.name).toBe(false);
     }
   });
 
@@ -979,7 +1184,7 @@ describe('Station 33 main switch', () => {
     mode.onInteract();
     expect(arena.powerSwitch.isOn).toBe(true);
     expect(side.ctx.audio.playPowerSwitch).toHaveBeenCalledOnce();
-    expect(side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('banner.powerOn'));
+    expect(side.hud.showRoundBanner).toHaveBeenLastCalledWith(t('banner.powerOn'), t('banner.kovkaUnsealed'));
     expect(mode.getInteractPrompt()).toBeNull();
     // The blades still travel; the power arrives when they close.
     expect(sleight.powered).toBe(false);
@@ -1033,7 +1238,7 @@ describe('Station 33 main switch', () => {
 });
 
 describe('Station 33 lights and ambience', () => {
-  it.each(['low', 'medium', 'high'] as const)('keeps a fixed %s-quality point-light budget through flicker, blackouts and both rooms', (quality: QualityLevel) => {
+  it.each(QUALITY_LEVELS)('keeps a fixed %s-quality point-light budget through flicker, blackouts and both rooms', (quality: QualityLevel) => {
     const arena = makeArena({ ...TEST_PROFILE, quality });
     const visibleLights = (): number => {
       let count = 0;
@@ -1047,7 +1252,7 @@ describe('Station 33 lights and ambience', () => {
     expect(visibleLights()).toBe(POINT_LIGHT_BUDGET[quality]);
   });
 
-  it.each(['low', 'medium', 'high'] as const)('lights the vestibule from the spawn exactly as phase 1 did (%s)', (quality: QualityLevel) => {
+  it.each(QUALITY_LEVELS)('lights the vestibule from the spawn exactly as phase 1 did (%s)', (quality: QualityLevel) => {
     const arena = makeArena({ ...TEST_PROFILE, quality });
     const visible: string[] = [];
     arena.group.traverse((object) => {

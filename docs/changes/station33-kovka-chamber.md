@@ -21,9 +21,31 @@
 - Escala: 22 x 30 m en planta frente a los 30 x 22 propuestos, para que el
   rectangulo de navegacion crezca solo hacia el oeste (+17 % de celdas en la
   planta 0).
-- Presupuesto: la sala y el reactor son geometria estatica del batch (unos
-  12k triangulos; seis materiales nuevos, ninguna textura nueva) con
-  proxies AABB simples. Para la sala y su galeria se ampliaron los topes de
-  `drawables`, `visibleDrawables`, `colliders`, `wallBoxes` y `navCells` del
-  contrato de arena de Station 33; triangulos y geometria siguen dentro de
-  los topes previos.
+- Ambientacion: la primera version se veia sosa y la boca de la galeria
+  rara (una pilastra visual en mitad del paso y un soporte de pasarela
+  flotando). Se corrigio y se añadio `KovkaDressing` (celdas de sujetos,
+  camilla, pupitre, foso inundado, ganchos, sangre y quemaduras), polvo,
+  goteo y cables en `Station33Atmosphere`, una baliza roja sobre las celdas
+  y un gemido metalico como evento de ambiente, con sonidos ya existentes.
+- Presupuesto: la sala, el reactor y el decorado son geometria estatica del
+  batch (unos 16k triangulos; ocho materiales nuevos, ninguna textura nueva;
+  el atlas de rotulos crece una fila) con proxies AABB simples. Se ampliaron
+  los topes de `drawables`, `visibleDrawables`, `visibleTriangles` (185k a
+  190k), `colliders`, `wallBoxes` y `navCells` del contrato de arena de
+  Station 33. Triangulos totales (198,9k de 200k) y geometria (16,9 de
+  17 MiB) quedan casi al limite en el perfil alto.
+- Forja y acceso: la sala parecia no servir para nada y nada avisaba de
+  cuando usarla. Ahora la compuerta lleva un sello (`PointDoorSeal`) y no se
+  vende hasta la electricidad, con aviso, piloto rojo/verde y subtitulo en
+  el aviso de electricidad; dentro, la `UpgradeMachine` compartida forja el
+  arma en mano (5000, treinta segundos, doble dano, recarga y acabado del mapa
+  por `setWeaponFinish`). Para no tocar el inventario, el arma no sale de
+  la mano durante la forja; el acabado `KOVKA_WEAPON_FINISH` es provisional.
+  Topes del contrato: `triangles` 205k, `geometryMiB` 17,5 y `materials` 260.
+- Acabado de las armas forjadas: el tinte provisional (acero azulado) se
+  sustituye por una nebulosa animada en shader con arcos electricos
+  (`ElectricArcRibbons`, extraidos de los arcos ZEUS-77 de los zombis para
+  compartirlos). Las copias de material del tinte perdian el parche de
+  profundidad del arma en primera persona (`Material.clone` no copia
+  `onBeforeCompile`), asi que un arma forjada podia atravesar paredes; el
+  acabado nuevo lo conserva.

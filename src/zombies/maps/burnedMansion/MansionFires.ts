@@ -17,7 +17,7 @@ const FLAMES = { count: 150, life: { min: 0.45, max: 0.9 }, sizePerRadius: 1.1 }
 /** Sparks lifting off the fires, beyond the house-wide embers of `MansionAtmosphere`. */
 const SPARKS = { count: 48, life: { min: 1.6, max: 2.8 }, size: 0.028, climb: 3 } as const;
 const SPARK_COLOR = { r: 1, g: 0.5, b: 0.16 } as const;
-/** Warm halo around each fire, standing in for the bloom the renderer does not have. */
+/** Warm halo around each fire, complementing the top tier's bloom. */
 const GLOW = { color: 0xff6a24, sizePerRadius: 5, opacity: 0.32, lift: 0.4 } as const;
 const FIRELIGHT = { color: 0xff7a32, decay: 1.8, lift: 0.6 } as const;
 const FIRES_SEED = 5641;
@@ -33,7 +33,7 @@ interface FireView {
 }
 
 /**
- * Ultra quality's live fire: flames, sparks, a warm halo and flickering
+ * Ultra Max quality's live fire: flames, sparks, a warm halo and flickering
  * firelight at each of `MANSION_SMOULDERING_FIRES`. Buffers are filled in
  * place every frame; nothing here is solid or casts shadows. Firelight
  * keeps its authored intensity in `baseIntensityOf`, so the arena's light

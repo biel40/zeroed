@@ -99,5 +99,9 @@ export function createDeveloperConsoleControls(run: RunAction): HTMLElement {
   const boss = card(t('dev.boss'), t('dev.boss.description'));
   boss.classList.add('dev-card-wide');
   boss.append(button(t('dev.boss.start'), () => run('boss', t('dev.boss.start'))));
+
+  const forge = card(t('dev.forge'), t('dev.forge.description'));
+  forge.classList.add('dev-card-wide');
+  forge.append(button(t('dev.forge.start'), () => run('forge', t('dev.forge.start'))));
   return grid;
 }

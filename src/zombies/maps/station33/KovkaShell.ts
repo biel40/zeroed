@@ -71,24 +71,26 @@ export function buildKovkaShell(context: Station33BuildContext, kovka: KovkaMate
     const face = wall.fixed + wall.inward * HALF_THICKNESS;
     const min = Math.max(wall.min, wall.axis === 'z' ? hall.minZ : hall.minX);
     const max = Math.min(wall.max, wall.axis === 'z' ? hall.maxZ : hall.maxX);
-    for (const [from, to] of wallSpans(min, max, wall.openings)) addDado(context, wall.axis, face + wall.inward * 0.015, from, to);
+    for (const [from, to] of wallSpans(min, max, wall.openings)) addDado(context, kovka, wall.axis, face + wall.inward * 0.015, from, to);
   }
   addDeck(context);
   addPit(context);
-  addCorridor(context);
+  addCorridor(context, kovka);
+  addCorridorPortal(context, kovka);
   addVault(context, kovka);
 }
 
-function addDado(context: Station33BuildContext, axis: 'x' | 'z', face: number, from: number, to: number): void {
+/** Dark oil paint along the foot of a wall, under a thin black line. */
+function addDado(context: Station33BuildContext, kovka: KovkaMaterials, axis: 'x' | 'z', face: number, from: number, to: number): void {
   const { batch, materials } = context;
   const along = (from + to) / 2;
   const length = to - from;
   if (axis === 'z') {
-    batch.addBox(materials.paintedSteel, face, DADO_HEIGHT / 2, along, 0.03, DADO_HEIGHT, length, 0, 0, 0, along);
-    batch.addBox(materials.stucco, face, DADO_HEIGHT + 0.03, along, 0.035, 0.06, length);
+    batch.addBox(kovka.wallPaint, face, DADO_HEIGHT / 2, along, 0.03, DADO_HEIGHT, length);
+    batch.addBox(materials.rubber, face, DADO_HEIGHT + 0.02, along, 0.034, 0.04, length);
   } else {
-    batch.addBox(materials.paintedSteel, along, DADO_HEIGHT / 2, face, length, DADO_HEIGHT, 0.03, 0, 0, 0, along);
-    batch.addBox(materials.stucco, along, DADO_HEIGHT + 0.03, face, length, 0.06, 0.035);
+    batch.addBox(kovka.wallPaint, along, DADO_HEIGHT / 2, face, length, DADO_HEIGHT, 0.03);
+    batch.addBox(materials.rubber, along, DADO_HEIGHT + 0.02, face, length, 0.04, 0.034);
   }
 }
 
@@ -141,7 +143,7 @@ function addPit(context: Station33BuildContext): void {
  * ceiling, two side walls with the chamber's dado, and the cables it was
  * dug for along its north wall. Its ends are the two rooms' walls.
  */
-function addCorridor(context: Station33BuildContext): void {
+function addCorridor(context: Station33BuildContext, kovka: KovkaMaterials): void {
   const { batch, materials, structure } = context;
   const { minX, maxX, minZ, maxZ, height } = KOVKA_CORRIDOR;
   const centerX = (minX + maxX) / 2;
@@ -155,7 +157,7 @@ function addCorridor(context: Station33BuildContext): void {
   structure.addBox(centerX, height + DECK_THICKNESS / 2, centerZ, length, DECK_THICKNESS, width, materials.serviceConcrete, options('ceiling', 'slab', false));
   for (const [name, z, inward] of [['north', minZ - HALF_THICKNESS, 1], ['south', maxZ + HALF_THICKNESS, -1]] as const) {
     structure.addBox(centerX, height / 2, z, length, height, STATION33_WALL_THICKNESS, materials.serviceConcrete, options(name, 'wall', true));
-    addDado(context, 'x', z + inward * (HALF_THICKNESS + 0.015), minX, maxX);
+    addDado(context, kovka, 'x', z + inward * (HALF_THICKNESS + 0.015), minX, maxX);
   }
   for (let cable = 0; cable < 3; cable++) {
     const geometry = new THREE.CylinderGeometry(0.03, 0.03, length, 6).rotateZ(Math.PI / 2);
@@ -185,7 +187,33 @@ function addVault(context: Station33BuildContext, kovka: KovkaMaterials): void {
   for (const z of kovkaBayLines()) {
     batch.add(vaultRibGeometry(KOVKA_VAULT, z, RIB.thickness, RIB.width), materials.serviceConcrete);
     for (const [face, inward] of [[hall.minX, 1], [hall.maxX, -1]] as const) {
-      batch.addBox(materials.serviceConcrete, face + inward * KOVKA_PILASTER_DEPTH / 2, wallHeight / 2, z, KOVKA_PILASTER_DEPTH, wallHeight, RIB.width + 0.1);
+      // Over the corridor's mouth the rib lands on the portal's lintel instead.
+      const inMouth = inward < 0 && Math.abs(z - CORRIDOR_MOUTH.center) < CORRIDOR_MOUTH.width / 2 + RIB.width;
+      const bottom = inMouth ? CORRIDOR_MOUTH.top + PORTAL_LINTEL : 0;
+      batch.addBox(materials.serviceConcrete, face + inward * KOVKA_PILASTER_DEPTH / 2, (bottom + wallHeight) / 2, z, KOVKA_PILASTER_DEPTH, wallHeight - bottom, RIB.width + 0.1);
     }
+  }
+}
+
+/** Depth of the steel lintel over the corridor's mouth. */
+const PORTAL_LINTEL = 0.4;
+
+/**
+ * The corridor's mouth on the chamber side: hazard-striped concrete jambs
+ * and a riveted steel lintel, so it reads as the way in, not a hole.
+ */
+function addCorridorPortal(context: Station33BuildContext, kovka: KovkaMaterials): void {
+  const { batch, materials } = context;
+  const face = hall.maxX - 0.1;
+  const { center, width, top } = CORRIDOR_MOUTH;
+  for (const side of [-1, 1]) {
+    const z = center + side * (width / 2 + 0.15);
+    batch.addBox(materials.serviceConcrete, face, top / 2, z, 0.2, top, 0.3);
+    batch.addBox(materials.hazardPaint, face - 0.11, 1.0, z, 0.02, 2.0, 0.3);
+  }
+  batch.addBox(kovka.primer, face - 0.05, top + PORTAL_LINTEL / 2, center, 0.3, PORTAL_LINTEL, width + 0.6);
+  for (let index = 0; index < 7; index++) {
+    const z = center - width / 2 + (index + 0.5) * (width / 7);
+    batch.add(new THREE.SphereGeometry(0.025, 5, 3).translate(face - 0.21, top + PORTAL_LINTEL / 2, z), materials.greySteel);
   }
 }

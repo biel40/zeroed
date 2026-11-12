@@ -13,6 +13,7 @@ import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import type { WeaponId } from '../../weapons/WeaponTypes';
+import type { WeaponFinish } from '../../weapons/WeaponFinish';
 import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules, EvacuationStage } from '../evacuation/EvacuationProtocol';
 import type { CaptainUssrField, GroundRect } from '../guardians/CaptainUssrBrain';
@@ -115,6 +116,33 @@ export interface ArenaWeaponStation {
 }
 
 /**
+ * A machine that forges the weapon in the player's hands: paid once per
+ * weapon, it runs its forge for a few seconds, after which the weapon hits
+ * harder and wears the map's finish. The mode charges and upgrades; the
+ * map only presents the machine.
+ */
+export interface ArenaUpgradeMachine {
+  readonly id: string;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly floor: number;
+  readonly useRange: number;
+  readonly lookDotMin: number;
+  readonly cost: number;
+  /** How much harder a forged weapon hits. */
+  readonly damageMultiplier: number;
+  /** The look a forged weapon wears on this map. */
+  readonly finish: WeaponFinish;
+  /** False while the machine waits for the map's power: it takes no order and stays dark. */
+  readonly powered: boolean;
+  /** True while a forge runs; the weapon is ready when it ends. */
+  readonly busy: boolean;
+  /** Where a player stands to use it, and the yaw that faces it. */
+  readonly standPoint: { readonly x: number; readonly z: number; readonly yaw: number };
+  /** `weaponId` was just paid for: runs the forge with that weapon on show. */
+  forge(weaponId: WeaponId): void;
+}
+
+/**
  * What a ring machine shows: its ring for sale, nothing while the player
  * wears the charged ring, or a call to recharge once that ring is spent.
  */
@@ -157,6 +185,8 @@ export interface ArenaPowerSwitch {
   readonly lookDotMin: number;
   /** True once thrown this run. */
   readonly isOn: boolean;
+  /** Subtitle of the power-on banner: what the power just opened on this map. */
+  readonly announcementKey?: TranslationKey;
   /** Throws the switch; false when it already is. */
   activate(): boolean;
 }
@@ -417,6 +447,13 @@ export interface ZombieArena {
   readonly gasMaskRack?: ArenaGasMaskRack;
   /** Optional: special-weapon stations (the ФАКЕЛ-33 cabinet); maps without them omit it. */
   readonly weaponStations?: ReadonlyArray<ArenaWeaponStation>;
+  /** Weapon upgrade machine, if the map has one. */
+  readonly upgradeMachine?: ArenaUpgradeMachine;
+  /**
+   * Developer console: powers the map and opens every door on the way to its
+   * upgrade machine, so it can be tested at once. False when it cannot.
+   */
+  prepareUpgradeMachineVisit?(): boolean;
   /** Optional: the switch that powers the map's machines; maps without power omit it. */
   readonly powerSwitch?: ArenaPowerSwitch;
   /** Paid interaction that ends the run with the map's own ending. */

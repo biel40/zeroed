@@ -132,7 +132,7 @@ export class ZombiesRings {
     const cost = this.rings.priceOf(machine.ringId)!;
     if (this.rings.buy(machine.ringId, (price) => this.economy.spend(price)) === 'notEnoughPoints') {
       this.ctx.hud.flashNotEnoughPoints();
-      this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
+      this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost }));
       return true;
     }
     this.processEvents();
@@ -181,7 +181,7 @@ export class ZombiesRings {
       }
     }
     if (!nearest?.energize?.(seconds)) return null;
-    this.ctx.hud.showRoundBanner(t(RING_DEFINITIONS[nearest.ringId].nameKey), t('banner.machineCharged', { seconds }));
+    this.ctx.hud.showNotice('info', t(RING_DEFINITIONS[nearest.ringId].nameKey), t('banner.machineCharged', { seconds }));
     return nearest;
   }
 
@@ -294,14 +294,14 @@ export class ZombiesRings {
         case 'purchased': {
           const ring = RING_DEFINITIONS[event.ringId];
           audio.playRingPurchase();
-          hud.showRoundBanner(t(ring.nameKey), t('banner.ringWorn', { finger: t(`ring.finger.${ring.finger}`) }));
+          hud.showNotice('info', t(ring.nameKey), t('banner.ringWorn', { finger: t(`ring.finger.${ring.finger}`) }));
           this.donning.start(ring.finger);
           break;
         }
         case 'recharged': {
           const ring = RING_DEFINITIONS[event.ringId];
           audio.playRingRecharge();
-          hud.showRoundBanner(t(ring.nameKey), t('banner.ringRecharged'));
+          hud.showNotice('info', t(ring.nameKey), t('banner.ringRecharged'));
           handRings.pulse(ring.finger, RECHARGE_PULSE);
           break;
         }
@@ -309,7 +309,7 @@ export class ZombiesRings {
           const ring = RING_DEFINITIONS[event.ringId];
           audio.playResurrection();
           hud.flashRing();
-          hud.showRoundBanner(t(ring.nameKey), t('banner.ringActivated'));
+          hud.showNotice('info', t(ring.nameKey), t('banner.ringActivated'));
           handRings.pulse(ring.finger, FIRE_PULSE);
           break;
         }

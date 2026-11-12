@@ -313,8 +313,8 @@ export class CoopWorld {
 
   public showDoorDenied(door: PointDoor): void {
     this.ctx.hud.flashNotEnoughPoints();
-    if (door.requiredMessage) this.ctx.hud.showRoundBanner(t(door.requiredMessage, { cost: door.cost }));
-    else this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: door.cost }));
+    if (door.requiredMessage) this.ctx.hud.showNotice('denied', t(door.requiredMessage, { cost: door.cost }));
+    else this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: door.cost }));
   }
 
   /**

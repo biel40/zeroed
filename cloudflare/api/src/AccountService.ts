@@ -114,8 +114,14 @@ export class AccountService {
   /** Creates the account, or gives a password to one that has none (seeded, Google or link sign-ins). */
   public async register(rawEmail: unknown, password: unknown): Promise<RegistrationResult> {
     const email = normalizeEmail(rawEmail);
-    if (!email) return 'invalid-email';
-    if (!isAcceptablePassword(password)) return 'weak-password';
+
+    if (!email) {
+      return 'invalid-email';
+    }
+
+    if (!isAcceptablePassword(password)) {
+      return 'weak-password';
+    }
 
     const { store, now: clock, randomBytes } = this.options;
     const credentials = await store.findCredentials(email);

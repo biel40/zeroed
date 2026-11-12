@@ -1,0 +1,76 @@
+#debug-stats {
+  --debug-accent: #8edbb0;
+  position: fixed;
+  top: calc(54px + env(safe-area-inset-top, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  z-index: 30;
+  width: min(296px, calc(100vw - 20px));
+  padding: 12px 14px;
+  border: 1px solid #859a9a45;
+  border-top: 2px solid var(--debug-accent);
+  border-radius: 6px;
+  background: #0b1215ed;
+  box-shadow: 0 6px 24px #0005;
+  color: #ecf1ed;
+  font: 12px/1.4 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+#debug-stats[data-state='warning'] { --debug-accent: #f0cc7e; }
+#debug-stats[data-state='critical'] { --debug-accent: #ff9185; }
+#debug-stats[data-state='paused'], #debug-stats[data-state='waiting'] { --debug-accent: #a5b9c5; }
+.debug-header, .debug-summary, .debug-chart-caption, .debug-resolution {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.debug-title { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.debug-status { color: var(--debug-accent); font-size: 11px; text-align: right; }
+.debug-summary { margin-top: 6px; align-items: end; }
+.debug-cadence { display: flex; align-items: baseline; gap: 6px; }
+.debug-fps { color: var(--debug-accent); font-size: 34px; line-height: 1.1; font-weight: 650; }
+.debug-unit, .debug-label { color: #b6c6c8; }
+.debug-summary .debug-metric { text-align: right; }
+.debug-value { display: block; font: 600 14px/1.4 'Consolas', 'SF Mono', monospace; color: #ecf1ed; }
+.debug-explanation { margin-top: 4px; color: #a3b5b8; font-size: 10px; line-height: 1.4; }
+.debug-chart { margin: 10px 0 6px; }
+.debug-chart-caption { font-size: 10px; color: #a3b5b8; }
+.debug-chart svg { display: block; width: 100%; height: 54px; margin-top: 4px; overflow: visible; }
+.debug-chart text { font: 9px 'Consolas', monospace; fill: #a3b5b8; }
+.debug-grid-line { stroke: #abc4cb24; stroke-width: 1; }
+.debug-target-line { stroke: #8edbb080; stroke-width: 1; stroke-dasharray: 3 3; }
+.debug-plot { fill: none; stroke: var(--debug-accent); stroke-width: 1.5; stroke-linejoin: round; }
+.debug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.debug-grid .debug-metric:nth-child(2) { text-align: right; }
+.debug-resolution { margin-top: 8px; padding-top: 8px; border-top: 1px solid #abc4cb24; }
+.debug-resolution-value { text-align: right; }
+.debug-dimensions { display: block; color: #a3b5b8; font-size: 10px; }
+.debug-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid #abc4cb24; }
+.debug-section-title { color: #c6d4d5; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 4px; }
+
+@media (max-width: 640px), (max-height: 500px) {
+  #debug-stats { width: min(240px, calc(100vw - 20px)); padding: 8px 10px; font-size: 11px; }
+  .debug-title { font-size: 10px; }
+  .debug-status { font-size: 10px; }
+  .debug-fps { font-size: 26px; }
+  .debug-value { font-size: 12px; }
+  .debug-chart { margin-top: 5px; }
+  .debug-chart svg { height: 38px; }
+  .debug-section, .debug-resolution { margin-top: 5px; padding-top: 5px; }
+}
+@media (max-height: 500px) {
+  #debug-stats {
+    top: calc(44px + env(safe-area-inset-top, 0px));
+    width: min(270px, calc(100vw - 20px));
+  }
+  .debug-chart, .debug-explanation { display: none; }
+  .debug-grid .debug-metric { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+  .debug-grid .debug-label { font-size: 10px; }
+  .debug-resolution-value { white-space: nowrap; }
+  .debug-resolution-value .debug-value, .debug-dimensions { display: inline; }
+  .debug-dimensions { margin-left: 6px; }
+}
+@media (max-height: 380px) {
+  .debug-section-title { display: none; }
+}

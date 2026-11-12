@@ -118,7 +118,14 @@
     <div id="protection-overlay" aria-hidden="true"></div>
     <div id="radiance-overlay" aria-hidden="true"></div>
     <div id="ring-flash"></div>
-    <div id="interact-prompt" class="hidden" data-action="interact"></div>
+    <!-- The prompt and the notice answering it share one column under the crosshair. -->
+    <div id="interaction-stack">
+      <div id="interact-prompt" class="hidden" data-action="interact"></div>
+      <div id="hud-notice" role="status" aria-live="polite">
+        <div id="hud-notice-title"></div>
+        <div id="hud-notice-detail"></div>
+      </div>
+    </div>
     <div id="downed-filter" class="hidden"></div>
     <div id="death-filter" aria-hidden="true"></div>
     <div id="downed-status" class="hidden" role="status"><strong data-i18n="hud.downed"></strong><span id="downed-countdown"></span></div>
@@ -404,10 +411,11 @@
         <!-- Quality is read when a match starts, so it is only offered from the main menu. -->
         <div class="settings-row settings-choice" data-menu-only><span id="setting-quality-label" data-i18n="settings.quality"></span>
           <div id="quality-select" class="choice-group" role="group" aria-labelledby="setting-quality-label">
+            <button type="button" data-quality="auto" data-i18n="settings.qualityAuto"></button>
             <button type="button" data-quality="low" data-i18n="settings.qualityLow"></button>
             <button type="button" data-quality="medium" data-i18n="settings.qualityMedium"></button>
             <button type="button" data-quality="high" data-i18n="settings.qualityHigh"></button>
-            <button type="button" data-quality="ultra" data-i18n="settings.qualityUltra" hidden></button>
+            <button type="button" data-quality="ultraMax" data-i18n="settings.qualityUltraMax"></button>
           </div></div>
       </fieldset>
       <fieldset>

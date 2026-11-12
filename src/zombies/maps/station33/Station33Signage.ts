@@ -44,15 +44,19 @@ export type SignId =
   | 'security'
   | 'protocol-33'
   | 'emergency-exit'
-  | 'kovka';
+  | 'kovka'
+  | 'test-subjects'
+  | 'radiation'
+  | 'kovka-stencil';
 
 const ATLAS_WIDTH = 1024;
 /**
  * Two 128 px rows below the original square (the machine room's plates, then
  * the militia post's), a 384 px band of the post's red corner, a row of
- * plates ending in the KOVKA hatch's, then a row of Protocol 33's lightboxes.
+ * plates ending in the KOVKA hatch's, a row of Protocol 33's lightboxes, then
+ * the KOVKA chamber's own row.
  */
-const ATLAS_HEIGHT = 1920;
+const ATLAS_HEIGHT = 2048;
 
 /** Atlas cells in canvas pixels: x, y, width, height. */
 const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, number]>> = {
@@ -92,6 +96,9 @@ const SIGN_REGIONS: Readonly<Record<SignId, readonly [number, number, number, nu
   ventilation: [256, 1664, 256, 128],
   security: [512, 1664, 256, 128],
   kovka: [768, 1664, 256, 128],
+  'test-subjects': [0, 1920, 256, 128],
+  radiation: [256, 1920, 256, 128],
+  'kovka-stencil': [512, 1920, 512, 128],
   'protocol-33': [0, 1792, 512, 128],
   'emergency-exit': [512, 1792, 512, 128],
 };
@@ -287,6 +294,34 @@ function paintAtlas(context: CanvasRenderingContext2D): void {
   paintProtocolSigns(context, random);
   // The secret object's hatch: a restricted plate, red like the no-entry one.
   enamelPlate(context, 'kovka', '#9a1f16', '#e8e2d2', '#f1ead8', ['ОБЪЕКТ', '«КОВКА»'], 36, random);
+  paintKovkaSigns(context, random);
+}
+
+/**
+ * Inside the KOVKA chamber: the cages' enamel plate, a radiation lightbox
+ * (red field, pale letters, so it glows red on the lit material) and the
+ * object's name stencilled on the concrete through a template, sprayed and
+ * dripping.
+ */
+function paintKovkaSigns(context: CanvasRenderingContext2D, random: () => number): void {
+  enamelPlate(context, 'test-subjects', '#e4e0d4', '#1b1b1b', '#1b1b1b', ['ИСПЫТУЕМЫЕ'], 34, random);
+  const [rx, ry, rw, rh] = SIGN_REGIONS.radiation;
+  context.fillStyle = '#7a0d08';
+  context.fillRect(rx, ry, rw, rh);
+  lettering(context, 'ОПАСНО!', rx + rw / 2, ry + rh * 0.33, 40, '#ffe8dc');
+  lettering(context, 'ИЗЛУЧЕНИЕ', rx + rw / 2, ry + rh * 0.72, 34, '#ffe8dc');
+  weather(context, rx, ry, rw, rh, random, 25);
+  const [sx, sy, sw, sh] = SIGN_REGIONS['kovka-stencil'];
+  context.clearRect(sx, sy, sw, sh);
+  const ink = '#d9d4c4';
+  lettering(context, 'КОВКА-1', sx + sw / 2, sy + sh / 2, 92, ink);
+  // Template bridges cut through the letters, and paint running down from them.
+  context.clearRect(sx, sy + sh / 2 - 3, sw, 6);
+  context.fillStyle = ink;
+  for (let index = 0; index < 9; index++) {
+    context.fillRect(sx + 60 + random() * (sw - 120), sy + sh * 0.78, 2 + random() * 2, 8 + random() * 24);
+  }
+  weather(context, sx, sy, sw, sh, random, 30);
 }
 
 /**
@@ -617,7 +652,7 @@ function paintMural(context: CanvasRenderingContext2D): void {
 }
 
 export function createStation33Signage(anisotropyLimit: number): Station33Signage {
-  const anisotropy = Math.min(anisotropyLimit, 8);
+  const anisotropy = Math.min(anisotropyLimit, 16);
   const atlas = makeCanvas(ATLAS_WIDTH, ATLAS_HEIGHT);
   paintAtlas(atlas.context);
   const atlasTexture = canvasTexture(atlas.canvas, anisotropy);

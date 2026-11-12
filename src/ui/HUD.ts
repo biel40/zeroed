@@ -1,6 +1,6 @@
 import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
-import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
+import { isQualityPreference, type QualityLevel, type QualityPreference } from '../core/DeviceProfile';
 import { grenadeCookDial, lethalPouchIcons } from './GrenadeHudPresentation';
 import { formatNumber, onLanguageChange, setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
@@ -80,6 +80,9 @@ const MAP_LOADING_FADE_MS = 450;
 /** Length of `#round-banner.active` in style.css. */
 const ROUND_BANNER_MS = 3800;
 const MAP_LOADING_MIN_MS = 700;
+
+/** Feedback on the player's own action: neutral news, or why it was refused. */
+export type HudNoticeTone = 'info' | 'denied';
 /** Matches the #start-screen opacity transition in style.css. */
 const START_SCREEN_FADE_MS = 450;
 
@@ -123,6 +126,9 @@ export class HUD {
   private readonly roundBanner: HTMLElement = mustGet('round-banner');
   private readonly bannerTitle: HTMLElement = mustGet('banner-title');
   private readonly bannerSub: HTMLElement = mustGet('banner-sub');
+  private readonly notice: HTMLElement = mustGet('hud-notice');
+  private readonly noticeTitle: HTMLElement = mustGet('hud-notice-title');
+  private readonly noticeDetail: HTMLElement = mustGet('hud-notice-detail');
   private readonly damageOverlay: HTMLElement = mustGet('damage-overlay');
   private readonly damageDirectionMarks = Array.from(mustGet('damage-directions').children) as HTMLElement[];
   private readonly damageDirections = new DamageDirectionTracker();
@@ -303,6 +309,7 @@ export class HUD {
       this.roundBannerShownAt = Number.NEGATIVE_INFINITY;
       this.bannerTitle.textContent = '';
       this.bannerSub.textContent = '';
+      this.notice.classList.remove('active');
       this.ringFlash.classList.remove('active');
       this.damageOverlay.classList.remove('active');
       this.damageDirections.clear();
@@ -489,23 +496,20 @@ export class HUD {
     this.betaThanks.show(email, onClose);
   }
 
-  /**
-   * Settings quality buttons (main menu only), showing only the tiers this
-   * device is offered; the choice applies from the next match.
-   */
+  /** Settings quality buttons (main menu only); the choice applies from the next match. */
   public setQualitySelect(
-    current: QualityLevel,
+    current: QualityPreference,
     available: readonly QualityLevel[],
-    onSelect: (quality: QualityLevel) => void,
+    onSelect: (quality: QualityPreference) => void,
   ): void {
     const buttons = mustGet('quality-select').querySelectorAll<HTMLButtonElement>('[data-quality]');
-    const sync = (selected: QualityLevel): void => {
+    const sync = (selected: QualityPreference): void => {
       for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.quality === selected));
     };
     for (const button of buttons) {
-      button.hidden = !available.some((level) => level === button.dataset.quality);
+      button.hidden = button.dataset.quality !== 'auto' && !available.some((level) => level === button.dataset.quality);
       button.onclick = () => {
-        if (!isQualityLevel(button.dataset.quality)) return;
+        if (!isQualityPreference(button.dataset.quality)) return;
         sync(button.dataset.quality);
         onSelect(button.dataset.quality);
       };
@@ -799,7 +803,11 @@ export class HUD {
     this.zPoints.classList.add('denied');
   }
 
-  /** Big centered announcement; CSS animation auto-fades it. */
+  /**
+   * Big centered announcement for events of the run itself (rounds, power,
+   * objectives, bosses, partners); CSS animation auto-fades it. Feedback on
+   * the player's own actions goes to `showNotice` instead.
+   */
   public showRoundBanner(title: string, sub = ''): void {
     this.bannerTitle.textContent = title;
     this.bannerSub.textContent = sub;
@@ -808,6 +816,22 @@ export class HUD {
     void this.roundBanner.offsetWidth;
     this.roundBanner.classList.add('active');
     this.roundBannerShownAt = performance.now();
+  }
+
+  /**
+   * Compact card under the interaction prompt answering the player's own
+   * action (a refused purchase, a full pouch, a ring worn); CSS fades it, and
+   * a new notice replaces the current one.
+   */
+  public showNotice(tone: HudNoticeTone, title: string, detail = ''): void {
+    this.noticeTitle.textContent = title;
+    this.noticeDetail.textContent = detail;
+    this.noticeDetail.hidden = detail === '';
+    this.notice.classList.toggle('denied', tone === 'denied');
+    this.notice.classList.remove('active');
+    // Force reflow so the animation restarts on repeated attempts.
+    void this.notice.offsetWidth;
+    this.notice.classList.add('active');
   }
 
   /** Points an edge marker at a hit's world source (x, z) for a moment; repeated hits refresh it. */

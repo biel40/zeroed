@@ -138,14 +138,14 @@ export class CoopGuestMode implements GameMode {
       this.boxWait += dt;
       if (this.boxWait >= 5) {
         this.boxPending = false;
-        this.ctx.hud.showRoundBanner(t('banner.boxNotConfirmed'));
+        this.ctx.hud.showNotice('denied', t('banner.boxNotConfirmed'));
       }
     }
     if (this.wallBuyPending) {
       this.wallBuyWait += dt;
       if (this.wallBuyWait >= 5) {
         this.wallBuyPending = false;
-        this.ctx.hud.showRoundBanner(t('banner.purchaseNotConfirmed'));
+        this.ctx.hud.showNotice('denied', t('banner.purchaseNotConfirmed'));
       }
     }
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
@@ -264,7 +264,7 @@ export class CoopGuestMode implements GameMode {
       if (this.wallBuyPending) return;
       const refill = this.ctx.hasWeapon(wallBuy.weaponId);
       if (refill && !this.ctx.canRefillWeaponAmmo(wallBuy.weaponId)) {
-        this.ctx.hud.showRoundBanner(t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
+        this.ctx.hud.showNotice('denied', t('banner.ammoFull'), WEAPON_DEFINITIONS[wallBuy.weaponId].name);
         return;
       }
       this.wallBuyPending = true;
@@ -278,22 +278,20 @@ export class CoopGuestMode implements GameMode {
         this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon, code });
       })) return;
       const kills = this.match?.stats.guest.kills ?? 0;
-      if (weaponCaseLocked(pickup, kills)) {
-        this.ctx.hud.showRoundBanner(weaponCasePrompt(pickup, kills, this.ctx.profile.useTouchControls));
-        return;
-      }
+      // A locked case's prompt already says how many kills it still needs.
+      if (weaponCaseLocked(pickup, kills)) return;
       this.send({ type: 'mapUse', kind: 'pickup', id: pickup.id, equippedWeapon });
       return;
     }
     const grenadeBuy = this.grenades.facingBuy();
     if (grenadeBuy) {
-      if (this.grenades.hand.isFull) { this.ctx.hud.showRoundBanner(t('banner.grenadesFull')); return; }
+      if (this.grenades.hand.isFull) { this.ctx.hud.showNotice('denied', t('banner.grenadesFull')); return; }
       this.send({ type: 'mapUse', kind: 'grenades', id: grenadeBuy.id, equippedWeapon });
       return;
     }
     const refill = this.world.findFacingAmmoRefill();
     if (refill) {
-      if (!this.ctx.canRefillEquippedWeaponAmmo()) { this.ctx.hud.showRoundBanner(t('banner.ammoFull')); return; }
+      if (!this.ctx.canRefillEquippedWeaponAmmo()) { this.ctx.hud.showNotice('denied', t('banner.ammoFull')); return; }
       this.send({ type: 'mapUse', kind: 'ammo', id: refill.id, equippedWeapon });
       return;
     }
@@ -450,9 +448,9 @@ export class CoopGuestMode implements GameMode {
         this.wallBuyPending = false;
         if (message.reason === 'insufficientPoints') {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'));
-        } else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
-        else this.ctx.hud.showRoundBanner(t('banner.purchaseUnavailable'));
+          this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'));
+        } else if (message.reason === 'ammoFull') this.ctx.hud.showNotice('denied', t('banner.ammoFull'));
+        else this.ctx.hud.showNotice('denied', t('banner.purchaseUnavailable'));
         break;
       case 'boxGranted':
         this.boxPending = false;
@@ -463,9 +461,9 @@ export class CoopGuestMode implements GameMode {
         this.boxPending = false;
         if (message.reason === 'insufficientPoints') {
           this.ctx.hud.flashNotEnoughPoints();
-          this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
-        } else if (message.reason === 'reserved') this.ctx.hud.showRoundBanner(t('banner.boxReserved'));
-        else this.ctx.hud.showRoundBanner(t('banner.boxUnavailable'));
+          this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: MYSTERY_BOX_TUNING.cost }));
+        } else if (message.reason === 'reserved') this.ctx.hud.showNotice('denied', t('banner.boxReserved'));
+        else this.ctx.hud.showNotice('denied', t('banner.boxUnavailable'));
         break;
       case 'mapUsed':
         if (message.kind === 'lamp') this.world.arena.soulLampInteractions.find((entry) => entry.id === message.id)?.activate();
@@ -484,10 +482,10 @@ export class CoopGuestMode implements GameMode {
         }
         break;
       case 'mapUseFailed':
-        if (message.reason === 'insufficientPoints') this.ctx.hud.showRoundBanner(t('banner.notEnoughPoints'));
-        else if (message.reason === 'ammoFull') this.ctx.hud.showRoundBanner(t('banner.ammoFull'));
-        else if (message.reason === 'grenadesFull') this.ctx.hud.showRoundBanner(t('banner.grenadesFull'));
-        else this.ctx.hud.showRoundBanner(t('banner.unavailable'));
+        if (message.reason === 'insufficientPoints') this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'));
+        else if (message.reason === 'ammoFull') this.ctx.hud.showNotice('denied', t('banner.ammoFull'));
+        else if (message.reason === 'grenadesFull') this.ctx.hud.showNotice('denied', t('banner.grenadesFull'));
+        else this.ctx.hud.showNotice('denied', t('banner.unavailable'));
         break;
       case 'playerDamaged': {
         this.ctx.hud.flashDamage();

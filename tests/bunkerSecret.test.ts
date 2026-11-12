@@ -93,7 +93,7 @@ describe('Burned Mansion secret bunker interaction', () => {
       profile: { useTouchControls: false },
       hud: {
         flashNotEnoughPoints: () => undefined,
-        showRoundBanner: (title: string) => banners.push(title),
+        showNotice: (_tone: string, title: string) => banners.push(title),
       },
     };
     (mode as unknown as { findFacingDoor(): PointDoor }).findFacingDoor = () => door;
@@ -167,7 +167,7 @@ describe('Burned Mansion secret bunker interaction', () => {
       profile: { useTouchControls: false },
       hud: {
         flashNotEnoughPoints: () => undefined,
-        showRoundBanner: (title: string, sub: string) => banners.push(`${title}|${sub}`),
+        showNotice: (_tone: string, title: string, sub: string) => banners.push(`${title}|${sub}`),
       },
     };
     (mode as any).findFacingDoor = () => null;

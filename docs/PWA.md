@@ -34,6 +34,10 @@ runtime cache `StaleWhileRevalidate`:
 Se usan revisiones Workbox, `cleanupOutdatedCaches` y `purgeOnQuotaError`.
 Offline solo funciona para assets ya solicitados online.
 
+El build separa Three.js del codigo del juego para mantener los archivos JS
+dentro del limite de precache de Workbox; configuracion en
+[`vite.config.ts`](../vite.config.ts).
+
 ## Actualizaciones
 
 `registerType: 'prompt'`, `skipWaiting: false`, `clientsClaim: true`.

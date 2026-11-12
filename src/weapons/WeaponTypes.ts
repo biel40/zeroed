@@ -108,6 +108,37 @@ export interface MuzzleFlashConfig {
   readonly lightIntensity: number;
 }
 
+/** Side jets of a muzzle brake, in view-model metres; the brake sits `behind` the crown. */
+export interface MuzzleFlareVents {
+  readonly offset: number;
+  readonly length: number;
+  readonly spread: number;
+  readonly behind: number;
+}
+
+/**
+ * Gunpowder flame of the top quality tier (`MuzzleFlare`), in view-model
+ * metres, seconds and linear HDR brightness. Presets by cartridge live in
+ * `config/muzzleFlares.ts`.
+ */
+export interface MuzzleFlareConfig {
+  /** Reach of the flame ahead of the crown. */
+  readonly length: number;
+  /** Width of each tongue at its widest. */
+  readonly width: number;
+  /** Half-size of the burst seen down the barrel. */
+  readonly burst: number;
+  /** Tongues fanned around the barrel axis: more reads wider and more ragged. */
+  readonly tongues: number;
+  /** Seconds the flame is visible. */
+  readonly duration: number;
+  /** Peak brightness of the core. */
+  readonly brightness: number;
+  /** Peak intensity of the shot's light pulse. */
+  readonly light: number;
+  readonly vents?: MuzzleFlareVents;
+}
+
 export interface BarrelGlowSize {
   readonly radius: number;
   /** Stretch behind the muzzle that glows. */
@@ -451,6 +482,8 @@ export interface WeaponDefinition {
   readonly heat?: BarrelHeatConfig;
   readonly muzzleSmoke?: MuzzleSmokeConfig;
   readonly muzzleFlash?: MuzzleFlashConfig;
+  /** Top quality tier flame; gunpowder weapons only. Without it the standard flash is kept. */
+  readonly muzzleFlare?: MuzzleFlareConfig;
   /** World-space spent case; absent keeps the standard small brass casing. */
   readonly shellCasing?: ShellCasingProfile;
   readonly ads: AdsConfig;

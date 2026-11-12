@@ -12,6 +12,8 @@ export interface DeveloperConsoleActions {
   invincible(enabled: boolean): void;
   /** Jumps to the map's boss fight; false when the run has none left to start. */
   boss(): boolean;
+  /** Powers the map, opens the way to its upgrade machine and stands the player at it; false without one. */
+  forge(): boolean;
 }
 
 /** Explicit commands only: never evaluates JavaScript or mutates shared weapon definitions. */
@@ -65,6 +67,10 @@ export class DeveloperConsoleCommands {
       case 'boss':
         if (args.length) break;
         return t(actions.boss() ? 'dev.ok' : 'dev.unavailable');
+      case 'forge':
+      case 'kovka':
+        if (args.length) break;
+        return t(actions.forge() ? 'dev.ok' : 'dev.unavailable');
     }
     return t('dev.invalid');
   }

@@ -97,6 +97,12 @@ export default defineConfig({
   ],
   build: {
     target: 'es2022',
+    rollupOptions: {
+      output: {
+        // Keep the renderer and gameplay below Workbox's per-file precache limit.
+        manualChunks: (id) => id.includes('/node_modules/three/') ? 'three' : undefined,
+      },
+    },
   },
   test: {
     environment: 'node',

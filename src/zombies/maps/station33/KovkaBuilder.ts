@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { POINT_DOOR_SIZE } from '../../doors/PointDoor';
-import { KOVKA, KOVKA_REACTOR, KOVKA_UPGRADE_SITE, STATION33_DOORS, STATION33_WALL_THICKNESS } from '../Station33Config';
+import type { MapPower } from '../shared/MapPower';
+import { UpgradeMachine, type UpgradeMachineLook } from '../shared/UpgradeMachine';
+import {
+  KOVKA, KOVKA_CORE_COLOR, KOVKA_REACTOR, KOVKA_UPGRADE_MACHINE, KOVKA_UPGRADE_SITE, KOVKA_WEAPON_FINISH, STATION33_DOORS, STATION33_MAINS,
+  STATION33_WALL_THICKNESS, STATION33_WEAPONS,
+} from '../Station33Config';
+import { buildKovkaDressing } from './KovkaDressing';
 import { createKovkaMaterials } from './KovkaMaterials';
 import { buildKovkaReactor } from './KovkaReactor';
 import { buildKovkaShell } from './KovkaShell';
@@ -12,17 +18,28 @@ const HATCH = STATION33_DOORS.find((door) => door.zone === 'kovka')!;
 
 /**
  * The KOVKA chamber west of the escalator, reached through a corridor from
- * its hatch in the machine room's west wall: the great vault, the deck round the reactor's
- * pit with its rails, catwalks and pipes, the dormant reactor itself, and
- * the deck kept free in front of it for the weapon upgrade machine to come.
+ * its hatch in the machine room's west wall: the great vault, the deck
+ * round the reactor's pit with its rails, catwalks and pipes, the reactor,
+ * the forge before it (the shared upgrade machine in the station's dress,
+ * returned for the arena to run) and the set dressing.
  */
-export function buildKovka(context: Station33BuildContext, lighting: Station33Lighting): void {
+export function buildKovka(context: Station33BuildContext, lighting: Station33Lighting, power: MapPower): UpgradeMachine {
   const kovka = createKovkaMaterials(context.materials);
   buildKovkaShell(context, kovka);
   buildKovkaWalkways(context, kovka);
   buildKovkaReactor(context, kovka, lighting);
   addHatchSurround(context);
   addUpgradeSite(context);
+  buildKovkaDressing(context, kovka, lighting);
+  const look: UpgradeMachineLook = {
+    materials: { ...context.materials, copper: kovka.copper },
+    plate: { geometry: context.signage.signGeometry('kovka', 0.6, 0.3), material: context.signage.material },
+    glowColor: KOVKA_CORE_COLOR,
+    mainsGlowBoost: STATION33_MAINS.machineGlowBoost,
+    finish: KOVKA_WEAPON_FINISH,
+    weapons: STATION33_WEAPONS,
+  };
+  return new UpgradeMachine(context, KOVKA_UPGRADE_MACHINE, look, power);
 }
 
 /**

@@ -12,10 +12,10 @@ import {
 import { CHAR_EMBER_INTENSITY } from '../BurnedMansionMaterials';
 import type { MansionBuildContext } from './MansionBuildContext';
 
-const ASH_COUNT: Readonly<Record<QualityLevel, number>> = { low: 40, medium: 70, high: 110, ultra: 260 };
-const EMBER_COUNT: Readonly<Record<QualityLevel, number>> = { low: 8, medium: 14, high: 22, ultra: 44 };
-const SMOKE_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 3, medium: 5, high: 8, ultra: 12 };
-const BUNKER_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 20, medium: 35, high: 50, ultra: 90 };
+const ASH_COUNT: Readonly<Record<QualityLevel, number>> = { low: 40, medium: 70, high: 110, ultraMax: 260 };
+const EMBER_COUNT: Readonly<Record<QualityLevel, number>> = { low: 8, medium: 14, high: 22, ultraMax: 44 };
+const SMOKE_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 3, medium: 5, high: 8, ultraMax: 12 };
+const BUNKER_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 20, medium: 35, high: 50, ultraMax: 90 };
 
 /** Ground-floor air volume, inside the outer walls. */
 const HOUSE = { minX: -6.8, maxX: MANSION_EAST_WALL_X - 0.4, minZ: -7.8, maxZ: 9.8 } as const;

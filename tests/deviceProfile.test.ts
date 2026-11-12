@@ -78,7 +78,7 @@ describe('Device profile compatibility', () => {
     expect(highPhone.useTouchControls).toBe(true);
   });
 
-  it('offers the opt-in Ultra tier only where High is detected, and never detects it', () => {
+  it('offers the opt-in Ultra Max tier only where High is detected, and never detects it', () => {
     const desktop = {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       maxTouchPoints: 0,
@@ -96,17 +96,17 @@ describe('Device profile compatibility', () => {
     };
 
     expect(getDeviceProfile(desktop).quality).toBe('high');
-    expect(getAvailableQualityLevels(desktop)).toEqual(['low', 'medium', 'high', 'ultra']);
+    expect(getAvailableQualityLevels(desktop)).toEqual(['low', 'medium', 'high', 'ultraMax']);
     expect(getAvailableQualityLevels(modestDesktop)).toEqual(['low', 'medium', 'high']);
     expect(getAvailableQualityLevels(phone)).toEqual(['low', 'medium', 'high']);
 
-    const ultra = getDeviceProfile(desktop, 'ultra');
-    expect(ultra.quality).toBe('ultra');
-    expect(ultra.useReducedEffects).toBe(false);
-    expect(ultra.pixelRatioLimit).toBeGreaterThanOrEqual(getDeviceProfile(desktop, 'high').pixelRatioLimit);
-    // A saved Ultra choice never reaches a device that is not offered it.
-    expect(getDeviceProfile(phone, 'ultra').quality).toBe('high');
-    expect(getDeviceProfile(modestDesktop, 'ultra').quality).toBe('high');
+    const ultraMax = getDeviceProfile(desktop, 'ultraMax');
+    expect(ultraMax.quality).toBe('ultraMax');
+    expect(ultraMax.useReducedEffects).toBe(false);
+    expect(ultraMax.pixelRatioLimit).toBeGreaterThanOrEqual(getDeviceProfile(desktop, 'high').pixelRatioLimit);
+    // A saved Ultra Max choice never reaches a device that is not offered it.
+    expect(getDeviceProfile(phone, 'ultraMax').quality).toBe('high');
+    expect(getDeviceProfile(modestDesktop, 'ultraMax').quality).toBe('high');
   });
 
   it('keeps mouse controls on a fine-pointer desktop with a touch screen', () => {
