@@ -146,7 +146,7 @@ function wallDecal(name: string, map: THREE.Texture, alphaTest = 0.03, roughness
 }
 
 export function createMansionSurfaceMaterials(anisotropyLimit: number): MansionSurfaceMaterials {
-  const anisotropy = Math.min(anisotropyLimit, 8);
+  const anisotropy = Math.min(anisotropyLimit, 16);
   const surface = (
     name: string,
     key: string,

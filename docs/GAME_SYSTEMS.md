@@ -828,10 +828,10 @@ El alcance, la autoridad, el combate, la pausa y los limites de red se describen
 Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 24,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
 
-`DeviceProfile` fija una calidad Baja/Media/Alta: la elegida en Ajustes
+`DeviceProfile` fija una calidad Baja/Media/Alta/Ultra Max: la elegida en Ajustes
 desde el menu principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
 moviles con poca memoria, Media en moviles, equipos modestos o con movimiento
-reducido, Alta en el resto). La calidad decide pixel ratio maximo (1/1,5/2),
+reducido, Alta en el resto; Ultra Max nunca se detecta, solo se elige). La calidad decide pixel ratio maximo (1/1,5/2),
 efectos reducidos, anisotropia y luces puntuales; los controles tactiles
 siguen dependiendo solo del dispositivo. Se aplica al empezar la siguiente
 partida. Durante el juego, `DynamicResolution` baja la resolucion por pasos
@@ -839,6 +839,17 @@ del 10 % (minimo 50 %) si la media de un segundo cae de 50 fps, y la sube al
 recuperar 57 fps; un intento de subida fallido duplica la espera del
 siguiente y una bajada que no acelera el frame se deshace, porque el cuello
 no era la GPU. `?debug` muestra la escala actual.
+
+Ultra Max (`useAdvancedRendering`) suma a Alta tres capas, todas en
+`src/rendering/`: `PostProcessing` dibuja la escena con MSAA en un buffer HDR,
+hace florecer la luz intensa y aplica el tone mapping al final;
+`ReflectionProbe` sustituye el entorno generico por una captura cubica de la
+sala alrededor del jugador, repartida a una cara por frame y renovada cada
+segundo, de modo que metal y cristal reflejan sus lamparas y su fuego; y
+`SurfaceDetail` anade microrrelieve procedural (normal, rugosidad y cavidades)
+a los materiales de las armas en primera persona y de los zombis con modelo
+GLB. Ademas sube el presupuesto de luces puntuales a ocho, la anisotropia y
+las particulas ambientales. No hay sombras dinamicas: ninguna luz las proyecta.
 
 Station 33 mantiene visibles solo las luces puntuales que caben en ese mismo
 presupuesto (`POINT_LIGHT_BUDGET`): las de la sala donde esta el jugador, por
@@ -850,7 +861,7 @@ mostrador, carro y bancos chocan con proxies AABB invisibles.
 Burned Mansion fusiona los 17 peldaños visuales de la escalera en una sola
 malla; la rampa caminable solo existe para raycasts y no se dibuja. Mantiene
 un presupuesto local estable de luces puntuales segun la calidad: seis en
-Alta, cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
+Alta (ocho en Ultra Max), cuatro en Media y tres en Baja. El ranking pondera intensidad nominal (sin el
 parpadeo) por alcance y distancia, con histeresis, para iluminar el hueco
 desde ambas plantas sin intercambios bruscos. Su decoracion estatica se
 fusiona por material y por planta (`MansionDecorBatch`); cada malla guarda su

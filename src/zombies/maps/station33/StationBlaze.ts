@@ -7,9 +7,9 @@ import { makeSoftSpot } from './Station33Atmosphere';
 
 /** Particles of each layer by device quality, how long each one lives, and their size in metres. */
 const LAYERS = {
-  flames: { count: { low: 140, medium: 260, high: 420 }, life: { min: 0.7, max: 1.3 }, size: 2.8 },
-  embers: { count: { low: 50, medium: 110, high: 180 }, life: { min: 1.8, max: 3.2 }, size: 0.22 },
-  smoke: { count: { low: 24, medium: 48, high: 72 }, life: { min: 5, max: 8 }, size: 11 },
+  flames: { count: { low: 140, medium: 260, high: 420, ultraMax: 630 }, life: { min: 0.7, max: 1.3 }, size: 2.8 },
+  embers: { count: { low: 50, medium: 110, high: 180, ultraMax: 270 }, life: { min: 1.8, max: 3.2 }, size: 0.22 },
+  smoke: { count: { low: 24, medium: 48, high: 72, ultraMax: 108 }, life: { min: 5, max: 8 }, size: 11 },
 } as const;
 /** How much harder than the snow the heat and smoke are carried along the yard's wind. */
 const DRIFT = 4;

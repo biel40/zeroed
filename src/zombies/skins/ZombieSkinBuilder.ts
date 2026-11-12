@@ -200,28 +200,31 @@ export function createSkinnedWalkerSource(source: ZombieModelSource, skinId: Zom
 export interface ZombieHordeLook {
   readonly skins?: readonly ZombieSkinId[];
   readonly eyes?: ZombieEyeColors;
+  /** See `ZombieModelSource.surfaceDetail`. */
+  readonly surfaceDetail?: boolean;
 }
 
 /**
  * Zombie sources dressed for a map: the walker becomes one look per listed
  * skin, dealt in turn across its pool, and every model takes the map's eye
- * colors. Missing assets (procedural fallback) keep their own look; without
- * a look the sources pass through untouched.
+ * colors and the surface detail flag. Missing assets (procedural fallback)
+ * keep their own look; without a look the sources pass through untouched.
  */
 export function dressZombieSources(
   sources: Readonly<Record<ZombieModelId, ZombieModelSource | null>>,
-  { skins = [], eyes }: ZombieHordeLook = {},
+  { skins = [], eyes, surfaceDetail = false }: ZombieHordeLook = {},
 ): ZombieModelSources {
-  if (skins.length === 0 && !eyes) return sources;
-  const withEyes = (source: ZombieModelSource): ZombieModelSource => (eyes ? { ...source, eyes } : source);
+  if (skins.length === 0 && !eyes && !surfaceDetail) return sources;
+  const withLook = (source: ZombieModelSource): ZombieModelSource =>
+    (eyes || surfaceDetail ? { ...source, ...(eyes && { eyes }), ...(surfaceDetail && { surfaceDetail }) } : source);
   const dressed: ZombieModelSources = {};
   for (const modelId of Object.keys(sources) as ZombieModelId[]) {
     const source = sources[modelId];
     dressed[modelId] = !source
       ? source
       : modelId === 'walker' && skins.length > 0
-        ? skins.map((skinId) => withEyes(createSkinnedWalkerSource(source, skinId)))
-        : withEyes(source);
+        ? skins.map((skinId) => withLook(createSkinnedWalkerSource(source, skinId)))
+        : withLook(source);
   }
   return dressed;
 }

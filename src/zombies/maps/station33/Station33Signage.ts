@@ -613,7 +613,7 @@ function paintMural(context: CanvasRenderingContext2D): void {
 }
 
 export function createStation33Signage(anisotropyLimit: number): Station33Signage {
-  const anisotropy = Math.min(anisotropyLimit, 8);
+  const anisotropy = Math.min(anisotropyLimit, 16);
   const atlas = makeCanvas(ATLAS_WIDTH, ATLAS_HEIGHT);
   paintAtlas(atlas.context);
   const atlasTexture = canvasTexture(atlas.canvas, anisotropy);

@@ -15,6 +15,9 @@ import { PlayerController } from '../player/PlayerController';
 import { BarrelSmoke } from '../rendering/BarrelSmoke';
 import { Effects } from '../rendering/Effects';
 import { isFadeMaterial, setFadeBlending } from '../rendering/FadeMaterials';
+import { hdrTextureType, PostProcessing } from '../rendering/PostProcessing';
+import { ReflectionProbe } from '../rendering/ReflectionProbe';
+import { applySurfaceDetail, WEAPON_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
 import { BallisticsSystem } from '../shooting/BallisticsSystem';
 import type { SurfaceType } from '../shooting/HitTarget';
 import { HUD } from '../ui/HUD';
@@ -80,6 +83,9 @@ export class Game {
   private flameStreamDriven = false;
   /** Scales the drawing buffer below the profile's pixel ratio while frames run slow. */
   private readonly dynamicResolution = new DynamicResolution();
+  /** Top quality tier only: the HDR frame and the local reflections. */
+  private readonly postProcessing: PostProcessing | null = null;
+  private readonly reflectionProbe: ReflectionProbe | null = null;
 
   private readonly debugElement: HTMLElement | null = null;
   private debugTimer = 0;
@@ -109,6 +115,7 @@ export class Game {
   private readonly tmpMuzzle = new THREE.Vector3();
   private readonly tmpEject = new THREE.Vector3();
   private readonly tmpRight = new THREE.Vector3();
+  private readonly tmpObserver = new THREE.Vector3();
   private readonly spreadRight = new THREE.Vector3();
   private readonly spreadUp = new THREE.Vector3();
   /** Reused every frame to avoid per-frame allocations in the loop. */
@@ -126,7 +133,8 @@ export class Game {
   ) {
     this.audio = new AudioSystem(music);
     const rendererOptions = {
-      antialias: !this.profile.useReducedEffects,
+      // The post-processed frame is antialiased in its own offscreen target.
+      antialias: !this.profile.useReducedEffects && !this.profile.useAdvancedRendering,
       powerPreference: 'high-performance' as const,
       alpha: false,
       depth: true,
@@ -137,6 +145,8 @@ export class Game {
     this.viewportWidth = container.clientWidth || window.innerWidth || 1;
     this.viewportHeight = container.clientHeight || window.innerHeight || 1;
     this.renderer = new THREE.WebGLRenderer(rendererOptions);
+    this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
+    if (this.profile.useAdvancedRendering) this.postProcessing = new PostProcessing(this.renderer, this.scene, this.player.camera);
     this.applyPixelRatio();
     // updateStyle=false everywhere: CSS owns the canvas box (100% of a
     // dvh-sized container), the renderer only owns the drawing buffer. An
@@ -159,7 +169,6 @@ export class Game {
     pmrem.dispose();
 
     this.input = new Input(this.renderer.domElement, this.profile, gamepad);
-    this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
     this.scene.add(this.player.rig);
 
     this.effects = new Effects(this.scene);
@@ -214,6 +223,7 @@ export class Game {
           reloadAnim ? (reloadAnim.chargeEnd - reloadAnim.charge) * weapon.definition.reloadTime * weapon.reloadTimeScale : 0,
         );
       if (weapon.definition.boltAction) view.onBoltEject = () => this.ejectShell(view, weapon.definition.shellCasing);
+      if (this.profile.useAdvancedRendering) applySurfaceDetail(view.root, WEAPON_SURFACE_DETAIL);
       this.player.camera.add(view.root);
       this.arsenal.set(id, { weapon, view });
     }
@@ -271,6 +281,9 @@ export class Game {
       resetArsenal: () => this.resetArsenal(),
       returnToMainMenu: () => this.returnToMainMenu(),
     });
+    if (this.profile.useAdvancedRendering) {
+      this.reflectionProbe = new ReflectionProbe(this.renderer, this.scene, this.player.rig, hdrTextureType(this.renderer));
+    }
 
     this.input.onLockChange = (locked) => this.handlePointerLockChange(locked);
     this.input.onKeyInput = (key) => {
@@ -350,15 +363,19 @@ export class Game {
    */
   public async prepare(): Promise<void> {
     const camera = this.player.camera;
-    const compile = (): Promise<unknown> => Promise.race([
-      this.renderer.compileAsync(this.scene, camera).catch(() => undefined),
-      new Promise((resolve) => setTimeout(resolve, SHADER_WARMUP_TIMEOUT_MS)),
-    ]);
+    const compile = (): Promise<unknown> => {
+      // Programs depend on the target bound when they are requested.
+      this.renderer.setRenderTarget(this.postProcessing?.sceneTarget ?? null);
+      const compiled = this.renderer.compileAsync(this.scene, camera).catch(() => undefined);
+      this.renderer.setRenderTarget(null);
+      return Promise.race([compiled, new Promise((resolve) => setTimeout(resolve, SHADER_WARMUP_TIMEOUT_MS))]);
+    };
     // Rings start off the hand; show them for the compile so wearing one never stalls.
     this.viewArms.rings.setWarmup(true);
     await compile();
     this.viewArms.rings.setWarmup(false);
     if (this.disposed) return;
+    this.reflectionProbe?.capture(camera.getWorldPosition(this.tmpObserver));
     const textures = new Set<THREE.Texture>();
     const fadeMaterials = new Set<THREE.Material>();
     this.scene.traverse((object) => {
@@ -378,7 +395,7 @@ export class Game {
       if (this.disposed) return;
     }
     for (const texture of textures) this.renderer.initTexture(texture);
-    this.renderer.render(this.scene, camera);
+    this.present(camera);
     this.renderer.setAnimationLoop(this.tick);
   }
 
@@ -536,6 +553,8 @@ export class Game {
     this.debugElement?.remove();
     if (document.pointerLockElement) document.exitPointerLock();
     this.audio.dispose();
+    this.reflectionProbe?.dispose();
+    this.postProcessing?.dispose();
     this.scene.environment?.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
@@ -581,9 +600,18 @@ export class Game {
     this.player.resize(width / height);
   };
 
+  /** Applies the viewport size and the dynamic resolution to every drawing buffer. */
   private applyPixelRatio(): void {
     const devicePixelRatio = Math.min(window.devicePixelRatio || 1, this.profile.pixelRatioLimit);
-    this.renderer.setPixelRatio(devicePixelRatio * this.dynamicResolution.scale);
+    const pixelRatio = devicePixelRatio * this.dynamicResolution.scale;
+    this.renderer.setPixelRatio(pixelRatio);
+    this.postProcessing?.setResolution(this.viewportWidth, this.viewportHeight, pixelRatio);
+  }
+
+  /** Draws the frame, post-processed on the top quality tier. */
+  private present(camera: THREE.Camera): void {
+    if (this.postProcessing) this.postProcessing.render(camera);
+    else this.renderer.render(this.scene, camera);
   }
 
   private switchWeapon(index: number): void {
@@ -802,7 +830,7 @@ export class Game {
     // (networked) match never halts here; the menu only gates local input.
     if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
       this.input.suppressGamepad();
-      this.renderer.render(this.scene, this.mode.getCinematicCamera?.() ?? this.player.camera);
+      this.present(this.mode.getCinematicCamera?.() ?? this.player.camera);
       this.input.endFrame();
       this.dynamicResolution.resetWindow();
       return;
@@ -926,7 +954,9 @@ export class Game {
       allowGameplayInput ? (this.mode.getInteractPrompt?.() ?? null) : null,
     );
 
-    this.renderer.render(this.scene, cinematicCamera ?? this.player.camera);
+    const camera = cinematicCamera ?? this.player.camera;
+    this.reflectionProbe?.update(dt, camera.getWorldPosition(this.tmpObserver));
+    this.present(camera);
     if (this.dynamicResolution.sample(dt)) this.applyPixelRatio();
     this.updateDebug(dt);
     this.input.endFrame();

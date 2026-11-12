@@ -53,11 +53,18 @@
   renderizar y los datos del mapa guardan claves, no frases. La eleccion se
   recuerda en `localStorage`; sin ella se usa el idioma del navegador.
 - **Calidad grafica por niveles y resolucion dinamica.** El jugador elige
-  Baja/Media/Alta en Ajustes, solo cuando lo abre desde el menu principal
+  Baja/Media/Alta/Ultra Max en Ajustes, solo cuando lo abre desde el menu principal
   (desde pausa esa fila se oculta); sin eleccion manda la deteccion del
   dispositivo. La resolucion se adapta sola al tiempo de frame dentro del
   limite de la calidad, sin tocar el numero de luces durante la partida para
   no recompilar shaders.
+- **Ultra Max es opcional y aditivo.** Nunca se asigna por deteccion y no
+  cambia el camino de render de los demas niveles. Los reflejos son una sonda
+  cubica local y no SSR ni reflejos planares, porque la sonda no depende del
+  truco de profundidad del arma ni duplica la escena cada frame; las "mejores
+  texturas" son detalle procedural en el shader porque armas y mapas no usan
+  archivos de textura. Contexto en
+  [la nota de cambio](changes/ultra-max-graphics.md).
 - **Ajustes del jugador en vivo.** `PlayerSettings` es la unica fuente de
   volumenes, sensibilidad, eje Y y campo de vision; se guarda en
   `localStorage` y se puede cambiar en mitad de la partida. La calidad grafica

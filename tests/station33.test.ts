@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { DeviceProfile, QualityLevel } from '../src/core/DeviceProfile';
+import { QUALITY_LEVELS, type DeviceProfile, type QualityLevel } from '../src/core/DeviceProfile';
 import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
 import type { Input } from '../src/player/Input';
 import type { Weapon } from '../src/weapons/Weapon';
@@ -864,7 +864,7 @@ describe('Station 33 main switch', () => {
 });
 
 describe('Station 33 lights and ambience', () => {
-  it.each(['low', 'medium', 'high'] as const)('keeps a fixed %s-quality point-light budget through flicker, blackouts and both rooms', (quality: QualityLevel) => {
+  it.each(QUALITY_LEVELS)('keeps a fixed %s-quality point-light budget through flicker, blackouts and both rooms', (quality: QualityLevel) => {
     const arena = makeArena({ ...TEST_PROFILE, quality });
     const visibleLights = (): number => {
       let count = 0;
@@ -878,7 +878,7 @@ describe('Station 33 lights and ambience', () => {
     expect(visibleLights()).toBe(POINT_LIGHT_BUDGET[quality]);
   });
 
-  it.each(['low', 'medium', 'high'] as const)('lights the vestibule from the spawn exactly as phase 1 did (%s)', (quality: QualityLevel) => {
+  it.each(QUALITY_LEVELS)('lights the vestibule from the spawn exactly as phase 1 did (%s)', (quality: QualityLevel) => {
     const arena = makeArena({ ...TEST_PROFILE, quality });
     const visible: string[] = [];
     arena.group.traverse((object) => {

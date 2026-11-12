@@ -818,7 +818,7 @@ export const PROTOCOL33_SNOWFALL = {
     minZ: PROTOCOL33_SURFACE.yard.minZ - 12,
     maxZ: PROTOCOL33_SURFACE.yard.maxZ + 4,
   },
-  flakes: { low: 260, medium: 520, high: 900 },
+  flakes: { low: 260, medium: 520, high: 900, ultraMax: 1350 },
   fallSpeed: { min: 0.55, max: 1.15 },
   wind: { x: 0.35, z: -0.12 },
   sway: 0.35,

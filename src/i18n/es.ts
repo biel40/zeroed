@@ -91,6 +91,7 @@ export const es: Record<TranslationKey, string> = {
   'settings.qualityLow': 'BAJA',
   'settings.qualityMedium': 'MEDIA',
   'settings.qualityHigh': 'ALTA',
+  'settings.qualityUltraMax': 'ULTRA MAX',
   'menu.settings': 'AJUSTES',
   'settings.audio': 'AUDIO',
   'settings.masterVolume': 'Volumen general',

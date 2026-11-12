@@ -192,7 +192,9 @@ export class ZombiesMode implements GameMode {
 
     this.zombies = new ZombieManager(
       Math.random,
-      dressZombieSources(ctx.assets.getZombieModels(), { skins: this.arena.zombieSkins, eyes: this.arena.zombieEyes }),
+      dressZombieSources(ctx.assets.getZombieModels(), {
+        skins: this.arena.zombieSkins, eyes: this.arena.zombieEyes, surfaceDetail: ctx.profile.useAdvancedRendering,
+      }),
       // Static shadow maps (mobile) must not have moving casters.
       !ctx.profile.useReducedEffects,
       this.arena.spawnPoints,

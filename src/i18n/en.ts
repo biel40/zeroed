@@ -93,6 +93,7 @@ export const en = {
   'settings.qualityLow': 'LOW',
   'settings.qualityMedium': 'MEDIUM',
   'settings.qualityHigh': 'HIGH',
+  'settings.qualityUltraMax': 'ULTRA MAX',
   'menu.settings': 'SETTINGS',
   'settings.audio': 'AUDIO',
   'settings.masterVolume': 'Master volume',

@@ -13,6 +13,7 @@ import { ShinyStars } from './ShinyStars';
 import { ZombieElectricArcs } from './ZombieElectricArcs';
 import { ZombieFlames } from './ZombieFlames';
 import { installZombieChar, setZombieChar } from '../rendering/ZombieCharShader';
+import { installSurfaceDetail, ZOMBIE_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
 import { ZombieLimb } from './ZombieLimb';
 import { buildZombieRestClips, type ZombieRestClips } from './ZombieMotionClips';
 import { ZOMBIE_DEATH_PROFILES, type ZombieFallStyle } from './ZombieDeath';
@@ -40,6 +41,8 @@ export interface ZombieModelSource {
   readonly clips: THREE.AnimationClip[];
   /** Map override of the model's eye colors; omitted keeps `ZombieModelConfig.eyes`. */
   readonly eyes?: ZombieEyeColors;
+  /** Layers procedural micro-relief on the body materials (top quality tier). */
+  readonly surfaceDetail?: boolean;
 }
 
 
@@ -797,6 +800,7 @@ export class ZombieVisual {
     for (const material of this.materials) {
       installVortex9Dissolve(material, this.modelConfig.height);
       installZombieChar(material);
+      if (source?.surfaceDetail) installSurfaceDetail(material, ZOMBIE_SURFACE_DETAIL);
     }
     this.root.updateMatrixWorld(true);
     placeOnAnchor(eyes.group, this.headAnchor, this.resolveHeadTarget());

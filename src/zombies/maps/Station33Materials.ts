@@ -579,7 +579,7 @@ function makeBlotTexture(seed: number, wet: boolean): THREE.DataTexture {
 }
 
 export function createStation33Materials(anisotropyLimit: number): Station33Materials {
-  const anisotropy = Math.min(anisotropyLimit, 8);
+  const anisotropy = Math.min(anisotropyLimit, 16);
   const wallMarble = bake('wall-marble', 256, 2, marblePainter(256, 3331, [150, 148, 140], [92, 94, 90], 1.6));
   const columnMarble = bake('column-marble', 256, 2, marblePainter(256, 3337, [118, 92, 80], [168, 150, 136], 1.1));
   const darkGranite = bake('dark-granite', 256, 1.5, marblePainter(256, 3343, [58, 54, 52], [96, 92, 88], 4));

@@ -17,14 +17,14 @@ interface DustVolume {
 
 /** Motes over the vestibule, the luggage-office hall, the train sheds, the machine room, the militia post and the workshop. */
 const DUST_VOLUMES: ReadonlyArray<DustVolume> = [
-  { room: VESTIBULE, count: { low: 30, medium: 60, high: 90 }, ceiling: 4.1, seed: 3407 },
-  { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
-  { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60 }, ceiling: 4.1, seed: 3419 },
-  { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: 4.1, seed: 3421 },
-  { room: MILICIA.hall, count: { low: 8, medium: 16, high: 24 }, ceiling: MILICIA.ceilingHeight - 0.2, seed: 3423 },
-  { room: TALLER.hall, count: { low: 10, medium: 20, high: 30 }, ceiling: TALLER.ceilingHeight - 0.2, seed: 3427 },
+  { room: VESTIBULE, count: { low: 30, medium: 60, high: 90, ultraMax: 135 }, ceiling: 4.1, seed: 3407 },
+  { room: CONSIGNA.hall, count: { low: 10, medium: 20, high: 30, ultraMax: 45 }, ceiling: CONSIGNA.ceilingHeight - 0.2, seed: 3413 },
+  { room: COCHERAS.hall, count: { low: 20, medium: 40, high: 60, ultraMax: 90 }, ceiling: 4.1, seed: 3419 },
+  { room: SUBESTACION.hall, count: { low: 10, medium: 20, high: 30, ultraMax: 45 }, ceiling: 4.1, seed: 3421 },
+  { room: MILICIA.hall, count: { low: 8, medium: 16, high: 24, ultraMax: 36 }, ceiling: MILICIA.ceilingHeight - 0.2, seed: 3423 },
+  { room: TALLER.hall, count: { low: 10, medium: 20, high: 30, ultraMax: 45 }, ceiling: TALLER.ceilingHeight - 0.2, seed: 3427 },
 ];
-const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5 };
+const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5, ultraMax: 8 };
 /**
  * Seepage points in the ceilings; the third one is the hole the vault
  * plaster fell from, the next two soak the luggage office, three drip from

@@ -5135,6 +5135,7 @@ html.touch-controls-enabled .start-panel {
   .settings-form { padding: 16px 18px 14px; }
   .settings-form h2 { margin-bottom: 8px; font-size: 26px; }
   .settings-row { min-height: 32px; gap: 8px; }
+  .choice-group button { min-width: 0; padding: 7px 8px; letter-spacing: .06em; }
 }
 @media (max-width: 600px) {
   #hud-zombies { right: 10px; bottom: 10px; width: min(248px, calc(100vw - 20px)); }

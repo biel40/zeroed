@@ -1,4 +1,5 @@
-export const QUALITY_LEVELS = ['low', 'medium', 'high'] as const;
+/** `ultraMax` is opt-in only: detection never picks it. */
+export const QUALITY_LEVELS = ['low', 'medium', 'high', 'ultraMax'] as const;
 export type QualityLevel = (typeof QUALITY_LEVELS)[number];
 
 export interface DeviceProfile {
@@ -12,6 +13,8 @@ export interface DeviceProfile {
   readonly useReducedEffects: boolean;
   readonly useTouchControls: boolean;
   readonly anisotropyLimit: number;
+  /** HDR post-processing, local reflections and procedural surface detail. */
+  readonly useAdvancedRendering: boolean;
 }
 
 type DeviceNavigator = Partial<Navigator> & {
@@ -19,12 +22,14 @@ type DeviceNavigator = Partial<Navigator> & {
   deviceMemory?: number;
 };
 
-type QualitySettings = Pick<DeviceProfile, 'pixelRatioLimit' | 'shadowQuality' | 'useReducedEffects' | 'anisotropyLimit'>;
+type QualitySettings = Pick<DeviceProfile,
+  'pixelRatioLimit' | 'shadowQuality' | 'useReducedEffects' | 'anisotropyLimit' | 'useAdvancedRendering'>;
 
 const QUALITY_SETTINGS: Record<QualityLevel, QualitySettings> = {
-  low: { pixelRatioLimit: 1, shadowQuality: 0, useReducedEffects: true, anisotropyLimit: 2 },
-  medium: { pixelRatioLimit: 1.5, shadowQuality: 1, useReducedEffects: true, anisotropyLimit: 2 },
-  high: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8 },
+  low: { pixelRatioLimit: 1, shadowQuality: 0, useReducedEffects: true, anisotropyLimit: 2, useAdvancedRendering: false },
+  medium: { pixelRatioLimit: 1.5, shadowQuality: 1, useReducedEffects: true, anisotropyLimit: 2, useAdvancedRendering: false },
+  high: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 8, useAdvancedRendering: false },
+  ultraMax: { pixelRatioLimit: 2, shadowQuality: 2, useReducedEffects: false, anisotropyLimit: 16, useAdvancedRendering: true },
 };
 
 const QUALITY_STORAGE_KEY = 'zeroed.quality';
