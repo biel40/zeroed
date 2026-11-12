@@ -90,6 +90,7 @@ export const en = {
   'menu.multiplayer': 'MULTIPLAYER MODE',
   'menu.language': 'LANGUAGE',
   'settings.quality': 'Quality',
+  'settings.qualityAuto': 'AUTO',
   'settings.qualityLow': 'LOW',
   'settings.qualityMedium': 'MEDIUM',
   'settings.qualityHigh': 'HIGH',

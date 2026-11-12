@@ -8,7 +8,17 @@ import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } f
 import { MusicManager } from './audio/MusicManager';
 import { canAccessZombieMap, COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
-import { getDeviceProfile, getQualityPreference, setQualityPreference, type DeviceProfile } from './core/DeviceProfile';
+import { recordAutoQualityDowngrade, resolveAutoQuality, type AutoQualityLevel, type DeviceSignals, type GpuSignals } from './core/AutoQuality';
+import { AutoQualityGovernor } from './core/AutoQualityGovernor';
+import {
+  getDeviceProfile,
+  getQualityPreference,
+  readDeviceSignals,
+  setQualityPreference,
+  type DeviceProfile,
+  type QualityPreference,
+} from './core/DeviceProfile';
+import { measureRenderPixels, probeGpu } from './core/GraphicsProbe';
 import { Game } from './core/Game';
 import type { GameMode } from './modes/GameMode';
 import { getDesktopShell } from './platform/DesktopShell';
@@ -23,7 +33,13 @@ import { GamepadControls } from './player/GamepadControls';
 
 class ZeroedBoot {
   private readonly container: HTMLElement;
-  /** Rebuilt when the settings quality changes; each match reads it at start. */
+  /** Null when the browser has no WebGL at all. */
+  private readonly gpu: GpuSignals | null = probeGpu();
+  private readonly deviceSignals: DeviceSignals;
+  private qualityPreference: QualityPreference;
+  /** The tier Auto plays at; a match that runs too slowly lowers it for the next one. */
+  private autoQuality: AutoQualityLevel;
+  /** Rebuilt when the quality changes; each match reads it at start. */
   private profile: DeviceProfile;
   private readonly hud: HUD;
   private readonly assets: AssetManager;
@@ -44,7 +60,10 @@ class ZeroedBoot {
     if (!container) throw new Error('Missing #app container');
 
     this.container = container;
-    this.profile = getDeviceProfile(undefined, getQualityPreference());
+    this.deviceSignals = readDeviceSignals(undefined, this.gpu, measureRenderPixels());
+    this.qualityPreference = getQualityPreference();
+    this.autoQuality = resolveAutoQuality(this.deviceSignals);
+    this.profile = this.createProfile();
     this.hud = new HUD();
     this.assets = new AssetManager(this.profile.anisotropyLimit);
     this.startMenuLoop();
@@ -63,9 +82,19 @@ class ZeroedBoot {
     document.addEventListener('keydown', unlockMenuMusic, { capture: true, once: true });
   }
 
-  private static hasWebGL(): boolean {
-    const canvas: HTMLCanvasElement = document.createElement('canvas');
-    return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+  private createProfile(): DeviceProfile {
+    return getDeviceProfile(undefined, this.qualityPreference === 'auto' ? this.autoQuality : this.qualityPreference);
+  }
+
+  /** Auto only: a tier that keeps the game too slow is lowered from the next match on. */
+  private createQualityGovernor(): AutoQualityGovernor | null {
+    if (this.qualityPreference !== 'auto' || this.autoQuality === 'low') return null;
+    const playedQuality = this.autoQuality;
+    return new AutoQualityGovernor(() => {
+      if (this.qualityPreference !== 'auto' || this.autoQuality !== playedQuality) return;
+      this.autoQuality = recordAutoQualityDowngrade(this.deviceSignals, playedQuality);
+      this.profile = this.createProfile();
+    });
   }
 
   private async startGame(mode: GameMode, mapId: ZombieMapId): Promise<void> {
@@ -82,7 +111,7 @@ class ZeroedBoot {
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     try {
       const game: Game = new Game(this.container, this.hud, this.assets, this.profile, mode, this.music,
-        () => this.onGameExited(game), this.gamepad);
+        () => this.onGameExited(game), this.gamepad, this.createQualityGovernor());
       this.game = game;
       await game.prepare();
       // A co-op partner may have ended the match while the GPU warmed up.
@@ -207,7 +236,7 @@ class ZeroedBoot {
   private async initialize(): Promise<void> {
     document.documentElement.classList.toggle('touch-controls-enabled', this.profile.useTouchControls);
 
-    if (!ZeroedBoot.hasWebGL()) {
+    if (!this.gpu) {
       this.hud.setError(t('start.noWebGL'));
       return;
     }
@@ -244,9 +273,10 @@ class ZeroedBoot {
       this.hud.setCoopSelectHandler(() => this.showCoopLobby());
       const desktop = getDesktopShell();
       if (desktop) this.hud.enableQuit(() => desktop.quit());
-      this.hud.setQualitySelect(this.profile.quality, (quality) => {
-        setQualityPreference(quality);
-        this.profile = getDeviceProfile(undefined, quality);
+      this.hud.setQualitySelect(this.qualityPreference, (preference) => {
+        setQualityPreference(preference);
+        this.qualityPreference = preference;
+        this.profile = this.createProfile();
       });
 
       this.openRequestedMap();

@@ -1,5 +1,6 @@
 import { CHAIN_ZAP_DAMAGE } from '../zombies/ZombieConfig';
 import type { WeaponDefinition, WeaponId } from '../weapons/WeaponTypes';
+import { MUZZLE_FLARES } from './muzzleFlares';
 
 /**
  * Declarative weapon definitions. Values are tuned for game feel, not for
@@ -16,6 +17,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    */
   m1911: {
     id: 'm1911',
+    muzzleFlare: MUZZLE_FLARES.pistol,
     name: 'M1911',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
@@ -123,6 +125,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
 
   m4a1: {
     id: 'm4a1',
+    muzzleFlare: MUZZLE_FLARES.carbine,
     name: 'M4A1',
     fireModes: ['auto', 'semi'],
     defaultFireMode: 'auto',
@@ -223,6 +226,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    */
   mp5: {
     id: 'mp5',
+    muzzleFlare: MUZZLE_FLARES.smg,
     name: 'MP5',
     fireModes: ['auto', 'semi'],
     defaultFireMode: 'auto',
@@ -328,6 +332,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    */
   vector: {
     id: 'vector',
+    muzzleFlare: MUZZLE_FLARES.smg,
     name: 'Vector',
     fireModes: ['auto', 'semi'],
     defaultFireMode: 'auto',
@@ -427,6 +432,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   /** Drum-fed Soviet SMG: sustained close-range fire traded for a heavy, slower reload. */
   ppsh41: {
     id: 'ppsh41',
+    muzzleFlare: MUZZLE_FLARES.smg,
     name: 'PPSh-41',
     fireModes: ['auto', 'semi'],
     defaultFireMode: 'auto',
@@ -516,6 +522,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
 
   ak47: {
     id: 'ak47',
+    muzzleFlare: MUZZLE_FLARES.carbine,
     name: 'AK-47',
     fireModes: ['auto', 'semi'],
     defaultFireMode: 'auto',
@@ -618,6 +625,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    */
   m14: {
     id: 'm14',
+    muzzleFlare: MUZZLE_FLARES.rifle,
     name: 'M14',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
@@ -716,6 +724,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
 
   m60: {
     id: 'm60',
+    muzzleFlare: MUZZLE_FLARES.rifle,
     name: 'M60',
     fireModes: ['auto'],
     defaultFireMode: 'auto',
@@ -806,6 +815,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
 
   l96: {
     id: 'l96',
+    muzzleFlare: MUZZLE_FLARES.sniper,
     name: 'L96',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
@@ -899,6 +909,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
 
   barrett: {
     id: 'barrett',
+    muzzleFlare: MUZZLE_FLARES.antiMateriel,
     name: 'BARRETT .50',
     muzzleFlash: { length: 0.78, width: 0.26, sideLength: 0.6, coreScale: 2.4, duration: 0.14, lightIntensity: 32 },
     shellCasing: 'bmg50',

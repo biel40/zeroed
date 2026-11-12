@@ -4,6 +4,7 @@ import type { AssetManager } from '../assets/AssetManager';
 import { AudioSystem } from '../audio/AudioSystem';
 import { MusicManager } from '../audio/MusicManager';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
+import type { AutoQualityGovernor } from '../core/AutoQualityGovernor';
 import { getDeviceProfile, type DeviceProfile } from '../core/DeviceProfile';
 import { DynamicResolution } from '../core/DynamicResolution';
 import { Stats } from '../game/Stats';
@@ -15,6 +16,8 @@ import { PlayerController } from '../player/PlayerController';
 import { BarrelSmoke } from '../rendering/BarrelSmoke';
 import { Effects } from '../rendering/Effects';
 import { isFadeMaterial, setFadeBlending } from '../rendering/FadeMaterials';
+import { advancedFeatures } from '../rendering/AdvancedRenderingFeatures';
+import { LampShadows } from '../rendering/LampShadows';
 import { hdrTextureType, PostProcessing } from '../rendering/PostProcessing';
 import { ReflectionProbe } from '../rendering/ReflectionProbe';
 import { applySurfaceDetail, WEAPON_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
@@ -29,6 +32,7 @@ import type { ShellCasingProfile, WeaponId } from '../weapons/WeaponTypes';
 import { WeaponView } from '../weapons/WeaponView';
 import { ViewArms } from '../weapons/ViewArms';
 import { armDetailFor } from '../weapons/FirstPersonArm';
+import { FLARE_LIGHT_COLOR, flareLightDecay } from '../weapons/MuzzleFlare';
 
 interface ArsenalEntry {
   readonly weapon: Weapon;
@@ -83,9 +87,10 @@ export class Game {
   private flameStreamDriven = false;
   /** Scales the drawing buffer below the profile's pixel ratio while frames run slow. */
   private readonly dynamicResolution = new DynamicResolution();
-  /** Top quality tier only: the HDR frame and the local reflections. */
+  /** Top quality tier only: the HDR frame, the local reflections and the lamp shadows. */
   private readonly postProcessing: PostProcessing | null = null;
   private readonly reflectionProbe: ReflectionProbe | null = null;
+  private readonly lampShadows: LampShadows | null = null;
 
   private readonly debugElement: HTMLElement | null = null;
   private debugTimer = 0;
@@ -130,6 +135,8 @@ export class Game {
     music: MusicManager = new MusicManager(),
     private readonly onExitToMenu: () => void = () => undefined,
     gamepad?: GamepadControls,
+    /** Automatic quality only: judges this match's frame rate for the next one. */
+    private readonly qualityGovernor: AutoQualityGovernor | null = null,
   ) {
     this.audio = new AudioSystem(music);
     const rendererOptions = {
@@ -146,7 +153,10 @@ export class Game {
     this.viewportHeight = container.clientHeight || window.innerHeight || 1;
     this.renderer = new THREE.WebGLRenderer(rendererOptions);
     this.player = new PlayerController(this.viewportWidth / this.viewportHeight);
-    if (this.profile.useAdvancedRendering) this.postProcessing = new PostProcessing(this.renderer, this.scene, this.player.camera);
+    const features = advancedFeatures(window.location.search);
+    if (this.profile.useAdvancedRendering) {
+      this.postProcessing = new PostProcessing(this.renderer, this.scene, this.player.camera, features);
+    }
     this.applyPixelRatio();
     // updateStyle=false everywhere: CSS owns the canvas box (100% of a
     // dvh-sized container), the renderer only owns the drawing buffer. An
@@ -213,7 +223,8 @@ export class Game {
       const weapon = this.mode.reserveAmmoFor
         ? new Weapon(definitions[id], Math.random, this.mode.reserveAmmoFor(id))
         : new Weapon(definitions[id]);
-      const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops);
+      const view = new WeaponView(weapon.definition, this.assets.getWeaponModel(id), this.magazineDrops,
+        { cinematicFlash: this.profile.useAdvancedRendering });
       const reloadAnim = weapon.definition.view.reloadAnim;
       view.onReloadPhase = (phase) =>
         this.audio.playReloadPhase(
@@ -281,8 +292,13 @@ export class Game {
       resetArsenal: () => this.resetArsenal(),
       returnToMainMenu: () => this.returnToMainMenu(),
     });
-    if (this.profile.useAdvancedRendering) {
-      this.reflectionProbe = new ReflectionProbe(this.renderer, this.scene, this.player.rig, hdrTextureType(this.renderer));
+    if (this.profile.useAdvancedRendering && features.reflections) {
+      this.reflectionProbe = new ReflectionProbe(this.renderer, this.scene, this.player.rig, [this.flashLight], hdrTextureType(this.renderer));
+    }
+    if (this.profile.useAdvancedRendering && features.shadows) {
+      this.lampShadows = new LampShadows(this.scene, new Set([this.flashLight]));
+      // Before the shader warm-up, which compiles for the lights casting then.
+      this.lampShadows.update(0, this.player.camera.getWorldPosition(this.tmpObserver));
     }
 
     this.input.onLockChange = (locked) => this.handlePointerLockChange(locked);
@@ -553,6 +569,7 @@ export class Game {
     this.debugElement?.remove();
     if (document.pointerLockElement) document.exitPointerLock();
     this.audio.dispose();
+    this.lampShadows?.dispose();
     this.reflectionProbe?.dispose();
     this.postProcessing?.dispose();
     this.scene.environment?.dispose();
@@ -606,6 +623,14 @@ export class Game {
     const pixelRatio = devicePixelRatio * this.dynamicResolution.scale;
     this.renderer.setPixelRatio(pixelRatio);
     this.postProcessing?.setResolution(this.viewportWidth, this.viewportHeight, pixelRatio);
+  }
+
+  /** Top quality tier: follows the observer with the lamp shadows and the local reflections. */
+  private updateAdvancedLighting(dt: number, camera: THREE.Camera): void {
+    if (!this.lampShadows && !this.reflectionProbe) return;
+    camera.getWorldPosition(this.tmpObserver);
+    this.lampShadows?.update(dt, this.tmpObserver);
+    this.reflectionProbe?.update(dt, this.tmpObserver);
   }
 
   /** Draws the frame, post-processed on the top quality tier. */
@@ -723,9 +748,17 @@ export class Game {
       this.flashLightDecay = FLAME_LIGHT_DECAY;
       return;
     }
-    this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
-    this.flashLight.intensity = energy ? 10 : (weapon.definition.muzzleFlash?.lightIntensity ?? 9);
-    this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
+    const flare = this.profile.useAdvancedRendering ? weapon.definition.muzzleFlare : undefined;
+    if (flare) {
+      // A pulse as short as the flame: the HDR frame does not clamp a lingering glow.
+      this.flashLight.color.setHex(FLARE_LIGHT_COLOR);
+      this.flashLight.intensity = flare.light * (0.85 + Math.random() * 0.3);
+      this.flashLightDecay = flareLightDecay(flare.duration);
+    } else {
+      this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
+      this.flashLight.intensity = energy ? 10 : (weapon.definition.muzzleFlash?.lightIntensity ?? 9);
+      this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
+    }
 
     if (energy) {
       this.player.playShotImpulse(0.014);
@@ -833,6 +866,7 @@ export class Game {
       this.present(this.mode.getCinematicCamera?.() ?? this.player.camera);
       this.input.endFrame();
       this.dynamicResolution.resetWindow();
+      this.qualityGovernor?.reset();
       return;
     }
 
@@ -955,9 +989,12 @@ export class Game {
     );
 
     const camera = cinematicCamera ?? this.player.camera;
-    this.reflectionProbe?.update(dt, camera.getWorldPosition(this.tmpObserver));
+    this.updateAdvancedLighting(dt, camera);
     this.present(camera);
     if (this.dynamicResolution.sample(dt)) this.applyPixelRatio();
+    // A shared match keeps running behind the local menu; only played frames are judged.
+    if (this.paused) this.qualityGovernor?.reset();
+    else this.qualityGovernor?.sample(dt, this.dynamicResolution.scale);
     this.updateDebug(dt);
     this.input.endFrame();
   }

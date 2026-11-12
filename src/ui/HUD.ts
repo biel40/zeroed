@@ -1,6 +1,6 @@
 import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
-import { isQualityLevel, type QualityLevel } from '../core/DeviceProfile';
+import { isQualityPreference, type QualityPreference } from '../core/DeviceProfile';
 import { grenadeCookDial, grenadeIcon } from './GrenadeHudPresentation';
 import { formatNumber, onLanguageChange, setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 import { clamp } from '../utils/math';
@@ -478,14 +478,14 @@ export class HUD {
   }
 
   /** Settings quality buttons (main menu only); the choice applies from the next match. */
-  public setQualitySelect(current: QualityLevel, onSelect: (quality: QualityLevel) => void): void {
+  public setQualitySelect(current: QualityPreference, onSelect: (quality: QualityPreference) => void): void {
     const buttons = mustGet('quality-select').querySelectorAll<HTMLButtonElement>('[data-quality]');
-    const sync = (selected: QualityLevel): void => {
+    const sync = (selected: QualityPreference): void => {
       for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.quality === selected));
     };
     for (const button of buttons) {
       button.onclick = () => {
-        if (!isQualityLevel(button.dataset.quality)) return;
+        if (!isQualityPreference(button.dataset.quality)) return;
         sync(button.dataset.quality);
         onSelect(button.dataset.quality);
       };

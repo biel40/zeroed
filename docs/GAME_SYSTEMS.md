@@ -829,27 +829,62 @@ Pools conocidos: balistica 32, agujeros 96, casquillos 24, chispas 16, humo 24,
 pasos 8 y drops de cargador 12. No se crean objetos en loops criticos.
 
 `DeviceProfile` fija una calidad Baja/Media/Alta/Ultra Max: la elegida en Ajustes
-desde el menu principal (guardada en `localStorage`) o, sin eleccion, la detectada (Baja en
-moviles con poca memoria, Media en moviles, equipos modestos o con movimiento
-reducido, Alta en el resto; Ultra Max nunca se detecta, solo se elige). La calidad decide pixel ratio maximo (1/1,5/2),
+desde el menu principal (guardada en `localStorage`) o, con Auto (por defecto),
+la que decide `AutoQuality`. La calidad decide pixel ratio maximo (1/1,5/2),
 efectos reducidos, anisotropia y luces puntuales; los controles tactiles
 siguen dependiendo solo del dispositivo. Se aplica al empezar la siguiente
-partida. Durante el juego, `DynamicResolution` baja la resolucion por pasos
+partida.
+
+Auto clasifica el dispositivo sin benchmark a partir de pistas que pueden
+faltar: tactil o no, memoria y nucleos que exponga el navegador, pixeles de
+pantalla al pixel ratio maximo y un contexto WebGL de prueba (`GraphicsProbe`:
+WebGL2, tamano maximo de textura, si el navegador solo concede WebGL con
+penalizacion grave y si el renderer es por software). Un dato ausente no
+penaliza a un escritorio, pero impide Alta en un movil. Ultra Max nunca se
+elige en Auto. El nivel se guarda con una huella de esas pistas y se reutiliza
+mientras no cambien. En partida, `AutoQualityGovernor` ignora los primeros 10 s
+y los 3 s tras cada pausa, y juzga ventanas de un segundo: una es lenta si va
+por debajo de 48 fps con la resolucion dinamica ya reducida, o si solo
+aguanta con la escala al 60 % o menos. Con 24 lentas de las ultimas 30 pide
+una unica bajada, que se guarda y se aplica en la siguiente partida, sin
+recompilar nada en la actual. Nunca sube de nivel por si sola. Durante el juego, `DynamicResolution` baja la resolucion por pasos
 del 10 % (minimo 50 %) si la media de un segundo cae de 50 fps, y la sube al
 recuperar 57 fps; un intento de subida fallido duplica la espera del
 siguiente y una bajada que no acelera el frame se deshace, porque el cuello
 no era la GPU. `?debug` muestra la escala actual.
 
-Ultra Max (`useAdvancedRendering`) suma a Alta tres capas, todas en
-`src/rendering/`: `PostProcessing` dibuja la escena con MSAA en un buffer HDR,
-hace florecer la luz intensa y aplica el tone mapping al final;
-`ReflectionProbe` sustituye el entorno generico por una captura cubica de la
-sala alrededor del jugador, repartida a una cara por frame y renovada cada
-segundo, de modo que metal y cristal reflejan sus lamparas y su fuego; y
-`SurfaceDetail` anade microrrelieve procedural (normal, rugosidad y cavidades)
-a los materiales de las armas en primera persona y de los zombis con modelo
-GLB. Ademas sube el presupuesto de luces puntuales a ocho, la anisotropia y
-las particulas ambientales. No hay sombras dinamicas: ninguna luz las proyecta.
+Ultra Max (`useAdvancedRendering`) suma a Alta estas capas, todas en
+`src/rendering/`:
+
+- `LampShadows`: sombras en tiempo real de las dos lamparas que mas pesan
+  para el jugador (en los demas niveles ninguna luz proyecta sombra). El
+  numero de lamparas con sombra es fijo, sus mapas se mueven de una lampara a
+  otra y se refrescan por turnos, uno por frame; un relevo exige ir claramente
+  por delante durante un rato, asi que ni el parpadeo ni un fogonazo lo
+  provocan.
+- `PostProcessing`: la escena se dibuja con MSAA en un buffer HDR; despues
+  `AmbientOcclusion` oscurece esquinas y contactos a partir de la profundidad
+  del propio frame (el arma en primera persona queda fuera), la luz intensa
+  florece y `FilmOutputPass` aplica el tone mapping, nitidez, vineta,
+  aberracion cromatica y grano.
+- `ReflectionProbe`: suma al entorno generico una captura cubica de la sala
+  alrededor del jugador, repartida a una cara por frame. Metal y cristal
+  reflejan sus lamparas y su fuego y la sala devuelve luz rebotada, sin perder
+  la luz ambiente con la que se equilibro cada mapa: la intensidad de entorno
+  sigue siendo del mapa y la captura se amplifica para compensarla.
+- `SurfaceDetail`: microrrelieve procedural (normal, rugosidad y cavidades) en
+  los materiales de las armas en primera persona y de los zombis con modelo
+  GLB.
+- `MuzzleFlare` (`src/weapons/`): las armas de polvora cambian los sprites de
+  fogonazo por una llama de 40-80 ms con nucleo blanco amarillento, lenguas
+  naranjas hacia delante y forma distinta en cada disparo, segun el preset de
+  su cartucho (`config/muzzleFlares.ts`; la Barrett suma los chorros laterales
+  del freno). La luz del disparo dura lo mismo que la llama y la sonda de
+  reflejos no la captura. Las armas de energia y el ФАКЕЛ-33 no cambian.
+
+Ademas sube el presupuesto de luces puntuales a ocho, la anisotropia y las
+particulas ambientales. `?gfx-off=shadows,occlusion,reflections,film` apaga
+capas sueltas para comparar su efecto y su coste.
 
 Station 33 mantiene visibles solo las luces puntuales que caben en ese mismo
 presupuesto (`POINT_LIGHT_BUDGET`): las de la sala donde esta el jugador, por

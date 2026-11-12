@@ -88,6 +88,7 @@ export const ca: Record<TranslationKey, string> = {
   'menu.multiplayer': 'MODE MULTIJUGADOR',
   'menu.language': 'IDIOMA',
   'settings.quality': 'Qualitat',
+  'settings.qualityAuto': 'AUTO',
   'settings.qualityLow': 'BAIXA',
   'settings.qualityMedium': 'MITJANA',
   'settings.qualityHigh': 'ALTA',

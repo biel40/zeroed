@@ -100,6 +100,20 @@ describe('local pause vs shared simulation', () => {
     if (shared) expect(weapon.update).toHaveBeenCalledWith(0.016, expect.objectContaining({ trigger: false, ads: false }));
   });
 
+  it.each([
+    [false, false], [true, false], [false, true], [true, true],
+  ])('judges automatic quality only on played frames (shared: %s, paused: %s)', (shared, paused) => {
+    const { game } = stubGame(shared, paused);
+    game.qualityGovernor = { sample: vi.fn(), reset: vi.fn() };
+    prototype.frame.call(game);
+    if (paused) {
+      expect(game.qualityGovernor.sample).not.toHaveBeenCalled();
+      expect(game.qualityGovernor.reset).toHaveBeenCalled();
+    } else {
+      expect(game.qualityGovernor.sample).toHaveBeenCalledWith(0.016, game.dynamicResolution.scale);
+    }
+  });
+
   it('halts the whole simulation behind the single-player pause menu', () => {
     const { game, weapon } = stubGame(false, true);
     prototype.frame.call(game);
