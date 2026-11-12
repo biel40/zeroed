@@ -965,9 +965,13 @@ Ultra Max (`useAdvancedRendering`) suma a Alta estas capas, todas en
   provocan.
 - `PostProcessing`: la escena se dibuja con MSAA en un buffer HDR; despues
   `AmbientOcclusion` oscurece esquinas y contactos a partir de la profundidad
-  del propio frame (el arma en primera persona queda fuera), la luz intensa
-  florece y `FilmOutputPass` aplica el tone mapping, nitidez, vineta,
-  aberracion cromatica y grano.
+  del propio frame (el arma en primera persona queda fuera tambien al
+  reconstruir normales y filtrar la oclusion). El bloom se reserva a luces
+  por encima del blanco lineal en HDR (al extremo alto del rango si la GPU
+  necesita el buffer de ocho bits); `FilmOutputPass` aplica el tone mapping,
+  nitidez y un tratamiento suave de vineta, aberracion cromatica y grano.
+  Las siluetas de compra en pared usan un material propio de menor emision
+  y reflejo, conservando el relieve y las aberturas del arma.
 - `ReflectionProbe`: suma al entorno generico una captura cubica de la sala
   alrededor del jugador, repartida a una cara por frame. Metal y cristal
   reflejan sus lamparas y su fuego y la sala devuelve luz rebotada, sin perder
@@ -975,13 +979,17 @@ Ultra Max (`useAdvancedRendering`) suma a Alta estas capas, todas en
   sigue siendo del mapa y la captura se amplifica para compensarla.
 - `SurfaceDetail`: microrrelieve procedural (normal, rugosidad y cavidades) en
   los materiales de las armas en primera persona y de los zombis con modelo
-  GLB.
+  GLB. Las superficies opacas horneadas de los mapas reciben una capa mas
+  suave sobre sus mapas de normales y rugosidad, con el mismo volumen de
+  ruido compartido; no se aplica a los decals ni a los brillos sin iluminar.
 - `MuzzleFlare` (`src/weapons/`): las armas de polvora cambian los sprites de
-  fogonazo por una llama de 40-80 ms con nucleo blanco amarillento, lenguas
-  naranjas hacia delante y forma distinta en cada disparo, segun el preset de
-  su cartucho (`config/muzzleFlares.ts`; la Barrett suma los chorros laterales
-  del freno). La luz del disparo dura lo mismo que la llama y la sonda de
-  reflejos no la captura. Las armas de energia y el ФАКЕЛ-33 no cambian.
+  fogonazo por una llama de 32-60 ms con nucleo volumetrico blanco
+  amarillento, lenguas naranjas hacia delante y turbulencia animada distinta
+  en cada disparo, segun el preset de su cartucho (`config/muzzleFlares.ts`).
+  Su mezcla alfa limita la acumulacion de brillo; la Barrett suma los chorros
+  laterales del freno, alineados con el canon. La luz del disparo dura lo mismo
+  que la llama y la sonda de reflejos no la captura. Las armas de energia y el
+  ФАКЕЛ-33 no cambian.
 
 Ademas sube el presupuesto de luces puntuales a ocho, la anisotropia y las
 particulas ambientales. `?gfx-off=shadows,occlusion,reflections,film` apaga

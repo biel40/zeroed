@@ -19,11 +19,31 @@ export const WALL_BUY_OUTLINE_MATERIAL = new THREE.MeshStandardMaterial({
   metalness: 0.08,
 });
 
+let ultraMaxOutlineMaterial: THREE.MeshStandardMaterial | null = null;
+
+/** Shared chalk materials stay separate: an Ultra run must never retune a later lower preset. */
+export function wallBuyOutlineMaterial(advancedRendering = false): THREE.MeshStandardMaterial {
+  if (!advancedRendering) return WALL_BUY_OUTLINE_MATERIAL;
+  // Keep the constant glow below the HDR bloom threshold, leaving headroom for
+  // real lamp highlights. The opaque diffuse layer retains relief and shape.
+  ultraMaxOutlineMaterial ??= new THREE.MeshStandardMaterial({
+    color: 0xa6b9bd,
+    emissive: 0x85c1cf,
+    emissiveIntensity: 0.72,
+    roughness: 0.84,
+    metalness: 0.02,
+    envMapIntensity: 0.3,
+  });
+  return ultraMaxOutlineMaterial;
+}
+
 /** Lightweight luminous wall silhouette derived from the weapon's view dimensions. */
 export class WallBuyView {
-  readonly group = new THREE.Group();
+  public readonly group = new THREE.Group();
+  private readonly material: THREE.MeshStandardMaterial;
 
-  constructor(wallBuy: WallBuy, definition: WeaponDefinition, parent: THREE.Group) {
+  public constructor(wallBuy: WallBuy, definition: WeaponDefinition, parent: THREE.Group, advancedRendering = false) {
+    this.material = wallBuyOutlineMaterial(advancedRendering);
     const view = definition.view;
     if (definition.id === 'ak47') {
       this.buildAk47Silhouette(view.sightHeight);
@@ -620,14 +640,14 @@ export class WallBuyView {
   private addShape(shape: THREE.Shape, name: string): THREE.Mesh {
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false });
     geometry.translate(0, 0, -0.0125);
-    const mesh = new THREE.Mesh(geometry, WALL_BUY_OUTLINE_MATERIAL);
+    const mesh = new THREE.Mesh(geometry, this.material);
     mesh.name = name;
     this.group.add(mesh);
     return mesh;
   }
 
   private addPart(width: number, height: number, x: number, y: number, rotation = 0): THREE.Mesh {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.025), WALL_BUY_OUTLINE_MATERIAL);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.025), this.material);
     mesh.position.set(x, y, 0);
     mesh.rotation.z = rotation;
     this.group.add(mesh);

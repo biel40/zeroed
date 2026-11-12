@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { F1GrenadeModel } from '../../../weapons/F1GrenadeModel';
-import { WALL_BUY_OUTLINE_MATERIAL } from '../../wallbuys/WallBuyView';
+import { wallBuyOutlineMaterial } from '../../wallbuys/WallBuyView';
 import type { ArenaGrenadeBuy } from '../ZombieArena';
 
 /** Map-owned placement of a grenade wall; the pouch and its refill belong to the mode. */
@@ -20,14 +20,14 @@ const PAIR: ReadonlyArray<readonly [number, number]> = [[-0.1, 0.22], [0.1, -0.2
  * as the weapon wall buys, 2 cm off the wall face. Returns the placement the
  * mode reads; the outline itself is pure decoration.
  */
-export function buildGrenadeWallBuy(parent: THREE.Group, placement: GrenadeWallBuyPlacement): ArenaGrenadeBuy {
+export function buildGrenadeWallBuy(parent: THREE.Group, placement: GrenadeWallBuyPlacement, advancedRendering = false): ArenaGrenadeBuy {
   const group = new THREE.Group();
   group.name = `grenade-buy:${placement.id}`;
   group.userData.mapRole = 'grenade-buy';
   group.position.set(placement.position.x, placement.position.y, placement.position.z);
   group.rotation.y = placement.yaw;
   for (const [x, tilt] of PAIR) {
-    const outline = new F1GrenadeModel(false, WALL_BUY_OUTLINE_MATERIAL);
+    const outline = new F1GrenadeModel(false, wallBuyOutlineMaterial(advancedRendering));
     outline.root.position.x = x;
     outline.root.rotation.z = tilt;
     outline.root.scale.set(OUTLINE_SCALE, OUTLINE_SCALE, OUTLINE_SCALE * OUTLINE_DEPTH);

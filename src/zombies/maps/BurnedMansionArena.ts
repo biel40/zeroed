@@ -444,7 +444,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
 
     this.wallBuys = MANSION_WALL_BUYS.map((config) => new WallBuy(config));
     for (const wallBuy of this.wallBuys) {
-      new WallBuyView(wallBuy, WEAPON_DEFINITIONS[wallBuy.weaponId], this.group);
+      new WallBuyView(wallBuy, WEAPON_DEFINITIONS[wallBuy.weaponId], this.group, this.profile.useAdvancedRendering);
     }
 
     this.floorTransitions = this.buildFloorTransitions();

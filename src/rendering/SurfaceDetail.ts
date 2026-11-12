@@ -19,6 +19,8 @@ export interface SurfaceDetailProfile {
 export const ZOMBIE_SURFACE_DETAIL: SurfaceDetailProfile = { fineTile: 0.035, coarseTile: 0.28, bump: 0.45, roughness: 0.22, cavity: 0.3 };
 /** Steel, polymer and wood at arm's length: fine grain and handling wear that breaks up reflections. */
 export const WEAPON_SURFACE_DETAIL: SurfaceDetailProfile = { fineTile: 0.012, coarseTile: 0.11, bump: 0.22, roughness: 0.16, cavity: 0.1 };
+/** Subtle grain and wear over the environment's existing baked normal and roughness maps. */
+export const ENVIRONMENT_SURFACE_DETAIL: SurfaceDetailProfile = { fineTile: 0.045, coarseTile: 0.65, bump: 0.1, roughness: 0.06, cavity: 0.04 };
 
 const NOISE_SIZE = 32;
 const NOISE_SEED = 1986;
@@ -202,6 +204,20 @@ export function applySurfaceDetail(root: THREE.Object3D, profile: SurfaceDetailP
     const material = (object as THREE.Mesh).material;
     for (const entry of Array.isArray(material) ? material : material ? [material] : []) {
       if (entry instanceof THREE.MeshStandardMaterial) installSurfaceDetail(entry, profile);
+    }
+  });
+}
+
+/** Once before shader warm-up; only the maps' baked opaque PBR surfaces opt in via their UV scale. */
+export function applyEnvironmentSurfaceDetail(root: THREE.Object3D, enabled: boolean): void {
+  if (!enabled) return;
+  root.traverse((object) => {
+    const material = (object as THREE.Mesh).material;
+    for (const entry of Array.isArray(material) ? material : material ? [material] : []) {
+      if (entry instanceof THREE.MeshStandardMaterial && !entry.transparent
+        && typeof entry.userData.metersPerTile === 'number') {
+        installSurfaceDetail(entry, ENVIRONMENT_SURFACE_DETAIL);
+      }
     }
   });
 }

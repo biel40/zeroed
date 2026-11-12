@@ -20,7 +20,7 @@ import { advancedFeatures } from '../rendering/AdvancedRenderingFeatures';
 import { LampShadows } from '../rendering/LampShadows';
 import { hdrTextureType, PostProcessing } from '../rendering/PostProcessing';
 import { ReflectionProbe } from '../rendering/ReflectionProbe';
-import { applySurfaceDetail, WEAPON_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
+import { applyEnvironmentSurfaceDetail, applySurfaceDetail, WEAPON_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
 import { BallisticsSystem } from '../shooting/BallisticsSystem';
 import type { SurfaceType } from '../shooting/HitTarget';
 import { HUD } from '../ui/HUD';
@@ -294,6 +294,7 @@ export class Game {
       returnToMainMenu: () => this.returnToMainMenu(),
       setDebugStatsEnabled: (enabled) => this.setDebugStatsEnabled(enabled),
     });
+    applyEnvironmentSurfaceDetail(this.scene, this.profile.useAdvancedRendering);
     if (this.profile.useAdvancedRendering && features.reflections) {
       this.reflectionProbe = new ReflectionProbe(this.renderer, this.scene, this.player.rig, [this.flashLight], hdrTextureType(this.renderer));
     }

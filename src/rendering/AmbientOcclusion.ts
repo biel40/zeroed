@@ -13,18 +13,20 @@ export const AMBIENT_OCCLUSION = {
   denoiseSamples: 8,
 } as const;
 
-const DEPTH_READ = 'return textureLod(tDepth, uv.xy, 0.0).DEPTH_SWIZZLING;';
+// GTAO and its denoiser reconstruct normals with texelFetch as well as sampling depth.
+const DEPTH_READ = /return ((?:textureLod\(tDepth, uv\.xy, 0\.0\)|texelFetch\(tDepth, uv\.xy, 0\))\.(?:DEPTH_SWIZZLING|r|a));/g;
 
 /**
  * Makes the occlusion shader read the first-person view model as empty sky.
  * The weapon is drawn in a squeezed slice of the depth range (see
  * `applyViewModelDepth`), so its depth does not describe where it is: left
- * in, it would be shaded as a wall touching the camera.
+ * in, it would be shaded as a wall touching the camera. Every depth read is
+ * masked, including normal reconstruction and the denoiser's edge weights.
  */
 export function maskViewModelDepth(fragmentShader: string): string {
   return fragmentShader.replace(
     DEPTH_READ,
-    `float depth = textureLod(tDepth, uv.xy, 0.0).DEPTH_SWIZZLING;
+    `float depth = $1;
 			return depth < ${VIEW_MODEL_DEPTH_SHARE.toFixed(3)} ? 1.0 : depth;`,
   );
 }
@@ -43,6 +45,7 @@ export class AmbientOcclusion {
     // After construction: the pass only builds the targets it resizes later when it starts without a depth texture.
     this.pass.setGBuffer(depthTexture);
     this.pass.gtaoMaterial.fragmentShader = maskViewModelDepth(this.pass.gtaoMaterial.fragmentShader);
+    this.pass.pdMaterial.fragmentShader = maskViewModelDepth(this.pass.pdMaterial.fragmentShader);
     this.pass.updateGtaoMaterial({
       radius: AMBIENT_OCCLUSION.radius,
       thickness: AMBIENT_OCCLUSION.thickness,
@@ -57,5 +60,11 @@ export class AmbientOcclusion {
     this.pass.camera = camera;
     this.pass.gtaoMaterial.uniforms.tDepth.value = depthTexture;
     this.pass.pdMaterial.uniforms.tDepth.value = depthTexture;
+  }
+
+  public dispose(): void {
+    this.pass.dispose();
+    // Three r178 releases the targets and denoiser but omits this material.
+    this.pass.gtaoMaterial.dispose();
   }
 }

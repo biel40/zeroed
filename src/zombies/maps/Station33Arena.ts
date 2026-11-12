@@ -276,8 +276,8 @@ export class Station33Arena implements ZombieArena {
     });
 
     this.wallBuys = STATION33_WALL_BUYS.map((config) => new WallBuy(config));
-    for (const wallBuy of this.wallBuys) new WallBuyView(wallBuy, STATION33_WEAPONS[wallBuy.weaponId], this.group);
-    this.grenadeBuys = STATION33_GRENADE_BUYS.map((placement) => buildGrenadeWallBuy(this.group, placement));
+    for (const wallBuy of this.wallBuys) new WallBuyView(wallBuy, STATION33_WEAPONS[wallBuy.weaponId], this.group, profile.useAdvancedRendering);
+    this.grenadeBuys = STATION33_GRENADE_BUYS.map((placement) => buildGrenadeWallBuy(this.group, placement, profile.useAdvancedRendering));
 
     this.refreshZones();
   }

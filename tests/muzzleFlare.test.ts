@@ -9,6 +9,7 @@ import type { WeaponDefinition } from '../src/weapons/WeaponTypes';
 import { resetSettings, updateSettings } from '../src/core/PlayerSettings';
 import type { SpringRecoil } from '../src/weapons/SpringRecoil';
 import type { SustainedFireKick } from '../src/weapons/SustainedFireKick';
+import { Weapon } from '../src/weapons/Weapon';
 
 const DT = 1 / 60;
 const FLARE_NAME = 'muzzle-flare';
@@ -38,11 +39,12 @@ describe('Muzzle flare data', () => {
     }
   });
 
-  it('keeps every flare between 40 and 80 ms', () => {
+  it('keeps the flame brief, with a compact pistol core', () => {
     for (const [name, flare] of Object.entries(MUZZLE_FLARES)) {
-      expect(flare.duration, name).toBeGreaterThanOrEqual(0.04);
-      expect(flare.duration, name).toBeLessThanOrEqual(0.08);
+      expect(flare.duration, name).toBeGreaterThanOrEqual(0.03);
+      expect(flare.duration, name).toBeLessThanOrEqual(0.06);
     }
+    expect(MUZZLE_FLARES.pistol.burst).toBeLessThanOrEqual(0.03);
   });
 
   it('scales the flame with the cartridge: pistol < carbine < rifle < sniper < anti-materiel', () => {
@@ -55,6 +57,17 @@ describe('Muzzle flare data', () => {
 });
 
 describe('Muzzle flare geometry', () => {
+  it('gives the crown flash depth instead of a flat disc perpendicular to the barrel', () => {
+    const geometry = buildFlareGeometry(MUZZLE_FLARES.pistol);
+    const positions = geometry.getAttribute('position');
+    const shapes = geometry.getAttribute('aShape');
+    const depths = new Set<number>();
+    for (let index = 0; index < positions.count; index++) {
+      if (shapes.getX(index) === 0) depths.add(positions.getZ(index));
+    }
+    expect(depths.size).toBeGreaterThan(3);
+  });
+
   it('reaches forward from the crown and never back into the weapon', () => {
     const geometry = buildFlareGeometry(MUZZLE_FLARES.rifle);
     geometry.computeBoundingBox();
@@ -82,6 +95,14 @@ describe('Muzzle flare geometry', () => {
 });
 
 describe('Muzzle flare envelope', () => {
+  it('can reuse the envelope storage during automatic fire', () => {
+    const envelope = { fade: 0, heat: 0, stretch: 0 };
+    expect(flareEnvelope(0.5, envelope)).toBe(envelope);
+    expect(envelope.fade).toBeGreaterThan(0);
+    expect(flareEnvelope(1, envelope)).toBe(envelope);
+    expect(envelope.fade).toBe(0);
+  });
+
   it('starts at full strength and white-hot, then cools and fades to nothing', () => {
     const start = flareEnvelope(0);
     const end = flareEnvelope(1);
@@ -114,7 +135,7 @@ describe('Muzzle flare playback', () => {
       flare.update(DT);
       if (flare.root.visible) visibleFrames++;
     }
-    expect(visibleFrames).toBe(Math.round(MUZZLE_FLARES.carbine.duration / DT));
+    expect(visibleFrames).toBe(Math.ceil(MUZZLE_FLARES.carbine.duration / DT));
     expect(flare.root.visible).toBe(false);
   });
 
@@ -147,9 +168,51 @@ describe('Muzzle flare playback', () => {
     flare.update(DT);
     expect(flare.root.visible).toBe(false);
   });
+
+  it('keeps muzzle-brake jets aligned with the barrel ports between shots', () => {
+    const flare = new MuzzleFlare(MUZZLE_FLARES.antiMateriel, seededRandom(7));
+    for (let shot = 0; shot < 20; shot++) {
+      flare.trigger();
+      expect(flare.root.rotation.z).toBe(0);
+    }
+  });
+
+  it('advances flame turbulence and resets it for each shot without rebuilding resources', () => {
+    const flare = new MuzzleFlare(MUZZLE_FLARES.pistol, seededRandom(3));
+    const mesh = flare.root.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+    flare.trigger();
+    expect(mesh.material.uniforms.uProgress.value).toBe(0);
+    flare.update(DT);
+    flare.update(DT);
+    expect(mesh.material.uniforms.uProgress.value).toBeGreaterThan(0);
+    flare.trigger();
+    expect(mesh.material.uniforms.uProgress.value).toBe(0);
+    expect(mesh.material.depthWrite).toBe(false);
+    expect(mesh.material.blending).toBe(THREE.NormalBlending);
+    expect(mesh.material.forceSinglePass).toBe(true);
+  });
 });
 
 describe('Muzzle flare in the weapon view', () => {
+  it.each([false, true])('keeps the pistol flame on the muzzle through recoil (ADS: %s)', (ads) => {
+    const definition = WEAPON_DEFINITIONS.m1911;
+    const weapon = new Weapon(definition, seededRandom(1));
+    const view = new WeaponView(definition, null, null, { cinematicFlash: true });
+    for (let frame = 0; frame < 60; frame++) {
+      weapon.update(DT, { trigger: false, ads });
+      view.update(DT, weapon, 0, 0, 0);
+    }
+    view.onShot();
+    view.update(DT, weapon, 0, 0, 0);
+    view.root.updateMatrixWorld(true);
+    const flame = view.root.getObjectByName(FLARE_NAME)!;
+    const muzzle = view.getMuzzleWorldPosition(new THREE.Vector3());
+    expect(flame.getWorldPosition(new THREE.Vector3()).distanceTo(muzzle)).toBeLessThan(1e-6);
+    const barrel = new THREE.Vector3(0, 0, -1).transformDirection(flame.parent!.matrixWorld);
+    const forward = new THREE.Vector3(0, 0, -1).transformDirection(flame.matrixWorld);
+    expect(forward.dot(barrel)).toBeCloseTo(1, 6);
+  });
+
   it.each([false, true])('preserves automatic kick and the comfort setting (cinematic: %s)', (cinematicFlash) => {
     const view = new WeaponView(WEAPON_DEFINITIONS.ak47, null, null, { cinematicFlash });
     const internals = view as unknown as { spring: SpringRecoil; sustainedKick: SustainedFireKick };

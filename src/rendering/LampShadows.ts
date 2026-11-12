@@ -8,8 +8,8 @@ export const LAMP_SHADOWS = {
   mapSize: 1024,
   /** Nothing closer than this to the bulb casts, so its own fixture cannot black the room out. */
   near: 0.4,
-  bias: -0.003,
-  normalBias: 0.04,
+  bias: -0.0005,
+  normalBias: 0.025,
   /** How much brighter a lamp must look than the weakest caster to challenge it. */
   hysteresis: 1.5,
   /** Seconds a challenger must stay ahead before it takes over: flashes and flicker never do. */

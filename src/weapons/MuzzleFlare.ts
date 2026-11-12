@@ -3,8 +3,9 @@ import type { MuzzleFlareConfig } from './WeaponTypes';
 
 /** Which part of the flame a vertex belongs to; read by the shader. */
 const SHAPE = { burst: 0, tongue: 1, vent: 2 } as const;
-/** The burst sits a little ahead of the crown so the barrel face never cuts it. */
-const BURST_AHEAD = 0.25;
+/** The rounded core clears the barrel face and stretches forward with the gas. */
+const BURST_AHEAD = 0.65;
+const BURST_DEPTH = 0.5;
 /** Per-shot spread of the flame's size and length. */
 const SIZE_JITTER = 0.1;
 const LENGTH_JITTER = 0.15;
@@ -17,17 +18,20 @@ export const FLARE_LIGHT_COLOR = 0xffb870;
 /** Look of a flare at `progress` (0 at the shot, 1 at its end). */
 export interface FlareEnvelope {
   /** Overall strength, 1 → 0. */
-  readonly fade: number;
+  fade: number;
   /** 1 white-hot → cooler orange as the gas expands. */
-  readonly heat: number;
+  heat: number;
   /** Length along the barrel relative to the shot's own. */
-  readonly stretch: number;
+  stretch: number;
 }
 
 /** Bright at once, then cooling and dying fast while the gas pushes forward. */
-export function flareEnvelope(progress: number): FlareEnvelope {
+export function flareEnvelope(progress: number, out: FlareEnvelope = { fade: 0, heat: 0, stretch: 0 }): FlareEnvelope {
   const p = THREE.MathUtils.clamp(progress, 0, 1);
-  return { fade: Math.pow(1 - p, 1.6), heat: 1 - p * 0.75, stretch: 0.85 + Math.sqrt(p) * 0.3 };
+  out.fade = Math.pow(1 - p, 2.1);
+  out.heat = 1 - p * 0.8;
+  out.stretch = 0.85 + Math.sqrt(p) * 0.3;
+  return out;
 }
 
 /** Exponential decay rate that leaves `LIGHT_TAIL` of the shot light when a flare of `duration` ends. */
@@ -42,6 +46,33 @@ class FlareGeometryBuilder {
   private readonly shapes: number[] = [];
   private readonly phases: number[] = [];
   private readonly indices: number[] = [];
+
+  /** Small rounded crown volume; projected UVs retain an irregular soft flame edge. */
+  public burst(radius: number): void {
+    const base = this.positions.length / 3;
+    const rings = 6;
+    const segments = 12;
+    for (let ring = 0; ring <= rings; ring++) {
+      const latitude = ring / rings * Math.PI;
+      const radial = Math.sin(latitude);
+      for (let segment = 0; segment <= segments; segment++) {
+        const angle = segment / segments * Math.PI * 2;
+        const x = Math.cos(angle) * radial;
+        const y = Math.sin(angle) * radial;
+        const z = Math.cos(latitude);
+        this.positions.push(x * radius, y * radius, -radius * (BURST_AHEAD + z * BURST_DEPTH));
+        const normal = new THREE.Vector3(x, y, -z / BURST_DEPTH).normalize();
+        this.normals.push(normal.x, normal.y, normal.z);
+        this.uvs.push(x * 0.5 + 0.5, y * 0.5 + 0.5);
+        this.shapes.push(SHAPE.burst);
+        this.phases.push(0);
+        if (ring === rings || segment === segments) continue;
+        const a = base + ring * (segments + 1) + segment;
+        const b = a + segments + 1;
+        this.indices.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+  }
 
   /**
    * One quad. `origin` is where its UV x is 0 (the root of the flame), `along`
@@ -76,14 +107,13 @@ class FlareGeometryBuilder {
 
 /**
  * The flame as one mesh, forward along -Z from the crown at the origin: a
- * burst facing back down the barrel (what the shooter mostly sees), soft
+ * rounded core at the crown (what the shooter mostly sees), soft
  * tongues fanned around the barrel axis and, for a muzzle brake, jets
  * thrown out to both sides from behind the crown.
  */
 export function buildFlareGeometry(config: MuzzleFlareConfig): THREE.BufferGeometry {
   const builder = new FlareGeometryBuilder();
-  const { burst } = config;
-  builder.quad(new THREE.Vector3(-burst, 0, -burst * BURST_AHEAD), new THREE.Vector3(burst * 2, 0, 0), new THREE.Vector3(0, burst * 2, 0), SHAPE.burst, 0);
+  builder.burst(config.burst);
   const forward = new THREE.Vector3(0, 0, -config.length);
   for (let tongue = 0; tongue < config.tongues; tongue++) {
     const angle = (tongue / config.tongues) * Math.PI;
@@ -126,6 +156,7 @@ uniform float uSeed;
 uniform float uFade;
 uniform float uHeat;
 uniform float uBrightness;
+uniform float uProgress;
 varying vec2 vUv;
 varying float vShape;
 varying float vPhase;
@@ -159,17 +190,17 @@ void main() {
     vec2 p = vUv * 2.0 - 1.0;
     float radius = length(p);
     float angle = atan(p.y, p.x);
-    vec2 around = vec2(cos(angle), sin(angle)) * 1.6 + uSeed;
+    vec2 around = vec2(cos(angle), sin(angle)) * 1.6 + uSeed + uProgress * vec2(1.7, -2.1);
     float reach = 0.3 + 0.6 * noise(around) * (0.55 + 0.45 * noise(around * 2.7 + 5.0));
     float petals = 1.0 - smoothstep(reach * 0.45, reach, radius);
-    float core = exp(-radius * radius * 18.0);
+    float core = exp(-radius * radius * 28.0);
     density = max(petals * 0.7, core);
     heat = clamp(core + petals * (0.6 - radius * 0.5), 0.0, 1.0);
   } else {
     // Tongue or vent: x runs from the root to the tip, y across the sheet.
     float along = vUv.x;
     float across = abs(vUv.y * 2.0 - 1.0);
-    vec2 seed = vec2(vPhase * 7.31 + uSeed, vPhase * 3.17 - uSeed);
+    vec2 seed = vec2(vPhase * 7.31 + uSeed - uProgress * 2.0, vPhase * 3.17 - uSeed + uProgress * 1.3);
     float wobble = noise(vec2(along * 6.0, vUv.y * 2.5) + seed);
     float profile = sin(3.14159 * pow(along, 0.55)) * (0.55 + 0.6 * wobble);
     float sheet = 1.0 - smoothstep(profile * 0.35, profile, across);
@@ -201,6 +232,7 @@ export class MuzzleFlare {
   private fresh = false;
   private shotSize = 1;
   private shotLength = 1;
+  private readonly envelope: FlareEnvelope = { fade: 0, heat: 0, stretch: 0 };
 
   public constructor(private readonly config: MuzzleFlareConfig, private readonly random: () => number = Math.random) {
     this.material = new THREE.ShaderMaterial({
@@ -210,13 +242,16 @@ export class MuzzleFlare {
         uFade: { value: 0 },
         uHeat: { value: 1 },
         uBrightness: { value: config.brightness },
+        uProgress: { value: 0 },
       },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      // Alpha compositing bounds overlapping HDR sheets instead of adding them into a white halo.
+      blending: THREE.NormalBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
+      forceSinglePass: true,
     });
     const mesh = new THREE.Mesh(buildFlareGeometry(config), this.material);
     mesh.name = 'muzzle-flare-mesh';
@@ -230,7 +265,9 @@ export class MuzzleFlare {
     this.remaining = this.config.duration;
     this.fresh = true;
     this.material.uniforms.uSeed.value = this.random() * 64;
-    this.root.rotation.z = this.random() * Math.PI * 2;
+    const roll = this.random() * Math.PI * 2;
+    // Brake ports belong to the barrel; their side jets must not roll into vertical flares.
+    this.root.rotation.z = this.config.vents ? 0 : roll;
     this.shotSize = 1 + (this.random() * 2 - 1) * SIZE_JITTER;
     this.shotLength = this.shotSize * (1 + (this.random() * 2 - 1) * LENGTH_JITTER);
     this.apply(0);
@@ -258,7 +295,8 @@ export class MuzzleFlare {
   }
 
   private apply(progress: number): void {
-    const envelope = flareEnvelope(progress);
+    const envelope = flareEnvelope(progress, this.envelope);
+    this.material.uniforms.uProgress.value = progress;
     this.material.uniforms.uFade.value = envelope.fade;
     this.material.uniforms.uHeat.value = envelope.heat;
     this.root.scale.set(this.shotSize, this.shotSize, this.shotLength * envelope.stretch);

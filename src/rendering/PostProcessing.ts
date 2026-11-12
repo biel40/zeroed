@@ -7,7 +7,7 @@ import { AmbientOcclusion } from './AmbientOcclusion';
 import { FilmOutputPass } from './FilmOutputPass';
 
 /** Glow around whatever is brighter than `threshold` in linear light; a look decision. */
-export const BLOOM = { strength: 0.55, radius: 0.65, threshold: 0.8 } as const;
+export const BLOOM = { strength: 0.3, radius: 0.45, threshold: 1.15 } as const;
 
 /** The renderer's own antialiasing does not reach an offscreen target, so the target carries it. */
 const MSAA_SAMPLES = 4;
@@ -42,8 +42,9 @@ export class PostProcessing {
   ) {
     // The frame is several draws: count them all instead of only the last pass.
     renderer.info.autoReset = false;
+    const textureType = hdrTextureType(renderer);
     const target = new THREE.WebGLRenderTarget(1, 1, {
-      type: hdrTextureType(renderer), samples: MSAA_SAMPLES, depthTexture: new THREE.DepthTexture(1, 1),
+      type: textureType, samples: MSAA_SAMPLES, depthTexture: new THREE.DepthTexture(1, 1),
     });
     this.composer = new EffectComposer(renderer, target);
     this.scenePass = new RenderPass(scene, camera);
@@ -52,7 +53,9 @@ export class PostProcessing {
       this.occlusion = new AmbientOcclusion(scene, camera, this.sceneDepth);
       this.composer.addPass(this.occlusion.pass);
     }
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM.strength, BLOOM.radius, BLOOM.threshold));
+    // The 8-bit fallback clips at 1: keep its bright extraction reachable.
+    const bloomThreshold = textureType === THREE.UnsignedByteType ? 0.92 : BLOOM.threshold;
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM.strength, BLOOM.radius, bloomThreshold));
     const output = options.film ? new FilmOutputPass() : new OutputPass();
     // It draws to the screen: swapping after it would only shuffle the frame buffers.
     output.needsSwap = false;
@@ -82,7 +85,14 @@ export class PostProcessing {
   }
 
   public dispose(): void {
-    this.occlusion?.pass.dispose();
+    this.occlusion?.dispose();
+    // EffectComposer owns its buffers, but does not release the passes added to it.
+    for (const pass of this.composer.passes) {
+      if (pass === this.occlusion?.pass) continue;
+      pass.dispose();
+      // Three r178's bloom dispose omits the bright-extraction material.
+      if (pass instanceof UnrealBloomPass) pass.materialHighPassFilter.dispose();
+    }
     this.composer.dispose();
   }
 

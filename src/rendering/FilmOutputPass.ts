@@ -4,13 +4,13 @@ import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js'
 /** Tuning of the lens and film treatment; a look decision. */
 export const FILM = {
   /** Unsharp mask on the finished image: restores the crispness antialiasing and bloom soften. */
-  sharpen: 0.5,
+  sharpen: 0.32,
   /** Darkening of the corners, 0..1. */
-  vignette: 0.3,
+  vignette: 0.16,
   /** Peak deviation of the grain, in display values. */
-  grain: 0.03,
+  grain: 0.008,
   /** Colour fringing at the corners, in screen widths. */
-  aberration: 0.006,
+  aberration: 0.0006,
 } as const;
 
 const VERTEX = /* glsl */ `

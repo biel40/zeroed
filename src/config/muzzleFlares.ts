@@ -3,23 +3,23 @@ import type { MuzzleFlareConfig } from '../weapons/WeaponTypes';
 /**
  * Gunpowder flames of the top quality tier, by cartridge rather than by
  * weapon: a weapon picks the one its round burns like. Sizes are view-model
- * metres ahead of the crown; brightness is linear HDR, where the bloom
- * starts at 0.8, so only the very core glows.
+ * metres ahead of the crown; brightness is linear HDR, with only the hot
+ * core intended to cross the bloom threshold.
  */
 export const MUZZLE_FLARES = {
   /** .45 ACP from a short slide: a compact puff. */
-  pistol: { length: 0.09, width: 0.05, burst: 0.045, tongues: 3, duration: 0.045, brightness: 1.5, light: 4 },
+  pistol: { length: 0.085, width: 0.04, burst: 0.028, tongues: 3, duration: 0.032, brightness: 1.6, light: 3 },
   /** Pistol rounds from a carbine barrel (MP5, Vector, PPSh-41). */
-  smg: { length: 0.12, width: 0.055, burst: 0.05, tongues: 3, duration: 0.045, brightness: 1.6, light: 4.5 },
+  smg: { length: 0.11, width: 0.045, burst: 0.03, tongues: 3, duration: 0.035, brightness: 1.7, light: 3.6 },
   /** Intermediate rifle rounds (M4A1, AK-47): a sharp, directional flame. */
-  carbine: { length: 0.17, width: 0.07, burst: 0.06, tongues: 4, duration: 0.05, brightness: 1.8, light: 6 },
+  carbine: { length: 0.16, width: 0.06, burst: 0.038, tongues: 4, duration: 0.04, brightness: 1.8, light: 5 },
   /** Full-power rifle rounds (M14, M60). */
-  rifle: { length: 0.23, width: 0.085, burst: 0.075, tongues: 4, duration: 0.06, brightness: 1.9, light: 8 },
+  rifle: { length: 0.21, width: 0.075, burst: 0.045, tongues: 4, duration: 0.045, brightness: 1.9, light: 6.5 },
   /** Magnum bolt action (L96): a long, pronounced flame. */
-  sniper: { length: 0.3, width: 0.1, burst: 0.085, tongues: 5, duration: 0.07, brightness: 2, light: 10 },
+  sniper: { length: 0.28, width: 0.09, burst: 0.052, tongues: 5, duration: 0.05, brightness: 2, light: 8 },
   /** .50 BMG through a muzzle brake (Barrett): the brake throws most of the flame sideways. */
   antiMateriel: {
-    length: 0.36, width: 0.12, burst: 0.11, tongues: 5, duration: 0.08, brightness: 2.2, light: 16,
+    length: 0.34, width: 0.11, burst: 0.066, tongues: 5, duration: 0.06, brightness: 2.2, light: 12,
     vents: { offset: 0.03, length: 0.3, spread: 0.07, behind: 0.06 },
   },
 } as const satisfies Readonly<Record<string, MuzzleFlareConfig>>;

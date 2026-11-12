@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GTAOShader } from 'three/examples/jsm/shaders/GTAOShader.js';
-import { describe, expect, it } from 'vitest';
+import { PoissonDenoiseShader } from 'three/examples/jsm/shaders/PoissonDenoiseShader.js';
+import { describe, expect, it, vi } from 'vitest';
 import { advancedFeatures } from '../src/rendering/AdvancedRenderingFeatures';
-import { maskViewModelDepth } from '../src/rendering/AmbientOcclusion';
+import { AmbientOcclusion, maskViewModelDepth } from '../src/rendering/AmbientOcclusion';
 import { LAMP_SHADOWS, LampShadows } from '../src/rendering/LampShadows';
 import { reflectionGain } from '../src/rendering/ReflectionProbe';
 
@@ -130,6 +131,32 @@ describe('Ambient occlusion', () => {
     expect(patched).not.toBe(GTAOShader.fragmentShader);
     expect(patched).toContain('float getDepth(const vec2 uv)');
     expect(patched).toMatch(/depth < \d\.\d+ \? 1\.0 : depth/);
+  });
+
+  it.each([
+    ['occlusion', GTAOShader.fragmentShader],
+    ['denoising', PoissonDenoiseShader.fragmentShader],
+  ])('masks every sampled and fetched depth in %s, including reconstructed normals', (_name, source) => {
+    const rawReads = /return ((?:textureLod|texelFetch)\(tDepth[^;]+);/g;
+    const readCount = [...source.matchAll(rawReads)].length;
+    expect(readCount).toBeGreaterThan(1);
+    const patched = maskViewModelDepth(source);
+    expect(patched).not.toMatch(rawReads);
+    expect(patched.match(/depth < 0\.100 \? 1\.0 : depth/g)).toHaveLength(readCount);
+  });
+
+  it('installs the view-model mask in both passes and releases the AO shader with its targets', () => {
+    const occlusion = new AmbientOcclusion(new THREE.Scene(), new THREE.PerspectiveCamera(), new THREE.DepthTexture(1, 1));
+    expect(occlusion.pass.gtaoMaterial.fragmentShader).toContain('depth < 0.100');
+    expect(occlusion.pass.pdMaterial.fragmentShader).toContain('depth < 0.100');
+    const shaderDisposed = vi.fn();
+    const targetDisposed = vi.fn();
+    occlusion.pass.gtaoMaterial.addEventListener('dispose', shaderDisposed);
+    occlusion.pass.gtaoRenderTarget.addEventListener('dispose', targetDisposed);
+
+    occlusion.dispose();
+    expect(shaderDisposed).toHaveBeenCalledOnce();
+    expect(targetDisposed).toHaveBeenCalledOnce();
   });
 });
 
