@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { FlameShotLook } from '../weapons/WeaponShotLook';
+import { applyFlameLook, createFlameLookUniforms, type FlameLookUniforms } from './FlameLookUniforms';
 import { FlameParticles } from './FlameParticles';
 
 /**
@@ -48,6 +50,8 @@ const STREAM_VERTEX = /* glsl */ `
  * Racing fire along the rod: fast scrolling noise, dense in the middle and
  * soft at the edge. The core burns blue-white to gold; the body runs gold
  * to orange and frays out at its end, where the rolling fire takes over.
+ * Under a finish's look (`uLook`) both burn in its colours instead,
+ * brighter so a cold fire still reads in the dark.
  */
 const STREAM_FRAGMENT = /* glsl */ `
   uniform float uTime;
@@ -55,6 +59,10 @@ const STREAM_FRAGMENT = /* glsl */ `
   uniform float uIntensity;
   uniform float uTail;
   uniform float uCore;
+  uniform float uLook;
+  uniform vec3 uLookCore;
+  uniform vec3 uLookBody;
+  uniform vec3 uLookEmber;
   varying float vAlong;
   varying float vAngle;
   varying float vFacing;
@@ -73,7 +81,11 @@ const STREAM_FRAGMENT = /* glsl */ `
     float density = pow(vFacing, 1.2) * (0.5 + 0.8 * flow);
     density *= smoothstep(0.0, 0.04, vAlong - uTail) * (1.0 - smoothstep(0.6, 1.0, vAlong + (flow - 0.5) * 0.35));
     vec3 color;
-    if (uCore > 0.5) {
+    if (uLook > 0.5) {
+      color = uCore > 0.5
+        ? mix(uLookCore, mix(uLookCore, uLookBody, 0.45), smoothstep(0.05, 0.6, vAlong)) * 1.8
+        : mix(mix(uLookCore, uLookBody, 0.6), uLookEmber, smoothstep(0.15, 0.9, vAlong)) * 1.7;
+    } else if (uCore > 0.5) {
       color = mix(vec3(0.7, 0.85, 1.0), vec3(1.0, 0.95, 0.75), smoothstep(0.05, 0.6, vAlong)) * 1.6;
     } else {
       color = mix(vec3(1.0, 0.86, 0.45), vec3(1.0, 0.46, 0.08), smoothstep(0.1, 0.8, vAlong)) * 1.25;
@@ -82,17 +94,18 @@ const STREAM_FRAGMENT = /* glsl */ `
   }
 `;
 
-/** A flat ribbon along -Z twisted into a widening helix round the rod. */
+/** A flat ribbon along -Z twisted into a widening helix round the rod; `uSpread` widens it with the rod. */
 const HELIX_VERTEX = /* glsl */ `
   uniform float uTime;
   uniform float uLength;
   uniform float uPhase;
+  uniform float uSpread;
   varying float vAlong;
   varying float vAcross;
   void main() {
     float t = clamp(-position.z, 0.0, 1.0);
     float angle = t * 15.0 - uTime * 14.0 + uPhase;
-    float radius = 0.05 + t * 0.42;
+    float radius = (0.05 + t * 0.42) * uSpread;
     vec3 center = vec3(cos(angle) * radius, sin(angle) * radius, -t * uLength);
     vec3 across = vec3(-sin(angle), cos(angle), 0.0);
     vAlong = t;
@@ -101,10 +114,14 @@ const HELIX_VERTEX = /* glsl */ `
   }
 `;
 
+/** Crimson ribbons with a pale edge, or the finish's arcane colour with its core's edge under a look. */
 const HELIX_FRAGMENT = /* glsl */ `
   uniform float uIntensity;
   uniform float uTail;
   uniform float uTime;
+  uniform float uLook;
+  uniform vec3 uLookCore;
+  uniform vec3 uLookArcane;
   varying float vAlong;
   varying float vAcross;
   void main() {
@@ -112,7 +129,9 @@ const HELIX_FRAGMENT = /* glsl */ `
     float edge = 1.0 - abs(vAcross) * 2.0;
     float pulse = 0.65 + 0.35 * sin(vAlong * 40.0 - uTime * 25.0);
     float fade = smoothstep(0.0, 0.06, vAlong - uTail) * (1.0 - smoothstep(0.45, 1.0, vAlong));
-    vec3 color = mix(vec3(1.0, 0.75, 0.7), vec3(1.0, 0.08, 0.12), smoothstep(0.0, 0.25, 1.0 - edge));
+    vec3 color = uLook > 0.5
+      ? mix(mix(uLookCore, uLookArcane, 0.35), uLookArcane, smoothstep(0.0, 0.25, 1.0 - edge)) * 1.3
+      : mix(vec3(1.0, 0.75, 0.7), vec3(1.0, 0.08, 0.12), smoothstep(0.0, 0.25, 1.0 - edge));
     gl_FragColor = vec4(color * edge * edge * pulse * fade * 1.6, uIntensity);
   }
 `;
@@ -125,7 +144,8 @@ const additive = {
   forceSinglePass: true,
 } as const;
 
-function streamMaterial(core: boolean): THREE.ShaderMaterial {
+/** `look` joins the material's uniforms, so writing it restyles the material. */
+function streamMaterial(core: boolean, look: FlameLookUniforms): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     name: core ? 'flame_jet_core' : 'flame_jet_rod',
     uniforms: {
@@ -136,6 +156,7 @@ function streamMaterial(core: boolean): THREE.ShaderMaterial {
       uIntensity: { value: 0 },
       uTail: { value: 0 },
       uCore: { value: core ? 1 : 0 },
+      ...look,
     },
     vertexShader: STREAM_VERTEX,
     fragmentShader: STREAM_FRAGMENT,
@@ -150,9 +171,10 @@ function streamMaterial(core: boolean): THREE.ShaderMaterial {
  * fireballs that keep the aim they left with (sweeping bends the fire into
  * a lagging arc), swell and climb at the end of the reach, splash across a
  * wall that cuts it, shed smoke and spit sparks (FlameParticles). Ignition
- * throws a fireball out of the nozzle. Six draw calls while it burns, none
- * once everything has died out; no lights (the shell's muzzle light
- * flickers with it).
+ * throws a fireball out of the nozzle. An upgraded weapon's stream burns
+ * wider and in its finish's colours (`setLook`) with the same draw calls.
+ * Six draw calls while it burns, none once everything has died out; no
+ * lights (the shell's muzzle light flickers with it).
  */
 export class FlameJet {
   readonly group = new THREE.Group();
@@ -166,14 +188,18 @@ export class FlameJet {
   private tail = 0;
   private time = 0;
   private fed = false;
+  /** A finish's look the stream burns in; null for the weapon's own fire. */
+  private flameLook: FlameShotLook | null = null;
+  /** The look uniforms of every rod material (body, core, ribbons). */
+  private readonly lookUniforms: FlameLookUniforms[] = [];
   private readonly aim = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
 
   constructor(reduced = false) {
     // Unit cone along -Z, open at both ends; the shader shapes radius and length.
     const geometry = new THREE.CylinderGeometry(1, 1, 1, 16, 20, true).rotateX(-Math.PI / 2).translate(0, 0, -0.5);
-    this.body = new THREE.Mesh(geometry, streamMaterial(false));
-    this.core = new THREE.Mesh(geometry, streamMaterial(true));
+    this.body = new THREE.Mesh(geometry, streamMaterial(false, this.lookUniform()));
+    this.core = new THREE.Mesh(geometry, streamMaterial(true, this.lookUniform()));
     this.core.renderOrder = 1;
     // A ribbon: across in X, along -Z, densely cut so the twist stays smooth.
     const ribbon = new THREE.PlaneGeometry(1, 1, 1, 64).rotateX(-Math.PI / 2).translate(0, 0, -0.5);
@@ -182,7 +208,7 @@ export class FlameJet {
         name: 'flame_jet_arcane_helix',
         uniforms: {
           uTime: { value: 0 }, uLength: { value: 1 }, uPhase: { value: (index / HELIX_RIBBONS) * Math.PI * 2 },
-          uIntensity: { value: 0 }, uTail: { value: 0 },
+          uIntensity: { value: 0 }, uTail: { value: 0 }, uSpread: { value: 1 }, ...this.lookUniform(),
         },
         vertexShader: HELIX_VERTEX,
         fragmentShader: HELIX_FRAGMENT,
@@ -198,6 +224,30 @@ export class FlameJet {
     this.group.name = 'flame-jet';
     this.group.add(this.rod, this.particles.group);
     this.reset();
+  }
+
+  /**
+   * Burns in a finish's look (an upgraded weapon): its colours, with the
+   * rod, its ribbons and the rolling fire `look.width` times as wide; null
+   * restores the weapon's own fire. Uniform writes only, and none when the
+   * look is unchanged, so it can be called every frame.
+   */
+  public setLook(look: FlameShotLook | null): void {
+    if (look === this.flameLook) return;
+    this.flameLook = look;
+    const width = look?.width ?? 1;
+    this.body.material.uniforms.uWidth.value = ROD_RADIUS * width;
+    this.core.material.uniforms.uWidth.value = ROD_RADIUS * CORE_WIDTH_SHARE * width;
+    for (const helix of this.helices) helix.material.uniforms.uSpread.value = width;
+    for (const uniforms of this.lookUniforms) applyFlameLook(uniforms, look);
+    this.particles.setLook(look);
+  }
+
+  /** Look uniforms for one more material of the rod, kept to restyle it. */
+  private lookUniform(): FlameLookUniforms {
+    const uniforms = createFlameLookUniforms();
+    this.lookUniforms.push(uniforms);
+    return uniforms;
   }
 
   /** True while any of the fire is still visible. */

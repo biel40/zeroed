@@ -264,7 +264,10 @@ export class Game {
       unlockPointer: () => document.exitPointerLock(),
       grantWeapon: (id, replacePinned) => this.grantWeapon(id, replacePinned),
       canGrantWeapon: (id) => this.arsenal.has(id),
-      hasWeapon: (id) => this.inventory.has(id),
+      hasWeapon: (id) => this.inventory.owns(id),
+      canStoreWeapon: (id) => this.inventory.canStore(id),
+      storeWeapon: (id) => this.storeWeapon(id),
+      retrieveStoredWeapon: () => this.retrieveStoredWeapon(),
       getEquippedWeaponId: () => this.inventory.currentWeapon,
       getEquippedWeapon: () => this.currentWeapon,
       getMuzzleWorldPosition: (out) => this.currentView.getMuzzleWorldPosition(out),
@@ -286,6 +289,7 @@ export class Game {
         return true;
       },
       setWeaponFinish: (id, finish) => this.arsenal.get(id)?.view.setFinish(finish, this.profile.useReducedEffects),
+      setWeaponCapacityScale: (id, scale) => this.arsenal.get(id)?.weapon.setCapacityScale(scale),
       setReloadTimeScale: (scale) => {
         for (const entry of this.arsenal.values()) entry.weapon.reloadTimeScale = scale;
       },
@@ -645,12 +649,33 @@ export class Game {
     const previousId = this.inventory.currentWeapon;
     const nextId = this.inventory.switchTo(index);
     if (!nextId) return;
+    this.presentSelection(previousId);
+  }
+
+  /** Puts `previousId` away and raises the weapon now selected. */
+  private presentSelection(previousId: WeaponId): void {
     const previous = this.entry(previousId);
     previous.weapon.equip();
     previous.view.reset();
     previous.view.root.visible = false;
     this.currentView.root.visible = true;
     this.currentWeapon.equip();
+  }
+
+  /** Leaves `id` at a machine: out of the inventory, its ammunition kept, the other weapon raised. */
+  private storeWeapon(id: WeaponId): boolean {
+    const previousId = this.inventory.currentWeapon;
+    if (!this.inventory.store(id)) return false;
+    if (previousId === id) this.presentSelection(id);
+    return true;
+  }
+
+  /** Takes the stored weapon back into its slot, raised as it was left. */
+  private retrieveStoredWeapon(): WeaponId | null {
+    const previousId = this.inventory.currentWeapon;
+    const id = this.inventory.restore();
+    if (id) this.presentSelection(previousId);
+    return id;
   }
 
   /** Cycles to the next carried weapon for touch and controller actions. */
@@ -666,7 +691,8 @@ export class Game {
    */
   private grantWeapon(id: WeaponId, replacePinned = false): boolean {
     const entry = this.arsenal.get(id);
-    if (!entry) return false;
+    // A weapon stored at a machine is still owned: never a second copy.
+    if (!entry || this.inventory.storedWeapon === id) return false;
     const previousId = this.inventory.currentWeapon;
     const { equipped } = this.inventory.grant(id, replacePinned);
     const equippedEntry = this.entry(equipped);
@@ -691,6 +717,7 @@ export class Game {
   private resetArsenal(): void {
     this.inventory.reset(this.mode.startingInventory ?? this.mode.weaponIds);
     for (const entry of this.arsenal.values()) {
+      entry.weapon.setCapacityScale(1);
       entry.weapon.resetAmmo();
       entry.view.reset();
       entry.view.setFinish(null);

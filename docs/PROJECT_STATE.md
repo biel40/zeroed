@@ -35,14 +35,17 @@
   el rendimiento movil con la horda del evento estan pendientes de validacion
   manual en el juego.
 - La camara KOVKA de Station 33 se abre con la electricidad y su forja
-  mejora armas; la forja no retira el arma de la mano mientras
-  trabaja y la mejora no cambia el nombre ni el cargador. Su aspecto, su
-  combate, el acabado de las armas forjadas y el rendimiento movil estan
-  pendientes de validacion manual.
+  mejora armas; el arma queda en la maquina mientras se forja y hay que
+  recogerla; la mejora duplica dano, cargador y reserva maxima sin cambiar
+  el nombre. Su aspecto, su combate, el acabado de las armas forjadas, la
+  muerte por sobrecarga del ZEUS-77 forjado, el chorro azul y la muerte en
+  cenizas de la ФАКЕЛ-33 forjada, la animacion y el sonido del reactor
+  durante la forja y el rendimiento movil estan pendientes de validacion
+  manual.
 - El ajuste de quemadura de la ФАКЕЛ-33 basica esta cubierto por pruebas;
-  su equilibrio en PC/Android sigue pendiente de juego manual. El perfil
-  KOVKA especifico de 7000 puntos solo esta propuesto en la
-  [auditoria](changes/fakel-balance.md).
+  su equilibrio en PC/Android sigue pendiente de juego manual. La forja la
+  convierte en letal al primer contacto en lugar del perfil KOVKA propuesto
+  en la [auditoria](changes/fakel-balance.md).
 - Antes del primer START la simulacion puede avanzar; game over tactil aun
   puede recibir movimiento/disparo.
 - Barreras totalmente destruidas no siempre entran en reparacion; el cambio de

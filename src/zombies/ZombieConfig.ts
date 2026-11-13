@@ -181,6 +181,28 @@ export const ZOMBIE_CORPSE_LINGER = 1.6;
 export const ZOMBIE_DEATH_FADE = 0.8;
 /** Vaporization/dissolution duration for zombies eliminated by the VORTEX-9 (0.8–1.2 s). */
 export const ZOMBIE_VORTEX9_DEATH_DURATION = 1.0;
+/**
+ * Timing of a death by a forged weapon, in seconds from the killing blow:
+ * the body plays its fall clip, `clip` long, starts disintegrating at
+ * `disintegrateStart`, while it still moves, and is gone at `duration`,
+ * having sunk `sink` metres as it melts.
+ */
+export interface ZombieDisintegrationTiming {
+  readonly clip: number;
+  readonly disintegrateStart: number;
+  readonly duration: number;
+  readonly sink: number;
+}
+
+/** Forged ZEUS-77: it convulses for its whole overload clip, collapses and melts. */
+export const ZOMBIE_OVERLOAD_DEATH: ZombieDisintegrationTiming = { clip: 1.8, disintegrateStart: 1.45, duration: 2.6, sink: 0.22 };
+
+/**
+ * Forged ФАКЕЛ-33: the blue fire overwhelms the body within its first
+ * writhe (the burn clip), eats it from a quarter second and leaves nothing
+ * after a second and a quarter.
+ */
+export const ZOMBIE_CINDER_DEATH: ZombieDisintegrationTiming = { clip: 1.6, disintegrateStart: 0.25, duration: 1.25, sink: 0.3 };
 
 // --- Per-zombie visual/behavior variation (fractions, applied at spawn) ---
 export const ZOMBIE_SPEED_JITTER = 0.08;

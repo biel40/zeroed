@@ -306,6 +306,19 @@ export function setVortex9DissolveState(
 }
 
 /**
+ * Recolours the rim of the dissolution on a material registered with
+ * `installVortex9Dissolve` (uniform values only: no recompile). Another
+ * weapon's disintegration borrows the shader; it restores the VORTEX-9's
+ * neon green and hot core afterwards.
+ */
+export function setVortex9DissolveColors(material: THREE.Material, edge: number, hot: number): void {
+  const uniforms = material.userData.vortex9Dissolve as Vortex9DissolveUniforms | undefined;
+  if (!uniforms) return;
+  uniforms.uDissolveEdgeColor.value.setHex(edge);
+  uniforms.uDissolveHotColor.value.setHex(hot);
+}
+
+/**
  * Ascending neon-green plasma ash particle burst attached to a zombie visual
  * during a VORTEX-9 vaporization death. Uses a single draw call (`THREE.Points`)
  * and exposes `dispose()` for explicit GPU memory cleanup.
@@ -401,6 +414,17 @@ export class Vortex9AshParticles {
   public reset(): void {
     this.material.uniforms.uProgress.value = 0;
     this.points.visible = false;
+  }
+
+  /** Recolours the burst's rim and hot core; a reset keeps the colours. */
+  public setColors(edge: number, hot: number): void {
+    (this.material.uniforms.uEdgeColor.value as THREE.Color).setHex(edge);
+    (this.material.uniforms.uHotColor.value as THREE.Color).setHex(hot);
+  }
+
+  /** Draws only the first `count` motes, fewer on low-end devices; omitted draws them all. */
+  public setCount(count?: number): void {
+    this.geometry.setDrawRange(0, count === undefined ? Infinity : Math.min(count, ASH_PARTICLE_COUNT));
   }
 
   public dispose(): void {

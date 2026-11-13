@@ -100,3 +100,79 @@ describe('WeaponInventory (zombies two-weapon rule)', () => {
     expect(inventory.weapons).toEqual(['m1911']);
   });
 });
+
+describe('WeaponInventory (a weapon left at an upgrade machine)', () => {
+  const carrying = (...weapons: Parameters<WeaponInventory['grant']>[0][]): WeaponInventory => {
+    const inventory = new WeaponInventory([weapons[0]], 2);
+    for (const id of weapons.slice(1)) inventory.grant(id);
+    return inventory;
+  };
+
+  it('takes the weapon out of its slot, keeps it owned and hands over the other weapon', () => {
+    const inventory = carrying('m1911', 'ak47');
+    inventory.switchTo(0);
+    expect(inventory.canStore('m1911')).toBe(true);
+    expect(inventory.store('m1911')).toBe(true);
+    expect(inventory.weapons).toEqual(['ak47']);
+    expect(inventory.currentWeapon).toBe('ak47');
+    expect(inventory.storedWeapon).toBe('m1911');
+    expect(inventory.has('m1911')).toBe(false);
+    expect(inventory.owns('m1911')).toBe(true);
+    expect(inventory.owns('ak47')).toBe(true);
+  });
+
+  it('puts it back into its original slot and equips it, once', () => {
+    const inventory = carrying('m1911', 'ak47');
+    inventory.store('m1911');
+    expect(inventory.restore()).toBe('m1911');
+    expect(inventory.weapons).toEqual(['m1911', 'ak47']);
+    expect(inventory.currentWeapon).toBe('m1911');
+    expect(inventory.storedWeapon).toBeNull();
+    expect(inventory.restore()).toBeNull();
+    expect(inventory.weapons).toEqual(['m1911', 'ak47']);
+  });
+
+  it('never leaves the hands empty and holds a single weapon at a time', () => {
+    const alone = new WeaponInventory(['m1911'], 2);
+    expect(alone.canStore('m1911')).toBe(false);
+    expect(alone.store('m1911')).toBe(false);
+    expect(alone.weapons).toEqual(['m1911']);
+    const inventory = carrying('m1911', 'ak47');
+    expect(inventory.canStore('m60')).toBe(false);
+    inventory.store('ak47');
+    expect(inventory.canStore('m1911')).toBe(false);
+    expect(inventory.store('m1911')).toBe(false);
+  });
+
+  it('keeps the empty slot reserved: a new weapon replaces the one in hand', () => {
+    const inventory = carrying('m1911', 'ak47');
+    inventory.store('ak47');
+    expect(inventory.grant('m60')).toEqual({ equipped: 'm60', dropped: 'm1911' });
+    expect(inventory.weapons).toEqual(['m60']);
+    expect(inventory.restore()).toBe('ak47');
+    expect(inventory.weapons).toEqual(['m60', 'ak47']);
+    expect(inventory.weapons).toHaveLength(inventory.maxSlots);
+  });
+
+  it('refuses a second copy of the stored weapon', () => {
+    const inventory = carrying('m1911', 'ak47');
+    inventory.store('ak47');
+    expect(inventory.grant('ak47')).toEqual({ equipped: 'm1911', dropped: null });
+    expect(inventory.weapons).toEqual(['m1911']);
+    expect(inventory.restore()).toBe('ak47');
+    expect(inventory.weapons).toEqual(['m1911', 'ak47']);
+  });
+
+  it('keeps a pinned weapon pinned across the visit and forgets the stored weapon on reset', () => {
+    const inventory = carrying('m1911', 'tesla');
+    inventory.pin('tesla');
+    inventory.store('tesla');
+    inventory.restore();
+    expect(inventory.isPinned('tesla')).toBe(true);
+    inventory.store('tesla');
+    inventory.reset(['m1911']);
+    expect(inventory.storedWeapon).toBeNull();
+    expect(inventory.owns('tesla')).toBe(false);
+    expect(inventory.weapons).toEqual(['m1911']);
+  });
+});

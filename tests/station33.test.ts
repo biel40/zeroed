@@ -969,7 +969,7 @@ describe('Station 33 KOVKA chamber', () => {
     expect(solidBoxes(arena).some((box) => box.intersectsBox(front))).toBe(false);
   });
 
-  it('forges the weapon in hand once the power is on: price, a 7.5 s forge, double damage, refill, finish and shot looks', () => {
+  it('forges the weapon in hand once the power is on: price, a 7.5 s forge, then a mandatory pick-up with double damage, refill, finish and shot looks', () => {
     const forgeSeconds = KOVKA_UPGRADE_MACHINE.forgeSeconds;
     expect(forgeSeconds).toBe(7.5);
     const side = makeContext();
@@ -996,33 +996,111 @@ describe('Station 33 KOVKA chamber', () => {
     economy.setUnlimitedSpending(true);
     mode.onInteract();
     expect(machine.busy).toBe(true);
+    // The weapon leaves the hands for the chamber.
+    expect(side.ctx.storeWeapon).toHaveBeenCalledWith('m1911');
     expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeForging', { weapon }));
     const upgrade = mode as unknown as { weaponUpgrade: { update(): void; shotLooks(id: string): unknown } };
+    const shown = arena.group.getObjectByName('upgrade-machine-weapon')!;
     arena.update(forgeSeconds - 0.5);
     upgrade.weaponUpgrade.update();
     // Nothing is handed over before the forge ends, however often USE is pressed.
     mode.onInteract();
     expect(machine.busy).toBe(true);
+    expect(side.ctx.retrieveStoredWeapon).not.toHaveBeenCalled();
     expect(damageScale()).toBe(1);
     expect(side.ctx.setWeaponFinish).not.toHaveBeenCalled();
     expect(side.ctx.refillWeaponAmmo).not.toHaveBeenCalled();
+    expect(side.ctx.setWeaponCapacityScale).not.toHaveBeenCalled();
     expect(upgrade.weaponUpgrade.shotLooks('m1911')).toBeNull();
     arena.update(0.6);
     upgrade.weaponUpgrade.update();
+    // Done, but it waits on show in the chamber until the player takes it.
     expect(machine.busy).toBe(false);
+    expect(shown.visible).toBe(true);
+    expect(side.ctx.audio.playMysteryBoxReveal).toHaveBeenCalledWith(true);
+    expect(side.hud.showNotice).toHaveBeenLastCalledWith('info', t('banner.weaponReady', { weapon }));
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeCollect', { weapon, key: actionKey(false) }));
+    for (let i = 0; i < 4; i++) {
+      arena.update(30);
+      upgrade.weaponUpgrade.update();
+    }
+    expect(side.ctx.retrieveStoredWeapon).not.toHaveBeenCalled();
+    expect(shown.visible).toBe(true);
+    expect(damageScale()).toBe(1);
+
+    vi.mocked(side.ctx.retrieveStoredWeapon).mockReturnValueOnce('m1911');
+    mode.onInteract();
+    expect(side.ctx.retrieveStoredWeapon).toHaveBeenCalledTimes(1);
+    expect(shown.visible).toBe(false);
     expect(damageScale()).toBe(2);
     expect(upgrade.weaponUpgrade.shotLooks('m1911')).toBe(KOVKA_WEAPON_FINISH.shots);
     expect(upgrade.weaponUpgrade.shotLooks('ak47')).toBeNull();
     expect(side.ctx.refillWeaponAmmo).toHaveBeenCalledWith('m1911');
+    // Twice the magazine and reserve, grown before the refill fills them.
+    expect(KOVKA_UPGRADE_MACHINE.ammoMultiplier).toBe(2);
+    expect(side.ctx.setWeaponCapacityScale).toHaveBeenCalledWith('m1911', 2);
+    expect(vi.mocked(side.ctx.setWeaponCapacityScale).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(side.ctx.refillWeaponAmmo).mock.invocationCallOrder[0]);
     expect(side.ctx.setWeaponFinish).toHaveBeenCalledWith('m1911', KOVKA_WEAPON_FINISH);
     expect(side.hud.showNotice).toHaveBeenLastCalledWith('info', t('banner.weaponUpgraded', { weapon }));
     expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeDone', { weapon }));
     mode.onInteract();
     expect(machine.busy).toBe(false);
+    expect(side.ctx.retrieveStoredWeapon).toHaveBeenCalledTimes(1);
+    expect(side.ctx.storeWeapon).toHaveBeenCalledTimes(1);
 
     mode.onRestartRequested();
     expect(damageScale()).toBe(1);
     expect(side.ctx.resetArsenal).toHaveBeenCalled();
+  });
+
+  it('refuses to take the only weapon in hand, free of charge', () => {
+    const side = makeContext();
+    vi.mocked(side.ctx.canStoreWeapon).mockReturnValue(false);
+    const mode = new ZombiesMode('station-33');
+    mode.init(side.ctx);
+    const arena = (mode as unknown as { arena: Station33Arena }).arena;
+    const economy = (mode as unknown as { economy: PlayerEconomy }).economy;
+    const machine = arena.upgradeMachine;
+    side.player.teleport(machine.position.x, EYE_HEIGHT, machine.position.z + 0.8, 0);
+    side.player.face(FACE_NORTH);
+    side.player.rig.updateMatrixWorld(true);
+    arena.switchOnPower();
+    economy.setUnlimitedSpending(true);
+    const spend = vi.spyOn(economy, 'spend');
+    const weapon = STATION33_WEAPONS.m1911.name;
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeNeedsSecondWeapon', { weapon }));
+    mode.onInteract();
+    expect(machine.busy).toBe(false);
+    expect(spend).not.toHaveBeenCalled();
+    expect(side.ctx.storeWeapon).not.toHaveBeenCalled();
+  });
+
+  it('forgets a weapon left in the forge on restart and empties the chamber', () => {
+    const side = makeContext();
+    const mode = new ZombiesMode('station-33');
+    mode.init(side.ctx);
+    const arena = (mode as unknown as { arena: Station33Arena }).arena;
+    const economy = (mode as unknown as { economy: PlayerEconomy }).economy;
+    const machine = arena.upgradeMachine;
+    side.player.teleport(machine.position.x, EYE_HEIGHT, machine.position.z + 0.8, 0);
+    side.player.face(FACE_NORTH);
+    side.player.rig.updateMatrixWorld(true);
+    arena.switchOnPower();
+    economy.setUnlimitedSpending(true);
+    mode.onInteract();
+    arena.update(KOVKA_UPGRADE_MACHINE.forgeSeconds + 0.1);
+    (mode as unknown as { weaponUpgrade: { update(): void } }).weaponUpgrade.update();
+    mode.onRestartRequested();
+    expect(side.ctx.resetArsenal).toHaveBeenCalled();
+    expect(arena.group.getObjectByName('upgrade-machine-weapon')!.visible).toBe(false);
+    arena.switchOnPower();
+    economy.setUnlimitedSpending(true);
+    side.player.teleport(machine.position.x, EYE_HEIGHT, machine.position.z + 0.8, 0);
+    side.player.face(FACE_NORTH);
+    side.player.rig.updateMatrixWorld(true);
+    const weapon = STATION33_WEAPONS.m1911.name;
+    expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeWeapon', { weapon, key: actionKey(false), cost: 5000 }));
   });
 
   it('takes a MOTDRULES player straight to a powered forge from the developer console, ready to forge for free', () => {
@@ -1049,7 +1127,7 @@ describe('Station 33 KOVKA chamber', () => {
     expect(mode.executeDeveloperCommand('forge')).toBe(t('dev.ok'));
   });
 
-  it('shows the weapon in the forge chamber while it forges and wails from the reactor as it starts', () => {
+  it('shows the weapon in the forge chamber while it forges and until it is taken, and wails from the reactor as it starts', () => {
     const arena = makeArena();
     arena.switchOnPower();
     const cues: ArenaAmbientCue[] = [];
@@ -1069,6 +1147,13 @@ describe('Station 33 KOVKA chamber', () => {
     expect(weapon.rotation.x).not.toBe(turn);
     arena.update(KOVKA_UPGRADE_MACHINE.forgeSeconds);
     expect(arena.upgradeMachine.busy).toBe(false);
+    // Ready: it stays on show, still turning, until it is taken.
+    expect(weapon.visible).toBe(true);
+    const readyTurn = weapon.rotation.x;
+    arena.update(5);
+    expect(weapon.visible).toBe(true);
+    expect(weapon.rotation.x).not.toBe(readyTurn);
+    arena.upgradeMachine.collect();
     expect(weapon.visible).toBe(false);
     arena.upgradeMachine.forge('ak47');
     expect(shown()!.visible).toBe(true);

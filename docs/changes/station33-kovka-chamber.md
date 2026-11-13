@@ -49,3 +49,25 @@
   profundidad del arma en primera persona (`Material.clone` no copia
   `onBeforeCompile`), asi que un arma forjada podia atravesar paredes; el
   acabado nuevo lo conserva.
+- Recogida obligatoria (2026-11-13): la forja ya no deja el arma en la mano.
+  Pagar la saca del inventario (`WeaponInventory.store`, con su hueco
+  reservado para que nada llene el inventario ni se compre una segunda
+  copia) y, al terminar, la maquina la expone latiendo hasta que el
+  jugador la recoge; solo entonces se aplica la mejora. No acepta la unica
+  arma que se lleva, para no dejar las manos vacias (el shell siempre
+  necesita un arma equipada). Solo existe en individual: el cooperativo no
+  tiene maquina de mejora. En el mismo cambio el ZEUS-77 forjado pasa a un
+  morado mas oscuro con halo y sus bajas mueren por sobrecarga
+  (`overload`), reutilizando el disolvente de la VORTEX-9 recoloreado.
+- Escala global y ФАКЕЛ-33 forjada (2026-11-13): toda arma forjada pasa a
+  llevar el doble de cargador y de reserva maxima (`ammoMultiplier` de la
+  maquina) ademas del doble de dano. La capacidad es un factor del `Weapon`
+  que la municion actual sigue en proporcion (redondeo hacia abajo, sin
+  crear balas) y que sobrevive a `resetAmmo`, para que recoger de nuevo el
+  arma la mantenga; solo el reinicio del arsenal la restaura. La ФАКЕЛ-33
+  forjada sustituye el perfil de 7000 puntos propuesto en
+  [fakel-balance](fakel-balance.md) por uno letal a peticion de diseño:
+  chorro azul mas ancho, cristal azul oscuro y muerte `cinder` al primer
+  contacto (toda la vida restante, sin quemadura residual), reutilizando la
+  desintegracion de la sobrecarga del ZEUS-77. El jefe CAPITAN URSS no entra
+  en esa ruta: solo recibe el doble de dano del chorro.

@@ -14,8 +14,13 @@ const BASE = { width: 2.1, height: 0.95, depth: 1.05 } as const;
 /** The forge chamber across the top: a glowing tube between two copper coils. */
 const CHAMBER = { y: 1.38, radius: 0.3, length: 1.2, coilRadius: 0.42, coilLength: 0.32 } as const;
 const ELECTRODE = { x: 0.62, z: -0.32, top: 2.05 } as const;
-/** Glow of the chamber: dark without power, a slow pulse on it, a stuttering blaze while forging. */
-const GLOW = { off: 0, idle: 0.9, forging: 4.2, flash: 5 } as const;
+/**
+ * Glow of the chamber: dark without power, a slow pulse on it, a stuttering
+ * blaze while forging and a quick beacon throb while the forged weapon waits.
+ */
+const GLOW = { off: 0, idle: 0.9, forging: 4.2, ready: 2.2, flash: 5 } as const;
+/** Throbs per second of the ready beacon, and how far each dips. */
+const READY_BEACON = { rate: 5.5, depth: 0.55 } as const;
 const GLOW_EASE = 5;
 const FLASH_DECAY = 1.6;
 /** The weapon on show in the chamber while it forges: its length, and how fast it turns about its own axis. */
@@ -26,8 +31,8 @@ const DISPLAY = { length: 0.95, spin: 1.1 } as const;
  * turns fully dressed for the last moments.
  */
 const PAINT = { start: 0.1, end: 0.85 } as const;
-/** While forging the glass clears and its glow is held down, so the weapon inside shows. */
-const GLASS = { opacity: 0.8, forgingOpacity: 0.28, forgingGlowCap: 1.3, forgingHaloCap: 0.4 } as const;
+/** While a weapon is on show the glass clears and its glow is held down, so the weapon inside shows. */
+const GLASS = { opacity: 0.8, forgingOpacity: 0.28, forgingGlowCap: 1.3, forgingHaloCap: 0.4, readyHaloCap: 0.65 } as const;
 
 /** Where a map puts its upgrade machine and what it charges. */
 export interface UpgradeMachinePlacement {
@@ -39,6 +44,8 @@ export interface UpgradeMachinePlacement {
   readonly facingZ: number;
   readonly cost: number;
   readonly damageMultiplier: number;
+  /** Magazine and reserve capacity of a forged weapon, as a multiple of its own. */
+  readonly ammoMultiplier: number;
   /** Seconds a forge runs. */
   readonly forgeSeconds: number;
   /** Takes orders only once the map's power is on (dark until then). */
@@ -70,7 +77,8 @@ export interface UpgradeMachineLook {
  * pulses in the map's glow colour; paying for a forge makes it blaze and
  * stutter for `forgeSeconds` with the weapon turning inside its cleared
  * glass as the map's finish paints itself onto it, then flash as the
- * weapon is done. The
+ * weapon is done and throb like a beacon, the weapon still turning on
+ * show, until it is collected. The
  * carcass is static batch geometry with one solid proxy; the chamber,
  * halo and lamp animate their own emissive materials, never a light.
  * Stands on the ground floor (floor 0, y 0).
@@ -83,6 +91,7 @@ export class UpgradeMachine implements ArenaUpgradeMachine {
   public readonly lookDotMin = 0.5;
   public readonly cost: number;
   public readonly damageMultiplier: number;
+  public readonly ammoMultiplier: number;
   public readonly finish: WeaponFinish;
   public readonly standPoint: { readonly x: number; readonly z: number; readonly yaw: number };
   private readonly forgeSeconds: number;
@@ -97,6 +106,8 @@ export class UpgradeMachine implements ArenaUpgradeMachine {
   private time = 0;
   /** Seconds left of the running forge (0 when idle). */
   private forging = 0;
+  /** The forge is done and the weapon waits on show to be collected. */
+  private holding = false;
   /** Holder of the weapon on show in the chamber, turning while it forges. */
   private readonly display = new THREE.Group();
   /** Display models built so far, one per weapon forged here, each with the finish that paints it. */
@@ -115,6 +126,7 @@ export class UpgradeMachine implements ArenaUpgradeMachine {
     this.id = config.id;
     this.cost = config.cost;
     this.damageMultiplier = config.damageMultiplier;
+    this.ammoMultiplier = config.ammoMultiplier;
     this.forgeSeconds = config.forgeSeconds;
     this.requiresPower = config.requiresPower;
     this.finish = look.finish;
@@ -149,10 +161,21 @@ export class UpgradeMachine implements ArenaUpgradeMachine {
     return this.forging > 0;
   }
 
+  /** 0..1 progress of the running forge; null while none runs, so a map can stage its own show around it. */
+  public get forgeProgress(): number | null {
+    return this.forging > 0 ? 1 - this.forging / Math.max(this.forgeSeconds, 1e-6) : null;
+  }
+
   public forge(weaponId: WeaponId): void {
     this.forging = this.forgeSeconds;
+    this.holding = false;
     this.showWeapon(weaponId);
     this.onForge?.(weaponId);
+  }
+
+  public collect(): void {
+    this.holding = false;
+    this.display.visible = false;
   }
 
   public update(dt: number): void {
@@ -160,37 +183,47 @@ export class UpgradeMachine implements ArenaUpgradeMachine {
     this.time += step;
     if (this.forging > 0) {
       this.forging = Math.max(0, this.forging - step);
-      this.display.rotation.x += DISPLAY.spin * step;
-      const progress = 1 - this.forging / Math.max(this.forgeSeconds, 1e-6);
+      const progress = this.forgeProgress ?? 1;
       const reveal = THREE.MathUtils.smoothstep(progress, PAINT.start, PAINT.end);
       this.shownFinish?.setReveal(reveal);
       // Its arcs wake as the finish takes hold.
       this.shownFinish?.update(step, reveal);
       if (this.forging === 0) {
         this.flash = 1;
-        this.display.visible = false;
+        this.holding = true;
       }
+    } else if (this.holding) {
+      this.shownFinish?.update(step, 1);
     }
+    // The weapon turns while it forges and while it waits to be taken.
+    const showing = this.forging > 0 || this.holding;
+    if (showing) this.display.rotation.x += DISPLAY.spin * step;
     this.flash = Math.max(0, this.flash - FLASH_DECAY * step);
-    const target = !this.powered ? GLOW.off : this.forging > 0 ? GLOW.forging : GLOW.idle;
+    const target = !this.powered ? GLOW.off : this.forging > 0 ? GLOW.forging : this.holding ? GLOW.ready : GLOW.idle;
     this.level += (target - this.level) * (1 - Math.exp(-GLOW_EASE * step));
     const mains = this.power.on ? this.look.mainsGlowBoost : 1;
-    // Idle: a slow breath. Forging: the arc stutters like a failing starter.
+    // Idle: a slow breath. Forging: the arc stutters like a failing starter. Ready: a beacon throb.
     const pulse = this.forging > 0
       ? 0.55 + 0.45 * Math.abs(Math.sin(this.time * 23) * Math.sin(this.time * 7.1))
-      : 0.8 + 0.2 * Math.sin(this.time * 1.4);
+      : this.holding
+        ? 1 - READY_BEACON.depth * (0.5 + 0.5 * Math.cos(this.time * READY_BEACON.rate * Math.PI * 2))
+        : 0.8 + 0.2 * Math.sin(this.time * 1.4);
     const glow = this.level * pulse * mains + this.flash * GLOW.flash;
-    const forging = this.forging > 0;
-    this.glow.emissiveIntensity = forging ? Math.min(GLASS.forgingGlowCap, glow) : glow;
-    this.glow.opacity = forging ? GLASS.forgingOpacity : GLASS.opacity;
+    // The glass stays clear and its glow held down while the weapon is on
+    // show; the ready beacon throbs under that cap so it still reads.
+    const beacon = this.holding ? pulse : 1;
+    this.glow.emissiveIntensity = showing ? Math.min(GLASS.forgingGlowCap * beacon, glow) : glow;
+    this.glow.opacity = showing ? GLASS.forgingOpacity : GLASS.opacity;
     this.lamp.color.copy(this.glowColor).multiplyScalar(0.04 + Math.min(1.5, glow * 0.6));
-    this.halo.opacity = Math.min(forging ? GLASS.forgingHaloCap : 0.95, glow * 0.22);
+    const haloCap = this.holding ? GLASS.readyHaloCap * beacon : showing ? GLASS.forgingHaloCap : 0.95;
+    this.halo.opacity = Math.min(haloCap, glow * 0.22);
   }
 
   public reset(): void {
     this.time = 0;
     this.flash = 0;
     this.forging = 0;
+    this.holding = false;
     this.display.visible = false;
     this.display.rotation.x = 0;
     this.level = this.powered ? GLOW.idle : GLOW.off;

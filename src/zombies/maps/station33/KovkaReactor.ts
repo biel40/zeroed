@@ -23,6 +23,30 @@ const CORE_DEPTH = 2.6;
 /** Lattice masts carrying the high-voltage feed, either side of the face, standing on the pit floor. */
 const MAST = { offset: 5.9, z: FRONT_Z + 0.45, half: 0.22, top: 4.6, panel: 1.24 } as const;
 
+/**
+ * Where the face's live parts sit, for the forge's show (`KovkaReactorForge`):
+ * the iris of plates between `boreRadius` and `irisRadius`, the coils on
+ * `coilRadius` round the lattice ring at `ringZ`, and the electrodes'
+ * ball ends `electrodeReach` from the axis.
+ */
+export const KOVKA_REACTOR_FACE = {
+  boreRadius: PETALS.inner,
+  irisRadius: PETALS.outer,
+  coilRadius: (TRUSS.inner + TRUSS.outer) / 2,
+  electrodeReach: TRUSS.outer + 0.42,
+  ringZ: FRONT_Z + 0.1,
+} as const;
+
+/** Angles of the electrodes, one between each pair of coils, except under the busbars' arch at the top. */
+export function kovkaElectrodeAngles(): number[] {
+  const angles: number[] = [];
+  for (let index = 0; index < 8; index++) {
+    const tilt = (index * Math.PI) / 4 + Math.PI / 8;
+    if (Math.sin(tilt) <= 0.8) angles.push(tilt);
+  }
+  return angles;
+}
+
 const UP = new THREE.Vector3(0, 1, 0);
 const scratchDirection = new THREE.Vector3();
 const scratchMiddle = new THREE.Vector3();
@@ -98,7 +122,7 @@ function addDrum(context: Station33BuildContext, kovka: KovkaMaterials): void {
 /** The high-voltage face: lattice ring with coils and electrodes, stepped plates, the bore and its core. */
 function addFace(context: Station33BuildContext, kovka: KovkaMaterials, core: THREE.MeshBasicMaterial): void {
   const { batch, materials } = context;
-  const ringZ = FRONT_Z + 0.1;
+  const { ringZ } = KOVKA_REACTOR_FACE;
   for (const radius of [TRUSS.inner, TRUSS.outer]) {
     batch.add(new THREE.TorusGeometry(radius, TRUSS.tube, 3, SEGMENTS).translate(AXIS_X, AXIS_Y, ringZ), kovka.reactorSteel);
   }
@@ -151,16 +175,15 @@ function addPetals(batch: StaticMeshBatch, material: THREE.Material): void {
  * between them, except under the busbars' arch at the top.
  */
 function addCoilsAndElectrodes(batch: StaticMeshBatch, kovka: KovkaMaterials, ringZ: number): void {
-  const middle = (TRUSS.inner + TRUSS.outer) / 2;
   for (let index = 0; index < 8; index++) {
     const angle = (index * Math.PI) / 4;
-    const at = onFace(middle, angle, ringZ);
+    const at = onFace(KOVKA_REACTOR_FACE.coilRadius, angle, ringZ);
     batch.add(new THREE.CylinderGeometry(0.32, 0.32, 0.7, 12).rotateZ(angle).translate(at.x, at.y, at.z), kovka.copper);
     batch.add(new THREE.CylinderGeometry(0.335, 0.335, 0.08, 12, 1, true).rotateZ(angle).translate(at.x, at.y, at.z), kovka.boreLining);
-    const tilt = angle + Math.PI / 8;
-    if (Math.sin(tilt) > 0.8) continue;
+  }
+  for (const tilt of kovkaElectrodeAngles()) {
     const root = onFace(TRUSS.outer, tilt, ringZ);
-    const tip = onFace(TRUSS.outer + 0.42, tilt, ringZ);
+    const tip = onFace(KOVKA_REACTOR_FACE.electrodeReach, tilt, ringZ);
     addBeam(batch, kovka.copper, root, tip, 0.06);
     batch.add(new THREE.SphereGeometry(0.1, 6, 4).translate(tip.x, tip.y, tip.z), kovka.copper);
   }

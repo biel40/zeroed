@@ -236,19 +236,31 @@ codigo: actualiza la guia.
   mastiles de celosia con aisladores de porcelana lo alimentan por barras de
   cobre, cada uno con un brazo articulado que apunta a la cara. Esta dormido:
   el nucleo azul electrico (el unico acento azul del mapa) solo se enciende,
-  con su luz, cuando el interruptor general devuelve la red.
+  con su luz, cuando el interruptor general devuelve la red, y solo cobra
+  vida mientras la forja trabaja.
 - Dos entradas propias en el muro norte, detras del reactor, a cada lado de
   su eje. Delante de la cara, en el eje y de espaldas a la barandilla, esta
   la forja (`KOVKA_UPGRADE_MACHINE`, la `UpgradeMachine` compartida): un
   armario de acero con una camara de forja, un tubo que brilla en el azul
   del nucleo entre dos bobinas de cobre, bajo dos electrodos. Mirandola con
-  un arma en la mano, el aviso pide 5000 para forjarla; pagar hace que la
+  un arma en la mano (y otra encima), el aviso pide 5000 para forjarla;
+  pagar deja el arma en la maquina y hace que la
   camara se encienda y tartamudee siete segundos y medio, con el cristal aclarado y
   el arma girando dentro, que la materia de KOVKA va pintando de la culata
   a la boca, mientras el reactor gime desde el foso (un dron
   grave que late, un gemido como de voz y crujidos de la boveda: el evento
-  `KOVKA_FORGE_CUE`) y, al terminar, el arma
-  pega el doble, se recarga entera y lleva el acabado de KOVKA. Cada arma
+  `KOVKA_FORGE_CUE`). El reactor despierta con la forja (`KovkaReactorForge`):
+  el iris de placas se ilumina en aspas azules que giran cada vez mas
+  rapido, la corriente persigue su propia cola por el anillo de bobinas, el
+  nucleo florece y, en la recta final, saltan rayos entre los electrodos y
+  el anima; zumba a golpes regulares (`KOVKA_FORGE_SURGE_CUE`) y, al
+  terminar, descarga con un trueno y un fogonazo
+  (`KOVKA_FORGE_DISCHARGE_CUE`) antes de apagarse girando cada vez mas
+  despacio. Al terminar, la camara late como una baliza con el
+  arma expuesta hasta que el jugador vuelve a por ella: recogida, pega el
+  doble, carga el doble de cargador y de reserva, se recarga entera y lleva
+  el acabado de KOVKA. La ФАКЕЛ-33 forjada escupe fuego azul que reduce a
+  cenizas a cualquier zombi que toca, de su cristal azul oscuro. Cada arma
   se forja una vez por partida. El acabado (`KOVKA_WEAPON_FINISH`) es la
   materia capturada por la camara: una nebulosa violeta y magenta que se
   mueve despacio por dentro del arma, con venas palidas y estrellas, el

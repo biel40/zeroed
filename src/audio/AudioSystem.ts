@@ -155,7 +155,8 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
 /** Map ambience with a procedural voice in this class. */
 export type AmbientCueSound =
   | 'pa-crackle' | 'distant-train' | 'power-dip' | 'metal-echo' | 'machinery'
-  | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl' | 'forge-wail';
+  | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl' | 'forge-wail'
+  | 'forge-surge' | 'forge-discharge';
 
 /** What to play for a map ambient event; `sampleFile` (in `assets/audio/`) replaces the procedural sound. */
 export interface AmbientCuePlayback {
@@ -1752,6 +1753,8 @@ export class AudioSystem {
       case 'ember-crackle': this.playEmberCrackle(output); break;
       case 'distant-howl': this.playDistantHowl(output, t); break;
       case 'forge-wail': this.playForgeWail(audio, output, t); break;
+      case 'forge-surge': this.playForgeSurge(output, t); break;
+      case 'forge-discharge': this.playForgeDischarge(output, t); break;
     }
   }
 
@@ -1857,6 +1860,36 @@ export class AudioSystem {
     for (let pop = 0; pop < 10; pop++) {
       this.tick(Math.random() * 1.6, 1400 + Math.random() * 2600, 0.03 + Math.random() * 0.04, 3, 0.025, output);
     }
+  }
+
+  /**
+   * One throb of a charging reactor, about a second and a quarter: a thump
+   * in the pit, the coils' mains hum swelling a few hertz sharp with its
+   * octave, a turbine whine climbing over it and arcs crackling across it.
+   */
+  private playForgeSurge(output: AudioNode, t: number): void {
+    this.tick(0, 60, 0.2, 1, 0.3, output);
+    this.sweep(0, 'sawtooth', 50, 58, 0.13, 1.2, t, output);
+    this.sweep(0, 'sawtooth', 100, 116, 0.06, 1.1, t, output);
+    this.sweep(0, 'triangle', 420, 760, 0.03, 1.1, t + 0.05, output);
+    for (let crack = 0; crack < 6; crack++) {
+      this.tick(0.1 + Math.random() * 0.8, 2500 + Math.random() * 2500, 0.05, 4, 0.04, output);
+    }
+  }
+
+  /**
+   * The forge's end, about three seconds: a thunderclap off the reactor's
+   * face with a bright crack on top, a zap falling through it, the coils'
+   * hum dying, a whine running down and the clap rolling round the vault.
+   */
+  private playForgeDischarge(output: AudioNode, t: number): void {
+    this.tick(0, 90, 0.45, 0.7, 1.2, output);
+    this.tick(0, 400, 0.28, 1, 0.5, output);
+    this.tick(0.02, 3000, 0.22, 2, 0.25, output);
+    this.sweep(0, 'sawtooth', 1800, 120, 0.1, 0.45, t, output);
+    this.sweep(0, 'sawtooth', 58, 30, 0.13, 2.2, t, output);
+    this.sweep(0, 'triangle', 900, 70, 0.05, 2.6, t + 0.1, output);
+    [0.4, 0.85, 1.35].forEach((at, echo) => this.tick(at, 110 - echo * 15, 0.12 * Math.pow(0.6, echo), 1, 0.6, output));
   }
 
   /**

@@ -234,6 +234,8 @@ export const es: Record<TranslationKey, string> = {
   'prompt.upgradeNeedsPower': 'FORJA KOVKA\nHAY QUE ENCENDER LA ELECTRICIDAD',
   'prompt.upgradeForging': 'FORJANDO {weapon}…',
   'prompt.upgradeDone': '{weapon} YA ESTÁ FORJADA',
+  'prompt.upgradeCollect': 'RECOGER {weapon} DE KOVKA\n{key}',
+  'prompt.upgradeNeedsSecondWeapon': 'FORJAR {weapon} EN KOVKA\nNECESITAS LLEVAR OTRA ARMA',
   'prompt.coreCrystals': 'CRISTALES DE {weapon}\n{key} — {cost} PTS',
 
   'door.to-dining': 'EL SALÓN',
@@ -322,6 +324,8 @@ export const es: Record<TranslationKey, string> = {
   'banner.powerOn': 'ELECTRICIDAD ACTIVADA',
   'banner.kovkaUnsealed': 'La compuerta de la cámara KOVKA se ha desbloqueado',
   'banner.weaponUpgraded': '{weapon} FORJADA',
+  'banner.weaponReady': '{weapon} LISTA EN KOVKA',
+  'banner.weaponInForge': '{weapon} ESTÁ EN LA FORJA KOVKA',
   'banner.ringActivated': 'EL ANILLO TE HA DEVUELTO',
   'ring.resurrection': 'RESURRECCIÓN',
   'ring.resurrection.description': 'Te salva de una muerte',

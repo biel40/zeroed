@@ -6,7 +6,7 @@ import { BallisticsSystem } from '../src/shooting/BallisticsSystem';
 import { TRACER_STREAK, TracerStreak } from '../src/shooting/TracerStreak';
 import { MuzzleFlare } from '../src/weapons/MuzzleFlare';
 import { MuzzleFlash } from '../src/weapons/MuzzleFlash';
-import { energyShotLook, firearmShotLook, type EnergyShotLook } from '../src/weapons/WeaponShotLook';
+import { energyShotLook, firearmShotLook, flameShotLook, type EnergyShotLook } from '../src/weapons/WeaponShotLook';
 import { ChainLightning } from '../src/zombies/ChainLightning';
 import { EnergyProjectiles } from '../src/zombies/EnergyProjectiles';
 import { KOVKA_WEAPON_FINISH } from '../src/zombies/maps/Station33Config';
@@ -25,6 +25,11 @@ function isRed(hex: number): boolean {
 function isPurple(hex: number): boolean {
   const { r, g, b } = channels(hex);
   return b >= r && r > g * 1.5 && b > 0x80;
+}
+
+function isBlue(hex: number): boolean {
+  const { r, g, b } = channels(hex);
+  return b > r * 1.5 && b > g * 1.2 && b >= 0x20;
 }
 
 function isRedOrange(hex: number): boolean {
@@ -99,6 +104,21 @@ describe('KOVKA shot looks', () => {
     expect(isPurple(arc.core)).toBe(true);
     expect(isPurple(arc.branch)).toBe(true);
     expect(luminance(arc.shroud)).toBeLessThan(0.05);
+  });
+
+  it('throws a wider stream of intense blue fire from a dark blue crystal on the upgraded ФАКЕЛ-33 only', () => {
+    expect(flameShotLook('fakel', null)).toBeNull();
+    expect(flameShotLook('m4a1', KOVKA_SHOTS)).toBeNull();
+    const fakel = flameShotLook('fakel', KOVKA_SHOTS);
+    expect(fakel).not.toBeNull();
+    expect(fakel!.width).toBeGreaterThan(1.3);
+    for (const hex of [fakel!.body, fakel!.ember, fakel!.arcane, fakel!.crystal.vein]) expect(isBlue(hex), hex.toString(16)).toBe(true);
+    // A white-blue heart, bright enough to read in the dark, and a dark glass round the crystal's veins.
+    expect(luminance(fakel!.core)).toBeGreaterThan(0.85);
+    expect(channels(fakel!.core).b).toBeGreaterThanOrEqual(channels(fakel!.core).r);
+    expect(luminance(fakel!.crystal.glass)).toBeLessThan(0.05);
+    expect(isBlue(fakel!.crystal.glass)).toBe(true);
+    expect(luminance(fakel!.crystal.hot)).toBeGreaterThan(luminance(fakel!.crystal.vein));
   });
 });
 
@@ -233,7 +253,11 @@ describe('Energy bolts of an upgraded energy weapon', () => {
 });
 
 describe('Chain arcs of an upgraded ZEUS-77', () => {
-  type ArcInternals = { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; shroud: THREE.Mesh; shroudMaterial: THREE.MeshBasicMaterial };
+  type ArcInternals = {
+    mesh: THREE.Mesh; material: THREE.MeshBasicMaterial;
+    shroud: THREE.Mesh; shroudMaterial: THREE.MeshBasicMaterial;
+    glow: THREE.Mesh; glowMaterial: THREE.MeshBasicMaterial;
+  };
   const arcsOf = (chain: ChainLightning): ArcInternals[] => (chain as unknown as { arcs: ArcInternals[] }).arcs;
   const forksOf = (parent: THREE.Group): number => {
     let count = 0;
@@ -251,10 +275,23 @@ describe('Chain arcs of an upgraded ZEUS-77', () => {
     expect(first.mesh.visible).toBe(true);
     expect(first.material.color.getHex()).toBe(0x9fe0ff);
     expect(first.shroud.visible).toBe(false);
+    expect(first.glow.visible).toBe(false);
     expect(forksOf(parent)).toBe(0);
   });
 
-  it('draws purple arcs inside a dark envelope with purple forks, forks dropped on reduced effects', () => {
+  it('gives the forged beam a bright violet core in a dark purple haze', () => {
+    const arc = energyShotLook('tesla', KOVKA_SHOTS)!.arc!;
+    expect(isPurple(arc.core)).toBe(true);
+    expect(isPurple(arc.glow)).toBe(true);
+    const lightness = (hex: number): number => {
+      const { r, g, b } = channels(hex);
+      return (Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255;
+    };
+    expect(lightness(arc.core)).toBeGreaterThan(0.7);
+    expect(lightness(arc.glow)).toBeLessThan(0.5);
+  });
+
+  it('draws purple arcs inside a purple haze and a dark envelope with purple forks, forks dropped on reduced effects', () => {
     const arc = energyShotLook('tesla', KOVKA_SHOTS)!.arc!;
     const parent = new THREE.Group();
     const chain = new ChainLightning(parent, seeded());
@@ -267,10 +304,17 @@ describe('Chain arcs of an upgraded ZEUS-77', () => {
       expect(entry.shroud.geometry).toBe(entry.mesh.geometry);
       expect(entry.shroudMaterial.color.getHex()).toBe(arc.shroud);
       expect(entry.shroudMaterial.blending).toBe(THREE.NormalBlending);
+      expect(entry.glow.visible).toBe(true);
+      expect(entry.glow.geometry).toBe(entry.mesh.geometry);
+      expect(entry.glowMaterial.color.getHex()).toBe(arc.glow);
+      expect(entry.glowMaterial.blending).toBe(THREE.AdditiveBlending);
+      // Haze over the dark envelope, the core over both.
+      expect(entry.shroud.renderOrder).toBeLessThan(entry.glow.renderOrder);
+      expect(entry.glow.renderOrder).toBeLessThan(entry.mesh.renderOrder);
     }
     expect(forksOf(parent)).toBeGreaterThan(0);
     for (let frame = 0; frame < 30; frame++) chain.update(1 / 60);
-    expect(arcsOf(chain).every((entry) => !entry.mesh.visible && !entry.shroud.visible)).toBe(true);
+    expect(arcsOf(chain).every((entry) => !entry.mesh.visible && !entry.shroud.visible && !entry.glow.visible)).toBe(true);
     expect(forksOf(parent)).toBe(0);
 
     const reducedParent = new THREE.Group();

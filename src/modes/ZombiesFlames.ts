@@ -1,13 +1,23 @@
 import * as THREE from 'three';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { Weapon } from '../weapons/Weapon';
+import type { FlameShotLook } from '../weapons/WeaponShotLook';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import { FlameJet } from '../zombies/FlameJet';
 import { selectFlameTargets, type FlameHit } from '../zombies/FlameTargeting';
-import type { Zombie } from '../zombies/Zombie';
+import type { Zombie, ZombieForgedDeath } from '../zombies/Zombie';
 import { ZombieBurns } from '../zombies/ZombieBurns';
 import type { ZombieManager } from '../zombies/ZombieManager';
 import type { ModeContext } from './GameMode';
+
+/**
+ * What an upgrade machine made of a flame weapon: its stream burns in
+ * `look`, and every zombie it touches dies at once in `death`.
+ */
+export interface ForgedFlame {
+  readonly look: FlameShotLook;
+  readonly death: ZombieForgedDeath;
+}
 
 /** Height above the feet a line of sight aims at: the torso. */
 const TORSO_HEIGHT = 1.1;
@@ -20,9 +30,12 @@ const SIGHT_SLACK = 0.3;
  * inside the cone and in sight (walls and closed doors stop it), sets them
  * burning and pays one hit reward per fresh ignition; a burn keeps biting
  * after they leave the stream and every bite and kill is the weapon's own,
- * so rewards and death styles follow the usual rules. It also draws the
- * world-space stream from the nozzle to its reach or to the wall that cuts
- * it. `ZombiesMode` delegates every flame concern here.
+ * so rewards and death styles follow the usual rules. A forged weapon's
+ * stream (`forgedFlame`) burns every zombie it touches to cinders at once
+ * instead: one kill and its reward each, no burn left to bite. It also
+ * draws the world-space stream from the nozzle to its reach or to the wall
+ * that cuts it, in the forged look while the forged weapon is in hand.
+ * `ZombiesMode` delegates every flame concern here.
  */
 export class ZombiesFlames {
   private readonly burns = new ZombieBurns<Zombie>();
@@ -46,6 +59,8 @@ export class ZombiesFlames {
     /** The arena's static colliders: walls, solids and closed doors. */
     private readonly staticColliders: () => ReadonlyArray<THREE.Object3D>,
     private readonly damageScale: (id: WeaponId) => number,
+    /** What the upgrade machine made of flame weapon `id`; null while it is not forged. */
+    private readonly forgedFlame: (id: WeaponId) => ForgedFlame | null = () => null,
   ) {
     // Reduced-effects profiles keep half the fire particles.
     this.jet = new FlameJet(ctx.profile.useReducedEffects);
@@ -71,12 +86,17 @@ export class ZombiesFlames {
     selectFlameTargets(origin, direction, reach, this.candidates, flame, this.hits);
     const { id, damage } = weapon.definition;
     const scale = this.damageScale(id);
+    const forged = this.forgedFlame(id);
     let nearest = Infinity;
     for (const { target, distance } of this.hits) {
       if (!this.inSight(origin, target, distance)) continue;
       nearest = Math.min(nearest, distance);
       // The fire stays on the body, alive or falling.
       target.ignite(flame.burnSeconds);
+      if (forged) {
+        this.zombies.disintegrateZombie(target, id, forged.death);
+        continue;
+      }
       if (this.zombies.damageZombie(target, 'torso', damage * scale, id)) continue;
       if (this.burns.ignite(target, flame.burnSeconds, flame.burnDamagePerSecond * scale, id)) this.economy.awardHit(false);
     }
@@ -97,7 +117,10 @@ export class ZombiesFlames {
     const flame = weapon.definition.flame;
     const active = runLive && flame !== undefined && weapon.isFiring;
     if (!active && !this.jet.burning) return;
-    if (flame) this.range = flame.range;
+    if (flame) {
+      this.range = flame.range;
+      this.jet.setLook(this.forgedFlame(weapon.definition.id)?.look ?? null);
+    }
     const camera = this.ctx.player.camera;
     camera.getWorldPosition(this.origin);
     camera.getWorldDirection(this.direction);
@@ -107,10 +130,11 @@ export class ZombiesFlames {
     this.jet.update(dt, active, this.muzzle, this.end, reach < this.range - 0.01);
   }
 
-  /** Restart: nobody burns and the stream is gone. */
+  /** Restart: nobody burns, the stream is gone and back to the weapon's own fire. */
   reset(): void {
     this.burns.reset();
     this.jet.reset();
+    this.jet.setLook(null);
   }
 
   /** Distance the stream travels along a ray before a wall cuts it. */

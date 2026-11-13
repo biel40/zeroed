@@ -16,12 +16,15 @@ import {
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
   ZOMBIE_ELECTRIFIED_DURATION,
+  ZOMBIE_CINDER_DEATH,
+  ZOMBIE_OVERLOAD_DEATH,
   ZOMBIE_VORTEX9_DEATH_DURATION,
   ZOMBIE_SPAWN_DURATION,
   ZOMBIE_ATTACK_DAMAGE,
   ZOMBIE_CRAWLER_SPEED_FACTOR,
   ZOMBIE_CRIPPLE_COLLAPSE,
   ZOMBIE_TYPE_CONFIGS,
+  type ZombieDisintegrationTiming,
   type ZombieHitPart,
   type ZombieTypeId,
 } from './ZombieConfig';
@@ -62,12 +65,44 @@ export function staggerForce(amount: number, maxHp: number, headshot: boolean, l
   return Math.min(1, lethal ? Math.max(force, STAGGER_LETHAL_FORCE) : force);
 }
 
-/** Lifecycle of the death: a fallen corpse, the VORTEX-9 dissolve, or a body blown into gibs. */
-export type ZombieDeathKind = 'normal' | 'vortex9' | 'shatter';
+/**
+ * How a forged weapon's kill disintegrates the body: the ZEUS-77 overloads
+ * it (a convulsion), the ФАКЕЛ-33 burns it to cinders (blue fire).
+ */
+export type ZombieDisintegrationKind = 'overload' | 'cinder';
+
+/**
+ * Lifecycle of the death: a fallen corpse, the VORTEX-9 dissolve, a body
+ * blown into gibs, or a forged weapon's disintegration.
+ */
+export type ZombieDeathKind = 'normal' | 'vortex9' | 'shatter' | ZombieDisintegrationKind;
+
+/**
+ * A hit of a forged weapon: when lethal, the body dies `kind`'s
+ * disintegration instead of its weapon's death. `detailed` false trims
+ * the effect for low-end devices.
+ */
+export interface ZombieForgedDeath {
+  readonly kind: ZombieDisintegrationKind;
+  readonly detailed: boolean;
+}
+
+/** Fall clip each disintegration plays: the overload's own, the burn writhe for cinders. */
+const DISINTEGRATION_STYLES: Readonly<Record<ZombieDisintegrationKind, ZombieDeathStyle>> = { overload: 'overload', cinder: 'burn' };
+
+const DISINTEGRATION_TIMINGS: Readonly<Record<ZombieDisintegrationKind, ZombieDisintegrationTiming>> = {
+  overload: ZOMBIE_OVERLOAD_DEATH,
+  cinder: ZOMBIE_CINDER_DEATH,
+};
+
+function isDisintegration(kind: ZombieDeathKind): kind is ZombieDisintegrationKind {
+  return kind === 'overload' || kind === 'cinder';
+}
 
 /** Death lifecycle a replicated style implies; the VORTEX-9 dissolve also follows a lethal headshot locally. */
 function deathKindOf(style: ZombieDeathStyle): ZombieDeathKind {
   if (style === 'blast') return 'vortex9';
+  if (style === 'overload') return 'overload';
   return style === 'shatter' ? 'shatter' : 'normal';
 }
 
@@ -335,7 +370,8 @@ export class Zombie implements HitTarget {
    * Applies pre-computed damage. Returns true when the hit is lethal.
    * Non-lethal hits trigger directional visual feedback without interrupting
    * pursuit. Headshots and stronger damage produce a larger brief reaction.
-   * The lethal blow's source and direction pick the death performance.
+   * The lethal blow's source and direction pick the death performance;
+   * a `forged` weapon's blow overrides it with its disintegration.
    */
   applyDamage(
     amount: number,
@@ -343,8 +379,9 @@ export class Zombie implements HitTarget {
     sourceX?: number,
     sourceZ?: number,
     source?: ZombieKillSource | 'normal',
+    forged: ZombieForgedDeath | null = null,
   ): boolean {
-    return this.takeDamage(amount, headshot, sourceX, sourceZ, source, false);
+    return this.takeDamage(amount, headshot, sourceX, sourceZ, source, false, forged);
   }
 
   /**
@@ -383,6 +420,7 @@ export class Zombie implements HitTarget {
     sourceZ: number | undefined,
     source: ZombieKillSource | 'normal' | undefined,
     shatter: boolean,
+    forged: ZombieForgedDeath | null = null,
   ): boolean {
     if (!this.isAlive) return false;
     this.hp -= amount;
@@ -391,6 +429,10 @@ export class Zombie implements HitTarget {
     this.bleed(amount, headshot, source, this.hp <= 0);
     if (this.hp <= 0) {
       const killSource = source === 'normal' ? undefined : source;
+      if (forged && !shatter) {
+        this.enterDeath(DISINTEGRATION_STYLES[forged.kind], forged.kind, headshot, forged.detailed);
+        return true;
+      }
       const style = shatter ? 'shatter' : resolveZombieDeathStyle(killSource, headshot, this.impact.y);
       this.enterDeath(style, killSource === 'vortex9' ? 'vortex9' : deathKindOf(style), headshot);
       return true;
@@ -418,7 +460,7 @@ export class Zombie implements HitTarget {
       );
     }
     const inferredSource = style === 'slash' ? 'knife' : style === 'shatter' ? 'barrett'
-      : style === 'burn' ? 'fakel' : style === 'shock' ? 'tesla' : style === 'blast' ? 'vortex9'
+      : style === 'burn' ? 'fakel' : style === 'shock' || style === 'overload' ? 'tesla' : style === 'blast' ? 'vortex9'
         : style === 'blown' ? 'f1' : undefined;
     this.bleed(1, headshot, source ?? inferredSource, true);
     // The host decided the kill; the replica still takes the fatal blow before it falls.
@@ -488,6 +530,7 @@ export class Zombie implements HitTarget {
     style: ZombieDeathStyle,
     deathKind: ZombieDeathKind = deathKindOf(style),
     headshot = false,
+    detailedDisintegration = true,
   ): void {
     this.deathGroundY = this.position.y;
     this.deathStyle = style;
@@ -507,8 +550,17 @@ export class Zombie implements HitTarget {
     this.visual.prepareDeath(style, this.impact.x, this.impact.y);
     this.visual.setState('death');
     if (style === 'shock') this.electrify();
+    if (isDisintegration(deathKind)) {
+      // The body disintegrates; wounds riding it would float over the holes.
+      this.wounds.clear();
+      this.stateTimer = DISINTEGRATION_TIMINGS[deathKind].duration;
+      this.visual.disintegrate(deathKind, detailedDisintegration);
+    }
     if (style === 'burn') {
       this.visual.incinerate();
+    }
+    // Burnt to cinders, nothing is left to bleed.
+    if (style === 'burn' && deathKind !== 'cinder') {
       if (!this.bloodPool) {
         this.bloodPool = new ZombieBloodPool();
         this.group.add(this.bloodPool.mesh);
@@ -656,6 +708,23 @@ export class Zombie implements HitTarget {
             this.group.position.y = 0;
             this.visual.setDissolveProgress(0);
             this.visual.setOpacity(1);
+            this.onDeathFinished?.();
+            return;
+          }
+          break;
+        }
+        if (isDisintegration(this.deathKind)) {
+          // The fall clip plays on while the charge or the fire eats the body and it melts into the floor.
+          const { clip, duration, disintegrateStart, sink } = DISINTEGRATION_TIMINGS[this.deathKind];
+          const elapsed = duration - Math.max(0, this.stateTimer);
+          const melt = THREE.MathUtils.clamp((elapsed - disintegrateStart) / (duration - disintegrateStart), 0, 1);
+          this.visual.setDeathProgress(Math.min(1, elapsed / clip));
+          this.visual.setDisintegration(melt);
+          this.group.position.y = this.deathGroundY - melt * sink;
+          if (this.stateTimer <= 0) {
+            this.group.visible = false;
+            this.group.position.y = 0;
+            this.visual.setDisintegration(0);
             this.onDeathFinished?.();
             return;
           }

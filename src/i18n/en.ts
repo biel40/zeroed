@@ -236,6 +236,8 @@ export const en = {
   'prompt.upgradeNeedsPower': 'KOVKA FORGE\nTHE POWER MUST BE TURNED ON',
   'prompt.upgradeForging': 'FORGING {weapon}…',
   'prompt.upgradeDone': '{weapon} IS ALREADY FORGED',
+  'prompt.upgradeCollect': 'TAKE {weapon} FROM KOVKA\n{key}',
+  'prompt.upgradeNeedsSecondWeapon': 'FORGE {weapon} IN KOVKA\nCARRY ANOTHER WEAPON FIRST',
   'prompt.coreCrystals': '{weapon} CORE CRYSTALS\n{key} — {cost} PTS',
 
   'door.to-dining': 'THE PARLOUR',
@@ -324,6 +326,8 @@ export const en = {
   'banner.powerOn': 'POWER ON',
   'banner.kovkaUnsealed': 'The KOVKA chamber hatch is unsealed',
   'banner.weaponUpgraded': '{weapon} FORGED',
+  'banner.weaponReady': '{weapon} IS READY IN KOVKA',
+  'banner.weaponInForge': '{weapon} IS IN THE KOVKA FORGE',
   'banner.ringActivated': 'THE RING BROUGHT YOU BACK',
   'ring.resurrection': 'RESURRECTION',
   'ring.resurrection.description': 'Saves you from one death',

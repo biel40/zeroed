@@ -44,7 +44,17 @@ export interface ModeContext {
    */
   grantWeapon(id: WeaponId, replacePinned?: boolean): boolean;
   canGrantWeapon(id: WeaponId): boolean;
+  /** Carried, or stored away at a machine (see `storeWeapon`): either way it cannot be granted again. */
   hasWeapon(id: WeaponId): boolean;
+  /** `id` is carried and another weapon would stay in hand; only one weapon is stored at a time. */
+  canStoreWeapon(id: WeaponId): boolean;
+  /**
+   * Takes `id` out of the inventory, its ammunition intact, and equips a
+   * weapon still carried; its slot stays reserved. False unless `canStoreWeapon`.
+   */
+  storeWeapon(id: WeaponId): boolean;
+  /** Puts the stored weapon back into its slot and equips it; null when none is stored. */
+  retrieveStoredWeapon(): WeaponId | null;
   /** Weapon selected when an interaction begins. */
   getEquippedWeaponId(): WeaponId;
   /** Read by networked modes to publish aim/reload state; do not mutate. */
@@ -58,6 +68,12 @@ export interface ModeContext {
   setWeaponInfiniteReserve(id: WeaponId): boolean;
   /** Dresses one weapon of the arsenal in a machine's finish (null back to its own look); a reset clears it. */
   setWeaponFinish(id: WeaponId, finish: WeaponFinish | null): void;
+  /**
+   * Magazine and reserve capacity of one weapon of the arsenal, as a
+   * multiple of its own (1 restores it); the rounds carried keep their
+   * share (Weapon.setCapacityScale). A reset restores every weapon.
+   */
+  setWeaponCapacityScale(id: WeaponId, scale: number): void;
   /** Reload-duration multiplier for every weapon of the arsenal (1 = normal). */
   setReloadTimeScale(scale: number): void;
   /** Fire-rate multiplier for every weapon of the arsenal (1 = normal). */

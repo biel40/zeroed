@@ -7,6 +7,7 @@ import { canvasTexture, chippedPaintTexture, steelWearTexture } from './Procedur
 import { mergeAssemblies } from './ViewModelBatching';
 import type { Weapon } from './Weapon';
 import type { BuiltProcedural, ViewModelLiveParts } from './WeaponView';
+import type { FlameShotLook } from './WeaponShotLook';
 import type { ViewModelConfig } from './WeaponTypes';
 
 /**
@@ -51,6 +52,12 @@ const PETAL_CLOSE_RATE = 3.5;
 const NEEDLE_COLD = 2.1;
 const NEEDLE_HOT = -2.1;
 const CRYSTAL_RED = new THREE.Color(0xff2416);
+/** Ruby glass of the core crystal. */
+const CRYSTAL_GLASS = new THREE.Color(0x5a0605);
+/** The red power in it (linear, as the shader burns it): its veins, its rim glow and its white-hot threads. */
+const CRYSTAL_VEIN = new THREE.Color(1.0, 0.1, 0.05);
+const CRYSTAL_RIM = new THREE.Color(1.0, 0.16, 0.08);
+const CRYSTAL_HOT = new THREE.Color(1.0, 0.78, 0.6);
 const DULL_RED = new THREE.Color(0x6a0d02);
 const HOT_ORANGE = new THREE.Color(0xff6a1a);
 const THROAT_COLOR = new THREE.Color(0xffa040);
@@ -68,14 +75,17 @@ const CRYSTAL_ENERGY_VERTEX = /* glsl */ `
 `;
 
 /**
- * Power inside the core crystal: churning veins of red light flowing along
- * it, white-hot where they thicken (core), or a soft glow hugging the
- * crystal's silhouette (rim). `uGlow` follows the charge and the heat.
+ * Power inside the core crystal: churning veins of light (`uVein`) flowing
+ * along it, white-hot (`uHot`) where they thicken (core), or a soft glow
+ * hugging the crystal's silhouette (rim). `uGlow` follows the charge and
+ * the heat; a finish recolours veins and threads (setFlameLook).
  */
 const CRYSTAL_ENERGY_FRAGMENT = /* glsl */ `
   uniform float uGlow;
   uniform float uTime;
   uniform float uRim;
+  uniform vec3 uVein;
+  uniform vec3 uHot;
   varying vec3 vLocal;
   varying float vFacing;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -93,11 +103,11 @@ const CRYSTAL_ENERGY_FRAGMENT = /* glsl */ `
     float light;
     if (uRim > 0.5) {
       light = pow(1.0 - vFacing, 2.2) * 0.7;
-      color = vec3(1.0, 0.16, 0.08);
+      color = uVein;
     } else {
       float thread = smoothstep(0.5, 0.9, veins);
       light = pow(vFacing, 1.3) * (0.35 + 0.8 * veins);
-      color = mix(vec3(1.0, 0.1, 0.05), vec3(1.0, 0.78, 0.6), thread * smoothstep(0.4, 1.0, vFacing));
+      color = mix(uVein, uHot, thread * smoothstep(0.4, 1.0, vFacing));
     }
     gl_FragColor = vec4(color * light * uGlow, 1.0);
   }
@@ -145,7 +155,10 @@ function crystalGeometry(radius: number, length: number, seed: number): THREE.Bu
 function crystalEnergyMaterial(rim: boolean): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     name: rim ? 'fakel_crystal_rim' : 'fakel_crystal_energy',
-    uniforms: { uGlow: { value: 1.3 }, uTime: { value: 0 }, uRim: { value: rim ? 1 : 0 } },
+    uniforms: {
+      uGlow: { value: 1.3 }, uTime: { value: 0 }, uRim: { value: rim ? 1 : 0 },
+      uVein: { value: (rim ? CRYSTAL_RIM : CRYSTAL_VEIN).clone() }, uHot: { value: CRYSTAL_HOT.clone() },
+    },
     vertexShader: CRYSTAL_ENERGY_VERTEX,
     fragmentShader: CRYSTAL_ENERGY_FRAGMENT,
     transparent: true,
@@ -284,6 +297,26 @@ class FakelLiveParts implements ViewModelLiveParts {
     parts.pilot.visible = false;
   }
 
+  /** The core crystal in a finish's colours (an upgraded weapon), or back to its ruby with null. */
+  public setFlameLook(look: FlameShotLook | null): void {
+    const { crystal, crystalEnergy } = this.parts;
+    const [veins, rim] = crystalEnergy;
+    if (look) {
+      crystal.color.setHex(look.crystal.glass);
+      crystal.emissive.setHex(look.crystal.vein);
+      for (const material of crystalEnergy) {
+        (material.uniforms.uVein.value as THREE.Color).setHex(look.crystal.vein);
+        (material.uniforms.uHot.value as THREE.Color).setHex(look.crystal.hot);
+      }
+      return;
+    }
+    crystal.color.copy(CRYSTAL_GLASS);
+    crystal.emissive.copy(CRYSTAL_RED);
+    (veins.uniforms.uVein.value as THREE.Color).copy(CRYSTAL_VEIN);
+    (rim.uniforms.uVein.value as THREE.Color).copy(CRYSTAL_RIM);
+    for (const material of crystalEnergy) (material.uniforms.uHot.value as THREE.Color).copy(CRYSTAL_HOT);
+  }
+
   private heatGlow(material: THREE.MeshStandardMaterial, t: number, peak: number): void {
     material.emissive.copy(this.color.copy(DULL_RED).lerp(HOT_ORANGE, t));
     material.emissiveIntensity = t * t * peak;
@@ -291,7 +324,7 @@ class FakelLiveParts implements ViewModelLiveParts {
 
   /** The core dims with its charge; a spent one dies as it is pulled, a fresh one flares as the cage locks. */
   private crystalGlow(weapon: Weapon, firing: boolean, flicker: number, heat: number, reloadGlow: number): number {
-    const charge = weapon.ammoInMagazine / weapon.definition.magazineSize;
+    const charge = weapon.ammoInMagazine / weapon.magazineCapacity;
     let glow = 0.35 + 1.25 * charge + heat * 0.35 + (firing ? 0.45 + flicker * 0.3 : 0);
     const reload = weapon.definition.view.reloadAnim;
     if (weapon.state === 'reloading' && reload) {
@@ -353,7 +386,7 @@ export function buildFakel(config: ViewModelConfig): BuiltProcedural {
   const throat = new THREE.MeshBasicMaterial({ color: THROAT_COLOR.clone(), toneMapped: false });
   // Deep red glass under a glossy clear coat: every facet throws its own highlight.
   const crystalMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x5a0605, roughness: 0.06, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.04,
+    color: CRYSTAL_GLASS, roughness: 0.06, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.04,
     emissive: CRYSTAL_RED.clone(), emissiveIntensity: 1.4, transparent: true, opacity: 0.74, flatShading: true,
     envMapIntensity: 1.8,
   });

@@ -98,3 +98,15 @@ export function setZombieChar(material: THREE.Material, amount: number, ember: n
   uniforms.uCharEmber.value = THREE.MathUtils.clamp(ember, 0, 1);
   uniforms.uCharTime.value = time;
 }
+
+/**
+ * Colour of the embers in the cracks of a material installed with
+ * `installZombieChar` (a forged flame burns them blue); null restores the
+ * fire's own orange. Uniform value only: no recompile.
+ */
+export function setZombieCharEmberColor(material: THREE.Material, color: number | null): void {
+  const uniforms = material.userData.zombieChar as ZombieCharUniforms | undefined;
+  if (!uniforms) return;
+  if (color === null) uniforms.uCharEmberColor.value.copy(EMBER_COLOR);
+  else uniforms.uCharEmberColor.value.setHex(color);
+}

@@ -14,6 +14,11 @@ const ARC_COLOR = 0x9fe0ff;
 /** Metres the dark envelope of a restyled arc reaches past its bright core. */
 const SHROUD_WIDTH = 0.03;
 const SHROUD_OPACITY = 0.6;
+/** Metres the coloured haze of a restyled arc reaches past its core: inside the dark envelope, so its rim stays dark. */
+const GLOW_WIDTH = 0.018;
+const GLOW_OPACITY = 0.85;
+/** Draw order: the dark envelope first, the haze added over it, the bright core last. */
+const ORDER = { shroud: -2, glow: -1, core: 0 } as const;
 /** Forks crackling off each hop of a restyled arc, their reach and how long they live. */
 const FORK = { perHop: 2, minReach: 0.35, extraReach: 0.45, jitter: 0.12, life: ARC_LIFETIME * 0.8 } as const;
 
@@ -25,26 +30,38 @@ interface ArcBolt {
   /** Same tube pushed outwards and drawn dark over the scene; shown only for a look. */
   shroud: THREE.Mesh;
   shroudMaterial: THREE.MeshBasicMaterial;
+  /** Same tube pushed out less and added in the look's haze colour; shown only for a look. */
+  glow: THREE.Mesh;
+  glowMaterial: THREE.MeshBasicMaterial;
 }
 
-/** A dark copy of the arc's material that pushes the tube out along its normals. */
-function createShroudMaterial(): THREE.MeshBasicMaterial {
+/** A copy of the arc's material that pushes the tube `width` metres out along its normals. */
+function createOffsetMaterial(width: number, blending: THREE.Blending, name: string): THREE.MeshBasicMaterial {
   const material = new THREE.MeshBasicMaterial({
     color: 0x000000,
     transparent: true,
     opacity: 0,
-    blending: THREE.NormalBlending,
+    blending,
     depthWrite: false,
     toneMapped: false,
   });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
-      `#include <begin_vertex>\ntransformed += normal * ${SHROUD_WIDTH.toFixed(3)};`,
+      `#include <begin_vertex>\ntransformed += normal * ${width.toFixed(3)};`,
     );
   };
-  material.customProgramCacheKey = () => 'chain-lightning-shroud';
+  material.customProgramCacheKey = () => `chain-lightning-${name}`;
   return material;
+}
+
+/** A shell of the arc's tube sharing its geometry, hidden until a look shows it. */
+function createShell(geometry: THREE.BufferGeometry, material: THREE.Material, renderOrder: number): THREE.Mesh {
+  const shell = new THREE.Mesh(geometry, material);
+  shell.visible = false;
+  shell.frustumCulled = false;
+  shell.renderOrder = renderOrder;
+  return shell;
 }
 
 /**
@@ -53,8 +70,9 @@ function createShroudMaterial(): THREE.MeshBasicMaterial {
  * TubeGeometry rebuilt on fire along a randomized zigzag path — pooled so
  * counts are hard-capped. Zombies-only system constructed for ZEUS-77
  * projectiles. A discharge with an `ArcShotLook` (an upgraded weapon)
- * recolours the arcs, wraps them in a dark envelope sharing their tube and,
- * with `detailed` effects, adds pooled forks; still one light for it all.
+ * recolours the arcs, wraps them in a coloured haze and a dark envelope
+ * sharing their tube and, with `detailed` effects, adds pooled forks;
+ * still one light for it all.
  */
 export class ChainLightning {
   private readonly arcs: ArcBolt[] = [];
@@ -77,14 +95,14 @@ export class ChainLightning {
       const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
       mesh.visible = false;
       mesh.frustumCulled = false;
-      const shroudMaterial = createShroudMaterial();
-      const shroud = new THREE.Mesh(mesh.geometry, shroudMaterial);
-      shroud.visible = false;
-      shroud.frustumCulled = false;
-      // Under the additive core, so the arc burns out of its dark envelope.
-      shroud.renderOrder = -1;
-      parent.add(shroud, mesh);
-      this.arcs.push({ active: false, life: 0, mesh, material, shroud, shroudMaterial });
+      mesh.renderOrder = ORDER.core;
+      // Under the additive core, so the arc burns out of its haze and dark envelope.
+      const shroudMaterial = createOffsetMaterial(SHROUD_WIDTH, THREE.NormalBlending, 'shroud');
+      const shroud = createShell(mesh.geometry, shroudMaterial, ORDER.shroud);
+      const glowMaterial = createOffsetMaterial(GLOW_WIDTH, THREE.AdditiveBlending, 'glow');
+      const glow = createShell(mesh.geometry, glowMaterial, ORDER.glow);
+      parent.add(shroud, glow, mesh);
+      this.arcs.push({ active: false, life: 0, mesh, material, shroud, shroudMaterial, glow, glowMaterial });
     }
     this.forks = new ElectricArcs(MAX_CHAINS * FORK.perHop, random);
     parent.add(this.forks.group);
@@ -119,15 +137,18 @@ export class ChainLightning {
         arc.active = false;
         arc.mesh.visible = false;
         arc.shroud.visible = false;
+        arc.glow.visible = false;
         arc.material.opacity = 0;
         arc.shroudMaterial.opacity = 0;
+        arc.glowMaterial.opacity = 0;
         continue;
       }
       const t = arc.life / ARC_LIFETIME;
       // Flicker: opacity stutters like a real discharge, fading out overall.
       arc.material.opacity = t * (0.55 + 0.45 * Math.abs(Math.sin(arc.life * 90)));
-      // The dark energy surges out of step with the light.
+      // The dark energy surges out of step with the light; the haze holds steadier than the core.
       arc.shroudMaterial.opacity = t * SHROUD_OPACITY * (0.7 + 0.3 * Math.abs(Math.sin(arc.life * 53 + 1.3)));
+      arc.glowMaterial.opacity = t * GLOW_OPACITY * (0.8 + 0.2 * Math.abs(Math.sin(arc.life * 71 + 0.6)));
     }
     this.forks.update(dt);
     this.pointLight.intensity =
@@ -160,13 +181,17 @@ export class ChainLightning {
     arc.mesh.geometry.dispose();
     arc.mesh.geometry = geometry;
     arc.shroud.geometry = geometry;
+    arc.glow.geometry = geometry;
     arc.material.color.setHex(look?.core ?? ARC_COLOR);
     arc.material.opacity = 1;
     arc.mesh.visible = true;
     arc.shroud.visible = look !== null;
+    arc.glow.visible = look !== null;
     if (look) {
       arc.shroudMaterial.color.setHex(look.shroud);
       arc.shroudMaterial.opacity = SHROUD_OPACITY;
+      arc.glowMaterial.color.setHex(look.glow);
+      arc.glowMaterial.opacity = GLOW_OPACITY;
     }
   }
 

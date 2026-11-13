@@ -1,13 +1,18 @@
 import type { LethalGrenadeId } from '../config/grenades';
 import type { WeaponId } from '../weapons/WeaponTypes';
 import { shapePreservingTangent } from './ZombieAttackMotion';
+import { ZOMBIE_OVERLOAD_DEATH } from './ZombieConfig';
 
 /** What dealt the lethal blow. Rewards only distinguish the knife. */
 export type ZombieKillSource = WeaponId | 'knife' | LethalGrenadeId;
 
-/** Deaths the body performs by falling: each has a profile and a baked clip. */
+/**
+ * Deaths the body performs by falling: each has a profile and a baked clip.
+ * 'overload' is no weapon's own: a lethal bolt of the forged ZEUS-77 picks
+ * it (Zombie.applyDamage) whatever the weapon's style.
+ */
 export const ZOMBIE_FALL_STYLES = [
-  'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock', 'burn', 'blown',
+  'knockback', 'stumble', 'riddled', 'headshot', 'slash', 'blast', 'shock', 'burn', 'blown', 'overload',
 ] as const;
 export type ZombieFallStyle = typeof ZOMBIE_FALL_STYLES[number];
 
@@ -190,6 +195,7 @@ const shockShake = curve([0, 0], [0.06, 1], [0.55, 1], [0.65, 0.3], [0.8, 0]);
 const slashClutch = curve([0, 0], [0.18, 1], [1, 1]);
 const burnWrithe = curve([0, 0], [0.08, 1], [0.5, 1], [0.78, 0.35], [0.86, 0]);
 const burnTwitch = curve([0.82, 0], [0.88, 1], [1, 0.25]);
+const overloadSpasm = curve([0, 0], [0.04, 1], [0.66, 1], [0.78, 0.45], [0.92, 0.1], [1, 0]);
 
 /**
  * Hand-keyed performances baked into clips per rig (ZombieMotionClips).
@@ -409,6 +415,48 @@ export const ZOMBIE_DEATH_PROFILES: Record<ZombieFallStyle, ZombieDeathProfile> 
       pose.right[0] -= b * 0.02;
       pose.left[1] += b * 0.025;
       pose.right[1] += a * 0.025;
+    },
+  },
+  // Forged ZEUS-77: the overload throws it rigid onto its toes, arms flung
+  // out, and wrenches it in hard, spaced jolts over a fast buzz, slow enough
+  // to read; then the knees give, it folds and pitches onto its face.
+  overload: {
+    duration: ZOMBIE_OVERLOAD_DEATH.clip,
+    fall: 'forward',
+    followsImpact: false,
+    channels: {
+      drop: curve([0, 0], [0.1, -0.05], [0.64, -0.04], [0.76, 0.3], [0.82, 0.36], [0.94, 0.85, IMPACT], [0.97, 0.82], [1, 0.84, IMPACT]),
+      travel: curve([0, 0], [0.64, -0.03], [1, 0.12]),
+      pitch: curve([0, 0], [0.1, -0.16], [0.64, -0.14], [0.76, 0.15], [0.84, 0.32], [0.95, 1.42, IMPACT], [1, 1.4]),
+      roll: curve([0.6, 0], [1, 0.25]),
+      spine: curve([0, 0], [0.1, -0.38], [0.64, -0.3], [0.78, 0.45], [1, 0.08]),
+      nod: curve([0, 0], [0.1, -0.55], [0.64, -0.45], [0.8, 0.5], [0.95, -0.15], [1, -0.25]),
+      turn: curve([0.8, 0], [1, -0.8]),
+      plant: curve([0, 1], [0.72, 1], [0.92, 0.15], [1, 0]),
+      knees: curve([0.72, 0], [0.84, 0.3], [1, 0.12]),
+    },
+    hand: handPath(
+      [[0.1, 0.42], [0.64, 0.4], [0.8, 0.22], [1, 0.2]],
+      [[0.1, 0.8], [0.64, 0.78], [0.82, 0.55], [1, 0.5]],
+      [[0.1, 0.1], [0.64, 0.12], [0.86, 0.05], [1, 0.03]],
+    ),
+    layer(t, pose) {
+      const spasm = overloadSpasm(t);
+      const jolt = impacts(t, 13) * spasm;
+      const wrench = Math.abs(jolt);
+      const a = tremor(t, 30) * spasm;
+      const b = tremor(t + 0.37, 26) * spasm;
+      pose.roll += jolt * 0.08 + b * 0.03;
+      pose.spine += jolt * 0.22 + a * 0.08;
+      pose.twist += -jolt * 0.26 + b * 0.08;
+      pose.nod += -wrench * 0.28 + b * 0.12;
+      pose.tilt += jolt * 0.18 + a * 0.1;
+      pose.left[0] += a * 0.05 + jolt * 0.04;
+      pose.right[0] -= b * 0.05 - jolt * 0.04;
+      pose.left[1] += wrench * 0.08 + b * 0.03;
+      pose.right[1] += wrench * 0.06 + a * 0.03;
+      pose.left[2] += a * 0.03;
+      pose.right[2] += b * 0.03;
     },
   },
 };

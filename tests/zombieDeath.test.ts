@@ -7,6 +7,7 @@ import {
   ZOMBIE_DEATH_FADE,
   ZOMBIE_DEATH_FALL,
   ZOMBIE_ELECTRIFIED_DURATION,
+  ZOMBIE_OVERLOAD_DEATH,
   ZOMBIE_SPAWN_DURATION,
 } from '../src/zombies/ZombieConfig';
 import {
@@ -73,7 +74,8 @@ describe('zombie death style resolution', () => {
       sampleZombieDeath(profile, 1, pose);
       expect(pose.drop, style).toBeGreaterThan(0.75);
       expect(pose.plant, style).toBe(0);
-      expect(profile.duration, style).toBeLessThanOrEqual(1.6);
+      // The overload has its own, longer lifecycle (convulsion, then disintegration).
+      expect(profile.duration, style).toBeLessThanOrEqual(style === 'overload' ? ZOMBIE_OVERLOAD_DEATH.clip : 1.6);
     }
   });
 });

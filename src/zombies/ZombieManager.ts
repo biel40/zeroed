@@ -36,7 +36,7 @@ import {
   type ZombieTypeId,
 } from './ZombieConfig';
 import { refreshGibWalls, type GibWalls } from './GibWalls';
-import { Zombie } from './Zombie';
+import { Zombie, type ZombieForgedDeath } from './Zombie';
 import type { ZombieKillSource } from './ZombieDeath';
 import type { GrenadeBlastConfig } from '../config/grenades';
 import { resolveBlastOutcome } from './grenades/GrenadeBlast';
@@ -681,15 +681,31 @@ export class ZombieManager {
   }
 
   /**
+   * A forged weapon's touch that no zombie survives (the forged ФАКЕЛ-33):
+   * all of its remaining health in one torso blow from the player, and it
+   * dies `death`'s disintegration. One kill by `source`, rewarded as usual;
+   * false for a body already dead, so a corpse is never killed twice.
+   */
+  public disintegrateZombie(zombie: Zombie, source: ZombieKillSource, death: ZombieForgedDeath): boolean {
+    if (!zombie.isAlive) return false;
+    const lethalBlow = Math.max(1, zombie.hp);
+    if (!this.applyTrackedDamage(zombie, lethalBlow, false, this.lastPlayerX, this.lastPlayerZ, source, death)) return false;
+    this.kill(zombie, false, source);
+    return true;
+  }
+
+  /**
    * Tesla discharge: electrocutes the directly-hit zombie and chains the
    * charge to the nearest living zombies (selectChainTargets), never the
    * same one twice, at most CHAIN_MAX_TARGETS. Returns the electrocuted
    * zombies in arc order (impact first) so the view can draw the bolts.
+   * With `forged` (a forged ZEUS-77) every body it kills overloads.
    */
   applyChainLightning(
     impact: Zombie,
     damage: number,
     directPart: ZombieHitPart = 'torso',
+    forged: ZombieForgedDeath | null = null,
   ): Zombie[] {
     // Snapshot living zombies once; the pure selection runs on plain data.
     const candidates: { id: number; x: number; z: number; alive: boolean }[] = [];
@@ -718,7 +734,7 @@ export class ZombieManager {
       const sourceX = isDirectHit ? this.lastPlayerX : impact.position.x;
       const sourceZ = isDirectHit ? this.lastPlayerZ : impact.position.z;
       zombie.electrify();
-      if (this.applyTrackedDamage(zombie, appliedDamage, headshot, sourceX, sourceZ, 'tesla')) {
+      if (this.applyTrackedDamage(zombie, appliedDamage, headshot, sourceX, sourceZ, 'tesla', forged)) {
         this.kill(zombie, headshot, 'tesla');
       }
     }
@@ -783,9 +799,10 @@ export class ZombieManager {
 
   private applyTrackedDamage(
     zombie: Zombie, damage: number, headshot: boolean, x: number, z: number, source: ZombieKillSource | undefined,
+    forged: ZombieForgedDeath | null = null,
   ): boolean {
     const before = Math.max(0, zombie.hp);
-    const lethal = zombie.applyDamage(damage, headshot, x, z, source);
+    const lethal = zombie.applyDamage(damage, headshot, x, z, source, forged);
     const removed = before - Math.max(0, zombie.hp);
     if (removed > 0) this.onZombieDamaged?.(removed);
     return lethal;

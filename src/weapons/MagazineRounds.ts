@@ -101,7 +101,7 @@ export function cartridgeMaterials(): { brass: THREE.MeshStandardMaterial; coppe
  */
 export function roundsInViewMagazine(weapon: Weapon, reload: ReloadAnimConfig): number {
   if (weapon.state === 'reloading') {
-    return weapon.stateProgress >= reload.magIn ? weapon.definition.magazineSize : weapon.ammoInMagazine;
+    return weapon.stateProgress >= reload.magIn ? weapon.magazineCapacity : weapon.ammoInMagazine;
   }
   return weapon.inspectProgress !== null ? weapon.ammoInMagazine : 0;
 }

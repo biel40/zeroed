@@ -124,8 +124,9 @@ cortan), y los deja ardiendo unos segundos (`ZombieBurns`: mordiscos cada
 La ФАКЕЛ-33 basica conserva el dano directo, la cadencia, el cono y el combustible;
 su quemadura aporta dos ticks directos de dano durante tres segundos, de modo
 que barrer una horda de rondas medias exige mantener el consumo para rematarla.
-Valores, auditoria y propuesta KOVKA aun sin implementar en la
-[nota de equilibrio](changes/fakel-balance.md). Cada ignicion
+Valores y auditoria en la [nota de equilibrio](changes/fakel-balance.md);
+su propuesta KOVKA quedo sustituida por la forja letal descrita en Station
+33 (arma forjada: los zombis que toca mueren al instante). Cada ignicion
 nueva paga un impacto; bajas y dano son los del arma. Muere con su propio
 estilo (`burn`): se arana la cara en llamas, cae de rodillas y se desploma
 de bruces encogido como un cadaver calcinado; el fuego lo envuelve, la piel
@@ -392,7 +393,19 @@ existente a `MOTDRULES`.
   espaldas), automaticas (sacudidas por cada impacto y se desploma de bruces),
   headshot con arma de fuego (se derrumba inerte), VORTEX-9 (vaporizacion de
   1.0 s con `Vortex9DissolveShader`, borde incandescente verde y cenizas
-  ascendentes), Tesla (convulsiona rigido y cae) y Barrett (`shatter`, siempre,
+  ascendentes), Tesla (convulsiona rigido y cae), ZEUS-77 forjado
+  (`overload`, `ZOMBIE_OVERLOAD_DEATH`: convulsiones violentas con arcos
+  violeta por todo el cuerpo y la piel en morado durante 1.8 s, se desploma
+  y, ya cayendo, el disolvente de la VORTEX-9 lo desintegra en morado con
+  cenizas mientras se aplasta y se hunde; con efectos reducidos, menos
+  arcos y cenizas), ФАКЕЛ-33 forjada (`cinder`, `ZOMBIE_CINDER_DEATH`:
+  cualquier zombi de la horda que toque el chorro, Brutus incluido, recibe
+  toda su vida restante en un golpe, `ZombieManager.disintegrateZombie`;
+  se retuerce con el clip `burn` envuelto en fuego azul, con la piel
+  brillando en azul y grietas de brasas azules, y desde 0,25 s el
+  disolvente lo desintegra en azul hasta desaparecer a 1,25 s, sin charco
+  de sangre ni quemadura residual; una sola baja y recompensa) y Barrett
+  (`shatter`, siempre,
   incluso en headshot: el cuerpo desaparece y `ZombieGibs` lanza sus pedazos con
   munones rojos, restos y gotas de sangre varios metros en la direccion del
   disparo, con una nube de sangre que queda un instante en el aire;
@@ -544,12 +557,33 @@ existente a `MOTDRULES`.
   planta 0 a su alrededor (barandillas solidas cierran el foso; pasarelas y
   escaleras son decorado), dos entradas propias y el sitio reservado de la
   la forja: la `UpgradeMachine` compartida (un `ArenaUpgradeMachine` que el
-  modo lleva con `ZombiesWeaponUpgrade`) cobra 5000 por el arma en mano,
-  forja durante `forgeSeconds` (siete segundos y medio en KOVKA) con esa arma girando en la camara mientras el acabado se pinta sobre ella (y el mapa lo
-  sonoriza con `onForge`: el reactor gime, `forge-wail`) y la deja con el doble de dano (multiplica en
-  `weaponDamageScale`), recargada y con el acabado del mapa
-  (`WeaponFinish`, aplicado por el shell con `setWeaponFinish`); una vez por
-  arma y partida. El acabado pinta el cuerpo del arma con una nebulosa que
+  modo lleva con `ZombiesWeaponUpgrade`) cobra 5000 por el arma en mano y
+  la saca del inventario (`ModeContext.storeWeapon`): su hueco queda
+  reservado, el jugador sigue con su otra arma y, mientras tanto, esa arma
+  no se vende en paredes, estaciones ni vitrinas ni sale en la caja. No
+  acepta la unica arma que se lleva. Forja durante `forgeSeconds` (siete
+  segundos y medio en KOVKA) con esa arma girando en la camara mientras el
+  acabado se pinta sobre ella (y el mapa lo sonoriza con `onForge`: el
+  reactor gime, `forge-wail`). Station 33 escenifica ademas el reactor del
+  fondo a partir de `UpgradeMachine.forgeProgress`: `KovkaReactorDrive`
+  (logica pura) acelera la carga hasta un climax, marca latidos a tiempos
+  fijos y descarga al acabar; `KovkaReactorForge` lo pinta con cuatro draw
+  calls sin luces (iris de aspas giratorias, anillo de bobinas, rayos con
+  menos arcos en efectos reducidos y destello del nucleo) y el mapa los
+  sonoriza (`forge-surge`, `forge-discharge`). Un reinicio lo apaga sin
+  descarga. Al terminar suena el aviso y la camara late
+  como una baliza con el arma expuesta, sin devolverla sola. Hay que volver
+  a usar la maquina para recogerla: vuelve a su hueco con su municion, y
+  solo entonces pega el doble (multiplica en `weaponDamageScale`), lleva el
+  doble de cargador y de reserva maxima (`ammoMultiplier` de la maquina,
+  aplicado por el shell con `setWeaponCapacityScale` sobre
+  `Weapon.setCapacityScale`: la municion que llevaba conserva su
+  proporcion, redondeada hacia abajo), se recarga hasta esas capacidades y
+  lleva el acabado del mapa (`WeaponFinish`, aplicado por el shell con
+  `setWeaponFinish`); una vez por arma y partida. Recarga, recompra de
+  municion, Radiante y recoger de nuevo el arma (caja) usan la capacidad
+  forjada hasta reiniciar. Reiniciar olvida el
+  arma que quedara en la maquina. El acabado pinta el cuerpo del arma con una nebulosa que
   fluye (shader de ruido en el espacio del arma, con luz propia, venas,
   estrellas que titilan y un borde brillante), deja el acero brillante como
   remate pulido y hace saltar arcos electricos entre puntos del arma
@@ -565,10 +599,19 @@ existente a `MOTDRULES`.
   trayectoria real hasta el impacto (`TracerStreak`, en lugar de la
   trazadora normal) y sus fogonazos y luz de disparo se tinen de rojo
   anaranjado; el VORTEX-9 dispara plasma rojo y el ZEUS-77 un proyectil y
-  arcos morados envueltos en energia oscura, con ramificaciones moradas que
-  se omiten con efectos reducidos. El modo pasa el aspecto al proyectil y a
-  los arcos sin tocar el `EnergyWeaponConfig`, asi que dano, alcance y
-  cadena no cambian; reutiliza las luces existentes. La compuerta lleva un sello (`PointDoorSeal`): sin
+  arcos morado oscuro de nucleo violeta brillante, con un halo morado
+  aditivo (visible en la oscuridad) dentro de una envoltura de energia
+  oscura y ramificaciones moradas que se omiten con efectos reducidos. El
+  modo pasa el aspecto al proyectil y a los arcos sin tocar el
+  `EnergyWeaponConfig`, asi que dano, alcance y cadena no cambian;
+  reutiliza las luces existentes. La ФАКЕЛ-33 forjada lanza un chorro mas
+  ancho de fuego azul intenso con corazon blanco azulado y su cristal se
+  vuelve azul oscuro (`FlameShotLook`: `FlameJet` y `FlameParticles` cambian
+  solo uniforms, con los mismos draw calls; con efectos reducidos las bolas
+  de fuego conservan el tamano basico y la mitad del pool). El cono de dano
+  no cambia. Los zombis que mata el ZEUS-77 forjado mueren sobrecargados, y
+  los que toca la ФАКЕЛ-33 forjada arden hasta las cenizas en el primer
+  contacto (ver muertes de zombis). La compuerta lleva un sello (`PointDoorSeal`): sin
   electricidad no se vende y lo dice su aviso, un piloto rojo pasa a verde
   y el aviso de electricidad lo anuncia (`announcementKey`); el nucleo del
   reactor solo brilla con la electricidad. Un unico rectangulo de

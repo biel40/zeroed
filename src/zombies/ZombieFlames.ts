@@ -22,10 +22,16 @@ const VERTEX_SHADER = /* glsl */ `
   }
 `;
 
-/** Licking flame from value noise: narrows to the tip, flickers upwards, orange body and yellow heart. */
+/** The fire's own orange body and yellow heart (linear, as the shader burns them). */
+const FIRE_BODY = new THREE.Color(0.85, 0.16, 0.03);
+const FIRE_HEART = new THREE.Color(1.0, 0.74, 0.28);
+
+/** Licking flame from value noise: narrows to the tip, flickers upwards, `uBody` round a `uHeart` heart. */
 const FRAGMENT_SHADER = /* glsl */ `
   uniform float uTime;
   uniform float uStrength;
+  uniform vec3 uBody;
+  uniform vec3 uHeart;
   varying vec2 vUv;
   varying float vTongue;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -44,7 +50,7 @@ const FRAGMENT_SHADER = /* glsl */ `
     float body = 1.0 - smoothstep(halfWidth * 0.55, halfWidth, side);
     body *= smoothstep(0.0, 0.14, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y + (n - 0.5) * 0.55));
     float heat = body * (0.55 + 0.65 * n);
-    vec3 color = mix(vec3(0.85, 0.16, 0.03), vec3(1.0, 0.74, 0.28), clamp(heat * 1.3 - vUv.y * 0.5, 0.0, 1.0));
+    vec3 color = mix(uBody, uHeart, clamp(heat * 1.3 - vUv.y * 0.5, 0.0, 1.0));
     gl_FragColor = vec4(color * heat, uStrength);
   }
 `;
@@ -94,7 +100,9 @@ export class ZombieFlames {
     geometry.setIndex(indices);
     this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
       name: 'zombie_flames',
-      uniforms: { uTime: { value: 0 }, uStrength: { value: 0 } },
+      uniforms: {
+        uTime: { value: 0 }, uStrength: { value: 0 }, uBody: { value: FIRE_BODY.clone() }, uHeart: { value: FIRE_HEART.clone() },
+      },
       vertexShader: VERTEX_SHADER,
       fragmentShader: FRAGMENT_SHADER,
       transparent: true,
@@ -147,6 +155,20 @@ export class ZombieFlames {
 
   hide(): void {
     this.mesh.visible = false;
+  }
+
+  /** Burns in another fire's colours (a forged flame's blue); null restores its own orange. */
+  public setPalette(palette: { readonly body: number; readonly heart: number } | null): void {
+    const uniforms = this.mesh.material.uniforms;
+    const body = uniforms.uBody.value as THREE.Color;
+    const heart = uniforms.uHeart.value as THREE.Color;
+    if (palette) {
+      body.setHex(palette.body);
+      heart.setHex(palette.heart);
+    } else {
+      body.copy(FIRE_BODY);
+      heart.copy(FIRE_HEART);
+    }
   }
 
   dispose(): void {

@@ -25,6 +25,7 @@ import { buildEscalatorHead } from './station33/EscalatorHeadBuilder';
 import { buildEscapeRoute, escapeStairTransitions } from './station33/EscapeRouteBuilder';
 import { HighlandCathedral } from './station33/HighlandCathedral';
 import { buildKovka } from './station33/KovkaBuilder';
+import { KovkaReactorForge } from './station33/KovkaReactorForge';
 import { KovkaHatchLamp } from './station33/KovkaHatchLamp';
 import type { UpgradeMachine } from './shared/UpgradeMachine';
 import { buildMilicia } from './station33/MiliciaBuilder';
@@ -48,6 +49,8 @@ import { TicketWindowShutters } from './station33/TicketWindowShutters';
 import { buildVestibule } from './station33/VestibuleBuilder';
 import {
   KOVKA_FORGE_CUE,
+  KOVKA_FORGE_DISCHARGE_CUE,
+  KOVKA_FORGE_SURGE_CUE,
   KOVKA_ROUTE,
   PROTOCOL33_BLAZE,
   PROTOCOL33_HIGHLANDS,
@@ -182,6 +185,8 @@ export class Station33Arena implements ZombieArena {
   private readonly ticketShutters: TicketWindowShutters;
   /** Red while the KOVKA hatch is sealed, green once the power opens it. */
   private readonly hatchLamp: KovkaHatchLamp;
+  /** The reactor's show while the forge runs. */
+  private readonly reactorForge: KovkaReactorForge;
   private readonly ticketAmbush = new AmbushTrigger(TICKET_WINDOW_AMBUSH_SITES, TICKET_WINDOW_AMBUSH);
   private readonly hemisphere: THREE.HemisphereLight;
   private readonly surfaceMood: SurfaceMood;
@@ -223,8 +228,11 @@ export class Station33Arena implements ZombieArena {
     buildMilicia(context, this.lighting);
     this.upgradeMachine = buildKovka(context, this.lighting, this.power);
     this.hatchLamp = new KovkaHatchLamp(context, this.power);
-    // The reactor wails through every forge, wherever the player stands.
+    // The reactor wails through every forge, wherever the player stands,
+    // throbs while it charges and discharges as the forge ends.
     this.upgradeMachine.onForge = () => this.onAmbientCue?.(KOVKA_FORGE_CUE);
+    this.reactorForge = new KovkaReactorForge(context, this.upgradeMachine,
+      (event) => this.onAmbientCue?.(event === 'surge' ? KOVKA_FORGE_SURGE_CUE : KOVKA_FORGE_DISCHARGE_CUE));
     this.weaponPickups = [new CodeWeaponChest(context, STATION33_WEAPON_CHEST, STATION33_WEAPONS)];
     buildDoorFrames(context);
     buildServicePassages(context, this.lighting, STATION33_BARRIERS);
@@ -295,6 +303,7 @@ export class Station33Arena implements ZombieArena {
     for (const locker of this.ringLockers) locker.update(dt);
     for (const station of this.weaponStations) station.update(dt);
     this.upgradeMachine.update(dt);
+    this.reactorForge.update(dt);
     this.hatchLamp.update(dt);
     for (const pickup of this.weaponPickups) pickup.update(dt);
     for (const refill of this.ammoRefills) refill.update?.(dt);
@@ -326,6 +335,7 @@ export class Station33Arena implements ZombieArena {
     for (const locker of this.ringLockers) locker.reset();
     for (const station of this.weaponStations) station.reset();
     this.upgradeMachine.reset();
+    this.reactorForge.reset();
     this.hatchLamp.reset();
     for (const pickup of this.weaponPickups) pickup.reset();
     this.ticketAmbush.reset();

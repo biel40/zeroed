@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { BILLBOARD_NOISE, BillboardLayer, type BillboardParticle } from '../rendering/BillboardParticles';
+import type { FlameShotLook } from '../weapons/WeaponShotLook';
+import { applyFlameLook, createFlameLookUniforms } from './FlameLookUniforms';
 
 /** Pool sizes at full quality; reduced-effects profiles keep half. */
 const FIRE_POOL = 140;
@@ -29,10 +31,17 @@ const SPARK = { speed: [14, 30], spread: 0.22, gravity: 7, life: [0.35, 0.85], s
 /**
  * A rolling fireball: a ragged, churning ball of flame that starts as a
  * white-hot jet with a blue root, burns orange and dies dark red. One in
- * seven burns with the crimson of the core crystal: the arcane fire.
+ * seven burns with the crimson of the core crystal: the arcane fire. Under
+ * a finish's look (`uLook`) it runs from the look's core through its body
+ * to its embers, the arcane ones in its arcane colour, a little brighter.
  */
 const FIRE_FRAGMENT = /* glsl */ `
   uniform float uTime;
+  uniform float uLook;
+  uniform vec3 uLookCore;
+  uniform vec3 uLookBody;
+  uniform vec3 uLookEmber;
+  uniform vec3 uLookArcane;
   varying vec2 vUv;
   varying float vAge;
   varying float vSeed;
@@ -43,10 +52,17 @@ const FIRE_FRAGMENT = /* glsl */ `
     float shape = 1.0 - smoothstep(0.25, 1.0, length(p) + (n - 0.5) * 0.85);
     float heat = shape * (0.45 + 0.9 * n) * (1.0 - smoothstep(0.5, 1.0, vAge));
     if (heat <= 0.004) discard;
-    vec3 color = mix(vec3(1.0, 0.95, 0.78), vec3(1.0, 0.5, 0.1), smoothstep(0.0, 0.3, vAge));
-    color = mix(color, vec3(0.62, 0.08, 0.03), smoothstep(0.3, 0.85, vAge));
-    color = mix(color, vec3(1.0, 0.1, 0.2), step(0.86, vSeed) * 0.8);
-    color = mix(vec3(0.5, 0.68, 1.0), color, smoothstep(0.0, 0.07, vAge));
+    vec3 color;
+    if (uLook > 0.5) {
+      color = mix(uLookCore, uLookBody, smoothstep(0.0, 0.3, vAge));
+      color = mix(color, uLookEmber, smoothstep(0.3, 0.85, vAge));
+      color = mix(color, uLookArcane, step(0.86, vSeed) * 0.8) * 1.35;
+    } else {
+      color = mix(vec3(1.0, 0.95, 0.78), vec3(1.0, 0.5, 0.1), smoothstep(0.0, 0.3, vAge));
+      color = mix(color, vec3(0.62, 0.08, 0.03), smoothstep(0.3, 0.85, vAge));
+      color = mix(color, vec3(1.0, 0.1, 0.2), step(0.86, vSeed) * 0.8);
+      color = mix(vec3(0.5, 0.68, 1.0), color, smoothstep(0.0, 0.07, vAge));
+    }
     gl_FragColor = vec4(color * heat * 1.25, 1.0);
   }
 `;
@@ -106,17 +122,29 @@ export class FlameParticles {
   private sparkDebt = 0;
   private time = 0;
   private alive = 0;
+  private readonly reduced: boolean;
+  /** Colours of the fireballs under a finish's look (FlameShotLook). */
+  private readonly lookUniforms = createFlameLookUniforms();
+  /** The finish's look, null for the weapon's own fire; with it, the colours its sparks burn in. */
+  private look: FlameShotLook | null = null;
+  private readonly sparkHot = new THREE.Color();
+  private readonly sparkArcane = new THREE.Color();
+  /** How much wider the puffs launch, and how much bigger they are, under the look. */
+  private spreadScale = 1;
+  private sizeScale = 1;
   private readonly aim = new THREE.Vector3();
   private readonly side = new THREE.Vector3();
   private readonly up = new THREE.Vector3();
 
   constructor(reduced = false) {
+    this.reduced = reduced;
     const scale = reduced ? 0.5 : 1;
     this.fire = makePool(Math.round(FIRE_POOL * scale));
     this.smoke = makePool(Math.round(SMOKE_POOL * scale));
     this.sparks = makePool(Math.round(SPARK_POOL * scale));
     this.rates = { fire: FIRE_RATE * scale, sparks: SPARK_RATE * scale };
     this.fireLayer = new BillboardLayer('flame_fireballs', this.fire.length, FIRE_FRAGMENT, true);
+    Object.assign(this.fireLayer.mesh.material.uniforms, this.lookUniforms);
     this.smokeLayer = new BillboardLayer('flame_smoke', this.smoke.length, SMOKE_FRAGMENT, false);
     // Smoke under the fire, so the flames read through it.
     this.smokeLayer.mesh.renderOrder = -1;
@@ -138,6 +166,23 @@ export class FlameParticles {
   /** Live fire, smoke and sparks. */
   get aliveCount(): number {
     return this.alive;
+  }
+
+  /**
+   * Burns in a finish's look from the next puff (null: the weapon's own
+   * fire): its colours, puffs launched `look.width` times as wide and, at
+   * full quality, a little bigger. Reduced effects keep the basic puff size
+   * so the wider stream costs no extra overdraw on low-end devices.
+   */
+  public setLook(look: FlameShotLook | null): void {
+    this.look = look;
+    applyFlameLook(this.lookUniforms, look);
+    this.spreadScale = look?.width ?? 1;
+    this.sizeScale = look && !this.reduced ? (1 + look.width) / 2 : 1;
+    if (look) {
+      this.sparkHot.setHex(look.core);
+      this.sparkArcane.setHex(look.arcane);
+    }
   }
 
   /**
@@ -237,13 +282,14 @@ export class FlameParticles {
     const puff = this.take(this.fire);
     if (!puff) return;
     puff.position.copy(origin);
-    this.scatter(puff.velocity, FIRE.spread * burst).multiplyScalar(random(FIRE.speed) * (burst > 1 ? 0.8 + Math.random() * 0.5 : 1));
+    this.scatter(puff.velocity, FIRE.spread * burst * this.spreadScale)
+      .multiplyScalar(random(FIRE.speed) * (burst > 1 ? 0.8 + Math.random() * 0.5 : 1));
     // Spread the launches over the frame so the stream never shows gaps.
     puff.position.addScaledVector(puff.velocity, Math.random() * 0.016);
     puff.age = 0;
     puff.life = random(FIRE.life) * (burst > 1 ? 1.25 : 1);
-    puff.size = random(FIRE.size) * (burst > 1 ? 2 : 1);
-    puff.growth = random(FIRE.growth) * (burst > 1 ? 1.3 : 1);
+    puff.size = random(FIRE.size) * (burst > 1 ? 2 : 1) * this.sizeScale;
+    puff.growth = random(FIRE.growth) * (burst > 1 ? 1.3 : 1) * this.sizeScale;
     puff.seed = Math.random();
     puff.spin = Math.random() * Math.PI * 2;
     puff.spinRate = (Math.random() - 0.5) * 4;
@@ -311,9 +357,20 @@ export class FlameParticles {
       positions[o + 5] = spark.position.z - spark.velocity.z * SPARK.streak;
       const glow = 1 - spark.age / spark.life;
       const crimson = spark.seed > 0.8;
-      const r = glow * 1.4;
-      const g = crimson ? glow * 0.15 : glow * glow * 0.9;
-      const b = crimson ? glow * 0.25 : glow * glow * glow * 0.4;
+      let r: number;
+      let g: number;
+      let b: number;
+      if (this.look) {
+        // The look's hot core, or its arcane colour now and then, fading as they fall.
+        const tone = crimson ? this.sparkArcane : this.sparkHot;
+        r = tone.r * glow * 1.4;
+        g = tone.g * glow * 1.4;
+        b = tone.b * glow * 1.4;
+      } else {
+        r = glow * 1.4;
+        g = crimson ? glow * 0.15 : glow * glow * 0.9;
+        b = crimson ? glow * 0.25 : glow * glow * glow * 0.4;
+      }
       colors[o] = r;
       colors[o + 1] = g;
       colors[o + 2] = b;

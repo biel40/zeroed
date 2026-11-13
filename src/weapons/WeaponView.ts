@@ -28,7 +28,9 @@ import { SustainedFireKick } from './SustainedFireKick';
 import { getSettings } from '../core/PlayerSettings';
 import type { Weapon } from './Weapon';
 import { WeaponFinishLayer, type WeaponFinish } from './WeaponFinish';
-import { energyShotLook, firearmShotLook, type EnergyShotLook, type FirearmShotLook } from './WeaponShotLook';
+import {
+  energyShotLook, firearmShotLook, flameShotLook, type EnergyShotLook, type FirearmShotLook, type FlameShotLook,
+} from './WeaponShotLook';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
 const FLASH_DURATION = 0.045;
@@ -199,6 +201,8 @@ export interface ViewModelLiveParts {
   /** `reloadGlow` is the reload animator's 0..1 energy spin-up. */
   update(dt: number, weapon: Weapon, reloadGlow: number): void;
   reset(): void;
+  /** A flame weapon's parts (its core crystal) in a finish's look; null restores their own. */
+  setFlameLook?(look: FlameShotLook | null): void;
 }
 
 /**
@@ -1566,6 +1570,7 @@ export class WeaponView {
     this.finishLayer.apply(finish);
     this.firearmShot = firearmShotLook(this.definition, finish?.shots);
     this.energyShot = energyShotLook(this.definition.id, finish?.shots);
+    this.liveParts?.setFlameLook?.(flameShotLook(this.definition.id, finish?.shots));
     this.tintFlashes();
   }
 

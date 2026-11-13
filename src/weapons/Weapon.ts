@@ -39,6 +39,8 @@ export class Weapon {
   readonly pendingEvents: WeaponEvent[] = [];
 
   private readonly initialReserve: number | null;
+  /** Magazine and reserve capacity relative to the starting ones (an upgrade machine doubles them). */
+  private capacityScale = 1;
   private weaponState: WeaponState = 'ready';
   private cooldown = 0;
   private stateTimer = 0;
@@ -72,6 +74,36 @@ export class Weapon {
       arguments.length >= 3 ? (reserveOverride ?? null) : (definition.reserveAmmo ?? null);
     this.reserveAmmo = this.initialReserve;
     this.fireMode = definition.defaultFireMode;
+  }
+
+  /** Rounds a full magazine holds: the definition's, times the capacity scale. */
+  public get magazineCapacity(): number {
+    return Math.round(this.definition.magazineSize * this.capacityScale);
+  }
+
+  /** Rounds a full reserve holds, times the capacity scale; null for a weapon that starts bottomless. */
+  public get reserveCapacity(): number | null {
+    return this.initialReserve === null ? null : Math.round(this.initialReserve * this.capacityScale);
+  }
+
+  /**
+   * Sets magazine and reserve capacity to `scale` times the starting ones
+   * (1 restores them); it outlives `resetAmmo`, so a weapon picked up again
+   * keeps it. The rounds already carried keep their share of the old
+   * capacity, rounded down and clamped to the new one, so a change never
+   * creates rounds beyond that share nor leaves a negative count; a
+   * bottomless reserve stays bottomless.
+   */
+  public setCapacityScale(scale: number): void {
+    if (!(scale > 0) || !Number.isFinite(scale)) throw new Error(`Weapon capacity scale must be positive, got ${scale}`);
+    const magazine = this.magazineCapacity;
+    const reserve = this.reserveCapacity;
+    this.capacityScale = scale;
+    this.ammoInMagazine = rescaleRounds(this.ammoInMagazine, magazine, this.magazineCapacity);
+    const nextReserve = this.reserveCapacity;
+    if (this.reserveAmmo !== null && reserve !== null && nextReserve !== null) {
+      this.reserveAmmo = rescaleRounds(this.reserveAmmo, reserve, nextReserve);
+    }
   }
 
   get state(): WeaponState {
@@ -176,7 +208,7 @@ export class Weapon {
 
   reload(): boolean {
     if (this.weaponState !== 'ready') return false;
-    if (this.ammoInMagazine >= this.definition.magazineSize) return false;
+    if (this.ammoInMagazine >= this.magazineCapacity) return false;
     // A finite, empty reserve makes the reload impossible.
     if (this.reserveAmmo !== null && this.reserveAmmo <= 0) return false;
     this.activeReloadType = this.ammoInMagazine === 0 ? 'empty' : 'tactical';
@@ -227,8 +259,8 @@ export class Weapon {
    * zombies restart and by Mystery Box pickups (fresh weapon, fresh ammo).
    */
   resetAmmo(): void {
-    this.ammoInMagazine = this.definition.magazineSize;
-    this.reserveAmmo = this.initialReserve;
+    this.ammoInMagazine = this.magazineCapacity;
+    this.reserveAmmo = this.reserveCapacity;
     this.weaponState = 'ready';
     this.stateTimer = 0;
     this.stateDuration = 0;
@@ -247,28 +279,29 @@ export class Weapon {
 
   get isAmmoFull(): boolean {
     return (
-      this.ammoInMagazine === this.definition.magazineSize &&
-      (this.reserveAmmo === null || this.reserveAmmo === this.initialReserve)
+      this.ammoInMagazine === this.magazineCapacity &&
+      (this.reserveAmmo === null || this.reserveAmmo === this.reserveCapacity)
     );
   }
 
   /** Replenishes only ammunition, preserving the current firing/reload state. */
   refillAmmo(): boolean {
     if (this.isAmmoFull) return false;
-    this.ammoInMagazine = this.definition.magazineSize;
-    if (this.reserveAmmo !== null) this.reserveAmmo = this.initialReserve;
+    this.ammoInMagazine = this.magazineCapacity;
+    if (this.reserveAmmo !== null) this.reserveAmmo = this.reserveCapacity;
     return true;
   }
 
   /**
-   * Adds `share` of the starting reserve (at least one round) back to a
-   * finite reserve, capped at its starting size. False when the reserve is
+   * Adds `share` of the full reserve (at least one round) back to a
+   * finite reserve, capped at its capacity. False when the reserve is
    * bottomless or already full.
    */
   public restoreReserveShare(share: number): boolean {
-    if (this.reserveAmmo === null || this.initialReserve === null || this.reserveAmmo >= this.initialReserve) return false;
-    const rounds = Math.max(1, Math.round(this.initialReserve * share));
-    this.reserveAmmo = Math.min(this.initialReserve, this.reserveAmmo + rounds);
+    const capacity = this.reserveCapacity;
+    if (this.reserveAmmo === null || capacity === null || this.reserveAmmo >= capacity) return false;
+    const rounds = Math.max(1, Math.round(capacity * share));
+    this.reserveAmmo = Math.min(capacity, this.reserveAmmo + rounds);
     return true;
   }
 
@@ -347,7 +380,7 @@ export class Weapon {
       case 'reloading': {
         // Draw only what the magazine needs from the reserve; bottomless
         // reserves (null) always refill to full.
-        const needed = this.definition.magazineSize - this.ammoInMagazine;
+        const needed = this.magazineCapacity - this.ammoInMagazine;
         const taken = this.reserveAmmo === null ? needed : Math.min(needed, this.reserveAmmo);
         this.ammoInMagazine += taken;
         if (this.reserveAmmo !== null) this.reserveAmmo -= taken;
@@ -370,4 +403,10 @@ export class Weapon {
       this.reload();
     }
   }
+}
+
+/** `rounds` out of `from` as the same share of `to`, rounded down, within 0..to. */
+function rescaleRounds(rounds: number, from: number, to: number): number {
+  const scaled = from > 0 ? Math.floor((rounds * to) / from) : rounds;
+  return Math.min(to, Math.max(0, scaled));
 }

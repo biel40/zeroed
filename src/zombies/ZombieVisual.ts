@@ -5,14 +5,19 @@ import { registerFadeMaterial, setFadeOpacity } from '../rendering/FadeMaterials
 import {
   installVortex9Dissolve,
   Vortex9AshParticles,
+  VORTEX9_HOT_CORE,
   VORTEX9_NEON_GREEN,
+  setVortex9DissolveColors,
   setVortex9DissolveState,
 } from '../rendering/Vortex9DissolveShader';
-import type { ZombieState } from './Zombie';
+import { OVERLOAD_ARC_STYLE, OVERLOAD_ARC_STYLE_REDUCED, OVERLOAD_LOOK } from './ZombieOverloadLook';
+import { CINDER_EMBERS, CINDER_FLAMES, CINDER_LOOK } from './ZombieCinderLook';
+import type { ZombieDisintegrationLook } from './ZombieDisintegrationLook';
+import type { ZombieDisintegrationKind, ZombieState } from './Zombie';
 import { windowVaultPose, type WindowVaultPose } from './barriers/WindowVault';
 import { ShinyStars } from './ShinyStars';
 import { ZombieFlames } from './ZombieFlames';
-import { installZombieChar, setZombieChar } from '../rendering/ZombieCharShader';
+import { installZombieChar, setZombieChar, setZombieCharEmberColor } from '../rendering/ZombieCharShader';
 import { installSurfaceDetail, ZOMBIE_SURFACE_DETAIL } from '../rendering/SurfaceDetail';
 import { ZombieLimb } from './ZombieLimb';
 import { AccentChannel, ZombieHitAccent } from './ZombieHitAccent';
@@ -26,6 +31,7 @@ import {
   ZOMBIE_ATTACK_HIT_MOMENT,
   ZOMBIE_BARRIER_ATTACK_HIT_MOMENT,
   ZOMBIE_DEATH_FALL,
+  ZOMBIE_OVERLOAD_DEATH,
   ZOMBIE_TYPE_CONFIGS,
   type ZombieModelId,
   type ZombieTypeId,
@@ -612,6 +618,15 @@ export class ZombieVisual {
   /** Seconds of ZEUS-77 charge left on the body; arcs persist through death. */
   private electrified = 0;
   private readonly electricArcs: ElectricArcRibbons;
+  /** Joints any charge on the body jumps between. */
+  private readonly arcAnchors: readonly THREE.Object3D[];
+  /** Arcs of a forged ZEUS-77 kill, built the first time this pooled body overloads. */
+  private overloadArcs: ElectricArcRibbons | null = null;
+  /** From a forged weapon's kill until the body is reused: how it disintegrates, and in what look. */
+  private disintegrationKind: ZombieDisintegrationKind | null = null;
+  private disintegrationLook: ZombieDisintegrationLook | null = null;
+  /** 0..1 disintegration of a body killed by a forged weapon. */
+  private disintegration = 0;
   /** Seconds of ФАКЕЛ-33 fire left on the body; it keeps burning through death. */
   private burning = 0;
   private readonly flames: ZombieFlames;
@@ -864,6 +879,7 @@ export class ZombieVisual {
     const arcAnchors = this.rig
       ? Object.values(this.rig)
       : ARC_ANCHORS.map((name) => findByName(this.root, [name])).filter((bone): bone is THREE.Object3D => bone !== null);
+    this.arcAnchors = arcAnchors;
     this.electricArcs = new ElectricArcRibbons(arcAnchors, ZOMBIE_ARC_STYLE);
     this.electricArcs.mesh.name = 'zombie-electric-arcs';
     this.root.add(this.electricArcs.mesh);
@@ -891,6 +907,7 @@ export class ZombieVisual {
     this.flash = this.electrified = 0;
     this.emissiveOverridden = false;
     this.electricArcs.hide();
+    this.clearDisintegration();
     this.burning = 0;
     this.flames.hide();
     this.scorch = 0;
@@ -1246,6 +1263,80 @@ export class ZombieVisual {
     this.electrified = Math.max(this.electrified, seconds);
   }
 
+  /**
+   * Killed by a forged weapon: the skin surges in the weapon's colour for
+   * the whole death, and the dissolve rim and ash take it for the
+   * disintegration that ends it (`setDisintegration`). An overload (ZEUS-77)
+   * swaps the residual crackle for wilder violet arcs; cinders (ФАКЕЛ-33)
+   * burn the body in blue fire, blue embers glowing in its charred cracks.
+   * `detailed` false trims arcs and ash for low-end devices. A reused body
+   * clears it all (`setZombieType`).
+   */
+  public disintegrate(kind: ZombieDisintegrationKind, detailed: boolean): void {
+    const look = kind === 'overload' ? OVERLOAD_LOOK : CINDER_LOOK;
+    this.disintegrationKind = kind;
+    this.disintegrationLook = look;
+    for (const material of this.materials) setVortex9DissolveColors(material, look.colors.edge, look.colors.hot);
+    this.vortex9Ash.setColors(look.colors.edge, look.colors.hot);
+    this.vortex9Ash.setCount(detailed ? undefined : look.reducedAsh);
+    if (kind === 'cinder') {
+      this.flames.setPalette(CINDER_FLAMES);
+      this.embers.setColors(CINDER_EMBERS.edge, CINDER_EMBERS.hot);
+      for (const material of this.materials) setZombieCharEmberColor(material, CINDER_EMBERS.crack);
+      return;
+    }
+    // Spent just before the body is gone, so the arcs never outlive it.
+    this.electrified = ZOMBIE_OVERLOAD_DEATH.duration - ELECTRIC_FADE * 0.25;
+    this.electricArcs.hide();
+    if (!this.overloadArcs) {
+      this.overloadArcs = new ElectricArcRibbons(this.arcAnchors, detailed ? OVERLOAD_ARC_STYLE : OVERLOAD_ARC_STYLE_REDUCED);
+      this.overloadArcs.mesh.name = 'zombie-overload-arcs';
+      this.root.add(this.overloadArcs.mesh);
+    }
+  }
+
+  /**
+   * 0..1 disintegration of a body killed by a forged weapon, driven by the
+   * owning Zombie: the VORTEX-9 dissolve eats it in the weapon's colour from
+   * the top and through noise while ash rises off it and it slumps and
+   * spreads as if melting. The death clip keeps playing underneath; 0
+   * restores the body's shape.
+   */
+  public setDisintegration(progress: number): void {
+    this.disintegration = THREE.MathUtils.clamp(progress, 0, 1);
+    for (const material of this.materials) setVortex9DissolveState(material, this.disintegration);
+    if (this.disintegration > 0) {
+      const eyeAlpha = Math.max(0, 1 - this.disintegration * 2.2);
+      for (const material of this.eyeMaterials) material.opacity = eyeAlpha;
+    }
+    this.vortex9Ash.setProgress(this.disintegration);
+    const [scaleX, scaleY, scaleZ] = ZOMBIE_TYPE_CONFIGS[this.zombieType].bodyScale;
+    const melt = this.disintegration * this.disintegration;
+    const { slump, spread: widen } = this.disintegrationLook?.melt ?? OVERLOAD_LOOK.melt;
+    const spread = 1 + melt * widen;
+    this.root.scale.set(scaleX * spread, scaleY * (1 - melt * slump), scaleZ * spread);
+  }
+
+  /**
+   * Back to an ordinary body: no overload arcs, the VORTEX-9's and the
+   * fire's own colours, every ash mote.
+   */
+  private clearDisintegration(): void {
+    if (!this.disintegrationKind) return;
+    this.disintegrationKind = null;
+    this.disintegrationLook = null;
+    this.disintegration = 0;
+    this.overloadArcs?.hide();
+    for (const material of this.materials) {
+      setVortex9DissolveColors(material, VORTEX9_NEON_GREEN, VORTEX9_HOT_CORE);
+      setZombieCharEmberColor(material, null);
+    }
+    this.vortex9Ash.setColors(VORTEX9_NEON_GREEN, VORTEX9_HOT_CORE);
+    this.vortex9Ash.setCount();
+    this.flames.setPalette(null);
+    this.embers.setColors(EMBER_COLORS.edge, EMBER_COLORS.hot);
+  }
+
   /** Additive recoil in body-local space; never changes the locomotion clock. */
   reactToHit(localX: number, localZ: number, strength: number): void {
     this.reactionX = THREE.MathUtils.clamp(this.reactionX + localZ * strength, -0.18, 0.18);
@@ -1511,10 +1602,11 @@ export class ZombieVisual {
 
     this.electrified = Math.max(0, this.electrified - dt);
     const charge = Math.min(1, this.electrified / ELECTRIC_FADE);
-    this.electricArcs.update(dt, charge * this.opacity);
+    if (this.disintegrationKind === 'overload') this.overloadArcs?.update(dt, charge);
+    else this.electricArcs.update(dt, charge * this.opacity);
     this.burning = Math.max(0, this.burning - dt);
     this.updateBurn(dt);
-    if (this.flash > 0 || charge > 0 || this.dissolveProgress > 0 || this.emissiveOverridden) {
+    if (this.flash > 0 || charge > 0 || this.dissolveProgress > 0 || this.disintegrationLook || this.emissiveOverridden) {
       this.updateEmissive(dt, charge);
     }
   }
@@ -1544,12 +1636,22 @@ export class ZombieVisual {
     for (const material of this.materials) setZombieChar(material, char, ember * this.opacity, time);
   }
 
-  /** Red hit flash beats the electric flicker and dissolve glow; the undead glow returns when all end. */
+  /**
+   * Red hit flash beats the dissolve glow, a forged weapon's surge and the
+   * electric flicker; the undead glow returns when all end.
+   */
   private updateEmissive(dt: number, charge: number): void {
     this.flash = Math.max(0, this.flash - dt * 5);
     // Mostly a faint cold sheen with occasional bright jolts, so the arcs stay the focus.
     const spike = Math.random() ** 3;
     const flicker = charge * (0.15 + 0.55 * spike) * this.opacity;
+    // A body a forged weapon kills burns with it, hottest as it melts: an
+    // overload surges with its charge, cinders blaze from the first moment.
+    const look = this.disintegrationLook;
+    const drive = this.disintegrationKind === 'overload' ? charge : 1;
+    const surge = look
+      ? drive * (look.surge.base + look.surge.spike * spike) + Math.sin(this.disintegration * Math.PI) * look.surge.meltGlow
+      : 0;
     for (const material of this.materials) {
       if (this.flash > 0) {
         material.emissive.setHex(FLASH_COLOR);
@@ -1557,6 +1659,9 @@ export class ZombieVisual {
       } else if (this.dissolveProgress > 0) {
         material.emissive.setHex(VORTEX9_NEON_GREEN);
         material.emissiveIntensity = Math.sin(this.dissolveProgress * Math.PI) * 1.65;
+      } else if (look) {
+        material.emissive.setHex(look.colors.skin);
+        material.emissiveIntensity = surge;
       } else if (charge > 0) {
         material.emissive.setHex(ELECTRIC_COLOR);
         material.emissiveIntensity = flicker;
@@ -1565,7 +1670,7 @@ export class ZombieVisual {
         material.emissiveIntensity = this.glowIntensity * this.opacity;
       }
     }
-    this.emissiveOverridden = this.flash > 0 || charge > 0 || this.dissolveProgress > 0;
+    this.emissiveOverridden = this.flash > 0 || charge > 0 || this.dissolveProgress > 0 || look !== null;
   }
 
   /** Code-driven humanoid animation for the fallback rig. */
@@ -1831,6 +1936,10 @@ export class ZombieVisual {
   public dispose(): void {
     this.mixer?.stopAllAction();
     this.vortex9Ash.dispose();
+    for (const arcs of [this.electricArcs, this.overloadArcs]) {
+      arcs?.mesh.geometry.dispose();
+      arcs?.mesh.material.dispose();
+    }
     this.embers.dispose();
     this.flames.dispose();
     if (this.shinyStars) {

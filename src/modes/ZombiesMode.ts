@@ -11,7 +11,7 @@ import { DeveloperConsoleCommands } from '../game/DeveloperConsoleCommands';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
-import { energyShotLook } from '../weapons/WeaponShotLook';
+import { energyShotLook, flameShotLook } from '../weapons/WeaponShotLook';
 import { Knife, knifeDamageForRound } from '../weapons/Knife';
 import { KnifeCombat } from '../weapons/KnifeCombat';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
@@ -21,7 +21,7 @@ import { MYSTERY_BOX_POOL, MYSTERY_BOX_TUNING, MysteryBoxMachine } from '../zomb
 import { mysteryBoxFootprint } from '../zombies/MysteryBoxFootprint';
 import { MysteryBoxView } from '../zombies/MysteryBoxView';
 import { RoundManager } from '../zombies/RoundManager';
-import { Zombie } from '../zombies/Zombie';
+import { Zombie, type ZombieForgedDeath } from '../zombies/Zombie';
 import { ZOMBIE_TYPE_CONFIGS, type ZombieHitPart } from '../zombies/ZombieConfig';
 import {
   CHAIN_ZAP_DAMAGE,
@@ -60,7 +60,7 @@ import { ZombiesGasMask } from './ZombiesGasMask';
 import { ZombiesPowerSwitch } from './ZombiesPowerSwitch';
 import { ZombiesWeaponUpgrade } from './ZombiesWeaponUpgrade';
 import { ZombiesRings } from './ZombiesRings';
-import { ZombiesFlames } from './ZombiesFlames';
+import { ZombiesFlames, type ForgedFlame } from './ZombiesFlames';
 import { ZombiesGrenades } from './ZombiesGrenades';
 import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
 import { ZombiesEvacuation } from './ZombiesEvacuation';
@@ -126,6 +126,13 @@ export class ZombiesMode implements GameMode {
   private gasMask: ZombiesGasMask | null = null;
   private powerSwitch: ZombiesPowerSwitch | null = null;
   private weaponUpgrade: ZombiesWeaponUpgrade | null = null;
+  /**
+   * How forged weapons kill on this device: the ZEUS-77 overloads bodies,
+   * the ФАКЕЛ-33 burns them to cinders (fewer arcs and ash on reduced effects).
+   */
+  private forgedDeaths: Partial<Record<WeaponId, ZombieForgedDeath>> = {};
+  /** Flame weapons the map's machine restyles: their forged look and death, built once per run setup. */
+  private forgedFlames: Partial<Record<WeaponId, ForgedFlame>> = {};
   private codeLockDialog: CodeLockDialog | null = null;
   private crystalRecoveries: ZombiesCrystalRecovery[] = [];
   /** The map's evacuation easter egg; null on maps without one. */
@@ -255,7 +262,7 @@ export class ZombiesMode implements GameMode {
       this.onEnergyImpact(point, config, object, distance);
     this.chain = new ChainLightning(ctx.scene);
     this.flames = new ZombiesFlames(ctx, this.zombies, this.economy, () => this.arena.colliders,
-      (id) => this.weaponDamageScale(id));
+      (id) => this.weaponDamageScale(id), (id) => this.forgedFlame(id));
     this.grenades = new ZombiesGrenades(ctx, this.zombies, this.economy, this.arena, {
       damageScale: () => this.rings?.damageScale ?? 1,
       hurtPlayer: (damage) => this.onPlayerHit(damage, true),
@@ -273,6 +280,13 @@ export class ZombiesMode implements GameMode {
     this.weaponUpgrade = this.arena.upgradeMachine
       ? new ZombiesWeaponUpgrade(ctx, this.arena.upgradeMachine, this.economy, this.weaponDefinitions)
       : null;
+    const detailed = !ctx.profile.useReducedEffects;
+    this.forgedDeaths = { tesla: { kind: 'overload', detailed }, fakel: { kind: 'cinder', detailed } };
+    this.forgedFlames = {};
+    for (const [id, death] of Object.entries(this.forgedDeaths) as [WeaponId, ZombieForgedDeath][]) {
+      const look = flameShotLook(id, this.arena.upgradeMachine?.finish.shots);
+      if (look) this.forgedFlames[id] = { look, death };
+    }
     this.crystalRecoveries = (this.arena.weaponStations ?? [])
       .filter((station) => station.requiresStartupCrystal)
       .map((station) => new ZombiesCrystalRecovery(ctx, station));
@@ -655,6 +669,7 @@ export class ZombiesMode implements GameMode {
       }
       // A locked case's prompt already says how many kills it still needs.
       if (weaponCaseLocked(pickup, this.kills)) return;
+      if (this.refuseWeaponInForge(pickup.weaponId)) return;
       if (!this.ctx.canGrantWeapon(pickup.weaponId)) {
         throw new Error(`Map pickup "${pickup.id}" references a weapon that is not preloaded`);
       }
@@ -1012,6 +1027,7 @@ export class ZombiesMode implements GameMode {
   private purchaseWeaponOffer(
     offer: Pick<WallBuy, 'id' | 'weaponId' | 'price' | 'ammoPrice'> | ArenaWeaponStation,
   ): boolean {
+    if (this.refuseWeaponInForge(offer.weaponId)) return false;
     const owned = this.ctx.hasWeapon(offer.weaponId);
     if (!owned && !this.ctx.canGrantWeapon(offer.weaponId)) {
       throw new Error(`Weapon offer "${offer.id}" references a weapon that is not preloaded`);
@@ -1031,6 +1047,17 @@ export class ZombiesMode implements GameMode {
       : this.ctx.grantWeapon(offer.weaponId);
     if (!delivered) throw new Error(`Weapon offer "${offer.id}" could not deliver after validation`);
     this.pushHudState();
+    return true;
+  }
+
+  /**
+   * A weapon left in the upgrade machine is still the player's: neither a
+   * second copy nor ammunition is sold for it until it is taken back.
+   * Returns true, with a notice, when `id` is in the machine.
+   */
+  private refuseWeaponInForge(id: WeaponId): boolean {
+    if (!this.weaponUpgrade?.holds(id)) return false;
+    this.ctx.hud.showNotice('denied', t('banner.weaponInForge', { weapon: this.weaponDefinitions[id].name }));
     return true;
   }
 
@@ -1331,6 +1358,16 @@ export class ZombiesMode implements GameMode {
     return this.developerCommands.damageScale(id) * (this.rings?.damageScale ?? 1) * (this.weaponUpgrade?.damageScale(id) ?? 1);
   }
 
+  /** How forged weapon `id` disintegrates the bodies it kills; null before it is forged or for a weapon without one. */
+  private forgedDeath(id: WeaponId): ZombieForgedDeath | null {
+    return this.weaponUpgrade?.isUpgraded(id) ? this.forgedDeaths[id] ?? null : null;
+  }
+
+  /** A forged flame weapon's look and its cinder death; null while it is not forged. */
+  private forgedFlame(id: WeaponId): ForgedFlame | null {
+    return this.weaponUpgrade?.isUpgraded(id) ? this.forgedFlames[id] ?? null : null;
+  }
+
   /** ZEUS-77 arcs through `points`, in the machine's look once forged; reduced effects drop its forks. */
   private dischargeTeslaArcs(points: readonly THREE.Vector3[]): void {
     const arc = energyShotLook('tesla', this.weaponUpgrade?.shotLooks('tesla'))?.arc ?? null;
@@ -1365,7 +1402,7 @@ export class ZombiesMode implements GameMode {
       this.ctx.hud.showHitmarker(headshot);
       if (headshot) this.ctx.audio.playHeadshotHit();
       const chain = this.zombies.applyChainLightning(zombie,
-        CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla'), part);
+        CHAIN_ZAP_DAMAGE * this.weaponDamageScale('tesla'), part, this.forgedDeath('tesla'));
       if (headshot && zombie.isAlive) this.economy.awardHit(true);
       this.ctx.audio.playTeslaChain(chain.length);
       // Arc from the muzzle through each electrocuted zombie in order.

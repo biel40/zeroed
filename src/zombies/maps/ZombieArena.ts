@@ -117,9 +117,10 @@ export interface ArenaWeaponStation {
 
 /**
  * A machine that forges the weapon in the player's hands: paid once per
- * weapon, it runs its forge for a few seconds, after which the weapon hits
- * harder and wears the map's finish. The mode charges and upgrades; the
- * map only presents the machine.
+ * weapon, it takes the weapon in and runs its forge for a few seconds, then
+ * holds it on show until the player takes it back, hitting harder and
+ * wearing the map's finish. The mode charges, stores and upgrades the
+ * weapon; the map only presents the machine.
  */
 export interface ArenaUpgradeMachine {
   readonly id: string;
@@ -130,16 +131,20 @@ export interface ArenaUpgradeMachine {
   readonly cost: number;
   /** How much harder a forged weapon hits. */
   readonly damageMultiplier: number;
+  /** How many times its own magazine and reserve a forged weapon carries. */
+  readonly ammoMultiplier: number;
   /** The look a forged weapon wears on this map. */
   readonly finish: WeaponFinish;
   /** False while the machine waits for the map's power: it takes no order and stays dark. */
   readonly powered: boolean;
-  /** True while a forge runs; the weapon is ready when it ends. */
+  /** True while a forge runs; the weapon is ready when it ends and stays on show until `collect`. */
   readonly busy: boolean;
   /** Where a player stands to use it, and the yaw that faces it. */
   readonly standPoint: { readonly x: number; readonly z: number; readonly yaw: number };
   /** `weaponId` was just paid for: runs the forge with that weapon on show. */
   forge(weaponId: WeaponId): void;
+  /** The forged weapon was taken back: the chamber empties and idles. */
+  collect(): void;
 }
 
 /**

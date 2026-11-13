@@ -104,7 +104,7 @@ describe('Double Tap ring', () => {
     const object = new THREE.Object3D();
     object.userData.zombie = zombie;
     run.internals.onEnergyImpact(POINT, WEAPON_DEFINITIONS.tesla.energy!, object, 5);
-    expect(chain).toHaveBeenLastCalledWith(zombie, CHAIN_ZAP_DAMAGE * 1.1, 'torso');
+    expect(chain).toHaveBeenLastCalledWith(zombie, CHAIN_ZAP_DAMAGE * 1.1, 'torso', null);
     const vortex9 = WEAPON_DEFINITIONS.vortex9;
     run.internals.onEnergyImpact(POINT, vortex9.energy!, object, 5);
     expect(damage).toHaveBeenLastCalledWith(zombie, 'torso', vortex9.damage * 1.1, 'vortex9');

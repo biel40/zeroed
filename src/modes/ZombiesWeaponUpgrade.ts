@@ -8,18 +8,27 @@ import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { ArenaUpgradeMachine } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 
+/** The weapon handed to the machine and whether its forge has finished. */
+interface ForgeOrder {
+  readonly weapon: WeaponId;
+  ready: boolean;
+}
+
 /**
  * The map's weapon upgrade machine in a single-player run: facing it with a
- * weapon in hand, the prompt names the weapon and the price; paying starts
- * the machine's forge, and when it ends that weapon hits harder for the rest
- * of the run, is refilled and wears the map's finish. Each weapon is forged
- * once. `ZombiesMode` delegates every upgrade concern here and asks it for
- * the damage multiplier of each weapon.
+ * weapon in hand, the prompt names the weapon and the price; paying takes
+ * the weapon out of the inventory (the other one stays in hand) into the
+ * machine's forge. When the forge ends the weapon waits on show until the
+ * player uses the machine again to take it back into its slot: only then
+ * does it hit harder and carry a larger magazine and reserve for the rest of
+ * the run, come back refilled and wear the map's finish. Each weapon is forged once and the machine holds one
+ * weapon at a time. `ZombiesMode` delegates every upgrade concern here and
+ * asks it for the damage multiplier of each weapon.
  */
 export class ZombiesWeaponUpgrade {
   private readonly upgrades: WeaponUpgrades;
-  /** Weapon in the running forge, upgraded once the machine is done. */
-  private forging: WeaponId | null = null;
+  /** Weapon in the machine, from payment until it is taken back. */
+  private order: ForgeOrder | null = null;
   private readonly forward = new THREE.Vector3();
 
   public constructor(
@@ -34,41 +43,60 @@ export class ZombiesWeaponUpgrade {
   /** Prompt while facing the machine, else null. */
   public prompt(): string | null {
     if (!this.facingMachine()) return null;
+    const key = actionKey(this.ctx.profile.useTouchControls);
+    if (this.order) {
+      const weapon = this.weapons[this.order.weapon].name;
+      return this.order.ready ? t('prompt.upgradeCollect', { weapon, key }) : t('prompt.upgradeForging', { weapon });
+    }
     if (!this.machine.powered) return t('prompt.upgradeNeedsPower');
-    if (this.forging) return t('prompt.upgradeForging', { weapon: this.weapons[this.forging].name });
     const id = this.ctx.getEquippedWeaponId();
     const weapon = this.weapons[id].name;
     if (this.upgrades.has(id)) return t('prompt.upgradeDone', { weapon });
-    return t('prompt.upgradeWeapon', { weapon, key: actionKey(this.ctx.profile.useTouchControls), cost: this.machine.cost });
+    if (!this.ctx.canStoreWeapon(id)) return t('prompt.upgradeNeedsSecondWeapon', { weapon });
+    return t('prompt.upgradeWeapon', { weapon, key, cost: this.machine.cost });
   }
 
-  /** USE pressed: pays for and starts forging the weapon in hand. False when the machine is not faced. */
+  /**
+   * USE pressed: takes back a forged weapon, or pays for and starts forging
+   * the weapon in hand. False when the machine is not faced.
+   */
   public interact(): boolean {
     if (!this.facingMachine()) return false;
+    if (this.order) {
+      if (this.order.ready) this.collect();
+      return true;
+    }
     const id = this.ctx.getEquippedWeaponId();
-    // Unpowered, busy or already forged: the prompt already says why.
-    if (!this.machine.powered || this.forging || this.upgrades.has(id)) return true;
+    // Unpowered, already forged or the last weapon in hand: the prompt already says why.
+    if (!this.machine.powered || this.upgrades.has(id) || !this.ctx.canStoreWeapon(id)) return true;
     if (!this.economy.spend(this.machine.cost)) {
       this.ctx.hud.flashNotEnoughPoints();
       this.ctx.hud.showNotice('denied', t('banner.notEnoughPoints'), t('banner.pointsNeeded', { cost: this.machine.cost }));
       return true;
     }
-    this.forging = id;
+    if (!this.ctx.storeWeapon(id)) throw new Error(`Weapon "${id}" could not be handed to the upgrade machine after validation`);
+    this.order = { weapon: id, ready: false };
     this.machine.forge(id);
     this.ctx.audio.playMysteryBoxOpen();
     return true;
   }
 
-  /** Delivers the forged weapon once the machine's forge has run. */
+  /** Announces the forged weapon once the machine's forge has run; it is never handed over by itself. */
   public update(): void {
-    if (!this.forging || this.machine.busy) return;
-    const id = this.forging;
-    this.forging = null;
-    this.upgrades.upgrade(id);
-    this.ctx.refillWeaponAmmo(id);
-    this.ctx.setWeaponFinish(id, this.machine.finish);
+    if (!this.order || this.order.ready || this.machine.busy) return;
+    this.order.ready = true;
     this.ctx.audio.playMysteryBoxReveal(true);
-    this.ctx.hud.showNotice('info', t('banner.weaponUpgraded', { weapon: this.weapons[id].name }));
+    this.ctx.hud.showNotice('info', t('banner.weaponReady', { weapon: this.weapons[this.order.weapon].name }));
+  }
+
+  /** True while `id` is in the machine, forging or waiting to be taken. */
+  public holds(id: WeaponId): boolean {
+    return this.order?.weapon === id;
+  }
+
+  /** Whether `id` has been forged and taken back this run. */
+  public isUpgraded(id: WeaponId): boolean {
+    return this.upgrades.has(id);
   }
 
   /** Damage multiplier of `id`: the machine's once forged, else 1. */
@@ -81,10 +109,25 @@ export class ZombiesWeaponUpgrade {
     return this.upgrades.has(id) ? this.machine.finish.shots ?? null : null;
   }
 
-  /** A restart forgets every forge; the shell takes the finishes off with the arsenal. */
+  /** A restart forgets every forge and the weapon left in the machine; the shell resets the arsenal. */
   public reset(): void {
     this.upgrades.reset();
-    this.forging = null;
+    this.order = null;
+  }
+
+  /** The forged weapon goes back into its slot, upgraded, its capacity grown and refilled, dressed in the finish. */
+  private collect(): void {
+    const id = this.ctx.retrieveStoredWeapon();
+    if (!id) throw new Error('The upgrade machine held a weapon the inventory had not stored');
+    this.order = null;
+    this.machine.collect();
+    this.upgrades.upgrade(id);
+    // Larger magazine and reserve first, so the refill fills them.
+    this.ctx.setWeaponCapacityScale(id, this.machine.ammoMultiplier);
+    this.ctx.refillWeaponAmmo(id);
+    this.ctx.setWeaponFinish(id, this.machine.finish);
+    this.ctx.audio.playMysteryBoxPickup();
+    this.ctx.hud.showNotice('info', t('banner.weaponUpgraded', { weapon: this.weapons[id].name }));
   }
 
   private facingMachine(): boolean {

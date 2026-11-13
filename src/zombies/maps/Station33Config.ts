@@ -1220,7 +1220,10 @@ export const KOVKA_CORE_COLOR = 0x5aa8ff;
  * twinkling stars, its bright steel turned to polished black, and arcs of
  * the reactor's charge crackling over it. Its shots change too: firearms
  * throw brief red-orange tracers and flashes, the VORTEX-9 fires red
- * plasma and the ZEUS-77 purple lightning wrapped in dark energy.
+ * plasma and the ZEUS-77 deep purple lightning: a bright violet core in
+ * an intense dark purple haze, wrapped in dark energy, with violet forks.
+ * The ФАКЕЛ-33 throws a wider stream of intense blue fire, white-blue at
+ * its heart, from a core crystal turned dark blue.
  */
 export const KOVKA_WEAPON_FINISH: WeaponFinish = {
   id: 'kovka',
@@ -1232,8 +1235,14 @@ export const KOVKA_WEAPON_FINISH: WeaponFinish = {
     energy: {
       vortex9: { core: 0xff8a78, color: 0xff1f1a, accent: 0xff6a2a, shroud: null, arc: null },
       tesla: {
-        core: 0xc77dff, color: 0x9d2cff, accent: 0x5b12c9, shroud: 0x0a0014,
-        arc: { core: 0xb84dff, branch: 0x8f3bff, shroud: 0x070010 },
+        core: 0xd68aff, color: 0x7414e8, accent: 0x4a0aa8, shroud: 0x07000f,
+        arc: { core: 0xdc8fff, glow: 0x6a10dc, branch: 0xa45cff, shroud: 0x05000c },
+      },
+    },
+    flame: {
+      fakel: {
+        width: 1.6, core: 0xe4f0ff, body: 0x2260ff, ember: 0x0a1a8c, arcane: 0x3048ff,
+        crystal: { glass: 0x020a26, vein: 0x0d2fe0, hot: 0x7aa6ff },
       },
     },
   },
@@ -1241,7 +1250,7 @@ export const KOVKA_WEAPON_FINISH: WeaponFinish = {
 
 /**
  * The forge on its reserved deck before the reactor: 5000 a weapon, once
- * per weapon, double damage, seven and a half seconds of forging, short
+ * per weapon, double damage, double magazine and reserve, seven and a half seconds of forging, short
  * enough to wait out by the machine; it runs on the mains like the hatch
  * that leads to it.
  */
@@ -1253,6 +1262,7 @@ export const KOVKA_UPGRADE_MACHINE: UpgradeMachinePlacement = {
   facingZ: KOVKA_UPGRADE_SITE.facingZ,
   cost: 5000,
   damageMultiplier: 2,
+  ammoMultiplier: 2,
   forgeSeconds: 7.5,
   requiresPower: true,
 };
@@ -1265,6 +1275,15 @@ export const KOVKA_FORGE_CUE: ArenaAmbientCue = {
   sound: 'forge-wail',
   position: { x: KOVKA_REACTOR.x, y: KOVKA_REACTOR.axisY, z: (KOVKA_REACTOR.frontZ + KOVKA_REACTOR.backZ) / 2 },
 };
+
+/** The reactor's face, where its surges and its discharge ring out (`KovkaReactorForge`). */
+const KOVKA_REACTOR_FACE_POINT = { x: KOVKA_REACTOR.x, y: KOVKA_REACTOR.axisY, z: KOVKA_REACTOR.frontZ + 0.5 } as const;
+
+/** A throb of the charging reactor, at fixed beats through the forge: a coil hum swelling over crackling arcs. */
+export const KOVKA_FORGE_SURGE_CUE: ArenaAmbientCue = { sound: 'forge-surge', position: KOVKA_REACTOR_FACE_POINT };
+
+/** The forge's end: the reactor discharges with a thunderclap and its whine runs down. */
+export const KOVKA_FORGE_DISCHARGE_CUE: ArenaAmbientCue = { sound: 'forge-discharge', position: KOVKA_REACTOR_FACE_POINT };
 
 /** Zones whose doors lead from the vestibule to the forge, in order (the developer console opens them). */
 export const KOVKA_ROUTE: ReadonlyArray<Station33ZoneId> = ['cocheras', 'subestacion', 'kovka'];

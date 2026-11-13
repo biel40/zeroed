@@ -60,14 +60,24 @@ sufra tirones de compilacion de shaders.
   la `UpgradeMachine` compartida) y su acabado (`WeaponFinish`); el modo
   cobra y lleva el estado de la partida (`ZombiesWeaponUpgrade`, sobre la
   logica pura `WeaponUpgrades`) y aplica el dano en `weaponDamageScale`; el
-  shell viste la vista del arma (`ModeContext.setWeaponFinish`,
-  `WeaponFinishLayer`) y la desviste al reiniciar el arsenal. Las copias de
+  shell guarda el arma mientras esta en la maquina
+  (`ModeContext.storeWeapon`/`retrieveStoredWeapon`, sobre
+  `WeaponInventory.store`/`restore`, que reserva su hueco e impide una
+  segunda copia), amplia su cargador y reserva (`ModeContext.setWeaponCapacityScale`,
+  `Weapon.setCapacityScale`, que sobrevive a `resetAmmo`) y viste la vista
+  del arma (`ModeContext.setWeaponFinish`, `WeaponFinishLayer`); al
+  reiniciar el arsenal restaura ambas. Las copias de
   material del acabado conservan los parches de shader del original (el
   rango de profundidad del arma en primera persona) antes de anadir el suyo.
   El aspecto de los disparos del acabado (`WeaponFinish.shots`,
   `WeaponShotLook`) es solo presentacion: la vista del arma tine sus
   fogonazos y lo expone al shell (trazadora y luz) y el modo lo pasa a
-  `EnergyProjectiles` y `ChainLightning` junto al config intacto. Una puerta
+  `EnergyProjectiles`, `ChainLightning` y `ZombiesFlames` (`FlameJet`) junto
+  al config intacto; las partes vivas de una vista de llama lo reciben con
+  `ViewModelLiveParts.setFlameLook`. La muerte de un arma forjada es un
+  `ZombieForgedDeath` (`overload` o `cinder`) que el modo pasa al dano;
+  `ZombieVisual.disintegrate` la presenta con datos de
+  `ZombieOverloadLook`/`ZombieCinderLook`. Una puerta
   puede llevar un sello (`PointDoorSeal`) que la saca de la venta.
 
 - `Input` combina el estado desktop/tactil con el estado aislado de
