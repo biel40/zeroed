@@ -5,7 +5,7 @@ import { CAPTAIN_USSR_BODY as B, createPose, POSE, type Pose } from '../src/zomb
 
 const GUARD: ChoreographyInput = {
   state: 'stalking', progress: 0, stateTime: 0, time: 0, phase: 1, walk: 0, swing: 0,
-  perched: false, followThrough: false, crashed: false, roar: 0,
+  perched: false, followThrough: false, slammed: false, crashed: false, roar: 0,
 };
 
 function pose(input: Partial<ChoreographyInput> = {}): Pose {
@@ -16,7 +16,7 @@ function pose(input: Partial<ChoreographyInput> = {}): Pose {
 
 const STATES: readonly CaptainUssrState[] = [
   'dormant', 'arriving', 'stalking', 'bashWindup', 'throwWindup', 'shieldFlight',
-  'chargeWindup', 'charging', 'stunned', 'recovering', 'enraged', 'defeated',
+  'chargeWindup', 'charging', 'slamWindup', 'shockwaveWindup', 'stunned', 'recovering', 'enraged', 'defeated',
 ];
 
 describe('Captain USSR choreography', () => {
@@ -25,7 +25,7 @@ describe('Captain USSR choreography', () => {
     for (const state of STATES) {
       for (const progress of [0, 0.25, 0.5, 0.79, 0.81, 0.9, 1]) {
         for (const stateTime of [0, 0.1, 0.3, 0.6, 1.2, 2, 2.4, 3, 6]) {
-          for (const variant of [{}, { perched: true }, { followThrough: true }, { crashed: true }, { walk: 1, swing: 1 }, { roar: 1, phase: 3 as const }]) {
+          for (const variant of [{}, { perched: true }, { followThrough: true }, { slammed: true }, { crashed: true }, { walk: 1, swing: 1 }, { roar: 1, phase: 3 as const }]) {
             const out = pose({ state, progress, stateTime, time: stateTime * 1.7, ...variant });
             for (let side = 0; side < 2; side++) {
               const hipX = (side === 0 ? 1 : -1) * B.hipX + out[POSE.sway];
@@ -70,6 +70,19 @@ describe('Captain USSR choreography', () => {
     expect(cocked[POSE.spineYaw]).toBeLessThan(guard[POSE.spineYaw]);
     expect(released[POSE.shoulderRoll[0]]).toBeGreaterThan(0.8);
     expect(released[POSE.spineYaw]).toBeGreaterThan(guard[POSE.spineYaw]);
+  });
+
+  it('heaves its shield overhead before a slam or a shockwave, then drives it down onto one knee', () => {
+    const guard = pose();
+    for (const state of ['slamWindup', 'shockwaveWindup'] as const) {
+      const heaved = pose({ state, progress: 1 });
+      expect(heaved[POSE.shieldY], state).toBeGreaterThan(guard[POSE.shieldY] + 0.4);
+      expect(heaved[POSE.shieldPitch], state).toBeLessThan(-1);
+    }
+    // It sinks lower to send out a shockwave.
+    expect(pose({ state: 'shockwaveWindup', progress: 1 })[POSE.drop]).toBeLessThan(pose({ state: 'slamWindup', progress: 1 })[POSE.drop]);
+    expect(pose({ state: 'recovering', slammed: true, stateTime: 0.15 })[POSE.drop]).toBeLessThan(-0.45);
+    expect(pose({ state: 'recovering', slammed: true, stateTime: 0.8 })[POSE.drop]).toBeCloseTo(guard[POSE.drop], 2);
   });
 
   it('lowers its head behind the shield and leans into a charge', () => {

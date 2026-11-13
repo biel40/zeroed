@@ -64,6 +64,37 @@ const TUBE_LENGTH = 1.55;
  */
 const ALARM = { rate: 6.5, floor: 0.12, peak: 1.6, mainsLevel: 0.55 } as const;
 
+/** The room a guardian's duel turns to emergency red: the open yard. */
+const DUEL_ZONE: Station33ZoneId = 'superficie';
+const DUEL_RED = new THREE.Color(EMERGENCY_COLOR);
+
+/** The duel's alert, 1 (Containment Protocol) and 2 (LAST ORDER): how red the yard's lights turn, how fast they pulse between `floor` and `peak`, and LAST ORDER's stutters. */
+const DUEL_ALERT = {
+  tint: [0, 0.85, 1],
+  rate: [0, 3.2, 5.4],
+  floor: [1, 0.45, 0.35],
+  peak: [1, 1.25, 1.45],
+  stutter: { rate: 6, chance: 0.12, level: 0.3 },
+} as const;
+
+/** Level of the duel's alert: none, Containment Protocol or LAST ORDER. */
+export type Station33DuelAlert = 0 | 1 | 2;
+
+/**
+ * Brightness multiplier of the yard's lights under a duel's `alert` at
+ * `time`: steady without one, a slow emergency pulse in Containment
+ * Protocol, a faster one in LAST ORDER broken by brief, controlled dips
+ * (never black). Deterministic and allocation free.
+ */
+export function duelAlertLevel(alert: Station33DuelAlert, time: number): number {
+  if (alert === 0) return 1;
+  const sweep = 0.5 + 0.5 * Math.sin(time * DUEL_ALERT.rate[alert]);
+  const level = DUEL_ALERT.floor[alert] + (DUEL_ALERT.peak[alert] - DUEL_ALERT.floor[alert]) * sweep * sweep;
+  if (alert < 2) return level;
+  const { stutter } = DUEL_ALERT;
+  return hash(Math.floor(time * stutter.rate) * 1.37 + 5.1) < stutter.chance ? level * stutter.level : level;
+}
+
 function hash(value: number): number {
   const s = Math.sin(value * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
@@ -95,6 +126,7 @@ interface CircuitLight {
   readonly light: THREE.PointLight;
   readonly circuit: Station33LightCircuit;
   readonly baseIntensity: number;
+  readonly baseColor: THREE.Color;
   readonly zone: Station33ZoneId;
   readonly id?: string;
 }
@@ -123,6 +155,7 @@ export class Station33Lighting {
   private mainsRestored = false;
   /** The evacuation alarm is sounding. */
   private alarm = false;
+  private duelAlert: Station33DuelAlert = 0;
 
   constructor(private readonly context: Station33BuildContext) {
     for (const circuit of CIRCUITS) {
@@ -206,6 +239,20 @@ export class Station33Lighting {
     this.alarm = true;
   }
 
+  /**
+   * A guardian's duel on the yard: its lights turn emergency red and pulse
+   * (`alert` 1), faster and stuttering in the last phase (2); 0 gives them
+   * back their own colour.
+   */
+  public setDuelAlert(alert: Station33DuelAlert): void {
+    if (alert === this.duelAlert) return;
+    this.duelAlert = alert;
+    if (alert !== 0) return;
+    for (const entry of this.lights) {
+      if (entry.zone === DUEL_ZONE) entry.light.color.copy(entry.baseColor);
+    }
+  }
+
   /** Animates every circuit; with an observer, the real lights follow them between rooms. */
   update(dt: number, observer?: THREE.Vector3): void {
     if (observer) this.followObserver(observer);
@@ -229,8 +276,15 @@ export class Station33Lighting {
       const floor = entry.circuit === 'mains' && !this.mainsRestored ? 0 : 0.04;
       entry.material.color.copy(entry.baseColor).multiplyScalar(Math.max(floor, this.levels.get(entry.circuit)!));
     }
+    const duel = duelAlertLevel(this.duelAlert, this.time);
     for (const entry of this.lights) {
-      entry.light.intensity = entry.baseIntensity * this.levels.get(entry.circuit)!;
+      let intensity = entry.baseIntensity * this.levels.get(entry.circuit)!;
+      // Only while the duel lasts: other owners (the blaze) tint these lights afterwards.
+      if (this.duelAlert !== 0 && entry.zone === DUEL_ZONE) {
+        entry.light.color.copy(entry.baseColor).lerp(DUEL_RED, DUEL_ALERT.tint[this.duelAlert]);
+        intensity *= duel;
+      }
+      entry.light.intensity = intensity;
     }
   }
 
@@ -242,6 +296,7 @@ export class Station33Lighting {
     this.powerUpElapsed = null;
     this.mainsRestored = false;
     this.alarm = false;
+    this.setDuelAlert(0);
     this.update(0);
   }
 
@@ -384,7 +439,9 @@ export class Station33Lighting {
       light.castShadow = false;
       light.userData.mapRole = 'station-light';
       this.context.group.add(light);
-      this.lights.push({ light, circuit: config.circuit, baseIntensity: config.intensity, zone: config.zone, id: config.id });
+      this.lights.push({
+        light, circuit: config.circuit, baseIntensity: config.intensity, baseColor: light.color.clone(), zone: config.zone, id: config.id,
+      });
     }
   }
 }

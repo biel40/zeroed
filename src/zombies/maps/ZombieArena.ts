@@ -16,7 +16,7 @@ import type { WeaponId } from '../../weapons/WeaponTypes';
 import type { WeaponFinish } from '../../weapons/WeaponFinish';
 import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules, EvacuationStage } from '../evacuation/EvacuationProtocol';
-import type { CaptainUssrField, GroundRect } from '../guardians/CaptainUssrBrain';
+import type { CaptainUssrField, GroundRect, GuardianDuelPhase } from '../guardians/CaptainUssrBrain';
 import type { GuardianEntranceBeats } from '../guardians/GuardianEntrance';
 
 export interface MysteryBoxPlacement {
@@ -232,6 +232,14 @@ export interface ArenaEvacuationGuardian {
    * map's music keeps playing.
    */
   readonly music?: MusicTrackName;
+  /** Optional: where the field's loudspeakers hang. The duel's sirens and orders sound from there; without, from over its landing. */
+  readonly loudspeaker?: { readonly x: number; readonly y: number; readonly z: number };
+  /**
+   * Optional presentation of the duel's phase, called once per change: 0
+   * while no duel is on (asleep, beaten, a new run), else the guardian's
+   * phase. The map's lights answer it (emergency red from phase 2).
+   */
+  showDuelPhase?(phase: GuardianDuelPhase): void;
 }
 
 /**

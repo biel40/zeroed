@@ -164,7 +164,15 @@ sufra tirones de compilacion de shaders.
   decide: posa el cuerpo con logica pura y testeable (la coreografia
   `CaptainUssrChoreography`, los muelles `PoseSpring`, la marcha e IK de
   piernas `CaptainUssrGait` y la caida del escudo `DroppedShield`) y devuelve
-  en `cues` pisadas e impactos que el modo hace sonar y temblar. Con
+  en `cues` pisadas e impactos que el modo hace sonar y temblar. Las marcas
+  de suelo de sus ataques de area (`CaptainUssrTelegraphs`) y las descargas
+  del campo (`GuardianDuelDischarges`, sobre `ElectricArcs`) tambien solo
+  presentan lo que el cerebro decide; los refuerzos los cuenta la logica pura
+  `GuardianReinforcements` y el modo los crea con `spawnZombie` de su run
+  (tope sobre todos los zombis vivos). El mapa puede declarar `loudspeaker`
+  (de donde suenan sirenas y avisos del duelo) y presentar la fase con
+  `showDuelPhase` (0 fuera del duelo); en Station 33 vuelve roja la luz del
+  patio (`Station33Lighting.setDuelAlert`). Con
   `entrance` (`ArenaGuardianEntrance`: tiempos y planos) su aparicion se
   filma: el reloj puro `GuardianEntrance` marca los tiempos, `EndingCinematic`
   rueda los planos, `ZombiesMode` congela la run mientras dura y el HUD

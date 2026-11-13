@@ -19,6 +19,7 @@ import { gamepadMenuButtonLabel } from '../player/GamepadBindings';
 import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
 import { HitmarkerThrottle } from './HitmarkerThrottle';
 import { DamageDirectionTracker, damageDirectionAngle, damageDirectionOpacity } from './DamageDirections';
+import { hudNoticeDurationMs } from './HudNotice';
 
 /** Live state shown on the Zombies mode panel. */
 /** The menu's account: what the unlock dialog needs plus the beta-tester badge. */
@@ -239,6 +240,11 @@ export class HUD {
     this.settings = new SettingsPanel(mustGet('settings-dialog') as HTMLDialogElement,
       mustGet('menu-settings'), mustGet('pause-settings'));
     bindInteractionPromptVisibility(this.interactPrompt);
+    this.notice.addEventListener('animationend', (event: AnimationEvent): void => {
+      if (event.target === this.notice && (event.animationName === 'notice-fade' || event.animationName === 'notice-fade-still')) {
+        this.notice.classList.remove('active');
+      }
+    });
     onInputDeviceChange(() => this.refreshStartHint());
 
     // The language is only chosen from the main menu; in-game texts read it when rendered.
@@ -828,6 +834,7 @@ export class HUD {
     this.noticeDetail.textContent = detail;
     this.noticeDetail.hidden = detail === '';
     this.notice.classList.toggle('denied', tone === 'denied');
+    this.notice.style.setProperty('--notice-duration', `${hudNoticeDurationMs(title, detail)}ms`);
     this.notice.classList.remove('active');
     // Force reflow so the animation restarts on repeated attempts.
     void this.notice.offsetWidth;

@@ -5,9 +5,20 @@ import { t, type TranslationKey } from '../i18n/i18n';
 import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 import type { Weapon } from '../weapons/Weapon';
 import { selectFlameTargets, type FlameHit } from '../zombies/FlameTargeting';
-import { CAPTAIN_USSR, CaptainUssrBrain, type CaptainUssrHitPart, type CaptainUssrHitResult } from '../zombies/guardians/CaptainUssrBrain';
+import { ESCAPE_ALARM, EscapeAlarm, type EscapeAlarmTuning } from '../zombies/evacuation/EscapeAlarm';
+import {
+  CAPTAIN_USSR,
+  CaptainUssrBrain,
+  type CaptainUssrHitPart,
+  type CaptainUssrHitResult,
+  type CaptainUssrState,
+  type GuardianDuelPhase,
+} from '../zombies/guardians/CaptainUssrBrain';
+import { CaptainUssrTelegraphs } from '../zombies/guardians/CaptainUssrTelegraphs';
 import { CaptainUssrView } from '../zombies/guardians/CaptainUssrView';
+import { GuardianDuelDischarges } from '../zombies/guardians/GuardianDuelDischarges';
 import { GuardianEntrance } from '../zombies/guardians/GuardianEntrance';
+import { CAPTAIN_USSR_REINFORCEMENTS, GuardianReinforcements } from '../zombies/guardians/GuardianReinforcements';
 import type { ArenaEvacuationGuardian, ArenaGuardianEntrance } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
 import type { GrenadeBlastConfig } from '../config/grenades';
@@ -19,6 +30,28 @@ const CRASH_TRAUMA = 0.45;
 const STRIDE_TRAUMA = 0.12;
 /** Camera jolt of the scream in a fit of rage in red fury, at point blank. */
 const BELLOW_TRAUMA = 0.5;
+/** Camera jolt of a ground slam and of a shockwave leaving its feet, at point blank. */
+const SLAM_TRAUMA = 0.55;
+const SHOCKWAVE_TRAUMA = 0.65;
+/** Camera jolt of a blow that throws the player back. */
+const KNOCKBACK_TRAUMA = 0.35;
+/** Camera jolt of a bolt striking the ground nearby, at point blank. */
+const DISCHARGE_TRAUMA = 0.18;
+/**
+ * The field's loudspeakers through the duel, from Containment Protocol: the
+ * siren and a garbled order over and over; LAST ORDER adds a steady klaxon,
+ * the escape alarm's last stretch held for the rest of the fight.
+ */
+const DUEL_ALARM: EscapeAlarmTuning = {
+  sirenEvery: ESCAPE_ALARM.sirenEvery + 1,
+  announceEvery: 13,
+  klaxonFrom: 1,
+  klaxonInterval: { slowest: 2.4, fastest: 2.4 },
+};
+/** Without loudspeakers on its field, the duel's alarms sound this high over its landing. */
+const SPEAKER_HEIGHT = 5;
+/** States in which it is not attacking: reinforcements may join only then, so no group lands on top of an attack. */
+const CALM: ReadonlySet<CaptainUssrState> = new Set(['stalking', 'recovering', 'stunned', 'enraged']);
 /** Seconds its duel's theme takes to fade out once it falls. */
 const THEME_FADE_SECONDS = 3;
 /** The dropped shield's clang is heard from this impact speed up (m/s). */
@@ -49,6 +82,9 @@ export interface GuardianRun {
   hurtPlayer(damage: number): void;
   /** Rattles the camera (0..1). */
   shake(amount: number): void;
+  aliveZombies(): number;
+  /** Spawns one zombie of the current round; false when none could be placed. */
+  spawnZombie(): boolean;
 }
 
 /**
@@ -58,14 +94,26 @@ export interface GuardianRun {
  * the brain's events into damage, banners, sounds and camera shake, and
  * keeps its HUD bar and objective note. With a filmed entrance, waking it
  * holds the run (`filming`) while its camera films it on its perch, the
- * roar, the leap and the landing under the HUD's title card. The pure
- * `CaptainUssrBrain` decides; `CaptainUssrView` presents.
+ * roar, the leap and the landing under the HUD's title card. From
+ * Containment Protocol (phase 2) it calls small groups of zombies
+ * (`GuardianReinforcements`), sounds the field's sirens and orders, and
+ * has the map turn its lights to emergency red (`showDuelPhase`); LAST
+ * ORDER (phase 3) adds the klaxon and bolts striking around the field.
+ * The pure `CaptainUssrBrain` decides; `CaptainUssrView`, its ground
+ * telegraphs and the field's discharges present.
  */
 export class ZombiesGuardian {
   private readonly brain: CaptainUssrBrain;
   private readonly view: CaptainUssrView;
+  private readonly telegraphs: CaptainUssrTelegraphs;
+  private readonly discharges: GuardianDuelDischarges;
+  private readonly reinforcements: GuardianReinforcements;
+  private readonly alarm = new EscapeAlarm(DUEL_ALARM);
+  private readonly speaker: { readonly x: number; readonly y: number; readonly z: number };
+  /** The phase last shown to the map. */
+  private shownPhase: GuardianDuelPhase = 0;
   private readonly leapFrom: THREE.Vector3;
-  private readonly player = { x: 0, z: 0, reachable: false };
+  private readonly player = { x: 0, z: 0, reachable: false, airborne: false };
   private readonly camera = new THREE.Vector3();
   private readonly flameHits: FlameHit<{ position: THREE.Vector3 }>[] = [];
   private readonly flameBody = { position: new THREE.Vector3() };
@@ -95,8 +143,14 @@ export class ZombiesGuardian {
     random: () => number,
   ) {
     this.brain = new CaptainUssrBrain(CAPTAIN_USSR, guardian.field, random);
-    this.view = new CaptainUssrView(!ctx.profile.useReducedEffects);
-    ctx.scene.add(this.view.group);
+    const fullEffects = !ctx.profile.useReducedEffects;
+    this.view = new CaptainUssrView(fullEffects, random);
+    this.telegraphs = new CaptainUssrTelegraphs(CAPTAIN_USSR);
+    this.discharges = new GuardianDuelDischarges(guardian.field, guardian.groundY, random, fullEffects);
+    this.reinforcements = new GuardianReinforcements(CAPTAIN_USSR_REINFORCEMENTS, ctx.profile.useReducedEffects);
+    const { landing } = guardian.field;
+    this.speaker = guardian.loudspeaker ?? { x: landing.x, y: guardian.groundY + SPEAKER_HEIGHT, z: landing.z };
+    ctx.scene.add(this.view.group, this.telegraphs.group, this.discharges.group);
     this.leapFrom = new THREE.Vector3(guardian.leapFrom.x, guardian.leapFrom.y, guardian.leapFrom.z);
     const config = guardian.entrance;
     this.entrance = config ? { config, clock: new GuardianEntrance(config), film: new EndingCinematic(config.shots) } : null;
@@ -135,7 +189,13 @@ export class ZombiesGuardian {
     else this.brain.update(dt, this.player);
     this.processEvents();
     this.view.update(dt, this.brain, this.guardian.groundY, this.leapFrom);
+    this.telegraphs.update(dt, this.brain, this.guardian.groundY);
     this.presentBody();
+    const phase: GuardianDuelPhase = this.brain.engaged ? this.brain.phase : 0;
+    this.showPhase(phase);
+    this.presentDischarges(dt, phase);
+    this.soundDuelAlarm(dt, phase);
+    if (phase !== 0) this.reinforce(dt, phase);
     this.fadeTheme(dt);
     this.showBar();
   }
@@ -213,6 +273,11 @@ export class ZombiesGuardian {
     this.stopTheme();
     this.brain.reset();
     this.view.reset();
+    this.telegraphs.reset();
+    this.discharges.reset();
+    this.reinforcements.reset();
+    this.alarm.reset();
+    this.showPhase(0);
     this.unregister();
     this.note = null;
     this.notePhase = 0;
@@ -228,6 +293,7 @@ export class ZombiesGuardian {
     const { bounds } = this.guardian.field;
     this.player.x = rig.position.x;
     this.player.z = rig.position.z;
+    this.player.airborne = this.ctx.player.airborne;
     this.player.reachable = floor === this.guardian.floor
       && rig.position.x > bounds.minX - REACH_MARGIN && rig.position.x < bounds.maxX + REACH_MARGIN
       && rig.position.z > bounds.minZ - REACH_MARGIN && rig.position.z < bounds.maxZ + REACH_MARGIN;
@@ -326,8 +392,21 @@ export class ZombiesGuardian {
           this.ctx.audio.playBarrierBreak(this.cueAtBoss(1.2));
           this.shakeNear(CRASH_TRAUMA);
           break;
+        case 'slamWindup':
+        case 'shockwaveWindup':
+          // A roar as it heaves the shield overhead: the ground is about to be struck.
+          this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), event.type === 'shockwaveWindup' ? 1 : 0.6);
+          break;
+        case 'slam':
+        case 'shockwave':
+          this.strikeGround(event.type === 'shockwave');
+          break;
         case 'playerHit':
           this.run.hurtPlayer(event.damage);
+          if (event.push) {
+            this.ctx.player.applyKnockback(event.push.x, event.push.z);
+            this.run.shake(KNOCKBACK_TRAUMA);
+          }
           break;
         case 'defeated':
           this.unregister();
@@ -363,6 +442,56 @@ export class ZombiesGuardian {
     if (cues.bellow > 0) {
       this.ctx.audio.playGuardianRoar(this.cueAtBoss(ROAR_HEIGHT), cues.bellow);
       this.shakeNear(BELLOW_TRAUMA * cues.bellow);
+    }
+    if (cues.arc > 0) this.ctx.audio.playElectricArc(this.cueAtBoss(1.3), cues.arc);
+  }
+
+  /** The shield driven into the ground (a slam, or a shockwave leaving its feet): heard and felt. */
+  private strikeGround(shockwave: boolean): void {
+    const at = this.cueAtBoss(0.2);
+    this.ctx.audio.playGuardianFootfall(at, 1);
+    this.ctx.audio.playBarrierBreak(at);
+    if (shockwave) this.ctx.audio.playElectricArc(at, 1);
+    this.shakeNear(shockwave ? SHOCKWAVE_TRAUMA : SLAM_TRAUMA);
+  }
+
+  /** The map answers each change of phase (its lights); 0 once the duel is over. */
+  private showPhase(phase: GuardianDuelPhase): void {
+    if (phase === this.shownPhase) return;
+    this.shownPhase = phase;
+    this.guardian.showDuelPhase?.(phase);
+  }
+
+  /** Sparks, smoke and bolts around the field from Containment Protocol, each heard (and a bolt felt) where it strikes. */
+  private presentDischarges(dt: number, phase: GuardianDuelPhase): void {
+    this.discharges.update(dt, phase);
+    const { cue } = this.discharges;
+    if (cue.strength <= 0) return;
+    this.ctx.audio.playElectricArc(this.cueAt(cue.at.x, cue.at.y, cue.at.z), cue.strength);
+    if (cue.strength >= 1 && this.player.reachable) {
+      const distance = Math.hypot(cue.at.x - this.player.x, cue.at.z - this.player.z);
+      if (distance < TRAUMA_REACH) this.run.shake(DISCHARGE_TRAUMA * (1 - distance / TRAUMA_REACH));
+    }
+  }
+
+  /** The field's loudspeakers from Containment Protocol on: sirens, the garbled order and, in LAST ORDER, the klaxon. */
+  private soundDuelAlarm(dt: number, phase: GuardianDuelPhase): void {
+    if (phase >= 2 && !this.alarm.isRunning) this.alarm.start();
+    if (phase < 2 && this.alarm.isRunning) this.alarm.stop();
+    this.alarm.update(dt, phase === 3 ? DUEL_ALARM.klaxonFrom : Number.POSITIVE_INFINITY);
+    const { siren, announcement, klaxon } = this.alarm.due;
+    if (!siren && !announcement && !klaxon) return;
+    const cue = this.cueAt(this.speaker.x, this.speaker.y, this.speaker.z);
+    if (siren) this.ctx.audio.playEvacuationSiren(cue, true);
+    if (announcement) this.ctx.audio.playIntercomAnnouncement(cue, true);
+    if (klaxon) this.ctx.audio.playEscapeKlaxon(cue, true);
+  }
+
+  /** Small groups of zombies join the duel, never on top of an attack and never past the phase's cap. */
+  private reinforce(dt: number, phase: 1 | 2 | 3): void {
+    const due = this.reinforcements.update(dt, phase, this.run.aliveZombies(), CALM.has(this.brain.state));
+    for (let spawned = 0; spawned < due; spawned++) {
+      if (!this.run.spawnZombie()) return;
     }
   }
 

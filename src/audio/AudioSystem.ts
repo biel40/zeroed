@@ -1649,6 +1649,22 @@ export class AudioSystem {
   }
 
   /**
+   * An electrical discharge out in the open: a dry snap, a stutter of
+   * crackles and a mains buzz dying away; `strength` 0..1 (a spark on a
+   * body is quieter than a bolt to the ground).
+   */
+  public playElectricArc(cue: SpatialCue, strength: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue);
+    const t = audio.ctx.currentTime;
+    const level = clamp(strength, 0, 1);
+    this.tick(0, 4200, 0.12 + 0.3 * level, 4, 0.04, output);
+    for (let crackle = 1; crackle < 5; crackle++) this.tick(crackle * 0.035, 2600 + crackle * 700, 0.06 + 0.12 * level, 3, 0.03, output);
+    this.sweep(0, 'sawtooth', 110, 55, 0.05 + 0.12 * level, 0.25 + 0.2 * level, t, output);
+  }
+
+  /**
    * A boss's roar: a deep sawtooth bellow that swells and breaks over a
    * rasping throat; `fury` 0..1 roughens and deepens it. Heard from afar.
    */

@@ -36,10 +36,10 @@ Estas herramientas son una ayuda visual; no reemplazan las pruebas automatizadas
 
 ## Visor del CAPITÁN URSS
 
-`http://localhost:5173/tools/viewers/guardian-viewer.html` reproduce en bucle un combate guionizado del jefe de Station 33 sobre nieve, con cámara orbital que lo sigue: poste, rugido, salto, marcha, golpe de escudo, lanzamiento, carga, choque, aturdimiento y muerte con el escudo cayendo. La cabecera muestra estado, draw calls y triángulos.
+`http://localhost:5173/tools/viewers/guardian-viewer.html` reproduce en bucle un combate guionizado del jefe de Station 33 sobre nieve, con cámara orbital que lo sigue: poste, rugido, salto, marcha, golpe de escudo, lanzamiento, carga, choque, aturdimiento, golpe al suelo y onda expansiva (con sus marcas rojas en el suelo) y muerte con el escudo cayendo. La cabecera muestra estado, draw calls y triángulos.
 
-- `?state=bashWindup` repite un solo estado donde está (`stalking`, `throwWindup`, `chargeWindup`, `charging`, `stunned`, `defeated`…).
-- `?phase=3` lo muestra en furia roja (venas y vapor), `?slow=4` lo ralentiza, `?close=1` encuadra la cara y `?shadows=0` usa el perfil de efectos reducidos.
+- `?state=bashWindup` repite un solo estado donde está (`stalking`, `throwWindup`, `chargeWindup`, `charging`, `slamWindup`, `shockwaveWindup`, `stunned`, `defeated`…).
+- `?phase=3` lo muestra en ULTIMA ORDEN (venas, ojos mas intensos, arcos electricos, chispas, humo y traje ardiendo), `?slow=4` lo ralentiza, `?close=1` encuadra la cara y `?shadows=0` usa el perfil de efectos reducidos.
 
 ## Visor del compañero
 
@@ -60,7 +60,9 @@ La camara orbital permite comprobar silueta, suelo y orientacion del arma.
 
 ## Visor de interacciones
 
-`http://localhost:5173/tools/viewers/interaction-viewer.html` usa el render y CSS reales del HUD para revisar avisos, precios y requisitos sobre fondos claros, oscuros y con detalle. Permite cambiar entre los tres idiomas, teclado y controles tactiles, y repetir la entrada. Respeta la visibilidad guardada en Ajustes > Accesibilidad y el movimiento reducido del sistema.
+`http://localhost:5173/tools/viewers/interaction-viewer.html` carga el HTML y controlador reales del HUD para revisar interacciones y sus mensajes de respuesta junto al HUD de combate y los controles tactiles. Permite cambiar entre los tres idiomas, teclado y tactil, fondos claros, oscuros y con detalle, y repetir cada entrada. Respeta la visibilidad guardada en Ajustes > Accesibilidad y el movimiento reducido del sistema.
+
+En «Controles del visor» se eligen mensajes cortos, puntos insuficientes o un texto largo de prueba para revisar el ajuste de lineas y la duracion adaptativa. «Mostrar interaccion» permite comprobar tambien el mensaje solo. Cierra los controles para comprobar el encuadre sin cubrir el HUD. Revisar manualmente en escritorio (1366×768), movil pequeño (568×320 y 640×360), vertical (360×640), y Android panoramico con zonas seguras; repetir durante un aviso activo y comprobar entrada, salida, contraste y separacion de los controles.
 
 ## Visor de rondas del HUD
 

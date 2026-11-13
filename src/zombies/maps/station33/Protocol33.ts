@@ -15,6 +15,7 @@ import {
   PROTOCOL33_SURFACE_Y,
   PROTOCOL33_SWITCHES,
   PROTOCOL33_TRUCK,
+  PROTOCOL33_YARD,
   TALLER,
   type Protocol33Switch,
 } from '../Station33Config';
@@ -91,7 +92,7 @@ export class Protocol33 implements ArenaEvacuation {
     yardSolids: ReadonlyArray<GroundRect>,
     private readonly onLayoutChanged: () => void,
   ) {
-    this.guardian = protocol33Guardian(yardSolids);
+    this.guardian = protocol33Guardian(yardSolids, lighting);
     this.systems = PROTOCOL33_SWITCHES.map((config, index) => ({
       lever: new PowerLever(context, config, station33PowerLeverLook(context, config.plate), () => { this.panelState.restored[index] = true; }),
       lamp: buildStatusLamp(context, config),
@@ -210,10 +211,16 @@ function buildFan(context: Station33BuildContext, config: Protocol33Switch): THR
   return rotor;
 }
 
-/** CAPITÁN URSS on the yard: its whole floor, its solids, awakened (and filmed leaping in) a few steps out of the stairhead. */
-function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>): ArenaEvacuationGuardian {
+/**
+ * CAPITÁN URSS on the yard: its whole floor, its solids, awakened (and
+ * filmed leaping in) a few steps out of the stairhead. The sodium lamp's
+ * horn speakers sound the duel's alarms, and from Containment Protocol the
+ * yard's lights turn to emergency red.
+ */
+function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>, lighting: Station33Lighting): ArenaEvacuationGuardian {
   const { yard } = PROTOCOL33_SURFACE;
   const { landing, leapFrom, awakenDepth, approach } = PROTOCOL33_GUARDIAN;
+  const { lampPost } = PROTOCOL33_YARD;
   return {
     kind: 'captain-ussr',
     floor: 1,
@@ -224,5 +231,7 @@ function protocol33Guardian(yardSolids: ReadonlyArray<GroundRect>): ArenaEvacuat
     approach,
     entrance: PROTOCOL33_GUARDIAN_ENTRANCE,
     music: 'captain_ussr_theme',
+    loudspeaker: { x: lampPost.x, y: PROTOCOL33_SURFACE_Y + lampPost.height - 1, z: lampPost.z },
+    showDuelPhase: (phase) => lighting.setDuelAlert(phase === 3 ? 2 : phase === 2 ? 1 : 0),
   };
 }

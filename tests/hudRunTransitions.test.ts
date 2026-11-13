@@ -1,11 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HUD } from '../src/ui/HUD';
 import { DamageDirectionTracker } from '../src/ui/DamageDirections';
+import { hudNoticeDurationMs } from '../src/ui/HudNotice';
 
 class HudElement {
   public textContent = '';
-  public readonly style = { opacity: '0' };
+  public hidden = false;
+  public readonly children: HudElement[] = [];
+  public readonly properties = new Map<string, string>();
+  public readonly style = {
+    opacity: '0',
+    setProperty: vi.fn((name: string, value: string): void => { this.properties.set(name, value); }),
+  };
   public readonly offsetWidth = 0;
+  private readonly listeners = new Map<string, (event: AnimationEvent) => void>();
   private readonly classes = new Set<string>();
   public readonly classList = {
     add: (name: string): void => { this.classes.add(name); },
@@ -16,6 +24,15 @@ class HudElement {
       else this.classes.delete(name);
     },
   };
+
+  public querySelector(): HudElement { return this; }
+  public querySelectorAll(): HudElement[] { return []; }
+  public addEventListener(type: string, listener: (event: AnimationEvent) => void): void {
+    this.listeners.set(type, listener);
+  }
+  public finishAnimation(animationName: string, target: HudElement = this): void {
+    this.listeners.get('animationend')?.({ animationName, target } as unknown as AnimationEvent);
+  }
 }
 
 function hudHarness(): { hud: HUD; element: (name: string) => HudElement; objectives: { update: ReturnType<typeof vi.fn> } } {
@@ -87,5 +104,55 @@ describe('HUD between runs', () => {
     hud.setHudVisible(true);
     expect(element('ringFlash').classList.contains('active')).toBe(true);
     expect(element('protectionOverlay').style.opacity).toBe('0.6');
+  });
+});
+
+describe('HUD action notices', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('sets adaptive reading time and replaces a notice without changing the round banner', () => {
+    const { hud, element } = hudHarness();
+    hud.showRoundBanner('ROUND 4', 'THE HORDE APPROACHES');
+    hud.showNotice('denied', 'PUNTOS INSUFICIENTES', 'SE NECESITAN 1000 PTS');
+    expect(element('notice').properties.get('--notice-duration')).toBe('4110ms');
+    expect(element('notice').classList.contains('active')).toBe(true);
+    expect(element('notice').classList.contains('denied')).toBe(true);
+    expect(element('noticeDetail').hidden).toBe(false);
+
+    const title = 'A'.repeat(50);
+    hud.showNotice('info', title);
+    expect(element('noticeTitle').textContent).toBe(title);
+    expect(element('noticeDetail').textContent).toBe('');
+    expect(element('noticeDetail').hidden).toBe(true);
+    expect(element('notice').classList.contains('denied')).toBe(false);
+    expect(element('notice').properties.get('--notice-duration')).toBe(`${hudNoticeDurationMs(title)}ms`);
+    expect(element('roundBanner').classList.contains('active')).toBe(true);
+    expect(element('bannerTitle').textContent).toBe('ROUND 4');
+    expect(element('bannerSub').textContent).toBe('THE HORDE APPROACHES');
+    expect(element('roundBanner').style.setProperty).not.toHaveBeenCalled();
+  });
+
+  it.each(['notice-fade', 'notice-fade-still'])('clears a finished %s and allows repeated feedback', (animationName) => {
+    const nodes = new Map<string, HudElement>();
+    const element = (id: string): HudElement => {
+      let node = nodes.get(id);
+      if (!node) { node = new HudElement(); nodes.set(id, node); }
+      return node;
+    };
+    vi.stubGlobal('document', { getElementById: element, addEventListener: vi.fn() });
+    const hud = new HUD();
+    const notice = element('hud-notice');
+    hud.showNotice('denied', 'PUNTOS INSUFICIENTES');
+    notice.finishAnimation('unrelated-animation');
+    expect(notice.classList.contains('active')).toBe(true);
+    notice.finishAnimation(animationName, element('hud-notice-title'));
+    expect(notice.classList.contains('active')).toBe(true);
+    notice.finishAnimation(animationName);
+    expect(notice.classList.contains('active')).toBe(false);
+
+    hud.showNotice('denied', 'PUNTOS INSUFICIENTES');
+    expect(notice.classList.contains('active')).toBe(true);
+    expect(notice.style.setProperty).toHaveBeenCalledTimes(2);
+    expect(notice.properties.get('--notice-duration')).toBe('4000ms');
   });
 });

@@ -17,6 +17,8 @@ const ACCELERATION = 14;
 const ADS_MOVE_PENALTY = 0.45;
 const JUMP_SPEED = 5.2;
 const GRAVITY = 15;
+/** How fast a shove (`applyKnockback`) dies away, 1/s: slower than walking's damping, so a blow carries the body a couple of metres. */
+const KNOCKBACK_DECAY = 6;
 /** Body radius used for swept wall collision in arenas that enable it. */
 export const PLAYER_BODY_RADIUS = 0.35;
 /** Vertical speed of stair transitions. */
@@ -81,6 +83,8 @@ export class PlayerController {
   readonly camera: THREE.PerspectiveCamera;
   private readonly pitchNode = new THREE.Group();
   private readonly velocity = new THREE.Vector3();
+  /** A shove from outside (a boss's blow), on the ground plane: added to walking and dying away on its own. */
+  private readonly knockback = new THREE.Vector3();
   private readonly wish = new THREE.Vector3();
   /** Look movement taken back out of the weapon recoil this frame (see RecoilController.absorbCompensation). */
   private readonly recoilCompensation = { pitch: 0, yaw: 0 };
@@ -160,6 +164,7 @@ export class PlayerController {
     this.targetY = y;
     this.jumpOffset = 0;
     this.jumpVelocity = 0;
+    this.knockback.set(0, 0, 0);
     this.currentFloor = floor;
     this.downedCamera = false;
     this.currentStance = 'standing';
@@ -205,6 +210,17 @@ export class PlayerController {
     if (Math.abs(this.viewImpulse) < 1e-5) this.viewImpulse = 0;
     if (this.deathFallElapsed === null) this.camera.rotation.x += this.viewImpulse * getSettings().cameraShake;
   }
+  /** Off the ground in a jump. */
+  get airborne(): boolean {
+    return this.jumpOffset > 0;
+  }
+
+  /** Shoves the player along the ground at (`x`, `z`) m/s; walls still stop them and the shove dies away by itself. */
+  public applyKnockback(x: number, z: number): void {
+    this.knockback.x += x;
+    this.knockback.z += z;
+  }
+
   /** Nudges the player backwards along the view; movement damping eats it within a fraction of a second. */
   public applyShotPush(speed: number): void {
     this.velocity.x += Math.sin(this.yaw) * speed;
@@ -290,12 +306,12 @@ export class PlayerController {
     this.velocity.z = damp(this.velocity.z, this.wish.z, ACCELERATION, dt);
 
     let nextX = clamp(
-      this.rig.position.x + this.velocity.x * dt,
+      this.rig.position.x + (this.velocity.x + this.knockback.x) * dt,
       this.bounds.minX,
       this.bounds.maxX,
     );
     let nextZ = clamp(
-      this.rig.position.z + this.velocity.z * dt,
+      this.rig.position.z + (this.velocity.z + this.knockback.z) * dt,
       this.bounds.minZ,
       this.bounds.maxZ,
     );
@@ -312,6 +328,7 @@ export class PlayerController {
 
     this.rig.position.x = nextX;
     this.rig.position.z = nextZ;
+    this.knockback.multiplyScalar(Math.exp(-KNOCKBACK_DECAY * dt));
 
     let ramp: StairRamp | undefined;
     for (const zone of this.floorTransitions) {

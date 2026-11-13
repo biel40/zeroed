@@ -638,17 +638,33 @@ existente a `MOTDRULES`.
   el brazo del escudo sobre su asa. Aterriza del salto con una rodilla y el
   puño en el suelo, tensa cada ataque (el aro del escudo destella justo antes
   de soltarlo), rasca el suelo antes de embestir, rebota contra lo que choca,
-  ruge al aterrizar, echa vaho y en la fase 3 humea y le brillan las venas. Al morir se tambalea, cae de rodillas y se desploma de
+  ruge al aterrizar, echa vaho y en la fase 3 humea y le brillan las venas. En la
+  fase 3 (ULTIMA ORDEN) ademas el traje arde sin llama, le recorren arcos
+  electricos entre las articulaciones con chispas y humo y los ojos brillan mas. Al morir se tambalea, cae de rodillas y se desploma de
   bruces; el escudo se le escapa, rebota y se asienta vibrando como una
   moneda (`DroppedShield`). Pisadas, golpes contra el suelo y el escudo
   suenan y, cerca, sacuden la camara. Su tema de duelo
-  (`ArenaEvacuationGuardian.music`; en Station 33 `captain_ussr_theme.mp3`,
-  aun sin archivo) sustituye a la musica del mapa al despertarlo y se funde
-  al caer; sin el archivo sigue sonando la del mapa. Ataques: golpe de escudo a corta distancia,
+  (`ArenaEvacuationGuardian.music`; en Station 33 `captain_ussr_theme.mp3`)
+  sustituye a la musica del mapa al despertarlo y se funde al caer; si el
+  archivo no carga, sigue sonando la del mapa. Ataques: golpe de escudo a corta distancia,
   lanzamiento del escudo (vuela hasta donde estaba el jugador y vuelve; sin
   el queda expuesto de frente) y, desde la fase 2, la carga en linea recta,
-  que si choca con la valla o un solido lo deja aturdido. Fases al 60 % y al
-  30 % de vida, con consejo propio en la nota y ritmo mas agresivo; sin
+  que si choca con la valla o un solido lo deja aturdido. Fase 2 (PROTOCOLO DE
+  CONTENCION, 70 % de vida): camina mas rapido, persigue mas deprisa al
+  jugador que se aleja y recupera antes; añade el golpe al suelo (alza el
+  escudo y lo clava delante: daña y empuja solo dentro de un cono marcado en
+  rojo en el suelo, que deja de seguir al jugador al final de la carga),
+  pequeños grupos de zombis con tope estricto de vivos que nunca llegan en
+  mitad de un ataque (`GuardianReinforcements`), luz de emergencia roja
+  (`ArenaEvacuationGuardian.showDuelPhase`), sirena y aviso distorsionado por
+  los altavoces del patio y chispas y humo en sus bordes. Fase 3 (ULTIMA
+  ORDEN, 35 %): carga doble con una breve pausa legible entre cargas (si la
+  primera choca, no hay segunda), onda expansiva circular cuyo alcance se
+  marca en el suelo (se evita quedando fuera o saltandola), nunca dos ondas
+  ni dos golpes al suelo seguidos, la onda se extingue antes de su siguiente
+  ataque, la luz parpadea de forma controlada, suena la bocina y caen
+  descargas electricas en los bordes del patio. Mientras alza el escudo para
+  el golpe al suelo o la onda, baja la guardia. Al cruzar cada fase, sin
   cartel: al cruzarlas entra en un ataque de ira (`enraged`), se encorva
   temblando, grita al cielo agitando el puno y con las venas y los ojos
   encendidos, con la guardia baja. Si estaba con el escudo en el aire, en
@@ -1081,8 +1097,12 @@ compañero y anillo radiante; su tamaño se ajusta al ancho de pantalla y los
 titulos largos se parten en lineas equilibradas. La respuesta a una accion del
 jugador (`HUD.showNotice`: falta de puntos, municion o granadas llenas, compra
 no confirmada, anillo puesto o recargado, maquina cargando, arma mejorada) es
-una tarjeta compacta bajo el aviso de interaccion, roja si se rechaza, que dura
-unos dos segundos y no retrasa los objetivos. Si el propio aviso ya explica por
+una tarjeta compacta bajo el aviso de interaccion, roja si se rechaza, con
+tipografia responsive y fondo oscuro. Su duracion se adapta al titulo y al
+detalle entre cuatro y ocho segundos ([politica de lectura](../src/ui/HudNotice.ts)),
+con entrada y salida suaves; no retrasa los objetivos. La columna reserva las
+zonas seguras y espacio para el HUD y los controles tactiles mientras aparece
+la respuesta. Si el propio aviso ya explica por
 que no se puede usar algo (puerta sellada, vitrina con muertes pendientes),
 pulsar no repite el mensaje.
 

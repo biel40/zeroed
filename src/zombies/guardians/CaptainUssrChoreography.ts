@@ -19,6 +19,8 @@ export interface ChoreographyInput {
   readonly perched: boolean;
   /** The current recovery follows a bash: its strike plays first. */
   readonly followThrough: boolean;
+  /** The current recovery follows a ground slam or a shockwave: the shield driven into the ground plays first. */
+  readonly slammed: boolean;
   /** The current stun follows a crash into a solid. */
   readonly crashed: boolean;
   /** Weight of a roar over whatever it does, 0..1. */
@@ -27,6 +29,8 @@ export interface ChoreographyInput {
 
 /** Seconds of a bash's strike, from the release until it is back in its guard. */
 const STRIKE_SECONDS = 0.4;
+/** Seconds a slam or a shockwave keeps it down on the ground it struck before it rises into its guard. */
+const IMPACT_SECONDS = 0.55;
 /** The death's beats, seconds: the stagger ends, the knees hit, the topple starts and the body hits the ground. */
 export const DEATH = { stagger: 0.35, kneel: 0.95, topple: 2.0, down: 2.75 } as const;
 /** Scrapes a second of the rear foot while it gathers for a charge. */
@@ -67,6 +71,13 @@ export function choreograph(input: ChoreographyInput, out: Pose): number {
       break;
     case 'recovering':
       if (input.followThrough && input.stateTime < STRIKE_SECONDS) agility = strike(out, input);
+      if (input.slammed && input.stateTime < IMPACT_SECONDS) agility = impact(out, input);
+      break;
+    case 'slamWindup':
+      heave(out, input, 0);
+      break;
+    case 'shockwaveWindup':
+      heave(out, input, 1);
       break;
     case 'throwWindup':
       cockThrow(out, input);
@@ -215,6 +226,34 @@ function lunge(out: Pose): void {
   foot(out, 0, 0.2, 0.58);
   foot(out, 1, -STANCE.width, -0.3, 0.04, 0.5);
   shield(out, 0.02, 0.32, 0.88, 0.45, -0.1, 0);
+}
+
+/**
+ * The windup of a slam (`depth` 0) or a shockwave (1): it rears back, the
+ * shield heaved overhead face up in its arm and the free fist raised with
+ * it, sinking lower on its legs for the shockwave.
+ */
+function heave(out: Pose, input: ChoreographyInput, depth: number): void {
+  const lift = anticipation(input.progress);
+  const raise = smooth(input.progress / 0.5);
+  out[POSE.drop] -= (0.06 + 0.12 * depth) * raise;
+  out[POSE.pitch] -= 0.1 * lift;
+  out[POSE.spinePitch] = 0.06 - 0.3 * lift;
+  out[POSE.spineYaw] = lerp(-0.16, 0, raise);
+  out[POSE.twist] = 0;
+  lookAhead(out, 0.15);
+  out[POSE.jaw] = 0.15 + 0.35 * lift;
+  arm(out, 1, lerp(-0.35, -2.4, raise), -0.3, lerp(-1.05, -0.5, raise));
+  foot(out, 0, 0.24 + 0.04 * depth, STANCE.lead);
+  foot(out, 1, -0.24 - 0.04 * depth, STANCE.rear);
+  shield(out, lerp(0.1, 0.08, raise), lerp(0.3, 0.85, raise), lerp(0.5, 0.25, raise), lerp(0.16, 0, raise), lerp(-0.06, -1.25, raise), 0);
+}
+
+/** The slam or the shockwave landing: driven down onto one knee into the three-point slam of its leap, then rising out of it. */
+function impact(out: Pose, input: ChoreographyInput): number {
+  const t = input.stateTime;
+  blendTowards(out, smooth(t / 0.06) * (1 - smooth((t - 0.25) / (IMPACT_SECONDS - 0.25))), slam, input);
+  return t < 0.1 ? AGILITY.strike : 1.2;
 }
 
 /** The backhand's windup: the shield cocked across the chest to the right shoulder, the body wound up the other way. */

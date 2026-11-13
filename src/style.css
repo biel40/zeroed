@@ -49,6 +49,14 @@ body {
 /* ---------- HUD ---------- */
 
 #hud {
+  /* Shared geometry for the touch controls and transient feedback clearance. */
+  --touch-edge-right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
+  --touch-edge-bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
+  --touch-fire-size: clamp(88px, 8vw, 116px);
+  --touch-fire-lift: clamp(12px, 3.5vh, 28px);
+  --touch-secondary-size: clamp(44px, 4.8vw, 50px);
+  --touch-aim-size: clamp(52px, 5.8vw, 60px);
+  --touch-arc-gap: clamp(8px, 1.2vmin, 12px);
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -208,13 +216,6 @@ body {
 }
 
 #touch-controls {
-  --touch-edge-right: calc(clamp(12px, 2vw, 24px) + env(safe-area-inset-right, 0px));
-  --touch-edge-bottom: calc(clamp(12px, 2vh, 24px) + env(safe-area-inset-bottom, 0px));
-  --touch-fire-size: clamp(88px, 8vw, 116px);
-  --touch-fire-lift: clamp(12px, 3.5vh, 28px);
-  --touch-secondary-size: clamp(44px, 4.8vw, 50px);
-  --touch-aim-size: clamp(52px, 5.8vw, 60px);
-  --touch-arc-gap: clamp(8px, 1.2vmin, 12px);
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -1100,16 +1101,63 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 /* Under the crosshair: the interaction prompt, then the notice answering
    the player's action (HUD.showNotice). Either may be absent. */
 #interaction-stack {
+  --interaction-anchor: 58dvh;
+  --interaction-left: max(16px, calc(12px + env(safe-area-inset-left, 0px)));
+  --interaction-right: max(16px, calc(12px + env(safe-area-inset-right, 0px)));
+  --interaction-top: max(12px, calc(12px + env(safe-area-inset-top, 0px)));
+  --interaction-bottom: max(16px, calc(12px + env(safe-area-inset-bottom, 0px)));
   position: absolute;
-  left: 50%;
-  top: 58%;
+  left: calc((100% + var(--interaction-left) - var(--interaction-right)) / 2);
+  top: var(--interaction-anchor);
   transform: translateX(-50%);
-  width: min(460px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - var(--interaction-left) - var(--interaction-right)));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
   pointer-events: none;
+}
+
+/* The percentage in translate uses the column's own height: lift a tall
+   prompt/notice pair only as far as the safe bottom requires, without JS
+   measurements or work in the game loop. Inactive notices take no space. */
+#interaction-stack:has(#hud-notice.active) {
+  --interaction-width: min(560px, calc(100vw - var(--interaction-left) - var(--interaction-right)));
+  width: var(--interaction-width);
+  left: clamp(
+    calc(var(--interaction-left) + var(--interaction-width) / 2),
+    50%,
+    calc(100% - var(--interaction-right) - var(--interaction-width) / 2)
+  );
+  transform: translate(-50%, max(
+    calc(var(--interaction-top) - var(--interaction-anchor)),
+    min(0px, calc(100dvh - var(--interaction-anchor) - var(--interaction-bottom) - 100%))
+  ));
+}
+
+/* On tall, narrow screens keep the feedback above the bottom combat HUD. */
+@media (orientation: portrait) {
+  #interaction-stack:has(#hud-notice.active) {
+    --interaction-bottom: calc(220px + env(safe-area-inset-bottom, 0px));
+  }
+  html.touch-controls-enabled #interaction-stack:has(#hud-notice.active) {
+    --interaction-bottom: calc(var(--touch-edge-bottom) + var(--touch-fire-lift) + var(--touch-fire-size)
+      + 2 * var(--touch-secondary-size) + 3 * var(--touch-arc-gap) + 12px);
+  }
+}
+
+/* Landscape uses the corridor between the corner HUD panels. Touch reserves
+   the existing arc of action buttons on the right instead of the points HUD. */
+@media (orientation: landscape) {
+  #interaction-stack:has(#hud-notice.active) {
+    --interaction-left: calc(204px + env(safe-area-inset-left, 0px));
+    --interaction-right: calc(276px + env(safe-area-inset-right, 0px));
+  }
+  html.touch-controls-enabled #interaction-stack:has(#hud-notice.active) {
+    --interaction-left: calc(148px + env(safe-area-inset-left, 0px));
+    --interaction-right: calc(var(--touch-edge-right) + var(--touch-fire-size) + var(--touch-aim-size)
+      + 2 * var(--touch-arc-gap) + 12px);
+  }
 }
 
 #interact-prompt {
@@ -1349,43 +1397,48 @@ html.touch-controls-enabled .boss-bar-track { height: 8px; }
 
 #hud-notice {
   --notice-accent: #e7bb72;
+  display: none;
   max-width: 100%;
-  padding: 7px 16px 8px;
+  flex-shrink: 0;
+  padding: clamp(9px, 1.5vmin, 13px) clamp(14px, 2.4vw, 24px);
   border-left: 2px solid var(--notice-accent);
   border-radius: 3px;
-  background: linear-gradient(90deg, #10130fe6, #10130fcc);
+  background: linear-gradient(90deg, #10130ff5, #10130fe8);
   box-shadow: 0 4px 16px #0008;
   text-align: center;
-  font: 600 12px/1.35 'Consolas', 'SF Mono', monospace;
-  letter-spacing: 0.08em;
+  font: 600 clamp(15px, 1.8vw, 18px)/1.4 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
   text-wrap: balance;
+  overflow-wrap: anywhere;
   color: #fff3dd;
-  text-shadow: 0 1px 2px #000;
+  text-shadow: 0 1px 3px #000, 0 0 6px #0008;
+  pointer-events: none;
   opacity: 0;
   visibility: hidden;
 }
 
 #hud-notice.denied { --notice-accent: #ff6a55; }
 #hud-notice.denied #hud-notice-title { color: #ff8b78; }
-#hud-notice-detail { margin-top: 2px; font-size: 11px; color: #d8d2c6; }
+#hud-notice-detail { margin-top: 4px; font-size: clamp(14px, 1.6vw, 16px); color: #e7e1d5; }
 #hud-notice-detail[hidden] { display: none; }
 
 #hud-notice.active {
+  display: block;
   visibility: visible;
-  animation: notice-fade 2.4s ease-out forwards;
+  animation: notice-fade var(--notice-duration, 4000ms) ease-out forwards;
 }
 
 @keyframes notice-fade {
   0% { opacity: 0; translate: 0 -6px; }
-  8%, 78% { opacity: 1; translate: 0 0; }
+  5%, 92% { opacity: 1; translate: 0 0; }
   100% { opacity: 0; translate: 0 0; }
 }
 
 /* Reduced motion keeps the notice's fade, without the drop-in. */
 @keyframes notice-fade-still {
   0%, 100% { opacity: 0; }
-  8%, 78% { opacity: 1; }
+  5%, 92% { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5088,14 +5141,19 @@ html.touch-controls-enabled .start-panel {
   html.touch-controls-enabled #hud-ammo { font-size: 17px; margin: 0; }
   html.touch-controls-enabled #banner-title { letter-spacing: 0.16em; padding-left: 0.16em; }
   html.touch-controls-enabled #banner-sub { letter-spacing: 0.2em; padding-left: 0.2em; }
-  html.touch-controls-enabled #interaction-stack { top: 56%; gap: 6px; }
+  html.touch-controls-enabled #interaction-stack { --interaction-anchor: 56dvh; gap: 6px; }
+  html.touch-controls-enabled #joystick { width: 108px; height: 108px; }
+  html.touch-controls-enabled #joystick-knob { width: 46px; height: 46px; }
+}
+
+/* Reuse the compact interaction profile on short landscape phones too, so
+   a long response and its USE control fit together without shrinking the notice. */
+@media (max-width: 560px), (orientation: landscape) and (max-height: 480px) {
+  html.touch-controls-enabled #interaction-stack { gap: 6px; }
   html.touch-controls-enabled #interact-prompt { font-size: 12px; padding: 9px 14px 10px; }
-  html.touch-controls-enabled #hud-notice { padding: 5px 12px 6px; font-size: 11px; }
   html.touch-controls-enabled .interaction-title { font-size: 13px; letter-spacing: 0.07em; }
   html.touch-controls-enabled .interaction-detail { margin-top: 5px; }
   html.touch-controls-enabled .interaction-key { min-height: 26px; min-width: 26px; font-size: 13px; }
-  html.touch-controls-enabled #joystick { width: 108px; height: 108px; }
-  html.touch-controls-enabled #joystick-knob { width: 46px; height: 46px; }
 }
 
 @media (orientation: landscape) and (max-height: 480px) {

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Zeroed — Interaction viewer</title>
   <style>
     body { background: #030403; }
@@ -11,25 +11,34 @@
       background: repeating-linear-gradient(8deg, #514233 0 45px, #a6906a 46px 49px, #161b14 50px 67px, #837052 68px 114px);
     }
     .viewer-controls {
-      position: fixed; z-index: 20; top: 18px; left: 18px; right: 18px;
-      display: flex; flex-wrap: wrap; gap: 12px; padding: 14px;
-      width: fit-content; max-width: calc(100% - 36px);
+      position: fixed; z-index: 20; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%;
+      transform: translateX(-50%); padding: 10px 14px;
+      width: max-content; max-width: calc(100% - 32px);
+      max-height: calc(100dvh - 24px); overflow-y: auto;
       background: #10130ff5; border: 1px solid #706b57; color: #fff3dd;
       font: 13px 'Consolas', monospace;
     }
+    .viewer-controls summary { cursor: pointer; }
+    .viewer-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
     .viewer-controls label { display: flex; align-items: center; gap: 8px; }
-    .viewer-controls select { padding: 5px; background: #22261e; color: #fff3dd; border: 1px solid #706b57; }
+    .viewer-controls select { max-width: 190px; padding: 5px; background: #22261e; color: #fff3dd; border: 1px solid #706b57; }
+    .viewer-controls button { padding: 6px 9px; cursor: pointer; }
   </style>
 </head>
 <body data-scene="busy">
-  <div class="viewer-controls">
-    <label>Aviso <select id="sample"><option value="repair">Barricada</option><option value="buy">Comprar arma</option><option value="ammo">Munición</option><option value="door">Búnker</option><option value="locked">Vitrina bloqueada</option><option value="pickup">Recoger arma</option><option value="mask">Máscara de gas</option></select></label>
+  <details class="viewer-controls">
+    <summary>Controles del visor</summary>
+    <div class="viewer-fields">
+    <label>Interacción <select id="sample"><option value="repair">Barricada</option><option value="buy">Comprar arma</option><option value="ammo">Munición</option><option value="door" selected>Búnker</option><option value="locked">Vitrina bloqueada</option><option value="pickup">Recoger arma</option><option value="mask">Máscara de gas</option></select></label>
     <label>Fondo <select id="scene"><option value="busy">Detalle</option><option value="bright">Claro</option><option value="dark">Oscuro</option></select></label>
     <label>Idioma <select id="language"><option value="es">ES</option><option value="en">EN</option><option value="ca">CA</option></select></label>
     <label><input id="touch" type="checkbox" /> Táctil</label>
+    <label><input id="show-prompt" type="checkbox" checked /> Mostrar interacción</label>
     <button id="replay" type="button">Repetir entrada</button>
-  </div>
-  <div id="hud"><div id="crosshair"><span class="arm arm-top"></span><span class="arm arm-right"></span><span class="arm arm-bottom"></span><span class="arm arm-left"></span></div><div id="interact-prompt"></div></div>
+    <label>Mensaje <select id="notice-sample"><option value="none">Sin mensaje</option><option value="points" selected>Puntos insuficientes</option><option value="short">Mensaje corto</option><option value="long">Texto largo de prueba</option></select></label>
+    <button id="replay-notice" type="button">Repetir mensaje</button>
+    </div>
+  </details>
   <script type="module" src="./interaction-viewer.ts"></script>
 </body>
 </html>

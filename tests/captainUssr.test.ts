@@ -208,11 +208,11 @@ describe('Captain USSR brain', () => {
     const player = { x: 15, z: 25, reachable: true };
     const brain = fighting(player);
     const behind = (damage: number): void => { brain.takeHit(damage, 'torso', 15, 5); };
-    behind(brain.maxHealth * 0.39);
+    behind(brain.maxHealth * 0.29);
     expect(brain.phase).toBe(1);
     behind(brain.maxHealth * 0.02);
     expect(brain.phase).toBe(2);
-    behind(brain.maxHealth * 0.3);
+    behind(brain.maxHealth * 0.35);
     expect(brain.phase).toBe(3);
   });
 
@@ -269,7 +269,7 @@ describe('Captain USSR brain', () => {
     const brain = fighting(player);
     brain.takeHit(brain.maxHealth * 0.45, 'torso', 15, 5);
     until(brain, player, 'stunned');
-    brain.takeHit(brain.maxHealth * 0.2, 'torso', player.x, player.z);
+    brain.takeHit(brain.maxHealth * 0.25, 'torso', player.x, player.z);
     expect(brain.phase).toBe(3);
     brain.update(DT, player);
     expect(brain.state).toBe('stunned');

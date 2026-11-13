@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { CaptainUssrState } from '../../src/zombies/guardians/CaptainUssrBrain';
+import { CAPTAIN_USSR, type CaptainUssrState } from '../../src/zombies/guardians/CaptainUssrBrain';
+import { CaptainUssrTelegraphs } from '../../src/zombies/guardians/CaptainUssrTelegraphs';
 import { CaptainUssrView, type CaptainUssrSnapshot } from '../../src/zombies/guardians/CaptainUssrView';
 
 // Development-only visual review of CAPITÁN URSS, independent of the game entry/bundle.
 // /tools/viewers/guardian-viewer.html plays a scripted fight in a loop: perch, roar, leap, march, bash,
-// throw, charge, crash, death. ?state=bashWindup loops one state where it stands | ?phase=3 (red fury)
+// throw, charge, crash, ground slam, shockwave (with their ground marks), death.
+// ?state=bashWindup loops one state where it stands | ?phase=3 (LAST ORDER: arcs, smoke, smouldering suit)
 // | ?slow=4 (four times slower) | ?close=1 (his face) | ?shadows=0 (the reduced-effects profile).
 const params = new URLSearchParams(location.search);
 const phase = (Math.min(3, Math.max(1, Number(params.get('phase')) || 1))) as 1 | 2 | 3;
@@ -42,6 +44,11 @@ const FIGHT: readonly Beat[] = [
   { state: 'charging', seconds: 1, speed: 11, heading: Math.PI, from: { x: 0, z: 2 }, to: { x: 0, z: -9 } },
   { state: 'stunned', seconds: 3, heading: Math.PI },
   { state: 'stalking', seconds: 1, heading: Math.PI },
+  { state: 'slamWindup', seconds: CAPTAIN_USSR.slam.windup, heading: Math.PI },
+  { state: 'recovering', seconds: CAPTAIN_USSR.slam.recovery, heading: Math.PI },
+  { state: 'stalking', seconds: 0.8, heading: Math.PI },
+  { state: 'shockwaveWindup', seconds: CAPTAIN_USSR.shockwave.windup, heading: Math.PI },
+  { state: 'recovering', seconds: CAPTAIN_USSR.shockwave.recovery + 0.4, heading: Math.PI },
   { state: 'defeated', seconds: 6, heading: Math.PI },
 ];
 const single = params.get('state') as CaptainUssrState | null;
@@ -79,7 +86,8 @@ pole.castShadow = shadows;
 scene.add(pole);
 
 const view = new CaptainUssrView(shadows);
-scene.add(view.group);
+const telegraphs = new CaptainUssrTelegraphs(CAPTAIN_USSR);
+scene.add(view.group, telegraphs.group);
 const camera = new THREE.PerspectiveCamera(close ? 30 : 42, 1, 0.05, 80);
 camera.position.set(close ? 0.6 : 3.6, close ? 2.15 : 1.9, close ? 1.8 : 5.4);
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -90,6 +98,8 @@ const boss: Boss = {
   state: 'dormant', stateProgress: 0, position: { x: 0, z: 0 }, heading: 0, speed: 0,
   shieldHeld: true, shield: { x: 0, z: 0 }, phase,
 };
+/** The shockwave rolling out after its windup, as the brain would roll it. */
+const wave = { x: 0, z: 0, radius: -1 };
 const follow = new THREE.Vector3();
 let beatIndex = 0;
 let beatTime = 0;
@@ -107,7 +117,10 @@ function script(dt: number): void {
     const beat = beats[beatIndex];
     if (beat.state === 'arriving') boss.position = { ...beat.from! };
     if (beat.state === 'stunned' && !single) view.crash();
+    const before = beats[(beatIndex + beats.length - 1) % beats.length];
+    if (beat.state === 'recovering' && before.state === 'shockwaveWindup') Object.assign(wave, boss.position, { radius: 0 });
   }
+  if (wave.radius >= 0) wave.radius = wave.radius + CAPTAIN_USSR.shockwave.speed * dt < CAPTAIN_USSR.shockwave.radius ? wave.radius + CAPTAIN_USSR.shockwave.speed * dt : -1;
   const beat = beats[beatIndex];
   const progress = beatTime / beat.seconds;
   boss.state = beat.state;
@@ -139,6 +152,7 @@ renderer.setAnimationLoop((now) => {
   previous = now;
   script(dt);
   view.update(dt, boss, 0, LEAP_FROM);
+  telegraphs.update(dt, { ...boss, shockwave: wave }, 0);
   // The camera follows him at a distance, still orbitable.
   if (!close && boss.state !== 'dormant') {
     follow.set(boss.position.x, 1.2, boss.position.z).sub(controls.target).multiplyScalar(1 - Math.exp(-2.5 * dt));

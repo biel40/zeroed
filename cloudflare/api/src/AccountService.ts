@@ -127,6 +127,7 @@ export class AccountService {
     const credentials = await store.findCredentials(email);
     if (credentials?.passwordHash) return 'exists';
     const userId = credentials?.userId ?? await store.upsertUser(email, generateId(randomBytes), clock());
+    
     // Another registration may have set the password meanwhile.
     if (!(await store.claimPassword(userId, await hashPassword(password, randomBytes)))) return 'exists';
     return this.issueSession(userId, email);

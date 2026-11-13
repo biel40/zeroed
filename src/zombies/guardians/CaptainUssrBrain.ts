@@ -13,8 +13,11 @@ export interface CaptainUssrField {
   readonly landing: { readonly x: number; readonly z: number };
 }
 
-/** Per-phase values: phase 1 (full health), 2 and 3 (enraged). */
+/** Per-phase values: phase 1 (full health), 2 (Containment Protocol) and 3 (LAST ORDER). */
 type PhaseValues = readonly [number, number, number];
+
+/** The duel's phase as it is presented around the fight: 0 when no duel is on. */
+export type GuardianDuelPhase = 0 | 1 | 2 | 3;
 
 export interface CaptainUssrTuning {
   /** Health when it arrives: `base`, plus `perRound` for every round past the first. */
@@ -30,6 +33,8 @@ export interface CaptainUssrTuning {
   /** The fit of rage at each new phase: how long it stands screaming, and the seconds from then to its next attack. */
   readonly rage: { readonly seconds: number; readonly attackDelay: number };
   readonly walkSpeed: PhaseValues;
+  /** Hunting down a player who keeps away: beyond `from` metres it walks `boost` times faster. */
+  readonly pursuit: { readonly from: number; readonly boost: PhaseValues };
   /** Radians per second it turns towards the player. */
   readonly turnRate: PhaseValues;
   /** Seconds between attacks: the phase's minimum plus up to `spread`, drawn from the injected random. */
@@ -48,11 +53,35 @@ export interface CaptainUssrTuning {
     readonly minRange: number; readonly range: number; readonly windup: number; readonly speed: number;
     readonly hitRadius: number; readonly damage: number; readonly catchRadius: number; readonly recovery: number;
   };
-  /** The charge: locked in a straight line after the windup, until `distance` or a solid stops it. */
+  /**
+   * The charge: locked in a straight line after the windup, until `distance`
+   * or a solid stops it. A charge that runs out in the open is followed by
+   * `followUps` more, each after a shorter `repeatWindup`; a crash ends the run.
+   */
   readonly charge: {
     readonly minRange: number; readonly windup: number; readonly speed: number; readonly distance: number;
     readonly hitRadius: number; readonly damage: number; readonly chance: PhaseValues;
     readonly stunSeconds: number; readonly wallStunSeconds: number;
+    readonly followUps: PhaseValues; readonly repeatWindup: number;
+  };
+  /**
+   * The ground slam: the shield heaved overhead and driven into the ground
+   * in front of it. It lands in a cone (`arcCos`) up to `range`, aimed
+   * until `aimLock` of the windup, and throws the player back (m/s).
+   */
+  readonly slam: {
+    readonly range: number; readonly arcCos: number; readonly windup: number; readonly aimLock: number;
+    readonly damage: number; readonly knockback: number; readonly recovery: number; readonly chance: PhaseValues;
+  };
+  /**
+   * The shockwave: a ring of force rolling out from where it stands at
+   * `speed` up to `radius`. It strikes once a player its front sweeps
+   * over, `band` metres thick; standing beyond its reach or jumping over it is safe.
+   */
+  readonly shockwave: {
+    readonly triggerRange: number; readonly windup: number; readonly speed: number; readonly radius: number;
+    readonly band: number; readonly damage: number; readonly knockback: number; readonly recovery: number;
+    readonly chance: PhaseValues;
   };
 }
 
@@ -61,11 +90,13 @@ export const CAPTAIN_USSR: CaptainUssrTuning = {
   radius: 0.55,
   arrivalSeconds: 1.5,
   openingDelay: 0.5,
-  phaseThresholds: [0.6, 0.3],
+  // Containment Protocol at 70%, LAST ORDER at 35%.
+  phaseThresholds: [0.7, 0.35],
   rage: { seconds: 1.9, attackDelay: 0.4 },
-  walkSpeed: [1.9, 2.3, 2.9],
+  walkSpeed: [1.9, 2.4, 2.9],
+  pursuit: { from: 8, boost: [1, 1.25, 1.3] },
   turnRate: [2.6, 3.2, 4.2],
-  cooldown: { min: [2.6, 2.1, 1.4], spread: 1.2 },
+  cooldown: { min: [2.6, 1.9, 1.4], spread: 1.2 },
   // Shots from within 70° of where it faces ring off the shield.
   blockCos: Math.cos((70 * Math.PI) / 180),
   headMultiplier: 2,
@@ -75,6 +106,15 @@ export const CAPTAIN_USSR: CaptainUssrTuning = {
   charge: {
     minRange: 5, windup: 1.0, speed: 11, distance: 16, hitRadius: 1.1, damage: 50,
     chance: [0, 0.5, 0.65], stunSeconds: 1.4, wallStunSeconds: 3.0,
+    followUps: [0, 0, 1], repeatWindup: 0.7,
+  },
+  slam: {
+    range: 4.2, arcCos: Math.cos((55 * Math.PI) / 180), windup: 1.0, aimLock: 0.55,
+    damage: 40, knockback: 9, recovery: 0.9, chance: [0, 0.45, 0.4],
+  },
+  shockwave: {
+    triggerRange: 6, windup: 1.15, speed: 8, radius: 9, band: 0.9,
+    damage: 30, knockback: 7, recovery: 1.0, chance: [0, 0, 0.35],
   },
 };
 
@@ -82,14 +122,17 @@ export const CAPTAIN_USSR: CaptainUssrTuning = {
  * `dormant` until awakened, `arriving` during its leap, then it `stalks`
  * the player between attacks: a bash, a shield throw (`throwWindup`, then
  * `shieldFlight` until it catches the shield) or a charge that ends
- * `stunned`. Every attack ends `recovering` or `stunned` before the next.
- * Each new phase stops it `enraged`, screaming with its guard down.
+ * `stunned`. From phase 2 it also slams the ground (`slamWindup`), and in
+ * phase 3 it sends out a shockwave (`shockwaveWindup`). Every attack ends
+ * `recovering` or `stunned` before the next. Each new phase stops it
+ * `enraged`, screaming with its guard down.
  */
 export type CaptainUssrState =
   | 'dormant' | 'arriving' | 'stalking' | 'bashWindup' | 'throwWindup' | 'shieldFlight'
-  | 'chargeWindup' | 'charging' | 'stunned' | 'recovering' | 'enraged' | 'defeated';
+  | 'chargeWindup' | 'charging' | 'slamWindup' | 'shockwaveWindup'
+  | 'stunned' | 'recovering' | 'enraged' | 'defeated';
 
-export type CaptainUssrAttack = 'bash' | 'shield' | 'charge';
+export type CaptainUssrAttack = 'bash' | 'shield' | 'charge' | 'slam' | 'shockwave';
 export type CaptainUssrHitPart = 'head' | 'torso' | 'shield';
 /** What a hit did: nothing (not fighting), stopped by the shield, damage, or the last blow. */
 export type CaptainUssrHitResult = 'ignored' | 'blocked' | 'hurt' | 'killed';
@@ -103,20 +146,39 @@ export type CaptainUssrEvent =
   | { readonly type: 'chargeWindup' }
   | { readonly type: 'charge' }
   | { readonly type: 'chargeEnded'; readonly crashed: boolean }
-  | { readonly type: 'playerHit'; readonly attack: CaptainUssrAttack; readonly damage: number }
+  | { readonly type: 'slamWindup' }
+  | { readonly type: 'slam' }
+  | { readonly type: 'shockwaveWindup' }
+  | { readonly type: 'shockwave' }
+  /** `push`: the velocity (m/s, on the ground plane) the blow throws the player back with, if any. */
+  | { readonly type: 'playerHit'; readonly attack: CaptainUssrAttack; readonly damage: number; readonly push?: { readonly x: number; readonly z: number } }
   | { readonly type: 'defeated' };
 
-/** The player as the boss sees them: where they stand, and whether they share its ground. */
+/** The player as the boss sees them: where they stand, whether they share its ground and whether they are in the air. */
 export interface CaptainUssrTarget {
   readonly x: number;
   readonly z: number;
   readonly reachable: boolean;
+  readonly airborne?: boolean;
+}
+
+/** The shockwave rolling out: its centre and the radius of its front, negative when none is out. */
+export interface CaptainUssrShockwave {
+  readonly x: number;
+  readonly z: number;
+  readonly radius: number;
 }
 
 /** States that last a set time; `stateProgress` runs 0..1 through them. */
-const TIMED: ReadonlySet<CaptainUssrState> = new Set(['arriving', 'bashWindup', 'throwWindup', 'chargeWindup', 'stunned', 'recovering', 'enraged']);
+const TIMED: ReadonlySet<CaptainUssrState> = new Set([
+  'arriving', 'bashWindup', 'throwWindup', 'chargeWindup', 'slamWindup', 'shockwaveWindup', 'stunned', 'recovering', 'enraged',
+]);
 /** States a fit of rage can break into; it waits out a shield in the air, a charge under way and a stun. */
-const RAGE_BREAKS_INTO: ReadonlySet<CaptainUssrState> = new Set(['stalking', 'bashWindup', 'throwWindup', 'chargeWindup', 'recovering']);
+const RAGE_BREAKS_INTO: ReadonlySet<CaptainUssrState> = new Set([
+  'stalking', 'bashWindup', 'throwWindup', 'chargeWindup', 'slamWindup', 'shockwaveWindup', 'recovering',
+]);
+/** Its shield is lifted off its front: thrown, heaved overhead for a slam or a shockwave, or let fall. */
+const GUARD_DOWN: ReadonlySet<CaptainUssrState> = new Set(['throwWindup', 'slamWindup', 'shockwaveWindup', 'stunned', 'enraged']);
 
 /**
  * CAPITÁN URSS, the zombified Soviet super-soldier guarding an extraction.
@@ -147,6 +209,12 @@ export class CaptainUssrBrain {
   private attackLanded = false;
   private readonly chargeDir = { x: 0, z: 0 };
   private chargeTravelled = 0;
+  /** Charges still to follow the current one, if it does not crash. */
+  private chargesLeft = 0;
+  /** Its last attack: a slam or a shockwave is never repeated back to back. */
+  private lastAttack: CaptainUssrAttack | null = null;
+  private readonly wave = { x: 0, z: 0, radius: -1 };
+  private waveLanded = false;
 
   public constructor(
     private readonly tuning: CaptainUssrTuning,
@@ -203,19 +271,24 @@ export class CaptainUssrBrain {
     return this.shieldPos;
   }
 
-  /** In the fight: it can be hurt and can hurt. */
+  /** The shockwave rolling out, if any (`radius` negative when none). */
+  public get shockwave(): CaptainUssrShockwave {
+    return this.wave;
+  }
+
   /** Radius of its body, metres. */
   public get radius(): number {
     return this.tuning.radius;
   }
 
+  /** In the fight: it can be hurt and can hurt. */
   public get engaged(): boolean {
     return this.current !== 'dormant' && this.current !== 'arriving' && this.current !== 'defeated';
   }
 
   /** Its shield covers its front right now: raised while it walks, bashes or charges. */
   public get blocking(): boolean {
-    return this.holdingShield && this.engaged && this.current !== 'throwWindup' && this.current !== 'stunned' && this.current !== 'enraged';
+    return this.holdingShield && this.engaged && !GUARD_DOWN.has(this.current);
   }
 
   /** Lands it facing the player, at full health for `round`; once until a reset. */
@@ -237,8 +310,10 @@ export class CaptainUssrBrain {
     this.moved = 0;
     if (this.current === 'dormant' || this.current === 'defeated') return;
     this.stateTime += step;
+    this.spreadShockwave(step, player);
     if (this.rageDue && RAGE_BREAKS_INTO.has(this.current)) {
       this.rageDue = false;
+      this.chargesLeft = 0;
       this.enter('enraged', this.tuning.rage.seconds);
       return;
     }
@@ -270,6 +345,15 @@ export class CaptainUssrBrain {
         return;
       case 'charging':
         this.chargeOn(step, player);
+        return;
+      case 'slamWindup':
+        // Aimed until late in the windup: the last moments are the player's to step out of the cone.
+        if (this.stateProgress < this.tuning.slam.aimLock) this.turnTowards(player, step);
+        if (this.stateTime >= this.stateDuration) this.resolveSlam(player);
+        return;
+      case 'shockwaveWindup':
+        this.turnTowards(player, step);
+        if (this.stateTime >= this.stateDuration) this.releaseShockwave();
         return;
       case 'stunned':
       case 'recovering':
@@ -342,6 +426,10 @@ export class CaptainUssrBrain {
     this.shieldReturning = false;
     this.attackLanded = false;
     this.chargeTravelled = 0;
+    this.chargesLeft = 0;
+    this.lastAttack = null;
+    this.wave.radius = -1;
+    this.waveLanded = false;
     this.syncShield();
     this.pendingEvents.length = 0;
   }
@@ -353,6 +441,7 @@ export class CaptainUssrBrain {
     this.updatePhase();
     if (this.hp > 0) return 'hurt';
     this.current = 'defeated';
+    this.wave.radius = -1;
     this.holdingShield = true;
     this.syncShield();
     this.pendingEvents.push({ type: 'defeated' });
@@ -365,7 +454,9 @@ export class CaptainUssrBrain {
     const dz = player.z - this.pos.z;
     const distance = Math.hypot(dx, dz);
     if (distance > this.tuning.bash.range * 0.85) {
-      const stride = this.tuning.walkSpeed[this.currentPhase - 1] * dt;
+      const { pursuit, walkSpeed } = this.tuning;
+      const boost = distance > pursuit.from ? pursuit.boost[this.currentPhase - 1] : 1;
+      const stride = walkSpeed[this.currentPhase - 1] * boost * dt;
       const forwardX = Math.sin(this.yaw);
       const forwardZ = Math.cos(this.yaw);
       const beforeX = this.pos.x;
@@ -378,22 +469,99 @@ export class CaptainUssrBrain {
     this.chooseAttack(distance);
   }
 
+  /**
+   * The phase's attack for the player's distance: the shockwave and the slam
+   * first when the phase has them (never twice in a row), else the bash up
+   * close, a charge or a throw further out.
+   */
   private chooseAttack(distance: number): void {
-    const { bash, shieldThrow, charge } = this.tuning;
+    const { bash, shieldThrow, charge, slam, shockwave } = this.tuning;
+    const phase = this.currentPhase - 1;
+    if (distance <= shockwave.triggerRange && this.lastAttack !== 'shockwave' && this.rolls(shockwave.chance[phase])) {
+      this.beginAttack('shockwave', 'shockwaveWindup', shockwave.windup);
+      this.pendingEvents.push({ type: 'shockwaveWindup' });
+      return;
+    }
+    if (distance <= slam.range && this.lastAttack !== 'slam' && this.rolls(slam.chance[phase])) {
+      this.beginAttack('slam', 'slamWindup', slam.windup);
+      this.pendingEvents.push({ type: 'slamWindup' });
+      return;
+    }
     if (distance <= bash.range) {
-      this.enter('bashWindup', bash.windup);
+      this.beginAttack('bash', 'bashWindup', bash.windup);
       this.pendingEvents.push({ type: 'bashWindup' });
       return;
     }
-    if (distance >= charge.minRange && this.random() < charge.chance[this.currentPhase - 1]) {
-      this.enter('chargeWindup', charge.windup);
+    if (distance >= charge.minRange && this.random() < charge.chance[phase]) {
+      this.chargesLeft = charge.followUps[phase];
+      this.beginAttack('charge', 'chargeWindup', charge.windup);
       this.pendingEvents.push({ type: 'chargeWindup' });
       return;
     }
     if (distance >= shieldThrow.minRange && distance <= shieldThrow.range) {
-      this.enter('throwWindup', shieldThrow.windup);
+      this.beginAttack('shield', 'throwWindup', shieldThrow.windup);
       this.pendingEvents.push({ type: 'throwWindup' });
     }
+  }
+
+  /** Draws from the random only for an attack the phase allows, so phases without it keep their sequence. */
+  private rolls(chance: number): boolean {
+    return chance > 0 && this.random() < chance;
+  }
+
+  private beginAttack(attack: CaptainUssrAttack, windup: CaptainUssrState, seconds: number): void {
+    this.lastAttack = attack;
+    this.enter(windup, seconds);
+  }
+
+  /** The shield driven into the ground: a player in the cone before it is hurt and thrown back. */
+  private resolveSlam(player: CaptainUssrTarget): void {
+    const { slam } = this.tuning;
+    const dx = player.x - this.pos.x;
+    const dz = player.z - this.pos.z;
+    const distance = Math.hypot(dx, dz);
+    this.pendingEvents.push({ type: 'slam' });
+    if (player.reachable && distance <= slam.range + 0.3 && (distance < 1e-6 || this.faces(player.x, player.z, slam.arcCos))) {
+      this.hitPlayer('slam', slam.damage, dx, dz, slam.knockback);
+    }
+    this.finishAttack('recovering', slam.recovery);
+  }
+
+  /** The shockwave leaves its feet; it rolls on by itself while it recovers. */
+  private releaseShockwave(): void {
+    const { shockwave } = this.tuning;
+    this.wave.x = this.pos.x;
+    this.wave.z = this.pos.z;
+    this.wave.radius = 0;
+    this.waveLanded = false;
+    this.pendingEvents.push({ type: 'shockwave' });
+    this.finishAttack('recovering', shockwave.recovery);
+  }
+
+  /** The front rolls out; the first time it sweeps over a grounded player it strikes them, once. */
+  private spreadShockwave(dt: number, player: CaptainUssrTarget): void {
+    if (this.wave.radius < 0) return;
+    const { shockwave } = this.tuning;
+    const before = this.wave.radius;
+    this.wave.radius = Math.min(shockwave.radius, before + shockwave.speed * dt);
+    if (!this.waveLanded && player.reachable && !player.airborne) {
+      const dx = player.x - this.wave.x;
+      const dz = player.z - this.wave.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance <= this.wave.radius && distance >= before - shockwave.band) {
+        this.waveLanded = true;
+        this.hitPlayer('shockwave', shockwave.damage, dx, dz, shockwave.knockback);
+      }
+    }
+    if (this.wave.radius >= shockwave.radius) this.wave.radius = -1;
+  }
+
+  /** A blow that throws the player back along (`dx`, `dz`) from it at `knockback` m/s; straight ahead of it when on top of it. */
+  private hitPlayer(attack: CaptainUssrAttack, damage: number, dx: number, dz: number, knockback: number): void {
+    const length = Math.hypot(dx, dz);
+    const x = length > 1e-6 ? dx / length : Math.sin(this.yaw);
+    const z = length > 1e-6 ? dz / length : Math.cos(this.yaw);
+    this.pendingEvents.push({ type: 'playerHit', attack, damage, push: { x: x * knockback, z: z * knockback } });
   }
 
   private resolveBash(player: CaptainUssrTarget): void {
@@ -482,6 +650,14 @@ export class CaptainUssrBrain {
     }
     if (!crashed && this.chargeTravelled < charge.distance - 1e-9) return;
     this.pendingEvents.push({ type: 'chargeEnded', crashed });
+    if (!crashed && this.chargesLeft > 0) {
+      // LAST ORDER: it wheels round and gathers again, briefly, for the next charge.
+      this.chargesLeft--;
+      this.enter('chargeWindup', charge.repeatWindup);
+      this.pendingEvents.push({ type: 'chargeWindup' });
+      return;
+    }
+    this.chargesLeft = 0;
     this.finishAttack('stunned', crashed ? charge.wallStunSeconds : charge.stunSeconds);
   }
 

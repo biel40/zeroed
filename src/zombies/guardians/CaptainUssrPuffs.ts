@@ -11,12 +11,18 @@ export interface PuffStyle {
   readonly drag: number;
 }
 
-/** Its breath in the cold, the plume of a roar, snow kicked up by its feet, and the red steam of its fury. */
+/**
+ * Its breath in the cold, the plume of a roar, snow kicked up by its feet,
+ * the red steam of its fury, and the sparks and smoke of its broken armour
+ * and of the discharges around its duel (sparks fall).
+ */
 export const PUFF_STYLES = {
   breath: { color: 0xe6ecf0, opacity: 0.3, size: 0.12, growth: 0.45, life: 1.1, rise: 0.12, drag: 1.8 },
   roar: { color: 0xe6ecf0, opacity: 0.4, size: 0.18, growth: 0.9, life: 1.4, rise: 0.2, drag: 1.4 },
   dust: { color: 0xd9dde0, opacity: 0.45, size: 0.22, growth: 0.8, life: 0.9, rise: 0.05, drag: 3 },
   steam: { color: 0xb87a72, opacity: 0.22, size: 0.14, growth: 0.5, life: 1.3, rise: 0.5, drag: 1 },
+  spark: { color: 0xffc77a, opacity: 1, size: 0.05, growth: -0.04, life: 0.45, rise: -3.5, drag: 2.5 },
+  smoke: { color: 0x302a28, opacity: 0.32, size: 0.16, growth: 0.7, life: 1.8, rise: 0.55, drag: 1.2 },
 } as const satisfies Record<string, PuffStyle>;
 
 interface Puff {

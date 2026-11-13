@@ -9,6 +9,7 @@ import { CAPTAIN_USSR_BODY as B, CAPTAIN_USSR_SPRINGS, createPose, POSE, PoseSpr
 import { CaptainUssrPuffs, PUFF_STYLES, type PuffStyle } from './CaptainUssrPuffs';
 import { SHIELD_BACK, SHIELD_GRIP, SHIELD_RADIUS } from './CaptainUssrShield';
 import { DroppedShield } from './DroppedShield';
+import { ElectricArcs } from './ElectricArcs';
 
 /** What the view reads from the brain each frame. */
 export type CaptainUssrSnapshot = Pick<CaptainUssrBrain,
@@ -26,6 +27,8 @@ export interface CaptainUssrCues {
   clang: number;
   /** It screamed in a fit of rage: how furious (0..1), 0 when it did not. */
   bellow: number;
+  /** Electricity crackled across its broken armour (LAST ORDER): how loud (0..1), 0 when it did not. */
+  arc: number;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -53,8 +56,14 @@ const SHIELD_ARM_POLE = new THREE.Vector3(0.7, -0.4, -0.6);
 const CATCH_REACH = 3.5;
 /** Steps in place while it turns where it stands: march speed per rad/s turned, capped. */
 const TURN_SHUFFLE = { perRadian: 0.35, maxTurn: 4 } as const;
-/** Its eyes: base glow, more per phase, and the flare as an attack is loaded. */
-const EYES = { base: 0.55, perPhase: 0.2, flare: 0.6 } as const;
+/** Its eyes: base glow, more per phase, the flare as an attack is loaded, and how much fiercer they burn in LAST ORDER (and their halo's cap). */
+const EYES = { base: 0.55, perPhase: 0.2, flare: 0.6, lastOrder: 1.3, halo: 1.6, lastOrderHalo: 2.3 } as const;
+/**
+ * LAST ORDER's broken armour: arcs crackling between its joints every
+ * `every` seconds (shortest, longest), each `life` long and kinked up to
+ * `jitter` m, with a few sparks; the suit smouldering (`ember` glow).
+ */
+const DAMAGE = { every: [0.3, 0.85], life: 0.16, jitter: 0.07, sparks: 4, ember: 0.1, emberPulse: 0.05 } as const;
 /** How much a fit of rage kindles its eyes and burns in its veins. */
 const RAGE_GLOW = { eyes: 1.6, veins: 1.1, pulse: 0.3 } as const;
 /** Seconds between breaths, by how hard it works. */
@@ -72,7 +81,7 @@ function surface(kind: HitTarget['surface']): HitTarget {
 }
 
 function loadsAttack(state: CaptainUssrState): boolean {
-  return state === 'bashWindup' || state === 'throwWindup' || state === 'chargeWindup';
+  return state === 'bashWindup' || state === 'throwWindup' || state === 'chargeWindup' || state === 'slamWindup' || state === 'shockwaveWindup';
 }
 
 /**
@@ -88,7 +97,7 @@ function loadsAttack(state: CaptainUssrState): boolean {
 export class CaptainUssrView {
   public readonly group = new THREE.Group();
   public readonly hitboxes: readonly THREE.Mesh[];
-  public readonly cues: CaptainUssrCues = { footfall: 0, foot: new THREE.Vector3(), impact: 0, impactAt: new THREE.Vector3(), clang: 0, bellow: 0 };
+  public readonly cues: CaptainUssrCues = { footfall: 0, foot: new THREE.Vector3(), impact: 0, impactAt: new THREE.Vector3(), clang: 0, bellow: 0, arc: 0 };
   private readonly rig: CaptainUssrRig;
   private readonly hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
   private readonly target = createPose();
@@ -96,12 +105,15 @@ export class CaptainUssrView {
   private readonly gait = new Gait();
   private readonly puffs: CaptainUssrPuffs;
   private readonly dropped = new DroppedShield(SHIELD_RADIUS, SHIELD_BACK * 2);
+  private readonly arcs: ElectricArcs;
+  /** Joints LAST ORDER's arcs crackle between. */
+  private readonly arcJoints: readonly THREE.Object3D[];
   private readonly ghosts: readonly THREE.Mesh[];
   private readonly ghostMaterials: readonly THREE.MeshBasicMaterial[];
   private readonly trail: readonly { readonly position: THREE.Vector3; readonly quaternion: THREE.Quaternion }[];
   private readonly input: Mutable<ChoreographyInput> = {
     state: 'dormant', progress: 0, stateTime: 0, time: 0, phase: 1, walk: 0, swing: 0,
-    perched: false, followThrough: false, crashed: false, roar: 0,
+    perched: false, followThrough: false, slammed: false, crashed: false, roar: 0,
   };
   // Scratch, reused every frame.
   private readonly leg: LegAngles = { hip: 0, knee: 0 };
@@ -137,6 +149,7 @@ export class CaptainUssrView {
   private snapPose = false;
   /** The current recovery follows a bash; the current stun follows a crash. */
   private followThrough = false;
+  private slammed = false;
   private crashed = false;
   private stateTime = 0;
   private time = 0;
@@ -159,11 +172,18 @@ export class CaptainUssrView {
   private breathClock = 0;
   private steamClock = 0;
   private steamSide: 0 | 1 = 0;
+  private arcClock = 0;
 
-  /** `fullEffects`: cast shadows and keep a fuller pool of breath, steam and snow. */
-  public constructor(fullEffects: boolean) {
+  /**
+   * `fullEffects`: cast shadows and keep a fuller pool of breath, steam,
+   * snow and sparks. `random` kinks and places its arcs.
+   */
+  public constructor(fullEffects: boolean, private readonly random: () => number = Math.random) {
     this.rig = buildCaptainUssr(fullEffects);
-    this.puffs = new CaptainUssrPuffs(fullEffects ? 36 : 14);
+    this.puffs = new CaptainUssrPuffs(fullEffects ? 44 : 18);
+    this.arcs = new ElectricArcs(fullEffects ? 4 : 2, random);
+    const { rig } = this;
+    this.arcJoints = [rig.head, rig.torso, rig.body, ...rig.shoulders, ...rig.elbows, ...rig.knees];
     this.group.name = 'captain-ussr-view';
     const ghost = new THREE.CircleGeometry(SHIELD_RADIUS, 32);
     this.ghostMaterials = Array.from({ length: GHOSTS.count }, (_, index) => new THREE.MeshBasicMaterial({
@@ -176,7 +196,7 @@ export class CaptainUssrView {
       return mesh;
     });
     this.trail = Array.from({ length: TRAIL_LENGTH }, () => ({ position: new THREE.Vector3(), quaternion: new THREE.Quaternion() }));
-    this.group.add(this.rig.root, this.rig.shield, this.puffs.group, ...this.ghosts);
+    this.group.add(this.rig.root, this.rig.shield, this.puffs.group, this.arcs.group, ...this.ghosts);
     const flesh = surface('flesh');
     this.hitboxes = [
       this.hitbox(this.rig.body, new THREE.CapsuleGeometry(0.32, 0.5, 4, 10), 'torso', flesh, 0, 0.42, 0),
@@ -247,6 +267,7 @@ export class CaptainUssrView {
     this.cues.impact = 0;
     this.cues.clang = 0;
     this.cues.bellow = 0;
+    this.cues.arc = 0;
     this.group.visible = boss.state !== 'dormant' || this.perched;
     if (!this.group.visible) {
       this.shown = false;
@@ -269,7 +290,9 @@ export class CaptainUssrView {
     this.animateDetails(step, boss);
     this.emitPuffs(step, boss, groundY);
     this.bellowInRage(boss, groundY);
+    this.crackle(step, boss);
     this.puffs.update(step);
+    this.arcs.update(step);
     this.previous = boss.state;
     this.lastProgress = boss.stateProgress;
   }
@@ -280,6 +303,7 @@ export class CaptainUssrView {
     this.shown = false;
     this.snapPose = false;
     this.followThrough = false;
+    this.slammed = false;
     this.crashed = false;
     this.stateTime = 0;
     this.lastProgress = 0;
@@ -295,14 +319,17 @@ export class CaptainUssrView {
     this.trailCount = 0;
     this.breathClock = 0;
     this.steamClock = 0;
+    this.arcClock = 0;
     this.spring.reset();
     this.gait.reset();
     this.puffs.reset();
+    this.arcs.reset();
     this.hideGhosts();
     this.cues.footfall = 0;
     this.cues.impact = 0;
     this.cues.clang = 0;
     this.cues.bellow = 0;
+    this.cues.arc = 0;
     this.group.visible = false;
   }
 
@@ -316,6 +343,7 @@ export class CaptainUssrView {
     for (const material of this.ghostMaterials) material.dispose();
     this.hitboxMaterial.dispose();
     this.puffs.dispose();
+    this.arcs.dispose();
   }
 
   private hitbox(parent: THREE.Object3D, geometry: THREE.BufferGeometry, part: CaptainUssrHitPart, target: HitTarget, x: number, y: number, z: number): THREE.Mesh {
@@ -332,6 +360,9 @@ export class CaptainUssrView {
     const to = boss.state;
     if (to !== 'dormant') this.perched = false;
     this.followThrough = from === 'bashWindup' && to === 'recovering';
+    this.slammed = (from === 'slamWindup' || from === 'shockwaveWindup') && to === 'recovering';
+    // The shield strikes the ground before it: snow thrown up from where it hit.
+    if (this.slammed) this.burst(this.rig.shield.getWorldPosition(this.point).setY(this.rig.root.position.y + 0.05), 12, PUFF_STYLES.dust, 2.6, 1.3);
     if (from === 'stunned') this.crashed = false;
     if (to === 'arriving') {
       this.leapStart.set(leapFrom.x, leapFrom.y, leapFrom.z);
@@ -391,6 +422,7 @@ export class CaptainUssrView {
     input.swing = this.gait.swing;
     input.perched = this.perched;
     input.followThrough = this.followThrough;
+    input.slammed = this.slammed;
     input.crashed = this.crashed;
     input.roar = boss.state === 'arriving' || boss.state === 'defeated' ? 0 : roarWeight(this.roarTime);
     const agility = choreograph(input, this.target);
@@ -602,7 +634,7 @@ export class CaptainUssrView {
     }
     const glow = this.eyeGlow(boss);
     rig.eyes.color.setRGB(glow, glow * 0.14, glow * 0.08);
-    rig.halo.opacity = 0.3 * Math.min(1.6, glow);
+    rig.halo.opacity = 0.3 * Math.min(boss.phase === 3 ? EYES.lastOrderHalo : EYES.halo, glow);
     rig.skin.emissiveIntensity = this.veinGlow(boss);
     // A glint runs round the rim as an attack is about to be let loose: the player's cue to move.
     const progress = boss.stateProgress;
@@ -610,7 +642,9 @@ export class CaptainUssrView {
     rig.rim.emissive.setRGB(glint * 1.4, glint * 1.1, glint * 0.7);
     this.flashLeft = Math.max(0, this.flashLeft - step);
     const flash = this.flashLeft / FLASH_SECONDS;
-    for (const material of rig.fabric) material.emissive.setRGB(flash * 0.55, flash * 0.06, flash * 0.03);
+    // LAST ORDER: the battered suit smoulders under the hit's flush.
+    const ember = boss.phase === 3 && boss.state !== 'defeated' ? DAMAGE.ember + Math.sin(this.time * 3.3) * DAMAGE.emberPulse : 0;
+    for (const material of rig.fabric) material.emissive.setRGB(flash * 0.55 + ember, flash * 0.06 + ember * 0.22, flash * 0.03);
   }
 
   /** Its veins: lit by the later phases, burning at their brightest through a fit of rage. */
@@ -629,6 +663,7 @@ export class CaptainUssrView {
     if (boss.state === 'charging') glow *= 1 + EYES.flare;
     if (boss.state === 'enraged') glow *= RAGE_GLOW.eyes;
     if (boss.state === 'stunned') glow *= 0.3 + 0.25 * Math.max(0, Math.sin(this.time * 23));
+    if (boss.phase === 3) glow *= EYES.lastOrder;
     return glow;
   }
 
@@ -667,7 +702,8 @@ export class CaptainUssrView {
         this.steamSide = this.steamSide === 0 ? 1 : 0;
         this.rig.shoulders[this.steamSide].getWorldPosition(this.point);
         this.point.y += 0.12;
-        this.puffs.emit(this.point, this.velocity.set(0, 0.3, 0), PUFF_STYLES.steam);
+        // Steam off one shoulder; in LAST ORDER, smoke out of the broken armour on the other.
+        this.puffs.emit(this.point, this.velocity.set(0, 0.3, 0), this.steamSide === 0 || boss.phase < 3 ? PUFF_STYLES.steam : PUFF_STYLES.smoke);
       }
     }
     if (boss.state !== 'defeated') return;
@@ -681,6 +717,27 @@ export class CaptainUssrView {
       this.rig.torso.getWorldPosition(this.cues.impactAt).setY(groundY + 0.05);
       this.burst(this.cues.impactAt, 10, PUFF_STYLES.dust, 2, 1.4);
     }
+  }
+
+  /** LAST ORDER: now and then an arc crackles between two of its joints, throwing a few sparks; a cue for the mode. */
+  private crackle(step: number, boss: CaptainUssrSnapshot): void {
+    if (boss.phase !== 3 || boss.state === 'defeated' || boss.state === 'dormant') return;
+    this.arcClock -= step;
+    if (this.arcClock > 0) return;
+    const [shortest, longest] = DAMAGE.every;
+    this.arcClock = shortest + (longest - shortest) * this.random();
+    const joints = this.arcJoints;
+    const first = Math.floor(this.random() * joints.length) % joints.length;
+    const second = (first + 1 + Math.floor(this.random() * (joints.length - 1))) % joints.length;
+    joints[first].getWorldPosition(this.point);
+    joints[second].getWorldPosition(this.worldPosition);
+    this.arcs.strike(this.point, this.worldPosition, DAMAGE.life, DAMAGE.jitter);
+    for (let spark = 0; spark < DAMAGE.sparks; spark++) {
+      const angle = this.random() * Math.PI * 2;
+      this.velocity.set(Math.cos(angle) * 1.2, 0.8 + this.random(), Math.sin(angle) * 1.2);
+      this.puffs.emit(this.worldPosition, this.velocity, PUFF_STYLES.spark);
+    }
+    this.cues.arc = 0.35;
   }
 
   /** The moment a fit of rage turns to a scream: a cue for the mode, a cloud of breath and snow blown off its feet. */

@@ -192,6 +192,7 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `menu_theme.mp3` | Música en bucle del menú principal y de pausa |
 | `background_music_theme.mp3` | Música en bucle durante la partida en Burned Mansion |
 | `station33_theme.mp3` | Música en bucle durante la partida en Station 33 |
+| `captain_ussr_theme.mp3` | Tema en bucle del duelo contra el CAPITÁN URSS (carga diferida). Copiado sin modificar de `captain_urss_boss_fight.mp3`, aportado por el usuario; origen y licencia pendientes de registrar |
 | `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
 | `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
