@@ -75,6 +75,11 @@ export class MuzzleFlash {
     this.root.add(jet);
   }
 
+  /** Multiplies the flame's colours (white keeps them): a finish retints its flash. */
+  public setTint(color: number): void {
+    this.material.color.setHex(color);
+  }
+
   trigger(): void {
     this.remaining = this.config.duration;
     this.shotScale = 0.9 + Math.random() * 0.2;

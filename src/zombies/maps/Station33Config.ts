@@ -1218,20 +1218,32 @@ export const KOVKA_CORE_COLOR = 0x5aa8ff;
  * A weapon forged in KOVKA carries the chamber's captured matter: a violet
  * and magenta nebula drifting slowly through its body, pale veins and
  * twinkling stars, its bright steel turned to polished black, and arcs of
- * the reactor's charge crackling over it.
+ * the reactor's charge crackling over it. Its shots change too: firearms
+ * throw brief red-orange tracers and flashes, the VORTEX-9 fires red
+ * plasma and the ZEUS-77 purple lightning wrapped in dark energy.
  */
 export const KOVKA_WEAPON_FINISH: WeaponFinish = {
   id: 'kovka',
   nebula: { deep: 0x0a0318, body: 0x3a0f8c, glow: 0xb32ee0, wisp: 0xffd6ff, scale: 7, flow: 0.12, glowStrength: 0.9 },
   trim: 0x17131f,
   arcs: { color: 0xc9a6ff, count: 4 },
+  shots: {
+    firearm: { tracer: 0xff5530, flashTint: 0xffb090, light: 0xff5a2e },
+    energy: {
+      vortex9: { core: 0xff8a78, color: 0xff1f1a, accent: 0xff6a2a, shroud: null, arc: null },
+      tesla: {
+        core: 0xc77dff, color: 0x9d2cff, accent: 0x5b12c9, shroud: 0x0a0014,
+        arc: { core: 0xb84dff, branch: 0x8f3bff, shroud: 0x070010 },
+      },
+    },
+  },
 };
 
 /**
  * The forge on its reserved deck before the reactor: 5000 a weapon, once
- * per weapon, double damage, thirty seconds of forging, a wait the player
- * has to earn against the horde; it runs on the mains
- * like the hatch that leads to it.
+ * per weapon, double damage, seven and a half seconds of forging, short
+ * enough to wait out by the machine; it runs on the mains like the hatch
+ * that leads to it.
  */
 export const KOVKA_UPGRADE_MACHINE: UpgradeMachinePlacement = {
   id: 'kovka-forge',
@@ -1241,7 +1253,7 @@ export const KOVKA_UPGRADE_MACHINE: UpgradeMachinePlacement = {
   facingZ: KOVKA_UPGRADE_SITE.facingZ,
   cost: 5000,
   damageMultiplier: 2,
-  forgeSeconds: 30,
+  forgeSeconds: 7.5,
   requiresPower: true,
 };
 

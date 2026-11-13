@@ -2,6 +2,8 @@ import type { ZombieKillSource } from './ZombieDeath';
 
 /** Seconds between two bites of a burn: steady enough to read, few enough damage events. */
 export const BURN_TICK_SECONDS = 0.25;
+/** Accumulating frame deltas must not delay a bite that falls exactly on a tick boundary. */
+const TICK_EPSILON = 1e-9;
 
 /** What can burn: anything that may die while its burn runs. */
 export interface Burnable {
@@ -25,16 +27,16 @@ interface Burn {
 export class ZombieBurns<T extends Burnable> {
   private readonly burns = new Map<T, Burn>();
 
-  get count(): number {
+  public get count(): number {
     return this.burns.size;
   }
 
-  isBurning(target: T): boolean {
+  public isBurning(target: T): boolean {
     return this.burns.has(target);
   }
 
   /** Sets `target` burning for `seconds`; true when it was not burning yet (a fresh ignition). */
-  ignite(target: T, seconds: number, damagePerSecond: number, source: ZombieKillSource): boolean {
+  public ignite(target: T, seconds: number, damagePerSecond: number, source: ZombieKillSource): boolean {
     if (!target.isAlive || seconds <= 0) return false;
     const burn = this.burns.get(target);
     if (burn) {
@@ -48,7 +50,7 @@ export class ZombieBurns<T extends Burnable> {
   }
 
   /** Advances every burn and deals its bites through `bite(target, damage, source)`. */
-  update(dt: number, bite: (target: T, damage: number, source: ZombieKillSource) => void): void {
+  public update(dt: number, bite: (target: T, damage: number, source: ZombieKillSource) => void): void {
     for (const [target, burn] of this.burns) {
       if (!target.isAlive) {
         this.burns.delete(target);
@@ -57,8 +59,8 @@ export class ZombieBurns<T extends Burnable> {
       const burnt = Math.min(dt, burn.remaining);
       burn.remaining -= burnt;
       burn.sinceTick += burnt;
-      while (burn.sinceTick >= BURN_TICK_SECONDS && target.isAlive) {
-        burn.sinceTick -= BURN_TICK_SECONDS;
+      while (burn.sinceTick + TICK_EPSILON >= BURN_TICK_SECONDS && target.isAlive) {
+        burn.sinceTick = Math.max(0, burn.sinceTick - BURN_TICK_SECONDS);
         bite(target, burn.damagePerSecond * BURN_TICK_SECONDS, burn.source);
       }
       if (burn.remaining > 0 && target.isAlive) continue;
@@ -68,7 +70,7 @@ export class ZombieBurns<T extends Burnable> {
     }
   }
 
-  reset(): void {
+  public reset(): void {
     this.burns.clear();
   }
 }

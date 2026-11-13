@@ -120,7 +120,12 @@ balistica: cada disparo es un tick del chorro que `ZombiesFlames` resuelve en
 el modo. Quema a los zombis vivos de la planta del jugador dentro de su cono y
 alcance (`FlameTargeting`), con linea de vision (paredes y puertas cerradas lo
 cortan), y los deja ardiendo unos segundos (`ZombieBurns`: mordiscos cada
-0,25 s, se refresca sin acumularse y nunca muerde un cadaver). Cada ignicion
+0,25 s, con tolerancia al redondeo del reloj, se refresca sin acumularse y nunca muerde un cadaver).
+La ФАКЕЛ-33 basica conserva el dano directo, la cadencia, el cono y el combustible;
+su quemadura aporta dos ticks directos de dano durante tres segundos, de modo
+que barrer una horda de rondas medias exige mantener el consumo para rematarla.
+Valores, auditoria y propuesta KOVKA aun sin implementar en la
+[nota de equilibrio](changes/fakel-balance.md). Cada ignicion
 nueva paga un impacto; bajas y dano son los del arma. Muere con su propio
 estilo (`burn`): se arana la cara en llamas, cae de rodillas y se desploma
 de bruces encogido como un cadaver calcinado; el fuego lo envuelve, la piel
@@ -540,7 +545,7 @@ existente a `MOTDRULES`.
   escaleras son decorado), dos entradas propias y el sitio reservado de la
   la forja: la `UpgradeMachine` compartida (un `ArenaUpgradeMachine` que el
   modo lleva con `ZombiesWeaponUpgrade`) cobra 5000 por el arma en mano,
-  forja durante `forgeSeconds` (treinta segundos en KOVKA) con esa arma girando en la camara mientras el acabado se pinta sobre ella (y el mapa lo
+  forja durante `forgeSeconds` (siete segundos y medio en KOVKA) con esa arma girando en la camara mientras el acabado se pinta sobre ella (y el mapa lo
   sonoriza con `onForge`: el reactor gime, `forge-wail`) y la deja con el doble de dano (multiplica en
   `weaponDamageScale`), recargada y con el acabado del mapa
   (`WeaponFinish`, aplicado por el shell con `setWeaponFinish`); una vez por
@@ -554,7 +559,16 @@ existente a `MOTDRULES`.
   frente deshilachado y brillante lo extiende de la culata a la boca; los
   arcos crecen con el. Con efectos reducidos la
   nebulosa omite la deformacion del dominio; no anade luces ni draw calls
-  salvo el de los arcos. La compuerta lleva un sello (`PointDoorSeal`): sin
+  salvo el de los arcos. El acabado puede cambiar tambien los disparos
+  (`WeaponFinish.shots`, solo visual): en KOVKA las armas de fuego lanzan
+  una trazadora roja anaranjada breve que sale de la boca y converge con la
+  trayectoria real hasta el impacto (`TracerStreak`, en lugar de la
+  trazadora normal) y sus fogonazos y luz de disparo se tinen de rojo
+  anaranjado; el VORTEX-9 dispara plasma rojo y el ZEUS-77 un proyectil y
+  arcos morados envueltos en energia oscura, con ramificaciones moradas que
+  se omiten con efectos reducidos. El modo pasa el aspecto al proyectil y a
+  los arcos sin tocar el `EnergyWeaponConfig`, asi que dano, alcance y
+  cadena no cambian; reutiliza las luces existentes. La compuerta lleva un sello (`PointDoorSeal`): sin
   electricidad no se vende y lo dice su aviso, un piloto rojo pasa a verde
   y el aviso de electricidad lo anuncia (`announcementKey`); el nucleo del
   reactor solo brilla con la electricidad. Un unico rectangulo de

@@ -157,6 +157,7 @@ uniform float uFade;
 uniform float uHeat;
 uniform float uBrightness;
 uniform float uProgress;
+uniform vec3 uTint;
 varying vec2 vUv;
 varying float vShape;
 varying float vPhase;
@@ -212,7 +213,7 @@ void main() {
   float alpha = density * uFade;
   if (alpha < 0.002) discard;
   float level = heat * uHeat;
-  gl_FragColor = vec4(flameColor(level) * uBrightness * (0.3 + 0.7 * level), alpha);
+  gl_FragColor = vec4(flameColor(level) * uTint * uBrightness * (0.3 + 0.7 * level), alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -243,6 +244,7 @@ export class MuzzleFlare {
         uHeat: { value: 1 },
         uBrightness: { value: config.brightness },
         uProgress: { value: 0 },
+        uTint: { value: new THREE.Color(0xffffff) },
       },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
@@ -259,6 +261,11 @@ export class MuzzleFlare {
     this.root.name = 'muzzle-flare';
     this.root.add(mesh);
     this.root.visible = false;
+  }
+
+  /** Multiplies the flame's colours (white keeps them): a finish retints its flare. */
+  public setTint(color: number): void {
+    (this.material.uniforms.uTint.value as THREE.Color).setHex(color);
   }
 
   public trigger(): void {

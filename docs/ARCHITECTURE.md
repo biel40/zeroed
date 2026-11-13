@@ -63,7 +63,11 @@ sufra tirones de compilacion de shaders.
   shell viste la vista del arma (`ModeContext.setWeaponFinish`,
   `WeaponFinishLayer`) y la desviste al reiniciar el arsenal. Las copias de
   material del acabado conservan los parches de shader del original (el
-  rango de profundidad del arma en primera persona) antes de anadir el suyo. Una puerta
+  rango de profundidad del arma en primera persona) antes de anadir el suyo.
+  El aspecto de los disparos del acabado (`WeaponFinish.shots`,
+  `WeaponShotLook`) es solo presentacion: la vista del arma tine sus
+  fogonazos y lo expone al shell (trazadora y luz) y el modo lo pasa a
+  `EnergyProjectiles` y `ChainLightning` junto al config intacto. Una puerta
   puede llevar un sello (`PointDoorSeal`) que la saca de la venta.
 
 - `Input` combina el estado desktop/tactil con el estado aislado de

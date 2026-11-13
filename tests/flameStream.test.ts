@@ -4,12 +4,17 @@ import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { PlayerEconomy } from '../src/game/PlayerEconomy';
 import { ZombiesFlames } from '../src/modes/ZombiesFlames';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
+import { CoopHostMode } from '../src/modes/coop/CoopHostMode';
+import { CoopGuestMode } from '../src/modes/coop/CoopGuestMode';
+import { COOP_WEAPONS } from '../src/modes/coop/CoopWeapons';
+import { ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import { Weapon } from '../src/weapons/Weapon';
 import { selectFlameTargets, type FlameHit } from '../src/zombies/FlameTargeting';
 import { BURN_TICK_SECONDS, ZombieBurns } from '../src/zombies/ZombieBurns';
 import type { ZombieKillSource } from '../src/zombies/ZombieDeath';
-import { roundConfig } from '../src/zombies/ZombieConfig';
+import { roundConfig, ZOMBIE_BASE_HP, ZOMBIE_TYPE_CONFIGS } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
+import { STAGGER_MIN_PACE } from '../src/zombies/ZombieStagger';
 import { FlameParticles } from '../src/zombies/FlameParticles';
 import { STATION33_WEAPON_STATIONS, SUBESTACION, station33ZoneAt } from '../src/zombies/maps/Station33Config';
 import { MapPower } from '../src/zombies/maps/shared/MapPower';
@@ -94,6 +99,39 @@ describe('Flame stream targeting', () => {
 });
 
 describe('Burns', () => {
+  it.each([20, 30, 60, 120])('deals the full afterburn in quarter-second bites at %i FPS', (fps) => {
+    const burns = new ZombieBurns<FakeZombie>();
+    const zombie = new FakeZombie(0, 0);
+    const bites: number[] = [];
+    burns.ignite(zombie, flame.burnSeconds, flame.burnDamagePerSecond, 'fakel');
+    for (let frame = 0; frame < (flame.burnSeconds + 1) * fps; frame++) {
+      burns.update(1 / fps, (_target, damage) => bites.push(damage));
+    }
+    expect(bites).toHaveLength(12);
+    for (const damage of bites) expect(damage).toBeCloseTo(7.5, 6);
+    expect(bites.reduce((sum, damage) => sum + damage, 0)).toBeCloseTo(90, 6);
+    expect(burns.count).toBe(0);
+  });
+
+  it('keeps the pending bite when refreshed, without stacking or paying an extra ignition', () => {
+    const burns = new ZombieBurns<FakeZombie>();
+    const zombie = new FakeZombie(0, 0);
+    const bites: number[] = [];
+    const bite = (_target: FakeZombie, damage: number): void => { bites.push(damage); };
+    burns.ignite(zombie, 3, 30, 'fakel');
+    burns.update(0.2, bite);
+    for (let ignition = 0; ignition < 50; ignition++) {
+      expect(burns.ignite(zombie, 3, 30, 'fakel')).toBe(false);
+    }
+    expect(bites).toHaveLength(0);
+    burns.update(0.05, bite);
+    expect(bites).toEqual([7.5]);
+    // A long frame drains the remaining burn, including its fractional last bite.
+    burns.update(10, bite);
+    expect(bites.reduce((sum, damage) => sum + damage, 0)).toBeCloseTo(3.2 * 30, 6);
+    expect(burns.count).toBe(0);
+  });
+
   it('bite steadily for their duration and refresh instead of stacking', () => {
     const burns = new ZombieBurns<FakeZombie>();
     const zombie = new FakeZombie(0, 0);
@@ -179,6 +217,83 @@ describe('ZombiesFlames', () => {
     expect(blows[blows.length - 1].lethal).toBe(true);
   });
 
+  it('cannot erase a round-five group with one fuel unit, even after the full afterburn', () => {
+    const hp = Math.round(ZOMBIE_BASE_HP * roundConfig(5).healthMultiplier);
+    const zombies = Array.from({ length: flame.maxTargets }, (_, index) => new FakeZombie(0, -2 - index * 0.4, hp));
+    const { weapon, fire, flames } = setup(zombies);
+    weapon.update(0, { trigger: true, ads: false });
+    for (const event of weapon.pendingEvents) if (event.type === 'shot') fire();
+    weapon.clearEvents();
+    flames.update(flame.burnSeconds + 1, true);
+    expect(weapon.ammoInMagazine).toBe(99);
+    for (const zombie of zombies) {
+      expect(zombie.isAlive).toBe(true);
+      expect(zombie.hp).toBeCloseTo(hp - 135, 6);
+    }
+  });
+
+  it.each([
+    [5, 3], [10, 8], [20, 17], [30, 25],
+  ])('at round %i, needs %i fuel units per group with one burst and its afterburn', (round, fuel) => {
+    const hp = Math.round(ZOMBIE_BASE_HP * roundConfig(round).healthMultiplier);
+    for (const units of [fuel - 1, fuel]) {
+      const zombies = Array.from({ length: flame.maxTargets }, (_, index) => new FakeZombie(0, -2 - index * 0.4, hp));
+      const { fire, flames, weapon } = setup(zombies);
+      for (let tick = 0; tick < units; tick++) {
+        weapon.update(tick === 0 ? 0 : weapon.shotInterval, { trigger: true, ads: false });
+        for (const event of weapon.pendingEvents) if (event.type === 'shot') fire();
+        weapon.clearEvents();
+        flames.update(weapon.shotInterval, true);
+      }
+      flames.update(flame.burnSeconds + 1, true);
+      expect(weapon.ammoInMagazine).toBe(100 - units);
+      expect(zombies.every((zombie) => zombie.isAlive)).toBe(units < fuel);
+      expect(zombies.every((zombie) => !zombie.isAlive)).toBe(units === fuel);
+    }
+  });
+
+  it.each([20, 30, 60, 120])('keeps damage cadence and fuel coupled at %i FPS', (fps) => {
+    const zombie = new FakeZombie(0, -3, 10000);
+    const { weapon, fire, flames, blows, economy } = setup([zombie]);
+    for (let frame = 0; frame < fps * 2; frame++) {
+      weapon.update(1 / fps, { trigger: true, ads: false });
+      for (const event of weapon.pendingEvents) if (event.type === 'shot') fire();
+      weapon.clearEvents();
+      flames.update(1 / fps, true);
+    }
+    const direct = blows.filter((blow) => blow.damage === WEAPON_DEFINITIONS.fakel.damage);
+    expect(direct).toHaveLength(25);
+    expect(weapon.ammoInMagazine).toBe(75);
+    expect(weapon.reserveAmmo).toBe(300);
+    expect(economy.points).toBe(10);
+    // One DoT, regardless of how often the stream refreshed it.
+    const dot = blows.filter((blow) => blow.damage !== WEAPON_DEFINITIONS.fakel.damage);
+    expect(dot.reduce((sum, blow) => sum + blow.damage, 0)).toBeCloseTo(60, 6);
+  });
+
+  it('shares normal damage with specials while their existing health multiplier increases the cost', () => {
+    const hp = ZOMBIE_BASE_HP * roundConfig(10).healthMultiplier;
+    const normal = new FakeZombie(0, -3, Math.round(hp));
+    const shiny = new FakeZombie(0.2, -3, Math.round(hp * ZOMBIE_TYPE_CONFIGS.shiny.healthMultiplier));
+    const brute = new FakeZombie(-0.2, -3, Math.round(hp * ZOMBIE_TYPE_CONFIGS.brute.healthMultiplier));
+    const { fire, flames } = setup([normal, shiny, brute]);
+    fire();
+    flames.update(flame.burnSeconds + 1, true);
+    expect(normal.hp).toBeCloseTo(433 - 135, 6);
+    expect(shiny.hp).toBe(normal.hp);
+    expect(brute.hp).toBeCloseTo(1300 - 135, 6);
+  });
+
+  it('caps each tick at twelve bodies and excludes other floors', () => {
+    const others = Array.from({ length: 13 }, (_, index) => new FakeZombie(0, -2 - index * 0.4));
+    const upstairs = new FakeZombie(0, -1, 1000, 1);
+    const { fire, blows } = setup([...others, upstairs]);
+    fire();
+    expect(blows.map((blow) => blow.zombie)).toEqual(others.slice(0, 12));
+    expect(upstairs.burning).toBe(0);
+    expect(others[12].burning).toBe(0);
+  });
+
   it('is stopped by walls: nothing behind one burns', () => {
     const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.3));
     wall.position.set(0, 1.5, -2.5);
@@ -217,6 +332,15 @@ describe('ZombiesFlames', () => {
     expect(shown('flame-jet-rod')).toBe(false);
     run(3, false);
     for (const name of ['flame_fireballs', 'flame_smoke', 'flame_sparks']) expect(shown(name), name).toBe(false);
+  });
+});
+
+describe('Flame co-op boundary', () => {
+  it('keeps the Station 33 exclusive out of both co-op clients and the supported maps', () => {
+    expect(ZOMBIE_MAPS['station-33'].coop).toBe(false);
+    expect(COOP_WEAPONS).not.toContain('fakel');
+    expect(new CoopHostMode({} as never).weaponIds).not.toContain('fakel');
+    expect(new CoopGuestMode({} as never).weaponIds).not.toContain('fakel');
   });
 });
 
@@ -387,6 +511,38 @@ describe('ФАКЕЛ-33 weapon station', () => {
 });
 
 describe('Burnt to death', () => {
+  it('keeps pursuing and landing attacks under sustained flame damage, then recovers its full pace', () => {
+    const manager = new ZombieManager(() => 0.5);
+    manager.registerColliders([]);
+    expect(manager.spawnZombie(roundConfig(100), 0, -5, 100)).toBe(true);
+    const zombie = [...manager.actives][0];
+    zombie.skipSpawnRise();
+    const landed = vi.fn();
+    zombie.onAttackLanded = landed;
+    const burns = new ZombieBurns<typeof zombie>();
+    const bite = (target: typeof zombie, damage: number, source: ZombieKillSource): void => {
+      manager.damageZombie(target, 'torso', damage, source);
+    };
+    const interval = 60 / WEAPON_DEFINITIONS.fakel.rpm;
+    for (let tick = 0; tick < 25; tick++) {
+      zombie.tryAttack();
+      manager.damageZombie(zombie, 'torso', WEAPON_DEFINITIONS.fakel.damage, 'fakel');
+      burns.ignite(zombie, flame.burnSeconds, flame.burnDamagePerSecond, 'fakel');
+      burns.update(interval, bite);
+      zombie.update(interval);
+      expect(zombie.paceScale).toBeGreaterThanOrEqual(STAGGER_MIN_PACE);
+      expect(['walk', 'attack']).toContain(zombie.state);
+    }
+    expect(zombie.isAlive).toBe(true);
+    expect(landed).toHaveBeenCalledTimes(2);
+    for (let frame = 0; frame < 480; frame++) {
+      burns.update(1 / 60, bite);
+      zombie.update(1 / 60);
+    }
+    expect(zombie.paceScale).toBe(1);
+    manager.dispose();
+  });
+
   function burnKill() {
     const manager = new ZombieManager(() => 0);
     manager.registerColliders([]);

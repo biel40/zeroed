@@ -45,11 +45,15 @@ export class ElectricArcs {
     });
   }
 
-  /** A bolt from `from` to `to` for `life` seconds, kinked up to `jitter` metres off its line. */
-  public strike(from: THREE.Vector3Like, to: THREE.Vector3Like, life: number, jitter: number): void {
+  /**
+   * A bolt from `from` to `to` for `life` seconds, kinked up to `jitter`
+   * metres off its line; `color` repaints that bolt, else it keeps its last.
+   */
+  public strike(from: THREE.Vector3Like, to: THREE.Vector3Like, life: number, jitter: number, color?: number): void {
     if (this.arcs.length === 0) return;
     const arc = this.arcs[this.next];
     this.next = (this.next + 1) % this.arcs.length;
+    if (color !== undefined) arc.material.color.setHex(color);
     arc.from.set(from.x, from.y, from.z);
     arc.to.set(to.x, to.y, to.z);
     arc.jitter = jitter;

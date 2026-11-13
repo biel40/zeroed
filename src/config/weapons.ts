@@ -1241,10 +1241,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
    * exclusive to Station 33 (its map declares it and sells it from a
    * powered weapon station). A red core crystal feeds a short, wide stream
    * that scorches up to twelve zombies per tick and leaves them burning for
-   * four seconds, enough to kill on its own: the horde breaker at close
-   * range, useless past nine metres. One crystal lasts eight seconds of
-   * fire, three spares ride in reserve, and four seconds of continuous fire
-   * redline the nozzle and lock it until cool.
+   * three seconds. A brief sweep softens a horde; sustained fire spends
+   * fuel to finish it. The stream cannot reach past nine metres. One crystal
+   * lasts eight seconds of fire, three spares ride in reserve, and four
+   * seconds of continuous fire redline the nozzle and lock it until cool.
    */
   fakel: {
     id: 'fakel',
@@ -1262,7 +1262,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 45,
-    flame: { range: 9, coneHalfAngle: 0.24, maxTargets: 12, burnSeconds: 4, burnDamagePerSecond: 120 },
+    // Afterburn adds two direct ticks of damage, rather than killing mid-round hordes for one fuel unit.
+    flame: { range: 9, coneHalfAngle: 0.24, maxTargets: 12, burnSeconds: 3, burnDamagePerSecond: 30 },
     // Redlines in four seconds of continuous fire and stays locked about four more;
     // the warning comes a second before the lockout.
     heat: {

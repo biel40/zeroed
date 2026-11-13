@@ -5,19 +5,23 @@ import {
   createWeaponFinishUniforms, patchWeaponFinishShader, weaponFinishProgramKey,
   type WeaponFinishFrame, type WeaponFinishUniforms, type WeaponFinishVariant, type WeaponNebula,
 } from './WeaponFinishShader';
+import type { WeaponShotLooks } from './WeaponShotLook';
 
 export type { WeaponNebula } from './WeaponFinishShader';
 
 /**
  * A finish a weapon wears after a machine changes it (an upgrade): a nebula
- * drifting through its body, its bright steel turned to `trim`, and
- * optionally arcs crackling over it. Data only; maps own their finishes.
+ * drifting through its body, its bright steel turned to `trim`, optionally
+ * arcs crackling over it and its shots restyled. Data only; maps own their
+ * finishes.
  */
 export interface WeaponFinish {
   readonly id: string;
   readonly nebula: WeaponNebula;
   readonly trim: number;
   readonly arcs: { readonly color: number; readonly count: number } | null;
+  /** How the shots of a weapon wearing it look; absent keeps every weapon's own. */
+  readonly shots?: WeaponShotLooks;
 }
 
 /** Body parts carry the nebula; trim is the bright steel (bolts, barrels, pins) framing it. */

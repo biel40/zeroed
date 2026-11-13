@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { resolveSegmentHit } from '../shooting/BallisticsSystem';
+import type { EnergyShotLook } from '../weapons/WeaponShotLook';
 import type { EnergyWeaponConfig } from '../weapons/WeaponTypes';
 
 const MAX_PROJECTILES = 12;
@@ -14,6 +15,9 @@ const TRAIL_LENGTH = 1.4;
 const TRAIL_RADIUS = 0.05;
 const PROJECTILE_RADIUS = 0.07;
 const GLOW_SCALE = 0.42;
+/** Dark energy round a bolt whose look has a shroud: wider than the halo, so a dark rim frames it. */
+const SHROUD_SCALE = GLOW_SCALE * 1.9;
+const SHROUD_OPACITY = 0.7;
 const VORTEX9_RING_RED = 0xff3b1f;
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
@@ -29,10 +33,19 @@ interface EnergyBolt {
   trailEmitAccumulator: number;
   config: EnergyWeaponConfig | null;
   sourceId: number;
+  /** Halo, streak, rings, particles, scorch and light: the weapon's colour or its look's. */
+  color: number;
+  /** Second ring and impact particles. */
+  accent: number;
+  /** Every fourth wake particle. */
+  wakeAccent: number;
   core: THREE.Mesh;
   coreMaterial: THREE.MeshBasicMaterial;
   glow: THREE.Sprite;
   glowMaterial: THREE.SpriteMaterial;
+  /** Dark energy drawn over the scene behind the halo; shown only for a look with a shroud. */
+  shroud: THREE.Sprite;
+  shroudMaterial: THREE.SpriteMaterial;
   trail: THREE.Mesh;
   trailMaterial: THREE.MeshBasicMaterial;
   rings: THREE.Mesh[];
@@ -133,6 +146,9 @@ function getScorchTexture(): THREE.DataTexture {
  *  - Tapered additive streak + instanced plasma wake/trail particles
  *  - Impact plasma particle burst + temporary projected scorch/burn mark decal
  *  - Single shared PointLight for impact illumination
+ * A bolt fired with an `EnergyShotLook` (an upgraded weapon) takes its
+ * colours, and a dark shroud when the look has one, from it; the config,
+ * and so every gameplay read of it, stays the weapon's.
  */
 export class EnergyProjectiles {
   /**
@@ -209,15 +225,30 @@ export class EnergyProjectiles {
         depthWrite: false,
         toneMapped: false,
       });
+      const shroudMaterial = new THREE.SpriteMaterial({
+        map: getGlowTexture(),
+        color: 0x000000,
+        transparent: true,
+        opacity: SHROUD_OPACITY,
+        // Additive light cannot darken: the shroud is composited over the scene instead.
+        blending: THREE.NormalBlending,
+        depthWrite: false,
+        toneMapped: false,
+      });
       const core = new THREE.Mesh(this.coreGeometry, coreMaterial);
       const glow = new THREE.Sprite(glowMaterial);
       glow.scale.setScalar(GLOW_SCALE);
+      const shroud = new THREE.Sprite(shroudMaterial);
+      shroud.scale.setScalar(SHROUD_SCALE);
+      // Under the additive halo, so the bolt glows out of its dark envelope.
+      shroud.renderOrder = -1;
       const trail = new THREE.Mesh(this.trailGeometry, trailMaterial);
       trail.frustumCulled = false;
       core.visible = false;
       glow.visible = false;
+      shroud.visible = false;
       trail.visible = false;
-      parent.add(core, glow, trail);
+      parent.add(core, glow, shroud, trail);
 
       const rings: THREE.Mesh[] = [];
       const ringMaterials: THREE.MeshBasicMaterial[] = [];
@@ -251,10 +282,15 @@ export class EnergyProjectiles {
         trailEmitAccumulator: 0,
         config: null,
         sourceId: 0,
+        color: 0xffffff,
+        accent: 0xffffff,
+        wakeAccent: 0xffffff,
         core,
         coreMaterial,
         glow,
         glowMaterial,
+        shroud,
+        shroudMaterial,
         trail,
         trailMaterial,
         rings,
@@ -340,7 +376,14 @@ export class EnergyProjectiles {
     parent.add(this.burstLight);
   }
 
-  fire(origin: THREE.Vector3, direction: THREE.Vector3, config: EnergyWeaponConfig, sourceId = 0): void {
+  /** Fires a bolt; `look` restyles it (an upgraded weapon), null keeps the weapon's own colours. */
+  fire(
+    origin: THREE.Vector3,
+    direction: THREE.Vector3,
+    config: EnergyWeaponConfig,
+    sourceId = 0,
+    look: EnergyShotLook | null = null,
+  ): void {
     const bolt = this.bolts[this.boltCursor];
     this.boltCursor = (this.boltCursor + 1) % MAX_PROJECTILES;
 
@@ -355,11 +398,21 @@ export class EnergyProjectiles {
     bolt.trailEmitAccumulator = 0;
     bolt.config = config;
     bolt.sourceId = sourceId;
-    bolt.coreMaterial.color.setHex(config.color);
-    bolt.glowMaterial.color.setHex(config.color);
-    bolt.trailMaterial.color.setHex(config.color);
+    // Characteristic concentric rings: alternating neon green and crimson-red
+    // plasma for the VORTEX-9, or electric cyan/white for arc bolts.
+    const isVortex9 = config.splashRadius > 0;
+    bolt.color = look?.color ?? config.color;
+    bolt.accent = look?.accent ?? (isVortex9 ? VORTEX9_RING_RED : 0xffffff);
+    bolt.wakeAccent = look?.accent ?? (isVortex9 ? VORTEX9_RING_RED : config.color);
+    bolt.coreMaterial.color.setHex(look?.core ?? config.color);
+    bolt.glowMaterial.color.setHex(bolt.color);
+    bolt.trailMaterial.color.setHex(bolt.color);
     bolt.core.position.set(origin.x, origin.y, origin.z);
     bolt.glow.position.set(origin.x, origin.y, origin.z);
+    const shroud = look?.shroud ?? null;
+    if (shroud !== null) bolt.shroudMaterial.color.setHex(shroud);
+    bolt.shroud.position.set(origin.x, origin.y, origin.z);
+    bolt.shroud.visible = shroud !== null;
     this.segmentDirection.set(direction.x, direction.y, direction.z);
     bolt.trail.position
       .set(origin.x, origin.y, origin.z)
@@ -369,13 +422,9 @@ export class EnergyProjectiles {
     bolt.glow.visible = true;
     bolt.trail.visible = true;
 
-    // Characteristic concentric rings: alternating neon green and crimson-red
-    // plasma for the VORTEX-9, or electric cyan/white for arc bolts.
-    const isVortex9 = config.splashRadius > 0;
-    const altRingColor = isVortex9 ? VORTEX9_RING_RED : 0xffffff;
     for (let r = 0; r < bolt.rings.length; r++) {
       const ring = bolt.rings[r];
-      bolt.ringMaterials[r].color.setHex(r === 1 ? altRingColor : config.color);
+      bolt.ringMaterials[r].color.setHex(r === 1 ? bolt.accent : bolt.color);
       ring.position
         .set(origin.x, origin.y, origin.z)
         .addScaledVector(this.segmentDirection, -r * 0.16);
@@ -416,23 +465,29 @@ export class EnergyProjectiles {
         bolt.active = false;
         this.hideBolt(bolt);
         this.extractWorldNormal(hit, this.segmentDirection, this.tmpNormal);
-        this.spawnBurst(hit.point, config);
-        this.spawnImpactParticles(hit.point, this.tmpNormal, config);
-        this.spawnScorchDecal(hit.point, this.tmpNormal, hit.object, config);
+        this.spawnBurst(hit.point, config, bolt.color);
+        this.spawnImpactParticles(hit.point, this.tmpNormal, bolt);
+        this.spawnScorchDecal(hit.point, this.tmpNormal, hit.object, bolt.color);
         this.onImpact?.(hit.point, config, hit.object, bolt.travelled, bolt.sourceId);
       } else if (bolt.travelled >= 80) {
         bolt.active = false;
         this.hideBolt(bolt);
         this.segmentOrigin.set(bolt.x, bolt.y, bolt.z);
         this.tmpNormal.set(-bolt.dx, -bolt.dy, -bolt.dz);
-        this.spawnBurst(this.segmentOrigin, config);
-        this.spawnImpactParticles(this.segmentOrigin, this.tmpNormal, config);
+        this.spawnBurst(this.segmentOrigin, config, bolt.color);
+        this.spawnImpactParticles(this.segmentOrigin, this.tmpNormal, bolt);
         this.onImpact?.(this.segmentOrigin, config, null, bolt.travelled, bolt.sourceId);
       } else {
         bolt.core.position.set(bolt.x, bolt.y, bolt.z);
         bolt.glow.position.set(bolt.x, bolt.y, bolt.z);
         // Unstable plasma: the halo shimmers instead of holding a fixed size.
         bolt.glow.scale.setScalar(GLOW_SCALE * (1 + Math.sin(this.time * 47 + index * 1.7) * 0.16));
+        if (bolt.shroud.visible) {
+          // The dark envelope breathes against the halo, out of step with it.
+          bolt.shroud.position.set(bolt.x, bolt.y, bolt.z);
+          bolt.shroud.scale.setScalar(SHROUD_SCALE * (1 + Math.sin(this.time * 29 + index * 2.3) * 0.12));
+          bolt.shroudMaterial.opacity = SHROUD_OPACITY * (0.8 + 0.2 * Math.sin(this.time * 61 + index));
+        }
         bolt.trail.position
           .set(bolt.x, bolt.y, bolt.z)
           .addScaledVector(this.segmentDirection, -TRAIL_LENGTH / 2);
@@ -452,7 +507,7 @@ export class EnergyProjectiles {
         bolt.trailEmitAccumulator += stepLength;
         while (bolt.trailEmitAccumulator >= 0.45) {
           bolt.trailEmitAccumulator -= 0.45;
-          this.spawnWakeParticle(bolt.x, bolt.y, bolt.z, bolt.dx, bolt.dy, bolt.dz, config);
+          this.spawnWakeParticle(bolt);
         }
       }
     }
@@ -530,6 +585,7 @@ export class EnergyProjectiles {
     for (const bolt of this.bolts) {
       bolt.coreMaterial.dispose();
       bolt.glowMaterial.dispose();
+      bolt.shroudMaterial.dispose();
       bolt.trailMaterial.dispose();
       for (const mat of bolt.ringMaterials) mat.dispose();
     }
@@ -550,19 +606,19 @@ export class EnergyProjectiles {
     out.copy(fallbackDir).negate().normalize();
   }
 
-  private spawnBurst(point: THREE.Vector3, config: EnergyWeaponConfig): void {
+  private spawnBurst(point: THREE.Vector3, config: EnergyWeaponConfig, color: number): void {
     const burst = this.bursts[this.burstCursor];
     this.burstCursor = (this.burstCursor + 1) % MAX_BURSTS;
     burst.active = true;
     burst.life = BURST_LIFETIME;
     burst.maxRadius = config.splashRadius;
-    burst.material.color.setHex(config.color);
+    burst.material.color.setHex(color);
     burst.material.opacity = 0.9;
     burst.sprite.position.copy(point);
     burst.sprite.scale.setScalar(0.4);
     burst.sprite.visible = true;
 
-    this.burstLight.color.setHex(config.color);
+    this.burstLight.color.setHex(color);
     this.burstLight.position.copy(point);
     this.burstLight.intensity = 6;
   }
@@ -571,14 +627,14 @@ export class EnergyProjectiles {
     point: THREE.Vector3,
     normal: THREE.Vector3,
     object: THREE.Object3D | null,
-    config: EnergyWeaponConfig,
+    color: number,
   ): void {
     const decal = this.scorchDecals[this.scorchCursor];
     this.scorchCursor = (this.scorchCursor + 1) % MAX_SCORCH_DECALS;
     decal.active = true;
     decal.life = SCORCH_LIFETIME;
     decal.maxLife = SCORCH_LIFETIME;
-    decal.material.color.setHex(config.color);
+    decal.material.color.setHex(color);
     decal.material.opacity = 0.85;
     decal.mesh.visible = true;
 
@@ -602,15 +658,8 @@ export class EnergyProjectiles {
     );
   }
 
-  private spawnWakeParticle(
-    x: number,
-    y: number,
-    z: number,
-    dx: number,
-    dy: number,
-    dz: number,
-    config: EnergyWeaponConfig,
-  ): void {
+  private spawnWakeParticle(bolt: EnergyBolt): void {
+    const { x, y, z, dx, dy, dz } = bolt;
     const p = this.particles[this.particleCursor];
     const index = this.particleCursor;
     this.particleCursor = (this.particleCursor + 1) % MAX_PLASMA_PARTICLES;
@@ -628,8 +677,7 @@ export class EnergyProjectiles {
     p.vz = -dz * 0.4;
     p.baseScale = 0.75;
 
-    const isVortex9 = config.splashRadius > 0;
-    this.tmpColor.setHex(isVortex9 && index % 4 === 0 ? VORTEX9_RING_RED : config.color);
+    this.tmpColor.setHex(index % 4 === 0 ? bolt.wakeAccent : bolt.color);
     this.particleMesh.setColorAt(index, this.tmpColor);
     if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
   }
@@ -637,11 +685,10 @@ export class EnergyProjectiles {
   private spawnImpactParticles(
     point: THREE.Vector3,
     normal: THREE.Vector3,
-    config: EnergyWeaponConfig,
+    bolt: EnergyBolt,
   ): void {
-    const isVortex9 = config.splashRadius > 0;
-    this.tmpColor.setHex(config.color);
-    this.tmpAltColor.setHex(isVortex9 ? VORTEX9_RING_RED : 0xffffff);
+    this.tmpColor.setHex(bolt.color);
+    this.tmpAltColor.setHex(bolt.accent);
 
     for (let i = 0; i < IMPACT_PARTICLE_COUNT; i++) {
       const p = this.particles[this.particleCursor];
@@ -699,6 +746,7 @@ export class EnergyProjectiles {
   private hideBolt(bolt: EnergyBolt): void {
     bolt.core.visible = false;
     bolt.glow.visible = false;
+    bolt.shroud.visible = false;
     bolt.trail.visible = false;
     for (const ring of bolt.rings) ring.visible = false;
   }

@@ -2,11 +2,15 @@ import * as THREE from 'three';
 import type { HitTarget } from './HitTarget';
 import type { ProjectileConfig } from '../weapons/WeaponTypes';
 import type { Weapon } from '../weapons/Weapon';
+import { TracerStreak } from './TracerStreak';
 import { stepTrajectory, type TrajectoryState } from './trajectory';
 
 const MAX_PROJECTILES = 32;
 const MAX_STEP_LENGTH = 3;
 const TRACER_LENGTH = 2.5;
+/** Cross-section of a tracer streak, metres: fine enough to read as a glint, never a beam. */
+const STREAK_WIDTH = 0.012;
+const STREAK_OPACITY = 0.85;
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 /**
@@ -51,14 +55,25 @@ interface Projectile extends TrajectoryState {
   config: ProjectileConfig | null;
   weapon: Weapon | null;
   tracer: THREE.Mesh;
+  /** Muzzle streak of a round fired with a `ShotTracer`; it outlives the round by its fade. */
+  readonly streak: TracerStreak;
+  readonly streakMesh: THREE.Mesh;
   /** Zombies this round has already passed through; their hitboxes no longer stop it. */
   readonly pierced: unknown[];
+}
+
+/** A visible streak for a round: it leaves `muzzle` and slides onto the round's true path. */
+export interface ShotTracer {
+  readonly muzzle: THREE.Vector3Like;
+  readonly color: number;
 }
 
 /**
  * Simulates projectiles as points integrated over time, checking each
  * integration segment with a raycast. No rigid bodies, no per-shot scene
- * objects beyond a pooled tracer mesh.
+ * objects beyond a pooled tracer mesh. A round fired with a `ShotTracer`
+ * shows a pooled streak from the muzzle instead (one shared material per
+ * colour); it is drawn only and never changes what the round hits.
  */
 export class BallisticsSystem {
   onTargetHit:
@@ -82,6 +97,8 @@ export class BallisticsSystem {
   private readonly segmentOrigin = new THREE.Vector3();
   private readonly segmentDirection = new THREE.Vector3();
   private readonly hitNormal = new THREE.Vector3();
+  private readonly streakGeometry = new THREE.BoxGeometry(STREAK_WIDTH, STREAK_WIDTH, 1);
+  private readonly streakMaterials = new Map<number, THREE.MeshBasicMaterial>();
   private cursor = 0;
 
   constructor(
@@ -103,6 +120,11 @@ export class BallisticsSystem {
       tracer.visible = false;
       tracer.frustumCulled = false;
       tracerParent.add(tracer);
+      const streakMesh = new THREE.Mesh(this.streakGeometry);
+      streakMesh.name = 'tracer-streak';
+      streakMesh.visible = false;
+      streakMesh.frustumCulled = false;
+      tracerParent.add(streakMesh);
       this.projectiles.push({
         active: false,
         x: 0,
@@ -115,12 +137,20 @@ export class BallisticsSystem {
         config: null,
         weapon: null,
         tracer,
+        streak: new TracerStreak(),
+        streakMesh,
         pierced: [],
       });
     }
   }
 
-  spawn(origin: THREE.Vector3, direction: THREE.Vector3, config: ProjectileConfig, weapon: Weapon | null = null): void {
+  spawn(
+    origin: THREE.Vector3,
+    direction: THREE.Vector3,
+    config: ProjectileConfig,
+    weapon: Weapon | null = null,
+    tracer: ShotTracer | null = null,
+  ): void {
     const p = this.projectiles[this.cursor];
     this.cursor = (this.cursor + 1) % MAX_PROJECTILES;
 
@@ -135,7 +165,14 @@ export class BallisticsSystem {
     p.config = config;
     p.weapon = weapon;
     p.pierced.length = 0;
-    p.tracer.visible = true;
+    p.tracer.visible = tracer === null;
+    if (tracer) {
+      p.streak.begin(tracer.muzzle, origin);
+      p.streakMesh.material = this.streakMaterial(tracer.color);
+    } else {
+      p.streak.cancel();
+    }
+    p.streakMesh.visible = false;
   }
 
   update(dt: number): void {
@@ -173,6 +210,7 @@ export class BallisticsSystem {
         } else if (p.travelled >= p.config.maxDistance) {
           p.active = false;
           p.tracer.visible = false;
+          p.streak.fadeOut();
         }
       }
 
@@ -180,8 +218,40 @@ export class BallisticsSystem {
         this.segmentDirection.set(p.vx, p.vy, p.vz).normalize();
         p.tracer.position.set(p.x, p.y, p.z);
         p.tracer.quaternion.setFromUnitVectors(Z_AXIS, this.segmentDirection);
+        p.streak.follow(p.x, p.y, p.z, p.travelled);
       }
     }
+    for (const p of this.projectiles) this.drawStreak(p, dt);
+  }
+
+  /** One shared material per streak colour, made the first time that colour fires. */
+  private streakMaterial(color: number): THREE.MeshBasicMaterial {
+    let material = this.streakMaterials.get(color);
+    if (!material) {
+      material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: STREAK_OPACITY,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      this.streakMaterials.set(color, material);
+    }
+    return material;
+  }
+
+  /** Stretches the streak's box from its tail to its head, or hides it once it is gone. */
+  private drawStreak(p: Projectile, dt: number): void {
+    const mesh = p.streakMesh;
+    const length = p.streak.update(dt) ? p.streak.length : 0;
+    mesh.visible = length > 1e-4;
+    if (!mesh.visible) return;
+    const { head, tail } = p.streak;
+    mesh.position.addVectors(head, tail).multiplyScalar(0.5);
+    this.segmentDirection.subVectors(head, tail).divideScalar(length);
+    mesh.quaternion.setFromUnitVectors(Z_AXIS, this.segmentDirection);
+    mesh.scale.set(1, 1, length);
   }
 
   /**
@@ -205,6 +275,7 @@ export class BallisticsSystem {
       if (!zombie || p.pierced.length >= maxTargets) {
         p.active = false;
         p.tracer.visible = false;
+        p.streak.land(hit.point.x, hit.point.y, hit.point.z);
       }
 
       if (hit.face) {

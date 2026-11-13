@@ -3,6 +3,7 @@ import type { PlayerEconomy } from '../game/PlayerEconomy';
 import { WeaponUpgrades } from '../game/WeaponUpgrades';
 import { t } from '../i18n/i18n';
 import { actionKey } from '../ui/InteractionPrompts';
+import type { WeaponShotLooks } from '../weapons/WeaponShotLook';
 import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { ArenaUpgradeMachine } from '../zombies/maps/ZombieArena';
 import type { ModeContext } from './GameMode';
@@ -73,6 +74,11 @@ export class ZombiesWeaponUpgrade {
   /** Damage multiplier of `id`: the machine's once forged, else 1. */
   public damageScale(id: WeaponId): number {
     return this.upgrades.damageScale(id);
+  }
+
+  /** How `id`'s shots look once forged (the machine's finish), else null: they keep the weapon's own. */
+  public shotLooks(id: WeaponId): WeaponShotLooks | null {
+    return this.upgrades.has(id) ? this.machine.finish.shots ?? null : null;
   }
 
   /** A restart forgets every forge; the shell takes the finishes off with the arsenal. */

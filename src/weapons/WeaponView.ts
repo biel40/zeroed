@@ -28,10 +28,13 @@ import { SustainedFireKick } from './SustainedFireKick';
 import { getSettings } from '../core/PlayerSettings';
 import type { Weapon } from './Weapon';
 import { WeaponFinishLayer, type WeaponFinish } from './WeaponFinish';
+import { energyShotLook, firearmShotLook, type EnergyShotLook, type FirearmShotLook } from './WeaponShotLook';
 import type { ReloadPhase, ViewModelConfig, WeaponDefinition } from './WeaponTypes';
 
 const FLASH_DURATION = 0.045;
 const ENERGY_FLASH_DURATION = 0.065;
+/** Corona of an energy weapon's muzzle flash. */
+const PLASMA_RING_COLOR = 0xeaffd6;
 /** Bore line as a fraction of the sight line height (rifle geometry heuristic). */
 const BORE_HEIGHT_FRACTION = 0.65;
 /** Pistol slide blowback: travel in meters and full return time in seconds. */
@@ -1223,6 +1226,9 @@ export class WeaponView {
   private readonly muzzle = new THREE.Object3D();
   private readonly ejectionPort = new THREE.Object3D();
   private readonly flash: THREE.Mesh;
+  private readonly flashMaterial: THREE.MeshBasicMaterial;
+  /** Corona of an energy weapon's flash; null on firearms. */
+  private readonly plasmaRingMaterial: THREE.MeshBasicMaterial | null = null;
   private readonly heavyFlash: MuzzleFlash | null = null;
   /** Top quality tier: the gunpowder flame that replaces both flashes above. */
   private readonly flare: MuzzleFlare | null = null;
@@ -1255,6 +1261,9 @@ export class WeaponView {
   private liveParts: ViewModelLiveParts | null = null;
   /** Created on the first finish; null while the weapon never wore one. */
   private finishLayer: WeaponFinishLayer | null = null;
+  /** How the worn finish restyles this weapon's shots; null keeps its own. */
+  private firearmShot: FirearmShotLook | null = null;
+  private energyShot: EnergyShotLook | null = null;
   /** Wired by Game: bolt-action weapons eject their case mid-cycle, not on the shot. */
   onBoltEject: (() => void) | null = null;
 
@@ -1333,6 +1342,7 @@ export class WeaponView {
     });
     // Energy weapons tint the muzzle flash to their bolt color.
     if (view.energyColor !== undefined) flashMaterial.color.setHex(view.energyColor);
+    this.flashMaterial = flashMaterial;
     this.flash = new THREE.Mesh(
       new THREE.PlaneGeometry(isEnergyFlash ? 0.25 : 0.22, isEnergyFlash ? 0.25 : 0.22),
       flashMaterial,
@@ -1340,7 +1350,7 @@ export class WeaponView {
     this.flash.name = 'muzzle-flash';
     if (isEnergyFlash) {
       const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xeaffd6,
+        color: PLASMA_RING_COLOR,
         transparent: true,
         opacity: 0.9,
         blending: THREE.AdditiveBlending,
@@ -1351,6 +1361,7 @@ export class WeaponView {
       plasmaRing.name = 'muzzle-plasma-ring';
       plasmaRing.position.z = -0.008;
       this.flash.add(plasmaRing);
+      this.plasmaRingMaterial = ringMat;
     }
     this.flash.visible = false;
     this.muzzle.add(this.flash);
@@ -1553,6 +1564,28 @@ export class WeaponView {
   public setFinish(finish: WeaponFinish | null, reducedEffects = false): void {
     this.finishLayer ??= new WeaponFinishLayer(this.root, this.energyMaterials, { reducedEffects, firstPerson: true });
     this.finishLayer.apply(finish);
+    this.firearmShot = firearmShotLook(this.definition, finish?.shots);
+    this.energyShot = energyShotLook(this.definition.id, finish?.shots);
+    this.tintFlashes();
+  }
+
+  /** The worn finish's look for this firearm's tracer and flash light; null keeps its own. */
+  public get firearmLook(): FirearmShotLook | null {
+    return this.firearmShot;
+  }
+
+  /** The worn finish's look for this energy weapon's bolt; null keeps its own. */
+  public get energyLook(): EnergyShotLook | null {
+    return this.energyShot;
+  }
+
+  /** Every flash of this view in the worn finish's colours, or back to the weapon's own. */
+  private tintFlashes(): void {
+    const tint = this.firearmShot?.flashTint ?? 0xffffff;
+    this.flashMaterial.color.setHex(this.energyShot?.color ?? this.definition.view.energyColor ?? tint);
+    this.plasmaRingMaterial?.color.setHex(this.energyShot?.core ?? PLASMA_RING_COLOR);
+    this.heavyFlash?.setTint(tint);
+    this.flare?.setTint(tint);
   }
 
   getMuzzleWorldPosition(out: THREE.Vector3): THREE.Vector3 {

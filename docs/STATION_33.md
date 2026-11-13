@@ -243,7 +243,7 @@ codigo: actualiza la guia.
   armario de acero con una camara de forja, un tubo que brilla en el azul
   del nucleo entre dos bobinas de cobre, bajo dos electrodos. Mirandola con
   un arma en la mano, el aviso pide 5000 para forjarla; pagar hace que la
-  camara se encienda y tartamudee treinta segundos, con el cristal aclarado y
+  camara se encienda y tartamudee siete segundos y medio, con el cristal aclarado y
   el arma girando dentro, que la materia de KOVKA va pintando de la culata
   a la boca, mientras el reactor gime desde el foso (un dron
   grave que late, un gemido como de voz y crujidos de la boveda: el evento

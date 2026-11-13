@@ -118,6 +118,8 @@ export class Game {
   private readonly tmpOrigin = new THREE.Vector3();
   private readonly tmpDirection = new THREE.Vector3();
   private readonly tmpMuzzle = new THREE.Vector3();
+  /** Reused tracer request of a forged firearm's shot: leaves the muzzle in the finish's colour. */
+  private readonly shotTracer = { muzzle: this.tmpMuzzle, color: 0 };
   private readonly tmpEject = new THREE.Vector3();
   private readonly tmpRight = new THREE.Vector3();
   private readonly tmpObserver = new THREE.Vector3();
@@ -723,11 +725,17 @@ export class Game {
     this.player.camera.getWorldDirection(this.tmpDirection);
     this.applyCone(this.tmpDirection, weapon.currentSpread());
 
+    view.getMuzzleWorldPosition(this.tmpMuzzle);
+    // A forged firearm's round streaks from the muzzle; others keep the plain tracer.
+    const firearmLook = view.firearmLook;
+    const energyColor = view.energyLook?.color ?? energy?.color;
     // Energy weapons fire visible bolts handled by the mode; everything
     // else goes through the classic ballistic simulation.
     const handledByMode = this.mode.onWeaponFired?.(weapon, this.tmpOrigin, this.tmpDirection);
     if (!handledByMode) {
-      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile, weapon);
+      if (firearmLook) this.shotTracer.color = firearmLook.tracer;
+      this.ballistics.spawn(this.tmpOrigin, this.tmpDirection, weapon.definition.projectile, weapon,
+        firearmLook ? this.shotTracer : null);
     }
 
     // A flame stream roars on its own loop (setFlameStream) instead of a report per tick.
@@ -736,7 +744,6 @@ export class Game {
     if (cameraJolt) this.player.playShotImpulse(cameraJolt);
     if (playerPush) this.player.applyShotPush(playerPush);
     view.onShot(weapon.fireMode === 'auto');
-    view.getMuzzleWorldPosition(this.tmpMuzzle);
     this.flashLight.position.copy(this.tmpMuzzle);
     if (flame) {
       // The scene's single muzzle light becomes the stream's firelight, out where the fire
@@ -752,18 +759,18 @@ export class Game {
     const flare = this.profile.useAdvancedRendering ? weapon.definition.muzzleFlare : undefined;
     if (flare) {
       // A pulse as short as the flame: the HDR frame does not clamp a lingering glow.
-      this.flashLight.color.setHex(FLARE_LIGHT_COLOR);
+      this.flashLight.color.setHex(firearmLook?.light ?? FLARE_LIGHT_COLOR);
       this.flashLight.intensity = flare.light * (0.85 + Math.random() * 0.3);
       this.flashLightDecay = flareLightDecay(flare.duration);
     } else {
-      this.flashLight.color.setHex(energy ? energy.color : 0xffc27a);
+      this.flashLight.color.setHex(energyColor ?? firearmLook?.light ?? 0xffc27a);
       this.flashLight.intensity = energy ? 10 : (weapon.definition.muzzleFlash?.lightIntensity ?? 9);
       this.flashLightDecay = energy ? ENERGY_FLASH_LIGHT_DECAY : FLASH_LIGHT_DECAY;
     }
 
     if (energy) {
       this.player.playViewImpulse(0.014);
-      this.effects.puff(this.tmpMuzzle, energy.color, 0.2);
+      this.effects.puff(this.tmpMuzzle, energyColor ?? energy.color, 0.2);
     } else {
       this.tmpRight.setFromMatrixColumn(this.player.camera.matrixWorld, 0);
       this.barrelSmoke.onShot(this.tmpMuzzle, weapon.heat.intensity, this.tmpRight, weapon.definition.muzzleSmoke);

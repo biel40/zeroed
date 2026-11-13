@@ -969,9 +969,9 @@ describe('Station 33 KOVKA chamber', () => {
     expect(solidBoxes(arena).some((box) => box.intersectsBox(front))).toBe(false);
   });
 
-  it('forges the weapon in hand once the power is on: price, a long forge, double damage, refill and finish', () => {
+  it('forges the weapon in hand once the power is on: price, a 7.5 s forge, double damage, refill, finish and shot looks', () => {
     const forgeSeconds = KOVKA_UPGRADE_MACHINE.forgeSeconds;
-    expect(forgeSeconds).toBeGreaterThanOrEqual(20);
+    expect(forgeSeconds).toBe(7.5);
     const side = makeContext();
     const mode = new ZombiesMode('station-33');
     mode.init(side.ctx);
@@ -997,15 +997,22 @@ describe('Station 33 KOVKA chamber', () => {
     mode.onInteract();
     expect(machine.busy).toBe(true);
     expect(mode.getInteractPrompt()).toBe(t('prompt.upgradeForging', { weapon }));
-    const upgrade = mode as unknown as { weaponUpgrade: { update(): void } };
+    const upgrade = mode as unknown as { weaponUpgrade: { update(): void; shotLooks(id: string): unknown } };
     arena.update(forgeSeconds - 0.5);
     upgrade.weaponUpgrade.update();
+    // Nothing is handed over before the forge ends, however often USE is pressed.
+    mode.onInteract();
     expect(machine.busy).toBe(true);
     expect(damageScale()).toBe(1);
+    expect(side.ctx.setWeaponFinish).not.toHaveBeenCalled();
+    expect(side.ctx.refillWeaponAmmo).not.toHaveBeenCalled();
+    expect(upgrade.weaponUpgrade.shotLooks('m1911')).toBeNull();
     arena.update(0.6);
     upgrade.weaponUpgrade.update();
     expect(machine.busy).toBe(false);
     expect(damageScale()).toBe(2);
+    expect(upgrade.weaponUpgrade.shotLooks('m1911')).toBe(KOVKA_WEAPON_FINISH.shots);
+    expect(upgrade.weaponUpgrade.shotLooks('ak47')).toBeNull();
     expect(side.ctx.refillWeaponAmmo).toHaveBeenCalledWith('m1911');
     expect(side.ctx.setWeaponFinish).toHaveBeenCalledWith('m1911', KOVKA_WEAPON_FINISH);
     expect(side.hud.showNotice).toHaveBeenLastCalledWith('info', t('banner.weaponUpgraded', { weapon }));

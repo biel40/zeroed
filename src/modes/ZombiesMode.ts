@@ -11,6 +11,7 @@ import { DeveloperConsoleCommands } from '../game/DeveloperConsoleCommands';
 import type { HitTarget } from '../shooting/HitTarget';
 import type { Weapon } from '../weapons/Weapon';
 import type { EnergyWeaponConfig, WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
+import { energyShotLook } from '../weapons/WeaponShotLook';
 import { Knife, knifeDamageForRound } from '../weapons/Knife';
 import { KnifeCombat } from '../weapons/KnifeCombat';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
@@ -447,7 +448,9 @@ export class ZombiesMode implements GameMode {
     }
     const energy = weapon.definition.energy;
     if (!energy) return false;
-    this.energy.fire(origin, direction, energy);
+    const id = weapon.definition.id;
+    // A forged weapon's bolt wears the machine's look; its config, and so the gameplay, stays the weapon's.
+    this.energy.fire(origin, direction, energy, 0, energyShotLook(id, this.weaponUpgrade?.shotLooks(id)));
     return true;
   }
 
@@ -1328,6 +1331,12 @@ export class ZombiesMode implements GameMode {
     return this.developerCommands.damageScale(id) * (this.rings?.damageScale ?? 1) * (this.weaponUpgrade?.damageScale(id) ?? 1);
   }
 
+  /** ZEUS-77 arcs through `points`, in the machine's look once forged; reduced effects drop its forks. */
+  private dischargeTeslaArcs(points: readonly THREE.Vector3[]): void {
+    const arc = energyShotLook('tesla', this.weaponUpgrade?.shotLooks('tesla'))?.arc ?? null;
+    this.chain.discharge(points, arc, !this.ctx.profile.useReducedEffects);
+  }
+
   private onEnergyImpact(
     point: THREE.Vector3,
     config: EnergyWeaponConfig,
@@ -1365,7 +1374,7 @@ export class ZombiesMode implements GameMode {
       for (const z of chain) {
         points.push(new THREE.Vector3(z.position.x, z.position.y + 1.1, z.position.z));
       }
-      this.chain.discharge(points);
+      this.dischargeTeslaArcs(points);
       return;
     }
 
@@ -1378,7 +1387,7 @@ export class ZombiesMode implements GameMode {
       if (machine) {
         const muzzle = this.ctx.player.camera.getWorldPosition(this.tmpDirection);
         const { x, y, z } = machine.position;
-        this.chain.discharge([muzzle.clone(), new THREE.Vector3(x, y, z)]);
+        this.dischargeTeslaArcs([muzzle.clone(), new THREE.Vector3(x, y, z)]);
         this.ctx.audio.playTeslaChain(1);
       }
       return;
