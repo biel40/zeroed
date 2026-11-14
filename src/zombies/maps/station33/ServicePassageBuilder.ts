@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addEntrancePassageShell, EntranceFrame } from '../shared/EntrancePassage';
 import { seededRandom } from '../shared/ProceduralNoise';
 import {
   SERVICE_PASSAGE,
@@ -12,34 +13,6 @@ import type { Station33Lighting } from './Station33Lighting';
 const HALF_WALL = STATION33_WALL_THICKNESS / 2;
 
 /**
- * Places boxes in a barrier's frame: `along` runs outward from the wall
- * centre line, `across` runs along the wall, `y` is height.
- */
-class BarrierFrame {
-  private readonly acrossX: number;
-  private readonly acrossZ: number;
-
-  constructor(private readonly barrier: Station33Barrier) {
-    this.acrossX = -barrier.outwardZ;
-    this.acrossZ = barrier.outwardX;
-  }
-
-  point(along: number, across: number): { x: number; z: number } {
-    return {
-      x: this.barrier.x + this.barrier.outwardX * along + this.acrossX * across,
-      z: this.barrier.z + this.barrier.outwardZ * along + this.acrossZ * across,
-    };
-  }
-
-  /** World box size for extents measured along / across the barrier. */
-  size(alongSize: number, acrossSize: number): { width: number; depth: number } {
-    return this.barrier.outwardX !== 0
-      ? { width: alongSize, depth: acrossSize }
-      : { width: acrossSize, depth: alongSize };
-  }
-}
-
-/**
  * The hidden side of every zombie entrance: a dark dead-end passage where
  * its zombies appear, and the frame of the gate or vent on the hall side.
  * The surface-stairs passage ends in the bottom steps of the buried way up.
@@ -50,33 +23,21 @@ export function buildServicePassages(
   barriers: ReadonlyArray<Station33Barrier>,
 ): void {
   for (const barrier of barriers) {
-    const frame = new BarrierFrame(barrier);
+    const frame = new EntranceFrame(barrier);
     addPassage(context, lighting, barrier, frame);
     if (barrier.kind === 'gate') addGateFrame(context, frame);
     else addVentFrame(context, frame);
   }
 }
 
-function addPassage(context: Station33BuildContext, lighting: Station33Lighting, barrier: Station33Barrier, frame: BarrierFrame): void {
+function addPassage(context: Station33BuildContext, lighting: Station33Lighting, barrier: Station33Barrier, frame: EntranceFrame): void {
   const { structure, materials, batch } = context;
   const width = SERVICE_PASSAGE.width[barrier.kind];
   const height = SERVICE_PASSAGE.height[barrier.kind];
-  const start = HALF_WALL;
-  const end = start + SERVICE_PASSAGE.length;
-  const middle = (start + end) / 2;
-  const solid = (along: number, across: number, y: number, alongSize: number, acrossSize: number, ySize: number, role: string, seed: number): void => {
-    const { x, z } = frame.point(along, across);
-    const { width: sizeX, depth: sizeZ } = frame.size(alongSize, acrossSize);
-    structure.addBox(x, y, z, sizeX, ySize, sizeZ, materials.serviceConcrete, {
-      name: `${barrier.id}-${role}`, surface: 'concrete', mapRole: role, castShadow: false, uvSeed: seed, blocksPlayer: false,
-    });
-  };
-  solid(middle, 0, -0.08, SERVICE_PASSAGE.length, width + 0.6, 0.16, 'passage-floor', 1);
-  solid(middle, 0, height + 0.08, SERVICE_PASSAGE.length, width + 0.6, 0.16, 'passage-ceiling', 2);
-  for (const side of [-1, 1]) {
-    solid(middle, side * (width / 2 + HALF_WALL), height / 2, SERVICE_PASSAGE.length, STATION33_WALL_THICKNESS, height, 'passage-wall', 3 + side);
-  }
-  solid(end + HALF_WALL, 0, height / 2, STATION33_WALL_THICKNESS, width + 0.6, height, 'passage-end', 6);
+  const end = HALF_WALL + SERVICE_PASSAGE.length;
+  const middle = HALF_WALL + SERVICE_PASSAGE.length / 2;
+  addEntrancePassageShell(structure, frame, barrier.id,
+    { length: SERVICE_PASSAGE.length, width, height, wallThickness: STATION33_WALL_THICKNESS }, materials.serviceConcrete, 'concrete');
 
   // Cable trays and a pipe under the ceiling, and a red battery lamp at the far end.
   for (const across of [-width / 2 + 0.2, width / 2 - 0.25]) {
@@ -93,7 +54,7 @@ function addPassage(context: Station33BuildContext, lighting: Station33Lighting,
 }
 
 /** Bottom steps of a stairway climbing towards the surface, choked with spoil past the spawn. */
-function addBuriedStairs(context: Station33BuildContext, barrier: Station33Barrier, frame: BarrierFrame, width: number, end: number): void {
+function addBuriedStairs(context: Station33BuildContext, barrier: Station33Barrier, frame: EntranceFrame, width: number, end: number): void {
   const { batch, materials } = context;
   const firstStep = SERVICE_PASSAGE.spawnDepth + 0.7;
   for (let step = 0; step < 3; step++) {
@@ -112,7 +73,7 @@ function addBuriedStairs(context: Station33BuildContext, barrier: Station33Barri
 }
 
 /** Bronze door frame around a service gate opening, flush with the hall face. */
-function addGateFrame(context: Station33BuildContext, frame: BarrierFrame): void {
+function addGateFrame(context: Station33BuildContext, frame: EntranceFrame): void {
   const { batch, materials } = context;
   const opening = STATION33_OPENINGS.gate;
   const face = -HALF_WALL - 0.03;
@@ -127,7 +88,7 @@ function addGateFrame(context: Station33BuildContext, frame: BarrierFrame): void
 }
 
 /** Painted steel grille frame with the stubs of its torn louvres. */
-function addVentFrame(context: Station33BuildContext, frame: BarrierFrame): void {
+function addVentFrame(context: Station33BuildContext, frame: EntranceFrame): void {
   const { batch, materials } = context;
   const opening = STATION33_OPENINGS.vent;
   const face = -HALF_WALL - 0.03;

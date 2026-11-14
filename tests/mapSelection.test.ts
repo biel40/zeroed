@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { COOP_ZOMBIE_MAP_ID, isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
+import { COOP_ZOMBIE_MAP_ID, getZombieMapProduct, isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import type { EntitlementProvider } from '../src/entitlements/EntitlementProvider';
 import { HUD } from '../src/ui/HUD';
 
@@ -92,9 +92,11 @@ describe('Zombies map selection flow', () => {
     expect(css).toMatch(/\.map-card\[data-locked='true'\] \.map-card-lock \{\s*display: flex;/);
   });
 
-  it('lists Burned Mansion for everyone and Station 33 as a locked single-player premium map', () => {
+  it('lists Burned Mansion for everyone, Station 33 as a locked single-player premium map and La Seu as an included single-player map', () => {
     expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true });
     expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, product: 'map.station-33', coop: false });
+    expect(ZOMBIE_MAPS['la-seu']).toMatchObject({ visible: true, coop: false });
+    expect(getZombieMapProduct('la-seu')).toBeUndefined();
     expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
     expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);

@@ -29,6 +29,12 @@ const ARENA_BUDGETS: Record<ZombieMapId, Pick<ArenaMetrics, BudgetMetric>> = {
     drawables: 1_100, visibleDrawables: 800, triangles: 205_000, visibleTriangles: 190_000,
     geometryMiB: 17.5, materials: 260, colliders: 340, wallBoxes: 235, navCells: 56_000,
   },
+  // Phase 1: the nave, the chancel and the plaza. Every wall piece, passage box and proxy is its own solid;
+  // the stone, glass and furniture merge into one mesh per material and area.
+  'la-seu': {
+    drawables: 300, visibleDrawables: 240, triangles: 42_000, visibleTriangles: 41_000,
+    geometryMiB: 3.5, materials: 55, colliders: 125, wallBoxes: 90, navCells: 27_000,
+  },
 };
 
 let restoreDocument: () => void;

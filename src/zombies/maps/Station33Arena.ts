@@ -14,6 +14,7 @@ import { AmbientEventScheduler } from './shared/AmbientEventScheduler';
 import { AmbushTrigger } from './shared/AmbushTrigger';
 import { applySceneAmbience, createAmbienceHemisphereLight } from './shared/ArenaAmbience';
 import { ArenaStructure } from './shared/ArenaStructure';
+import { entrancePlayerStop } from './shared/EntrancePassage';
 import { MapPower } from './shared/MapPower';
 import { PowerLever } from './shared/PowerLever';
 import { RingLocker } from './shared/RingLocker';
@@ -101,16 +102,7 @@ const MAINS_SPIN_UP = 2.5;
  */
 const GATE_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = STATION33_BARRIERS
   .filter((barrier) => barrier.kind === 'gate')
-  .map((barrier) => {
-    const { width, top } = STATION33_OPENINGS.gate;
-    const halfAlong = width / 2;
-    const halfAcross = STATION33_WALL_THICKNESS / 2;
-    const alongX = barrier.outwardX === 0;
-    return new THREE.Box3(
-      new THREE.Vector3(barrier.x - (alongX ? halfAlong : halfAcross), 0, barrier.z - (alongX ? halfAcross : halfAlong)),
-      new THREE.Vector3(barrier.x + (alongX ? halfAlong : halfAcross), top, barrier.z + (alongX ? halfAcross : halfAlong)),
-    );
-  });
+  .map((barrier) => entrancePlayerStop(barrier, STATION33_OPENINGS.gate.width, STATION33_OPENINGS.gate.top, STATION33_WALL_THICKNESS));
 
 /**
  * Station 33, a deep Soviet metro station overrun by the dead. Single-player

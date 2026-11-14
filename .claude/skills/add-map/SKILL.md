@@ -55,9 +55,10 @@ necesitas solo existe dentro de `station33/`, muevelo a `shared/` y haz que
 Station 33 lo use desde alli.
 
 Tambien la navegacion de `src/zombies/navigation/` (`NavigationGrid`,
-`ZombieNavigationService`). Para los pasajes ocultos de los spawns, toma como
-modelo `station33/ServicePassageBuilder.ts`; si lo necesitan dos mapas,
-muevelo a `shared/` en lugar de copiarlo. Busca con grep en `CODEMAP.md` lo
+`ZombieNavigationService`). Los pasajes ocultos de los spawns, sus puntos de aparicion, el tope del
+jugador en las entradas y los huecos que entradas y puertas cortan en los
+muros salen de `shared/EntrancePassage.ts`; cada mapa solo viste su pasaje
+(`station33/ServicePassageBuilder.ts`, `laSeu/EntrancePassages.ts`). Busca con grep en `CODEMAP.md` lo
 que ofrece cada uno.
 
 ## 2. Contrato `ZombieArena` (`src/zombies/maps/ZombieArena.ts`)

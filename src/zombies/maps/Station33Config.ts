@@ -17,6 +17,7 @@ import { PTRS41_RESKIN, reskinWeapons } from '../../config/weaponReskins';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
+import { entranceSpawn } from './shared/EntrancePassage';
 import type { LockerSize } from './shared/LockerBank';
 import type { PowerLeverPlacement } from './shared/PowerLever';
 import type { RingLockerPlacement } from './shared/RingLocker';
@@ -514,23 +515,7 @@ export const SERVICE_PASSAGE = {
 } as const;
 
 function spawnBehind(barrier: Station33Barrier): ZombieSpawnPoint {
-  const along = (depth: number): { x: number; z: number } => ({
-    x: barrier.x + barrier.outwardX * depth,
-    z: barrier.z + barrier.outwardZ * depth,
-  });
-  const spawn = along(SERVICE_PASSAGE.spawnDepth);
-  const approach = along(SERVICE_PASSAGE.approachDepth);
-  const breach = along(-SERVICE_PASSAGE.breachDepth);
-  return {
-    x: spawn.x,
-    z: spawn.z,
-    barrierId: barrier.id,
-    approachX: approach.x,
-    approachZ: approach.z,
-    breachX: breach.x,
-    breachZ: breach.z,
-    exterior: true,
-  };
+  return entranceSpawn(barrier, SERVICE_PASSAGE);
 }
 
 /** Spawn points per unlocked zone, one at the end of each entrance passage. */

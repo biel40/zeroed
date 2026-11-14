@@ -216,6 +216,57 @@
             </span>
           </span>
         </button>
+        <button type="button" class="map-card" data-map="la-seu">
+          <span class="map-card-media">
+            <!-- Drawn in place until the map has a painted card: the main front under the moon, its rose lit from inside. -->
+            <svg class="map-card-art" viewBox="0 0 752 423" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="la-seu-sky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#05070f" /><stop offset="0.62" stop-color="#101a36" /><stop offset="1" stop-color="#1c2748" />
+                </linearGradient>
+                <radialGradient id="la-seu-moon" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0" stop-color="#eef2ff" stop-opacity="0.55" /><stop offset="1" stop-color="#8fa6e0" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="la-seu-rose" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0" stop-color="#ffd27a" /><stop offset="0.45" stop-color="#d24a56" /><stop offset="0.8" stop-color="#4a5fd0" /><stop offset="1" stop-color="#1a1430" />
+                </radialGradient>
+              </defs>
+              <g class="map-card-image">
+                <rect width="752" height="423" fill="url(#la-seu-sky)" />
+                <circle cx="600" cy="92" r="120" fill="url(#la-seu-moon)" />
+                <circle cx="600" cy="92" r="34" fill="#e9eefc" />
+                <path d="M0 372h752v51H0z" fill="#070c18" />
+                <path d="M540 372l60-4 40 4 112-6v8H520z" fill="#0b1224" />
+                <path fill="#0d0f17" d="M150 423V196l14-34 14 34v-52l12-44 12 44v52h46V150l18-58 18 58v-34l14-40 14 40v-58l24-64 24 64v58l14-40 14 40v34l18-58 18 58v46h46v-52l12-44 12 44v52l14-34 14 34v227z" />
+                <circle cx="376" cy="214" r="46" fill="url(#la-seu-rose)" />
+                <g fill="none" stroke="#0d0f17" stroke-width="3">
+                  <circle cx="376" cy="214" r="46" /><circle cx="376" cy="214" r="24" />
+                  <path d="M376 168v92M330 214h92M343.500 181.500l65 65M408.500 181.500l-65 65M336 191l80 46M416 191l-80 46" />
+                </g>
+                <path fill="#1c1410" d="M342 423V332q34-50 68 0v91z" />
+                <path fill="#ffb469" opacity="0.85" d="M369 423v-40h14v40z" />
+                <g fill="#c9a24f" opacity="0.8">
+                  <path d="M198 300q7-16 14 0v60h-14zM248 300q7-16 14 0v60h-14zM490 300q7-16 14 0v60h-14zM540 300q7-16 14 0v60h-14z" />
+                </g>
+              </g>
+            </svg>
+            <span class="map-card-lock">
+              <svg class="map-card-lock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="1.5" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7M12 14.6v2.2" /></svg>
+              <span data-i18n="map.locked"></span>
+            </span>
+          </span>
+          <span class="map-card-access" data-map-access></span>
+          <span class="map-card-body">
+            <span class="map-card-mode" data-i18n="menu.zombies"></span>
+            <span class="map-card-name" data-i18n="map.laSeu">LA SEU</span>
+            <span class="map-card-tagline" data-i18n="map.laSeu.tagline"></span>
+            <span class="map-card-meta">
+              <span class="map-card-chip" data-map-players></span>
+              <span class="map-card-chip" data-map-account></span>
+              <span class="map-card-action" data-map-action></span>
+            </span>
+          </span>
+        </button>
       </div>
       <div class="menu-actions">
         <button type="button" id="coop-select" class="menu-action">

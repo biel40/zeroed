@@ -491,6 +491,12 @@ existente a `MOTDRULES`.
   agradecimiento al tester empieza la partida. Los enlaces directos respetan el
   mismo permiso; detalles y limites en [acceso de beta](../public/beta/README.md).
 
+- `LaSeuArena`: la catedral de Palma, individual e incluida. Empieza en la
+  nave (cinco entradas, M14 junto a las puertas mayores, AK-47 en el
+  presbiterio); el postigo de las puertas mayores (1000) abre la plaza de
+  entrada, con dos entradas mas, la M60 y la Mystery Box. Sin anillos,
+  electricidad ni final. Guia en [La Seu](LA_SEU.md).
+
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
   unico mapa cooperativo. La planta baja se recorre en orden: inicio, salon de
