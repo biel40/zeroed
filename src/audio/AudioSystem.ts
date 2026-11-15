@@ -183,7 +183,7 @@ const KLAXON_TONES: ReadonlyArray<readonly [OscillatorType, number]> = [['square
 const ESCAPE_RADIO_DELAY = ESCAPE_BEAT.title + 1;
 /**
  * Ambience mix (bed and map cues) between rounds: the last kill opens a
- * quiet breath, the next round's sting builds it back up.
+ * quiet breath, the next round builds it back up.
  */
 const AMBIENCE_BREAK_LEVEL = 0.3;
 const AMBIENCE_BREAK_FADE = 1.5;
@@ -1930,17 +1930,11 @@ export class AudioSystem {
   }
 
   /**
-   * A new round begins: two-note ominous sting over a sub drop; the
-   * ambience hushed by the last round builds back up under it.
+   * A new round begins: the ambience hushed by the last round builds back
+   * up. The round MP3 (MusicManager) is the only audible cue.
    */
   public playRoundStartCue(): void {
     this.setAmbienceLevel(1, AMBIENCE_ROUND_SWELL);
-    const audio: AudioContextParts | null = this.context();
-    if (!audio) return;
-    const t: number = audio.ctx.currentTime;
-    this.sweep(0, 'sine', 72, 40, 0.26, 0.9, t);
-    this.tone(t, 'square', 220, 0.12, 0.14);
-    this.tone(t + 0.16, 'square', 277, 0.14, 0.2);
   }
 
   /**

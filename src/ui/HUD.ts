@@ -14,6 +14,7 @@ import { ObjectiveTracker } from './ObjectiveTracker';
 import { PointsPopups } from './PointsPopups';
 import { bindInteractionPromptVisibility, renderInteractionPrompt } from './InteractionPromptView';
 import { SettingsPanel } from './SettingsPanel';
+import { ControlsPanel } from './ControlsPanel';
 import { getControllerFamily, getInputDevice, onInputDeviceChange } from '../player/InputPresentation';
 import { gamepadMenuButtonLabel } from '../player/GamepadBindings';
 import { lampProgress, ringProgress, roundMarks, type RingHudEntry } from './SurvivalPresentation';
@@ -117,6 +118,7 @@ export class HUD {
   private readonly startHint: HTMLElement = mustGet('start-hint');
   private readonly loadingBar: HTMLElement = mustGet('loading-bar');
   private readonly loadingBarFill: HTMLElement;
+  private readonly readyHint: HTMLElement = mustGet('ready-hint');
   private readonly zombiesPanel: HTMLElement = mustGet('hud-zombies');
   private readonly zRound: HTMLElement = mustGet('z-round');
   private readonly zPoints: HTMLElement = mustGet('z-points');
@@ -239,6 +241,8 @@ export class HUD {
 
     this.settings = new SettingsPanel(mustGet('settings-dialog') as HTMLDialogElement,
       mustGet('menu-settings'), mustGet('pause-settings'));
+    new ControlsPanel(mustGet('controls-dialog') as HTMLDialogElement, mustGet('controls-devices'),
+      mustGet('controls-sections'), [mustGet('pause-controls'), mustGet('settings-controls')]);
     bindInteractionPromptVisibility(this.interactPrompt);
     this.notice.addEventListener('animationend', (event: AnimationEvent): void => {
       if (event.target === this.notice && (event.animationName === 'notice-fade' || event.animationName === 'notice-fade-still')) {
@@ -274,7 +278,7 @@ export class HUD {
 
   public setError(message: string): void {
     this.ready = false;
-    this.startScreen.classList.remove('ready');
+    this.startScreen.classList.remove('ready', 'map-ready');
     this.loadingBar.classList.remove('hidden');
     this.loadingBarFill.style.width = '0%';
     this.startHint.textContent = message;
@@ -288,6 +292,7 @@ export class HUD {
   public showMapLoading(mapNameKey: TranslationKey): void {
     setTranslatedText(mustGet('map-loading-title'), mapNameKey);
     setTranslatedText(mustGet('pause-map'), mapNameKey);
+    setTranslatedText(mustGet('ready-map'), mapNameKey);
     clearTimeout(this.mapLoadingTimer);
     this.mapLoadingShownAt = performance.now();
     this.mapLoading.classList.remove('hidden', 'leaving');
@@ -370,19 +375,25 @@ export class HUD {
     this.objectives.reset();
   }
 
+  /**
+   * The map is built and warmed up: a compact "ready" card over the live
+   * scene replaces the boot panel and waits for the gesture that starts play.
+   */
   public showStartScreen(paused: boolean): void {
     if (!this.ready) return;
     this.startPaused = paused;
+    this.startScreen.classList.add('map-ready');
     this.refreshStartHint();
     this.revealStartScreen();
   }
 
   private refreshStartHint(): void {
     if (!this.ready) return;
-    this.startHint.textContent = getInputDevice() === 'gamepad'
+    const device = getInputDevice(document.documentElement.classList.contains('touch-controls-enabled') ? 'touch' : 'keyboard');
+    this.readyHint.textContent = device === 'gamepad'
       ? t(this.startPaused ? 'start.gamepadResume' : 'start.gamepadStart',
         { button: gamepadMenuButtonLabel('confirm', getControllerFamily()) })
-      : t(this.startPaused ? 'start.pausedClick' : 'start.clickToStart');
+      : t(this.startPaused ? 'start.pausedClick' : device === 'touch' ? 'start.tapToStart' : 'start.clickToStart');
   }
 
   public hideStartScreen(): void {
@@ -396,8 +407,8 @@ export class HUD {
     this.startScreen.classList.remove('hidden', 'leaving');
   }
 
-  /** Cross-fades the loading screen into the menu shown beneath it. */
-  private fadeOutStartScreen(): void {
+  /** Cross-fades the start screen into whatever is shown beneath it: the menu or the match. */
+  public fadeOutStartScreen(): void {
     if (this.startScreen.classList.contains('hidden')) return;
     clearTimeout(this.startScreenTimer);
     this.startScreen.classList.add('leaving');

@@ -461,7 +461,7 @@ export class Game {
     this.audio.setAmbienceSuspended(false);
     this.startGameplayMusic();
     this.hud.hidePauseMenu();
-    this.hud.hideStartScreen();
+    this.hud.fadeOutStartScreen();
     this.hud.setHudVisible(true);
   }
 

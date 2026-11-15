@@ -228,7 +228,7 @@ describe('Game pause resume', () => {
     game.profile = { isMobile: true, useTouchControls: true };
     game.arsenal = new Map();
     game.input = { requestPointerLock: vi.fn(), suppressGamepad: vi.fn() };
-    game.hud = { hidePauseMenu: vi.fn(), hideStartScreen: vi.fn(), setHudVisible: vi.fn() };
+    game.hud = { hidePauseMenu: vi.fn(), fadeOutStartScreen: vi.fn(), setHudVisible: vi.fn() };
 
     game.start();
 
@@ -272,7 +272,7 @@ describe('Game pause resume', () => {
     game.audio.setAmbienceSuspended = vi.fn();
     game.hud = {
       hidePauseMenu: vi.fn(),
-      hideStartScreen: vi.fn(),
+      fadeOutStartScreen: vi.fn(),
       setHudVisible: vi.fn(),
     };
 
