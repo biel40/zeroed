@@ -47,6 +47,10 @@ export interface SpreadConfig {
   readonly maxBloom: number;
   /** Bloom recovery per second. */
   readonly bloomRecovery: number;
+  /** Seconds after the last shot before bloom recovers in automatic mode. */
+  readonly bloomRecoveryDelay?: number;
+  /** Bloom multiplier at full ADS; absent keeps the hip-fire penalty. */
+  readonly adsBloomMultiplier?: number;
 }
 
 /**
@@ -509,9 +513,9 @@ export type WeaponEventType =
   | 'boltEnd'
   | 'fireModeChanged';
 
-export interface WeaponEvent {
-  readonly type: WeaponEventType;
-}
+export type WeaponEvent =
+  | { readonly type: 'shot'; readonly spread: number }
+  | { readonly type: Exclude<WeaponEventType, 'shot'> };
 
 export interface WeaponFrameInput {
   readonly trigger: boolean;

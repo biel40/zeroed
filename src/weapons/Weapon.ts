@@ -161,9 +161,10 @@ export class Weapon {
     return this.bloom;
   }
 
-  currentSpread(): number {
+  public currentSpread(): number {
     const s = this.definition.spread;
-    return lerp(s.hipBase, s.adsBase, this.adsAlpha) + this.bloom + this.heat.spreadBonus;
+    const bloomScale = lerp(1, s.adsBloomMultiplier ?? 1, this.adsAlpha);
+    return lerp(s.hipBase, s.adsBase, this.adsAlpha) + this.bloom * bloomScale + this.heat.spreadBonus;
   }
 
   update(dt: number, input: WeaponFrameInput): void {
@@ -176,7 +177,11 @@ export class Weapon {
     if (wasLocked && !this.heat.overheated && this.definition.heat?.warning !== undefined) {
       this.pendingEvents.push({ type: 'cooledDown' });
     }
-    this.bloom = Math.max(0, this.bloom - this.definition.spread.bloomRecovery * dt);
+    const spread = this.definition.spread;
+    const recoveryDelay = this.fireMode === 'auto' ? (spread.bloomRecoveryDelay ?? 0) : 0;
+    // Only the part of this frame beyond the delay contributes to recovery.
+    const recoveryTime = Math.min(dt, Math.max(0, this.secondsSinceShot - recoveryDelay));
+    this.bloom = Math.max(0, this.bloom - spread.bloomRecovery * recoveryTime);
 
     const canAim = this.weaponState === 'ready' || this.weaponState === 'cycling';
     const adsTarget = input.ads && canAim ? 1 : 0;
@@ -330,6 +335,9 @@ export class Weapon {
     this.ammoInMagazine--;
     this.cooldown += this.shotInterval;
 
+    // Each round keeps its own accuracy, including several shots in one mobile
+    // frame. Its kick, bloom and heat affect the following rounds.
+    const shotSpread = this.currentSpread();
     const adsScale = lerp(1, this.definition.recoil.adsRecoilMultiplier, this.adsAlpha);
     this.recoil.kick(adsScale);
     this.bloom = Math.min(
@@ -339,7 +347,7 @@ export class Weapon {
     const heatBefore = this.heat.level;
     this.heat.onShot();
     this.secondsSinceShot = 0;
-    this.pendingEvents.push({ type: 'shot' });
+    this.pendingEvents.push({ type: 'shot', spread: shotSpread });
     const warning = this.definition.heat?.warning;
     if (warning !== undefined && heatBefore < warning && this.heat.level >= warning) {
       this.pendingEvents.push({ type: 'heatWarning' });
@@ -365,7 +373,7 @@ export class Weapon {
     if (this.inspectTimer >= INSPECT_TIME) this.inspectTimer = null;
   }
 
-  private enterState(state: WeaponState, duration: number, event?: WeaponEvent['type']): void {
+  private enterState(state: WeaponState, duration: number, event?: Exclude<WeaponEvent['type'], 'shot'>): void {
     // Reloading, cycling the bolt or equipping take the weapon out of the inspection.
     this.inspectTimer = null;
     this.weaponState = state;

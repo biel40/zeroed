@@ -4,6 +4,7 @@ import {
   CHANCEL,
   LA_SEU_WALL_THICKNESS,
   LANCET,
+  MOONLIT_LANCET_BAYS,
   NAVE,
   NAVE_COLUMN,
   NAVE_COLUMN_ZS,
@@ -179,7 +180,7 @@ function addArcade(context: LaSeuBuildContext): void {
   }
 }
 
-/** One lancet per bay in each side wall: warm glass towards the moon, cool away from it. */
+/** One lancet per bay in each side wall, its glass dead except where the moon still comes through the east ones. */
 function addAisleWindows(context: LaSeuBuildContext): void {
   const { batch, materials } = context;
   const { width, sillY, shoulderY, apexY } = LANCET.aisle;
@@ -188,7 +189,9 @@ function addAisleWindows(context: LaSeuBuildContext): void {
     for (let index = 0; index < NAVE.bays; index++) {
       const z = naveBayCenter(index);
       const lancet = lancetShape(width, sillY, shoulderY, apexY, RIB_SEGMENTS);
-      batch.add(wallShapeGeometry(lancet, side > 0 ? 'nx' : 'px', x, z), side > 0 ? materials.glassWarm : materials.glassCool);
+      const moonlit = side > 0 && MOONLIT_LANCET_BAYS.includes(index);
+      const glass = moonlit ? materials.glassMoon : side > 0 ? materials.glassWarm : materials.glassCool;
+      batch.add(wallShapeGeometry(lancet, side > 0 ? 'nx' : 'px', x, z), glass);
       batch.addBox(materials.dressedStone, side * (NAVE.maxX - 0.1), sillY - 0.09, z, 0.2, 0.18, width + 0.4, 0, 0, 0, index);
     }
   }
@@ -199,7 +202,8 @@ function addEndWallDressing(context: LaSeuBuildContext): void {
   const { batch, materials } = context;
   addGreatDoorFace(context, NAVE.maxZ, 'nz');
   const front = ROSE_WINDOWS.front;
-  batch.add(roundPaneGeometry(front.radius, 'nz', 0, front.y, NAVE.maxZ - 0.03), materials.glassRose);
+  // The moon stands over the bay, behind the front: its rose is the one that still glows.
+  batch.add(roundPaneGeometry(front.radius, 'nz', 0, front.y, NAVE.maxZ - 0.03), materials.glassRoseMoon);
   batch.add(roseRingGeometry(front.radius, 'nz', 0, front.y, NAVE.maxZ - 0.05), materials.dressedStone);
 
   const great = ROSE_WINDOWS.chancel;

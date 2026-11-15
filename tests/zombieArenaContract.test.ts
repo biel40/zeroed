@@ -31,9 +31,12 @@ const ARENA_BUDGETS: Record<ZombieMapId, Pick<ArenaMetrics, BudgetMetric>> = {
   },
   // Phase 1: the nave, the chancel and the plaza. Every wall piece, passage box and proxy is its own solid;
   // the stone, glass and furniture merge into one mesh per material and area.
+  // The nave's zones added seven paid gates (each a shared BuyableDoorVisual: about 20 drawables and 8 materials
+  // until it is bought), three entrances with their passages, and one low solid per stretch of grille or parapet;
+  // the bars themselves merge into the interior batch (about 9k triangles).
   'la-seu': {
-    drawables: 300, visibleDrawables: 240, triangles: 42_000, visibleTriangles: 41_000,
-    geometryMiB: 3.5, materials: 55, colliders: 125, wallBoxes: 90, navCells: 27_000,
+    drawables: 600, visibleDrawables: 400, triangles: 54_000, visibleTriangles: 52_000,
+    geometryMiB: 4.5, materials: 145, colliders: 200, wallBoxes: 150, navCells: 27_000,
   },
 };
 

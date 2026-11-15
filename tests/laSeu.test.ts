@@ -9,22 +9,32 @@ import { LaSeuArena } from '../src/zombies/maps/LaSeuArena';
 import {
   ALTAR,
   CHANCEL,
+  LA_SEU_AMBIENT_EVENTS,
   LA_SEU_BOX_PLACEMENT,
+  LA_SEU_CHAPELS,
   LA_SEU_DOORS,
   LA_SEU_ENTRANCES,
   LA_SEU_LIGHT_SITES,
   LA_SEU_PASSAGE,
   LA_SEU_PLAYER_SPAWN,
   LA_SEU_ROOMS,
+  LA_SEU_SCREEN,
+  LA_SEU_SCREENS,
   LA_SEU_SPAWNS,
   LA_SEU_WALL_BUYS,
   LA_SEU_WALL_THICKNESS,
+  LA_SEU_ZONE_AREAS,
+  LA_SEU_ZONES,
   NAVE,
   NAVE_COLUMN_ZS,
   PEW_BLOCKS,
   PLAZA,
+  chapelArea,
+  chapelScreens,
   naveBayCenter,
+  naveBayLine,
   type LaSeuEntrance,
+  type LaSeuZoneId,
 } from '../src/zombies/maps/LaSeuConfig';
 import { pointedArch, ribVaultGeometry, vaultHeightAt } from '../src/zombies/maps/laSeu/GothicVault';
 import { pewBlockFootprint } from '../src/zombies/maps/laSeu/NaveFurniture';
@@ -98,10 +108,71 @@ function openBarrier(arena: LaSeuArena, id: string): void {
   while (!barrier.isOpen) barrier.damage(barrier.boards[0].maxHp);
 }
 
+function openDoor(arena: LaSeuArena, id: string): void {
+  const door = arena.doors.find((candidate) => candidate.id === id)!;
+  expect(door.tryUnlock(() => true).success, id).toBe(true);
+  expect(arena.activateDoor(door.id), id).toBe(true);
+}
+
 function openPlaza(arena: LaSeuArena): void {
-  const door = arena.doors[0];
-  expect(door.tryUnlock(() => true).success).toBe(true);
-  expect(arena.activateDoor(door.id)).toBe(true);
+  openDoor(arena, 'to-plaza');
+}
+
+const ROOD_Z = naveBayLine(2);
+const CHOIR_Z = naveBayLine(6);
+
+/** Cheapest gates from the narthex into each zone. */
+const WAY_INTO: Readonly<Record<LaSeuZoneId, ReadonlyArray<string>>> = {
+  narthex: [],
+  nave: ['rood-gate'],
+  westAisle: ['almoina-gate'],
+  eastAisle: ['mirador-gate'],
+  crossing: ['rood-gate', 'choir-gate'],
+  plaza: ['to-plaza'],
+};
+
+/** A spot to stand on in each zone, plus the chancel and two chapels. */
+const PROBES = {
+  narthex: { x: 0, z: -3.5 },
+  nave: { x: 0, z: -28 },
+  westAisle: { x: -9, z: -28 },
+  eastAisle: { x: 9, z: -21 },
+  crossing: { x: 0, z: -45.5 },
+  plaza: { x: 0, z: 8 },
+  chancel: { x: 0, z: -51.5 },
+  armsChapel: { x: -12.5, z: -30.5 },
+  mortuaryChapel: { x: 12.5, z: -16.5 },
+} as const;
+
+type ProbeId = keyof typeof PROBES;
+
+const FLOOD_STEP = 0.5;
+
+/** Every probe the player can walk to from the spawn, on a half-metre lattice through the player's own colliders. */
+function reachableProbes(arena: LaSeuArena): ProbeId[] {
+  const walls = arena.wallColliders;
+  const bounds = arena.playerBounds;
+  const body = new THREE.Box3();
+  const free = (x: number, z: number): boolean => {
+    if (x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) return false;
+    body.min.set(x - 0.3, 0.05, z - 0.3);
+    body.max.set(x + 0.3, 1.8, z + 0.3);
+    return !walls.some((wall) => wall.intersectsBox(body));
+  };
+  const key = (x: number, z: number): string => `${Math.round(x / FLOOD_STEP)}/${Math.round(z / FLOOD_STEP)}`;
+  const seen = new Set<string>([key(PROBES.narthex.x, PROBES.narthex.z)]);
+  const queue: Array<readonly [number, number]> = [[PROBES.narthex.x, PROBES.narthex.z]];
+  while (queue.length > 0) {
+    const [x, z] = queue.pop()!;
+    for (const [stepX, stepZ] of [[FLOOD_STEP, 0], [-FLOOD_STEP, 0], [0, FLOOD_STEP], [0, -FLOOD_STEP]] as const) {
+      const nextX = x + stepX;
+      const nextZ = z + stepZ;
+      if (seen.has(key(nextX, nextZ)) || !free(nextX, nextZ)) continue;
+      seen.add(key(nextX, nextZ));
+      queue.push([nextX, nextZ]);
+    }
+  }
+  return (Object.keys(PROBES) as ProbeId[]).filter((id) => seen.has(key(PROBES[id].x, PROBES[id].z)));
 }
 
 function spawnOf(arena: LaSeuArena, id: string): ZombieSpawnPoint {
@@ -197,13 +268,19 @@ describe('La Seu layout', () => {
     expect(state.box).not.toBeNull();
   });
 
-  it('starts with the nave alone: the wicket locked and the plaza gates dormant', () => {
+  it('starts with the narthex alone: every gate locked and every other entrance dormant', () => {
     const arena: ZombieArena = makeArena();
-    expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([['to-plaza', 1000, true]]);
-    const nave = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === 'nave');
-    expect(nave).toHaveLength(5);
-    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(nave.map((entrance) => entrance.id));
-    expect(arena.spawnPoints).toEqual(LA_SEU_SPAWNS.nave);
+    expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
+      ['rood-gate', 750, true], ['almoina-gate', 1000, true], ['mirador-gate', 1000, true],
+      ['nave-west-gate', 750, true], ['nave-east-gate', 750, true], ['choir-gate', 1500, true],
+      ['ambulatory-gate', 1250, true], ['to-plaza', 1250, true],
+    ]);
+    const narthex = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === 'narthex');
+    expect(narthex).toHaveLength(2);
+    // One entrance in each side wall: the horde closes on the start from both aisles.
+    expect(narthex.map((entrance) => entrance.outwardX).sort()).toEqual([-1, 1]);
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(narthex.map((entrance) => entrance.id));
+    expect(arena.spawnPoints).toEqual(LA_SEU_SPAWNS.narthex);
     expect(arena.activateDoor('nowhere')).toBe(false);
     expect(arena.completionInteraction).toBeUndefined();
   });
@@ -221,7 +298,8 @@ describe('La Seu layout', () => {
 
   it('places every zombie spawn outside every room, clear of colliders, behind its own entrance', () => {
     const arena = makeArena();
-    openPlaza(arena);
+    for (const door of LA_SEU_DOORS) openDoor(arena, door.id);
+    expect(arena.spawnPoints).toHaveLength(LA_SEU_ENTRANCES.length);
     const solids = solidBoxes(arena);
     for (const spawn of Object.values(LA_SEU_SPAWNS).flat()) {
       expect(insideRoom(spawn.x, spawn.z), `spawn ${spawn.barrierId}`).toBe(false);
@@ -261,7 +339,7 @@ describe('La Seu layout', () => {
 
   it.each(LA_SEU_ENTRANCES.map((entrance) => [entrance.id, entrance.zone] as const))('gives the %s entrance (%s) a walkable route to the player spawn', (id, zone) => {
     const arena = makeArena();
-    if (zone === 'plaza') openPlaza(arena);
+    for (const door of WAY_INTO[zone]) openDoor(arena, door);
     openBarrier(arena, id);
     const { hit } = chaseUntilHit(arena, spawnOf(arena, id), LA_SEU_PLAYER_SPAWN.x, LA_SEU_PLAYER_SPAWN.z, 150);
     expect(hit).toBe(true);
@@ -271,7 +349,7 @@ describe('La Seu layout', () => {
     const arena = makeArena();
     openPlaza(arena);
     expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([
-      ['m14', 800, 625], ['ak47', 1750, 900], ['m60', 2500, 1250],
+      ['m14', 800, 625], ['ppsh41', 1250, 625], ['ak47', 1750, 900], ['m60', 2500, 1250],
     ]);
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
     for (const wallBuy of LA_SEU_WALL_BUYS) {
@@ -311,14 +389,17 @@ describe('La Seu nave', () => {
     expect(blocked.z).toBeGreaterThan(NAVE_COLUMN_ZS[0] + 0.8);
   });
 
-  it('keeps the central aisle and the west side aisle open from the doors to the crossing', () => {
+  it('stops the player at the rood grille until its gate is bought, then at the choir grille', () => {
     const arena = makeArena();
-    const crossing = naveBayCenter(NAVE.bays - 1);
+    for (const x of [0, -9.2, 9.2]) expect(walk(arena, x, -10.5, FACE_NORTH, 6).z, `aisle at ${x}`).toBeGreaterThan(ROOD_Z);
+    openDoor(arena, 'rood-gate');
+    arena.update(5);
     const central = walk(arena, 0, LA_SEU_PLAYER_SPAWN.z, FACE_NORTH, 14);
-    expect(central.z).toBeLessThan(crossing);
     expect(Math.abs(central.x)).toBeLessThan(0.01);
-    const side = walk(arena, -10.2, LA_SEU_PLAYER_SPAWN.z, FACE_NORTH, 14);
-    expect(side.z).toBeLessThan(crossing);
+    expect(central.z).toBeLessThan(ROOD_Z - 20);
+    expect(central.z).toBeGreaterThan(CHOIR_Z);
+    openDoor(arena, 'choir-gate');
+    expect(walk(arena, 0, CHOIR_Z + 3, FACE_NORTH, 4).z).toBeLessThan(CHOIR_Z - 4);
   });
 
   it('fills the central aisle with solid pew blocks, leaves the cleared ones open and a cross-aisle at every column line', () => {
@@ -333,8 +414,9 @@ describe('La Seu nave', () => {
       expect(Math.abs(footprint.maxX) < NAVE.columnX - 1.6 || Math.abs(footprint.minX) < NAVE.columnX - 1.6).toBe(true);
     }
     for (const z of NAVE_COLUMN_ZS) {
-      // From one side aisle to the other along the column line, round both shafts.
-      for (const x of [-10, -3, 0, 3, 10]) expect(isClear(arena, x, z, 0.42), `cross-aisle ${x}, ${z}`).toBe(true);
+      // Along every column line the floor is clear, except where a grille runs: there, only through its gates.
+      const screened = z === ROOD_Z || z === CHOIR_Z;
+      for (const x of [-10.5, -3, 3]) expect(isClear(arena, x, z, 0.42), `cross-aisle ${x}, ${z}`).toBe(!screened);
     }
     const acrossPews = walk(arena, -10, naveBayCenter(2), FACE_EAST, 6);
     expect(acrossPews.x).toBeLessThan(-PEW_BLOCKS.length / 2 + 1);
@@ -342,6 +424,7 @@ describe('La Seu nave', () => {
 
   it('lets the horde reach a player behind the altar from the far west door, and stops the player at the sacristy door', () => {
     const arena = makeArena();
+    for (const door of WAY_INTO.crossing) openDoor(arena, door);
     openBarrier(arena, 'nave-almoina-door');
     const behindAltar = { x: ALTAR.x, z: ALTAR.z - ALTAR.daisDepth / 2 - 0.8 };
     expect(isClear(arena, behindAltar.x, behindAltar.z, 0.35)).toBe(true);
@@ -356,6 +439,116 @@ describe('La Seu nave', () => {
   });
 });
 
+describe('La Seu zones', () => {
+  it.each([
+    [[], ['narthex']],
+    [['rood-gate'], ['narthex', 'nave']],
+    [['almoina-gate'], ['narthex', 'westAisle', 'armsChapel']],
+    [['mirador-gate'], ['narthex', 'eastAisle', 'mortuaryChapel']],
+    [['rood-gate', 'nave-west-gate'], ['narthex', 'nave', 'westAisle', 'armsChapel']],
+    [['rood-gate', 'nave-east-gate'], ['narthex', 'nave', 'eastAisle', 'mortuaryChapel']],
+    [['rood-gate', 'choir-gate'], ['narthex', 'nave', 'crossing', 'chancel']],
+    [['almoina-gate', 'ambulatory-gate'], ['narthex', 'westAisle', 'crossing', 'chancel', 'armsChapel']],
+    [['to-plaza'], ['narthex', 'plaza']],
+  ] as ReadonlyArray<readonly [string[], ProbeId[]]>)('opens exactly what the gates %j lead to', (doors, expected) => {
+    const arena = makeArena();
+    for (const door of doors) openDoor(arena, door);
+    expect([...reachableProbes(arena)].sort()).toEqual([...expected].sort());
+    // Only the zones the player can walk send their dead.
+    const awake = LA_SEU_ZONES.filter((zone) => zone === 'narthex' || doors.some((id) => LA_SEU_DOORS.find((door) => door.id === id)!.zones.includes(zone)));
+    expect(arena.spawnPoints).toEqual(awake.flatMap((zone) => LA_SEU_SPAWNS[zone]));
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(LA_SEU_ENTRANCES.filter((entrance) => awake.includes(entrance.zone)).map((entrance) => entrance.id));
+  });
+
+  it('joins two zones per gate, every zone to the narthex, and opens each gate only once', () => {
+    const arena = makeArena();
+    const reached = new Set<LaSeuZoneId>(['narthex']);
+    for (let pass = 0; pass < LA_SEU_DOORS.length; pass++) {
+      for (const door of LA_SEU_DOORS) {
+        if (door.zones.some((zone) => reached.has(zone))) door.zones.forEach((zone) => reached.add(zone));
+      }
+    }
+    expect([...reached].sort()).toEqual([...LA_SEU_ZONES].sort());
+    openDoor(arena, 'rood-gate');
+    expect(arena.activateDoor('rood-gate')).toBe(false);
+    // A gate between two zones already awake still has to be bought to walk through it.
+    openDoor(arena, 'almoina-gate');
+    expect(walk(arena, -3, naveBayCenter(5), -FACE_EAST, 4).x).toBeGreaterThan(-NAVE.columnX);
+    openDoor(arena, 'nave-west-gate');
+    arena.update(5);
+    expect(walk(arena, -3, naveBayCenter(5), -FACE_EAST, 4).x).toBeLessThan(-NAVE.columnX - 1);
+    for (const door of LA_SEU_DOORS) expect(door.cost, door.id).toBeGreaterThanOrEqual(750);
+  });
+
+  it('gives every zone with an outer wall two entrances, and keeps every one of them inside its own zone', () => {
+    for (const zone of LA_SEU_ZONES) {
+      const entrances = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === zone);
+      expect(entrances, zone).toHaveLength(zone === 'nave' ? 0 : 2);
+      if (zone === 'plaza') continue;
+      for (const entrance of entrances) {
+        const area = entrance.id === 'chancel-sacristy' ? CHANCEL : LA_SEU_ZONE_AREAS[zone as Exclude<LaSeuZoneId, 'plaza'>];
+        expect(entrance.z, entrance.id).toBeGreaterThan(area.minZ);
+        expect(entrance.z, entrance.id).toBeLessThan(area.maxZ);
+      }
+    }
+  });
+
+  it('divides the nave without closing it: no screen reaches head height, and the altar shows from the spawn', () => {
+    const arena = makeArena();
+    arena.group.updateMatrixWorld(true);
+    const screens = [...LA_SEU_SCREENS, ...LA_SEU_CHAPELS.flatMap(chapelScreens)];
+    const solids = arena.colliders.filter((collider) => screens.some((screen) => collider.name === screen.id || collider.name.startsWith(`${screen.id}-`)));
+    expect(solids.length).toBeGreaterThanOrEqual(screens.length);
+    for (const solid of solids) {
+      const box = new THREE.Box3().setFromObject(solid);
+      expect(box.max.y, solid.name).toBeLessThanOrEqual(LA_SEU_SCREEN.rubbleHeight);
+      expect(box.max.y, solid.name).toBeLessThan(NAVE.aisleSpringY / 4);
+    }
+    // Eyes a step off the central aisle (its gates are shut), looking over both grilles at the candles on the altar.
+    const eye = new THREE.Vector3(LA_SEU_PLAYER_SPAWN.x + 1.5, EYE_HEIGHT, LA_SEU_PLAYER_SPAWN.z);
+    const altar = new THREE.Vector3(ALTAR.x, 3.2, ALTAR.z);
+    const sight = new THREE.Raycaster(eye, altar.clone().sub(eye).normalize(), 0, eye.distanceTo(altar));
+    expect(sight.intersectObjects([...arena.colliders], false)).toHaveLength(0);
+  });
+
+  it('fences each chapel off against the side wall, open in the middle, leaving a walkway beside the columns', () => {
+    const arena = makeArena();
+    for (const door of ['almoina-gate', 'mirador-gate']) openDoor(arena, door);
+    for (const chapel of LA_SEU_CHAPELS) {
+      const area = chapelArea(chapel);
+      const front = chapel.side * (NAVE.maxX - (area.maxX - area.minX));
+      const middle = naveBayCenter(chapel.bay);
+      expect(isClear(arena, front, middle, 0.42), `${chapel.id} gap`).toBe(true);
+      expect(isClear(arena, front, middle + 2, 0.3), `${chapel.id} grille`).toBe(false);
+      const walkway = Math.abs(front) - (NAVE.columnX + 0.85);
+      expect(walkway, chapel.id).toBeGreaterThan(2.5);
+      expect(walkway, chapel.id).toBeLessThan(5);
+    }
+  });
+
+  it('leaves no safe spot: the horde reaches the far corners of every zone through the gates', () => {
+    const arena = makeArena();
+    for (const door of ['rood-gate', 'nave-west-gate', 'nave-east-gate', 'choir-gate']) openDoor(arena, door);
+    for (const id of ['narthex-east-chapel', 'chancel-sacristy']) openBarrier(arena, id);
+    // From the narthex window to the back of the arms chapel, through the central nave.
+    const chapel = chaseUntilHit(arena, spawnOf(arena, 'narthex-east-chapel'), -13, naveBayCenter(4) + 2, 200);
+    expect(chapel.hit).toBe(true);
+    // From the sacristy to the dead end under the collapse, at the top of the east aisle.
+    const deadEnd = chaseUntilHit(arena, spawnOf(arena, 'chancel-sacristy'), 9, CHOIR_Z + 2.2, 200);
+    expect(deadEnd.hit).toBe(true);
+    expect(deadEnd.path.some((point) => point.z > naveBayCenter(4) - 2 && Math.abs(point.x) < NAVE.columnX)).toBe(true);
+  });
+
+  it('hangs iron gates in the screens and keeps the boarded wicket in the great doors', () => {
+    const arena = makeArena();
+    arena.group.updateMatrixWorld(true);
+    for (const door of LA_SEU_DOORS) {
+      const collider = arena.colliders.find((candidate) => candidate.name === `point-door-collider:${door.id}`)!;
+      expect(collider.userData.surface, door.id).toBe(door.kind === 'gate' ? 'metal' : 'wood');
+    }
+  });
+});
+
 describe('La Seu plaza', () => {
   it('stays shut behind the wicket until it is bought, then opens the way out and wakes its gates', () => {
     const arena = makeArena();
@@ -365,9 +558,10 @@ describe('La Seu plaza', () => {
     arena.update(5);
     const out = walk(arena, 0, -2, FACE_SOUTH, 4);
     expect(out.z).toBeGreaterThan(PLAZA.minZ + 4);
-    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(LA_SEU_ENTRANCES.map((entrance) => entrance.id));
-    expect(arena.spawnPoints).toEqual([...LA_SEU_SPAWNS.nave, ...LA_SEU_SPAWNS.plaza]);
-    expect(arena.activateDoor(LA_SEU_DOORS[0].id)).toBe(false);
+    const awake = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === 'narthex' || entrance.zone === 'plaza');
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(awake.map((entrance) => entrance.id));
+    expect(arena.spawnPoints).toEqual([...LA_SEU_SPAWNS.narthex, ...LA_SEU_SPAWNS.plaza]);
+    expect(arena.activateDoor('to-plaza')).toBe(false);
   });
 
   it('keeps the player on the plaza: side walls, the parapet over the sea and the front either side of the doors', () => {
@@ -381,6 +575,7 @@ describe('La Seu plaza', () => {
   it('routes the horde through the wicket both ways', () => {
     const arena = makeArena();
     openPlaza(arena);
+    for (const door of ['almoina-gate', 'rood-gate']) openDoor(arena, door);
     openBarrier(arena, 'nave-west-chapel');
     const outward = chaseUntilHit(arena, spawnOf(arena, 'nave-west-chapel'), 6, 11, 200);
     expect(outward.hit).toBe(true);
@@ -450,8 +645,40 @@ describe('La Seu lights and ambience', () => {
     expect(scene.environmentIntensity).toBe(arena.ambience.environmentIntensity?.intensity);
     // Thin enough to read the vault from the floor.
     expect(Math.exp(-((arena.ambience.fog.density * NAVE.naveApexY) ** 2))).toBeGreaterThan(0.7);
-    expect(arena.group.getObjectByName('laseu-moon-shafts')).toBeDefined();
-    expect(makeArena().group.getObjectByName('laseu-moon-shafts')).toBeUndefined();
+    for (const name of ['laseu-moon-shafts', 'laseu-mist']) {
+      expect(arena.group.getObjectByName(name), name).toBeDefined();
+      expect(makeArena().group.getObjectByName(name), name).toBeUndefined();
+    }
+  });
+
+  it('lights islands, not the building: little fill, and no two indoor lights close enough to merge', () => {
+    const { hemisphereLight, environmentIntensity } = makeArena().ambience;
+    expect(hemisphereLight.intensity).toBeLessThanOrEqual(0.3);
+    expect(environmentIntensity.intensity).toBeLessThanOrEqual(0.08);
+    const indoor = LA_SEU_LIGHT_SITES.filter((site) => site.z < NAVE.maxZ);
+    for (const site of indoor) {
+      expect(site.distance, site.id).toBeLessThanOrEqual(13);
+      for (const other of indoor) {
+        if (other !== site) expect(Math.hypot(site.x - other.x, site.z - other.z), `${site.id} / ${other.id}`).toBeGreaterThan(6);
+      }
+    }
+    // The run starts in a pool of light, and every weapon on a wall has one within reach.
+    const lit = (x: number, z: number): boolean => LA_SEU_LIGHT_SITES.some((site) => Math.hypot(site.x - x, site.z - z) < site.distance * 0.8);
+    expect(lit(LA_SEU_PLAYER_SPAWN.x, LA_SEU_PLAYER_SPAWN.z)).toBe(true);
+    for (const wallBuy of LA_SEU_WALL_BUYS) expect(lit(wallBuy.position.x, wallBuy.position.z), wallBuy.id).toBe(true);
+  });
+
+  it('schedules rare ambient sounds through the map cue hook, and none while time stands still', () => {
+    const arena = makeArena();
+    const heard: string[] = [];
+    arena.onAmbientCue = (cue) => heard.push(cue.sound);
+    arena.update(0);
+    expect(heard).toHaveLength(0);
+    for (let step = 0; step < 600; step++) arena.update(1);
+    expect(new Set(heard)).toEqual(new Set(LA_SEU_AMBIENT_EVENTS.map((event) => event.sound)));
+    // Silence does most of the work: well under one sound every ten seconds.
+    expect(heard.length).toBeLessThan(60);
+    for (const event of LA_SEU_AMBIENT_EVENTS) expect(event.initialDelay).toBeGreaterThanOrEqual(20);
   });
 });
 
@@ -477,7 +704,7 @@ describe('La Seu reset', () => {
       intensities: intensities(),
     };
 
-    openPlaza(arena);
+    for (const door of LA_SEU_DOORS) openDoor(arena, door.id);
     for (const barrier of arena.barriers) {
       while (!barrier.isOpen) barrier.damage(100);
     }
@@ -488,7 +715,8 @@ describe('La Seu reset', () => {
     expect(arena.colliders).toHaveLength(baseline.colliders);
     expect(arena.wallColliders.every((box, index) => box.equals(baseline.wallColliders[index]))).toBe(true);
     expect(arena.spawnPoints).toEqual(baseline.spawns);
-    expect(arena.doors[0].isLocked).toBe(true);
+    for (const door of arena.doors) expect(door.isLocked, door.id).toBe(true);
+    expect(reachableProbes(arena)).toEqual(['narthex']);
     for (const barrier of arena.barriers) expect(barrier.intactCount).toBe(barrier.boards.length);
     expect(intensities()).toEqual(baseline.intensities);
   });

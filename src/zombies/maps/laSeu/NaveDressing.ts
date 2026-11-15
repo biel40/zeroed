@@ -3,35 +3,38 @@ import {
   ALTAR,
   COLUMN_RING_Y,
   LIT_COLUMN_RINGS,
+  MOONLIT_LANCET_BAYS,
   NAVE,
   NAVE_COLUMN,
   NAVE_COLUMN_ZS,
   PEW,
   PEW_BLOCKS,
   ROSE_WINDOWS,
+  SANCTUARY_LAMP,
   naveBayCenter,
 } from '../LaSeuConfig';
 import { seededRandom } from '../shared/ProceduralNoise';
 import type { LaSeuBuildContext } from './LaSeuBuildContext';
-import { roundPaneGeometry } from './LaSeuWalls';
 import { pewBlockFootprint } from './NaveFurniture';
 
 const RING_RADIUS = NAVE_COLUMN.radius + 0.6;
 const RING_CANDLES = 8;
 
 /** A flat decal on the floor, turned by `yaw`. */
-function floorDecal(width: number, depth: number, x: number, z: number, yaw: number, lift: number): THREE.BufferGeometry {
+export function floorDecal(width: number, depth: number, x: number, z: number, yaw: number, lift: number): THREE.BufferGeometry {
   return new THREE.PlaneGeometry(width, depth).rotateX(-Math.PI / 2).rotateY(yaw).translate(x, lift, z);
 }
 
 /**
  * What tells the story without stopping anyone: the wrought-iron candle
- * rings round the columns, banners, the coloured light the glass throws,
- * and the traces of whoever made a stand in here.
+ * rings round the columns, banners, the sanctuary lamp, the cold light the
+ * moon still throws through a few windows, and the traces of whoever made a
+ * stand in here.
  */
 export function buildNaveDressing(context: LaSeuBuildContext): void {
   addColumnRings(context);
   addBanners(context);
+  addSanctuaryLamp(context);
   addGlassLight(context);
   addLastStand(context);
 }
@@ -76,21 +79,30 @@ function addBanners(context: LaSeuBuildContext): void {
   }
 }
 
+/** A red glass lamp on a long chain before the chancel arch: the one light nobody put out. */
+function addSanctuaryLamp(context: LaSeuBuildContext): void {
+  const { batch, materials } = context;
+  const { x, y, z } = SANCTUARY_LAMP;
+  const chain = 5;
+  batch.addBox(materials.iron, x, y + 0.2 + chain / 2, z, 0.02, chain, 0.02);
+  batch.add(new THREE.CylinderGeometry(0.11, 0.05, 0.24, 6).translate(x, y, z), materials.redCloth);
+  batch.add(new THREE.TorusGeometry(0.11, 0.015, 4, 8).rotateX(Math.PI / 2).translate(x, y + 0.12, z), materials.gilt);
+  batch.add(new THREE.SphereGeometry(0.035, 5, 4).scale(1, 1.6, 1).translate(x, y + 0.02, z), materials.flame);
+}
+
 /**
- * Coloured light on stone: pools under the east lancets, the great rose on
- * the central aisle, and its image on the front wall under the front's own
- * rose, the "eight" the two windows draw in Palma twice a year.
+ * Moonlight on stone, and nowhere else: a cold pool under each lancet the
+ * moon still comes through, and the front rose laid on the floor of the
+ * narthex where the run starts.
  */
 function addGlassLight(context: LaSeuBuildContext): void {
   const { batch, materials } = context;
-  for (let bay = 0; bay < NAVE.bays; bay++) {
+  for (const bay of MOONLIT_LANCET_BAYS) {
     const pool = new THREE.PlaneGeometry(1.7, 5.2).rotateX(-Math.PI / 2).rotateY(Math.PI / 2).translate(NAVE.maxX - 3.6, 0.014, naveBayCenter(bay) - 1.6);
-    batch.add(pool, materials.poolWarm);
+    batch.add(pool, materials.poolCool);
   }
-  const great = ROSE_WINDOWS.chancel;
-  batch.add(floorDecal(great.radius * 2.2, great.radius * 3, 0, naveBayCenter(5) + 1, 0, 0.016), materials.poolRose);
   const front = ROSE_WINDOWS.front;
-  batch.add(roundPaneGeometry(front.radius, 'nz', 0, front.y - front.radius * 2, NAVE.maxZ - 0.012), materials.poolRose);
+  batch.add(floorDecal(front.radius * 1.8, front.radius * 2.6, 0, NAVE.maxZ - 5.4, 0, 0.016), materials.poolRose);
 }
 
 /** Blood, dropped books and fallen candlesticks where the pews were dragged away. */

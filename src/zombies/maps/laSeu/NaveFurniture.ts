@@ -37,7 +37,7 @@ export function buildNaveFurniture(context: LaSeuBuildContext): void {
 }
 
 /** One oak pew facing the altar (north), placed by its own transform. */
-function addPew(context: LaSeuBuildContext, x: number, y: number, z: number, yaw: number, roll: number, seed: number): void {
+export function addPew(context: LaSeuBuildContext, x: number, y: number, z: number, yaw: number, roll: number, seed: number): void {
   const { batch, materials } = context;
   scratchQuaternion.setFromEuler(scratchEuler.set(roll, yaw, 0, 'YXZ'));
   const pew = scratchMatrix.compose(scratchPosition.set(x, y, z), scratchQuaternion, UNIT_SCALE).clone();

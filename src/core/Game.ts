@@ -741,7 +741,7 @@ export class Game {
       .normalize();
   }
 
-  private handleShot(): void {
+  private handleShot(spread: number): void {
     const weapon = this.currentWeapon;
     const view = this.currentView;
     const energy = weapon.definition.energy;
@@ -750,7 +750,7 @@ export class Game {
 
     this.player.camera.getWorldPosition(this.tmpOrigin);
     this.player.camera.getWorldDirection(this.tmpDirection);
-    this.applyCone(this.tmpDirection, weapon.currentSpread());
+    this.applyCone(this.tmpDirection, spread);
 
     view.getMuzzleWorldPosition(this.tmpMuzzle);
     // A forged firearm's round streaks from the muzzle; others keep the plain tracer.
@@ -817,7 +817,7 @@ export class Game {
     for (const event of weapon.pendingEvents) {
       switch (event.type) {
         case 'shot':
-          this.handleShot();
+          this.handleShot(event.spread);
           break;
         case 'dryFire':
           this.audio.playDryFire();

@@ -28,6 +28,18 @@ muerto ni con los controles bloqueados. El comportamiento es compartido entre
 individual y cooperativo. `Weapon` gobierna cadencia, municion,
 ADS, recoil y recarga. La M1911 tiene una patada vertical marcada, con un golpe
 visual de elevacion y retroceso y una recuperacion que deja sentir cada disparo.
+La dispersion de cadera favorece el combate cercano; apuntar reduce tanto el
+cono base como el bloom acumulado, segun `spread` de cada
+[definicion de arma](../src/config/weapons.ts). En automatico, cada bala suma
+un pequeno incremento hasta `maxBloom`; `bloomRecoveryDelay` conserva esa
+perdida entre disparos y, tras la pausa, `bloomRecovery` la reduce gradualmente.
+Las rafagas cortas conservan mas precision que el fuego sostenido y una pausa
+breve no borra el bloom restante. En semiautomatico la recuperacion empieza
+sin esa espera, tambien con la repeticion del boton tactil. El calor conserva
+su penalizacion propia. La dispersion modifica la trayectoria real y cada
+evento de disparo conserva su cono antes de sumar el bloom de esa bala, incluso
+si varias balas salen en un frame. Estas reglas se comparten entre escritorio,
+Android y cooperativo; la capacidad y el acabado KOVKA no las alteran.
 El recoil de camara (`RecoilController`) se acumula hasta un tope
 (`recoil.maxClimb`, `DEFAULT_MAX_RECOIL_CLIMB` si falta): una rafaga larga sin
 compensar se estabiliza en vez de llevar la vista al techo. Mover la vista contra
@@ -491,11 +503,14 @@ existente a `MOTDRULES`.
   agradecimiento al tester empieza la partida. Los enlaces directos respetan el
   mismo permiso; detalles y limites en [acceso de beta](../public/beta/README.md).
 
-- `LaSeuArena`: la catedral de Palma, individual e incluida. Empieza en la
-  nave (cinco entradas, M14 junto a las puertas mayores, AK-47 en el
-  presbiterio); el postigo de las puertas mayores (1000) abre la plaza de
-  entrada, con dos entradas mas, la M60 y la Mystery Box. Sin anillos,
-  electricidad ni final. Guia en [La Seu](LA_SEU.md).
+- `LaSeuArena`: la catedral de Palma, individual e incluida. La nave es un
+  solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
+  y un derrumbe que nunca llegan a la boveda. Empieza en el nartex (M14) y
+  se abre reja a reja por Points: nave central, naves laterales con sus
+  capillas (PPSh-41), crucero y presbiterio (AK-47) y, por el postigo de las
+  puertas mayores, la plaza (M60 y Mystery Box). Las entradas de zombis de
+  cada zona despiertan con su primera reja. Sin anillos, electricidad ni
+  final. Zonas, precios y guia en [La Seu](LA_SEU.md).
 
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el

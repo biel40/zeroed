@@ -120,7 +120,10 @@ sufra tirones de compilacion de shaders.
   `StanceTransition` comparte la respuesta amortiguada entre la camara y las
   vistas del compañero, sin depender de Three.js ni crear objetos por frame.
 - Las armas son datos (`WeaponDefinition`), no subclases. `Weapon` no importa
-  Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`.
+  Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`. Cada
+  evento `shot` entrega su dispersion al shell, que aplica el cono antes de
+  crear la trayectoria o pasar la direccion al modo; el HUD consulta la
+  dispersion actual sin alterar las balas ya emitidas.
 - El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
   inventario. Sirve como fallback sin municion y como ataque rapido dedicado;
   `GameMode.usesFallbackAttack()` permite que el shell ceda fire/ADS durante
