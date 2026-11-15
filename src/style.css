@@ -4807,11 +4807,14 @@ html.touch-controls-enabled #intro-skip small {
 
 @media (orientation: portrait) {
   html.touch-controls-enabled #start-screen.ready {
+    align-items: center;
+    padding: 0;
     background: #050606;
     cursor: default;
   }
 
-  html.touch-controls-enabled #start-screen.ready > .start-panel {
+  html.touch-controls-enabled #start-screen.ready > .start-panel,
+  html.touch-controls-enabled #start-screen.ready > .ready-card {
     display: none;
   }
 
@@ -4964,6 +4967,123 @@ html.touch-controls-enabled #intro-skip small {
   transition: width 0.15s ease;
 }
 
+/* ---------- Map ready card ----------
+   Once a map is built the start screen only gates the gesture that starts
+   play: a compact card low on a clear view of the scene, never behind the
+   crosshair. Only opacity and transform animate. */
+
+#start-screen.map-ready {
+  align-items: flex-end;
+  padding: 0 16px calc(clamp(48px, 15vh, 132px) + env(safe-area-inset-bottom, 0px));
+  background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(4, 6, 6, 0.5) 100%);
+}
+
+#start-screen.map-ready > .start-panel,
+#start-screen:not(.map-ready) > .ready-card {
+  display: none;
+}
+
+.ready-card {
+  position: relative;
+  width: min(400px, 100%);
+  padding: 15px 22px 14px 24px;
+  overflow: hidden;
+  color: #e3dccb;
+  text-align: left;
+  border: 1px solid #a4ac9d29;
+  border-left: 0;
+  background: linear-gradient(100deg, #090c0ce6, #0c100fc2);
+  box-shadow: 0 18px 50px #0009, inset 0 1px 0 #ffffff0a;
+  /* Waits for the map cover to lift; no fill after it ends so .leaving can transition. */
+  animation: ready-card-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s backwards;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.ready-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: #7e1713;
+  box-shadow: 0 0 18px #9618127a;
+}
+
+.ready-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #b6483e, #d9b46966 45%, transparent);
+  transform-origin: left;
+  animation: ready-line-in 0.7s ease-out 0.5s backwards;
+}
+
+.ready-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #8e968a;
+  font: 600 10px 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.32em;
+}
+
+.ready-kicker::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: #d9b469;
+  box-shadow: 0 0 8px #d9b46999;
+}
+
+.ready-title {
+  margin: 6px 0 8px;
+  color: #dedfd8;
+  font: 900 clamp(24px, 2.6vw, 30px)/0.95 Impact, 'Arial Narrow', sans-serif;
+  letter-spacing: 0.07em;
+  text-shadow: 2px 3px 0 #0009, 0 0 32px #7b110d38;
+}
+
+#ready-hint {
+  margin: 0;
+  color: #d9b469;
+  font: 700 11px/1.4 'Consolas', 'SF Mono', monospace;
+  letter-spacing: 0.22em;
+  animation: pulse 1.6s ease-in-out 0.8s infinite;
+}
+
+#start-screen.map-ready.leaving .ready-card {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+}
+
+@keyframes ready-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
+@keyframes ready-line-in {
+  from { transform: scaleX(0); }
+}
+
+@media (max-height: 500px), (max-width: 420px) {
+  #start-screen.map-ready { padding-bottom: calc(clamp(28px, 11vh, 56px) + env(safe-area-inset-bottom, 0px)); }
+  .ready-card { width: min(320px, 100%); padding: 11px 16px 10px 18px; }
+  .ready-kicker { font-size: 9px; letter-spacing: 0.26em; }
+  .ready-title { margin: 4px 0 6px; font-size: 20px; }
+  #ready-hint { font-size: 10px; letter-spacing: 0.16em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ready-card, .ready-card::after, #ready-hint { animation: none; }
+  .ready-card { transition: none; }
+}
+
 /* ---------- Map loading ---------- */
 
 /* Opaque so the GPU warm-up behind it is never seen. Only opacity and
@@ -5042,18 +5162,6 @@ html.touch-controls-enabled #intro-skip small {
   }
 }
 
-.controls-grid {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 8px 22px;
-  text-align: left;
-  font-size: 13px;
-  color: #b9c4cf;
-}
-
-.gamepad-controls { display: none; }
-html[data-input-device='gamepad'] .keyboard-controls { display: none; }
-html[data-input-device='gamepad'] .gamepad-controls { display: grid; }
 html[data-input-device='gamepad'] #touch-controls { display: none; }
 html[data-input-device='gamepad'] #pause-menu #pause-resume::before { content: attr(data-gamepad-label); }
 html[data-input-device='gamepad'] :focus {
@@ -5111,10 +5219,6 @@ html.touch-controls-enabled #hud-zombies {
   top: auto;
   right: auto;
   min-width: 0;
-}
-
-html.touch-controls-enabled .controls-grid {
-  display: none;
 }
 
 html.touch-controls-enabled #map-select::before {
@@ -5280,12 +5384,37 @@ html.touch-controls-enabled .start-panel {
 }
 
 /* Settings: same field-notes card as the pause menu, on top of either menu. */
-#settings-dialog {
+#settings-dialog,
+#controls-dialog {
   margin: auto; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0;
   overflow-y: auto; color: #e3dccb; border: 0; border-left: 3px solid #7e1713;
   background: linear-gradient(100deg, #090c0cfa, #0d1110f2); box-shadow: 0 34px 90px #000b;
 }
-#settings-dialog::backdrop { background: rgba(3, 4, 4, 0.72); }
+#settings-dialog::backdrop,
+#controls-dialog::backdrop { background: rgba(3, 4, 4, 0.72); }
+#controls-dialog { width: min(660px, calc(100vw - 32px)); }
+.settings-link {
+  display: block; width: 100%; margin: 4px 0 8px; padding: 9px 12px; cursor: pointer; text-align: left;
+  border: 1px solid #98a19340; border-left: 2px solid #7e1713; background: #1a1d1ce6; color: #c9cbc3;
+  font: 700 11px 'Consolas', 'SF Mono', monospace; letter-spacing: .18em;
+}
+.settings-link:hover,
+.settings-link:focus-visible { border-color: #b6483ec2; color: #f0e6d0; }
+.settings-link:focus-visible { outline: 2px solid #bd5148; outline-offset: 3px; }
+#controls-devices { margin-bottom: 12px; }
+.controls-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.controls-section { padding: 8px 14px 10px; border: 1px solid #a4ac9d1f; background: #0b0e0d; }
+.controls-section h3 {
+  margin: 0 0 6px; color: #8e968a; font: 600 10px 'Consolas', 'SF Mono', monospace; letter-spacing: .24em;
+}
+.controls-section dl { margin: 0; }
+.controls-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 30px; font: 13px 'Segoe UI', sans-serif;
+}
+.controls-row + .controls-row { border-top: 1px solid #a4ac9d14; }
+.controls-row dd { flex: none; margin: 0; color: #8e968a; text-align: right; white-space: nowrap; }
+.controls-row kbd { margin: 0 0 0 3px; }
 .confirm-dialog {
   margin: auto; width: min(420px, calc(100vw - 32px)); padding: 24px;
   color: #e3dccb; border: 0; border-left: 3px solid #7e1713; background: #0d1110;

@@ -187,8 +187,8 @@ Bajo la música, cada mapa puede declarar un fondo procedural
 rumor de tuneles en Station 33) que entra y sale con fundido. Fondo y eventos
 ambientales del mapa pasan por un bus propio de `AudioSystem`: al morir el
 ultimo zombi suena un toque de campana grave y el ambiente baja a un silencio
-tenso durante el descanso; el sting de la ronda siguiente lo devuelve
-gradualmente. `RoundCueGate` garantiza un unico cue de inicio y de fin por ronda
+tenso durante el descanso; al empezar la ronda siguiente vuelve
+gradualmente, sin efecto sintetico: el unico cue audible es el MP3 de ronda. `RoundCueGate` garantiza un unico cue de inicio y de fin por ronda
 en individual y en ambos clientes cooperativos, y se reinicia con la partida.
 La pausa silencia el bus y ocultar la pagina (cambio de pestaña o de app)
 suspende el contexto de efectos hasta volver. Los gemidos de zombi (aparicion y
@@ -1159,6 +1159,16 @@ golpes sin origen (jefe, evacuacion) solo muestran el destello.
 
 Al volver al menu se limpian los anuncios, destellos y la proteccion azul del
 HUD compartido para que no reaparezcan al empezar otro mapa.
+
+Cuando un mapa termina de construirse y calentar la GPU, la pantalla de inicio
+muestra sobre la escena una tarjeta compacta, baja y lejos de la mira, con el
+nombre del mapa, «LISTO PARA SOBREVIVIR» y la accion de empezar segun el
+dispositivo; sigue siendo el gesto que pide Pointer Lock o pantalla completa y
+se desvanece al empezar. Los controles ya no se listan ahi: el boton CONTROLES
+de la pausa y VER CONTROLES en Ajustes abren un dialogo por categorias
+(movimiento, combate, interaccion, otros) para PC o movil y mando, generado desde
+[ControlsCatalog](../src/ui/ControlsCatalog.ts), cuyos botones de mando salen de
+`GamepadBindings`.
 
 Los avisos de interaccion comparten una tarjeta oscura de alto contraste, con
 accion, tecla o boton tactil y coste separados. La entrada despliega el marco

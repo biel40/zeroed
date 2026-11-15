@@ -131,6 +131,15 @@ describe('Ambience mix', () => {
     expect(timeConstant).toBeGreaterThan(1);
   });
 
+  it('starts a round without a synthetic sting; the round MP3 is the only cue', () => {
+    const { audio, ctx } = startedSystem();
+    const sources = ctx.sources.length;
+
+    audio.playRoundStartCue();
+
+    expect(ctx.sources.length).toBe(sources);
+  });
+
   it('hushes the ambience while paused and restores the current round level', () => {
     const { audio, ctx } = startedSystem();
     const gain = ambienceGain(ctx);
