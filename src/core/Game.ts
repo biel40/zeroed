@@ -416,6 +416,9 @@ export class Game {
       if (this.disposed) return;
     }
     for (const texture of textures) this.renderer.initTexture(texture);
+    // The ready frame is frozen until play starts: grip the weapon now, or the
+    // unposed arms float in front of the camera.
+    this.viewArms.update(0, this.currentView, null);
     this.present(camera);
     this.renderer.setAnimationLoop(this.tick);
   }

@@ -990,18 +990,21 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     shellCasing: 'bmg50',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
-    rpm: 150,
+    rpm: 48,
     magazineSize: 7,
     reloadTime: 4.2,
     tacticalReloadTime: 3.4,
     boltAction: false,
     boltCycleTime: 0,
     scoped: true,
+    // Too heavy to hip-fire: the trigger only answers through the scope.
+    requireAdsToFire: true,
     damage: 1800,
     // Four rounds faster than the cool delay redline the barrel and lock
-    // the trigger until it has fully cooled (~4 s); the glow covers the
-    // brake and the exposed barrel behind it.
-    heat: { shotsToOverheat: 4, coolTime: 3.2, coolDelay: 0.6, lockout: true, maxSpreadBonus: 0.014, glow: { radius: 0.055, length: 0.3 } },
+    // the trigger until it has fully cooled (~4.5 s); the delay outlasts the
+    // 1.25 s cadence so back-to-back fire still redlines. The glow covers
+    // the brake and the exposed barrel behind it.
+    heat: { shotsToOverheat: 4, coolTime: 3.2, coolDelay: 1.3, lockout: true, maxSpreadBonus: 0.014, glow: { radius: 0.055, length: 0.3 } },
     // The arrowhead brake vents thick clouds to both sides on every shot.
     muzzleSmoke: { puffs: 6, scale: 2, life: 1.6 },
     recoil: {
@@ -1018,7 +1021,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     ads: { fov: 16, speed: 3.5, sensitivity: 0.35 },
     // A .50 round punches through up to five zombies in a line.
     projectile: { muzzleVelocity: 850, gravity: 9.8, maxDistance: 700, drag: 0.025, maxTargets: 5 },
-    moveSpeedMultiplier: 0.8,
+    moveSpeedMultiplier: 0.68,
     equipTime: 0.7,
     audio: { volume: 1.3, duration: 0.38, lowpass: 1800, thump: 62, crack: 0.55, tail: 1.15, mechanism: 0.3, sampleFile: 'barrett_shot.mp3' },
     view: {
