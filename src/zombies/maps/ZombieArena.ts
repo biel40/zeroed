@@ -9,6 +9,7 @@ import type { WindowBarrier } from '../barriers/WindowBarrier';
 import type { PointDoor } from '../doors/PointDoor';
 import type { SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
+import type { ZombieSkinShare } from '../skins/ZombieSkinShares';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
@@ -490,6 +491,12 @@ export interface ZombieArena {
   readonly ambience: ArenaAmbience;
   /** Optional: walker looks the horde wears, dealt in turn; omitted keeps the plain walker. */
   readonly zombieSkins?: readonly ZombieSkinId[];
+  /**
+   * Optional: walker looks rolled per spawn by weight instead of dealt in
+   * turn (a null skin is the plain walker). Appearance only. Takes the place
+   * of `zombieSkins`; a map declares one or the other.
+   */
+  readonly zombieSkinShares?: readonly ZombieSkinShare[];
   /** Optional: eye colors of every zombie on the map; omitted keeps each model's own. */
   readonly zombieEyes?: ZombieEyeColors;
   /** Optional: ambient sounds the map schedules itself; the mode plays them. */

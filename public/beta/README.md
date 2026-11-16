@@ -2,13 +2,18 @@
 
 Burned Mansion sigue abierto, en individual y cooperativo, sin cuenta. Los
 mapas con `product` en [el registro](../../src/config/zombieMaps.ts),
-actualmente Station 33, aparecen con candado mientras la cuenta no los tenga.
+actualmente Station 33 y Die Kathedrale, aparecen con candado mientras la cuenta
+no los tenga.
 
 Los testers ya no se comprueban en el cliente: tienen una concesion `*` en la
 [API de cuentas](../../cloudflare/api/README.md), que incluye todo el contenido
 premium presente y futuro. La lista de correos no se publica; se carga en la
 base de datos con `npm run api:seed-beta` desde un archivo fuera del
 repositorio.
+
+Al publicar un producto nuevo del [catalogo](../../src/config/products.ts),
+despliega tambien la API de cuentas: esta expande la concesion `*` con los
+productos de su version publicada.
 
 Flujo: la tarjeta bloqueada abre [MapUnlockDialog](../../src/ui/MapUnlockDialog.ts),
 que ofrece "Continuar con Google" (solo en web, si hay id de cliente) y entrar
@@ -24,10 +29,11 @@ cuenta, arriba a la derecha del menu, muestra la inicial y el correo, con la
 placa "BETA TESTER" en cuentas de beta (o "Iniciar sesion"). Si falta espacio,
 el correo se acorta con puntos suspensivos. El boton abre el dialogo para
 entrar o cerrar sesion, donde se ve la direccion completa de la cuenta.
-`?map=station-33` sin permiso muestra el menu con la tarjeta bloqueada.
+`?map=station-33` y `?map=la-seu` (Die Kathedrale) sin permiso muestran el menu
+con la tarjeta correspondiente bloqueada.
 
-Limites: el codigo de Station 33 sigue en el paquete del juego, asi que un
-cliente modificado puede abrirlo. Como el registro no verifica el correo,
+Limites: el codigo de los mapas premium sigue en el paquete del juego, asi que
+un cliente modificado puede abrirlos. Como el registro no verifica el correo,
 quien conozca el correo de un tester que aun no se ha registrado puede hacerlo
 antes que el; el tester lo recupera con Google o con el enlace de
 recuperacion. Las apps Android y de escritorio solo ofrecen correo y
@@ -42,10 +48,11 @@ beta; el resto de correos sigue el flujo normal. Los builds de produccion no
 incluyen ese modulo.
 
 Validacion manual (con la API local o desplegada): en una sesion nueva,
-Burned Mansion funciona y Station 33 aparece bloqueado y no abre por enlace
-directo; entrar con un correo de tester sin registrar y comprobar que lleva a
-"Crear cuenta"; registrarlo con la contraseña repetida, ver el agradecimiento y
-jugar; recargar; cerrar sesion y comprobar que una contraseña distinta se
-rechaza y la correcta entra; probar Google con una cuenta de tester; pedir el
+Burned Mansion funciona y ambos mapas premium aparecen bloqueados y no abren por
+enlace directo; entrar con un correo de tester sin registrar y comprobar que
+lleva a "Crear cuenta"; registrarlo con la contraseña repetida, ver el
+agradecimiento y jugar a Station 33 y Die Kathedrale; recargar; cerrar sesion y
+comprobar que una contraseña distinta se rechaza y la correcta entra; probar
+Google con una cuenta de tester; pedir el
 enlace de recuperacion, abrirlo y guardar otra contraseña; probar un correo sin
 concesion. Repetir en movil, PWA instalada y app Android.

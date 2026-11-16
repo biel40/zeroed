@@ -92,11 +92,11 @@ describe('Zombies map selection flow', () => {
     expect(css).toMatch(/\.map-card\[data-locked='true'\] \.map-card-lock \{\s*display: flex;/);
   });
 
-  it('lists Burned Mansion for everyone, Station 33 as a locked single-player premium map and La Seu as an included single-player map', () => {
+  it('lists Burned Mansion for everyone and both premium maps as single-player maps', () => {
     expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true });
     expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, product: 'map.station-33', coop: false });
-    expect(ZOMBIE_MAPS['la-seu']).toMatchObject({ visible: true, coop: false });
-    expect(getZombieMapProduct('la-seu')).toBeUndefined();
+    expect(ZOMBIE_MAPS['la-seu']).toMatchObject({ visible: true, product: 'map.die-kathedrale', coop: false });
+    expect(getZombieMapProduct('la-seu')).toBe('map.die-kathedrale');
     expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
     expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);
@@ -120,7 +120,8 @@ describe('Zombies map selection flow', () => {
     };
     const mansion = card('burned-mansion');
     const station = card('station-33');
-    const mapSelect = new FakeElement([mansion, station]);
+    const cathedral = card('la-seu');
+    const mapSelect = new FakeElement([mansion, station, cathedral]);
     const startScreen = new FakeElement();
     const elements: Record<string, FakeElement> = {
       'map-select': mapSelect,
@@ -190,6 +191,11 @@ describe('Zombies map selection flow', () => {
       expect(station.slots['[data-map-access]'].textContent).toBe('PREMIUM');
       expect(station.slots['[data-map-account]'].textContent).toBe('ACCOUNT REQUIRED');
       expect(station.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
+      expect(cathedral.dataset.access).toBe('premium');
+      expect(cathedral.dataset.locked).toBe('false');
+      expect(cathedral.slots['[data-map-access]'].textContent).toBe('PREMIUM');
+      expect(cathedral.slots['[data-map-account]'].textContent).toBe('ACCOUNT REQUIRED');
+      expect(cathedral.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion']);
       expect(mapSelect.classList.contains('hidden')).toBe(true);
@@ -219,6 +225,8 @@ describe('Zombies map selection flow', () => {
       expect(station.classList.contains('hidden')).toBe(false);
       expect(station.dataset.locked).toBe('true');
       expect(station.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
+      expect(cathedral.dataset.locked).toBe('true');
+      expect(cathedral.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
       expect(mansion.dataset.locked).toBe('false');
       expect(mansion.focused).toBe(true);
       station.onclick?.();
@@ -229,6 +237,11 @@ describe('Zombies map selection flow', () => {
       expect(elements['beta-google-field'].classList.contains('hidden')).toBe(true);
       expect(elements['beta-signout'].classList.contains('hidden')).toBe(true);
       expect(mapSelect.classList.contains('hidden')).toBe(false);
+      unlockDialog.close();
+      cathedral.onclick?.();
+      expect(unlockDialog.open).toBe(true);
+      expect(elements['beta-unlock-map'].dataset.i18n).toBe('map.laSeu');
+      expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
       const flush = async (): Promise<void> => {
         for (let i = 0; i < 5; i++) await Promise.resolve();

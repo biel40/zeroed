@@ -57,6 +57,7 @@ export const ZOMBIE_MAPS = {
   'la-seu': {
     id: 'la-seu',
     visible: true,
+    product: 'map.die-kathedrale',
     nameKey: 'map.laSeu',
     coop: false,
     exclusiveWeapons: [],

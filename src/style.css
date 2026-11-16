@@ -3045,7 +3045,7 @@ html.coop-guest #pause-restart {
   flex-shrink: 0;
 }
 
-/* Both assets contain baked UI. The same SVG viewport exposes only scenery;
+/* SVG viewports expose only scenery, cropping any baked UI in older assets;
    the frame, labels and interaction states belong to the shared card. Short
    windows crop the art wider instead of pushing the menu off screen. */
 .map-card-art {

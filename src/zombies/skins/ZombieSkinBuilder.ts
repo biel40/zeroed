@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import type { ZombieModelId } from '../ZombieConfig';
+import { ZOMBIE_MODEL_POOL_CAPACITIES, type ZombieModelId } from '../ZombieConfig';
 import type { ZombieModelSources } from '../ZombieManager';
 import { ZOMBIE_MODELS, type ZombieEyeColors, type ZombieModelSource } from '../ZombieVisual';
 import { ZombieBodyFrame } from './ZombieBodyFrame';
+import { measure } from './ZombieAccessoryGeometry';
+import { ZombieGarmentDrape } from './ZombieGarmentDrape';
+import { wornColor } from './ZombieGarmentWear';
 import { buildAccessoryParts } from './ZombieSkinAccessories';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from './ZombieSkinCatalog';
+import { apportionShares, type ZombieSkinShare } from './ZombieSkinShares';
 import { buildStumpParts, burnAt, charColor, severedBoneRemap, severedTriangles } from './ZombieSkinDamage';
 import {
   ACCESSORY_BAND,
@@ -44,9 +48,9 @@ function canBurn(band: WalkerPaletteBand): boolean {
 
 /**
  * The walker geometry dressed in a skin: atlas regions retinted through a
- * vertex color multiplier, burns painted the same way, severed forearms cut
- * away and accessories (and stumps) appended as rigid triangles weighted to
- * one bone, so the body stays a single skinned draw sharing the original
+ * vertex color multiplier, burns and stains painted the same way, severed
+ * forearms cut away and accessories (and stumps) appended as triangles
+ * weighted to one bone or, for long cloth, draped over the hips and thighs, so the body stays a single skinned draw sharing the original
  * texture. Returns non-indexed geometry.
  */
 export function buildSkinnedWalkerGeometry(
@@ -67,9 +71,21 @@ export function buildSkinnedWalkerGeometry(
     .sort((a, b) => Number(a.detachableHat) - Number(b.detachableHat)).map((part) => {
     const placed = part.geometry.clone().applyMatrix4(body.toGeometry);
     placed.computeVertexNormals();
-    part.geometry.dispose();
-    return { geometry: placed, tint: tintFor(part.color, ACCESSORY_BAND), bone: body.boneIndex(part.bone), hat: part.detachableHat };
+    return {
+      geometry: placed,
+      /** The part in the body frame, where drape and wear are measured. */
+      shape: part.geometry,
+      color: part.color,
+      tint: tintFor(part.color, ACCESSORY_BAND),
+      bone: body.boneIndex(part.bone),
+      hat: part.detachableHat,
+      draped: part.draped ?? false,
+      worn: Boolean(part.fabric && skin.stains),
+    };
   });
+  const drape = parts.some((part) => part.draped)
+    ? new ZombieGarmentDrape(body, base.getAttribute('skinIndex'), base.getAttribute('skinWeight'), measure(body))
+    : null;
 
   const baseCount = kept.length;
   const total = baseCount + parts.reduce((sum, part) => sum + part.geometry.getAttribute('position').count, 0);
@@ -102,6 +118,7 @@ export function buildSkinnedWalkerGeometry(
   const tints = new Map<string, THREE.Color>();
   const bodyPoint = new THREE.Vector3();
   const burnt = new THREE.Color();
+  const aged = new THREE.Color();
   for (let index = 0; index < baseCount; index++) {
     const vertex = kept[index];
     const band = walkerBandAt(uv[index * 2], uv[index * 2 + 1]);
@@ -111,6 +128,8 @@ export function buildSkinnedWalkerGeometry(
     let tint = WHITE;
     if (burn > 0) {
       tint = tintFor(charColor(hex !== undefined ? burnt.set(hex) : burnt.copy(bandColor(band)), burn), band);
+    } else if (hex !== undefined && skin.stains) {
+      tint = tintFor(wornColor(aged.set(hex), body.bodyPoint(vertex, bodyPoint), skin.stains), band);
     } else if (hex !== undefined) {
       const key = `${band}:${hex}`;
       tint = tints.get(key) ?? tints.set(key, tintFor(hex, band)).get(key)!;
@@ -125,13 +144,23 @@ export function buildSkinnedWalkerGeometry(
     write(position, 3, offset, part.geometry.getAttribute('position'));
     write(normal, 3, offset, part.geometry.getAttribute('normal'));
     const count = part.geometry.getAttribute('position').count;
+    const shape = part.shape.getAttribute('position');
     for (let vertex = offset; vertex < offset + count; vertex++) {
       uv.set(ACCESSORY_UV, vertex * 2);
-      skinIndex[vertex * 4] = part.bone;
-      skinWeight[vertex * 4] = 1;
-      part.tint.toArray(color, vertex * 3);
+      bodyPoint.fromBufferAttribute(shape, vertex - offset);
+      if (drape && part.draped) {
+        drape.weightsAt(bodyPoint, skinIndex, skinWeight, vertex);
+      } else {
+        skinIndex[vertex * 4] = part.bone;
+        skinWeight[vertex * 4] = 1;
+      }
+      const tint = part.worn && skin.stains
+        ? tintFor(wornColor(aged.set(part.color), bodyPoint, skin.stains), ACCESSORY_BAND)
+        : part.tint;
+      tint.toArray(color, vertex * 3);
     }
     part.geometry.dispose();
+    part.shape.dispose();
     offset += count;
   }
   if (base !== geometry) base.dispose();
@@ -196,35 +225,57 @@ export function createSkinnedWalkerSource(source: ZombieModelSource, skinId: Zom
   return skinned;
 }
 
-/** How a map dresses its horde (see `ZombieArena.zombieSkins` and `zombieEyes`). */
+/** How a map dresses its horde (see `ZombieArena.zombieSkins`, `zombieSkinShares` and `zombieEyes`). */
 export interface ZombieHordeLook {
   readonly skins?: readonly ZombieSkinId[];
+  /** Weighted looks; when present they replace `skins`. */
+  readonly skinShares?: readonly ZombieSkinShare[];
   readonly eyes?: ZombieEyeColors;
   /** See `ZombieModelSource.surfaceDetail`. */
   readonly surfaceDetail?: boolean;
 }
 
 /**
+ * Walker looks of a weighted horde, one per pooled body: each share is a
+ * single source carrying its `spawnWeight` (bodies of a share reuse it, so
+ * ZombieLookPicker can tell them apart), apportioned across the reserve.
+ */
+function weightedWalkerLooks(
+  walker: ZombieModelSource,
+  shares: readonly ZombieSkinShare[],
+  withLook: (source: ZombieModelSource) => ZombieModelSource,
+): ZombieModelSource[] {
+  const looks = shares.map(({ skin, weight }) => ({
+    ...withLook(skin ? createSkinnedWalkerSource(walker, skin) : walker),
+    spawnWeight: weight,
+  }));
+  return apportionShares(shares.map((share) => share.weight), ZOMBIE_MODEL_POOL_CAPACITIES.walker)
+    .map((share) => looks[share]);
+}
+
+/**
  * Zombie sources dressed for a map: the walker becomes one look per listed
- * skin, dealt in turn across its pool, and every model takes the map's eye
- * colors and the surface detail flag. Missing assets (procedural fallback)
- * keep their own look; without a look the sources pass through untouched.
+ * skin, dealt in turn across its pool (or rolled per spawn by weight with
+ * `skinShares`), and every model takes the map's eye colors and the surface
+ * detail flag. Missing assets (procedural fallback) keep their own look;
+ * without a look the sources pass through untouched.
  */
 export function dressZombieSources(
   sources: Readonly<Record<ZombieModelId, ZombieModelSource | null>>,
-  { skins = [], eyes, surfaceDetail = false }: ZombieHordeLook = {},
+  { skins = [], skinShares = [], eyes, surfaceDetail = false }: ZombieHordeLook = {},
 ): ZombieModelSources {
-  if (skins.length === 0 && !eyes && !surfaceDetail) return sources;
+  if (skins.length === 0 && skinShares.length === 0 && !eyes && !surfaceDetail) return sources;
   const withLook = (source: ZombieModelSource): ZombieModelSource =>
     (eyes || surfaceDetail ? { ...source, ...(eyes && { eyes }), ...(surfaceDetail && { surfaceDetail }) } : source);
+  const dressWalker = (walker: ZombieModelSource): ZombieModelSource | ZombieModelSource[] => {
+    if (skinShares.length > 0) return weightedWalkerLooks(walker, skinShares, withLook);
+    if (skins.length > 0) return skins.map((skinId) => withLook(createSkinnedWalkerSource(walker, skinId)));
+    return withLook(walker);
+  };
   const dressed: ZombieModelSources = {};
   for (const modelId of Object.keys(sources) as ZombieModelId[]) {
     const source = sources[modelId];
-    dressed[modelId] = !source
-      ? source
-      : modelId === 'walker' && skins.length > 0
-        ? skins.map((skinId) => withLook(createSkinnedWalkerSource(source, skinId)))
-        : withLook(source);
+    dressed[modelId] = !source ? source : modelId === 'walker' ? dressWalker(source) : withLook(source);
   }
   return dressed;
 }

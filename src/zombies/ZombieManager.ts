@@ -42,6 +42,7 @@ import type { GrenadeBlastConfig } from '../config/grenades';
 import { resolveBlastOutcome } from './grenades/GrenadeBlast';
 import { arenaFloorHeight } from './maps/ArenaFloors';
 export type { ZombieKillSource } from './ZombieDeath';
+import { ZombieLookPicker } from './ZombieLookPicker';
 import { ZombiePool } from './ZombiePool';
 import { MIN_PLAYER_DISTANCE, ZombieSpawner } from './ZombieSpawner';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from './ZombieSpawner';
@@ -229,6 +230,8 @@ export class ZombieManager {
   public onBarrierImpact: ((barrier: WindowBarrier) => void) | null = null;
 
   private readonly pool: ZombiePool;
+  /** Rolls each spawned walker's look when the map weights its skins. */
+  private readonly looks = new ZombieLookPicker();
   /** Wall set shared by every pooled zombie's gibs. */
   private readonly gibWalls: GibWalls = { boxes: [] };
   private readonly blood = new ZombieBlood(this.gibWalls);
@@ -314,11 +317,13 @@ export class ZombieManager {
       const modelId = ZOMBIE_POOL_MODELS[index];
       const model = ZOMBIE_MODELS[modelId];
       const tint = model.tints[(this.nextZombieId - 1) % model.tints.length];
+      const source = zombiePoolSource(sources, index);
       const zombie = new Zombie(
-        new ZombieVisual(modelId, zombiePoolSource(sources, index), tint, castShadows),
+        new ZombieVisual(modelId, source, tint, castShadows),
         this.gibWalls,
         this.blood,
       );
+      this.looks.register(zombie, source);
       this.zombieIds.set(zombie, this.nextZombieId++);
       zombie.onDeathFinished = () => this.finishDeath(zombie);
       this.group.add(zombie.group);
@@ -522,13 +527,13 @@ export class ZombieManager {
   spawnZombie(config: RoundConfig, playerX: number, playerZ: number, round = 1): boolean {
     let typeId = selectZombieType(round, this.activeTypeCounts(), this.typeRng);
     let profile = ZOMBIE_TYPE_CONFIGS[typeId];
-    let zombie = this.pool.acquire(profile.modelId);
+    let zombie = this.acquireBody(profile.modelId);
     // A future type may share a smaller model reserve with another type.
     // Preserve round cadence by degrading to the default walker if it is full.
     if (!zombie && typeId !== 'normal') {
       typeId = 'normal';
       profile = ZOMBIE_TYPE_CONFIGS.normal;
-      zombie = this.pool.acquire(profile.modelId);
+      zombie = this.acquireBody(profile.modelId);
     }
     if (!zombie) return false;
     const spawn = this.pickValidSpawn(playerX, playerZ, profile.bodyRadius);
@@ -553,7 +558,7 @@ export class ZombieManager {
     const profile = ZOMBIE_TYPE_CONFIGS.normal;
     const feetY = this.floorBaseY(floor);
     if (this.hitsObstacle(x, z, feetY, profile.bodyRadius)) return false;
-    const zombie = this.pool.acquire(profile.modelId);
+    const zombie = this.acquireBody(profile.modelId);
     if (!zombie) return false;
     this.placeZombie(zombie, { x, z }, config, round, 'normal', feetY, floor);
     zombie.barrierTarget = null;
@@ -562,6 +567,13 @@ export class ZombieManager {
     zombie.skipSpawnRise();
     this.registerSpawned(zombie);
     return true;
+  }
+
+  /** A free pooled body of the model, wearing a rolled look when the map weights them. */
+  private acquireBody(modelId: ZombieModelId): Zombie | null {
+    if (!this.looks.weighted) return this.pool.acquire(modelId);
+    this.looks.roll(this.rng());
+    return this.pool.acquire(modelId, this.looks.wearsRolledLook);
   }
 
   private placeZombie(

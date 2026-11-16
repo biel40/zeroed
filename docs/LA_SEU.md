@@ -1,7 +1,8 @@
-# La Seu: direccion de arte y enfoque del mapa
+# Die Kathedrale: direccion de arte y enfoque del mapa
 
-Guia para retomar La Seu sin perder su identidad. Describe la intencion; las
-medidas, coordenadas y tablas viven en `src/zombies/maps/LaSeuConfig.ts` y en
+Guia para retomar Die Kathedrale (La Seu de Palma) sin perder su identidad.
+Describe la intencion; las medidas, coordenadas y tablas viven en
+`src/zombies/maps/LaSeuConfig.ts` y en
 los builders de `src/zombies/maps/laSeu/`. Si el codigo y esta guia discrepan,
 manda el codigo: actualiza la guia.
 
@@ -11,8 +12,10 @@ manda el codigo: actualiza la guia.
   Una interpretacion reconocible, no una reproduccion a escala: las naves miden
   aproximadamente la mitad que las reales y se conservan las proporciones que
   la hacen inconfundible.
-- Mapa individual e incluido (sin producto). Se desarrolla en la rama
-  `feature/map-la-seu`; decide su visibilidad en el menu antes de integrarla.
+- Mapa individual y premium, visible en el menu como Die Kathedrale. Conserva
+  el id interno `la-seu` y las rutas `LaSeu`; producto y acceso se declaran en
+  [el registro de mapas](../src/config/zombieMaps.ts). Comparte el acceso de
+  [beta cerrada](../public/beta/README.md) con Station 33.
 - Se construye por fases, como Station 33. Cada fase debe ser una partida
   completa y nunca abrir puertas hacia el vacio. El plan de ejes esta al
   principio de `LaSeuConfig.ts`: el frente principal sobre z = 0, la nave hacia
@@ -86,9 +89,12 @@ Las tablas exactas (rejas, capillas, entradas, luces y sonidos) estan en
   (`LaSeuLighting`); todo lo demas brilla por materiales sin iluminar.
 - El paisaje de la plaza no lleva niebla ni luz y debe quedar dentro del plano
   lejano de la camara.
-- Sin assets externos: texturas, vidrieras y tarjeta del menu se generan en
-  codigo. La musica reutiliza una pista existente y los sonidos ambientales,
-  los `AmbientCueSound` procedurales compartidos.
+- Las texturas y vidrieras del escenario se generan en codigo. La portada del
+  menu usa una ilustracion raster original de la nave, con pilares, roseton y
+  velas, y el mismo tratamiento dorado premium que Station 33; su fuente esta
+  registrada en [ASSETS.md](../ASSETS.md). La musica reutiliza una pista
+  existente y los sonidos ambientales, los `AmbientCueSound` procedurales
+  compartidos.
 
 ## Pendiente
 
@@ -98,8 +104,7 @@ Las tablas exactas (rejas, capillas, entradas, luces y sonidos) estan en
   (`BuyableDoorVisual` compartido); si el movil lo acusa, fusionar sus piezas.
 - La nave central no tiene entrada de zombis propia.
 - Reverberacion propia de la catedral: el audio no tiene aun reverb por mapa.
-- Tarjeta de menu pintada, musica propia, intro y sonidos ambientales
-  (campanas, organo).
+- Musica propia, intro y sonidos ambientales (campanas, organo).
 - Zonas siguientes: claustro, campanario, Almudaina,
   Parc de la Mar y casco antiguo. Anillos, electricidad, mejora de armas y un
   final propio.

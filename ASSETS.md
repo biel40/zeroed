@@ -240,6 +240,16 @@ variación la aporta el motor (playbackRate 0.9–1.12 y jitter de cadencia).
 Si un archivo falta o no decodifica, ambos sonidos vuelven a su síntesis
 procedural.
 
+## Portadas de mapas (`public/assets/maps/`)
+
+`die-kathedrale-menu.webp`: ilustracion original generada con la herramienta
+integrada OpenAI ImageGen el 15 de noviembre de 2026 para la tarjeta de
+Die Kathedrale. Escena de la nave gotica de La Seu de noche, con roseton,
+velas y luz lunar, siguiendo el acabado cinematografico de Station 33. Sin
+rotulos ni interfaz incrustados; estos los dibuja la tarjeta compartida.
+Exportada a WebP de 1440 × 810 para el menu. Prompt de generacion en
+[la fuente del arte](assets/maps/die-kathedrale-menu.prompt.txt).
+
 ## Resto
 
 Muzzle flash, bullet holes, humo, señales de distancia y dianas se generan

@@ -38,6 +38,7 @@ import {
   LA_SEU_START_ZONE,
   LA_SEU_WALL_BUYS,
   LA_SEU_WALL_THICKNESS,
+  LA_SEU_ZOMBIE_SKIN_SHARES,
   LA_SEU_ZONES,
   type LaSeuZoneId,
 } from './LaSeuConfig';
@@ -59,8 +60,8 @@ const DOOR_PLAYER_STOPS: ReadonlyArray<THREE.Box3> = LA_SEU_ENTRANCES
   .map((entrance) => entrancePlayerStop(entrance, LA_SEU_OPENINGS.door.width, LA_SEU_OPENINGS.door.top, LA_SEU_WALL_THICKNESS));
 
 /**
- * La Seu, Palma's Gothic cathedral by night, overrun. Single-player and
- * included. The arena only orchestrates: builders shape the nave, the
+ * Die Kathedrale, Palma's Gothic cathedral by night, overrun.
+ * The arena only orchestrates: builders shape the nave, the
  * chancel and the plaza, `LaSeuLighting` and `LaSeuAtmosphere` keep them
  * alive, and gameplay objects come from the shared barrier, door, wall-buy
  * and Mystery Box systems.
@@ -76,6 +77,7 @@ export class LaSeuArena implements ZombieArena {
   public readonly id = 'la-seu';
   public readonly group = new THREE.Group();
   public readonly ambience = LA_SEU_AMBIENCE;
+  public readonly zombieSkinShares = LA_SEU_ZOMBIE_SKIN_SHARES;
   public readonly playerSpawn = LA_SEU_PLAYER_SPAWN;
   public readonly useWallCollision = true;
   public readonly playerBounds = LA_SEU_PLAYER_BOUNDS;

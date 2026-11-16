@@ -51,6 +51,11 @@ export interface ZombieModelSource {
   readonly eyes?: ZombieEyeColors;
   /** Layers procedural micro-relief on the body materials (top quality tier). */
   readonly surfaceDetail?: boolean;
+  /**
+   * Relative chance a spawned body of this model wears this look (map skin
+   * shares, see ZombieLookPicker); omitted when looks are dealt in turn.
+   */
+  readonly spawnWeight?: number;
 }
 
 

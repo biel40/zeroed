@@ -1,8 +1,22 @@
 import * as THREE from 'three';
+import {
+  FIT,
+  box,
+  doubleSided,
+  frontOf,
+  loft,
+  measure,
+  scaled,
+  slab,
+  star,
+  RING_SEGMENTS,
+  type BodyMeasures,
+} from './ZombieAccessoryGeometry';
 import type { ZombieBodyFrame } from './ZombieBodyFrame';
-import type { ZombieAccessory } from './ZombieSkinCatalog';
+import { buildVestmentParts, isVestment } from './ZombieClergyGarments';
+import type { ZombieAccessory, ZombieVestment } from './ZombieSkinCatalog';
 
-/** One rigid, flat-colored piece riding a single bone, in body-frame meters. */
+/** One flat-colored piece, in body-frame meters; rigid on `bone` unless draped. */
 export interface AccessoryPart {
   /** Non-indexed triangles. */
   readonly geometry: THREE.BufferGeometry;
@@ -10,159 +24,24 @@ export interface AccessoryPart {
   readonly bone: string;
   /** A complete loose hat, including its badge; hoods stay sewn to the coat. */
   readonly detachableHat?: boolean;
+  /** Long cloth skinned to the torso and both thighs instead of `bone` (see ZombieGarmentDrape). */
+  readonly draped?: boolean;
+  /** Cloth the skin's stains and mud weather (see ZombieGarmentWear). */
+  readonly fabric?: boolean;
 }
 
-/** Elliptical cross-section of a body part at a height (body frame, meters). */
-interface Section {
-  readonly x: number;
-  readonly z: number;
-  readonly rx: number;
-  readonly rz: number;
-}
+/** Hats knocked off by the first head hit, with everything sewn onto them. */
+const DETACHABLE_HATS: ReadonlySet<ZombieAccessory['kind']> = new Set([
+  'sideCap', 'peakedCap', 'helmet', 'furHat', 'mitre', 'biretta',
+]);
 
-/** Low-poly ring resolution, matching the walker's faceted look. */
-const RING_SEGMENTS = 10;
-/** Clearance between cloth and the skin under it, as a radius factor. */
-const FIT = 1.08;
+/** Accessories built here; vestments have their own builders (ZombieClergyGarments). */
+type UniformAccessory = Exclude<ZombieAccessory, ZombieVestment>;
+type UniformKind = UniformAccessory['kind'];
+type AccessoryOf<K extends UniformKind> = Extract<UniformAccessory, { kind: K }>;
+type AccessoryBuilder<K extends UniformKind> = (accessory: AccessoryOf<K>, m: BodyMeasures) => AccessoryPart[];
 
-function sectionOf(box: THREE.Box3): Section {
-  return {
-    x: (box.min.x + box.max.x) / 2,
-    z: (box.min.z + box.max.z) / 2,
-    rx: (box.max.x - box.min.x) / 2,
-    rz: (box.max.z - box.min.z) / 2,
-  };
-}
-
-function scaled(section: Section, sx: number, sz = sx): Section {
-  return { ...section, rx: section.rx * sx, rz: section.rz * sz };
-}
-
-function ringPoint(section: Section, y: number, angle: number): THREE.Vector3 {
-  return new THREE.Vector3(section.x + Math.sin(angle) * section.rx, y, section.z + Math.cos(angle) * section.rz);
-}
-
-function trianglesGeometry(points: readonly THREE.Vector3[]): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points.flatMap((p) => [p.x, p.y, p.z]), 3));
-  return geometry;
-}
-
-/**
- * Lofted elliptical tube from `bottom` at y0 to `top` at y1, outward facing,
- * optionally capped on top. Angles start at the front (+z) and turn to the
- * left (+x); `arc` below 2π leaves an open shell (visors, flaps).
- */
-function loft(
-  bottom: Section, y0: number, top: Section, y1: number,
-  options: { readonly capTop?: boolean; readonly arc?: number; readonly start?: number } = {},
-): THREE.BufferGeometry {
-  const arc = options.arc ?? Math.PI * 2;
-  const start = options.start ?? 0;
-  const points: THREE.Vector3[] = [];
-  const topCenter = new THREE.Vector3(top.x, y1, top.z);
-  for (let i = 0; i < RING_SEGMENTS; i++) {
-    const a0 = start + (arc * i) / RING_SEGMENTS;
-    const a1 = start + (arc * (i + 1)) / RING_SEGMENTS;
-    const b0 = ringPoint(bottom, y0, a0);
-    const b1 = ringPoint(bottom, y0, a1);
-    const t0 = ringPoint(top, y1, a0);
-    const t1 = ringPoint(top, y1, a1);
-    points.push(b0, b1, t0, t0, b1, t1);
-    if (options.capTop) points.push(topCenter, t0, t1);
-  }
-  return trianglesGeometry(points);
-}
-
-/** Adds the reversed copy of every triangle, for open shells seen from inside. */
-function doubleSided(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-  const front = geometry.getAttribute('position').array;
-  const back = new Float32Array(front.length);
-  for (let i = 0; i < front.length; i += 9) {
-    back.set(front.subarray(i, i + 3), i);
-    back.set(front.subarray(i + 6, i + 9), i + 3);
-    back.set(front.subarray(i + 3, i + 6), i + 6);
-  }
-  const both = new Float32Array(front.length * 2);
-  both.set(front);
-  both.set(back, front.length);
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(both, 3));
-  return geometry;
-}
-
-/** Flat horizontal slab over part of an ellipse (visors), both faces. */
-function slab(section: Section, y: number, thickness: number, start: number, arc: number, droop: number): THREE.BufferGeometry {
-  const points: THREE.Vector3[] = [];
-  const center = new THREE.Vector3(section.x, y, section.z);
-  for (let i = 0; i < RING_SEGMENTS; i++) {
-    const a0 = start + (arc * i) / RING_SEGMENTS;
-    const a1 = start + (arc * (i + 1)) / RING_SEGMENTS;
-    const p0 = ringPoint(section, y - droop * Math.cos(a0), a0);
-    const p1 = ringPoint(section, y - droop * Math.cos(a1), a1);
-    const q0 = p0.clone().setY(p0.y - thickness);
-    const q1 = p1.clone().setY(p1.y - thickness);
-    const under = center.clone().setY(y - thickness);
-    points.push(center, p0, p1, under, q1, q0, p0, q0, p1, p1, q0, q1);
-  }
-  return trianglesGeometry(points);
-}
-
-function box(size: readonly [number, number, number], position: THREE.Vector3, rotation = new THREE.Euler()): THREE.BufferGeometry {
-  return new THREE.BoxGeometry(...size).toNonIndexed().applyMatrix4(
-    new THREE.Matrix4().compose(position, new THREE.Quaternion().setFromEuler(rotation), new THREE.Vector3(1, 1, 1)),
-  );
-}
-
-/** Flat five-pointed star facing +z, rotated by `rotation` and centered on `position`. */
-function star(radius: number, position: THREE.Vector3, rotation = new THREE.Euler()): THREE.BufferGeometry {
-  const points: THREE.Vector3[] = [];
-  const tip = (index: number): THREE.Vector3 => {
-    const r = index % 2 === 0 ? radius : radius * 0.42;
-    const angle = (index * Math.PI) / 5;
-    return new THREE.Vector3(Math.sin(angle) * r, Math.cos(angle) * r, 0);
-  };
-  for (let i = 0; i < 10; i++) points.push(new THREE.Vector3(), tip(i + 1), tip(i));
-  return trianglesGeometry(points).applyMatrix4(
-    new THREE.Matrix4().compose(position, new THREE.Quaternion().setFromEuler(rotation), new THREE.Vector3(1, 1, 1)),
-  );
-}
-
-/** Front surface point of a section at `y`, pushed out by `gap`. */
-function frontOf(section: Section, y: number, gap: number): THREE.Vector3 {
-  return new THREE.Vector3(section.x, y, section.z + section.rz + gap);
-}
-
-interface BodyMeasures {
-  /** Skull above the brow, where every hat sits. */
-  readonly crown: Section;
-  readonly crownTop: number;
-  readonly browY: number;
-  readonly waist: Section;
-  readonly waistY: number;
-  readonly chest: Section;
-  readonly shoulderY: number;
-}
-
-function measure(body: ZombieBodyFrame): BodyMeasures {
-  const head = body.bounds({ bones: ['Head'] });
-  const browY = head.max.y - 0.085;
-  const hips = body.bounds({ bones: ['Hips'] });
-  const chest = body.bounds({ bones: ['Spine2'] });
-  return {
-    crown: sectionOf(body.bounds({ bones: ['Head'], minY: browY - 0.03 })),
-    crownTop: head.max.y,
-    browY,
-    waist: sectionOf(hips),
-    waistY: (hips.min.y + hips.max.y) / 2,
-    chest: sectionOf(chest),
-    shoulderY: chest.max.y,
-  };
-}
-
-type AccessoryOf<K extends ZombieAccessory['kind']> = Extract<ZombieAccessory, { kind: K }>;
-type AccessoryBuilder<K extends ZombieAccessory['kind']> = (accessory: AccessoryOf<K>, m: BodyMeasures) => AccessoryPart[];
-
-const BUILDERS: { readonly [K in ZombieAccessory['kind']]: AccessoryBuilder<K> } = {
+const BUILDERS: { readonly [K in UniformKind]: AccessoryBuilder<K> } = {
   sideCap: ({ cloth, star: starColor }, m) => {
     const base = scaled(m.crown, FIT * 1.02, FIT * 1.05);
     // Boat shape: full length along the skull, pinched to a ridge on top.
@@ -344,7 +223,7 @@ const BUILDERS: { readonly [K in ZombieAccessory['kind']]: AccessoryBuilder<K> }
   },
 };
 
-function partsOf<K extends ZombieAccessory['kind']>(accessory: AccessoryOf<K>, measures: BodyMeasures): AccessoryPart[] {
+function partsOf<K extends UniformKind>(accessory: AccessoryOf<K>, measures: BodyMeasures): AccessoryPart[] {
   return (BUILDERS[accessory.kind] as AccessoryBuilder<K>)(accessory, measures);
 }
 
@@ -353,8 +232,8 @@ export function buildAccessoryParts(accessories: readonly ZombieAccessory[], bod
   if (accessories.length === 0) return [];
   const measures = measure(body);
   return accessories.flatMap((accessory) => {
-    const detachableHat = accessory.kind === 'sideCap' || accessory.kind === 'peakedCap'
-      || accessory.kind === 'helmet' || accessory.kind === 'furHat';
-    return partsOf(accessory, measures).map((part) => ({ ...part, detachableHat }));
+    const detachableHat = DETACHABLE_HATS.has(accessory.kind);
+    const parts = isVestment(accessory) ? buildVestmentParts(accessory, measures) : partsOf(accessory, measures);
+    return parts.map((part) => ({ ...part, detachableHat }));
   });
 }

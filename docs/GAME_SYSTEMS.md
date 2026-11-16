@@ -498,19 +498,20 @@ existente a `MOTDRULES`.
 
 ## Mapas e interacciones
 
-- Burned Mansion sigue publico. Station 33 aparece en el menu con candado y
-  requiere temporalmente un correo autorizado de beta para abrirlo; tras el
-  agradecimiento al tester empieza la partida. Los enlaces directos respetan el
+- Burned Mansion sigue publico. Station 33 y Die Kathedrale aparecen en el menu
+  con candado mientras la cuenta no tenga su producto; durante la beta cerrada
+  los testers reciben ambos mapas. Tras el agradecimiento al tester empieza la
+  partida. Los enlaces directos respetan el
   mismo permiso; detalles y limites en [acceso de beta](../public/beta/README.md).
 
-- `LaSeuArena`: la catedral de Palma, individual e incluida. La nave es un
-  solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
+- `LaSeuArena`: Die Kathedrale, la catedral de Palma, individual y premium. La
+  nave es un solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
   y un derrumbe que nunca llegan a la boveda. Empieza en el nartex (M14) y
   se abre reja a reja por Points: nave central, naves laterales con sus
   capillas (PPSh-41), crucero y presbiterio (AK-47) y, por el postigo de las
   puertas mayores, la plaza (M60 y Mystery Box). Las entradas de zombis de
   cada zona despiertan con su primera reja. Sin anillos, electricidad ni
-  final. Zonas, precios y guia en [La Seu](LA_SEU.md).
+  final. Zonas, precios y guia en [Die Kathedrale](LA_SEU.md).
 
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
@@ -781,8 +782,8 @@ existente a `MOTDRULES`.
   accesos a multijugador y ajustes, y un pie con creditos, privacidad y un enlace
   a la [web principal](https://zeroed-web.com) que abre en otra pestaña. Cada
   mapa tiene una tarjeta ilustrada con realce al pasar el cursor o enfocar con
-  teclado. Ambas usan la misma estructura y efectos, con acento rojo para el
-  mapa incluido y dorado para el premium; un mapa bloqueado oscurece su arte
+  teclado. Todas usan la misma estructura y efectos, con acento rojo para el
+  mapa incluido y dorado para los premium; un mapa bloqueado oscurece su arte
   bajo un candado. Las imagenes se recortan a la ilustracion y se acortan en
   ventanas bajas; nombres y lemas se traducen y `HUD` rellena desde el registro
   las etiquetas de jugadores, acceso y accion (jugar o desbloquear). En

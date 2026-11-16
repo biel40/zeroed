@@ -8,16 +8,25 @@ function owning(...products: ProductId[]): EntitlementProvider {
 }
 
 describe('map entitlements', () => {
-  it('sells Station 33 as its own product and keeps Burned Mansion free', () => {
+  it('sells each premium map as its own product and keeps Burned Mansion free', () => {
     expect(getZombieMapProduct('station-33')).toBe('map.station-33');
+    expect(getZombieMapProduct('la-seu')).toBe('map.die-kathedrale');
     expect(getZombieMapProduct('burned-mansion')).toBeUndefined();
     expect(PRODUCT_IDS).toContain('map.station-33');
+    expect(PRODUCT_IDS).toContain('map.die-kathedrale');
   });
 
   it('opens free maps without any product and premium maps only with theirs', () => {
     expect(canAccessZombieMap('burned-mansion', owning())).toBe(true);
     expect(canAccessZombieMap('station-33', owning())).toBe(false);
     expect(canAccessZombieMap('station-33', owning('map.station-33'))).toBe(true);
+    expect(canAccessZombieMap('la-seu', owning())).toBe(false);
+    expect(canAccessZombieMap('la-seu', owning('map.die-kathedrale'))).toBe(true);
+  });
+
+  it('keeps the two premium map entitlements independent', () => {
+    expect(canAccessZombieMap('la-seu', owning('map.station-33'))).toBe(false);
+    expect(canAccessZombieMap('station-33', owning('map.die-kathedrale'))).toBe(false);
   });
 
   it('rejects unknown map ids whatever the player owns', () => {

@@ -1,5 +1,6 @@
 import { POINT_DOOR_SIZE } from '../doors/PointDoor';
 import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
+import type { ZombieSkinShare } from '../skins/ZombieSkinShares';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
 import type { QualityLevel } from '../../core/DeviceProfile';
@@ -457,6 +458,21 @@ export const LA_SEU_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
     maxZ: PLAZA.maxZ + LA_SEU_WALL_THICKNESS + 0.3,
     baseY: 0,
   },
+];
+
+/**
+ * The horde: townsfolk who sought refuge in the cathedral and the clergy who
+ * kept it, rolled per spawn by weight (appearance only). Civilians 55 %,
+ * monks 20 %, priests 15 % (three chasuble colors), cardinal 7 %, bishop 3 %.
+ */
+export const LA_SEU_ZOMBIE_SKIN_SHARES: readonly ZombieSkinShare[] = [
+  { skin: null, weight: 55 },
+  { skin: 'penitentMonk', weight: 20 },
+  { skin: 'condemnedPriestGreen', weight: 5 },
+  { skin: 'condemnedPriestViolet', weight: 5 },
+  { skin: 'condemnedPriestBurgundy', weight: 5 },
+  { skin: 'fallenCardinal', weight: 7 },
+  { skin: 'corruptedBishop', weight: 3 },
 ];
 
 /**
