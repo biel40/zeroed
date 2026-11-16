@@ -96,6 +96,13 @@ export function createDeveloperConsoleControls(run: RunAction): HTMLElement {
     button(t('dev.invincible.off'), () => run('invincible off', t('dev.invincible.off'))),
   );
 
+  const stats = card(t('dev.stats'), t('dev.stats.description'));
+  stats.classList.add('dev-card-wide');
+  stats.append(
+    button(t('dev.stats.on'), () => run('stats on', t('dev.stats.on'))),
+    button(t('dev.stats.off'), () => run('stats off', t('dev.stats.off'))),
+  );
+
   const boss = card(t('dev.boss'), t('dev.boss.description'));
   boss.classList.add('dev-card-wide');
   boss.append(button(t('dev.boss.start'), () => run('boss', t('dev.boss.start'))));

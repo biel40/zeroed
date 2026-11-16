@@ -5,22 +5,25 @@ import { PLAYER_MAX_HP } from '../src/zombies/ZombieConfig';
 import { installCanvasDocument, makeContext } from './coopHarness';
 
 describe('Zombies GOD_MODE developer command', () => {
-  it('enables debug stats once per activation and clears them on restart', () => {
+  it('keeps the performance panel optional: hidden on activation, toggled by the console, hidden on restart', () => {
     const restoreDocument = installCanvasDocument();
     try {
       const mode = new ZombiesMode();
       const setDebugStatsEnabled = vi.fn();
       mode.init({ ...makeContext().ctx, setDebugStatsEnabled });
 
-      for (const key of 'MOTDRULE') mode.onKeyInput(key);
-      expect(setDebugStatsEnabled).not.toHaveBeenCalled();
-      mode.onKeyInput('S');
       for (const key of 'MOTDRULES') mode.onKeyInput(key);
-      expect(setDebugStatsEnabled.mock.calls).toEqual([[true]]);
+      expect(setDebugStatsEnabled).not.toHaveBeenCalled();
+      mode.executeDeveloperCommand('stats on');
+      mode.executeDeveloperCommand('stats off');
+      mode.executeDeveloperCommand('stats on');
+      expect(setDebugStatsEnabled.mock.calls).toEqual([[true], [false], [true]]);
 
       mode.onRestartRequested();
+      expect(setDebugStatsEnabled.mock.calls).toEqual([[true], [false], [true], [false]]);
+      mode.onRestartRequested();
       for (const key of 'MOTDRULES') mode.onKeyInput(key);
-      expect(setDebugStatsEnabled.mock.calls).toEqual([[true], [false], [true]]);
+      expect(setDebugStatsEnabled).toHaveBeenCalledTimes(4);
     } finally {
       restoreDocument();
     }

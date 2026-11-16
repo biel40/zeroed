@@ -60,7 +60,7 @@ El arranque precarga modelos y texturas del manifiesto global. La precarga de m�
 
 ## Protocolo manual de escritorio y Android
 
-`?debug` activa el HUD de diagnóstico desde el inicio. `MOTDRULES` también lo activa durante la partida individual. Actualiza cada 250 ms de simulación e informa de FPS suavizados, escala de resolución, llamadas y triángulos del último render, geometrías y texturas registradas. Como la simulación limita `dt` a 50 ms, usar la traza de frames y de tareas para percentiles y pausas largas. Registrar el tiempo GPU o los bytes GPU si la plataforma los expone. [Game](../src/core/Game.ts)
+`?debug` activa el HUD de diagnóstico desde el inicio. En individual, tras `MOTDRULES`, el comando de consola `stats on` también lo activa. Actualiza cada 250 ms de simulación e informa de FPS suavizados, escala de resolución, llamadas y triángulos del último render, geometrías y texturas registradas. Como la simulación limita `dt` a 50 ms, usar la traza de frames y de tareas para percentiles y pausas largas. Registrar el tiempo GPU o los bytes GPU si la plataforma los expone. [Game](../src/core/Game.ts)
 
 La descripción anterior corresponde al HUD de esta línea base. El [panel actual](GAME_SYSTEMS.md#hud-de-rendimiento) mide intervalos reales e incluye P95 y peor frame de su historial reciente; las trazas del protocolo siguen siendo necesarias para ventanas largas y tiempos CPU/GPU.
 

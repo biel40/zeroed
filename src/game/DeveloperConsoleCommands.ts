@@ -10,6 +10,8 @@ export interface DeveloperConsoleActions {
   infiniteAmmo(): void;
   equipped(): WeaponId;
   invincible(enabled: boolean): void;
+  /** Shows or hides the performance panel. */
+  stats(visible: boolean): void;
   /** Jumps to the map's boss fight; false when the run has none left to start. */
   boss(): boolean;
   /** Powers the map, opens the way to its upgrade machine and stands the player at it; false without one. */
@@ -63,6 +65,10 @@ export class DeveloperConsoleCommands {
       case 'invincible':
         if (args.length !== 1 || (value !== 'on' && value !== 'off')) break;
         actions.invincible(value === 'on');
+        return t('dev.ok');
+      case 'stats':
+        if (args.length !== 1 || (value !== 'on' && value !== 'off')) break;
+        actions.stats(value === 'on');
         return t('dev.ok');
       case 'boss':
         if (args.length) break;
