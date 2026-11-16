@@ -196,6 +196,7 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
 | `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
+| `barricade_repair.mp3` | Tablón reparado en una barricada (+10 Points). Opcional: sin el archivo suena el tick procedural. Origen y licencia pendientes de registrar |
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `m1911_shot.mp3` | Disparo de la M1911: mono, 44,1 kHz, 96 kbps, ~1,2 s con cola (con fallback procedural) |
 | `ak47_single_report.wav`, `ak47_auto_report.wav` | Grabación de un disparo de AK-47 por ninebilly, editada para ambos modos (CC0). [Fuente](https://freesound.org/people/ninebilly/sounds/520934/) |

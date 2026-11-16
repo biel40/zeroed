@@ -223,6 +223,7 @@ describe('Game pause resume', () => {
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
+      loadBarricadeRepairAsset: vi.fn().mockResolvedValue(undefined),
       preloadShotSample: vi.fn(),
     };
     game.profile = { isMobile: true, useTouchControls: true };
@@ -248,6 +249,7 @@ describe('Game pause resume', () => {
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
+      loadBarricadeRepairAsset: vi.fn().mockResolvedValue(undefined),
       preloadShotSample: vi.fn(),
     };
     game.input = { requestPointerLock: vi.fn() };
@@ -327,6 +329,7 @@ describe('Game pause resume', () => {
       loadMysteryBoxOpenAsset: vi.fn().mockResolvedValue(undefined),
       loadDryFireAsset: vi.fn().mockResolvedValue(undefined),
       loadDoorPurchaseAsset: vi.fn().mockResolvedValue(undefined),
+      loadBarricadeRepairAsset: vi.fn().mockResolvedValue(undefined),
       preloadShotSample: vi.fn(),
     };
     game.input = { requestPointerLock: vi.fn() };
@@ -657,17 +660,20 @@ describe('AudioSystem sampled effects', () => {
     audio.playDryFire();
     await audio.loadDoorPurchaseAsset();
     audio.playDoorUnlock();
+    await audio.loadBarricadeRepairAsset();
+    audio.playRepairBoard();
 
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('barricade_repair.mp3'));
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('mystery_box_open.mp3'));
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('encasquillada_arma.mp3'));
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('door_purchase.mp3'));
-    expect(starts).toHaveLength(3);
+    expect(starts).toHaveLength(4);
 
     // A weapon's shot MP3 replaces its whole procedural report (one source, no noise layers).
     audio.preloadShotSample(WEAPON_DEFINITIONS.barrett.audio);
     await new Promise((resolve) => setTimeout(resolve, 0));
     audio.playShot(WEAPON_DEFINITIONS.barrett.audio);
-    expect(starts).toHaveLength(4);
+    expect(starts).toHaveLength(5);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('barrett_shot.mp3'));
   });
 });

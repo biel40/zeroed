@@ -436,6 +436,7 @@ export class Game {
     void this.audio.loadDryFireAsset();
     for (const { weapon } of this.arsenal.values()) this.audio.preloadShotSample(weapon.definition.audio);
     void this.audio.loadDoorPurchaseAsset();
+    void this.audio.loadBarricadeRepairAsset();
     if (this.profile.useTouchControls || (this.input.usingGamepad && this.input.gamepadConnected)) {
       this.controllerSession = this.input.usingGamepad && this.input.gamepadConnected;
       this.pointerLockRequested = false;

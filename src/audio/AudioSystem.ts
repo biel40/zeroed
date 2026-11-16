@@ -269,6 +269,7 @@ export class AudioSystem {
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private dryFireBuffer: AudioBuffer | null = null;
   private doorPurchaseBuffer: AudioBuffer | null = null;
+  private barricadeRepairBuffer: AudioBuffer | null = null;
   private readonly optionalSamples = new Map<string, AudioBuffer | null>();
   private ringJingle: RingJingle | null = null;
   /** Looping layers of a flame stream, built on its first burst. */
@@ -282,6 +283,7 @@ export class AudioSystem {
   private readonly mysteryBoxOpenUrl: string = `${import.meta.env.BASE_URL}assets/audio/mystery_box_open.mp3`;
   private readonly dryFireUrl: string = `${import.meta.env.BASE_URL}assets/audio/encasquillada_arma.mp3`;
   private readonly doorPurchaseUrl: string = `${import.meta.env.BASE_URL}assets/audio/door_purchase.mp3`;
+  private readonly barricadeRepairUrl: string = `${import.meta.env.BASE_URL}assets/audio/barricade_repair.mp3`;
 
   private readonly stopSettingsListener: () => void;
 
@@ -1288,6 +1290,12 @@ export class AudioSystem {
 
   /** Short wood/hammer tick for each rebuilt barrier board. */
   public playRepairBoard(): void {
+    if (this.barricadeRepairBuffer) {
+      const audio: AudioContextParts | null = this.context();
+      if (!audio) return;
+      this.playSample(audio, this.barricadeRepairBuffer, 0.85, 0.05);
+      return;
+    }
     this.tick(0, 420, 0.28);
     this.tick(0.04, 180, 0.18);
   }
@@ -1985,6 +1993,11 @@ export class AudioSystem {
   public async loadDoorPurchaseAsset(): Promise<void> {
     // Without the asset the procedural purchase cue remains available.
     this.doorPurchaseBuffer ??= await this.loadSample(this.doorPurchaseUrl);
+  }
+
+  public async loadBarricadeRepairAsset(): Promise<void> {
+    // Without the asset the procedural board-repair tick remains available.
+    this.barricadeRepairBuffer ??= await this.loadSample(this.barricadeRepairUrl);
   }
 
   /** Mystery Box opening: a hollow rising creak with a wooden knock. */
