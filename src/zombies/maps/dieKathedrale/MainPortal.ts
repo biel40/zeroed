@@ -1,7 +1,7 @@
 import { POINT_DOOR_SIZE } from '../../doors/PointDoor';
-import { MAIN_PORTAL } from '../LaSeuConfig';
+import { MAIN_PORTAL } from '../DieKathedraleConfig';
 import { archPoints, lancetShape, ribGeometries, wallShapeGeometry, type WallFacing } from './GothicVault';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 
 const LEAF_THICKNESS = 0.07;
 
@@ -11,7 +11,7 @@ const LEAF_THICKNESS = 0.07;
  * and the arch over it. `faceZ` is the wall face it stands on and `facing`
  * the side it looks to; the nave and the plaza each dress their own face.
  */
-export function addGreatDoorFace(context: LaSeuBuildContext, faceZ: number, facing: Extract<WallFacing, 'pz' | 'nz'>): void {
+export function addGreatDoorFace(context: DieKathedraleBuildContext, faceZ: number, facing: Extract<WallFacing, 'pz' | 'nz'>): void {
   const { batch, materials } = context;
   const out = facing === 'pz' ? 1 : -1;
   const z = faceZ + out * LEAF_THICKNESS / 2;

@@ -95,8 +95,8 @@ describe('Zombies map selection flow', () => {
   it('lists Burned Mansion for everyone and both premium maps as single-player maps', () => {
     expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true });
     expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, product: 'map.station-33', coop: false });
-    expect(ZOMBIE_MAPS['la-seu']).toMatchObject({ visible: true, product: 'map.die-kathedrale', coop: false });
-    expect(getZombieMapProduct('la-seu')).toBe('map.die-kathedrale');
+    expect(ZOMBIE_MAPS['die-kathedrale']).toMatchObject({ visible: true, product: 'map.die-kathedrale', coop: false });
+    expect(getZombieMapProduct('die-kathedrale')).toBe('map.die-kathedrale');
     expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
     expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);
@@ -120,7 +120,7 @@ describe('Zombies map selection flow', () => {
     };
     const mansion = card('burned-mansion');
     const station = card('station-33');
-    const cathedral = card('la-seu');
+    const cathedral = card('die-kathedrale');
     const mapSelect = new FakeElement([mansion, station, cathedral]);
     const startScreen = new FakeElement();
     const elements: Record<string, FakeElement> = {
@@ -240,7 +240,7 @@ describe('Zombies map selection flow', () => {
       unlockDialog.close();
       cathedral.onclick?.();
       expect(unlockDialog.open).toBe(true);
-      expect(elements['beta-unlock-map'].dataset.i18n).toBe('map.laSeu');
+      expect(elements['beta-unlock-map'].dataset.i18n).toBe('map.dieKathedrale');
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
       const flush = async (): Promise<void> => {

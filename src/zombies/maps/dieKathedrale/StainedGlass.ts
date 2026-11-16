@@ -91,7 +91,7 @@ export function makeLancetGlass(palette: ReadonlyArray<Rgb>, seed: number): THRE
 
 /**
  * The rose: a lattice of small triangles gathered into larger ones by heavier
- * tracery, the star pattern of La Seu's "Gothic eye". Texels outside the
+ * tracery, the star pattern of Palma cathedral's "Gothic eye". Texels outside the
  * circle are transparent (the material cuts them with `alphaTest`).
  */
 export function makeRoseGlass(seed: number): THREE.DataTexture {

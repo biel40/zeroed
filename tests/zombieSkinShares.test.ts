@@ -4,7 +4,7 @@ import { ZombiePool } from '../src/zombies/ZombiePool';
 import { ZOMBIE_MODEL_POOL_CAPACITIES } from '../src/zombies/ZombieConfig';
 import { ZombieLookPicker } from '../src/zombies/ZombieLookPicker';
 import type { ZombieModelSource } from '../src/zombies/ZombieVisual';
-import { LA_SEU_ZOMBIE_SKIN_SHARES } from '../src/zombies/maps/LaSeuConfig';
+import { DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES } from '../src/zombies/maps/DieKathedraleConfig';
 import { apportionShares, pickShare } from '../src/zombies/skins/ZombieSkinShares';
 import { MANSION_ZOMBIE_SKINS } from '../src/zombies/maps/BurnedMansionConfig';
 import { STATION33_ZOMBIE_SKINS } from '../src/zombies/maps/Station33Config';
@@ -52,28 +52,35 @@ describe('skin shares', () => {
   });
 });
 
-describe('La Seu horde shares', () => {
-  const total = LA_SEU_ZOMBIE_SKIN_SHARES.reduce((sum, share) => sum + share.weight, 0);
+describe('Die Kathedrale horde shares', () => {
+  const total = DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.reduce((sum, share) => sum + share.weight, 0);
   const percentOf = (match: (skin: string | null) => boolean): number =>
-    (LA_SEU_ZOMBIE_SKIN_SHARES.filter((share) => match(share.skin)).reduce((sum, share) => sum + share.weight, 0) / total) * 100;
+    (DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.filter((share) => match(share.skin)).reduce((sum, share) => sum + share.weight, 0) / total) * 100;
 
-  it('matches the requested appearance distribution', () => {
-    expect(percentOf((skin) => skin === null)).toBeCloseTo(55);
-    expect(percentOf((skin) => skin === 'penitentMonk')).toBeCloseTo(20);
-    expect(percentOf((skin) => skin?.startsWith('condemnedPriest') ?? false)).toBeCloseTo(15);
-    expect(percentOf((skin) => skin === 'fallenCardinal')).toBeCloseTo(7);
-    expect(percentOf((skin) => skin === 'corruptedBishop')).toBeCloseTo(3);
+  it('dresses every walker in one of the eleven cathedral looks, the bishop rarest', () => {
+    const looks = [
+      'condemnedMonk', 'profanedPriest', 'undeadNun', 'cathedralGuardian', 'fallenBishop',
+      'cathedralCanon', 'cantor', 'dominicanFriar', 'pilgrim', 'cathedralCustodian', 'abbess',
+    ];
+    // No plain walker share: the whole horde wears the cathedral's clothes.
+    expect(new Set(DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.map((share) => share.skin))).toEqual(new Set(looks));
+    expect(DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES).toHaveLength(looks.length);
+    for (const look of looks.filter((id) => id !== 'fallenBishop')) {
+      expect(percentOf((skin) => skin === 'fallenBishop')).toBeLessThan(percentOf((skin) => skin === look));
+    }
+    // No single look dominates the horde.
+    for (const look of looks) expect(percentOf((skin) => skin === look)).toBeLessThan(15);
   });
 
-  it('dresses the priests in three chasuble colors', () => {
-    const priests = LA_SEU_ZOMBIE_SKIN_SHARES.filter((share) => share.skin?.startsWith('condemnedPriest'));
-    expect(priests).toHaveLength(3);
+  it('keeps a body of the walker reserve for every look, so each one can spawn', () => {
+    const slots = apportionShares(DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.map((share) => share.weight), ZOMBIE_MODEL_POOL_CAPACITIES.walker);
+    DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.forEach((share, index) => expect(slots.includes(index), String(share.skin)).toBe(true));
   });
 
   it('keeps the other maps on clothes they already wore', () => {
     for (const skins of [STATION33_ZOMBIE_SKINS, MANSION_ZOMBIE_SKINS]) {
       for (const skin of skins) {
-        expect(LA_SEU_ZOMBIE_SKIN_SHARES.some((share) => share.skin === skin)).toBe(false);
+        expect(DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.some((share) => share.skin === skin)).toBe(false);
       }
     }
   });
@@ -95,7 +102,7 @@ describe('weighted walker looks', () => {
   });
 
   it('spawns each look as often as its weight while bodies are free', () => {
-    const weights = LA_SEU_ZOMBIE_SKIN_SHARES.map((share) => share.weight);
+    const weights = DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.map((share) => share.weight);
     const looks = weights.map((weight) => look(weight));
     const slots = apportionShares(weights, ZOMBIE_MODEL_POOL_CAPACITIES.walker);
     const bodies = slots.map((slot) => ({ slot, visual: { modelId: 'walker' } }) as unknown as Zombie & { slot: number });

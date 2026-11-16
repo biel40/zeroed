@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import type { WallAxis, WallOpening } from '../shared/ArenaStructure';
 import { wallOpeningsAt } from '../shared/EntrancePassage';
-import { LA_SEU_WALL_CUTS, LA_SEU_WALL_THICKNESS } from '../LaSeuConfig';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import { DIE_KATHEDRALE_WALL_CUTS, DIE_KATHEDRALE_WALL_THICKNESS } from '../DieKathedraleConfig';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 import { FACING_YAW, type WallFacing } from './GothicVault';
 
-export interface LaSeuWallLine {
+export interface DieKathedraleWallLine {
   readonly axis: WallAxis;
   /** Centre line of the wall on the other axis. */
   readonly fixed: number;
@@ -22,7 +22,7 @@ export interface LaSeuWallLine {
 }
 
 /** Builds a stone wall in pieces, cut by every entrance and door on its line. */
-export function addStoneWall(context: LaSeuBuildContext, name: string, line: LaSeuWallLine, material: THREE.Material = context.materials.wallStone): void {
+export function addStoneWall(context: DieKathedraleBuildContext, name: string, line: DieKathedraleWallLine, material: THREE.Material = context.materials.wallStone): void {
   const breaks = (line.breaks ?? []).filter((stop) => stop > line.min && stop < line.max).sort((a, b) => a - b);
   const stops = [line.min, ...breaks, line.max];
   for (let index = 0; index + 1 < stops.length; index++) {
@@ -30,8 +30,8 @@ export function addStoneWall(context: LaSeuBuildContext, name: string, line: LaS
     const to = stops[index + 1];
     const inPiece = (opening: WallOpening): boolean => opening.center > from && opening.center < to;
     context.structure.addWallWithOpenings(
-      line.axis, line.fixed, from, to, 0, line.height, LA_SEU_WALL_THICKNESS,
-      [...wallOpeningsAt(line.axis, line.fixed, from, to, LA_SEU_WALL_CUTS), ...(line.extraOpenings ?? []).filter(inPiece)],
+      line.axis, line.fixed, from, to, 0, line.height, DIE_KATHEDRALE_WALL_THICKNESS,
+      [...wallOpeningsAt(line.axis, line.fixed, from, to, DIE_KATHEDRALE_WALL_CUTS), ...(line.extraOpenings ?? []).filter(inPiece)],
       material,
       { name: `${name}-${index}`, surface: 'concrete', mapRole: 'wall', castShadow: false, uvSeed: index, worldUVs: true, blocksPlayer: true },
     );

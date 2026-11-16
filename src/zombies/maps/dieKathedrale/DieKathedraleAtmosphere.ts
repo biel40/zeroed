@@ -1,14 +1,12 @@
 import * as THREE from 'three';
-import { LA_SEU_DUST_COUNT, LA_SEU_MIST_PATCHES, LANCET, MOONLIT_LANCET_BAYS, NAVE, naveBayCenter } from '../LaSeuConfig';
+import { DIE_KATHEDRALE_DUST_COUNT, DIE_KATHEDRALE_MIST_PATCHES, LANCET, MOONLIT_LANCET_BAYS, MOONLIT_LANCET_LANDING, NAVE, naveBayCenter } from '../DieKathedraleConfig';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { makeSoftSpot } from '../shared/SoftSpotTexture';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 
 /** Dust hangs below this height: where the candles and the beams catch it. */
 const DUST_CEILING = 9;
 const DUST_DRIFT = 0.4;
-/** Where an east lancet's beam meets the floor, measured from the wall and from its bay centre. */
-const SHAFT_LANDING = { nearX: 1.6, farX: 6.6, shiftZ: -1.6 } as const;
 
 /** Height the mist lies at: over the plinths, under the knees. */
 const MIST_Y = 0.32;
@@ -18,7 +16,7 @@ function mistGeometry(): THREE.BufferGeometry {
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
-  LA_SEU_MIST_PATCHES.forEach(({ x, z, radius }, patch) => {
+  DIE_KATHEDRALE_MIST_PATCHES.forEach(({ x, z, radius }, patch) => {
     const base = patch * 4;
     const y = MIST_Y + (patch % 3) * 0.07;
     positions.push(x - radius, y, z + radius, x + radius, y, z + radius, x + radius, y, z - radius, x - radius, y, z - radius);
@@ -49,11 +47,10 @@ function shaftGeometry(): THREE.BufferGeometry {
   const half = width / 2;
   for (const bay of MOONLIT_LANCET_BAYS) {
     const z = naveBayCenter(bay);
-    const landingZ = z + SHAFT_LANDING.shiftZ;
-    const nearX = NAVE.maxX - SHAFT_LANDING.nearX;
-    const farX = NAVE.maxX - SHAFT_LANDING.farX;
-    quad([[wallX, apexY, z], [wallX, sillY, z], [nearX, 0, landingZ], [farX, 0, landingZ]]);
-    quad([[wallX, middleY, z - half], [wallX, middleY, z + half], [(nearX + farX) / 2, 0, landingZ + half], [(nearX + farX) / 2, 0, landingZ - half]]);
+    const nearX = NAVE.maxX - MOONLIT_LANCET_LANDING.nearX;
+    const farX = NAVE.maxX - MOONLIT_LANCET_LANDING.farX;
+    quad([[wallX, apexY, z], [wallX, sillY, z], [nearX, 0, z], [farX, 0, z]]);
+    quad([[wallX, middleY, z - half], [wallX, middleY, z + half], [(nearX + farX) / 2, 0, z + half], [(nearX + farX) / 2, 0, z - half]]);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -67,7 +64,7 @@ function shaftGeometry(): THREE.BufferGeometry {
  * device can afford the overdraw, the moonbeams of the few lit lancets and
  * low mist lying in the still corners. Buffers are allocated once.
  */
-export class LaSeuAtmosphere {
+export class DieKathedraleAtmosphere {
   private readonly dust: THREE.Points;
   private readonly dustBase: Float32Array;
   private readonly dustPhase: Float32Array;
@@ -77,9 +74,9 @@ export class LaSeuAtmosphere {
   private readonly mistOpacity: number;
   private time = 0;
 
-  public constructor(context: LaSeuBuildContext) {
+  public constructor(context: DieKathedraleBuildContext) {
     const { group, materials, profile } = context;
-    const count = LA_SEU_DUST_COUNT[profile.quality];
+    const count = DIE_KATHEDRALE_DUST_COUNT[profile.quality];
     const random = seededRandom(6501);
     this.dustBase = new Float32Array(count * 3);
     this.dustPhase = new Float32Array(count);
@@ -92,21 +89,21 @@ export class LaSeuAtmosphere {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(this.dustBase.slice(), 3));
     this.dust = new THREE.Points(geometry, new THREE.PointsMaterial({
-      name: 'laseu_dust', size: 0.045, map: makeSoftSpot(16), color: 0x9a927e, transparent: true, opacity: 0.42, depthWrite: false,
+      name: 'die-kathedrale_dust', size: 0.045, map: makeSoftSpot(16), color: 0x9a927e, transparent: true, opacity: 0.42, depthWrite: false,
     }));
-    this.dust.name = 'laseu-dust';
+    this.dust.name = 'die-kathedrale-dust';
     group.add(this.dust);
 
     this.shaftOpacity = materials.lightShaft.opacity;
     this.mistOpacity = materials.mist.opacity;
     if (!profile.useReducedEffects) {
       const mist = new THREE.Mesh(mistGeometry(), materials.mist);
-      mist.name = 'laseu-mist';
+      mist.name = 'die-kathedrale-mist';
       mist.renderOrder = 1;
       group.add(mist);
       this.mistMaterial = materials.mist;
       const shafts = new THREE.Mesh(shaftGeometry(), materials.lightShaft);
-      shafts.name = 'laseu-moon-shafts';
+      shafts.name = 'die-kathedrale-moon-shafts';
       shafts.renderOrder = 2;
       group.add(shafts);
       this.shaftMaterial = materials.lightShaft;

@@ -44,7 +44,7 @@ export class ZombieHat {
     }
     const material = (Array.isArray(body.material) ? body.material[0] : body.material) as THREE.MeshStandardMaterial;
     this.loose = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-      map: material.map, color: material.color, vertexColors: true, roughness: material.roughness,
+      map: material.map, color: material.color, vertexColors: true, alphaTest: material.alphaTest, roughness: material.roughness,
       metalness: material.metalness, side: THREE.DoubleSide,
     }));
     this.loose.name = 'fallen-zombie-hat';

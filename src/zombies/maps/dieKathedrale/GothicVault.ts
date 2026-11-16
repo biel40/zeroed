@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * Gothic geometry shared by La Seu's builders: the pointed arch, the
+ * Gothic geometry shared by Die Kathedrale's builders: the pointed arch, the
  * four-part rib vault it generates, the ribs that follow it and the flat
  * shapes (windows, arch bands) cut to it. Pure geometry, no materials.
  */

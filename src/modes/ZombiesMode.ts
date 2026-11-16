@@ -242,7 +242,10 @@ export class ZombiesMode implements GameMode {
     this.arena.onBarrierBoardRebuilt = () => ctx.audio.playRepairBoard();
     this.arena.onAmbientCue = (cue) => {
       // The ending cinematic owns the soundtrack; the map's life goes quiet.
-      if (this.runFlow.state !== 'ENDING') ctx.audio.playAmbientCue(cue, this.spatialCueFor(cue.position));
+      if (this.runFlow.state !== 'ENDING') {
+        const camera = this.intro?.isPlaying ? this.intro.camera : ctx.player.camera;
+        ctx.audio.playAmbientCue(cue, cameraSpatialCue(camera, cue.position));
+      }
     };
     ctx.audio.setAmbientBed(this.arena.ambience.ambientBed ?? null);
     this.arena.onAmbush = (ambush) => this.spawnAmbush(ambush);
@@ -386,7 +389,8 @@ export class ZombiesMode implements GameMode {
     for (const station of this.arena.weaponStations ?? []) station.setOwned(this.ctx.hasWeapon(station.weaponId));
     this.chain.update(dt);
     this.footsteps.update(dt, this.zombies.actives, this.ctx.audio.rawContext);
-    this.arena.update(dt, playerPos);
+    // Pooled map lights follow the shot while the player stays at the spawn.
+    this.arena.update(dt, this.intro?.isPlaying ? this.intro.camera.position : playerPos);
     if (this.runAcceptsInput()) this.weaponUpgrade?.update();
     this.pushObjectives();
     if (this.box && this.boxView) {

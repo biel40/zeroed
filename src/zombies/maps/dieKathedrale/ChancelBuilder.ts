@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { ALTAR, CHANCEL, LA_SEU_WALL_THICKNESS, LANCET } from '../LaSeuConfig';
+import { ALTAR, CHANCEL, DIE_KATHEDRALE_WALL_THICKNESS, LANCET } from '../DieKathedraleConfig';
 import { addSolidProxy } from '../shared/SolidProxy';
 import { archPoints, lancetShape, ribGeometries, ribVaultGeometry, wallShapeGeometry, type VaultBay } from './GothicVault';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
-import { addStoneWall } from './LaSeuWalls';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
+import { addStoneWall } from './DieKathedraleWalls';
 
-const HALF_WALL = LA_SEU_WALL_THICKNESS / 2;
+const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 const CANOPY_SIDES = 7;
 const CANOPY_RADIUS = 2.8;
 
@@ -29,18 +29,18 @@ const CHANCEL_STALLS = [
  * lancets, the altar on its dais under the seven-sided hanging canopy, the
  * bishop's seat against the end wall and the choir stalls.
  */
-export function buildChancel(context: LaSeuBuildContext): void {
+export function buildChancel(context: DieKathedraleBuildContext): void {
   addShell(context);
   addAltar(context);
   addCanopy(context);
   addSeats(context);
 }
 
-function addShell(context: LaSeuBuildContext): void {
+function addShell(context: DieKathedraleBuildContext): void {
   const { batch, materials, structure, group } = context;
-  const width = CHANCEL.maxX - CHANCEL.minX + LA_SEU_WALL_THICKNESS * 2;
-  const northFace = CHANCEL.minZ - LA_SEU_WALL_THICKNESS;
-  const southFace = CHANCEL.maxZ - LA_SEU_WALL_THICKNESS;
+  const width = CHANCEL.maxX - CHANCEL.minX + DIE_KATHEDRALE_WALL_THICKNESS * 2;
+  const northFace = CHANCEL.minZ - DIE_KATHEDRALE_WALL_THICKNESS;
+  const southFace = CHANCEL.maxZ - DIE_KATHEDRALE_WALL_THICKNESS;
   structure.addBox(0, -0.08, (northFace + southFace) / 2, width, 0.16, southFace - northFace, materials.floorStone, {
     name: 'chancel-floor', surface: 'concrete', mapRole: 'slab', castShadow: false, uvSeed: 2, worldUVs: true, blocksPlayer: false,
   });
@@ -50,7 +50,7 @@ function addShell(context: LaSeuBuildContext): void {
     });
   }
   addStoneWall(context, 'chancel-end-wall', {
-    axis: 'x', fixed: CHANCEL.minZ - HALF_WALL, min: CHANCEL.minX - LA_SEU_WALL_THICKNESS, max: CHANCEL.maxX + LA_SEU_WALL_THICKNESS, height: CHANCEL.wallHeight,
+    axis: 'x', fixed: CHANCEL.minZ - HALF_WALL, min: CHANCEL.minX - DIE_KATHEDRALE_WALL_THICKNESS, max: CHANCEL.maxX + DIE_KATHEDRALE_WALL_THICKNESS, height: CHANCEL.wallHeight,
   });
 
   const vault = new THREE.Mesh(ribVaultGeometry(CHANCEL_VAULT, 10, materials.vaultStone.userData.metersPerTile as number), materials.vaultStone);
@@ -75,7 +75,7 @@ function addShell(context: LaSeuBuildContext): void {
 }
 
 /** Stone table on a dais, its red frontal, six candles and the cross; one solid for the whole of it. */
-function addAltar(context: LaSeuBuildContext): void {
+function addAltar(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { x, z, daisWidth, daisDepth, daisHeight, tableWidth, tableDepth, tableHeight } = ALTAR;
   batch.addBox(materials.dressedStone, x, daisHeight / 2, z, daisWidth, daisHeight, daisDepth, 0, 0, 0, 11);
@@ -101,7 +101,7 @@ function addAltar(context: LaSeuBuildContext): void {
 }
 
 /** The canopy hung over the altar: a seven-sided crown of gilt and cloth ringed with lamps. */
-function addCanopy(context: LaSeuBuildContext): void {
+function addCanopy(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { x, z, canopyY } = ALTAR;
   const flat = (geometry: THREE.BufferGeometry, y: number): THREE.BufferGeometry => geometry.rotateX(Math.PI / 2).translate(x, y, z);
@@ -121,7 +121,7 @@ function addCanopy(context: LaSeuBuildContext): void {
 }
 
 /** The bishop's seat against the end wall and the choir stalls along both sides. */
-function addSeats(context: LaSeuBuildContext): void {
+function addSeats(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const seatZ = CHANCEL.minZ + 0.35;
   batch.addBox(materials.dressedStone, 0, 0.3, seatZ, 1.3, 0.6, 0.7, 0, 0, 0, 21);

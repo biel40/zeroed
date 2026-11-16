@@ -29,7 +29,7 @@ cuenta, arriba a la derecha del menu, muestra la inicial y el correo, con la
 placa "BETA TESTER" en cuentas de beta (o "Iniciar sesion"). Si falta espacio,
 el correo se acorta con puntos suspensivos. El boton abre el dialogo para
 entrar o cerrar sesion, donde se ve la direccion completa de la cuenta.
-`?map=station-33` y `?map=la-seu` (Die Kathedrale) sin permiso muestran el menu
+`?map=station-33` y `?map=die-kathedrale` (Die Kathedrale) sin permiso muestran el menu
 con la tarjeta correspondiente bloqueada.
 
 Limites: el codigo de los mapas premium sigue en el paquete del juego, asi que

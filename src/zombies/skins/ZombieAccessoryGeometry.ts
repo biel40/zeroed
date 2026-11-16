@@ -71,17 +71,23 @@ export function loft(
 
 /** Adds the reversed copy of every triangle, for open shells seen from inside. */
 export function doubleSided(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-  const front = geometry.getAttribute('position').array;
-  const back = new Float32Array(front.length);
-  for (let i = 0; i < front.length; i += 9) {
-    back.set(front.subarray(i, i + 3), i);
-    back.set(front.subarray(i + 6, i + 9), i + 3);
-    back.set(front.subarray(i + 3, i + 6), i + 6);
+  for (const name of ['position', 'uv']) {
+    const attribute = geometry.getAttribute(name);
+    if (!attribute) continue;
+    const size = attribute.itemSize;
+    const front = attribute.array as Float32Array;
+    const back = new Float32Array(front.length);
+    // Swap the second and third corner of each triangle to flip its winding.
+    for (let i = 0; i < front.length; i += size * 3) {
+      back.set(front.subarray(i, i + size), i);
+      back.set(front.subarray(i + size * 2, i + size * 3), i + size);
+      back.set(front.subarray(i + size, i + size * 2), i + size * 2);
+    }
+    const both = new Float32Array(front.length * 2);
+    both.set(front);
+    both.set(back, front.length);
+    geometry.setAttribute(name, new THREE.Float32BufferAttribute(both, size));
   }
-  const both = new Float32Array(front.length * 2);
-  both.set(front);
-  both.set(back, front.length);
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(both, 3));
   return geometry;
 }
 
@@ -144,8 +150,11 @@ export interface BodyMeasures {
   readonly legs: Section;
   /** Distance of each thigh's center from the midline. */
   readonly legX: number;
-  /** Bind-pose forearm bounds; the walker binds its arms out along x. */
+  /** Bind-pose upper arm and forearm bounds; the walker binds its arms out along x. */
+  readonly upperArms: Readonly<Record<BodySide, THREE.Box3>>;
   readonly forearms: Readonly<Record<BodySide, THREE.Box3>>;
+  /** Bind-pose shin bounds (knee to ankle). */
+  readonly shins: Readonly<Record<BodySide, THREE.Box3>>;
   /** Bind-pose foot and toe bounds. */
   readonly feet: Readonly<Record<BodySide, THREE.Box3>>;
 }
@@ -173,7 +182,9 @@ export function measure(body: ZombieBodyFrame): BodyMeasures {
     kneeY: thighs.min.y,
     legs: sectionOf(thighs),
     legX: (leftThigh.min.x + leftThigh.max.x) / 2,
+    upperArms: { Left: body.bounds({ bones: ['LeftArm'] }), Right: body.bounds({ bones: ['RightArm'] }) },
     forearms: { Left: body.bounds({ bones: ['LeftForeArm'] }), Right: body.bounds({ bones: ['RightForeArm'] }) },
+    shins: { Left: body.bounds({ bones: ['LeftLeg'] }), Right: body.bounds({ bones: ['RightLeg'] }) },
     feet: {
       Left: body.bounds({ bones: ['LeftFoot', 'LeftToeBase'] }),
       Right: body.bounds({ bones: ['RightFoot', 'RightToeBase'] }),
@@ -239,6 +250,9 @@ export function garmentShell(rings: readonly GarmentRing[], options: GarmentShel
     return points;
   });
   const triangles: THREE.Vector3[] = [];
+  // Pattern coordinates: u runs across the shell, v from the top ring (0) to the hem (1).
+  const uvs: number[] = [];
+  const last = Math.max(1, rings.length - 1);
   for (let row = 0; row < rings.length - 1; row++) {
     for (let column = 0; column < segments; column++) {
       const next = (column + 1) % columns;
@@ -247,9 +261,16 @@ export function garmentShell(rings: readonly GarmentRing[], options: GarmentShel
       const b0 = grid[row + 1][column];
       const b1 = grid[row + 1][next];
       triangles.push(b0, b1, t0, t0, b1, t1);
+      const u0 = column / segments;
+      const u1 = (column + 1) / segments;
+      const v0 = row / last;
+      const v1 = (row + 1) / last;
+      uvs.push(u0, v1, u1, v1, u0, v0, u0, v0, u1, v1, u1, v0);
     }
   }
-  return doubleSided(trianglesGeometry(triangles));
+  const geometry = trianglesGeometry(triangles);
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  return doubleSided(geometry);
 }
 
 /**

@@ -3,14 +3,15 @@ import type { WindowBarrierConfig } from '../barriers/WindowBarrier';
 import type { ZombieSkinShare } from '../skins/ZombieSkinShares';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
+import type { ZombieEyeColors } from '../ZombieVisual';
 import type { QualityLevel } from '../../core/DeviceProfile';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import type { WallAxis } from './shared/ArenaStructure';
 import { entranceSpawn, type WallCut } from './shared/EntrancePassage';
-import type { ArenaAmbience, ArenaAmbientCue, MysteryBoxPlacement, PlayerBounds, ZombieNavigationBounds } from './ZombieArena';
+import type { ArenaAmbience, ArenaAmbientCue, ArenaIntro, MysteryBoxPlacement, PlayerBounds, ZombieNavigationBounds } from './ZombieArena';
 
 /**
- * La Seu layout data. Every coordinate is in metres, feet height 0 on the
+ * Die Kathedrale layout data. Every coordinate is in metres, feet height 0 on the
  * nave floor.
  *
  * AXIS PLAN (later phases grow around what exists without moving it):
@@ -23,17 +24,17 @@ import type { ArenaAmbience, ArenaAmbientCue, MysteryBoxPlacement, PlayerBounds,
  * - The entrance plaza lies south of the front (z > 0), closed by its side
  *   walls and by the parapet over the sea. Everything beyond the parapet is
  *   scenery (`PlazaVista`): the bay, the moon and the Almudaina's outline.
- * - Zombie entrances run LA_SEU_PASSAGE.length outward from their wall:
+ * - Zombie entrances run DIE_KATHEDRALE_PASSAGE.length outward from their wall:
  *   later zones (cloister, bell tower, the Almudaina, Parc de la Mar) must
  *   leave those footprints free or re-route the entrance.
- * - The nave is one room to the eye and five to the feet: `LA_SEU_SCREENS`
+ * - The nave is one room to the eye and five to the feet: `DIE_KATHEDRALE_SCREENS`
  *   (iron grilles, waist-high parapets, a collapse) split it into zones along
  *   its own lines, the bay lines and the two column rows. Nothing rises to
  *   the vault, so the whole cathedral stays in sight from every zone.
  */
 
-export const LA_SEU_WALL_THICKNESS = 0.3;
-const HALF_WALL = LA_SEU_WALL_THICKNESS / 2;
+export const DIE_KATHEDRALE_WALL_THICKNESS = 0.3;
+const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 
 /** Interior faces of the nave; walls are centred half a thickness outside. */
 export const NAVE = {
@@ -88,14 +89,14 @@ export const PLAZA = {
   minX: NAVE.minX,
   maxX: NAVE.maxX,
   /** Outer face of the front wall. */
-  minZ: NAVE.maxZ + LA_SEU_WALL_THICKNESS,
+  minZ: NAVE.maxZ + DIE_KATHEDRALE_WALL_THICKNESS,
   maxZ: 17,
   wallHeight: 5,
   parapetHeight: 1.1,
 } as const;
 
 /** Walkable rooms, for placement checks. */
-export const LA_SEU_ROOMS = [NAVE, CHANCEL, PLAZA] as const;
+export const DIE_KATHEDRALE_ROOMS = [NAVE, CHANCEL, PLAZA] as const;
 
 const WEST_WALL_X = NAVE.minX - HALF_WALL;
 const EAST_WALL_X = NAVE.maxX + HALF_WALL;
@@ -122,7 +123,7 @@ export const LANCET = {
 } as const;
 
 /** Board tuning shared with the other maps' balance. */
-export const LA_SEU_BARRIER_CONFIG: WindowBarrierConfig = {
+export const DIE_KATHEDRALE_BARRIER_CONFIG: WindowBarrierConfig = {
   boardCount: 5,
   boardHp: 100,
   repairInterval: 0.55,
@@ -130,12 +131,12 @@ export const LA_SEU_BARRIER_CONFIG: WindowBarrierConfig = {
 };
 
 /** Wall apertures by entrance: doors are walk-through, chapel windows keep a low sill. */
-export const LA_SEU_OPENINGS = {
+export const DIE_KATHEDRALE_OPENINGS = {
   door: { width: 1.5, bottom: 0, top: 2.2 },
   window: { width: 1.5, bottom: 0.3, top: 1.9 },
 } as const;
 
-export type LaSeuEntranceKind = keyof typeof LA_SEU_OPENINGS;
+export type DieKathedraleEntranceKind = keyof typeof DIE_KATHEDRALE_OPENINGS;
 
 /**
  * Zones of the run, in the order their spawns are listed:
@@ -145,11 +146,11 @@ export type LaSeuEntranceKind = keyof typeof LA_SEU_OPENINGS;
  * - `crossing`: the last bay, wall to wall, and the chancel behind its arch.
  * - `plaza`: outside, through the wicket in the great doors.
  */
-export const LA_SEU_ZONES = ['narthex', 'nave', 'westAisle', 'eastAisle', 'crossing', 'plaza'] as const;
+export const DIE_KATHEDRALE_ZONES = ['narthex', 'nave', 'westAisle', 'eastAisle', 'crossing', 'plaza'] as const;
 
-export type LaSeuZoneId = typeof LA_SEU_ZONES[number];
+export type DieKathedraleZoneId = typeof DIE_KATHEDRALE_ZONES[number];
 
-export const LA_SEU_START_ZONE: LaSeuZoneId = 'narthex';
+export const DIE_KATHEDRALE_START_ZONE: DieKathedraleZoneId = 'narthex';
 
 /** Bay lines the nave is cut on: the rood grille and the choir grille. */
 const ROOD_Z = naveBayLine(2);
@@ -163,7 +164,7 @@ export interface FloorRect {
 }
 
 /** Floor of every zone inside the nave, for placement checks. The crossing also holds `CHANCEL`. */
-export const LA_SEU_ZONE_AREAS: Readonly<Record<Exclude<LaSeuZoneId, 'plaza'>, FloorRect>> = {
+export const DIE_KATHEDRALE_ZONE_AREAS: Readonly<Record<Exclude<DieKathedraleZoneId, 'plaza'>, FloorRect>> = {
   narthex: { minX: NAVE.minX, maxX: NAVE.maxX, minZ: ROOD_Z, maxZ: NAVE.maxZ },
   nave: { minX: -NAVE.columnX, maxX: NAVE.columnX, minZ: CHOIR_Z, maxZ: ROOD_Z },
   westAisle: { minX: NAVE.minX, maxX: -NAVE.columnX, minZ: CHOIR_Z, maxZ: ROOD_Z },
@@ -171,7 +172,7 @@ export const LA_SEU_ZONE_AREAS: Readonly<Record<Exclude<LaSeuZoneId, 'plaza'>, F
   crossing: { minX: NAVE.minX, maxX: NAVE.maxX, minZ: NAVE.minZ, maxZ: CHOIR_Z },
 };
 
-export interface LaSeuEntrance {
+export interface DieKathedraleEntrance {
   readonly id: string;
   /** Centre of the opening on the wall's centre line. */
   readonly x: number;
@@ -179,9 +180,9 @@ export interface LaSeuEntrance {
   /** Outward normal: the side its zombies come from. */
   readonly outwardX: number;
   readonly outwardZ: number;
-  readonly kind: LaSeuEntranceKind;
+  readonly kind: DieKathedraleEntranceKind;
   /** Zone whose unlock wakes this entrance. */
-  readonly zone: LaSeuZoneId;
+  readonly zone: DieKathedraleZoneId;
 }
 
 /**
@@ -191,7 +192,7 @@ export interface LaSeuEntrance {
  * side wall of the plaza. The central nave has no wall of its own: its horde
  * comes through whichever grilles are open.
  */
-export const LA_SEU_ENTRANCES: ReadonlyArray<LaSeuEntrance> = [
+export const DIE_KATHEDRALE_ENTRANCES: ReadonlyArray<DieKathedraleEntrance> = [
   { id: 'nave-almoina-door', x: WEST_WALL_X, z: naveBayCenter(1), outwardX: -1, outwardZ: 0, kind: 'door', zone: 'narthex' },
   { id: 'narthex-east-chapel', x: EAST_WALL_X, z: naveBayCenter(0), outwardX: 1, outwardZ: 0, kind: 'window', zone: 'narthex' },
   { id: 'west-aisle-door', x: WEST_WALL_X, z: naveBayCenter(2), outwardX: -1, outwardZ: 0, kind: 'door', zone: 'westAisle' },
@@ -205,9 +206,9 @@ export const LA_SEU_ENTRANCES: ReadonlyArray<LaSeuEntrance> = [
 ];
 
 /** `wicket`: boards over a hole in the great doors. `gate`: an iron leaf in one of the nave's screens. */
-export type LaSeuDoorKind = 'wicket' | 'gate';
+export type DieKathedraleDoorKind = 'wicket' | 'gate';
 
-export interface LaSeuDoor {
+export interface DieKathedraleDoor {
   readonly id: string;
   /** Centre of the door on the centre line of its wall or screen. */
   readonly x: number;
@@ -216,9 +217,9 @@ export interface LaSeuDoor {
   readonly outwardX: number;
   readonly outwardZ: number;
   readonly cost: number;
-  readonly kind: LaSeuDoorKind;
+  readonly kind: DieKathedraleDoorKind;
   /** The two zones it joins: buying it wakes whichever still sleeps. */
-  readonly zones: readonly [LaSeuZoneId, LaSeuZoneId];
+  readonly zones: readonly [DieKathedraleZoneId, DieKathedraleZoneId];
 }
 
 /** X of the side-aisle gates: the middle of the walkway the chapels leave beside the column row. */
@@ -231,7 +232,7 @@ const AISLE_GATE_X = 9.2;
  * cleared, and through the choir gate onto the crossing and the chancel; the west aisle reaches the crossing too, the
  * east one ends under the collapse.
  */
-export const LA_SEU_DOORS: ReadonlyArray<LaSeuDoor> = [
+export const DIE_KATHEDRALE_DOORS: ReadonlyArray<DieKathedraleDoor> = [
   { id: 'rood-gate', x: 0, z: ROOD_Z, outwardX: 0, outwardZ: -1, cost: 750, kind: 'gate', zones: ['narthex', 'nave'] },
   { id: 'almoina-gate', x: -AISLE_GATE_X, z: ROOD_Z, outwardX: 0, outwardZ: -1, cost: 1000, kind: 'gate', zones: ['narthex', 'westAisle'] },
   { id: 'mirador-gate', x: AISLE_GATE_X, z: ROOD_Z, outwardX: 0, outwardZ: -1, cost: 1000, kind: 'gate', zones: ['narthex', 'eastAisle'] },
@@ -245,12 +246,12 @@ export const LA_SEU_DOORS: ReadonlyArray<LaSeuDoor> = [
 const DOOR_OPENING = { width: POINT_DOOR_SIZE.width, bottom: 0, top: POINT_DOOR_SIZE.height } as const;
 
 /** The hole every paid door needs in the wall or screen it stands on. */
-export const LA_SEU_DOOR_CUTS: ReadonlyArray<WallCut> = LA_SEU_DOORS.map((door) => ({ x: door.x, z: door.z, opening: DOOR_OPENING }));
+export const DIE_KATHEDRALE_DOOR_CUTS: ReadonlyArray<WallCut> = DIE_KATHEDRALE_DOORS.map((door) => ({ x: door.x, z: door.z, opening: DOOR_OPENING }));
 
 /** Every hole the entrances and doors cut in the walls, shared by all shells. */
-export const LA_SEU_WALL_CUTS: ReadonlyArray<WallCut> = [
-  ...LA_SEU_ENTRANCES.map((entrance) => ({ x: entrance.x, z: entrance.z, opening: LA_SEU_OPENINGS[entrance.kind] })),
-  ...LA_SEU_DOOR_CUTS,
+export const DIE_KATHEDRALE_WALL_CUTS: ReadonlyArray<WallCut> = [
+  ...DIE_KATHEDRALE_ENTRANCES.map((entrance) => ({ x: entrance.x, z: entrance.z, opening: DIE_KATHEDRALE_OPENINGS[entrance.kind] })),
+  ...DIE_KATHEDRALE_DOOR_CUTS,
 ];
 
 /**
@@ -259,24 +260,24 @@ export const LA_SEU_WALL_CUTS: ReadonlyArray<WallCut> = [
  * - `parapet`: a waist-high stone wall under an iron rail.
  * - `rubble`: fallen masonry from the vault above.
  */
-export type LaSeuScreenStyle = 'grille' | 'parapet' | 'rubble';
+export type DieKathedraleScreenStyle = 'grille' | 'parapet' | 'rubble';
 
-export interface LaSeuScreen {
+export interface DieKathedraleScreen {
   readonly id: string;
   /** Axis the screen runs along; `fixed` is its centre line on the other one. */
   readonly axis: WallAxis;
   readonly fixed: number;
   readonly min: number;
   readonly max: number;
-  readonly style: LaSeuScreenStyle;
+  readonly style: DieKathedraleScreenStyle;
   /** Centres of the free ways through it, besides the paid doors on its line. */
   readonly gaps?: ReadonlyArray<number>;
 }
 
 /** What the player, the horde and low shots meet of a screen; above it, bars are only drawn. */
-export const LA_SEU_SCREEN = { thickness: 0.3, solidHeight: 1.15, gapWidth: 1.8, rubbleDepth: 1.8, rubbleHeight: 1.9 } as const;
+export const DIE_KATHEDRALE_SCREEN = { thickness: 0.3, solidHeight: 1.15, gapWidth: 1.8, rubbleDepth: 1.8, rubbleHeight: 1.9 } as const;
 
-function arcadeScreens(side: -1 | 1, bays: ReadonlyArray<number>): LaSeuScreen[] {
+function arcadeScreens(side: -1 | 1, bays: ReadonlyArray<number>): DieKathedraleScreen[] {
   return bays.map((bay) => ({
     id: `arcade-${side < 0 ? 'west' : 'east'}-${bay}`,
     axis: 'z' as const, fixed: side * NAVE.columnX, min: naveBayLine(bay + 1), max: naveBayLine(bay), style: 'parapet' as const,
@@ -292,7 +293,7 @@ const CLOSED_ARCADE_BAYS = [1, 2, 3, 4, 5] as const;
  * close the arcades beside the central nave and the second bay of the
  * narthex, whose first bay, clear of pews, stays open into both side aisles.
  */
-export const LA_SEU_SCREENS: ReadonlyArray<LaSeuScreen> = [
+export const DIE_KATHEDRALE_SCREENS: ReadonlyArray<DieKathedraleScreen> = [
   { id: 'rood-west', axis: 'x', fixed: ROOD_Z, min: NAVE.minX, max: -NAVE.columnX, style: 'grille' },
   { id: 'rood-centre', axis: 'x', fixed: ROOD_Z, min: -NAVE.columnX, max: NAVE.columnX, style: 'grille' },
   { id: 'rood-east', axis: 'x', fixed: ROOD_Z, min: NAVE.columnX, max: NAVE.maxX, style: 'grille' },
@@ -304,13 +305,13 @@ export const LA_SEU_SCREENS: ReadonlyArray<LaSeuScreen> = [
 ];
 
 /** What a side chapel holds: a rifle on its wall, a boarded window the dead come through, or the dead themselves. */
-export type LaSeuChapelRole = 'arms' | 'breach' | 'mortuary';
+export type DieKathedraleChapelRole = 'arms' | 'breach' | 'mortuary';
 
-export interface LaSeuChapel {
+export interface DieKathedraleChapel {
   readonly id: string;
   readonly side: -1 | 1;
   readonly bay: number;
-  readonly role: LaSeuChapelRole;
+  readonly role: DieKathedraleChapelRole;
   /** Candles still burn on its altar. */
   readonly lit: boolean;
 }
@@ -323,7 +324,7 @@ export const CHAPEL = { depth: 3, inset: 0.5, altarOffsetZ: -1.9, altarWidth: 1.
  * own grille, open in the middle. They narrow the aisle to a walkway beside
  * the column row.
  */
-export const LA_SEU_CHAPELS: ReadonlyArray<LaSeuChapel> = [
+export const DIE_KATHEDRALE_CHAPELS: ReadonlyArray<DieKathedraleChapel> = [
   { id: 'chapel-west-4', side: -1, bay: 4, role: 'arms', lit: true },
   { id: 'chapel-west-5', side: -1, bay: 5, role: 'breach', lit: false },
   { id: 'chapel-east-2', side: 1, bay: 2, role: 'mortuary', lit: true },
@@ -331,7 +332,7 @@ export const LA_SEU_CHAPELS: ReadonlyArray<LaSeuChapel> = [
 ];
 
 /** Floor of a chapel, from the side wall to its front grille. */
-export function chapelArea(chapel: LaSeuChapel): FloorRect {
+export function chapelArea(chapel: DieKathedraleChapel): FloorRect {
   const wall = chapel.side * NAVE.maxX;
   const front = chapel.side * (NAVE.maxX - CHAPEL.depth);
   return {
@@ -341,7 +342,7 @@ export function chapelArea(chapel: LaSeuChapel): FloorRect {
 }
 
 /** The three grilles of a chapel: its front, open in the middle, and both sides. */
-export function chapelScreens(chapel: LaSeuChapel): LaSeuScreen[] {
+export function chapelScreens(chapel: DieKathedraleChapel): DieKathedraleScreen[] {
   const area = chapelArea(chapel);
   const front = chapel.side * (NAVE.maxX - CHAPEL.depth);
   return [
@@ -352,7 +353,7 @@ export function chapelScreens(chapel: LaSeuChapel): LaSeuScreen[] {
 }
 
 /** Dead-end passage behind every entrance, where its zombies appear. */
-export const LA_SEU_PASSAGE = {
+export const DIE_KATHEDRALE_PASSAGE = {
   length: 6,
   width: { door: 2.2, window: 1.8 },
   height: { door: 2.6, window: 2.2 },
@@ -364,12 +365,12 @@ export const LA_SEU_PASSAGE = {
   breachDepth: 0.6,
 } as const;
 
-function spawnsOf(zone: LaSeuZoneId): ReadonlyArray<ZombieSpawnPoint> {
-  return LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === zone).map((entrance) => entranceSpawn(entrance, LA_SEU_PASSAGE));
+function spawnsOf(zone: DieKathedraleZoneId): ReadonlyArray<ZombieSpawnPoint> {
+  return DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === zone).map((entrance) => entranceSpawn(entrance, DIE_KATHEDRALE_PASSAGE));
 }
 
 /** Spawn points per unlocked zone, one at the end of each entrance passage. */
-export const LA_SEU_SPAWNS: Readonly<Record<LaSeuZoneId, ReadonlyArray<ZombieSpawnPoint>>> = {
+export const DIE_KATHEDRALE_SPAWNS: Readonly<Record<DieKathedraleZoneId, ReadonlyArray<ZombieSpawnPoint>>> = {
   narthex: spawnsOf('narthex'),
   nave: spawnsOf('nave'),
   westAisle: spawnsOf('westAisle'),
@@ -379,7 +380,7 @@ export const LA_SEU_SPAWNS: Readonly<Record<LaSeuZoneId, ReadonlyArray<ZombieSpa
 };
 
 /** Weapon outlines 2 cm in front of the wall face. */
-export const LA_SEU_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
+export const DIE_KATHEDRALE_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
   {
     // Beside the great doors, in reach from the first round.
     id: 'nave-m14',
@@ -423,7 +424,7 @@ export const LA_SEU_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
 ];
 
 /** The plaza's crate, against the front east of the great doors, facing the sea. */
-export const LA_SEU_BOX_PLACEMENT: MysteryBoxPlacement = {
+export const DIE_KATHEDRALE_BOX_PLACEMENT: MysteryBoxPlacement = {
   position: { x: 7.4, y: 0, z: PLAZA.minZ + 0.6 },
   yaw: Math.PI,
   useRange: 2.2,
@@ -432,55 +433,92 @@ export const LA_SEU_BOX_PLACEMENT: MysteryBoxPlacement = {
 };
 
 /** Just inside the great doors, on the central aisle, looking at the altar. */
-export const LA_SEU_PLAYER_SPAWN = { x: 0, y: 1.72, z: -3.6, floor: 0 } as const;
+export const DIE_KATHEDRALE_PLAYER_SPAWN = { x: 0, y: 1.72, z: -3.6, floor: 0 } as const;
+
+/**
+ * One unbroken move: the moonlit front across the plaza, a low passage
+ * through the wicket, then a crane above the rood grille towards the rose
+ * and a gentle retreat into the player's eyes. Times are on the shared
+ * eased path, equally spaced to keep Catmull-Rom velocity continuous;
+ * the final key is supplied by IntroCinematic from the live rig.
+ */
+export const DIE_KATHEDRALE_INTRO: ArenaIntro = {
+  presentation: 'dieKathedrale',
+  duration: 16,
+  shots: [
+    { time: 0, position: { x: 6.5, y: 7.6, z: 28 }, target: { x: 0, y: 12, z: 0 } },
+    { time: 1, position: { x: 6, y: 7.2, z: 26 }, target: { x: 0, y: 11.6, z: 0 } },
+    { time: 2, position: { x: 4.8, y: 6.2, z: 21.5 }, target: { x: 0, y: 10, z: 0 } },
+    { time: 3, position: { x: 2.8, y: 4.3, z: 15 }, target: { x: 0, y: 7, z: 0 } },
+    { time: 4, position: { x: 0.8, y: 2.1, z: 8 }, target: { x: 0, y: 3, z: -1 } },
+    { time: 5, position: { x: 0, y: 1.4, z: 3.5 }, target: { x: 0, y: 1.7, z: -7 } },
+    { time: 6, position: { x: 0, y: 1.35, z: 0.8 }, target: { x: 0, y: 1.9, z: -10 } },
+    { time: 7, position: { x: 0, y: 1.6, z: -2.4 }, target: { x: 0, y: 4.6, z: -18 } },
+    { time: 8, position: { x: 0.7, y: 3.4, z: -7.4 }, target: { x: 0, y: 10, z: -28 } },
+    { time: 9, position: { x: 2, y: 5.8, z: -14.6 }, target: { x: 0, y: 15, z: -42 } },
+    { time: 10, position: { x: 2.4, y: 7.4, z: -20.5 }, target: { x: 0, y: 17, z: -49 } },
+    { time: 11, position: { x: 0.4, y: 7.5, z: -23.5 }, target: { x: 0, y: 14.5, z: -49 } },
+    { time: 12, position: { x: -1.4, y: 6.3, z: -21 }, target: { x: 0, y: 10.5, z: -45 } },
+    { time: 13, position: { x: -2, y: 4.8, z: -14.8 }, target: { x: 0, y: 7.5, z: -39 } },
+    { time: 14, position: { x: -0.8, y: 2.9, z: -8 }, target: { x: 0, y: 3.5, z: -23 } },
+    { time: 15, position: { x: 0, y: 1.95, z: -4.7 }, target: { x: 0, y: 1.9, z: -15.2 } },
+  ],
+};
 
 /**
  * One rectangle over the nave, the chancel and the plaza, inset by the body
  * radius: walls and the closed wicket keep the player out of what is not
  * open yet, and the arena stops them at every walk-through entrance.
  */
-export const LA_SEU_PLAYER_BOUNDS: PlayerBounds = {
+export const DIE_KATHEDRALE_PLAYER_BOUNDS: PlayerBounds = {
   minX: NAVE.minX + 0.4,
   maxX: NAVE.maxX - 0.4,
   minZ: CHANCEL.minZ + 0.4,
   maxZ: PLAZA.maxZ - 0.4,
 };
 
-const PASSAGE_REACH = HALF_WALL + LA_SEU_PASSAGE.length + LA_SEU_WALL_THICKNESS + 0.3;
+const PASSAGE_REACH = HALF_WALL + DIE_KATHEDRALE_PASSAGE.length + DIE_KATHEDRALE_WALL_THICKNESS + 0.3;
 
 /** Every room plus every entrance passage. Walls longer than the zombie obstacle limit (20 m) are built in pieces. */
-export const LA_SEU_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
+export const DIE_KATHEDRALE_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
   {
     floor: 0,
     minX: WEST_WALL_X - PASSAGE_REACH,
     maxX: EAST_WALL_X + PASSAGE_REACH,
-    minZ: CHANCEL.minZ - LA_SEU_WALL_THICKNESS - 0.3,
-    maxZ: PLAZA.maxZ + LA_SEU_WALL_THICKNESS + 0.3,
+    minZ: CHANCEL.minZ - DIE_KATHEDRALE_WALL_THICKNESS - 0.3,
+    maxZ: PLAZA.maxZ + DIE_KATHEDRALE_WALL_THICKNESS + 0.3,
     baseY: 0,
   },
 ];
 
 /**
- * The horde: townsfolk who sought refuge in the cathedral and the clergy who
- * kept it, rolled per spawn by weight (appearance only). Civilians 55 %,
- * monks 20 %, priests 15 % (three chasuble colors), cardinal 7 %, bishop 3 %.
+ * The horde: the people who kept the cathedral and the pilgrims who came to
+ * it, every walker dressed, rolled per spawn by weight (appearance only; tune
+ * freely). Eleven looks, the common ones first; the bishop stays the rarest.
  */
-export const LA_SEU_ZOMBIE_SKIN_SHARES: readonly ZombieSkinShare[] = [
-  { skin: null, weight: 55 },
-  { skin: 'penitentMonk', weight: 20 },
-  { skin: 'condemnedPriestGreen', weight: 5 },
-  { skin: 'condemnedPriestViolet', weight: 5 },
-  { skin: 'condemnedPriestBurgundy', weight: 5 },
-  { skin: 'fallenCardinal', weight: 7 },
-  { skin: 'corruptedBishop', weight: 3 },
+export const DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES: readonly ZombieSkinShare[] = [
+  { skin: 'condemnedMonk', weight: 13 },
+  { skin: 'dominicanFriar', weight: 11 },
+  { skin: 'pilgrim', weight: 11 },
+  { skin: 'profanedPriest', weight: 10 },
+  { skin: 'undeadNun', weight: 10 },
+  { skin: 'cathedralCanon', weight: 9 },
+  { skin: 'cantor', weight: 9 },
+  { skin: 'cathedralGuardian', weight: 8 },
+  { skin: 'cathedralCustodian', weight: 8 },
+  { skin: 'abbess', weight: 7 },
+  { skin: 'fallenBishop', weight: 4 },
 ];
+
+/** Blue eyes for the whole horde, with a pale blue core against the cathedral gloom. */
+export const DIE_KATHEDRALE_ZOMBIE_EYES: ZombieEyeColors = { glow: 0x142aff, core: 0x7a9aff };
 
 /**
  * Night in a dead cathedral: almost no fill, so stone only shows where a
  * flame or the moon reaches it. The haze stays thin enough to read the
  * vault from the floor and thick enough to lose the far end of the nave.
  */
-export const LA_SEU_AMBIENCE = {
+export const DIE_KATHEDRALE_AMBIENCE = {
   backgroundColor: 0x020308,
   fog: { color: 0x04060b, density: 0.024 },
   hemisphereLight: { skyColor: 0x39466c, groundColor: 0x0b0907, intensity: 0.24, reducedIntensity: 0.34 },
@@ -491,7 +529,7 @@ export const LA_SEU_AMBIENCE = {
 } as const satisfies ArenaAmbience;
 
 /** Unshadowed moonlight from over the bay (south-east): a cold graze that only separates shafts from walls. */
-export const LA_SEU_MOON = {
+export const DIE_KATHEDRALE_MOON = {
   color: 0x7f97c8,
   intensity: 0.14,
   reducedIntensity: 0.17,
@@ -504,12 +542,19 @@ export const LA_SEU_MOON = {
 /** East lancets the moon still comes through: their glass glows, a beam slants in and a cold pool lies on the floor. Every other window is dead. */
 export const MOONLIT_LANCET_BAYS: ReadonlyArray<number> = [0, 4];
 
+/**
+ * Floor band a moonlit lancet lights, as distances in from the east wall. It
+ * stays centred on its window's bay so the beam, the coloured pool and the
+ * glow read as the window's own light, not as a pool beside it.
+ */
+export const MOONLIT_LANCET_LANDING = { nearX: 1, farX: 6.2 } as const;
+
 const CANDLE_COLOR = 0xffa552;
 const MOON_GLASS_COLOR = 0x7d9cf0;
 const SANCTUARY_LAMP_COLOR = 0xc8231a;
 const LANTERN_COLOR = 0xffb866;
 
-export interface LaSeuLightSite {
+export interface DieKathedraleLightSite {
   readonly id: string;
   readonly x: number;
   readonly y: number;
@@ -519,15 +564,41 @@ export interface LaSeuLightSite {
   readonly distance: number;
   /** Candle flames waver; glass and moon glows hold still. */
   readonly flicker: boolean;
+  /** Omitted for permanent sources such as moonlight, votives and the sanctuary lamp. */
+  readonly ignition?: {
+    readonly radius: number;
+    readonly seconds: number;
+    readonly initiallyLit: boolean;
+    readonly zones: ReadonlyArray<DieKathedraleZoneId>;
+  };
 }
 
 /** Hanging height of the wrought-iron candle rings round the columns. */
 export const COLUMN_RING_Y = 4.4;
+export const COLUMN_RING_RADIUS = NAVE_COLUMN.radius + 0.6;
+export const COLUMN_RING_CANDLES = 8;
 
-/** The one column whose ring still carries lit candles, by row side and column index: deep in the central nave. */
-export const LIT_COLUMN_RINGS: ReadonlyArray<{ readonly side: -1 | 1; readonly column: number }> = [
-  { side: 1, column: 3 },
+/** Real seconds, rather than eased path time: wind outside, oak at the threshold, iron high in the nave. */
+export const DIE_KATHEDRALE_INTRO_CUES: ReadonlyArray<ArenaAmbientCue & { readonly time: number }> = [
+  { time: 0.5, sound: 'wind-gust', position: { x: 0, y: 7, z: 9 } },
+  { time: 6.2, sound: 'wood-creak', position: { x: 0, y: 1.4, z: NAVE.maxZ } },
+  { time: 8.8, sound: 'metal-echo', position: { x: 5, y: COLUMN_RING_Y, z: -28 } },
 ];
+
+/** Existing column candelabra: the first pair guides the start; the rest kindle as the player explores. */
+export const COLUMN_CANDLE_RINGS = ([-1, 1] as const).flatMap((side) => NAVE_COLUMN_ZS.map((z, column) => ({
+  id: `ring-${side < 0 ? 'west' : 'east'}-${column}`,
+  side,
+  column,
+  z,
+  // Keep the original distant candle island visible, too.
+  initiallyLit: column === 0 || (side === 1 && column === 3),
+  zones: column <= 1
+    ? ['narthex'] as const
+    : column === NAVE_COLUMN_ZS.length - 1
+      ? ['nave', side < 0 ? 'westAisle' : 'eastAisle', 'crossing'] as const
+      : ['nave', side < 0 ? 'westAisle' : 'eastAisle'] as const,
+})));
 
 /** The altar: a stone table on its dais under the hanging canopy. */
 export const ALTAR = { x: 0, z: -55.2, daisWidth: 5.2, daisDepth: 2.8, daisHeight: 0.3, tableWidth: 3.2, tableDepth: 1.1, tableHeight: 1.05, canopyY: 6.2 } as const;
@@ -542,32 +613,36 @@ export const VOTIVE_RACKS: ReadonlyArray<{ readonly id: string; readonly side: -
 export const SANCTUARY_LAMP = { x: CHANCEL.maxX + 2.5, y: 2.6, z: NAVE.minZ + 1.8 } as const;
 
 /**
- * Every place a real light may burn: few, small and far apart, so each is
- * an island and the stretches between them stay black. The lighting keeps
- * only the quality budget's worth alive, the ones nearest the player.
+ * Local candle islands and moonlight. Discovered column rings stay lit for
+ * the run; only the nearest quality-budget's worth receive real lights.
  */
-export const LA_SEU_LIGHT_SITES: ReadonlyArray<LaSeuLightSite> = [
+export const DIE_KATHEDRALE_LIGHT_SITES: ReadonlyArray<DieKathedraleLightSite> = [
   // The front rose: the only cold light of the narthex, on the spot the run starts.
   { id: 'entry-moon', x: 0, y: 4.6, z: -3.2, color: MOON_GLASS_COLOR, intensity: 6, distance: 13, flicker: false },
-  ...LIT_COLUMN_RINGS.map(({ side, column }) => ({
-    id: `ring-${side < 0 ? 'west' : 'east'}-${column}`,
+  ...COLUMN_CANDLE_RINGS.map(({ id, side, column, z, initiallyLit, zones }) => ({
+    id,
     x: side * (NAVE.columnX - 1.5),
     y: COLUMN_RING_Y - 0.3,
-    z: NAVE_COLUMN_ZS[column],
+    z,
     color: CANDLE_COLOR,
-    intensity: 7,
-    distance: 10,
+    intensity: column <= 1 ? 20 : 16,
+    distance: 12,
     flicker: true,
+    ignition: { radius: 9, seconds: 0.9, initiallyLit, zones },
   })),
   ...VOTIVE_RACKS.map((rack) => ({
     id: rack.id, x: rack.side * (NAVE.maxX - 1.3), y: 1.7, z: rack.z, color: CANDLE_COLOR, intensity: 4, distance: 7, flicker: true,
   })),
-  ...LA_SEU_CHAPELS.filter((chapel) => chapel.lit).map((chapel) => ({
+  ...DIE_KATHEDRALE_CHAPELS.filter((chapel) => chapel.lit).map((chapel) => ({
     id: `${chapel.id}-candles`, x: chapel.side * (NAVE.maxX - 0.9), y: 1.7, z: naveBayCenter(chapel.bay) + CHAPEL.altarOffsetZ,
     color: CANDLE_COLOR, intensity: 5, distance: 7, flicker: true,
   })),
   ...MOONLIT_LANCET_BAYS.map((bay) => ({
-    id: `lancet-moon-${bay}`, x: NAVE.maxX - 3.8, y: 2.2, z: naveBayCenter(bay) - 1.4, color: MOON_GLASS_COLOR, intensity: 3.5, distance: 8, flicker: false,
+    id: `lancet-moon-${bay}`,
+    x: NAVE.maxX - (MOONLIT_LANCET_LANDING.nearX + MOONLIT_LANCET_LANDING.farX) / 2,
+    y: 2.2,
+    z: naveBayCenter(bay),
+    color: MOON_GLASS_COLOR, intensity: 3.5, distance: 8, flicker: false,
   })),
   { id: 'altar-candles', x: ALTAR.x, y: 2.4, z: ALTAR.z + 1.2, color: CANDLE_COLOR, intensity: 11, distance: 13, flicker: true },
   // The one red light in the building.
@@ -583,7 +658,7 @@ export const LA_SEU_LIGHT_SITES: ReadonlyArray<LaSeuLightSite> = [
  * tracery, wood giving, something knocking behind the sacristy. Rare and
  * far apart, so silence does most of the work.
  */
-export const LA_SEU_AMBIENT_EVENTS: ReadonlyArray<AmbientEventTiming & ArenaAmbientCue> = [
+export const DIE_KATHEDRALE_AMBIENT_EVENTS: ReadonlyArray<AmbientEventTiming & ArenaAmbientCue> = [
   // The choir grille working on its hinges.
   { sound: 'metal-echo', position: { x: 0, y: 2, z: CHOIR_Z }, initialDelay: 30, minInterval: 45, maxInterval: 100 },
   // Chains of a dead lamp, high in the west aisle.
@@ -625,11 +700,11 @@ export const PEW_BLOCKS: ReadonlyArray<PewBlock> = [
 ];
 
 /** Dust motes drifting in the nave, per quality tier. */
-export const LA_SEU_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 90, medium: 180, high: 340, ultraMax: 520 };
+export const DIE_KATHEDRALE_DUST_COUNT: Readonly<Record<QualityLevel, number>> = { low: 90, medium: 180, high: 340, ultraMax: 520 };
 
 /** Low mist lying where the air does not move: the chapels, the collapse, the west aisle door and the foot of the choir. */
-export const LA_SEU_MIST_PATCHES: ReadonlyArray<{ readonly x: number; readonly z: number; readonly radius: number }> = [
-  ...LA_SEU_CHAPELS.map((chapel) => ({ x: chapel.side * (NAVE.maxX - CHAPEL.depth / 2), z: naveBayCenter(chapel.bay), radius: 3.4 })),
+export const DIE_KATHEDRALE_MIST_PATCHES: ReadonlyArray<{ readonly x: number; readonly z: number; readonly radius: number }> = [
+  ...DIE_KATHEDRALE_CHAPELS.map((chapel) => ({ x: chapel.side * (NAVE.maxX - CHAPEL.depth / 2), z: naveBayCenter(chapel.bay), radius: 3.4 })),
   { x: 10, z: CHOIR_Z + 2.6, radius: 4.2 },
   { x: -10.2, z: naveBayCenter(2), radius: 3.6 },
   { x: 0, z: NAVE.minZ + 2.5, radius: 5 },

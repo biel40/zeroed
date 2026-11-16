@@ -1,10 +1,10 @@
-import { LA_SEU_ENTRANCES, LA_SEU_OPENINGS, LA_SEU_PASSAGE, LA_SEU_WALL_THICKNESS, type LaSeuEntrance } from '../LaSeuConfig';
+import { DIE_KATHEDRALE_ENTRANCES, DIE_KATHEDRALE_OPENINGS, DIE_KATHEDRALE_PASSAGE, DIE_KATHEDRALE_WALL_THICKNESS, type DieKathedraleEntrance } from '../DieKathedraleConfig';
 import { addEntrancePassageShell, EntranceFrame } from '../shared/EntrancePassage';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { archPoints, ribGeometries } from './GothicVault';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 
-const HALF_WALL = LA_SEU_WALL_THICKNESS / 2;
+const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 /** How far the stone surround stands proud of the wall face. */
 const SURROUND_FACE = -HALF_WALL - 0.04;
 
@@ -14,8 +14,8 @@ const SURROUND_FACE = -HALF_WALL - 0.04;
  * on the side the player sees. `interior` and `plaza` each take the
  * surrounds of their own entrances, so they merge with their own area.
  */
-export function buildEntrancePassages(interior: LaSeuBuildContext, plaza: LaSeuBuildContext): void {
-  for (const entrance of LA_SEU_ENTRANCES) {
+export function buildEntrancePassages(interior: DieKathedraleBuildContext, plaza: DieKathedraleBuildContext): void {
+  for (const entrance of DIE_KATHEDRALE_ENTRANCES) {
     const context = entrance.zone === 'plaza' ? plaza : interior;
     const frame = new EntranceFrame(entrance);
     addPassage(context, entrance, frame);
@@ -23,13 +23,13 @@ export function buildEntrancePassages(interior: LaSeuBuildContext, plaza: LaSeuB
   }
 }
 
-function addPassage(context: LaSeuBuildContext, entrance: LaSeuEntrance, frame: EntranceFrame): void {
+function addPassage(context: DieKathedraleBuildContext, entrance: DieKathedraleEntrance, frame: EntranceFrame): void {
   const { structure, materials, batch } = context;
-  const width = LA_SEU_PASSAGE.width[entrance.kind];
-  const height = LA_SEU_PASSAGE.height[entrance.kind];
+  const width = DIE_KATHEDRALE_PASSAGE.width[entrance.kind];
+  const height = DIE_KATHEDRALE_PASSAGE.height[entrance.kind];
   addEntrancePassageShell(structure, frame, entrance.id,
-    { length: LA_SEU_PASSAGE.length, width, height, wallThickness: LA_SEU_WALL_THICKNESS }, materials.roughStone, 'concrete');
-  const end = HALF_WALL + LA_SEU_PASSAGE.length;
+    { length: DIE_KATHEDRALE_PASSAGE.length, width, height, wallThickness: DIE_KATHEDRALE_WALL_THICKNESS }, materials.roughStone, 'concrete');
+  const end = HALF_WALL + DIE_KATHEDRALE_PASSAGE.length;
   const random = seededRandom(Math.round(entrance.x * 13 + entrance.z * 7));
   for (let index = 0; index < 9; index++) {
     const size = 0.3 + random() * 0.5;
@@ -39,9 +39,9 @@ function addPassage(context: LaSeuBuildContext, entrance: LaSeuEntrance, frame: 
 }
 
 /** Jambs and a pointed head round the opening; chapel windows get a sill as well. */
-function addSurround(context: LaSeuBuildContext, entrance: LaSeuEntrance, frame: EntranceFrame): void {
+function addSurround(context: DieKathedraleBuildContext, entrance: DieKathedraleEntrance, frame: EntranceFrame): void {
   const { batch, materials } = context;
-  const opening = LA_SEU_OPENINGS[entrance.kind];
+  const opening = DIE_KATHEDRALE_OPENINGS[entrance.kind];
   const half = opening.width / 2 + 0.1;
   for (const side of [-1, 1]) {
     const { x, z } = frame.point(SURROUND_FACE, side * half);

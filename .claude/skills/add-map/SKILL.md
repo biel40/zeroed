@@ -58,7 +58,7 @@ Tambien la navegacion de `src/zombies/navigation/` (`NavigationGrid`,
 `ZombieNavigationService`). Los pasajes ocultos de los spawns, sus puntos de aparicion, el tope del
 jugador en las entradas y los huecos que entradas y puertas cortan en los
 muros salen de `shared/EntrancePassage.ts`; cada mapa solo viste su pasaje
-(`station33/ServicePassageBuilder.ts`, `laSeu/EntrancePassages.ts`). Busca con grep en `CODEMAP.md` lo
+(`station33/ServicePassageBuilder.ts`, `dieKathedrale/EntrancePassages.ts`). Busca con grep en `CODEMAP.md` lo
 que ofrece cada uno.
 
 ## 2. Contrato `ZombieArena` (`src/zombies/maps/ZombieArena.ts`)

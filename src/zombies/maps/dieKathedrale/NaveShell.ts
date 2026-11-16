@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   CHANCEL,
-  LA_SEU_WALL_THICKNESS,
+  DIE_KATHEDRALE_WALL_THICKNESS,
   LANCET,
   MOONLIT_LANCET_BAYS,
   NAVE,
@@ -11,7 +11,7 @@ import {
   ROSE_WINDOWS,
   naveBayCenter,
   naveBayLine,
-} from '../LaSeuConfig';
+} from '../DieKathedraleConfig';
 import {
   archBandShape,
   archPoints,
@@ -22,11 +22,11 @@ import {
   wallShapeGeometry,
   type VaultBay,
 } from './GothicVault';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
-import { addStoneWall, roseRingGeometry, roundPaneGeometry, scaleUVs } from './LaSeuWalls';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
+import { addStoneWall, roseRingGeometry, roundPaneGeometry, scaleUVs } from './DieKathedraleWalls';
 import { addGreatDoorFace } from './MainPortal';
 
-const HALF_WALL = LA_SEU_WALL_THICKNESS / 2;
+const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 const VAULT_SEGMENTS = 10;
 const RIB_SEGMENTS = 8;
 /** Turns an eight-sided cylinder so its flats, not its corners, face the aisles. */
@@ -52,7 +52,7 @@ export function naveVaultBays(index: number): ReadonlyArray<VaultBay> {
  * arcade and clerestory over them, the rib vaults of the three aisles, the
  * lancets and both rose windows, and the inner face of the great doors.
  */
-export function buildNaveShell(context: LaSeuBuildContext): void {
+export function buildNaveShell(context: DieKathedraleBuildContext): void {
   addFloor(context);
   addWalls(context);
   addColumns(context);
@@ -62,23 +62,23 @@ export function buildNaveShell(context: LaSeuBuildContext): void {
   addEndWallDressing(context);
 }
 
-function addFloor(context: LaSeuBuildContext): void {
-  const width = NAVE.maxX - NAVE.minX + LA_SEU_WALL_THICKNESS * 2;
-  const depth = NAVE.maxZ - NAVE.minZ + LA_SEU_WALL_THICKNESS * 2;
+function addFloor(context: DieKathedraleBuildContext): void {
+  const width = NAVE.maxX - NAVE.minX + DIE_KATHEDRALE_WALL_THICKNESS * 2;
+  const depth = NAVE.maxZ - NAVE.minZ + DIE_KATHEDRALE_WALL_THICKNESS * 2;
   context.structure.addBox(0, -0.08, (NAVE.minZ + NAVE.maxZ) / 2, width, 0.16, depth, context.materials.floorStone, {
     name: 'nave-floor', surface: 'concrete', mapRole: 'slab', castShadow: false, uvSeed: 1, worldUVs: true, blocksPlayer: false,
   });
 }
 
-function addWalls(context: LaSeuBuildContext): void {
+function addWalls(context: DieKathedraleBuildContext): void {
   const breaks = [naveBayLine(2), naveBayLine(4), naveBayLine(6)];
   for (const side of SIDES) {
     addStoneWall(context, side < 0 ? 'nave-west-wall' : 'nave-east-wall', {
       axis: 'z', fixed: side * (NAVE.maxX + HALF_WALL), min: NAVE.minZ, max: NAVE.maxZ, height: NAVE.sideWallHeight, breaks,
     });
   }
-  const outerMinX = NAVE.minX - LA_SEU_WALL_THICKNESS;
-  const outerMaxX = NAVE.maxX + LA_SEU_WALL_THICKNESS;
+  const outerMinX = NAVE.minX - DIE_KATHEDRALE_WALL_THICKNESS;
+  const outerMaxX = NAVE.maxX + DIE_KATHEDRALE_WALL_THICKNESS;
   // The wicket splits the front in two; the chancel arch does the same to the far wall.
   addStoneWall(context, 'nave-front-wall', { axis: 'x', fixed: NAVE.maxZ + HALF_WALL, min: outerMinX, max: outerMaxX, height: NAVE.endWallHeight });
   addStoneWall(context, 'nave-chancel-wall', {
@@ -88,7 +88,7 @@ function addWalls(context: LaSeuBuildContext): void {
 }
 
 /** Slender eight-sided shafts on moulded bases, each with an invisible eight-sided solid. */
-function addColumns(context: LaSeuBuildContext): void {
+function addColumns(context: DieKathedraleBuildContext): void {
   const { batch, materials, structure, group } = context;
   const { radius, baseHeight, capitalHeight } = NAVE_COLUMN;
   const shaftHeight = NAVE.aisleSpringY - baseHeight;
@@ -123,7 +123,7 @@ function addColumns(context: LaSeuBuildContext): void {
 }
 
 /** Webs of every bay in one solid mesh, and their ribs, cross arches and bosses. */
-function addVaults(context: LaSeuBuildContext): void {
+function addVaults(context: DieKathedraleBuildContext): void {
   const { batch, materials, structure, group } = context;
   const tile = materials.vaultStone.userData.metersPerTile as number;
   const webs: THREE.BufferGeometry[] = [];
@@ -161,7 +161,7 @@ function addVaults(context: LaSeuBuildContext): void {
 }
 
 /** The arcade arches between the columns and the clerestory wall they carry, with its round windows. */
-function addArcade(context: LaSeuBuildContext): void {
+function addArcade(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const tile = materials.wallStone.userData.metersPerTile as number;
   const half = NAVE.bayLength / 2;
@@ -181,7 +181,7 @@ function addArcade(context: LaSeuBuildContext): void {
 }
 
 /** One lancet per bay in each side wall, its glass dead except where the moon still comes through the east ones. */
-function addAisleWindows(context: LaSeuBuildContext): void {
+function addAisleWindows(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { width, sillY, shoulderY, apexY } = LANCET.aisle;
   for (const side of SIDES) {
@@ -198,7 +198,7 @@ function addAisleWindows(context: LaSeuBuildContext): void {
 }
 
 /** Both end walls: the great doors under the front's rose, and the great rose over the chancel arch. */
-function addEndWallDressing(context: LaSeuBuildContext): void {
+function addEndWallDressing(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   addGreatDoorFace(context, NAVE.maxZ, 'nz');
   const front = ROSE_WINDOWS.front;

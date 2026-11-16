@@ -5,26 +5,26 @@ import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { Input } from '../src/player/Input';
 import { EYE_HEIGHT, PlayerController } from '../src/player/PlayerController';
 import type { Weapon } from '../src/weapons/Weapon';
-import { LaSeuArena } from '../src/zombies/maps/LaSeuArena';
+import { DieKathedraleArena } from '../src/zombies/maps/DieKathedraleArena';
 import {
   ALTAR,
   CHANCEL,
-  LA_SEU_AMBIENT_EVENTS,
-  LA_SEU_BOX_PLACEMENT,
-  LA_SEU_CHAPELS,
-  LA_SEU_DOORS,
-  LA_SEU_ENTRANCES,
-  LA_SEU_LIGHT_SITES,
-  LA_SEU_PASSAGE,
-  LA_SEU_PLAYER_SPAWN,
-  LA_SEU_ROOMS,
-  LA_SEU_SCREEN,
-  LA_SEU_SCREENS,
-  LA_SEU_SPAWNS,
-  LA_SEU_WALL_BUYS,
-  LA_SEU_WALL_THICKNESS,
-  LA_SEU_ZONE_AREAS,
-  LA_SEU_ZONES,
+  DIE_KATHEDRALE_AMBIENT_EVENTS,
+  DIE_KATHEDRALE_BOX_PLACEMENT,
+  DIE_KATHEDRALE_CHAPELS,
+  DIE_KATHEDRALE_DOORS,
+  DIE_KATHEDRALE_ENTRANCES,
+  DIE_KATHEDRALE_LIGHT_SITES,
+  DIE_KATHEDRALE_PASSAGE,
+  DIE_KATHEDRALE_PLAYER_SPAWN,
+  DIE_KATHEDRALE_ROOMS,
+  DIE_KATHEDRALE_SCREEN,
+  DIE_KATHEDRALE_SCREENS,
+  DIE_KATHEDRALE_SPAWNS,
+  DIE_KATHEDRALE_WALL_BUYS,
+  DIE_KATHEDRALE_WALL_THICKNESS,
+  DIE_KATHEDRALE_ZONE_AREAS,
+  DIE_KATHEDRALE_ZONES,
   NAVE,
   NAVE_COLUMN_ZS,
   PEW_BLOCKS,
@@ -33,12 +33,12 @@ import {
   chapelScreens,
   naveBayCenter,
   naveBayLine,
-  type LaSeuEntrance,
-  type LaSeuZoneId,
-} from '../src/zombies/maps/LaSeuConfig';
-import { pointedArch, ribVaultGeometry, vaultHeightAt } from '../src/zombies/maps/laSeu/GothicVault';
-import { pewBlockFootprint } from '../src/zombies/maps/laSeu/NaveFurniture';
-import { naveVaultBays } from '../src/zombies/maps/laSeu/NaveShell';
+  type DieKathedraleEntrance,
+  type DieKathedraleZoneId,
+} from '../src/zombies/maps/DieKathedraleConfig';
+import { pointedArch, ribVaultGeometry, vaultHeightAt } from '../src/zombies/maps/dieKathedrale/GothicVault';
+import { pewBlockFootprint } from '../src/zombies/maps/dieKathedrale/NaveFurniture';
+import { naveVaultBays } from '../src/zombies/maps/dieKathedrale/NaveShell';
 import { POINT_LIGHT_BUDGET } from '../src/zombies/maps/shared/PointLightBudget';
 import type { ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { mysteryBoxFootprint } from '../src/zombies/MysteryBoxFootprint';
@@ -59,8 +59,8 @@ let restoreDocument: () => void;
 beforeAll(() => { restoreDocument = installCanvasDocument(); });
 afterAll(() => restoreDocument());
 
-function makeArena(profile: DeviceProfile = TEST_PROFILE): LaSeuArena {
-  const arena = new LaSeuArena(new THREE.Scene(), profile);
+function makeArena(profile: DeviceProfile = TEST_PROFILE): DieKathedraleArena {
+  const arena = new DieKathedraleArena(new THREE.Scene(), profile);
   arena.init();
   return arena;
 }
@@ -87,10 +87,10 @@ function isClear(arena: ZombieArena, x: number, z: number, radius: number): bool
 }
 
 /** Footprint of an entrance's dead-end passage, walls included. */
-function passageBox(entrance: LaSeuEntrance): THREE.Box3 {
-  const halfWidth = LA_SEU_PASSAGE.width[entrance.kind] / 2 + LA_SEU_WALL_THICKNESS;
-  const near = LA_SEU_WALL_THICKNESS / 2;
-  const far = near + LA_SEU_PASSAGE.length + LA_SEU_WALL_THICKNESS;
+function passageBox(entrance: DieKathedraleEntrance): THREE.Box3 {
+  const halfWidth = DIE_KATHEDRALE_PASSAGE.width[entrance.kind] / 2 + DIE_KATHEDRALE_WALL_THICKNESS;
+  const near = DIE_KATHEDRALE_WALL_THICKNESS / 2;
+  const far = near + DIE_KATHEDRALE_PASSAGE.length + DIE_KATHEDRALE_WALL_THICKNESS;
   const a = new THREE.Vector3(entrance.x + entrance.outwardX * near, 0, entrance.z + entrance.outwardZ * near);
   const b = new THREE.Vector3(entrance.x + entrance.outwardX * far, 3, entrance.z + entrance.outwardZ * far);
   const box = new THREE.Box3().setFromPoints([a, b]);
@@ -100,21 +100,21 @@ function passageBox(entrance: LaSeuEntrance): THREE.Box3 {
 }
 
 function insideRoom(x: number, z: number): boolean {
-  return LA_SEU_ROOMS.some((room) => x >= room.minX && x <= room.maxX && z >= room.minZ && z <= room.maxZ);
+  return DIE_KATHEDRALE_ROOMS.some((room) => x >= room.minX && x <= room.maxX && z >= room.minZ && z <= room.maxZ);
 }
 
-function openBarrier(arena: LaSeuArena, id: string): void {
+function openBarrier(arena: DieKathedraleArena, id: string): void {
   const barrier = arena.barriers.find((candidate) => candidate.id === id)!;
   while (!barrier.isOpen) barrier.damage(barrier.boards[0].maxHp);
 }
 
-function openDoor(arena: LaSeuArena, id: string): void {
+function openDoor(arena: DieKathedraleArena, id: string): void {
   const door = arena.doors.find((candidate) => candidate.id === id)!;
   expect(door.tryUnlock(() => true).success, id).toBe(true);
   expect(arena.activateDoor(door.id), id).toBe(true);
 }
 
-function openPlaza(arena: LaSeuArena): void {
+function openPlaza(arena: DieKathedraleArena): void {
   openDoor(arena, 'to-plaza');
 }
 
@@ -122,7 +122,7 @@ const ROOD_Z = naveBayLine(2);
 const CHOIR_Z = naveBayLine(6);
 
 /** Cheapest gates from the narthex into each zone. */
-const WAY_INTO: Readonly<Record<LaSeuZoneId, ReadonlyArray<string>>> = {
+const WAY_INTO: Readonly<Record<DieKathedraleZoneId, ReadonlyArray<string>>> = {
   narthex: [],
   nave: ['rood-gate'],
   westAisle: ['almoina-gate'],
@@ -149,7 +149,7 @@ type ProbeId = keyof typeof PROBES;
 const FLOOD_STEP = 0.5;
 
 /** Every probe the player can walk to from the spawn, on a half-metre lattice through the player's own colliders. */
-function reachableProbes(arena: LaSeuArena): ProbeId[] {
+function reachableProbes(arena: DieKathedraleArena): ProbeId[] {
   const walls = arena.wallColliders;
   const bounds = arena.playerBounds;
   const body = new THREE.Box3();
@@ -175,12 +175,12 @@ function reachableProbes(arena: LaSeuArena): ProbeId[] {
   return (Object.keys(PROBES) as ProbeId[]).filter((id) => seen.has(key(PROBES[id].x, PROBES[id].z)));
 }
 
-function spawnOf(arena: LaSeuArena, id: string): ZombieSpawnPoint {
+function spawnOf(arena: DieKathedraleArena, id: string): ZombieSpawnPoint {
   return arena.spawnPoints.find((point) => (point as ZombieSpawnPoint).barrierId === id) as ZombieSpawnPoint;
 }
 
 /** Runs one zombie from `spawn` at a stationary player until it lands a hit. */
-function chaseUntilHit(arena: LaSeuArena, spawn: ZombieSpawnPoint, playerX: number, playerZ: number, seconds: number): { hit: boolean; path: THREE.Vector3[] } {
+function chaseUntilHit(arena: DieKathedraleArena, spawn: ZombieSpawnPoint, playerX: number, playerZ: number, seconds: number): { hit: boolean; path: THREE.Vector3[] } {
   const manager = new ZombieManager(() => 0, {}, false, [spawn], arena.barriers, [], () => 1);
   manager.setNavigationBounds(arena.navigationBounds);
   manager.registerColliders([...arena.colliders]);
@@ -224,7 +224,7 @@ function walk(arena: ZombieArena, x: number, z: number, yaw: number, seconds: nu
   return player.rig.position.clone();
 }
 
-describe('La Seu Gothic geometry', () => {
+describe('Die Kathedrale Gothic geometry', () => {
   it('draws an equilateral pointed arch: upright at the springs, a point at the crown', () => {
     expect(pointedArch(-1)).toBeCloseTo(0);
     expect(pointedArch(1)).toBeCloseTo(0);
@@ -255,10 +255,10 @@ describe('La Seu Gothic geometry', () => {
   });
 });
 
-describe('La Seu layout', () => {
+describe('Die Kathedrale layout', () => {
   it('initializes and restarts single-player with the plaza Mystery Box', () => {
     const { ctx } = makeContext();
-    const mode = new ZombiesMode('la-seu');
+    const mode = new ZombiesMode('die-kathedrale');
     mode.init(ctx);
     const state = mode as unknown as { box: unknown; boxView: unknown };
     expect(state.box).not.toBeNull();
@@ -270,26 +270,27 @@ describe('La Seu layout', () => {
 
   it('starts with the narthex alone: every gate locked and every other entrance dormant', () => {
     const arena: ZombieArena = makeArena();
+    expect(arena.zombieEyes).toEqual({ glow: 0x142aff, core: 0x7a9aff });
     expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
       ['rood-gate', 750, true], ['almoina-gate', 1000, true], ['mirador-gate', 1000, true],
       ['nave-west-gate', 750, true], ['nave-east-gate', 750, true], ['choir-gate', 1500, true],
       ['ambulatory-gate', 1250, true], ['to-plaza', 1250, true],
     ]);
-    const narthex = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === 'narthex');
+    const narthex = DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === 'narthex');
     expect(narthex).toHaveLength(2);
     // One entrance in each side wall: the horde closes on the start from both aisles.
     expect(narthex.map((entrance) => entrance.outwardX).sort()).toEqual([-1, 1]);
     expect(arena.barriers.map((barrier) => barrier.id)).toEqual(narthex.map((entrance) => entrance.id));
-    expect(arena.spawnPoints).toEqual(LA_SEU_SPAWNS.narthex);
+    expect(arena.spawnPoints).toEqual(DIE_KATHEDRALE_SPAWNS.narthex);
     expect(arena.activateDoor('nowhere')).toBe(false);
     expect(arena.completionInteraction).toBeUndefined();
   });
 
   it('spawns the player on the central aisle, clear of every solid, under the high vault', () => {
     const arena = makeArena();
-    expect(isClear(arena, LA_SEU_PLAYER_SPAWN.x, LA_SEU_PLAYER_SPAWN.z, 0.35)).toBe(true);
-    expect(Math.abs(LA_SEU_PLAYER_SPAWN.x)).toBeLessThan(NAVE.columnX);
-    const up = new THREE.Raycaster(new THREE.Vector3(LA_SEU_PLAYER_SPAWN.x, EYE_HEIGHT, LA_SEU_PLAYER_SPAWN.z), new THREE.Vector3(0, 1, 0));
+    expect(isClear(arena, DIE_KATHEDRALE_PLAYER_SPAWN.x, DIE_KATHEDRALE_PLAYER_SPAWN.z, 0.35)).toBe(true);
+    expect(Math.abs(DIE_KATHEDRALE_PLAYER_SPAWN.x)).toBeLessThan(NAVE.columnX);
+    const up = new THREE.Raycaster(new THREE.Vector3(DIE_KATHEDRALE_PLAYER_SPAWN.x, EYE_HEIGHT, DIE_KATHEDRALE_PLAYER_SPAWN.z), new THREE.Vector3(0, 1, 0));
     arena.group.updateMatrixWorld(true);
     const [ceiling] = up.intersectObjects([...arena.colliders], false);
     expect(ceiling.object.name).toBe('nave-vault');
@@ -298,14 +299,14 @@ describe('La Seu layout', () => {
 
   it('places every zombie spawn outside every room, clear of colliders, behind its own entrance', () => {
     const arena = makeArena();
-    for (const door of LA_SEU_DOORS) openDoor(arena, door.id);
-    expect(arena.spawnPoints).toHaveLength(LA_SEU_ENTRANCES.length);
+    for (const door of DIE_KATHEDRALE_DOORS) openDoor(arena, door.id);
+    expect(arena.spawnPoints).toHaveLength(DIE_KATHEDRALE_ENTRANCES.length);
     const solids = solidBoxes(arena);
-    for (const spawn of Object.values(LA_SEU_SPAWNS).flat()) {
+    for (const spawn of Object.values(DIE_KATHEDRALE_SPAWNS).flat()) {
       expect(insideRoom(spawn.x, spawn.z), `spawn ${spawn.barrierId}`).toBe(false);
       const body = bodyBox(spawn.x, spawn.z, 0.45);
       for (const box of solids) expect(box.intersectsBox(body), `spawn ${spawn.barrierId}`).toBe(false);
-      const entrance = LA_SEU_ENTRANCES.find((candidate) => candidate.id === spawn.barrierId)!;
+      const entrance = DIE_KATHEDRALE_ENTRANCES.find((candidate) => candidate.id === spawn.barrierId)!;
       const side = (x: number, z: number): number => (x - entrance.x) * entrance.outwardX + (z - entrance.z) * entrance.outwardZ;
       expect(side(spawn.approachX!, spawn.approachZ!)).toBeGreaterThan(0.4);
       expect(side(spawn.breachX!, spawn.breachZ!)).toBeLessThan(-0.4);
@@ -314,12 +315,12 @@ describe('La Seu layout', () => {
   });
 
   it('keeps every entrance passage off the others and off every room but its own wall', () => {
-    const passages = LA_SEU_ENTRANCES.map(passageBox);
+    const passages = DIE_KATHEDRALE_ENTRANCES.map(passageBox);
     for (let index = 0; index < passages.length; index++) {
       for (let other = index + 1; other < passages.length; other++) expect(passages[index].intersectsBox(passages[other])).toBe(false);
-      for (const room of LA_SEU_ROOMS) {
+      for (const room of DIE_KATHEDRALE_ROOMS) {
         const interior = new THREE.Box3(new THREE.Vector3(room.minX, 0, room.minZ), new THREE.Vector3(room.maxX, 3, room.maxZ)).expandByScalar(-0.01);
-        expect(interior.intersectsBox(passages[index]), LA_SEU_ENTRANCES[index].id).toBe(false);
+        expect(interior.intersectsBox(passages[index]), DIE_KATHEDRALE_ENTRANCES[index].id).toBe(false);
       }
     }
   });
@@ -337,11 +338,11 @@ describe('La Seu layout', () => {
     }
   });
 
-  it.each(LA_SEU_ENTRANCES.map((entrance) => [entrance.id, entrance.zone] as const))('gives the %s entrance (%s) a walkable route to the player spawn', (id, zone) => {
+  it.each(DIE_KATHEDRALE_ENTRANCES.map((entrance) => [entrance.id, entrance.zone] as const))('gives the %s entrance (%s) a walkable route to the player spawn', (id, zone) => {
     const arena = makeArena();
     for (const door of WAY_INTO[zone]) openDoor(arena, door);
     openBarrier(arena, id);
-    const { hit } = chaseUntilHit(arena, spawnOf(arena, id), LA_SEU_PLAYER_SPAWN.x, LA_SEU_PLAYER_SPAWN.z, 150);
+    const { hit } = chaseUntilHit(arena, spawnOf(arena, id), DIE_KATHEDRALE_PLAYER_SPAWN.x, DIE_KATHEDRALE_PLAYER_SPAWN.z, 150);
     expect(hit).toBe(true);
   });
 
@@ -352,7 +353,7 @@ describe('La Seu layout', () => {
       ['m14', 800, 625], ['ppsh41', 1250, 625], ['ak47', 1750, 900], ['m60', 2500, 1250],
     ]);
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
-    for (const wallBuy of LA_SEU_WALL_BUYS) {
+    for (const wallBuy of DIE_KATHEDRALE_WALL_BUYS) {
       const facing = new THREE.Vector3(Math.sin(wallBuy.yaw), 0, Math.cos(wallBuy.yaw));
       const position = new THREE.Vector3(wallBuy.position.x, wallBuy.position.y, wallBuy.position.z);
       expect(inside(position.clone().addScaledVector(facing, -0.03)), wallBuy.id).toBe(true);
@@ -362,11 +363,11 @@ describe('La Seu layout', () => {
       expect(isClear(arena, stand.x, stand.z, 0.3), wallBuy.id).toBe(true);
     }
     // The first rifle is in the nave, in reach from the first round.
-    expect(LA_SEU_WALL_BUYS[0].position.z).toBeLessThan(NAVE.maxZ);
+    expect(DIE_KATHEDRALE_WALL_BUYS[0].position.z).toBeLessThan(NAVE.maxZ);
   });
 });
 
-describe('La Seu nave', () => {
+describe('Die Kathedrale nave', () => {
   it('stands both rows of octagonal columns as solids for the player, the horde and bullets', () => {
     const arena = makeArena();
     arena.group.updateMatrixWorld(true);
@@ -394,7 +395,7 @@ describe('La Seu nave', () => {
     for (const x of [0, -9.2, 9.2]) expect(walk(arena, x, -10.5, FACE_NORTH, 6).z, `aisle at ${x}`).toBeGreaterThan(ROOD_Z);
     openDoor(arena, 'rood-gate');
     arena.update(5);
-    const central = walk(arena, 0, LA_SEU_PLAYER_SPAWN.z, FACE_NORTH, 14);
+    const central = walk(arena, 0, DIE_KATHEDRALE_PLAYER_SPAWN.z, FACE_NORTH, 14);
     expect(Math.abs(central.x)).toBeLessThan(0.01);
     expect(central.z).toBeLessThan(ROOD_Z - 20);
     expect(central.z).toBeGreaterThan(CHOIR_Z);
@@ -433,13 +434,13 @@ describe('La Seu nave', () => {
     expect(path.some((point) => point.z < CHANCEL.maxZ)).toBe(true);
 
     openBarrier(arena, 'chancel-sacristy');
-    const sacristy = LA_SEU_ENTRANCES.find((entrance) => entrance.id === 'chancel-sacristy')!;
+    const sacristy = DIE_KATHEDRALE_ENTRANCES.find((entrance) => entrance.id === 'chancel-sacristy')!;
     const end = walk(arena, sacristy.x - 2.5, sacristy.z, FACE_EAST, 4);
     expect(end.x).toBeLessThan(CHANCEL.maxX);
   });
 });
 
-describe('La Seu zones', () => {
+describe('Die Kathedrale zones', () => {
   it.each([
     [[], ['narthex']],
     [['rood-gate'], ['narthex', 'nave']],
@@ -455,20 +456,20 @@ describe('La Seu zones', () => {
     for (const door of doors) openDoor(arena, door);
     expect([...reachableProbes(arena)].sort()).toEqual([...expected].sort());
     // Only the zones the player can walk send their dead.
-    const awake = LA_SEU_ZONES.filter((zone) => zone === 'narthex' || doors.some((id) => LA_SEU_DOORS.find((door) => door.id === id)!.zones.includes(zone)));
-    expect(arena.spawnPoints).toEqual(awake.flatMap((zone) => LA_SEU_SPAWNS[zone]));
-    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(LA_SEU_ENTRANCES.filter((entrance) => awake.includes(entrance.zone)).map((entrance) => entrance.id));
+    const awake = DIE_KATHEDRALE_ZONES.filter((zone) => zone === 'narthex' || doors.some((id) => DIE_KATHEDRALE_DOORS.find((door) => door.id === id)!.zones.includes(zone)));
+    expect(arena.spawnPoints).toEqual(awake.flatMap((zone) => DIE_KATHEDRALE_SPAWNS[zone]));
+    expect(arena.barriers.map((barrier) => barrier.id)).toEqual(DIE_KATHEDRALE_ENTRANCES.filter((entrance) => awake.includes(entrance.zone)).map((entrance) => entrance.id));
   });
 
   it('joins two zones per gate, every zone to the narthex, and opens each gate only once', () => {
     const arena = makeArena();
-    const reached = new Set<LaSeuZoneId>(['narthex']);
-    for (let pass = 0; pass < LA_SEU_DOORS.length; pass++) {
-      for (const door of LA_SEU_DOORS) {
+    const reached = new Set<DieKathedraleZoneId>(['narthex']);
+    for (let pass = 0; pass < DIE_KATHEDRALE_DOORS.length; pass++) {
+      for (const door of DIE_KATHEDRALE_DOORS) {
         if (door.zones.some((zone) => reached.has(zone))) door.zones.forEach((zone) => reached.add(zone));
       }
     }
-    expect([...reached].sort()).toEqual([...LA_SEU_ZONES].sort());
+    expect([...reached].sort()).toEqual([...DIE_KATHEDRALE_ZONES].sort());
     openDoor(arena, 'rood-gate');
     expect(arena.activateDoor('rood-gate')).toBe(false);
     // A gate between two zones already awake still has to be bought to walk through it.
@@ -477,16 +478,16 @@ describe('La Seu zones', () => {
     openDoor(arena, 'nave-west-gate');
     arena.update(5);
     expect(walk(arena, -3, naveBayCenter(5), -FACE_EAST, 4).x).toBeLessThan(-NAVE.columnX - 1);
-    for (const door of LA_SEU_DOORS) expect(door.cost, door.id).toBeGreaterThanOrEqual(750);
+    for (const door of DIE_KATHEDRALE_DOORS) expect(door.cost, door.id).toBeGreaterThanOrEqual(750);
   });
 
   it('gives every zone with an outer wall two entrances, and keeps every one of them inside its own zone', () => {
-    for (const zone of LA_SEU_ZONES) {
-      const entrances = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === zone);
+    for (const zone of DIE_KATHEDRALE_ZONES) {
+      const entrances = DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === zone);
       expect(entrances, zone).toHaveLength(zone === 'nave' ? 0 : 2);
       if (zone === 'plaza') continue;
       for (const entrance of entrances) {
-        const area = entrance.id === 'chancel-sacristy' ? CHANCEL : LA_SEU_ZONE_AREAS[zone as Exclude<LaSeuZoneId, 'plaza'>];
+        const area = entrance.id === 'chancel-sacristy' ? CHANCEL : DIE_KATHEDRALE_ZONE_AREAS[zone as Exclude<DieKathedraleZoneId, 'plaza'>];
         expect(entrance.z, entrance.id).toBeGreaterThan(area.minZ);
         expect(entrance.z, entrance.id).toBeLessThan(area.maxZ);
       }
@@ -496,16 +497,16 @@ describe('La Seu zones', () => {
   it('divides the nave without closing it: no screen reaches head height, and the altar shows from the spawn', () => {
     const arena = makeArena();
     arena.group.updateMatrixWorld(true);
-    const screens = [...LA_SEU_SCREENS, ...LA_SEU_CHAPELS.flatMap(chapelScreens)];
+    const screens = [...DIE_KATHEDRALE_SCREENS, ...DIE_KATHEDRALE_CHAPELS.flatMap(chapelScreens)];
     const solids = arena.colliders.filter((collider) => screens.some((screen) => collider.name === screen.id || collider.name.startsWith(`${screen.id}-`)));
     expect(solids.length).toBeGreaterThanOrEqual(screens.length);
     for (const solid of solids) {
       const box = new THREE.Box3().setFromObject(solid);
-      expect(box.max.y, solid.name).toBeLessThanOrEqual(LA_SEU_SCREEN.rubbleHeight);
+      expect(box.max.y, solid.name).toBeLessThanOrEqual(DIE_KATHEDRALE_SCREEN.rubbleHeight);
       expect(box.max.y, solid.name).toBeLessThan(NAVE.aisleSpringY / 4);
     }
     // Eyes a step off the central aisle (its gates are shut), looking over both grilles at the candles on the altar.
-    const eye = new THREE.Vector3(LA_SEU_PLAYER_SPAWN.x + 1.5, EYE_HEIGHT, LA_SEU_PLAYER_SPAWN.z);
+    const eye = new THREE.Vector3(DIE_KATHEDRALE_PLAYER_SPAWN.x + 1.5, EYE_HEIGHT, DIE_KATHEDRALE_PLAYER_SPAWN.z);
     const altar = new THREE.Vector3(ALTAR.x, 3.2, ALTAR.z);
     const sight = new THREE.Raycaster(eye, altar.clone().sub(eye).normalize(), 0, eye.distanceTo(altar));
     expect(sight.intersectObjects([...arena.colliders], false)).toHaveLength(0);
@@ -514,7 +515,7 @@ describe('La Seu zones', () => {
   it('fences each chapel off against the side wall, open in the middle, leaving a walkway beside the columns', () => {
     const arena = makeArena();
     for (const door of ['almoina-gate', 'mirador-gate']) openDoor(arena, door);
-    for (const chapel of LA_SEU_CHAPELS) {
+    for (const chapel of DIE_KATHEDRALE_CHAPELS) {
       const area = chapelArea(chapel);
       const front = chapel.side * (NAVE.maxX - (area.maxX - area.minX));
       const middle = naveBayCenter(chapel.bay);
@@ -542,14 +543,14 @@ describe('La Seu zones', () => {
   it('hangs iron gates in the screens and keeps the boarded wicket in the great doors', () => {
     const arena = makeArena();
     arena.group.updateMatrixWorld(true);
-    for (const door of LA_SEU_DOORS) {
+    for (const door of DIE_KATHEDRALE_DOORS) {
       const collider = arena.colliders.find((candidate) => candidate.name === `point-door-collider:${door.id}`)!;
       expect(collider.userData.surface, door.id).toBe(door.kind === 'gate' ? 'metal' : 'wood');
     }
   });
 });
 
-describe('La Seu plaza', () => {
+describe('Die Kathedrale plaza', () => {
   it('stays shut behind the wicket until it is bought, then opens the way out and wakes its gates', () => {
     const arena = makeArena();
     const shut = walk(arena, 0, -2, FACE_SOUTH, 4);
@@ -558,9 +559,9 @@ describe('La Seu plaza', () => {
     arena.update(5);
     const out = walk(arena, 0, -2, FACE_SOUTH, 4);
     expect(out.z).toBeGreaterThan(PLAZA.minZ + 4);
-    const awake = LA_SEU_ENTRANCES.filter((entrance) => entrance.zone === 'narthex' || entrance.zone === 'plaza');
+    const awake = DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === 'narthex' || entrance.zone === 'plaza');
     expect(arena.barriers.map((barrier) => barrier.id)).toEqual(awake.map((entrance) => entrance.id));
-    expect(arena.spawnPoints).toEqual([...LA_SEU_SPAWNS.narthex, ...LA_SEU_SPAWNS.plaza]);
+    expect(arena.spawnPoints).toEqual([...DIE_KATHEDRALE_SPAWNS.narthex, ...DIE_KATHEDRALE_SPAWNS.plaza]);
     expect(arena.activateDoor('to-plaza')).toBe(false);
   });
 
@@ -588,7 +589,7 @@ describe('La Seu plaza', () => {
   it('stands the crate against the front, clear of the piers, with room to use it', () => {
     const arena = makeArena();
     openPlaza(arena);
-    const footprint = mysteryBoxFootprint(LA_SEU_BOX_PLACEMENT);
+    const footprint = mysteryBoxFootprint(DIE_KATHEDRALE_BOX_PLACEMENT);
     expect(footprint.min.z).toBeGreaterThanOrEqual(PLAZA.minZ - 1e-6);
     arena.group.updateMatrixWorld(true);
     for (const collider of arena.colliders) {
@@ -596,17 +597,77 @@ describe('La Seu plaza', () => {
       if (collider.userData.mapRole === 'slab') continue;
       expect(box.intersectsBox(footprint.clone().expandByScalar(-0.01)), collider.name).toBe(false);
     }
-    const stand = bodyBox(LA_SEU_BOX_PLACEMENT.position.x, footprint.max.z + 0.5, 0.3);
+    const stand = bodyBox(DIE_KATHEDRALE_BOX_PLACEMENT.position.x, footprint.max.z + 0.5, 0.3);
     expect(solidBoxes(arena).some((box) => box.intersectsBox(stand))).toBe(false);
   });
 });
 
-describe('La Seu lights and ambience', () => {
-  const visibleLights = (arena: LaSeuArena): THREE.PointLight[] => {
+describe('Die Kathedrale lights and ambience', () => {
+  const visibleLights = (arena: DieKathedraleArena): THREE.PointLight[] => {
     const lights: THREE.PointLight[] = [];
     arena.group.traverse((object) => { if (object instanceof THREE.PointLight && object.visible) lights.push(object); });
     return lights;
   };
+
+  const ringFlameSizes = (arena: DieKathedraleArena, side: number, column: number): number[] => {
+    const flames = arena.group.getObjectByName('die-kathedrale-column-flames') as THREE.InstancedMesh;
+    expect(flames).toBeInstanceOf(THREE.InstancedMesh);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const sizes: number[] = [];
+    for (let index = 0; index < flames.count; index++) {
+      flames.getMatrixAt(index, matrix);
+      position.setFromMatrixPosition(matrix);
+      if (Math.abs(position.x - side * NAVE.columnX) > 2 || Math.abs(position.z - NAVE_COLUMN_ZS[column]) > 2) continue;
+      sizes.push(scale.setFromMatrixScale(matrix).y);
+    }
+    expect(sizes).toHaveLength(7);
+    return sizes;
+  };
+
+  it('starts with warm light on both sides of the player and ignites the next candles smoothly as they approach', () => {
+    const arena = makeArena({ ...TEST_PROFILE, quality: 'low' });
+    const warmStart = visibleLights(arena).filter((light) => light.color.r > light.color.b && light.intensity > 0);
+    expect(warmStart).toHaveLength(2);
+    expect(warmStart.some((light) => light.position.x < 0)).toBe(true);
+    expect(warmStart.some((light) => light.position.x > 0)).toBe(true);
+    expect(ringFlameSizes(arena, -1, 0).every((size) => size === 1)).toBe(true);
+    expect(ringFlameSizes(arena, -1, 1).every((size) => size === 0)).toBe(true);
+
+    const approach = new THREE.Vector3(0, 1.72, -9);
+    arena.update(0, approach);
+    expect(ringFlameSizes(arena, -1, 1).every((size) => size === 0)).toBe(true);
+    arena.update(0.2, approach);
+    expect(ringFlameSizes(arena, -1, 1).every((size) => size > 0 && size < 1)).toBe(true);
+    for (let step = 0; step < 20; step++) arena.update(0.1, approach);
+    expect(ringFlameSizes(arena, -1, 1).every((size) => size === 1)).toBe(true);
+    // The fixed pool only transfers once the new ring is closer than the held lights.
+    approach.z = -12;
+    for (let step = 0; step < 20; step++) arena.update(0.1, approach);
+    expect(visibleLights(arena).some((light) => light.position.z === NAVE_COLUMN_ZS[1] && light.intensity > 0)).toBe(true);
+
+    for (let step = 0; step < 20; step++) arena.update(0.1, new THREE.Vector3(0, 1.72, 12));
+    expect(ringFlameSizes(arena, -1, 1).every((size) => size === 1)).toBe(true);
+    arena.reset();
+    expect(ringFlameSizes(arena, -1, 1).every((size) => size === 0)).toBe(true);
+  });
+
+  it('keeps undiscovered candles dark during the intro and behind unopened gates', () => {
+    const arena = makeArena();
+    const furtherIn = new THREE.Vector3(-5, 1.72, NAVE_COLUMN_ZS[2]);
+    const initialCount = arena.group.getObjectByName('die-kathedrale-column-flames');
+    for (let step = 0; step < 20; step++) arena.update(0.1, furtherIn);
+    expect(ringFlameSizes(arena, -1, 2).every((size) => size === 0)).toBe(true);
+    openDoor(arena, 'rood-gate');
+    arena.startIntro();
+    for (let step = 0; step < 20; step++) arena.update(0.1, furtherIn);
+    expect(ringFlameSizes(arena, -1, 2).every((size) => size === 0)).toBe(true);
+    arena.finishIntro();
+    for (let step = 0; step < 30; step++) arena.update(0.1, furtherIn);
+    expect(ringFlameSizes(arena, -1, 2).every((size) => size === 1)).toBe(true);
+    expect(arena.group.getObjectByName('die-kathedrale-column-flames')).toBe(initialCount);
+  });
 
   it.each(QUALITY_LEVELS)('keeps a fixed %s-quality point-light budget wherever the player goes', (quality: QualityLevel) => {
     const arena = makeArena({ ...TEST_PROFILE, quality });
@@ -622,7 +683,7 @@ describe('La Seu lights and ambience', () => {
     const arena = makeArena({ ...TEST_PROFILE, quality: 'low' });
     const litSites = (): string[] => visibleLights(arena)
       .filter((light) => light.intensity > 0)
-      .map((light) => LA_SEU_LIGHT_SITES.find((site) => site.x === light.position.x && site.y === light.position.y && site.z === light.position.z)!.id)
+      .map((light) => DIE_KATHEDRALE_LIGHT_SITES.find((site) => site.x === light.position.x && site.y === light.position.y && site.z === light.position.z)!.id)
       .sort();
     const start = litSites();
     expect(start).toHaveLength(POINT_LIGHT_BUDGET.low);
@@ -639,33 +700,35 @@ describe('La Seu lights and ambience', () => {
   it('applies its own night mood and reuses existing music', () => {
     const scene = new THREE.Scene();
     scene.environmentIntensity = 0.45;
-    const arena = new LaSeuArena(scene, { ...TEST_PROFILE, useReducedEffects: false });
+    const arena = new DieKathedraleArena(scene, { ...TEST_PROFILE, useReducedEffects: false });
     arena.init();
     expect((scene.fog as THREE.FogExp2).density).toBe(arena.ambience.fog.density);
     expect(scene.environmentIntensity).toBe(arena.ambience.environmentIntensity?.intensity);
     // Thin enough to read the vault from the floor.
     expect(Math.exp(-((arena.ambience.fog.density * NAVE.naveApexY) ** 2))).toBeGreaterThan(0.7);
-    for (const name of ['laseu-moon-shafts', 'laseu-mist']) {
+    for (const name of ['die-kathedrale-moon-shafts', 'die-kathedrale-mist']) {
       expect(arena.group.getObjectByName(name), name).toBeDefined();
       expect(makeArena().group.getObjectByName(name), name).toBeUndefined();
     }
   });
 
-  it('lights islands, not the building: little fill, and no two indoor lights close enough to merge', () => {
+  it('keeps candle islands local and the ambient fill low, with cold window accents allowed nearby', () => {
     const { hemisphereLight, environmentIntensity } = makeArena().ambience;
     expect(hemisphereLight.intensity).toBeLessThanOrEqual(0.3);
     expect(environmentIntensity.intensity).toBeLessThanOrEqual(0.08);
-    const indoor = LA_SEU_LIGHT_SITES.filter((site) => site.z < NAVE.maxZ);
+    const indoor = DIE_KATHEDRALE_LIGHT_SITES.filter((site) => site.z < NAVE.maxZ);
     for (const site of indoor) {
       expect(site.distance, site.id).toBeLessThanOrEqual(13);
       for (const other of indoor) {
-        if (other !== site) expect(Math.hypot(site.x - other.x, site.z - other.z), `${site.id} / ${other.id}`).toBeGreaterThan(6);
+        if (other !== site && site.flicker && other.flicker) {
+          expect(Math.hypot(site.x - other.x, site.z - other.z), `${site.id} / ${other.id}`).toBeGreaterThan(6);
+        }
       }
     }
     // The run starts in a pool of light, and every weapon on a wall has one within reach.
-    const lit = (x: number, z: number): boolean => LA_SEU_LIGHT_SITES.some((site) => Math.hypot(site.x - x, site.z - z) < site.distance * 0.8);
-    expect(lit(LA_SEU_PLAYER_SPAWN.x, LA_SEU_PLAYER_SPAWN.z)).toBe(true);
-    for (const wallBuy of LA_SEU_WALL_BUYS) expect(lit(wallBuy.position.x, wallBuy.position.z), wallBuy.id).toBe(true);
+    const lit = (x: number, z: number): boolean => DIE_KATHEDRALE_LIGHT_SITES.some((site) => Math.hypot(site.x - x, site.z - z) < site.distance * 0.8);
+    expect(lit(DIE_KATHEDRALE_PLAYER_SPAWN.x, DIE_KATHEDRALE_PLAYER_SPAWN.z)).toBe(true);
+    for (const wallBuy of DIE_KATHEDRALE_WALL_BUYS) expect(lit(wallBuy.position.x, wallBuy.position.z), wallBuy.id).toBe(true);
   });
 
   it('schedules rare ambient sounds through the map cue hook, and none while time stands still', () => {
@@ -675,14 +738,14 @@ describe('La Seu lights and ambience', () => {
     arena.update(0);
     expect(heard).toHaveLength(0);
     for (let step = 0; step < 600; step++) arena.update(1);
-    expect(new Set(heard)).toEqual(new Set(LA_SEU_AMBIENT_EVENTS.map((event) => event.sound)));
+    expect(new Set(heard)).toEqual(new Set(DIE_KATHEDRALE_AMBIENT_EVENTS.map((event) => event.sound)));
     // Silence does most of the work: well under one sound every ten seconds.
     expect(heard.length).toBeLessThan(60);
-    for (const event of LA_SEU_AMBIENT_EVENTS) expect(event.initialDelay).toBeGreaterThanOrEqual(20);
+    for (const event of DIE_KATHEDRALE_AMBIENT_EVENTS) expect(event.initialDelay).toBeGreaterThanOrEqual(20);
   });
 });
 
-describe('La Seu reset', () => {
+describe('Die Kathedrale reset', () => {
   it('restores boards, the wicket, lights and spawns without leaving anything behind', () => {
     const arena = makeArena();
     arena.group.updateMatrixWorld(true);
@@ -704,7 +767,7 @@ describe('La Seu reset', () => {
       intensities: intensities(),
     };
 
-    for (const door of LA_SEU_DOORS) openDoor(arena, door.id);
+    for (const door of DIE_KATHEDRALE_DOORS) openDoor(arena, door.id);
     for (const barrier of arena.barriers) {
       while (!barrier.isOpen) barrier.damage(100);
     }

@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import {
   ALTAR,
+  COLUMN_CANDLE_RINGS,
+  COLUMN_RING_CANDLES,
+  COLUMN_RING_RADIUS,
   COLUMN_RING_Y,
-  LIT_COLUMN_RINGS,
+  LANCET,
   MOONLIT_LANCET_BAYS,
+  MOONLIT_LANCET_LANDING,
   NAVE,
   NAVE_COLUMN,
   NAVE_COLUMN_ZS,
@@ -12,13 +16,10 @@ import {
   ROSE_WINDOWS,
   SANCTUARY_LAMP,
   naveBayCenter,
-} from '../LaSeuConfig';
+} from '../DieKathedraleConfig';
 import { seededRandom } from '../shared/ProceduralNoise';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 import { pewBlockFootprint } from './NaveFurniture';
-
-const RING_RADIUS = NAVE_COLUMN.radius + 0.6;
-const RING_CANDLES = 8;
 
 /** A flat decal on the floor, turned by `yaw`. */
 export function floorDecal(width: number, depth: number, x: number, z: number, yaw: number, lift: number): THREE.BufferGeometry {
@@ -31,7 +32,7 @@ export function floorDecal(width: number, depth: number, x: number, z: number, y
  * moon still throws through a few windows, and the traces of whoever made a
  * stand in here.
  */
-export function buildNaveDressing(context: LaSeuBuildContext): void {
+export function buildNaveDressing(context: DieKathedraleBuildContext): void {
   addColumnRings(context);
   addBanners(context);
   addSanctuaryLamp(context);
@@ -39,36 +40,32 @@ export function buildNaveDressing(context: LaSeuBuildContext): void {
   addLastStand(context);
 }
 
-/** A ring of candles hung round every column on iron brackets; only some still burn. */
-function addColumnRings(context: LaSeuBuildContext): void {
+/** Static iron and wax; ColumnCandleFlames draws the flames as each ring kindles. */
+function addColumnRings(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
-  for (const side of [-1, 1] as const) {
-    NAVE_COLUMN_ZS.forEach((z, column) => {
-      const x = side * NAVE.columnX;
-      const lit = LIT_COLUMN_RINGS.some((ring) => ring.side === side && ring.column === column);
-      batch.add(new THREE.TorusGeometry(RING_RADIUS, 0.03, 5, 16).rotateX(Math.PI / 2).translate(x, COLUMN_RING_Y, z), materials.iron);
-      for (let index = 0; index < RING_CANDLES; index++) {
-        const angle = (index + 0.5) / RING_CANDLES * Math.PI * 2;
-        const candleX = x + Math.sin(angle) * RING_RADIUS;
-        const candleZ = z + Math.cos(angle) * RING_RADIUS;
-        if (index % 2 === 0) {
-          // Bracket from the shaft out to the ring.
-          const reach = RING_RADIUS - NAVE_COLUMN.radius * 0.9;
-          batch.addBox(
-            materials.iron,
-            x + Math.sin(angle) * (RING_RADIUS - reach / 2), COLUMN_RING_Y - 0.02, z + Math.cos(angle) * (RING_RADIUS - reach / 2),
-            0.03, 0.03, reach, 0, angle,
-          );
-        }
-        batch.add(new THREE.CylinderGeometry(0.03, 0.03, 0.24, 5).translate(candleX, COLUMN_RING_Y + 0.14, candleZ), materials.wax);
-        if (lit && index !== 3) batch.add(new THREE.SphereGeometry(0.04, 5, 4).scale(1, 1.8, 1).translate(candleX, COLUMN_RING_Y + 0.31, candleZ), materials.flame);
+  for (const { side, z } of COLUMN_CANDLE_RINGS) {
+    const x = side * NAVE.columnX;
+    batch.add(new THREE.TorusGeometry(COLUMN_RING_RADIUS, 0.03, 5, 16).rotateX(Math.PI / 2).translate(x, COLUMN_RING_Y, z), materials.iron);
+    for (let index = 0; index < COLUMN_RING_CANDLES; index++) {
+      const angle = (index + 0.5) / COLUMN_RING_CANDLES * Math.PI * 2;
+      const candleX = x + Math.sin(angle) * COLUMN_RING_RADIUS;
+      const candleZ = z + Math.cos(angle) * COLUMN_RING_RADIUS;
+      if (index % 2 === 0) {
+        // Bracket from the shaft out to the ring.
+        const reach = COLUMN_RING_RADIUS - NAVE_COLUMN.radius * 0.9;
+        batch.addBox(
+          materials.iron,
+          x + Math.sin(angle) * (COLUMN_RING_RADIUS - reach / 2), COLUMN_RING_Y - 0.02, z + Math.cos(angle) * (COLUMN_RING_RADIUS - reach / 2),
+          0.03, 0.03, reach, 0, angle,
+        );
       }
-    });
+      batch.add(new THREE.CylinderGeometry(0.03, 0.03, 0.24, 5).translate(candleX, COLUMN_RING_Y + 0.14, candleZ), materials.wax);
+    }
   }
 }
 
 /** Long red banners on the clerestory shafts nearest the chancel. */
-function addBanners(context: LaSeuBuildContext): void {
+function addBanners(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   for (const side of [-1, 1]) {
     for (const column of [3, 5]) {
@@ -80,7 +77,7 @@ function addBanners(context: LaSeuBuildContext): void {
 }
 
 /** A red glass lamp on a long chain before the chancel arch: the one light nobody put out. */
-function addSanctuaryLamp(context: LaSeuBuildContext): void {
+function addSanctuaryLamp(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { x, y, z } = SANCTUARY_LAMP;
   const chain = 5;
@@ -95,10 +92,14 @@ function addSanctuaryLamp(context: LaSeuBuildContext): void {
  * moon still comes through, and the front rose laid on the floor of the
  * narthex where the run starts.
  */
-function addGlassLight(context: LaSeuBuildContext): void {
+function addGlassLight(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
+  const { nearX, farX } = MOONLIT_LANCET_LANDING;
   for (const bay of MOONLIT_LANCET_BAYS) {
-    const pool = new THREE.PlaneGeometry(1.7, 5.2).rotateX(-Math.PI / 2).rotateY(Math.PI / 2).translate(NAVE.maxX - 3.6, 0.014, naveBayCenter(bay) - 1.6);
+    // The window's sill lands by the wall and its apex furthest in, under the beam.
+    const pool = new THREE.PlaneGeometry(LANCET.aisle.width + 0.2, farX - nearX)
+      .rotateX(-Math.PI / 2).rotateY(Math.PI / 2)
+      .translate(NAVE.maxX - (nearX + farX) / 2, 0.014, naveBayCenter(bay));
     batch.add(pool, materials.poolCool);
   }
   const front = ROSE_WINDOWS.front;
@@ -106,7 +107,7 @@ function addGlassLight(context: LaSeuBuildContext): void {
 }
 
 /** Blood, dropped books and fallen candlesticks where the pews were dragged away. */
-function addLastStand(context: LaSeuBuildContext): void {
+function addLastStand(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const random = seededRandom(6301);
   for (const block of PEW_BLOCKS.filter((candidate) => candidate.state === 'cleared')) {

@@ -36,7 +36,7 @@ function smooth(t: number): number {
 }
 
 /** Smooth 3D value noise in [0, 1). */
-function valueNoise(x: number, y: number, z: number, seed: number): number {
+export function valueNoise(x: number, y: number, z: number, seed: number): number {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const iz = Math.floor(z);

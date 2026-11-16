@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { NAVE, PEW, PEW_BLOCKS, VOTIVE_RACKS, naveBayCenter, type PewBlock } from '../LaSeuConfig';
+import { NAVE, PEW, PEW_BLOCKS, VOTIVE_RACKS, naveBayCenter, type PewBlock } from '../DieKathedraleConfig';
 import { projectMaterialUVs } from '../shared/ArenaStructure';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { addSolidProxy } from '../shared/SolidProxy';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 
 /** Solid furniture of the east aisle: the font by the doors and the confessional against the wall. */
 const NAVE_FONT = { x: 10.4, z: naveBayCenter(0), halfSize: 0.7, height: 1.05 } as const;
@@ -29,7 +29,7 @@ export function pewBlockFootprint(block: PewBlock): { minX: number; maxX: number
  * Everything solid on the nave floor besides the columns: the pew blocks of
  * the central aisle, the votive racks, the font and the confessional.
  */
-export function buildNaveFurniture(context: LaSeuBuildContext): void {
+export function buildNaveFurniture(context: DieKathedraleBuildContext): void {
   for (const block of PEW_BLOCKS) addPewBlock(context, block);
   for (const rack of VOTIVE_RACKS) addVotiveRack(context, rack.id, rack.side, rack.z);
   addFont(context);
@@ -37,7 +37,7 @@ export function buildNaveFurniture(context: LaSeuBuildContext): void {
 }
 
 /** One oak pew facing the altar (north), placed by its own transform. */
-export function addPew(context: LaSeuBuildContext, x: number, y: number, z: number, yaw: number, roll: number, seed: number): void {
+export function addPew(context: DieKathedraleBuildContext, x: number, y: number, z: number, yaw: number, roll: number, seed: number): void {
   const { batch, materials } = context;
   scratchQuaternion.setFromEuler(scratchEuler.set(roll, yaw, 0, 'YXZ'));
   const pew = scratchMatrix.compose(scratchPosition.set(x, y, z), scratchQuaternion, UNIT_SCALE).clone();
@@ -52,7 +52,7 @@ export function addPew(context: LaSeuBuildContext, x: number, y: number, z: numb
   for (const end of [-1, 1]) part(0.06, 0.92, PEW.depth, end * (PEW.length / 2 - 0.03), 0.46, 0);
 }
 
-function addPewBlock(context: LaSeuBuildContext, block: PewBlock): void {
+function addPewBlock(context: DieKathedraleBuildContext, block: PewBlock): void {
   if (block.state === 'cleared') return;
   const footprint = pewBlockFootprint(block);
   const centerX = (footprint.minX + footprint.maxX) / 2;
@@ -84,7 +84,7 @@ function addPewBlock(context: LaSeuBuildContext, block: PewBlock): void {
 }
 
 /** Tiered iron stand of votive candles against a side wall; a few still burn. */
-function addVotiveRack(context: LaSeuBuildContext, id: string, side: number, z: number): void {
+function addVotiveRack(context: DieKathedraleBuildContext, id: string, side: number, z: number): void {
   const { batch, materials } = context;
   const { depth, halfLength, height } = VOTIVE_RACK;
   const wall = side * NAVE.maxX;
@@ -112,7 +112,7 @@ function addVotiveRack(context: LaSeuBuildContext, id: string, side: number, z: 
 }
 
 /** Eight-sided baptismal font by the door. */
-function addFont(context: LaSeuBuildContext): void {
+function addFont(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { x, z, halfSize, height } = NAVE_FONT;
   const octagon = (top: number, bottom: number, tall: number, y: number): void => {
@@ -126,7 +126,7 @@ function addFont(context: LaSeuBuildContext): void {
 }
 
 /** Oak confessional against the east wall: a booth with a priest's door and two curtained sides. */
-function addConfessional(context: LaSeuBuildContext): void {
+function addConfessional(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { minX, maxX, minZ, maxZ, height } = NAVE_CONFESSIONAL;
   const centerX = (minX + maxX) / 2;

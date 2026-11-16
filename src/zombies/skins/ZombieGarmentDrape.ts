@@ -18,7 +18,13 @@ const LEG_PULL = 0.7;
  */
 const SIDE_BLEND = 4;
 /** Torso vertices blended for the weights of a point above the hips. */
-const SURFACE_SAMPLES = 12;
+const SURFACE_SAMPLES = 20;
+/**
+ * Weight of a height difference against a horizontal one when finding the torso
+ * under a point: wide cloth (a cope, a cloak) far from the body must take the
+ * weights of the spine at its own height, not of the hips that happen to be near.
+ */
+const HEIGHT_BIAS = 1.5;
 /** Influences per vertex the walker's skinning supports. */
 const INFLUENCES = 4;
 
@@ -92,7 +98,8 @@ export class ZombieGarmentDrape {
     if (cached) return cached;
     const nearest: Array<{ vertex: number; distance: number }> = [];
     for (const vertex of this.torsoVertices) {
-      const distance = this.body.bodyPoint(vertex, this.candidate).distanceTo(target);
+      const surface = this.body.bodyPoint(vertex, this.candidate);
+      const distance = Math.hypot(surface.x - target.x, (surface.y - target.y) * HEIGHT_BIAS, surface.z - target.z);
       if (nearest.length === SURFACE_SAMPLES && distance >= nearest[SURFACE_SAMPLES - 1].distance) continue;
       nearest.push({ vertex, distance });
       nearest.sort((a, b) => a.distance - b.distance);

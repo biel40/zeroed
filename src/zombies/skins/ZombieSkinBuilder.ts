@@ -6,6 +6,14 @@ import { ZOMBIE_MODELS, type ZombieEyeColors, type ZombieModelSource } from '../
 import { ZombieBodyFrame } from './ZombieBodyFrame';
 import { measure } from './ZombieAccessoryGeometry';
 import { ZombieGarmentDrape } from './ZombieGarmentDrape';
+import {
+  GARMENT_ALPHA_TEST,
+  garmentAtlasTexture,
+  garmentPatternGain,
+  garmentPatternUv,
+  walkerPaletteUv,
+  type GarmentPattern,
+} from './ZombieGarmentPatterns';
 import { wornColor } from './ZombieGarmentWear';
 import { buildAccessoryParts } from './ZombieSkinAccessories';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from './ZombieSkinCatalog';
@@ -36,6 +44,11 @@ function tintFor(target: number | THREE.Color, band: WalkerPaletteBand): THREE.C
   const source = bandColor(band);
   const color = new THREE.Color(target);
   return color.setRGB(color.r / source.r, color.g / source.g, color.b / source.b);
+}
+
+/** Vertex color that shows a pattern's main surface at `target` (linear). */
+function patternTint(target: number | THREE.Color, pattern: GarmentPattern): THREE.Color {
+  return new THREE.Color(target).multiplyScalar(garmentPatternGain(pattern));
 }
 
 /**
@@ -71,12 +84,14 @@ export function buildSkinnedWalkerGeometry(
     .sort((a, b) => Number(a.detachableHat) - Number(b.detachableHat)).map((part) => {
     const placed = part.geometry.clone().applyMatrix4(body.toGeometry);
     placed.computeVertexNormals();
+    const pattern = part.pattern && placed.getAttribute('uv') ? part.pattern : null;
     return {
       geometry: placed,
       /** The part in the body frame, where drape and wear are measured. */
       shape: part.geometry,
       color: part.color,
-      tint: tintFor(part.color, ACCESSORY_BAND),
+      pattern,
+      tint: pattern ? patternTint(part.color, pattern) : tintFor(part.color, ACCESSORY_BAND),
       bone: body.boneIndex(part.bone),
       hat: part.detachableHat,
       draped: part.draped ?? false,
@@ -86,6 +101,8 @@ export function buildSkinnedWalkerGeometry(
   const drape = parts.some((part) => part.draped)
     ? new ZombieGarmentDrape(body, base.getAttribute('skinIndex'), base.getAttribute('skinWeight'), measure(body))
     : null;
+  // Patterned garments sample the garment atlas, which also carries the walker palette.
+  const patterned = parts.some((part) => part.pattern);
 
   const baseCount = kept.length;
   const total = baseCount + parts.reduce((sum, part) => sum + part.geometry.getAttribute('position').count, 0);
@@ -136,6 +153,11 @@ export function buildSkinnedWalkerGeometry(
     }
     tint.toArray(color, index * 3);
   }
+  if (patterned) {
+    for (let index = 0; index < baseCount; index++) walkerPaletteUv(uv[index * 2], uv[index * 2 + 1], uv, index * 2);
+  }
+  const accessoryUv = new Float32Array(ACCESSORY_UV);
+  if (patterned) walkerPaletteUv(ACCESSORY_UV[0], ACCESSORY_UV[1], accessoryUv, 0);
 
   let offset = baseCount;
   let hatStart = total;
@@ -145,8 +167,10 @@ export function buildSkinnedWalkerGeometry(
     write(normal, 3, offset, part.geometry.getAttribute('normal'));
     const count = part.geometry.getAttribute('position').count;
     const shape = part.shape.getAttribute('position');
+    const partUv = part.geometry.getAttribute('uv');
     for (let vertex = offset; vertex < offset + count; vertex++) {
-      uv.set(ACCESSORY_UV, vertex * 2);
+      if (part.pattern) garmentPatternUv(part.pattern, partUv.getX(vertex - offset), partUv.getY(vertex - offset), uv, vertex * 2);
+      else uv.set(accessoryUv, vertex * 2);
       bodyPoint.fromBufferAttribute(shape, vertex - offset);
       if (drape && part.draped) {
         drape.weightsAt(bodyPoint, skinIndex, skinWeight, vertex);
@@ -154,9 +178,11 @@ export function buildSkinnedWalkerGeometry(
         skinIndex[vertex * 4] = part.bone;
         skinWeight[vertex * 4] = 1;
       }
-      const tint = part.worn && skin.stains
-        ? tintFor(wornColor(aged.set(part.color), bodyPoint, skin.stains), ACCESSORY_BAND)
-        : part.tint;
+      let tint = part.tint;
+      if (part.worn && skin.stains) {
+        wornColor(aged.set(part.color), bodyPoint, skin.stains);
+        tint = part.pattern ? patternTint(aged, part.pattern) : tintFor(aged, ACCESSORY_BAND);
+      }
       tint.toArray(color, vertex * 3);
     }
     part.geometry.dispose();
@@ -167,6 +193,7 @@ export function buildSkinnedWalkerGeometry(
 
   const result = new THREE.BufferGeometry();
   if (hatStart < total) result.userData.hatStart = hatStart;
+  if (patterned) result.userData.garmentAtlas = true;
   result.setAttribute('position', new THREE.BufferAttribute(position, 3));
   result.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
   result.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
@@ -213,9 +240,15 @@ export function createSkinnedWalkerSource(source: ZombieModelSource, skinId: Zom
     ZOMBIE_SKINS[skinId],
   );
   mesh.boundingBox = bodyBounds;
+  const garmentAtlas = mesh.geometry.userData.garmentAtlas === true;
   const materials = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((material) => {
-    const dressed = material.clone();
+    const dressed = material.clone() as THREE.MeshStandardMaterial;
     dressed.vertexColors = true;
+    if (garmentAtlas) {
+      // Every patterned skin shares one atlas, and with it one texture upload.
+      dressed.map = garmentAtlasTexture();
+      dressed.alphaTest = GARMENT_ALPHA_TEST;
+    }
     return dressed;
   });
   mesh.material = Array.isArray(mesh.material) ? materials : materials[0];

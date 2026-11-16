@@ -307,6 +307,29 @@ existente a `MOTDRULES`.
   reproduce el efecto tambien en las bajas de un disparo.
   `ZombieArena.zombieEyes` cambia el color de ojos de todos los modelos del mapa
   (`ZombieModelSource.eyes`); sin el, cada modelo usa el suyo.
+- Horda ponderada: en lugar de `zombieSkins`, un mapa puede declarar
+  `ZombieArena.zombieSkinShares` (una skin, o `null` para el walker sin vestir,
+  con un peso). Cada spawn de walker tira su aspecto con el rng del manager y
+  saca un cuerpo libre que lo lleve ([selector](../src/zombies/ZombieLookPicker.ts));
+  si no queda ninguno libre usa cualquier walker libre. Los cuerpos del pool se
+  reparten entre los aspectos en proporcion a los pesos, con al menos uno cada
+  uno. Solo apariencia: no cambia tipo, vida, velocidad ni dano.
+- Vestiduras largas ([prendas](../src/zombies/skins/ZombieClergyGarments.ts)):
+  habitos, albas, casullas, sobrevestas, velos y cofias se funden en la misma
+  malla. Por encima de la cadera la tela copia los pesos del torso bajo ella;
+  por debajo reparte parte del peso entre ambos muslos, asi que la falda se abre
+  entre las piernas al andar sin fisica de tela
+  ([drapeado](../src/zombies/skins/ZombieGarmentDrape.ts)). Las piernas bajo la
+  falda se tinen del mismo tejido para que un roce no se lea como piel. Una skin
+  con `stains` ensucia su ropa con sangre seca y barro desde el bajo. La mitra
+  es el unico tocado de estas skins que cae con el primer disparo a la cabeza.
+  Las prendas con patron muestrean un atlas procedural compartido
+  ([patrones](../src/zombies/skins/ZombieGarmentPatterns.ts)): tejido, bajos
+  rasgados con desgarros reales, bordado de hilo de oro, encaje calado, cota de
+  malla y cuerda, tenidos por el color de vertice, y tres brocados (lirios sobre
+  azul, roleos sobre negro, cruces sobre carmesi) que llevan su propio oro. El atlas copia la paleta del
+  walker, asi que el cuerpo sigue en el mismo material y draw call; un alpha test
+  bajo recorta rasgaduras y encaje sin cortar el fundido de muerte.
 - Las rondas 1–5 aplican una rampa de velocidad progresiva (65 %, 72 %, 80 %,
   88 % y 95 %) antes de alcanzar el ritmo normal en la ronda 6. Cada aparición
   recibe velocidad, escala y una fase de marcha independientes para evitar que
@@ -504,14 +527,18 @@ existente a `MOTDRULES`.
   partida. Los enlaces directos respetan el
   mismo permiso; detalles y limites en [acceso de beta](../public/beta/README.md).
 
-- `LaSeuArena`: Die Kathedrale, la catedral de Palma, individual y premium. La
+- `DieKathedraleArena`: Die Kathedrale, la catedral de Palma, individual y premium. La
   nave es un solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
   y un derrumbe que nunca llegan a la boveda. Empieza en el nartex (M14) y
   se abre reja a reja por Points: nave central, naves laterales con sus
   capillas (PPSh-41), crucero y presbiterio (AK-47) y, por el postigo de las
   puertas mayores, la plaza (M60 y Mystery Box). Las entradas de zombis de
-  cada zona despiertan con su primera reja. Sin anillos, electricidad ni
-  final. Zonas, precios y guia en [Die Kathedrale](LA_SEU.md).
+  cada zona despiertan con su primera reja. Los primeros candelabros iluminan
+  el inicio; los demas prenden progresivamente al acercarse por zonas abiertas
+  y conservan sus llamas hasta reiniciar. Las luces reales se reutilizan cerca
+  del jugador dentro del presupuesto de calidad; la intro no descubre velas.
+  Sin anillos, electricidad ni final. Zonas, precios y guia en
+  [Die Kathedrale](DIE_KATHEDRALE.md).
 
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
@@ -778,6 +805,14 @@ existente a `MOTDRULES`.
   La de Station 33 (8 s) arranca a oscuras con solo la luz de emergencia, un
   tren hace temblar la boveda, los circuitos se encienden uno a uno y la grua
   recorre la nave mientras aparece el titulo premium dorado.
+  La de Die Kathedrale (16 s) se aproxima desde el exterior sobre la plaza,
+  entra por el postigo y sube sobre las rejas para revelar la boveda y el
+  roseton antes de regresar al punto de inicio. Su titulo propio deja libre
+  el centro de la escena; viento, madera e hierro procedurales acompañan
+  el recorrido. Las luces siguen a la camara con el mismo presupuesto de
+  calidad. El postigo vuelve a verse cerrado al terminar o saltar: no se
+  compra ni se abre ninguna zona. Fuente e intencion en
+  [Die Kathedrale](DIE_KATHEDRALE.md#entrada-cinematografica).
 - El menu principal ordena cabecera (titulo e idioma), tarjetas de mapa,
   accesos a multijugador y ajustes, y un pie con creditos, privacidad y un enlace
   a la [web principal](https://zeroed-web.com) que abre en otra pestaña. Cada

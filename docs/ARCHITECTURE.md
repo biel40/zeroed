@@ -167,6 +167,10 @@ sufra tirones de compilacion de shaders.
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
   `ammoRefills`, `grenadeBuys`, `mysteryBoxPlacement`, `ringMachines`, `evacuation`).
+  El aspecto de la horda tambien: `zombieSkins` (repartidas por turnos) o
+  `zombieSkinShares` (tiradas por peso en cada spawn), y `zombieEyes`;
+  `dressZombieSources` las convierte en fuentes del pool y `ZombieManager`
+  elige el cuerpo con `ZombieLookPicker`, sin tocar tipo ni estadisticas.
   `ArenaEvacuation` (el Protocolo 33 de Station 33) declara reglas, puntos de
   uso, interruptores (`ArenaPowerSwitch`) y final; `ZombiesEvacuation`
   ejecuta el estado puro `EvacuationProtocol` y el ritmo de `EvacuationHorde`

@@ -1,7 +1,16 @@
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
+import { cameraSpatialCue } from '../src/audio/SpatialCue';
 import { easeIntroTime, IntroCinematic, sampleIntroPath } from '../src/rendering/IntroCinematic';
+import { DieKathedraleArena } from '../src/zombies/maps/DieKathedraleArena';
+import {
+  DIE_KATHEDRALE_INTRO,
+  DIE_KATHEDRALE_INTRO_CUES,
+  DIE_KATHEDRALE_PLAYER_SPAWN,
+  DIE_KATHEDRALE_WALL_THICKNESS,
+  NAVE,
+} from '../src/zombies/maps/DieKathedraleConfig';
 import { Station33Arena } from '../src/zombies/maps/Station33Arena';
 import {
   STATION33_INTRO,
@@ -137,7 +146,108 @@ describe('Station 33 intro', () => {
   });
 });
 
-describe('ZombiesMode map intro', () => {
+describe('Die Kathedrale intro', () => {
+  function startCathedral(): { arena: DieKathedraleArena; player: THREE.PerspectiveCamera; intro: IntroCinematic } {
+    const arena = new DieKathedraleArena(new THREE.Scene(), TEST_PROFILE);
+    arena.init();
+    const player = playerCameraAtSpawn();
+    const spawn = DIE_KATHEDRALE_PLAYER_SPAWN;
+    player.position.set(spawn.x, spawn.y, spawn.z);
+    const intro = new IntroCinematic(DIE_KATHEDRALE_INTRO);
+    arena.startIntro();
+    intro.start(player);
+    return { arena, player, intro };
+  }
+
+  it('enters through the real wicket, reveals the nave and lands in the live player view without clipping', () => {
+    const { arena, player, intro } = startCathedral();
+    const solids = arena.colliders
+      .filter((object) => object.name !== 'point-door-collider:to-plaza')
+      .map((object) => ({ name: object.name, box: new THREE.Box3().setFromObject(object).expandByScalar(0.12) }));
+    const previousPosition = intro.camera.position.clone();
+    const previousVelocity = new THREE.Vector3();
+    const velocity = new THREE.Vector3();
+    const previousDirection = intro.camera.getWorldDirection(new THREE.Vector3());
+    const direction = new THREE.Vector3();
+    let crossedPortal = false;
+    let revealedNave = false;
+    expect(intro.camera.position.z).toBeGreaterThan(17);
+    for (let time = 0; time <= DIE_KATHEDRALE_INTRO.duration + DT; time += DT) {
+      intro.update(DT, player);
+      const position = intro.camera.position;
+      for (const { name, box } of solids) expect(box.containsPoint(position), `${name} t=${time.toFixed(2)}`).toBe(false);
+      if (Math.abs(position.z - DIE_KATHEDRALE_WALL_THICKNESS / 2) < 0.4) {
+        crossedPortal = true;
+        expect(Math.abs(position.x)).toBeLessThan(0.5);
+        expect(position.y).toBeGreaterThan(0.5);
+        expect(position.y).toBeLessThan(1.9);
+      }
+      if (position.z < -14 && position.y > 6) revealedNave = true;
+      if (position.z < 0) expect(position.y).toBeLessThan(NAVE.naveSpringY - 1);
+      expect(position.distanceTo(previousPosition) / DT, `speed t=${time.toFixed(2)}`).toBeLessThan(16);
+      velocity.subVectors(position, previousPosition).divideScalar(DT);
+      expect(velocity.distanceTo(previousVelocity) / DT, `acceleration t=${time.toFixed(2)}`).toBeLessThan(40);
+      intro.camera.getWorldDirection(direction);
+      expect(direction.angleTo(previousDirection) / DT, `turn t=${time.toFixed(2)}`).toBeLessThan(2);
+      previousPosition.copy(position);
+      previousVelocity.copy(velocity);
+      previousDirection.copy(direction);
+    }
+    expect(crossedPortal).toBe(true);
+    expect(revealedNave).toBe(true);
+    expect(intro.isPlaying).toBe(false);
+    expect(intro.camera.position.distanceTo(player.position)).toBeLessThan(1e-6);
+    expect(direction.angleTo(player.getWorldDirection(previousDirection))).toBeLessThan(1e-4);
+  });
+
+  it('stages only the wicket view and restores it on finish, skip and reset without opening any zones', () => {
+    const { arena } = startCathedral();
+    const wicket = arena.group.getObjectByName('point-door-collider:to-plaza')!;
+    const view = wicket.parent!;
+    const colliders = [...arena.colliders];
+    const spawns = [...arena.spawnPoints];
+    const topologyChanged = vi.fn();
+    arena.onTopologyChanged = topologyChanged;
+    expect(view.visible).toBe(false);
+    arena.finishIntro();
+    arena.finishIntro();
+    expect(view.visible).toBe(true);
+    arena.startIntro();
+    expect(view.visible).toBe(false);
+    arena.reset();
+    expect(view.visible).toBe(true);
+    expect(arena.doors.every((door) => door.isLocked)).toBe(true);
+    expect(arena.colliders).toEqual(colliders);
+    expect(arena.spawnPoints).toEqual(spawns);
+    expect(topologyChanged).not.toHaveBeenCalled();
+  });
+
+  it('plays each authored cue once on its own clock and cancels pending cues on skip or reset', () => {
+    const { arena } = startCathedral();
+    const cues: ArenaAmbientCue[] = [];
+    arena.onAmbientCue = (cue) => cues.push(cue);
+    arena.update(-1);
+    expect(cues).toEqual([]);
+    arena.update(DIE_KATHEDRALE_INTRO.duration);
+    expect(cues.map((cue) => cue.sound)).toEqual(DIE_KATHEDRALE_INTRO_CUES.map((cue) => cue.sound));
+    arena.update(DT);
+    expect(cues).toHaveLength(DIE_KATHEDRALE_INTRO_CUES.length);
+    for (const finish of [(): void => arena.finishIntro(), (): void => arena.reset()]) {
+      cues.length = 0;
+      arena.startIntro();
+      arena.update(DIE_KATHEDRALE_INTRO_CUES[0].time);
+      expect(cues).toHaveLength(1);
+      finish();
+      arena.update(DIE_KATHEDRALE_INTRO.duration);
+      expect(cues).toHaveLength(1);
+    }
+  });
+});
+
+describe.each([
+  { mapId: 'station-33' as const, presentation: 'station33', duration: STATION33_INTRO.duration },
+  { mapId: 'die-kathedrale' as const, presentation: 'dieKathedrale', duration: DIE_KATHEDRALE_INTRO.duration },
+])('ZombiesMode $mapId intro', ({ mapId, presentation, duration }) => {
   /** A mode context whose audio has no Web Audio context yet (no footstep listener). */
   function silentContext(): ReturnType<typeof makeContext> {
     const base = makeContext();
@@ -145,21 +255,53 @@ describe('ZombiesMode map intro', () => {
     return { ...base, ctx: { ...base.ctx, audio } };
   }
 
-  function startStation() {
+  function startMapIntro(): { mode: ZombiesMode; hud: ReturnType<typeof makeContext>['hud'] } {
     const { ctx, hud } = silentContext();
-    const mode = new ZombiesMode('station-33');
+    const mode = new ZombiesMode(mapId);
     mode.init(ctx);
     mode.onGameplayStarted();
     return { mode, hud };
   }
 
+  it('lets the map lighting follow the filmed camera, then the player again after skip', () => {
+    const { ctx } = silentContext();
+    const update = vi.spyOn(mapId === 'station-33' ? Station33Arena.prototype : DieKathedraleArena.prototype, 'update');
+    try {
+      const mode = new ZombiesMode(mapId);
+      mode.init(ctx);
+      mode.onGameplayStarted();
+      const camera = mode.getCinematicCamera()!;
+      mode.update(DT);
+      expect(update.mock.lastCall?.[1]).toBe(camera.position);
+      mode.onLocalPauseChanged(true);
+      mode.update(DT);
+      expect(update.mock.lastCall?.[1]).toBe(ctx.player.rig.position);
+    } finally {
+      update.mockRestore();
+    }
+  });
+
+  it('hears the map intro cues from the moving shot', () => {
+    const { ctx } = silentContext();
+    const mode = new ZombiesMode(mapId);
+    mode.init(ctx);
+    mode.onGameplayStarted();
+    // Both maps emit their first authored sound within this first second.
+    mode.update(0.8);
+    const call = vi.mocked(ctx.audio.playAmbientCue).mock.lastCall!;
+    expect(call).toBeDefined();
+    const cue = call[0] as ArenaAmbientCue;
+    expect(call[1]).toEqual(cameraSpatialCue(mode.getCinematicCamera()!, cue.position));
+    expect(call[1]).not.toEqual(cameraSpatialCue(ctx.player.camera, cue.position));
+  });
+
   it('films the intro, holds the run, then hands control to the player once', () => {
-    const { mode, hud } = startStation();
-    expect(hud.showIntro).toHaveBeenCalledWith('station33', STATION33_INTRO.duration, expect.any(Function));
+    const { mode, hud } = startMapIntro();
+    expect(hud.showIntro).toHaveBeenCalledWith(presentation, duration, expect.any(Function));
     expect(mode.isGameplayInputEnabled()).toBe(false);
     expect(mode.getCinematicCamera()).toBeInstanceOf(THREE.PerspectiveCamera);
 
-    for (let time = 0; time < STATION33_INTRO.duration - 0.1; time += DT) mode.update(DT);
+    for (let time = 0; time < duration - 0.1; time += DT) mode.update(DT);
     expect(mode.isGameplayInputEnabled()).toBe(false);
     expect(hud.showRoundBanner).not.toHaveBeenCalled();
     for (let frame = 0; frame < 12; frame++) mode.update(DT);
@@ -179,12 +321,12 @@ describe('ZombiesMode map intro', () => {
     const load = vi.fn(async () => undefined);
     ctx.assets.loadPlayerModel = load;
     const model = vi.spyOn(ctx.assets, 'getPlayerModel');
-    const mode = new ZombiesMode('station-33');
+    const mode = new ZombiesMode(mapId);
     mode.init(ctx);
     const world = [...ctx.scene.children];
     mode.onGameplayStarted();
     expect(ctx.scene.children).toEqual(world);
-    for (let frame = 0; frame <= STATION33_INTRO.duration / DT; frame++) {
+    for (let frame = 0; frame <= duration / DT; frame++) {
       mode.update(DT);
       expect(ctx.scene.children).toEqual(world);
     }
@@ -194,7 +336,7 @@ describe('ZombiesMode map intro', () => {
   });
 
   it('skips on a key press after the start guard, or when the run pauses', () => {
-    const keyed = startStation();
+    const keyed = startMapIntro();
     keyed.mode.onKeyInput('w');
     expect(keyed.mode.getCinematicCamera()).not.toBeNull();
     for (let frame = 0; frame < 60; frame++) keyed.mode.update(DT);
@@ -203,34 +345,35 @@ describe('ZombiesMode map intro', () => {
     expect(keyed.mode.isGameplayInputEnabled()).toBe(true);
     expect(keyed.hud.hideIntro).toHaveBeenCalledTimes(1);
 
-    const paused = startStation();
+    const paused = startMapIntro();
     paused.mode.onLocalPauseChanged(true);
     expect(paused.mode.getCinematicCamera()).toBeNull();
     expect(paused.hud.hideIntro).toHaveBeenCalledTimes(1);
   });
 
   it('touch players skip through the HUD button', () => {
-    const { mode, hud } = startStation();
+    const { mode, hud } = startMapIntro();
     const onSkip = hud.showIntro.mock.calls[0][2] as () => void;
     onSkip();
     expect(mode.getCinematicCamera()).toBeNull();
   });
 
   it('hands control to the player when restarting during the intro', () => {
-    const { mode } = startStation();
+    const { mode } = startMapIntro();
     mode.onRestartRequested();
     expect(mode.getCinematicCamera()).toBeNull();
     mode.onGameplayStarted();
     expect(mode.getCinematicCamera()).toBeNull();
   });
 
-  it('leaves maps without an intro straight in first person', () => {
-    const { ctx, hud } = makeContext();
-    const mode = new ZombiesMode('burned-mansion');
-    mode.init(ctx);
-    mode.onGameplayStarted();
-    expect(hud.showIntro).not.toHaveBeenCalled();
-    expect(mode.getCinematicCamera()).toBeNull();
-    expect(mode.isGameplayInputEnabled()).toBe(true);
-  });
+});
+
+it('leaves maps without an intro straight in first person', () => {
+  const { ctx, hud } = makeContext();
+  const mode = new ZombiesMode('burned-mansion');
+  mode.init(ctx);
+  mode.onGameplayStarted();
+  expect(hud.showIntro).not.toHaveBeenCalled();
+  expect(mode.getCinematicCamera()).toBeNull();
+  expect(mode.isGameplayInputEnabled()).toBe(true);
 });

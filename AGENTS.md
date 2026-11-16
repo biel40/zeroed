@@ -24,7 +24,7 @@ Identifica el area, consulta sus rutas, busca simbolos y lee solo las secciones 
 | --- | --- | --- |
 | Armas y primera persona | [Shell](docs/GAME_SYSTEMS.md#shell-compartido), [armas](src/config/weapons.ts) | [add-weapon](.claude/skills/add-weapon/SKILL.md), [tests](tests/firstPersonArms.test.ts), [visores](tools/viewers/README.md) |
 | Anillos | [Anillos](docs/GAME_SYSTEMS.md#anillos), [catalogo](src/game/rings/RingCatalog.ts) | [add-ring](.claude/skills/add-ring/SKILL.md), [tests](tests/playerRings.test.ts) |
-| Mapas y decoracion | [Mapas](docs/GAME_SYSTEMS.md#mapas-e-interacciones), [arena](src/zombies/maps/ZombieArena.ts), [Station 33](docs/STATION_33.md), [La Seu](docs/LA_SEU.md) | [add-map](.claude/skills/add-map/SKILL.md), [tests](tests/zombieArenaContract.test.ts), [visores](tools/viewers/README.md) |
+| Mapas y decoracion | [Mapas](docs/GAME_SYSTEMS.md#mapas-e-interacciones), [arena](src/zombies/maps/ZombieArena.ts), [Station 33](docs/STATION_33.md), [Die Kathedrale](docs/DIE_KATHEDRALE.md) | [add-map](.claude/skills/add-map/SKILL.md), [tests](tests/zombieArenaContract.test.ts), [visores](tools/viewers/README.md) |
 | Zombis, combate y navegacion | [Zombies](docs/GAME_SYSTEMS.md#zombies), [manager](src/zombies/ZombieManager.ts) | [tests](tests/zombieNavigation.test.ts), [visores](tools/viewers/README.md) |
 | Cooperativo y red | [Cooperativo](docs/MULTIPLAYER.md#alcance-y-límites), [modos](src/modes/GameMode.ts) | [tests](tests/coopMatch.test.ts); `npm run multiplayer:test-server` y `npm run multiplayer:cloudflare:test` |
 | UI e idiomas | [HUD](docs/GAME_SYSTEMS.md#hud-y-estadisticas-de-partida), [idiomas](src/i18n/) | [tests](tests/i18n.test.ts), [visores](tools/viewers/README.md) |
@@ -43,6 +43,6 @@ Tras un cambio, comprueba que informacion relevante queda desactualizada y actua
 - [Arquitectura](docs/ARCHITECTURE.md): fronteras, contratos y puntos de extension; actualizar al cambiar responsabilidades o interfaces.
 - [Sistemas](docs/GAME_SYSTEMS.md): comportamiento del juego por tema; actualizar cuando cambie una mecanica o experiencia observable.
 - [Decisiones](docs/DECISIONS.md): decisiones vigentes y motivos; actualizar cuando cambie una decision o sus razones.
-- Guias de mapas ([Station 33](docs/STATION_33.md), [La Seu](docs/LA_SEU.md)): intencion artistica y restricciones propias; actualizar cuando cambien esas directrices.
+- Guias de mapas ([Station 33](docs/STATION_33.md), [Die Kathedrale](docs/DIE_KATHEDRALE.md)): intencion artistica y restricciones propias; actualizar cuando cambien esas directrices.
 - [Cooperativo](docs/MULTIPLAYER.md), [PWA](docs/PWA.md), [Android](docs/ANDROID_DOCS.md) y [beta](public/beta/README.md): procedimientos y limites propios de cada area. Actualiza la guia correspondiente cuando cambien.
 - [Historial](docs/changes/) e informes historicos: conservan el contexto de su fecha; no los reescribas como estado actual. Anade una nota de cambio solo cuando aporte contexto o una decision util.

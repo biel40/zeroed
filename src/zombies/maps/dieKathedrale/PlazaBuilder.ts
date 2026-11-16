@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { LA_SEU_WALL_THICKNESS, NAVE, PLAZA, ROSE_WINDOWS } from '../LaSeuConfig';
+import { DIE_KATHEDRALE_WALL_THICKNESS, NAVE, PLAZA, ROSE_WINDOWS } from '../DieKathedraleConfig';
 import { addSolidProxy } from '../shared/SolidProxy';
 import { lancetShape, wallShapeGeometry } from './GothicVault';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
-import { addStoneWall, roseRingGeometry, roundPaneGeometry } from './LaSeuWalls';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
+import { addStoneWall, roseRingGeometry, roundPaneGeometry } from './DieKathedraleWalls';
 import { addGreatDoorFace } from './MainPortal';
 
-const HALF_WALL = LA_SEU_WALL_THICKNESS / 2;
+const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 const FRONT_TOP = NAVE.endWallHeight;
 
 /** Buttress piers standing on the front, by their centre X: the pair flanking the great doors rise into turrets. */
@@ -31,25 +31,25 @@ const LAMP_HEIGHT = 3.7;
  * over the sea, the street furniture, and the outer face of the main front
  * (great doors, rose, buttress piers, turrets and gable).
  */
-export function buildPlaza(context: LaSeuBuildContext): void {
+export function buildPlaza(context: DieKathedraleBuildContext): void {
   addGround(context);
   addEnclosure(context);
   addFront(context);
   addStreetFurniture(context);
 }
 
-function addGround(context: LaSeuBuildContext): void {
-  const width = PLAZA.maxX - PLAZA.minX + LA_SEU_WALL_THICKNESS * 2;
-  const depth = PLAZA.maxZ - PLAZA.minZ + LA_SEU_WALL_THICKNESS;
+function addGround(context: DieKathedraleBuildContext): void {
+  const width = PLAZA.maxX - PLAZA.minX + DIE_KATHEDRALE_WALL_THICKNESS * 2;
+  const depth = PLAZA.maxZ - PLAZA.minZ + DIE_KATHEDRALE_WALL_THICKNESS;
   context.structure.addBox(0, -0.08, PLAZA.minZ + depth / 2, width, 0.16, depth, context.materials.plazaPaving, {
     name: 'plaza-floor', surface: 'concrete', mapRole: 'slab', castShadow: false, uvSeed: 3, worldUVs: true, blocksPlayer: false,
   });
 }
 
 /** Tall side walls (the gates are zombie entrances) and the low parapet on the sea side. */
-function addEnclosure(context: LaSeuBuildContext): void {
+function addEnclosure(context: DieKathedraleBuildContext): void {
   const { batch, materials, structure } = context;
-  const outerMaxZ = PLAZA.maxZ + LA_SEU_WALL_THICKNESS;
+  const outerMaxZ = PLAZA.maxZ + DIE_KATHEDRALE_WALL_THICKNESS;
   for (const side of [-1, 1]) {
     const fixed = side * (PLAZA.maxX + HALF_WALL);
     addStoneWall(context, side < 0 ? 'plaza-west-wall' : 'plaza-east-wall', {
@@ -60,7 +60,7 @@ function addEnclosure(context: LaSeuBuildContext): void {
   const parapetZ = PLAZA.maxZ + HALF_WALL;
   // Two solids: one 28 m piece would be longer than the zombies' obstacle limit.
   for (const side of [-1, 1]) {
-    structure.addBox(side * PLAZA.maxX / 2, PLAZA.parapetHeight / 2, parapetZ, PLAZA.maxX, PLAZA.parapetHeight, LA_SEU_WALL_THICKNESS, materials.wallStone, {
+    structure.addBox(side * PLAZA.maxX / 2, PLAZA.parapetHeight / 2, parapetZ, PLAZA.maxX, PLAZA.parapetHeight, DIE_KATHEDRALE_WALL_THICKNESS, materials.wallStone, {
       name: `plaza-parapet-${side < 0 ? 'west' : 'east'}`, surface: 'concrete', mapRole: 'wall', castShadow: false, uvSeed: 4 + side, worldUVs: true, blocksPlayer: true,
     });
   }
@@ -72,7 +72,7 @@ function addEnclosure(context: LaSeuBuildContext): void {
 }
 
 /** The main front as the plaza sees it. */
-function addFront(context: LaSeuBuildContext): void {
+function addFront(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const face = PLAZA.minZ;
   addGreatDoorFace(context, face, 'pz');
@@ -102,7 +102,7 @@ function addFront(context: LaSeuBuildContext): void {
   batch.add(wallShapeGeometry(gable, 'pz', 0, face, materials.wallStone.userData.metersPerTile as number), materials.wallStone);
   batch.addBox(materials.dressedStone, 0, FRONT_TOP + 4.9, face + 0.05, 0.16, 1.1, 0.16);
   batch.addBox(materials.dressedStone, 0, FRONT_TOP + 5.1, face + 0.05, 0.6, 0.16, 0.16);
-  const outerWidth = NAVE.maxX - NAVE.minX + LA_SEU_WALL_THICKNESS * 2;
+  const outerWidth = NAVE.maxX - NAVE.minX + DIE_KATHEDRALE_WALL_THICKNESS * 2;
   for (const y of [7.4, 11.2, FRONT_TOP - 0.1]) batch.addBox(materials.dressedStone, 0, y, face + 0.07, outerWidth, 0.22, 0.14, 0, 0, 0, y);
   for (const side of [-1, 1]) {
     for (let niche = 0; niche < 4; niche++) {
@@ -110,7 +110,7 @@ function addFront(context: LaSeuBuildContext): void {
       batch.add(wallShapeGeometry(blind, 'pz', side * (4.9 + niche * 1.3), face + 0.015, materials.roughStone.userData.metersPerTile as number), materials.roughStone);
     }
     // Corner towers beyond the plaza walls close the front's outline against the sky.
-    const towerX = side * (NAVE.maxX + LA_SEU_WALL_THICKNESS + 1.1);
+    const towerX = side * (NAVE.maxX + DIE_KATHEDRALE_WALL_THICKNESS + 1.1);
     batch.addBox(materials.wallStone, towerX, 12.5, face + 0.9, 2.2, 25, 2.2, 0, 0, 0, side + 9);
     batch.add(new THREE.ConeGeometry(1.5, 5, 8).translate(towerX, 27.5, face + 0.9), materials.dressedStone);
     // Iron lantern on a bracket either side of the doors.
@@ -122,7 +122,7 @@ function addFront(context: LaSeuBuildContext): void {
 }
 
 /** Lamp posts, palms in stone planters and benches along the parapet: all solid. */
-function addStreetFurniture(context: LaSeuBuildContext): void {
+function addStreetFurniture(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   for (const lamp of PLAZA_LAMP_POSTS) {
     batch.add(new THREE.CylinderGeometry(0.05, 0.08, LAMP_HEIGHT, 6).translate(lamp.x, LAMP_HEIGHT / 2, lamp.z), materials.iron);

@@ -76,7 +76,7 @@ const ENDING_DETONATION_TIME: Record<EndingPresentationId, number> = {
 };
 
 /** Opening cinematics a map can request through `ArenaIntro.presentation`. */
-export type IntroPresentationId = 'station33';
+export type IntroPresentationId = 'station33' | 'dieKathedrale';
 
 const MAP_LOADING_FADE_MS = 450;
 /** Length of `#round-banner.active` in style.css. */

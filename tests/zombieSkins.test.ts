@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  AnimationMixer, Box3, Color, SkinnedMesh, Texture, Vector3,
+  AnimationMixer, Box3, Color, SkinnedMesh, Texture, Vector3, type BufferAttribute,
   type AnimationClip, type BufferGeometry, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -10,18 +10,19 @@ import { ZOMBIE_BASE_HP, ZOMBIE_MODEL_POOL_CAPACITIES, ZOMBIE_TYPE_CONFIGS, roun
 import { ZOMBIE_POOL_MODELS, ZombieManager, zombiePoolSource } from '../src/zombies/ZombieManager';
 import { ZombieVisual, ZOMBIE_MODELS, type ZombieModelSource } from '../src/zombies/ZombieVisual';
 import { STATION33_ZOMBIE_EYES, STATION33_ZOMBIE_SKINS } from '../src/zombies/maps/Station33Config';
-import { createSkinnedWalkerSource, dressZombieSources } from '../src/zombies/skins/ZombieSkinBuilder';
+import { buildSkinnedWalkerGeometry, createSkinnedWalkerSource, dressZombieSources } from '../src/zombies/skins/ZombieSkinBuilder';
 import { MANSION_ZOMBIE_SKINS } from '../src/zombies/maps/BurnedMansionConfig';
-import { LA_SEU_ZOMBIE_SKIN_SHARES } from '../src/zombies/maps/LaSeuConfig';
+import { DIE_KATHEDRALE_ZOMBIE_EYES, DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES } from '../src/zombies/maps/DieKathedraleConfig';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from '../src/zombies/skins/ZombieSkinCatalog';
+import { GARMENT_ALPHA_TEST, garmentAtlasTexture, walkerPaletteUv } from '../src/zombies/skins/ZombieGarmentPatterns';
 import { walkerBandAt, walkerSkinRegion } from '../src/zombies/skins/ZombieSkinRegions';
 import { Zombie } from '../src/zombies/Zombie';
 
 const WALKER_GLB = fileURLToPath(new URL('../public/assets/zombies/zombie_walker.glb', import.meta.url));
 const SKIN_IDS = Object.keys(ZOMBIE_SKINS) as ZombieSkinId[];
-/** The La Seu clergy, dressed in long draped vestments. */
+/** The Die Kathedrale clergy, dressed in long draped vestments. */
 const CLERGY_SKINS: ReadonlySet<ZombieSkinId> = new Set(
-  LA_SEU_ZOMBIE_SKIN_SHARES.flatMap((share) => (share.skin ? [share.skin] : [])),
+  DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.flatMap((share) => (share.skin ? [share.skin] : [])),
 );
 
 async function loadWalker(): Promise<ZombieModelSource> {
@@ -94,7 +95,7 @@ describe('walker skins', async () => {
       // Hats and belts stay a small fraction of the 2116-triangle body; full
       // vestments stay well under the body itself.
       else expect(triangles - plainTriangles).toBeGreaterThan(0);
-      expect(triangles - plainTriangles).toBeLessThan(CLERGY_SKINS.has(skinId) ? 1300 : 400);
+      expect(triangles - plainTriangles).toBeLessThan(CLERGY_SKINS.has(skinId) ? 1700 : 400);
 
       const weights = geometry.getAttribute('skinWeight');
       const indices = geometry.getAttribute('skinIndex');
@@ -298,7 +299,7 @@ describe('walker skins', async () => {
   });
 });
 
-describe('La Seu clergy', async () => {
+describe('Die Kathedrale clergy', async () => {
   const walker = await loadWalker();
   const plainVertices = (skinnedMeshOf(walker).geometry.index?.count ?? 0);
   const clergy = [...CLERGY_SKINS];
@@ -362,7 +363,7 @@ describe('La Seu clergy', async () => {
   }
 
   it('hangs long cloth from the hips between both thighs and keeps the torso free of the legs', () => {
-    const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, 'penitentMonk'));
+    const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, 'condemnedMonk'));
     const bones = mesh.skeleton.bones.map((bone) => bone.name);
     const position = mesh.geometry.getAttribute('position');
     const indices = mesh.geometry.getAttribute('skinIndex');
@@ -385,23 +386,43 @@ describe('La Seu clergy', async () => {
     expect(betweenThighs).toBeGreaterThan(20);
   });
 
-  it('knocks the mitre and the biretta off on a head hit, with everything sewn onto them', () => {
-    for (const skinId of ['corruptedBishop', 'fallenCardinal'] as const) {
-      const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId));
-      const hatStart = mesh.geometry.userData.hatStart as number;
-      expect(hatStart).toBeGreaterThan(plainVertices);
-      const head = mesh.skeleton.bones.findIndex((bone) => bone.name === 'Head');
-      const indices = mesh.geometry.getAttribute('skinIndex');
-      for (let vertex = hatStart; vertex < indices.count; vertex++) expect(indices.getX(vertex)).toBe(head);
-    }
-    // Monks and priests have nothing to lose: the cowl stays on.
-    for (const skinId of ['penitentMonk', 'condemnedPriestGreen'] as const) {
+  it('knocks only the bishop\'s mitre off on a head hit, with everything sewn onto it', () => {
+    const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, 'fallenBishop'));
+    const hatStart = mesh.geometry.userData.hatStart as number;
+    expect(hatStart).toBeGreaterThan(plainVertices);
+    const head = mesh.skeleton.bones.findIndex((bone) => bone.name === 'Head');
+    const indices = mesh.geometry.getAttribute('skinIndex');
+    for (let vertex = hatStart; vertex < indices.count; vertex++) expect(indices.getX(vertex)).toBe(head);
+    // Hoods, veils and coifs stay on.
+    for (const skinId of ['condemnedMonk', 'profanedPriest', 'undeadNun', 'cathedralGuardian'] as const) {
       expect(skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry.userData.hatStart).toBeUndefined();
     }
   });
 
-  it('gives each clergy rank its own silhouette and palette', () => {
-    const silhouette = (skinId: ZombieSkinId): { top: number; color: Color } => {
+  it('snaps the front horn of the bishop\'s mitre while the back horn keeps its height', () => {
+    const plain = skinnedMeshOf(walker);
+    const bones = plain.skeleton.bones.map((bone) => bone.name);
+    const mitreOf = (broken: boolean): { vertices: number; top: number } => {
+      const geometry = buildSkinnedWalkerGeometry(plain.geometry, bones, {
+        regions: {}, accessories: [{ kind: 'mitre', cloth: 0xbcae86, orphrey: 0x8f7334, broken }],
+      });
+      const position = geometry.getAttribute('position');
+      const hatStart = geometry.userData.hatStart as number;
+      let top = -Infinity;
+      for (let vertex = hatStart; vertex < position.count; vertex++) top = Math.max(top, position.getY(vertex));
+      return { vertices: position.count - hatStart, top };
+    };
+    const intact = mitreOf(false);
+    const broken = mitreOf(true);
+    expect(broken.vertices).toBeLessThan(intact.vertices);
+    expect(broken.top).toBeCloseTo(intact.top, 4);
+  });
+
+  it('gives each of the five cathedral looks its own silhouette or palette', () => {
+    const plainPosition = skinnedMeshOf(walker).geometry;
+    const bodyBounds = new Box3().setFromBufferAttribute(plainPosition.getAttribute('position') as BufferAttribute);
+    const height = bodyBounds.max.y - bodyBounds.min.y;
+    const look = (skinId: ZombieSkinId): { top: number; covered: boolean; color: Color } => {
       const geometry = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry;
       const position = geometry.getAttribute('position');
       const color = geometry.getAttribute('color');
@@ -411,26 +432,48 @@ describe('La Seu clergy', async () => {
         top = Math.max(top, position.getY(vertex));
         mean.r += color.getX(vertex); mean.g += color.getY(vertex); mean.b += color.getZ(vertex);
       }
-      return { top, color: mean.multiplyScalar(1 / (position.count - plainVertices)) };
+      return { top: (top - bodyBounds.min.y) / height, covered: top > bodyBounds.max.y, color: mean.multiplyScalar(1 / (position.count - plainVertices)) };
     };
-    const bishop = silhouette('corruptedBishop');
-    const ranks = (['fallenCardinal', 'penitentMonk', 'condemnedPriestGreen'] as const).map(silhouette);
-    // The mitre towers over every other head.
-    for (const rank of ranks) expect(bishop.top).toBeGreaterThan(rank.top);
-    const looks = [bishop, ...ranks];
-    for (let a = 0; a < looks.length; a++) {
-      for (let b = a + 1; b < looks.length; b++) {
-        const { r, g, bl } = { r: looks[a].color.r - looks[b].color.r, g: looks[a].color.g - looks[b].color.g, bl: looks[a].color.b - looks[b].color.b };
-        expect(Math.hypot(r, g, bl), `${a} vs ${b}`).toBeGreaterThan(0.05);
+    const ids = ['condemnedMonk', 'profanedPriest', 'undeadNun', 'cathedralGuardian', 'fallenBishop'] as const;
+    const looks = Object.fromEntries(ids.map((id) => [id, look(id)])) as Record<(typeof ids)[number], ReturnType<typeof look>>;
+    // Hood, veil, coif and mitre cover the skull; the priest goes bareheaded.
+    expect(ids.filter((id) => looks[id].covered)).toEqual(['condemnedMonk', 'undeadNun', 'cathedralGuardian', 'fallenBishop']);
+    // The mitre, even broken, towers over every other head.
+    for (const id of ids.slice(0, -1)) expect(looks.fallenBishop.top).toBeGreaterThan(looks[id].top + 0.05);
+    for (let a = 0; a < ids.length; a++) {
+      for (let b = a + 1; b < ids.length; b++) {
+        const first = looks[ids[a]];
+        const second = looks[ids[b]];
+        const palette = Math.hypot(first.color.r - second.color.r, first.color.g - second.color.g, first.color.b - second.color.b);
+        const outline = Math.abs(first.top - second.top) + Number(first.covered !== second.covered);
+        expect(palette + outline, `${ids[a]} vs ${ids[b]}`).toBeGreaterThan(0.05);
       }
     }
+  });
+
+  it('frames the nun\'s face in a white wimple and marks the guardian\'s surcoat with a red cross', () => {
+    const countColors = (skinId: ZombieSkinId, match: (r: number, g: number, b: number) => boolean): number => {
+      const color = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry.getAttribute('color');
+      let count = 0;
+      for (let vertex = plainVertices; vertex < color.count; vertex++) {
+        if (match(color.getX(vertex), color.getY(vertex), color.getZ(vertex))) count++;
+      }
+      return count;
+    };
+    // Vertex colors multiply the light shirt band, so pale linen stays near or above 0.4.
+    const pale = (r: number, g: number, b: number): boolean => Math.min(r, g, b) > 0.4;
+    const red = (r: number, g: number, b: number): boolean => r > 0.1 && r > g * 3 && r > b * 3;
+    expect(countColors('undeadNun', pale)).toBeGreaterThan(100);
+    expect(countColors('cathedralGuardian', red)).toBeGreaterThan(20);
+    expect(countColors('condemnedMonk', pale)).toBe(0);
   });
 
   it('stains the clergy clothes but leaves the uniforms of other maps clean', () => {
     const shirtColors = (skinId: ZombieSkinId): number => {
       const geometry = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry;
       const colors = geometry.getAttribute('color');
-      const uvs = geometry.getAttribute('uv');
+      // Bands by the walker's own UVs: patterned skins retarget theirs into the garment atlas.
+      const uvs = skinnedMeshOf(walker).geometry.toNonIndexed().getAttribute('uv');
       const seen = new Set<string>();
       for (let vertex = 0; vertex < plainVertices; vertex++) {
         if (walkerBandAt(uvs.getX(vertex), uvs.getY(vertex)) !== 'shirt') continue;
@@ -439,29 +482,70 @@ describe('La Seu clergy', async () => {
       return seen.size;
     };
     expect(shirtColors('fieldOfficer')).toBe(1);
-    expect(shirtColors('condemnedPriestViolet')).toBeGreaterThan(5);
+    expect(shirtColors('profanedPriest')).toBeGreaterThan(5);
   });
 
-  it('dresses the La Seu horde with one weighted look per share across the walker reserve', () => {
-    const dressed = dressZombieSources({ walker, brute: null }, { skinShares: LA_SEU_ZOMBIE_SKIN_SHARES });
+  it('dresses the Die Kathedrale horde with one weighted look per share across the walker reserve', () => {
+    const dressed = dressZombieSources({ walker, brute: walker }, {
+      skinShares: DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES,
+      eyes: DIE_KATHEDRALE_ZOMBIE_EYES,
+    });
     const looks = dressed.walker as readonly ZombieModelSource[];
     expect(looks).toHaveLength(ZOMBIE_MODEL_POOL_CAPACITIES.walker);
-    expect(new Set(looks).size).toBe(LA_SEU_ZOMBIE_SKIN_SHARES.length);
-    const civilians = looks.find((look) => look.spawnWeight === 55)!;
-    expect(civilians.scene).toBe(walker.scene);
-    expect(looks.filter((look) => look.scene === createSkinnedWalkerSource(walker, 'corruptedBishop').scene)).toHaveLength(1);
+    expect(new Set(looks).size).toBe(DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.length);
+    // Every body is dressed; even the rarest look owns a body of the reserve.
+    expect(looks.some((look) => look.scene === walker.scene)).toBe(false);
+    expect(looks.filter((look) => look.scene === createSkinnedWalkerSource(walker, 'fallenBishop').scene).length).toBeGreaterThan(0);
+    for (let index = 0; index < ZOMBIE_POOL_MODELS.length; index++) {
+      expect(zombiePoolSource(dressed, index)!.eyes).toEqual({ glow: 0x142aff, core: 0x7a9aff });
+    }
+    expect(walker.eyes).toBeUndefined();
   });
 
-  it('spawns La Seu looks by weight without touching zombie stats', () => {
+  it('can still weight the plain walker in among the skins', () => {
+    const dressed = dressZombieSources({ walker, brute: null }, {
+      skinShares: [{ skin: null, weight: 1 }, { skin: 'undeadNun', weight: 1 }],
+    });
+    const looks = dressed.walker as readonly ZombieModelSource[];
+    expect(looks.filter((look) => look.scene === walker.scene)).toHaveLength(ZOMBIE_MODEL_POOL_CAPACITIES.walker / 2);
+  });
+
+  it('textures the cathedral garments from the shared atlas and leaves other skins on the walker palette', () => {
+    const atlas = garmentAtlasTexture();
+    for (const skinId of CLERGY_SKINS) {
+      const mesh = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId));
+      const material = mesh.material as MeshStandardMaterial;
+      expect(material.map, skinId).toBe(atlas);
+      expect(material.alphaTest).toBe(GARMENT_ALPHA_TEST);
+      const uv = mesh.geometry.getAttribute('uv');
+      const palette = new Float32Array(2);
+      walkerPaletteUv(1, 1, palette, 0);
+      // The body samples the palette copy; most garment texels sample a pattern.
+      for (let vertex = 0; vertex < plainVertices; vertex++) {
+        expect(uv.getX(vertex)).toBeLessThanOrEqual(palette[0]);
+        expect(uv.getY(vertex)).toBeLessThanOrEqual(palette[1]);
+      }
+      let patterned = 0;
+      for (let vertex = plainVertices; vertex < uv.count; vertex++) {
+        if (uv.getX(vertex) > palette[0] || uv.getY(vertex) > palette[1]) patterned++;
+      }
+      expect(patterned / (uv.count - plainVertices), skinId).toBeGreaterThan(0.45);
+    }
+    const uniform = skinnedMeshOf(createSkinnedWalkerSource(walker, 'fieldOfficer')).material as MeshStandardMaterial;
+    expect(uniform.map).not.toBe(atlas);
+    expect(uniform.alphaTest).toBe(0);
+  });
+
+  it('spawns Die Kathedrale looks by weight without touching zombie stats', () => {
     let state = 11;
     const rng = (): number => {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 0x100000000;
     };
-    const sources = dressZombieSources({ walker, brute: null }, { skinShares: LA_SEU_ZOMBIE_SKIN_SHARES });
+    const sources = dressZombieSources({ walker, brute: null }, { skinShares: DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES });
     const manager = new ZombieManager(rng, sources, false);
     manager.registerColliders([]);
-    const lookOf = new Map<BufferGeometry, ZombieSkinId | null>(LA_SEU_ZOMBIE_SKIN_SHARES.map((share) => [
+    const lookOf = new Map<BufferGeometry, ZombieSkinId | null>(DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.map((share) => [
       skinnedMeshOf(share.skin ? createSkinnedWalkerSource(walker, share.skin) : walker).geometry, share.skin,
     ]));
     const counts = new Map<ZombieSkinId | null, number>();
@@ -477,8 +561,8 @@ describe('La Seu clergy', async () => {
       counts.set(look!, (counts.get(look!) ?? 0) + 1);
       manager.reset();
     }
-    const total = LA_SEU_ZOMBIE_SKIN_SHARES.reduce((sum, share) => sum + share.weight, 0);
-    for (const share of LA_SEU_ZOMBIE_SKIN_SHARES) {
+    const total = DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.reduce((sum, share) => sum + share.weight, 0);
+    for (const share of DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES) {
       expect(Math.abs((counts.get(share.skin) ?? 0) / spawns - share.weight / total), String(share.skin)).toBeLessThan(0.06);
       expect(counts.get(share.skin) ?? 0).toBeGreaterThan(0);
     }

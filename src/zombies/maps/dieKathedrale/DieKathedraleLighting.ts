@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { QualityLevel } from '../../../core/DeviceProfile';
-import { LA_SEU_MOON, type LaSeuLightSite } from '../LaSeuConfig';
+import { DIE_KATHEDRALE_MOON, type DieKathedraleLightSite, type DieKathedraleZoneId } from '../DieKathedraleConfig';
 import { POINT_LIGHT_BUDGET } from '../shared/PointLightBudget';
+import { CandleIgnition } from './CandleIgnition';
+import type { ColumnCandleFlames } from './ColumnCandleFlames';
 
 /** Seconds a real light takes to die at one site and to come up at the next. */
 const FADE_SECONDS = 0.45;
@@ -12,14 +14,14 @@ const HELD_BIAS = 0.7;
 const DECAY = 1.8;
 
 /**
- * La Seu's real lights. The map has many more places a light could burn
+ * Die Kathedrale's real lights. The map has many more places a light could burn
  * than a device can afford, so a fixed pool (the quality budget, never
  * resized: a different count would recompile every shader) follows the
  * player: each pooled light sits on one of the nearest sites and fades out
  * and back in when it moves to another. The moon is one unshadowed
  * directional light. Nothing allocates after construction.
  */
-export class LaSeuLighting {
+export class DieKathedraleLighting {
   private readonly lights: THREE.PointLight[] = [];
   /** Site each pooled light sits on. */
   private readonly siteOf: Int16Array;
@@ -29,6 +31,7 @@ export class LaSeuLighting {
   private readonly held: Uint8Array;
   private readonly distance: Float32Array;
   private readonly home: THREE.Vector3;
+  private readonly ignition: CandleIgnition;
   private time = 0;
   private untilRetarget = 0;
 
@@ -36,10 +39,12 @@ export class LaSeuLighting {
     group: THREE.Group,
     quality: QualityLevel,
     reducedEffects: boolean,
-    private readonly sites: ReadonlyArray<LaSeuLightSite>,
+    private readonly sites: ReadonlyArray<DieKathedraleLightSite>,
     home: THREE.Vector3Like,
+    private readonly flames: ColumnCandleFlames,
   ) {
     this.home = new THREE.Vector3(home.x, home.y, home.z);
+    this.ignition = new CandleIgnition(sites);
     const count = Math.min(POINT_LIGHT_BUDGET[quality], sites.length);
     this.siteOf = new Int16Array(count);
     this.level = new Float32Array(count);
@@ -48,14 +53,14 @@ export class LaSeuLighting {
     this.distance = new Float32Array(sites.length);
     for (let index = 0; index < count; index++) {
       const light = new THREE.PointLight(0xffffff, 0, 1, DECAY);
-      light.name = `laseu-light-${index}`;
+      light.name = `die-kathedrale-light-${index}`;
       this.lights.push(light);
       group.add(light);
     }
 
-    const moon = new THREE.DirectionalLight(LA_SEU_MOON.color, reducedEffects ? LA_SEU_MOON.reducedIntensity : LA_SEU_MOON.intensity);
-    moon.name = 'laseu-moonlight';
-    const { x, y, z } = LA_SEU_MOON.direction;
+    const moon = new THREE.DirectionalLight(DIE_KATHEDRALE_MOON.color, reducedEffects ? DIE_KATHEDRALE_MOON.reducedIntensity : DIE_KATHEDRALE_MOON.intensity);
+    moon.name = 'die-kathedrale-moonlight';
+    const { x, y, z } = DIE_KATHEDRALE_MOON.direction;
     moon.position.set(-x * 60, -y * 60, -z * 60);
     group.add(moon, moon.target);
     this.reset();
@@ -70,19 +75,27 @@ export class LaSeuLighting {
   public reset(): void {
     this.time = 0;
     this.untilRetarget = 0;
+    this.ignition.reset();
+    this.flames.update(this.ignition);
     this.held.fill(0);
+    this.siteOf.fill(-1);
+    this.level.fill(0);
     this.chooseSites(this.home);
     let next = 0;
     for (let index = 0; index < this.lights.length; index++) {
-      while (!this.wanted[next]) next++;
+      while (next < this.sites.length && !this.wanted[next]) next++;
+      if (next === this.sites.length) break;
       this.place(index, next++);
       this.level[index] = 1;
     }
     this.applyIntensities();
   }
 
-  public update(dt: number, observer?: THREE.Vector3): void {
+  /** Omit activeZones for a cinematic: its camera can move the pool but cannot discover candles. */
+  public update(dt: number, observer?: THREE.Vector3, activeZones?: ReadonlySet<DieKathedraleZoneId>): void {
     const step = Math.max(0, dt);
+    if (activeZones) this.ignition.update(step, observer ?? this.home, activeZones);
+    this.flames.update(this.ignition);
     this.time += step;
     this.untilRetarget -= step;
     if (this.untilRetarget <= 0) {
@@ -91,7 +104,8 @@ export class LaSeuLighting {
     }
     const fade = step / FADE_SECONDS;
     for (let index = 0; index < this.lights.length; index++) {
-      if (this.wanted[this.siteOf[index]]) {
+      const site = this.siteOf[index];
+      if (site >= 0 && this.wanted[site]) {
         this.level[index] = Math.min(1, this.level[index] + fade);
         continue;
       }
@@ -99,7 +113,7 @@ export class LaSeuLighting {
       if (this.level[index] > 0) continue;
       const free = this.freeWantedSite();
       if (free >= 0) {
-        this.held[this.siteOf[index]] = 0;
+        if (site >= 0) this.held[site] = 0;
         this.place(index, free);
       }
     }
@@ -117,8 +131,9 @@ export class LaSeuLighting {
     for (let pick = 0; pick < this.lights.length; pick++) {
       let nearest = -1;
       for (let site = 0; site < this.sites.length; site++) {
-        if (!this.wanted[site] && (nearest < 0 || this.distance[site] < this.distance[nearest])) nearest = site;
+        if (this.ignition.getLevel(site) > 0 && !this.wanted[site] && (nearest < 0 || this.distance[site] < this.distance[nearest])) nearest = site;
       }
+      if (nearest < 0) break;
       this.wanted[nearest] = 1;
     }
   }
@@ -142,11 +157,16 @@ export class LaSeuLighting {
 
   private applyIntensities(): void {
     for (let index = 0; index < this.lights.length; index++) {
-      const site = this.sites[this.siteOf[index]];
+      const siteIndex = this.siteOf[index];
+      if (siteIndex < 0) {
+        this.lights[index].intensity = 0;
+        continue;
+      }
+      const site = this.sites[siteIndex];
       // Two slow sines out of step per site: a flame that wavers, never strobes.
       const phase = this.siteOf[index] * 1.7;
       const waver = site.flicker ? 0.86 + 0.14 * Math.sin(this.time * 9.1 + phase) * Math.sin(this.time * 3.7 + phase * 2.3) : 1;
-      this.lights[index].intensity = site.intensity * this.level[index] * waver;
+      this.lights[index].intensity = site.intensity * this.level[index] * this.ignition.getLevel(siteIndex) * waver;
     }
   }
 }

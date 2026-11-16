@@ -1,11 +1,14 @@
 /**
- * Looks for the walker rig: recolored body regions plus rigid accessories
- * fused into its single skinned draw (see ZombieSkinBuilder). Pure data; maps
- * pick their looks through `ZombieArena.zombieSkins`.
+ * Looks for the walker rig: recolored body regions plus accessories and
+ * garments fused into its single skinned draw (see ZombieSkinBuilder). Pure
+ * data; maps pick their looks through `ZombieArena.zombieSkins` or
+ * `zombieSkinShares`.
  *
  * Insignia stay generic (plain stars, stripes, discs): no identifiable
  * emblems or political symbols, as the Station 33 art direction requires.
  */
+
+import type { GarmentPattern } from './ZombieGarmentPatterns';
 
 /** Walker body areas a skin can recolor; anything left out keeps the asset color. */
 export type ZombieSkinRegion =
@@ -54,37 +57,79 @@ export type ZombieAccessory =
 export type GarmentHem = 'knee' | 'shin' | 'ankle';
 
 /**
- * Medieval clergy garments (13th-15th century inspired). Long cloth hangs
+ * Medieval cathedral garments (13th-15th century inspired). Long cloth hangs
  * from the hips between both thighs instead of riding one bone, so robes
  * follow the stride without cloth simulation (see ZombieGarmentDrape).
  */
 export type ZombieVestment =
-  /** Skirt of a cassock, alb or habit from the waist down; `layer` 1 sits over a layer 0 robe (rochet). */
-  | { readonly kind: 'robe'; readonly cloth: number; readonly hem: GarmentHem; readonly layer?: 0 | 1; readonly tatter?: number }
-  /** Gothic chasuble: front and back panels open at the sides, pointed hems and a cross orphrey. */
-  | { readonly kind: 'chasuble'; readonly cloth: number; readonly orphrey: number }
+  /**
+   * Skirt of an alb, habit or mail hauberk from the waist down; `surface`
+   * defaults to torn cloth and `lace` adds a lace band of that color at the hem.
+   */
+  | {
+    readonly kind: 'robe'; readonly cloth: number; readonly hem: GarmentHem; readonly tatter?: number;
+    readonly surface?: GarmentPattern; readonly lace?: number;
+    /** Cut wider to hang over another robe, as a rochet over a cassock. */
+    readonly over?: boolean;
+  }
+  /**
+   * Gothic chasuble: front and back panels open at the sides, pointed hems and
+   * a gold cross orphrey; `ample` cuts it wider, over the arms, with a gold border.
+   */
+  | { readonly kind: 'chasuble'; readonly cloth: number; readonly orphrey: number; readonly ample?: boolean }
   /** Stole ends hanging below the chasuble, frayed at the tips. */
   | { readonly kind: 'stole'; readonly cloth: number }
-  /** Tall two-horned Gothic mitre with orphrey bands and lappets. */
-  | { readonly kind: 'mitre'; readonly cloth: number; readonly orphrey: number }
-  /** Square cap with three ridges and a tuft. */
-  | { readonly kind: 'biretta'; readonly cloth: number; readonly tuft: number }
-  /** Short buttoned cape over the shoulders. */
-  | { readonly kind: 'mozzetta'; readonly cloth: number; readonly buttons: number }
-  /** Wide cloth sash round the waist with tails on the left hip. */
-  | { readonly kind: 'sash'; readonly cloth: number }
+  /** Tall two-horned Gothic mitre with orphrey bands and lappets; `broken` snaps the front horn. */
+  | { readonly kind: 'mitre'; readonly cloth: number; readonly orphrey: number; readonly broken?: boolean }
+  /** Nun's veil: a close hood open at the face, falling over the shoulders and down the back. */
+  | { readonly kind: 'veil'; readonly cloth: number }
+  /** Mail coif: a close hood over the skull, open at the face, its cape over the shoulders. */
+  | { readonly kind: 'coif'; readonly mail: number }
+  /** Wimple framing the face and chin, with a bib over the shoulders and breast. */
+  | { readonly kind: 'wimple'; readonly cloth: number }
+  /** Knight's surcoat: long front and back panels open at the sides, a cross on the breast. */
+  | { readonly kind: 'surcoat'; readonly cloth: number; readonly cross: number }
+  /** Broad leather sword belt over the surcoat, with buckle and pouch. */
+  | { readonly kind: 'swordBelt'; readonly leather: number; readonly buckle: number }
+  /** Mail sleeves over the upper arms and forearms. */
+  | { readonly kind: 'mailSleeves'; readonly mail: number }
+  /** Tall leather boots with a turned-down cuff under the knee. */
+  | { readonly kind: 'boots'; readonly leather: number }
   /** Pectoral cross on a chain. */
   | { readonly kind: 'pectoralCross'; readonly metal: number }
   /** Deep monastic cowl whose brim shades the face. */
   | { readonly kind: 'cowl'; readonly cloth: number }
   /** Monastic scapular: long narrow front and back panels. */
-  | { readonly kind: 'scapular'; readonly cloth: number }
+  | { readonly kind: 'scapular'; readonly cloth: number; readonly surface?: GarmentPattern; readonly trim?: number }
   /** Rope girdle with a knotted end hanging down the left thigh. */
   | { readonly kind: 'cord'; readonly rope: number }
   /** Bell-shaped sleeve ends over the forearms; `tatter` frays the cuffs. */
-  | { readonly kind: 'wideSleeves'; readonly cloth: number; readonly tatter?: number }
-  /** Leather soles strapped over bare feet. */
-  | { readonly kind: 'sandals'; readonly leather: number };
+  | { readonly kind: 'wideSleeves'; readonly cloth: number; readonly tatter?: number; readonly surface?: GarmentPattern }
+  /** Square cap with three ridges and a tuft. */
+  | { readonly kind: 'biretta'; readonly cloth: number; readonly tuft: number }
+  /** Pilgrim's wide-brimmed hat, turned up at the front over a scallop shell. */
+  | { readonly kind: 'pilgrimHat'; readonly felt: number; readonly shell: number }
+  /** Torn shoulder cape (mozzetta or pilgrim's cape), with a gold hem band or a cross on the breast. */
+  | { readonly kind: 'cape'; readonly cloth: number; readonly trim?: number; readonly cross?: number }
+  /** Long cloak open at the front; with an `orphrey` it is a cope, with gold edges and a back shield. */
+  | {
+    readonly kind: 'cloak'; readonly cloth: number; readonly hem: GarmentHem;
+    readonly surface?: GarmentPattern; readonly orphrey?: number;
+  }
+  /** Dalmatic: wide tunic panels to the knee with two clavi and a hem band. */
+  | { readonly kind: 'dalmatic'; readonly cloth: number; readonly surface: GarmentPattern; readonly trim: number }
+  /** Cloth strips wound round the shins. */
+  | { readonly kind: 'legWraps'; readonly cloth: number }
+  /** Pilgrim's scrip on a strap and a drinking gourd. */
+  | { readonly kind: 'pilgrimGear'; readonly leather: number; readonly gourd: number }
+  /** A book bound to hang from the belt. */
+  | { readonly kind: 'girdleBook'; readonly cover: number; readonly clasp: number }
+  /** Ring of large iron keys at the belt. */
+  | { readonly kind: 'keys'; readonly metal: number }
+  /** Small lantern hanging from the belt. */
+  | { readonly kind: 'lantern'; readonly metal: number; readonly glass: number }
+  /** Crozier planted at the right side. */
+  | { readonly kind: 'crozier'; readonly metal: number };
 
 /** Charred patches spread over the whole body, face included (see ZombieSkinDamage). */
 export interface ZombieSkinBurns {
@@ -115,28 +160,18 @@ export interface ZombieSkinDefinition {
 const BOOT_LEATHER = 0x24201c;
 const FADED_RED = 0x9c2a22;
 const BRASS = 0xa88c48;
-/** Clergy palette: muted, aged tones that sit on the cathedral stone. */
-const ALB = 0xb7ad95;
-const DIRTY_ALB = 0xa0967f;
-const TARNISHED_GOLD = 0x8a6f34;
-const FADED_OCHRE = 0x7a6640;
-const CRIMSON = 0x661217;
-const ROCHET_WHITE = 0xc2b9a3;
-const HABIT = 0x3a2d23;
-
-/** A Condemned Priest in a chasuble of the given color. */
-function condemnedPriest(chasuble: number, seed: number): ZombieSkinDefinition {
-  return {
-    regions: { tunic: DIRTY_ALB, sleeves: DIRTY_ALB, thighs: DIRTY_ALB, shins: DIRTY_ALB, feet: 0x1d1814 },
-    accessories: [
-      { kind: 'robe', cloth: DIRTY_ALB, hem: 'ankle', tatter: 0.05 },
-      { kind: 'wideSleeves', cloth: DIRTY_ALB, tatter: 0.05 },
-      { kind: 'stole', cloth: chasuble },
-      { kind: 'chasuble', cloth: chasuble, orphrey: FADED_OCHRE },
-    ],
-    stains: { coverage: 0.26, seed },
-  };
-}
+/** Die Kathedrale palette: muted, aged tones that sit on the cathedral stone. */
+const IVORY_ALB = 0xb3a88f;
+const TARNISHED_GOLD = 0x8f7334;
+const CRIMSON = 0x5e1418;
+const HABIT_BROWN = 0x36291f;
+const HABIT_BLACK = 0x1b1918;
+const AGED_LINEN = 0xc4bba8;
+const CHAINMAIL = 0x5b5852;
+const OLD_LEATHER = 0x3a2a1d;
+const ROPE = 0x7f6f50;
+/** Tint for brocades, whose pattern bakes its own colors: near-white, a little aged. */
+const BAKED = 0xe6dfd2;
 
 export const ZOMBIE_SKINS = {
   /** Civilian left behind by the evacuation: worn trousers and shoes. */
@@ -232,58 +267,191 @@ export const ZOMBIE_SKINS = {
     severedLimbs: ['rightForearm'],
   },
   /**
-   * Corrupted Bishop: burgundy Gothic chasuble with tarnished gold orphreys
-   * over an aged alb, stole ends below, pectoral cross and a tall mitre.
+   * Condemned Monk: dark brown habit torn to rags, deep cowl over a short
+   * shoulder cape, scapular, knotted rope girdle with tassels, wooden cross,
+   * wide frayed sleeves over decayed hands, bare feet.
    */
-  corruptedBishop: {
-    regions: { tunic: ALB, sleeves: ALB, thighs: ALB, shins: ALB, feet: 0x2e1416 },
+  condemnedMonk: {
+    regions: { tunic: HABIT_BROWN, sleeves: HABIT_BROWN, thighs: HABIT_BROWN, shins: HABIT_BROWN },
     accessories: [
-      { kind: 'robe', cloth: ALB, hem: 'ankle' },
+      { kind: 'robe', cloth: HABIT_BROWN, hem: 'ankle', tatter: 0.07 },
+      { kind: 'wideSleeves', cloth: HABIT_BROWN, tatter: 0.04 },
+      { kind: 'scapular', cloth: 0x2a2019 },
+      { kind: 'cord', rope: ROPE },
+      { kind: 'pectoralCross', metal: 0x4a3322 },
+      { kind: 'cowl', cloth: 0x30241b },
+    ],
+    stains: { coverage: 0.24, seed: 151 },
+  },
+  /**
+   * Profaned Priest: dirty ivory alb with a lace hem and frayed sleeves under
+   * a crimson Gothic chasuble with gold-embroidered cross orphreys, crimson
+   * embroidered stole ends, old boots.
+   */
+  profanedPriest: {
+    regions: { tunic: IVORY_ALB, sleeves: IVORY_ALB, thighs: IVORY_ALB, shins: IVORY_ALB, feet: 0x1f1915 },
+    accessories: [
+      { kind: 'robe', cloth: IVORY_ALB, hem: 'ankle', tatter: 0.06, lace: AGED_LINEN },
+      { kind: 'wideSleeves', cloth: IVORY_ALB, tatter: 0.05 },
+      { kind: 'stole', cloth: CRIMSON },
+      { kind: 'chasuble', cloth: CRIMSON, orphrey: TARNISHED_GOLD },
+    ],
+    stains: { coverage: 0.3, seed: 171 },
+  },
+  /**
+   * Undead Nun: black habit and scapular, aged white wimple and bib, torn
+   * black veil down the back, rope girdle and a small cross.
+   */
+  undeadNun: {
+    regions: { tunic: HABIT_BLACK, sleeves: HABIT_BLACK, thighs: HABIT_BLACK, shins: HABIT_BLACK, feet: 0x2a1f17 },
+    accessories: [
+      { kind: 'robe', cloth: HABIT_BLACK, hem: 'ankle', tatter: 0.07 },
+      { kind: 'wideSleeves', cloth: HABIT_BLACK, tatter: 0.05 },
+      { kind: 'scapular', cloth: 0x161414 },
+      { kind: 'cord', rope: ROPE },
+      { kind: 'wimple', cloth: AGED_LINEN },
+      { kind: 'veil', cloth: 0x141212 },
+      { kind: 'pectoralCross', metal: TARNISHED_GOLD },
+    ],
+    stains: { coverage: 0.22, seed: 191 },
+  },
+  /**
+   * Cathedral Guardian: rusted mail coif, sleeves and hauberk skirt under a
+   * torn linen surcoat with a faded red cross, sword belt and tall boots.
+   */
+  cathedralGuardian: {
+    regions: {
+      tunic: CHAINMAIL, sleeves: CHAINMAIL, gloves: OLD_LEATHER, thighs: CHAINMAIL, shins: OLD_LEATHER, feet: OLD_LEATHER,
+    },
+    accessories: [
+      { kind: 'robe', cloth: CHAINMAIL, hem: 'knee', tatter: 0.02, surface: 'chainmail' },
+      { kind: 'mailSleeves', mail: CHAINMAIL },
+      { kind: 'boots', leather: OLD_LEATHER },
+      { kind: 'coif', mail: CHAINMAIL },
+      { kind: 'surcoat', cloth: 0xb2a78e, cross: 0x8a1c18 },
+      { kind: 'swordBelt', leather: OLD_LEATHER, buckle: 0x7a6844 },
+    ],
+    stains: { coverage: 0.3, seed: 211 },
+  },
+  /**
+   * Fallen Bishop: ample crimson Gothic chasuble with gold-embroidered
+   * orphreys and border over an aged alb with a lace hem, gold stole ends,
+   * a large pectoral cross and a broken mitre.
+   */
+  fallenBishop: {
+    regions: { tunic: IVORY_ALB, sleeves: IVORY_ALB, thighs: IVORY_ALB, shins: IVORY_ALB, feet: 0x2e1416 },
+    accessories: [
+      { kind: 'robe', cloth: IVORY_ALB, hem: 'ankle', tatter: 0.06, lace: AGED_LINEN },
+      { kind: 'wideSleeves', cloth: IVORY_ALB, tatter: 0.03 },
       { kind: 'stole', cloth: TARNISHED_GOLD },
-      { kind: 'chasuble', cloth: 0x4c1418, orphrey: TARNISHED_GOLD },
-      { kind: 'pectoralCross', metal: 0x9a7f3c },
-      { kind: 'mitre', cloth: 0xb9ae8e, orphrey: TARNISHED_GOLD },
+      { kind: 'chasuble', cloth: 0x6a161b, orphrey: TARNISHED_GOLD, ample: true },
+      { kind: 'pectoralCross', metal: 0xa08440 },
+      { kind: 'mitre', cloth: 0xbcae86, orphrey: TARNISHED_GOLD, broken: true },
     ],
-    stains: { coverage: 0.18, seed: 101 },
+    stains: { coverage: 0.34, seed: 101 },
   },
   /**
-   * Fallen Cardinal: crimson cassock and sash, aged white rochet with a
-   * frayed lace hem, short buttoned mozzetta, pectoral cross and biretta.
+   * Cathedral Canon: black cassock under a knee-length lace rochet, torn
+   * crimson mozzetta with a gold hem band, lace sleeves, gold pectoral cross
+   * and a black biretta.
    */
-  fallenCardinal: {
-    regions: { tunic: CRIMSON, sleeves: ROCHET_WHITE, thighs: CRIMSON, shins: CRIMSON, feet: 0x2a1112 },
+  cathedralCanon: {
+    regions: { tunic: AGED_LINEN, sleeves: AGED_LINEN, thighs: HABIT_BLACK, shins: HABIT_BLACK, feet: 0x1c1714 },
     accessories: [
-      { kind: 'robe', cloth: CRIMSON, hem: 'ankle' },
-      { kind: 'robe', cloth: ROCHET_WHITE, hem: 'knee', layer: 1, tatter: 0.05 },
-      { kind: 'sash', cloth: 0x5e0f15 },
-      { kind: 'mozzetta', cloth: 0x74131a, buttons: 0x3a0a0e },
-      { kind: 'pectoralCross', metal: 0x8a7444 },
-      { kind: 'biretta', cloth: 0x6a1218, tuft: 0x4a0c10 },
+      { kind: 'robe', cloth: HABIT_BLACK, hem: 'ankle', tatter: 0.06 },
+      { kind: 'robe', cloth: AGED_LINEN, hem: 'knee', tatter: 0.03, surface: 'weave', lace: AGED_LINEN, over: true },
+      { kind: 'wideSleeves', cloth: AGED_LINEN, tatter: 0.02, surface: 'lace' },
+      { kind: 'cape', cloth: 0x5a1219, trim: TARNISHED_GOLD },
+      { kind: 'pectoralCross', metal: 0xa08440 },
+      { kind: 'biretta', cloth: 0x161413, tuft: 0x2a2220 },
     ],
-    stains: { coverage: 0.2, seed: 131 },
+    stains: { coverage: 0.32, seed: 223 },
   },
   /**
-   * Penitent Monk: heavy brown habit with scapular, deep cowl over the face,
-   * rope girdle, wide sleeves over bare decayed hands and worn sandals.
+   * Cantor: ivory alb with a lace hem under a blue dalmatic brocaded with
+   * gold lilies, gold clavi and hem band, blue brocade sleeves, leather belt
+   * and a girdle book of chants.
    */
-  penitentMonk: {
-    regions: { tunic: HABIT, sleeves: HABIT, thighs: HABIT, shins: HABIT },
+  cantor: {
+    regions: { tunic: 0x1e2742, sleeves: IVORY_ALB, thighs: IVORY_ALB, shins: IVORY_ALB, feet: 0x1f1915 },
     accessories: [
-      { kind: 'robe', cloth: HABIT, hem: 'ankle', tatter: 0.06 },
-      { kind: 'wideSleeves', cloth: HABIT, tatter: 0.03 },
-      { kind: 'scapular', cloth: 0x2b221b },
-      { kind: 'cord', rope: 0x7c6c4e },
-      { kind: 'cowl', cloth: 0x332820 },
-      { kind: 'sandals', leather: 0x3e2c1e },
+      { kind: 'robe', cloth: IVORY_ALB, hem: 'ankle', tatter: 0.06, lace: AGED_LINEN },
+      { kind: 'wideSleeves', cloth: BAKED, tatter: 0.04, surface: 'brocadeAzure' },
+      { kind: 'dalmatic', cloth: BAKED, surface: 'brocadeAzure', trim: TARNISHED_GOLD },
+      { kind: 'swordBelt', leather: OLD_LEATHER, buckle: 0x7a6844 },
+      { kind: 'girdleBook', cover: 0x4a2a1c, clasp: 0x8f7334 },
     ],
-    stains: { coverage: 0.22, seed: 151 },
+    stains: { coverage: 0.3, seed: 227 },
   },
-  /** Condemned Priest: dirty alb with frayed sleeves under a green Gothic chasuble. */
-  condemnedPriestGreen: condemnedPriest(0x2e3b26, 171),
-  /** Condemned Priest in a violet (penitential) chasuble. */
-  condemnedPriestViolet: condemnedPriest(0x3a2640, 181),
-  /** Condemned Priest in a burgundy chasuble. */
-  condemnedPriestBurgundy: condemnedPriest(0x531a1d, 191),
+  /**
+   * Dominican Friar: white habit and scapular under a long black cloak and
+   * hood with a shoulder cape, knotted white cord with tassels, wooden cross.
+   */
+  dominicanFriar: {
+    regions: { tunic: AGED_LINEN, sleeves: AGED_LINEN, thighs: AGED_LINEN, shins: AGED_LINEN, feet: 0x1f1915 },
+    accessories: [
+      { kind: 'robe', cloth: AGED_LINEN, hem: 'ankle', tatter: 0.07 },
+      { kind: 'wideSleeves', cloth: AGED_LINEN, tatter: 0.04 },
+      { kind: 'scapular', cloth: 0xb9b09a },
+      { kind: 'cord', rope: 0xb3a685 },
+      { kind: 'pectoralCross', metal: 0x4a3322 },
+      { kind: 'cloak', cloth: 0x161414, hem: 'shin' },
+      { kind: 'cowl', cloth: 0x141212 },
+    ],
+    stains: { coverage: 0.3, seed: 229 },
+  },
+  /**
+   * Pilgrim: short torn brown tunic, cape with a red cross, wide hat with
+   * the scallop shell, scrip and gourd, belt, wound leg wraps and boots.
+   */
+  pilgrim: {
+    regions: { tunic: 0x4a3828, sleeves: 0x4a3828, thighs: 0x3d3024, shins: 0x6a5a44, feet: OLD_LEATHER },
+    accessories: [
+      { kind: 'robe', cloth: 0x4a3828, hem: 'knee', tatter: 0.08 },
+      { kind: 'legWraps', cloth: 0x7a6a50 },
+      { kind: 'swordBelt', leather: OLD_LEATHER, buckle: 0x6a5a3a },
+      { kind: 'pilgrimGear', leather: 0x5a3e26, gourd: 0x8a6a3a },
+      { kind: 'cape', cloth: 0x54402c, cross: 0x7a1b17 },
+      { kind: 'pilgrimHat', felt: 0x3e2f22, shell: 0xcfc2a2 },
+    ],
+    stains: { coverage: 0.34, seed: 233 },
+  },
+  /**
+   * Cathedral Custodian: black robe under a cope of black and gold
+   * scrollwork brocade with gold edges and a back shield, belt with a ring
+   * of iron keys and a lantern.
+   */
+  cathedralCustodian: {
+    regions: { tunic: HABIT_BLACK, sleeves: HABIT_BLACK, thighs: HABIT_BLACK, shins: HABIT_BLACK, feet: 0x1c1714 },
+    accessories: [
+      { kind: 'robe', cloth: HABIT_BLACK, hem: 'ankle', tatter: 0.06 },
+      { kind: 'wideSleeves', cloth: BAKED, tatter: 0.03, surface: 'brocadeSable' },
+      { kind: 'swordBelt', leather: OLD_LEATHER, buckle: 0x7a6844 },
+      { kind: 'keys', metal: 0x4c4740 },
+      { kind: 'lantern', metal: 0x3a352e, glass: 0xc9a868 },
+      { kind: 'cloak', cloth: BAKED, hem: 'shin', surface: 'brocadeSable', orphrey: TARNISHED_GOLD },
+    ],
+    stains: { coverage: 0.26, seed: 239 },
+  },
+  /**
+   * Abbess: dark crimson habit, scapular of crimson brocade with gold
+   * crosses and gold edges, black veil over a white wimple, crimson belt,
+   * gold pectoral cross and a crozier.
+   */
+  abbess: {
+    regions: { tunic: 0x3a1418, sleeves: 0x2a1013, thighs: 0x2a1013, shins: 0x2a1013, feet: 0x2a1f17 },
+    accessories: [
+      { kind: 'robe', cloth: 0x2a1013, hem: 'ankle', tatter: 0.07 },
+      { kind: 'wideSleeves', cloth: 0x1f0d10, tatter: 0.05 },
+      { kind: 'scapular', cloth: BAKED, surface: 'brocadeGules', trim: TARNISHED_GOLD },
+      { kind: 'swordBelt', leather: 0x4a1418, buckle: TARNISHED_GOLD },
+      { kind: 'wimple', cloth: AGED_LINEN },
+      { kind: 'veil', cloth: 0x141212 },
+      { kind: 'pectoralCross', metal: 0xa08440 },
+      { kind: 'crozier', metal: 0x9a7c3c },
+    ],
+    stains: { coverage: 0.24, seed: 241 },
+  },
 } as const satisfies Record<string, ZombieSkinDefinition>;
 
 export type ZombieSkinId = keyof typeof ZOMBIE_SKINS;

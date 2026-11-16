@@ -3,7 +3,7 @@ import type { DeviceProfile } from '../core/DeviceProfile';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import type { TranslationKey } from '../i18n/i18n';
 import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
-import { LaSeuArena } from '../zombies/maps/LaSeuArena';
+import { DieKathedraleArena } from '../zombies/maps/DieKathedraleArena';
 import { Station33Arena } from '../zombies/maps/Station33Arena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
 import { STATION33_WEAPONS } from '../zombies/maps/Station33Config';
@@ -54,15 +54,15 @@ export const ZOMBIE_MAPS = {
     weapons: STATION33_WEAPONS,
     createArena: (scene, profile) => new Station33Arena(scene, profile),
   },
-  'la-seu': {
-    id: 'la-seu',
+  'die-kathedrale': {
+    id: 'die-kathedrale',
     visible: true,
     product: 'map.die-kathedrale',
-    nameKey: 'map.laSeu',
+    nameKey: 'map.dieKathedrale',
     coop: false,
     exclusiveWeapons: [],
     weapons: WEAPON_DEFINITIONS,
-    createArena: (scene, profile) => new LaSeuArena(scene, profile),
+    createArena: (scene, profile) => new DieKathedraleArena(scene, profile),
   },
 } as const satisfies Record<string, ZombieMapDefinition>;
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { LA_SEU_MOON, LA_SEU_WALL_THICKNESS, PLAZA } from '../LaSeuConfig';
+import { DIE_KATHEDRALE_MOON, DIE_KATHEDRALE_WALL_THICKNESS, PLAZA } from '../DieKathedraleConfig';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { StaticMeshBatch } from '../shared/StaticMeshBatch';
 import { makeShaftTexture } from './StainedGlass';
@@ -17,24 +17,24 @@ const HARBOUR_LIGHTS = 46;
  */
 export function buildPlazaVista(parent: THREE.Group): void {
   const vista = new THREE.Group();
-  vista.name = 'laseu-vista';
+  vista.name = 'die-kathedrale-vista';
   parent.add(vista);
   const flat = (name: string, color: number): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({ name, color, fog: false });
-  const sea = flat('laseu_sea', 0x060c19);
-  const nearStone = flat('laseu_vista_near', 0x15161c);
-  const farStone = flat('laseu_vista_far', 0x0c111d);
-  const windowGlow = flat('laseu_vista_window', 0xe0a45c);
+  const sea = flat('die-kathedrale_sea', 0x060c19);
+  const nearStone = flat('die-kathedrale_vista_near', 0x15161c);
+  const farStone = flat('die-kathedrale_vista_far', 0x0c111d);
+  const windowGlow = flat('die-kathedrale_vista_window', 0xe0a45c);
   const batch = new StaticMeshBatch();
 
   batch.add(new THREE.PlaneGeometry(900, 520).rotateX(-Math.PI / 2).translate(0, SEA_Y, PLAZA.maxZ + 250), sea);
   // The sea wall (Dalt Murada) and its walk, straight under the parapet.
-  const wallZ = PLAZA.maxZ + LA_SEU_WALL_THICKNESS;
+  const wallZ = PLAZA.maxZ + DIE_KATHEDRALE_WALL_THICKNESS;
   batch.addBox(nearStone, 0, SEA_Y / 2 - 0.2, wallZ + 3.5, 120, -SEA_Y - 0.4, 7);
   batch.addBox(nearStone, 0, SEA_Y / 2 - 2.8, wallZ + 9, 120, -SEA_Y - 5.6, 4);
 
   addAlmudaina(batch, nearStone, windowGlow);
   addFarShore(batch, farStone);
-  batch.build(vista, 'laseu-vista', { castShadow: false, receiveShadow: false });
+  batch.build(vista, 'die-kathedrale-vista', { castShadow: false, receiveShadow: false });
 
   addMoon(vista);
   addStars(vista);
@@ -73,13 +73,13 @@ function addFarShore(batch: StaticMeshBatch, stone: THREE.Material): void {
 
 /** The moon over the bay, its halo and the glitter it lays on the water, brightest towards the horizon. */
 function addMoon(vista: THREE.Group): void {
-  const { x, y, z } = LA_SEU_MOON.position;
+  const { x, y, z } = DIE_KATHEDRALE_MOON.position;
   // Kept inside the camera's far plane (700 m).
   const scale = 3.2;
   const position = new THREE.Vector3(x * scale, y * scale, z * scale);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(14, 28), new THREE.MeshBasicMaterial({ name: 'laseu_moon', color: 0xe8edfb, fog: false }));
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(14, 28), new THREE.MeshBasicMaterial({ name: 'die-kathedrale_moon', color: 0xe8edfb, fog: false }));
   const halo = new THREE.Mesh(new THREE.CircleGeometry(48, 28), new THREE.MeshBasicMaterial({
-    name: 'laseu_moon_halo', color: 0x5d76b4, fog: false, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false,
+    name: 'die-kathedrale_moon_halo', color: 0x5d76b4, fog: false, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false,
   }));
   for (const mesh of [halo, disc]) {
     mesh.position.copy(position);
@@ -87,7 +87,7 @@ function addMoon(vista: THREE.Group): void {
     vista.add(mesh);
   }
   const glitter = new THREE.Mesh(new THREE.PlaneGeometry(34, 420).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({
-    name: 'laseu_moon_glitter', map: makeShaftTexture(), color: 0x7890c8, fog: false, transparent: true, opacity: 0.5,
+    name: 'die-kathedrale_moon_glitter', map: makeShaftTexture(), color: 0x7890c8, fog: false, transparent: true, opacity: 0.5,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
   }));
   glitter.name = 'moon-glitter';
@@ -108,7 +108,7 @@ function addStars(vista: THREE.Group): void {
     positions[star * 3 + 1] = Math.sin(elevation) * radius;
     positions[star * 3 + 2] = Math.cos(azimuth) * Math.cos(elevation) * radius;
   }
-  vista.add(pointCloud('laseu-stars', positions, 0xcfd8f2, 1.6, 0.85));
+  vista.add(pointCloud('die-kathedrale-stars', positions, 0xcfd8f2, 1.6, 0.85));
 }
 
 /** Lights of the harbour along the far shore. */
@@ -120,7 +120,7 @@ function addHarbourLights(vista: THREE.Group): void {
     positions[light * 3 + 1] = SEA_Y + 6.5 + random() * 5;
     positions[light * 3 + 2] = 409;
   }
-  vista.add(pointCloud('laseu-harbour-lights', positions, 0xffc98a, 2.2, 0.9));
+  vista.add(pointCloud('die-kathedrale-harbour-lights', positions, 0xffc98a, 2.2, 0.9));
 }
 
 function pointCloud(name: string, positions: Float32Array, color: number, size: number, opacity: number): THREE.Points {

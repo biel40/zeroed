@@ -2,8 +2,8 @@
 
 Guia para retomar Die Kathedrale (La Seu de Palma) sin perder su identidad.
 Describe la intencion; las medidas, coordenadas y tablas viven en
-`src/zombies/maps/LaSeuConfig.ts` y en
-los builders de `src/zombies/maps/laSeu/`. Si el codigo y esta guia discrepan,
+`src/zombies/maps/DieKathedraleConfig.ts` y en
+los builders de `src/zombies/maps/dieKathedrale/`. Si el codigo y esta guia discrepan,
 manda el codigo: actualiza la guia.
 
 ## Que es
@@ -12,13 +12,14 @@ manda el codigo: actualiza la guia.
   Una interpretacion reconocible, no una reproduccion a escala: las naves miden
   aproximadamente la mitad que las reales y se conservan las proporciones que
   la hacen inconfundible.
-- Mapa individual y premium, visible en el menu como Die Kathedrale. Conserva
-  el id interno `la-seu` y las rutas `LaSeu`; producto y acceso se declaran en
+- Mapa individual y premium, visible en el menu como Die Kathedrale. Usa
+  el id `die-kathedrale` (tambien en `?map=die-kathedrale`) y las rutas
+  `DieKathedrale`/`dieKathedrale`; producto y acceso se declaran en
   [el registro de mapas](../src/config/zombieMaps.ts). Comparte el acceso de
   [beta cerrada](../public/beta/README.md) con Station 33.
 - Se construye por fases, como Station 33. Cada fase debe ser una partida
   completa y nunca abrir puertas hacia el vacio. El plan de ejes esta al
-  principio de `LaSeuConfig.ts`: el frente principal sobre z = 0, la nave hacia
+  principio de `DieKathedraleConfig.ts`: el frente principal sobre z = 0, la nave hacia
   el norte (el este liturgico) y la plaza hacia el sur, sobre el mar.
 
 ## Pilares de ambientacion
@@ -35,10 +36,13 @@ manda el codigo: actualiza la guia.
 3. **Islas de luz, no una catedral iluminada.** Casi no hay luz de relleno:
    la piedra solo existe donde llega una llama o la luna. Los vitrales estan
    muertos salvo el roseton del frente y dos ventanales del este, que dejan
-   un haz y un charco frio. El resto son puntos contados y separados: un
-   lampadario, el anillo de un pilar, el altar de una capilla, las velas del
-   altar mayor y la lampara roja del sagrario. Entre isla e isla, negro. Cada
-   arma de pared y el punto de inicio tienen una isla al alcance.
+   un haz y un charco frio. Los candelabros de los primeros pilares dan luz
+   calida al inicio; los siguientes se encienden suavemente al acercarse,
+   cuando alguna de sus zonas contiguas esta abierta, y conservan la llama
+   hasta reiniciar. La camara de la intro no los activa. Los altares, los
+   votivos y la lampara roja del sagrario mantienen sus islas permanentes.
+   Entre ellas debe quedar penumbra; el punto de inicio y las armas de pared
+   necesitan una isla al alcance.
 4. **Terror gotico contenido.** Algo terrible paso aqui y nadie lo explica:
    los muertos bajo sabanas en una capilla, bancos arrastrados y rotos,
    sangre que cruza cada reja alejandose de las puertas, telaranas, niebla
@@ -47,6 +51,25 @@ manda el codigo: actualiza la guia.
    poco atrezo: no es una mazmorra de fantasia.
 5. **Palma alrededor.** La plaza es un mirador: la bahia bajo la luna, la
    muralla del mar, la silueta almenada de la Almudaina y Bellver al fondo.
+6. **La horda de la catedral.** Todos los walkers visten a quienes guardaban
+   el templo: monje encapuchado con capa corta y cuerda con borlas, sacerdote
+   con alba de encaje y casulla carmesi bordada en oro, monja con toca y velo,
+   guardian con cota de malla, botas altas y sobrevesta con cruz roja, y un
+   obispo con casulla amplia ribeteada en oro y la mitra rota, el mas raro.
+   La segunda coleccion suma un canonigo (roquete de encaje, muceta carmesi y
+   birrete), un cantor (dalmatica azul con lirios de oro y libro al cinto), un
+   dominico (habito blanco bajo capa y capucha negras), un peregrino (sombrero
+   con concha, capa con cruz, zurron, calabaza y vendas en las piernas), un
+   custodio (capa pluvial negra y oro, llaves y farol al cinto) y una abadesa
+   (escapulario de brocado carmesi, toca, velo y baculo). Ninguna skin pasa
+   del 15 % de la horda.
+   Toda la horda tiene ojos azules con nucleo azul claro
+   (`DIE_KATHEDRALE_ZOMBIE_EYES`); Brutus conserva el resto de su aspecto propio.
+   Inspiracion de los siglos XIII-XV, tonos apagados que no compitan con la
+   piedra, ropa sucia y rasgada; nada de armaduras de
+   fantasia ni efectos sobrenaturales. Cada aspecto se reconoce por su silueta
+   a distancia de combate. Los pesos son `DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES` en
+   la [config](../src/zombies/maps/DieKathedraleConfig.ts).
 
 ## Fase 1 (construida)
 
@@ -66,12 +89,30 @@ entradas de zombis de la que aun dormia.
 | Plaza | Mirador sobre la bahia, M60, Mystery Box, dos puertas de zombis | Postigo de las puertas mayores (1250) |
 
 Las tablas exactas (rejas, capillas, entradas, luces y sonidos) estan en
-`LaSeuConfig.ts`.
+`DieKathedraleConfig.ts`.
+
+## Entrada cinematografica
+
+La intro dura 16 s y presenta la escala del templo en un recorrido continuo:
+desde el exterior sobre la plaza se aproxima a la portada, baja para entrar
+por el postigo y se eleva sobre las rejas hacia la boveda y el gran roseton.
+La retirada y el descenso terminan en los ojos del jugador, en el nartex.
+La tarjeta propia usa oro envejecido y luz fria, deja libre el centro de la
+escena y se retira antes de entregar el control. Viento, madera e hierro
+procedurales marcan el exterior, el umbral y la nave; no son campanas ni organo.
+
+El recorrido y sus sonidos se declaran en
+[`DIE_KATHEDRALE_INTRO` y `DIE_KATHEDRALE_INTRO_CUES`](../src/zombies/maps/DieKathedraleConfig.ts).
+La [arena](../src/zombies/maps/DieKathedraleArena.ts) retira solo la imagen
+del postigo durante el plano y la restaura al terminar, saltar o reiniciar:
+la intro no compra la plaza ni abre zonas. Usa el mismo flujo de entrada,
+salto y pausa de Station 33; consulta [sistemas](GAME_SYSTEMS.md#mapas-e-interacciones).
+
 ## Directrices tecnicas
 
 - Un muro mas largo que 20 m no cuenta como obstaculo para la horda: se
-  construyen por tramos (`LaSeuWalls.addStoneWall`, con `breaks`).
-- Las divisiones de la nave son datos (`LA_SEU_SCREENS`, `LA_SEU_CHAPELS`) y
+  construyen por tramos (`DieKathedraleWalls.addStoneWall`, con `breaks`).
+- Las divisiones de la nave son datos (`DIE_KATHEDRALE_SCREENS`, `DIE_KATHEDRALE_CHAPELS`) y
   las dibuja `NaveDivisions`: cada tramo deja un solido bajo (jugador, horda y
   disparos rasos) y los barrotes de encima solo se dibujan. No anadas muros
   de altura completa dentro de la nave. Una reja de pago es un `PointDoor`
@@ -82,11 +123,16 @@ Las tablas exactas (rejas, capillas, entradas, luces y sonidos) estan en
   jugador y la horda; el resto del mobiliario usa `addSolidProxy`.
 - Interior y plaza se fusionan en lotes separados (un mesh por material y
   zona) para que el renderizador descarte la zona que queda fuera de la vista.
-- Una luz nueva debe ser una isla: lejos de las demas y de corto alcance. Si
-  hace falta ver mas, mueve una isla; no subas el relleno ni la luna.
+- La visibilidad se refuerza con islas calidas de corto alcance en los
+  candelabros, sin subir el relleno ni la luna. Las islas de velas conservan
+  separacion; los acentos frios de las vidrieras pueden coincidir con ellas.
 - Ninguna luz proyecta sombras. Las luces reales son un grupo fijo del tamaño
-  del presupuesto de calidad que sigue al jugador entre los puntos de luz
-  (`LaSeuLighting`); todo lo demas brilla por materiales sin iluminar.
+  del presupuesto de calidad que sigue a la camara durante la intro y al
+  jugador durante la partida entre los puntos de luz
+  (`DieKathedraleLighting`); solo los puntos encendidos participan en esa
+  seleccion. Las llamas de los candelabros comparten una malla de instancias
+  (`ColumnCandleFlames`); su encendido lo decide `CandleIgnition`, sin Three.js.
+  A distancia conservan su brillo de material aunque la luz real se reutilice.
 - El paisaje de la plaza no lleva niebla ni luz y debe quedar dentro del plano
   lejano de la camara.
 - Las texturas y vidrieras del escenario se generan en codigo. La portada del
@@ -99,12 +145,21 @@ Las tablas exactas (rejas, capillas, entradas, luces y sonidos) estan en
 ## Pendiente
 
 - Validacion visual y medicion de FPS en navegador, PC y Android; en
-  especial, que la oscuridad deje leer a los zombis y las rejas en combate.
+  especial, el encuadre, el ritmo y el sonido de la intro, que la oscuridad
+  deje leer a los zombis y las rejas en combate, y
+  que las once skins de la horda se distingan y no atraviesen la ropa. El
+  baculo de la abadesa va plantado a su lado y el farol y el libro cuelgan del
+  cinto: las animaciones del walker no dejan una mano libre para sostenerlos.
+- Las skins de la horda son geometria low-poly con un atlas procedural de
+  64 px por patron: la cota, los bordados y el encaje se leen a distancia de
+  combate, pero no tienen el detalle del concept art. Las caras, las manos y
+  los pies siguen siendo los del walker. Igualarlo exigiria texturas pintadas o
+  modelos dedicados.
 - Cada reja de pago cuesta unas 20 llamadas de dibujo hasta que se compra
   (`BuyableDoorVisual` compartido); si el movil lo acusa, fusionar sus piezas.
 - La nave central no tiene entrada de zombis propia.
 - Reverberacion propia de la catedral: el audio no tiene aun reverb por mapa.
-- Musica propia, intro y sonidos ambientales (campanas, organo).
+- Musica propia y sonidos ambientales de campanas y organo.
 - Zonas siguientes: claustro, campanario, Almudaina,
   Parc de la Mar y casco antiguo. Anillos, electricidad, mejora de armas y un
   final propio.

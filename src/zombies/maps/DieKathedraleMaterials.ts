@@ -2,18 +2,18 @@ import * as THREE from 'three';
 import { makeBloodDecalTexture } from './shared/BloodDecalTexture';
 import { seededRandom, tileableNoise } from './shared/ProceduralNoise';
 import { bake, decalMaterial, hash2, surfaceMaterial, type Painter, type Rgb } from './shared/ProceduralSurface';
-import { makeCobwebTexture } from './laSeu/CobwebTexture';
-import { COOL_GLASS, makeLancetGlass, makeRoseGlass, makeShaftTexture, WARM_GLASS } from './laSeu/StainedGlass';
+import { makeCobwebTexture } from './dieKathedrale/CobwebTexture';
+import { COOL_GLASS, makeLancetGlass, makeRoseGlass, makeShaftTexture, WARM_GLASS } from './dieKathedrale/StainedGlass';
 import { makeSoftSpot } from './shared/SoftSpotTexture';
 
 /**
- * Surfaces of La Seu: the Santanyi limestone of Palma in ashlar courses,
+ * Surfaces of Die Kathedrale: the Santanyi limestone of Palma in ashlar courses,
  * gone grey with soot and damp, worn floor slabs, dark pew oak, wrought iron
  * and tarnished gilding, and glass that is dead but for what the moon still
  * comes through. Every texture is baked in code (no assets) and
  * cached per process; materials are created per arena.
  */
-export interface LaSeuMaterials {
+export interface DieKathedraleMaterials {
   /** Ashlar of the walls, inside and out. */
   readonly wallStone: THREE.MeshStandardMaterial;
   /** Finer, paler ashlar of the shafts, ribs and carved trim. */
@@ -163,47 +163,47 @@ function poolMaterial(name: string, map: THREE.Texture, opacity: number): THREE.
   });
 }
 
-export function createLaSeuMaterials(anisotropy: number): LaSeuMaterials {
+export function createDieKathedraleMaterials(anisotropy: number): DieKathedraleMaterials {
   const sandstone: Rgb = [116, 102, 80];
   const paleStone: Rgb = [132, 120, 100];
   const warmGlass = makeLancetGlass(WARM_GLASS, 6101);
   const coolGlass = makeLancetGlass(COOL_GLASS, 6102);
   const roseGlass = makeRoseGlass(6103);
   return {
-    wallStone: surfaceMaterial('laseu_wall_stone', bake('laseu-wall-stone', 256, 2.2, ashlarPainter(256, 6001, sandstone, 6, 3, 0.86)), anisotropy, 3),
-    dressedStone: surfaceMaterial('laseu_dressed_stone', bake('laseu-dressed-stone', 256, 1.4, ashlarPainter(256, 6002, paleStone, 4, 2, 0.74)), anisotropy, 2.4),
-    vaultStone: surfaceMaterial('laseu_vault_stone', bake('laseu-vault-stone', 128, 0.8, plasterPainter(128, 6003, [86, 80, 72])), anisotropy, 5),
-    roughStone: surfaceMaterial('laseu_rough_stone', bake('laseu-rough-stone', 128, 3, ashlarPainter(128, 6004, [78, 70, 58], 5, 3, 0.95)), anisotropy, 2),
-    floorStone: surfaceMaterial('laseu_floor_stone', bake('laseu-floor-stone', 256, 1.6, slabPainter(256, 6005, [92, 86, 76], [68, 64, 58], 4, 0.62)), anisotropy, 3.2),
-    plazaPaving: surfaceMaterial('laseu_plaza_paving', bake('laseu-plaza-paving', 256, 2.4, slabPainter(256, 6006, [124, 112, 94], [112, 102, 86], 8, 0.88)), anisotropy, 4),
-    darkWood: surfaceMaterial('laseu_dark_wood', bake('laseu-dark-wood', 128, 1.6, woodPainter(128, 6007, [62, 42, 27])), anisotropy, 1.6),
-    iron: new THREE.MeshStandardMaterial({ name: 'laseu_iron', color: 0x1b1a1c, roughness: 0.62, metalness: 0.75 }),
-    gateIron: new THREE.MeshStandardMaterial({ name: 'laseu_gate_iron', color: 0x3b302a, roughness: 0.74, metalness: 0.6 }),
-    shroud: new THREE.MeshStandardMaterial({ name: 'laseu_shroud', color: 0x7d7566, roughness: 0.95 }),
-    gilt: new THREE.MeshStandardMaterial({ name: 'laseu_gilt', color: 0x8a6a30, roughness: 0.5, metalness: 0.85 }),
-    wax: new THREE.MeshStandardMaterial({ name: 'laseu_wax', color: 0xd9cdae, roughness: 0.7, emissive: 0x3a2812, emissiveIntensity: 0.6 }),
-    redCloth: new THREE.MeshStandardMaterial({ name: 'laseu_red_cloth', color: 0x6a1418, roughness: 0.92, side: THREE.DoubleSide }),
-    foliage: new THREE.MeshStandardMaterial({ name: 'laseu_foliage', color: 0x243a22, roughness: 0.9, side: THREE.DoubleSide }),
-    flame: new THREE.MeshBasicMaterial({ name: 'laseu_flame', color: 0xffd9a0 }),
-    glassWarm: glassMaterial('laseu_glass_warm', warmGlass, false, DEAD_GLASS),
-    glassCool: glassMaterial('laseu_glass_cool', coolGlass, false, DEAD_GLASS),
-    glassRose: glassMaterial('laseu_glass_rose', roseGlass, true, DEAD_GLASS),
-    glassMoon: glassMaterial('laseu_glass_moon', coolGlass, false, MOON_GLASS),
-    glassRoseMoon: glassMaterial('laseu_glass_rose_moon', roseGlass, true, MOON_GLASS),
-    poolCool: poolMaterial('laseu_pool_cool', coolGlass, 0.2),
-    poolRose: poolMaterial('laseu_pool_rose', roseGlass, 0.16),
+    wallStone: surfaceMaterial('die-kathedrale_wall_stone', bake('die-kathedrale-wall-stone', 256, 2.2, ashlarPainter(256, 6001, sandstone, 6, 3, 0.86)), anisotropy, 3),
+    dressedStone: surfaceMaterial('die-kathedrale_dressed_stone', bake('die-kathedrale-dressed-stone', 256, 1.4, ashlarPainter(256, 6002, paleStone, 4, 2, 0.74)), anisotropy, 2.4),
+    vaultStone: surfaceMaterial('die-kathedrale_vault_stone', bake('die-kathedrale-vault-stone', 128, 0.8, plasterPainter(128, 6003, [86, 80, 72])), anisotropy, 5),
+    roughStone: surfaceMaterial('die-kathedrale_rough_stone', bake('die-kathedrale-rough-stone', 128, 3, ashlarPainter(128, 6004, [78, 70, 58], 5, 3, 0.95)), anisotropy, 2),
+    floorStone: surfaceMaterial('die-kathedrale_floor_stone', bake('die-kathedrale-floor-stone', 256, 1.6, slabPainter(256, 6005, [92, 86, 76], [68, 64, 58], 4, 0.62)), anisotropy, 3.2),
+    plazaPaving: surfaceMaterial('die-kathedrale_plaza_paving', bake('die-kathedrale-plaza-paving', 256, 2.4, slabPainter(256, 6006, [124, 112, 94], [112, 102, 86], 8, 0.88)), anisotropy, 4),
+    darkWood: surfaceMaterial('die-kathedrale_dark_wood', bake('die-kathedrale-dark-wood', 128, 1.6, woodPainter(128, 6007, [62, 42, 27])), anisotropy, 1.6),
+    iron: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_iron', color: 0x1b1a1c, roughness: 0.62, metalness: 0.75 }),
+    gateIron: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_gate_iron', color: 0x3b302a, roughness: 0.74, metalness: 0.6 }),
+    shroud: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_shroud', color: 0x7d7566, roughness: 0.95 }),
+    gilt: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_gilt', color: 0x8a6a30, roughness: 0.5, metalness: 0.85 }),
+    wax: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_wax', color: 0xd9cdae, roughness: 0.7, emissive: 0x3a2812, emissiveIntensity: 0.6 }),
+    redCloth: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_red_cloth', color: 0x6a1418, roughness: 0.92, side: THREE.DoubleSide }),
+    foliage: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_foliage', color: 0x243a22, roughness: 0.9, side: THREE.DoubleSide }),
+    flame: new THREE.MeshBasicMaterial({ name: 'die-kathedrale_flame', color: 0xffd9a0 }),
+    glassWarm: glassMaterial('die-kathedrale_glass_warm', warmGlass, false, DEAD_GLASS),
+    glassCool: glassMaterial('die-kathedrale_glass_cool', coolGlass, false, DEAD_GLASS),
+    glassRose: glassMaterial('die-kathedrale_glass_rose', roseGlass, true, DEAD_GLASS),
+    glassMoon: glassMaterial('die-kathedrale_glass_moon', coolGlass, false, MOON_GLASS),
+    glassRoseMoon: glassMaterial('die-kathedrale_glass_rose_moon', roseGlass, true, MOON_GLASS),
+    poolCool: poolMaterial('die-kathedrale_pool_cool', coolGlass, 0.2),
+    poolRose: poolMaterial('die-kathedrale_pool_rose', roseGlass, 0.16),
     lightShaft: new THREE.MeshBasicMaterial({
-      name: 'laseu_light_shaft', map: makeShaftTexture(), color: 0x8fa8e6, transparent: true, opacity: 0.09,
+      name: 'die-kathedrale_light_shaft', map: makeShaftTexture(), color: 0x8fa8e6, transparent: true, opacity: 0.09,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     }),
     mist: new THREE.MeshBasicMaterial({
-      name: 'laseu_mist', map: makeSoftSpot(32), color: 0x39424f, transparent: true, opacity: 0.2, depthWrite: false,
+      name: 'die-kathedrale_mist', map: makeSoftSpot(32), color: 0x39424f, transparent: true, opacity: 0.2, depthWrite: false,
     }),
     cobweb: new THREE.MeshBasicMaterial({
-      name: 'laseu_cobweb', map: makeCobwebTexture(6104), color: 0x8c8f96, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide,
+      name: 'die-kathedrale_cobweb', map: makeCobwebTexture(6104), color: 0x8c8f96, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide,
     }),
-    bloodSplatter: decalMaterial('laseu_blood_splatter', makeBloodDecalTexture('splatter', 6201), 0.35),
-    bloodSmear: decalMaterial('laseu_blood_smear', makeBloodDecalTexture('smear', 6202), 0.4),
-    collider: new THREE.MeshBasicMaterial({ name: 'laseu_collider', visible: false }),
+    bloodSplatter: decalMaterial('die-kathedrale_blood_splatter', makeBloodDecalTexture('splatter', 6201), 0.35),
+    bloodSmear: decalMaterial('die-kathedrale_blood_smear', makeBloodDecalTexture('smear', 6202), 0.4),
+    collider: new THREE.MeshBasicMaterial({ name: 'die-kathedrale_collider', visible: false }),
   };
 }

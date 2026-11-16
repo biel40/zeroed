@@ -14,6 +14,7 @@ import {
 } from './ZombieAccessoryGeometry';
 import type { ZombieBodyFrame } from './ZombieBodyFrame';
 import { buildVestmentParts, isVestment } from './ZombieClergyGarments';
+import type { GarmentPattern } from './ZombieGarmentPatterns';
 import type { ZombieAccessory, ZombieVestment } from './ZombieSkinCatalog';
 
 /** One flat-colored piece, in body-frame meters; rigid on `bone` unless draped. */
@@ -28,11 +29,13 @@ export interface AccessoryPart {
   readonly draped?: boolean;
   /** Cloth the skin's stains and mud weather (see ZombieGarmentWear). */
   readonly fabric?: boolean;
+  /** Surface pattern from the garment atlas; needs pattern UVs (garment shells have them). */
+  readonly pattern?: GarmentPattern;
 }
 
 /** Hats knocked off by the first head hit, with everything sewn onto them. */
 const DETACHABLE_HATS: ReadonlySet<ZombieAccessory['kind']> = new Set([
-  'sideCap', 'peakedCap', 'helmet', 'furHat', 'mitre', 'biretta',
+  'sideCap', 'peakedCap', 'helmet', 'furHat', 'mitre', 'biretta', 'pilgrimHat',
 ]);
 
 /** Accessories built here; vestments have their own builders (ZombieClergyGarments). */

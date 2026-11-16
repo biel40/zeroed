@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { CHAPEL, LA_SEU_CHAPELS, NAVE, chapelArea, naveBayCenter, type LaSeuChapel } from '../LaSeuConfig';
+import { CHAPEL, DIE_KATHEDRALE_CHAPELS, NAVE, chapelArea, naveBayCenter, type DieKathedraleChapel } from '../DieKathedraleConfig';
 import { addSolidProxy } from '../shared/SolidProxy';
 import { cobwebGeometry } from './CobwebTexture';
-import type { LaSeuBuildContext } from './LaSeuBuildContext';
+import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 import { floorDecal } from './NaveDressing';
 
 const RETABLE = { width: 1.7, height: 2.3, bottom: 1.25 } as const;
@@ -15,8 +15,8 @@ const SHROUD = { length: 1.9, width: 0.56, height: 0.26, spacing: 0.95 } as cons
  * burn, cobwebs in the corners, and in the mortuary chapel the dead laid out
  * under sheets by whoever was still counting.
  */
-export function buildSideChapels(context: LaSeuBuildContext): void {
-  for (const chapel of LA_SEU_CHAPELS) {
+export function buildSideChapels(context: DieKathedraleBuildContext): void {
+  for (const chapel of DIE_KATHEDRALE_CHAPELS) {
     addChapelAltar(context, chapel);
     addCobwebs(context, chapel);
     if (chapel.role === 'mortuary') addShrouds(context, chapel);
@@ -24,7 +24,7 @@ export function buildSideChapels(context: LaSeuBuildContext): void {
 }
 
 /** Stone table against the side wall, off the chapel's centre so the wall there stays free for a rifle or a window. */
-function addChapelAltar(context: LaSeuBuildContext, chapel: LaSeuChapel): void {
+function addChapelAltar(context: DieKathedraleBuildContext, chapel: DieKathedraleChapel): void {
   const { batch, materials } = context;
   const { altarWidth, altarDepth, altarHeight, altarOffsetZ } = CHAPEL;
   const wall = chapel.side * NAVE.maxX;
@@ -56,7 +56,7 @@ function addChapelAltar(context: LaSeuBuildContext, chapel: LaSeuChapel): void {
 }
 
 /** A web in each corner where a side grille meets the wall. */
-function addCobwebs(context: LaSeuBuildContext, chapel: LaSeuChapel): void {
+function addCobwebs(context: DieKathedraleBuildContext, chapel: DieKathedraleChapel): void {
   const area = chapelArea(chapel);
   const wall = chapel.side * (NAVE.maxX - 0.03);
   for (const z of [area.minZ, area.maxZ]) {
@@ -65,7 +65,7 @@ function addCobwebs(context: LaSeuBuildContext, chapel: LaSeuChapel): void {
 }
 
 /** Three bodies under sheets, feet to the grille, and what ran out from under them. */
-function addShrouds(context: LaSeuBuildContext, chapel: LaSeuChapel): void {
+function addShrouds(context: DieKathedraleBuildContext, chapel: DieKathedraleChapel): void {
   const { batch, materials } = context;
   const x = chapel.side * (NAVE.maxX - 0.3 - SHROUD.length / 2);
   for (let body = 0; body < 3; body++) {
