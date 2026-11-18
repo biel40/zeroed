@@ -36,14 +36,17 @@ afterAll(() => {
   else Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument });
 });
 
-/** Everything but identity, cadence and look. */
+/** Everything but identity, cadence, handling and look. */
 function sharedStatsOf(definition: WeaponDefinition): Partial<WeaponDefinition> {
-  const { id: _id, name: _name, rpm: _rpm, boltCycleTime: _cycle, view: _view, ...rest } = definition;
+  const {
+    id: _id, name: _name, rpm: _rpm, boltCycleTime: _cycle, view: _view,
+    ads: _ads, moveSpeedMultiplier: _move, equipTime: _equip, ...rest
+  } = definition;
   return rest;
 }
 
 describe('M40 definition', () => {
-  it('shares every L96 attribute but its name, look and a slightly faster bolt', () => {
+  it('shares every L96 attribute but its name, look, a slightly faster bolt and lighter handling', () => {
     expect(m40.id).toBe('m40');
     expect(m40.name).toBe('M40');
     expect(sharedStatsOf(m40)).toEqual(sharedStatsOf(l96));
@@ -55,6 +58,11 @@ describe('M40 definition', () => {
     expect(view.hands.action).toBe(l96.view.hands.action);
     expect(view.hands.magazine).toBe(l96.view.hands.magazine);
     expect(view.frame).toBe('m40');
+    // Lighter handling: quicker scope-in, move and equip, same optic.
+    expect({ ...m40.ads, speed: l96.ads.speed }).toEqual(l96.ads);
+    expect(m40.ads.speed).toBeGreaterThan(l96.ads.speed);
+    expect(m40.moveSpeedMultiplier).toBeGreaterThan(l96.moveSpeedMultiplier);
+    expect(m40.equipTime).toBeLessThan(l96.equipTime);
 
     const cadence = (definition: WeaponDefinition): number => Math.max(60 / definition.rpm, definition.boltCycleTime);
     expect(cadence(m40)).toBeLessThan(cadence(l96));
@@ -62,7 +70,7 @@ describe('M40 definition', () => {
     expect(m40.boltCycleTime / (60 / m40.rpm)).toBeCloseTo(l96.boltCycleTime / (60 / l96.rpm), 1);
   });
 
-  it('gets one more shot than the L96 out of 2.6 s of trigger taps', () => {
+  it('gets one more shot than the L96 out of 3.3 s of trigger taps', () => {
     const shotsIn = (definition: WeaponDefinition, seconds: number): number => {
       const weapon = new Weapon(definition, () => 0.5);
       const dt = 1 / 240;
@@ -74,8 +82,8 @@ describe('M40 definition', () => {
       }
       return shots;
     };
-    expect(shotsIn(l96, 2.6)).toBe(3);
-    expect(shotsIn(m40, 2.6)).toBe(4);
+    expect(shotsIn(l96, 3.3)).toBe(3);
+    expect(shotsIn(m40, 3.3)).toBe(4);
   });
 
   it('is a standard Mystery Box pull, preloaded, with the L96 reserve and death', () => {

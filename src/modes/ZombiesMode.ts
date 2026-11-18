@@ -150,6 +150,7 @@ export class ZombiesMode implements GameMode {
   private kills = 0;
   private headshots = 0;
   private godModeEnabled = false;
+  private debugStatsVisible = false;
   private readonly godModeCommand = new DeveloperCommand('MOTDRULES');
   private readonly developerCommands = new DeveloperConsoleCommands();
   private gameOver = false;
@@ -1252,7 +1253,6 @@ export class ZombiesMode implements GameMode {
 
   private activateGodMode(): void {
     this.godModeEnabled = true;
-    this.ctx.setDebugStatsEnabled?.(true);
     this.health.setInvincible(true);
     this.economy.setUnlimitedSpending(true);
     if (hasSoulRitual(this.arena)) this.arena.unlockSecretRoom();
@@ -1282,9 +1282,15 @@ export class ZombiesMode implements GameMode {
       infiniteAmmo: () => { this.ctx.setWeaponInfiniteReserve(this.ctx.getEquippedWeaponId()); },
       equipped: () => this.ctx.getEquippedWeaponId(),
       invincible: (enabled) => this.health.setInvincible(enabled),
+      stats: (visible) => this.setDebugStatsVisible(visible),
       boss: () => this.evacuation?.jumpToGuardian() ?? false,
       forge: () => this.jumpToUpgradeMachine(),
     });
+  }
+
+  private setDebugStatsVisible(visible: boolean): void {
+    this.debugStatsVisible = visible;
+    this.ctx.setDebugStatsEnabled?.(visible);
   }
 
   /** Developer console: the map readies its upgrade machine and the player is stood at it, facing it. */
@@ -1495,7 +1501,7 @@ export class ZombiesMode implements GameMode {
     this.totalDamage = 0;
     this.kills = 0;
     this.headshots = 0;
-    if (this.godModeEnabled) this.ctx.setDebugStatsEnabled?.(false);
+    if (this.debugStatsVisible) this.setDebugStatsVisible(false);
     this.godModeEnabled = false;
     this.developerCommands.reset();
     this.godModeCommand.reset();

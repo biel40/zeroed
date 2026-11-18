@@ -139,10 +139,14 @@ describe('Weapon fire rate scale', () => {
     expect(weapon.ammoInMagazine).toBe(weapon.definition.magazineSize - 1);
     const barrett = new Weapon(WEAPON_DEFINITIONS.barrett);
     barrett.fireRateScale = 2;
-    for (let shot = 0; shot < 4; shot++) barrett.update(0.21, INPUT);
+    // The Barrett only fires fully aimed.
+    barrett.adsAlpha = 1;
+    const aimedInput = { ...INPUT, ads: true };
+    const scaledInterval = 60 / barrett.definition.rpm / 2;
+    for (let shot = 0; shot < 4; shot++) barrett.update(scaledInterval, aimedInput);
     expect(barrett.heat.overheated).toBe(true);
     const before = barrett.ammoInMagazine;
-    barrett.update(10, INPUT);
+    barrett.update(10, aimedInput);
     expect(barrett.ammoInMagazine).toBe(before - 1);
   });
 

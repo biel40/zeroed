@@ -5,7 +5,7 @@ import { MUZZLE_FLARES } from './muzzleFlares';
 /**
  * Accuracy International L96A1: the scoped bolt-action 7.62 rifle. One
  * heavy round per bolt cycle that passes through up to three zombies.
- * The M40 shares all of it but its look and a quicker bolt.
+ * The M40 shares all of it but its look, a quicker bolt and lighter handling.
  */
 const L96_DEFINITION: WeaponDefinition = {
   id: 'l96',
@@ -14,13 +14,13 @@ const L96_DEFINITION: WeaponDefinition = {
   muzzleFlash: { length: 0.64, width: 0.21, coreScale: 2.1, duration: 0.12, lightIntensity: 25 },
   fireModes: ['semi'],
   defaultFireMode: 'semi',
-  rpm: 60,
+  rpm: 48,
   magazineSize: 5,
   // Unhurried: the rifle is shown whole while the box magazine is swapped.
   reloadTime: 3,
   tacticalReloadTime: 2.4,
   boltAction: true,
-  boltCycleTime: 0.7,
+  boltCycleTime: 0.88,
   scoped: true,
   damage: 1000,
   recoil: {
@@ -43,11 +43,11 @@ const L96_DEFINITION: WeaponDefinition = {
     bloomRecovery: 0.02,
     adsBloomMultiplier: 0.15,
   },
-  ads: { fov: 16, speed: 5, sensitivity: 0.35 },
+  ads: { fov: 16, speed: 4, sensitivity: 0.35 },
   // A 7.62 round punches through up to three zombies in a line (the Barrett, five).
   projectile: { muzzleVelocity: 900, gravity: 9.8, maxDistance: 600, drag: 0.03, maxTargets: 3 },
-  moveSpeedMultiplier: 0.9,
-  equipTime: 0.5,
+  moveSpeedMultiplier: 0.86,
+  equipTime: 0.65,
   // Full-power 7.62 fallback: supersonic crack, heavy body and a room echo.
   audio: {
     volume: 0.85, duration: 0.3, lowpass: 2100, thump: 82, crack: 0.42, tail: 0.9,
@@ -950,14 +950,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   /**
    * USMC M40A5: the L96's damage, ballistics, handling, magazine, reload and
    * audio (shot and bolt) in a McMillan A5 stock over a Remington 700
-   * action, whose smoother bolt cycles a little faster.
+   * action, whose smoother bolt cycles a little faster and lighter build
+   * handles a bit quicker.
    */
   m40: {
     ...L96_DEFINITION,
     id: 'm40',
     name: 'M40',
-    rpm: 72,
-    boltCycleTime: 0.58,
+    rpm: 56,
+    boltCycleTime: 0.75,
+    // Lighter A5 build: scopes in, moves and comes up a touch quicker.
+    ads: { ...L96_DEFINITION.ads, speed: 4.4 },
+    moveSpeedMultiplier: 0.88,
+    equipTime: 0.58,
     view: {
       ...L96_DEFINITION.view,
       // No GLB: dedicated M40A5 builder (see M40ViewModel.ts).
@@ -990,35 +995,38 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     shellCasing: 'bmg50',
     fireModes: ['semi'],
     defaultFireMode: 'semi',
-    rpm: 150,
+    rpm: 60,
     magazineSize: 7,
     reloadTime: 4.2,
     tacticalReloadTime: 3.4,
     boltAction: false,
     boltCycleTime: 0,
     scoped: true,
+    // Too heavy to hip-fire: the trigger only answers through the scope.
+    requireAdsToFire: true,
     damage: 1800,
     // Four rounds faster than the cool delay redline the barrel and lock
-    // the trigger until it has fully cooled (~4 s); the glow covers the
-    // brake and the exposed barrel behind it.
-    heat: { shotsToOverheat: 4, coolTime: 3.2, coolDelay: 0.6, lockout: true, maxSpreadBonus: 0.014, glow: { radius: 0.055, length: 0.3 } },
+    // the trigger until it has fully cooled (~4.5 s); the delay outlasts the
+    // 1 s cadence so back-to-back fire still redlines. The glow covers
+    // the brake and the exposed barrel behind it.
+    heat: { shotsToOverheat: 4, coolTime: 3.2, coolDelay: 1.3, lockout: true, maxSpreadBonus: 0.014, glow: { radius: 0.055, length: 0.3 } },
     // The arrowhead brake vents thick clouds to both sides on every shot.
     muzzleSmoke: { puffs: 6, scale: 2, life: 1.6 },
     recoil: {
-      verticalKick: 0.21, horizontalKick: 0.022, horizontalBias: 0,
+      verticalKick: 0.24, horizontalKick: 0.026, horizontalBias: 0,
       kickVariance: 0.15, recoverySpeed: 4, recoveryDelay: 0.28,
       cameraShare: 0.85, adsRecoilMultiplier: 1,
-      // A .50 BMG punch: a hard snap of the view and the shooter rocked ~12 cm back.
-      cameraJolt: 0.085, playerPush: 1.8,
+      // A .50 BMG punch: a hard snap of the view and the shooter rocked ~14 cm back.
+      cameraJolt: 0.1, playerPush: 2.1,
     },
     spread: {
       hipBase: 0.08, adsBase: 0.0005, bloomPerShot: 0.006,
       maxBloom: 0.018, bloomRecovery: 0.024, adsBloomMultiplier: 0.15,
     },
-    ads: { fov: 16, speed: 3.5, sensitivity: 0.35 },
+    ads: { fov: 16, speed: 2.2, sensitivity: 0.35 },
     // A .50 round punches through up to five zombies in a line.
     projectile: { muzzleVelocity: 850, gravity: 9.8, maxDistance: 700, drag: 0.025, maxTargets: 5 },
-    moveSpeedMultiplier: 0.8,
+    moveSpeedMultiplier: 0.68,
     equipTime: 0.7,
     audio: { volume: 1.3, duration: 0.38, lowpass: 1800, thump: 62, crack: 0.55, tail: 1.15, mechanism: 0.3, sampleFile: 'barrett_shot.mp3' },
     view: {

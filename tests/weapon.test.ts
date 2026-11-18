@@ -366,3 +366,43 @@ describe('Equip', () => {
     expect(m4.reserveAmmo).toBe(2);
   });
 });
+
+describe('ADS-only firing', () => {
+  const AIMED_FIRE = { trigger: true, ads: true };
+
+  it('ignores hip-fire without spending ammo or emitting events', () => {
+    const barrett = makeWeapon('barrett');
+    expect(barrett.definition.requireAdsToFire).toBe(true);
+    step(barrett, barrett.definition.equipTime + DT);
+    const { events } = step(barrett, 0.5, { trigger: true, ads: false });
+    expect(events).toEqual([]);
+    expect(barrett.ammoInMagazine).toBe(barrett.definition.magazineSize);
+  });
+
+  it('stays blocked while the aim is still blending in', () => {
+    const barrett = makeWeapon('barrett');
+    step(barrett, barrett.definition.equipTime + DT);
+    const partialAim = 0.5 / barrett.definition.ads.speed;
+    const { events } = step(barrett, partialAim, AIMED_FIRE);
+    expect(barrett.adsAlpha).toBeLessThan(1);
+    expect(events).toEqual([]);
+    expect(barrett.ammoInMagazine).toBe(barrett.definition.magazineSize);
+  });
+
+  it('fires once ADS is fully engaged', () => {
+    const barrett = makeWeapon('barrett');
+    step(barrett, barrett.definition.equipTime + DT);
+    step(barrett, 1 / barrett.definition.ads.speed + DT, { trigger: false, ads: true });
+    expect(barrett.adsAlpha).toBe(1);
+    const { events } = step(barrett, DT, AIMED_FIRE);
+    expect(events).toEqual(['shot']);
+    expect(barrett.ammoInMagazine).toBe(barrett.definition.magazineSize - 1);
+  });
+
+  it('keeps hip-fire on weapons without the flag', () => {
+    const m4 = makeWeapon('m4a1');
+    expect(m4.definition.requireAdsToFire).toBeUndefined();
+    const { events } = step(m4, DT, { trigger: true, ads: false });
+    expect(events).toEqual(['shot']);
+  });
+});

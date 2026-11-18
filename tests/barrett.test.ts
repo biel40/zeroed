@@ -16,6 +16,15 @@ import { STATION33_WALL_BUYS } from '../src/zombies/maps/Station33Config';
 
 const definition = WEAPON_DEFINITIONS.barrett;
 const idle = { trigger: false, ads: false };
+/** The Barrett only fires fully aimed: these inputs keep the scope up. */
+const aiming = { trigger: false, ads: true };
+const aimedFire = { trigger: true, ads: true };
+
+function aimedWeapon(reserve?: number): Weapon {
+  const weapon = new Weapon(definition, () => 0.5, reserve);
+  weapon.adsAlpha = 1;
+  return weapon;
+}
 
 describe('Barrett .50 integration', () => {
   it('can be rolled and equipped from the box, with finite ammo in both modes', () => {
@@ -42,24 +51,24 @@ describe('Barrett .50 integration', () => {
   });
 
   it('fires once per press without a manual bolt cycle and respects its cooldown', () => {
-    const weapon = new Weapon(definition);
-    weapon.update(1 / 60, { trigger: true, ads: true });
+    const weapon = aimedWeapon();
+    weapon.update(1 / 60, aimedFire);
     expect(weapon.pendingEvents.map((event) => event.type)).toEqual(['shot']);
     expect(weapon.state).toBe('ready');
     weapon.clearEvents();
-    weapon.update(1, { trigger: true, ads: true });
+    weapon.update(60 / definition.rpm, aimedFire);
     expect(weapon.pendingEvents).toEqual([]);
-    weapon.update(1 / 60, idle);
-    weapon.update(1 / 60, { trigger: true, ads: true });
+    weapon.update(1 / 60, aiming);
+    weapon.update(1 / 60, aimedFire);
     expect(weapon.ammoInMagazine).toBe(5);
     weapon.clearEvents();
-    weapon.update(1 / 60, idle);
-    weapon.update(1 / 60, { trigger: true, ads: true });
+    weapon.update(1 / 60, aiming);
+    weapon.update(1 / 60, aimedFire);
     expect(weapon.pendingEvents).toEqual([]);
   });
 
   it('draws reloads from the reserve and automatically reloads after the last shot', () => {
-    const weapon = new Weapon(definition, () => 0.5, 4);
+    const weapon = aimedWeapon(4);
     weapon.ammoInMagazine = 3;
     expect(weapon.reload()).toBe(true);
     expect(weapon.reloadType).toBe('tactical');
@@ -68,7 +77,8 @@ describe('Barrett .50 integration', () => {
     expect(weapon.reserveAmmo).toBe(0);
     weapon.resetAmmo();
     weapon.ammoInMagazine = 1;
-    weapon.update(1 / 60, { trigger: true, ads: false });
+    weapon.adsAlpha = 1;
+    weapon.update(1 / 60, aimedFire);
     expect(weapon.state).toBe('reloading');
     expect(weapon.reloadType).toBe('empty');
     weapon.update(definition.reloadTime + 0.01, idle);
@@ -77,12 +87,12 @@ describe('Barrett .50 integration', () => {
   });
 
   it('locks the trigger after four rapid rounds until the barrel has fully cooled', () => {
-    const weapon = new Weapon(definition);
+    const weapon = aimedWeapon();
     const press = (): string[] => {
       weapon.clearEvents();
-      weapon.update(1 / 60, { trigger: true, ads: true });
+      weapon.update(1 / 60, aimedFire);
       const events = weapon.pendingEvents.map((event) => event.type);
-      weapon.update(60 / definition.rpm, idle);
+      weapon.update(60 / definition.rpm, aiming);
       return events;
     };
     for (let shot = 1; shot <= 3; shot++) expect(press()).toEqual(['shot']);
@@ -91,16 +101,18 @@ describe('Barrett .50 integration', () => {
     expect(weapon.heat.intensity).toBe(1);
     expect(press()).toEqual(['overheated']);
     expect(weapon.ammoInMagazine).toBe(3);
-    weapon.update(definition.heat!.coolDelay! + definition.heat!.coolTime, idle);
+    weapon.update(definition.heat!.coolDelay! + definition.heat!.coolTime, aiming);
     expect(weapon.heat.overheated).toBe(false);
     expect(press()).toEqual(['shot']);
   });
 
   it('never overheats when each round is fired after the barrel had time to shed its heat', () => {
-    const weapon = new Weapon(definition);
+    const weapon = aimedWeapon();
+    // Past the cool delay, each gap sheds more heat than one round adds.
+    const gap = definition.heat!.coolDelay! + definition.heat!.coolTime / definition.heat!.shotsToOverheat;
     for (let shot = 0; shot < definition.magazineSize - 1; shot++) {
-      weapon.update(1 / 60, { trigger: true, ads: true });
-      weapon.update(1.5, idle);
+      weapon.update(1 / 60, aimedFire);
+      weapon.update(gap, aiming);
     }
     expect(weapon.ammoInMagazine).toBe(1);
     expect(weapon.heat.overheated).toBe(false);

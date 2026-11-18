@@ -103,8 +103,10 @@ todo (evento `overheated`: siseo y chasquido en cada intento); `heat.coolDelay`
 retiene el calor entre disparos para que un semiautomatico lo acumule. La M14
 lo usa sin bloqueo: un cargador disparado muy seguido (menos de 0.4 s entre
 disparos) la calienta, y el tiro pausado no. El
-Barrett lo usa: cuatro disparos seguidos (menos de 0.6 s entre ellos) lo
-bloquean hasta enfriarse. `audio.sampleFile` sustituye el disparo procedural por
+Barrett lo usa: cuatro disparos seguidos (menos de 1.3 s entre ellos, su
+cadencia maxima) lo bloquean hasta enfriarse. `requireAdsToFire` solo deja
+disparar con la mira completamente subida; el gatillo desde la cadera no gasta
+municion ni emite eventos. El Barrett lo usa. `audio.sampleFile` sustituye el disparo procedural por
 una grabacion de `public/assets/audio/`. La L96 salta la entrada del clip
 (`audio.sampleOffset`) para alinear el estampido con el disparo. La AK-47 usa
 una grabacion de tiro unico con una cola mas larga en semiautomatico y un
@@ -118,10 +120,10 @@ un golpe corto por bala para que la cola no se acumule.
 disponible, suena el procedural. `recoil.cameraJolt` y `recoil.playerPush`
 anaden a un arma pesada un golpe seco de camara y un leve empuje hacia atras
 del jugador. La L96 levanta el canón con fuerza y desplaza al jugador unos
-9 cm por disparo en reposo. El Barrett lo desplaza unos 12 cm. `muzzleSmoke` suelta nubes
+9 cm por disparo en reposo. El Barrett lo desplaza unos 14 cm. `muzzleSmoke` suelta nubes
 de humo a ambos lados de la boca (fuera de la linea de mira), mas duraderas,
 y agranda las volutas de recalentamiento; el Barrett lo usa y su bloqueo dura
-unos 4 s.
+unos 4.5 s.
 `muzzleFlash` da a la L96 y al Barrett una llamarada frontal con nucleo
 brillante y un golpe de luz mas intenso sobre el entorno. El Barrett tambien
 lanza chorros laterales por las dos camaras del freno de boca.
@@ -268,7 +270,8 @@ jugador delante, mirandola; con `MOTDRULES` forjar no cuesta puntos.
 `ammo full|infinite` afecta al arma
 equipada, `damage <1-100>` fija su multiplicador de dano (incluye area de
 VORTEX-9 y cadenas ZEUS) y `invincible on|off` permite probar salud y
-resurreccion. No es un sistema de mejora comprable: son ajustes temporales
+resurreccion; `stats on|off` muestra u oculta el
+[HUD de rendimiento](#hud-de-rendimiento). No es un sistema de mejora comprable: son ajustes temporales
 de prueba, reiniciados con la run. Historial con arriba/abajo y `clear`
 para limpiar la salida. Solo individual, disponible con el mismo acceso
 existente a `MOTDRULES`.
@@ -1154,7 +1157,9 @@ Asi una horda solapada en la escalera conserva el descarte por profundidad.
 
 ### HUD de rendimiento
 
-`MOTDRULES` y `?debug` muestran un panel de diagnostico arriba a la derecha,
+`?debug` lo muestra desde el inicio. Con `MOTDRULES` es opcional: empieza
+oculto y la consola lo muestra u oculta con `stats on|off` (o su tarjeta);
+reiniciar lo oculta. Es un panel de diagnostico arriba a la derecha,
 debajo de pausa y separado de las notas de objetivos. Agrupa cadencia, escala
 del perfil con resolucion interna en pixeles, dibujo del ultimo frame y
 recursos registrados por el renderer. Los textos y numeros siguen el idioma

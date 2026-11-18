@@ -319,7 +319,7 @@ export class Weapon {
   }
 
   private tryFire(triggerEdge: boolean): boolean {
-    if (this.weaponState !== 'ready' || this.cooldown > 1e-8) return false;
+    if (this.weaponState !== 'ready' || this.cooldown > 1e-8 || !this.isAimReady()) return false;
 
     if (this.heat.overheated) {
       if (triggerEdge) this.pendingEvents.push({ type: 'overheated' });
@@ -360,6 +360,11 @@ export class Weapon {
       this.reload();
     }
     return true;
+  }
+
+  /** False while an ADS-only weapon is not fully aimed; its trigger is then silently ignored. */
+  private isAimReady(): boolean {
+    return this.definition.requireAdsToFire !== true || this.adsAlpha >= 1;
   }
 
   /** Advances the inspection; the trigger or the aim interrupt it so the shot is never delayed. */

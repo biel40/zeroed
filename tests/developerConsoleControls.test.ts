@@ -78,5 +78,9 @@ describe('visual developer controls', () => {
     expect(run).toHaveBeenLastCalledWith('invincible off', t('dev.invincible.off'));
     click(t('dev.invincible.on'));
     expect(run).toHaveBeenLastCalledWith('invincible on', t('dev.invincible.on'));
+    click(t('dev.stats.on'));
+    expect(run).toHaveBeenLastCalledWith('stats on', t('dev.stats.on'));
+    click(t('dev.stats.off'));
+    expect(run).toHaveBeenLastCalledWith('stats off', t('dev.stats.off'));
   });
 });

@@ -474,6 +474,8 @@ export interface WeaponDefinition {
   readonly boltAction: boolean;
   readonly boltCycleTime: number;
   readonly scoped: boolean;
+  /** Fires only once ADS is fully engaged; hip-fire attempts do nothing. Defaults to false. */
+  readonly requireAdsToFire?: boolean;
   /** Base torso damage per hit (zombies mode). */
   readonly damage: number;
   /** Energy projectile behaviour; absence means classic ballistics. */

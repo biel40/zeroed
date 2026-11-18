@@ -6,7 +6,7 @@ import { t } from '../src/i18n/i18n';
 function actions(): DeveloperConsoleActions {
   return {
     equip: vi.fn(() => true), ring: vi.fn(() => true), refill: vi.fn(() => true),
-    infiniteAmmo: vi.fn(), equipped: () => 'm1911', invincible: vi.fn(), boss: vi.fn(() => true),
+    infiniteAmmo: vi.fn(), equipped: () => 'm1911', invincible: vi.fn(), stats: vi.fn(), boss: vi.fn(() => true),
     forge: vi.fn(() => true),
   };
 }
@@ -28,7 +28,8 @@ describe('developer console commands', () => {
 
   it.each(['damage', 'damage 0', 'damage -1', 'damage Infinity', 'damage NaN',
     'damage 101', 'damage 2 extra', 'weapon constructor', 'ring __proto__',
-    'weapon nope', 'invincible maybe', 'ammo', 'ammo infinite extra', 'help extra', 'boss extra', 'forge extra'])
+    'weapon nope', 'invincible maybe', 'ammo', 'ammo infinite extra', 'help extra', 'boss extra', 'forge extra',
+    'stats', 'stats maybe', 'stats on extra'])
   ('rejects invalid input without side effects: %s', (line) => {
     const commands = new DeveloperConsoleCommands();
     const target = actions();
@@ -38,6 +39,7 @@ describe('developer console commands', () => {
     expect(target.invincible).not.toHaveBeenCalled();
     expect(target.infiniteAmmo).not.toHaveBeenCalled();
     expect(target.boss).not.toHaveBeenCalled();
+    expect(target.stats).not.toHaveBeenCalled();
     expect(commands.damageScale('m1911')).toBe(1);
   });
 
@@ -63,6 +65,9 @@ describe('developer console commands', () => {
     expect(target.refill).toHaveBeenCalledOnce();
     expect(target.infiniteAmmo).toHaveBeenCalledOnce();
     expect(target.invincible).toHaveBeenCalledWith(false);
+    expect(commands.execute('STATS ON', target)).toBe(t('dev.ok'));
+    commands.execute('stats off', target);
+    expect(vi.mocked(target.stats).mock.calls).toEqual([[true], [false]]);
     target.equip = () => false;
     expect(commands.execute('weapon m1911', target)).toBe(t('dev.unavailable'));
   });
