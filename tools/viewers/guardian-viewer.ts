@@ -6,7 +6,7 @@ import { CaptainUssrView, type CaptainUssrSnapshot } from '../../src/zombies/gua
 
 // Development-only visual review of CAPITÁN URSS, independent of the game entry/bundle.
 // /tools/viewers/guardian-viewer.html plays a scripted fight in a loop: perch, roar, leap, march, bash,
-// throw, charge, crash, ground slam, shockwave (with their ground marks), death.
+// throw, charge, crash, ground slam, shockwave, electrical sweep (with their ground marks), death.
 // ?state=bashWindup loops one state where it stands | ?phase=3 (LAST ORDER: arcs, smoke, smouldering suit)
 // | ?slow=4 (four times slower) | ?close=1 (his face) | ?shadows=0 (the reduced-effects profile).
 const params = new URLSearchParams(location.search);
@@ -49,6 +49,9 @@ const FIGHT: readonly Beat[] = [
   { state: 'stalking', seconds: 0.8, heading: Math.PI },
   { state: 'shockwaveWindup', seconds: CAPTAIN_USSR.shockwave.windup, heading: Math.PI },
   { state: 'recovering', seconds: CAPTAIN_USSR.shockwave.recovery + 0.4, heading: Math.PI },
+  { state: 'stalking', seconds: 0.8, heading: Math.PI },
+  { state: 'sweepWindup', seconds: CAPTAIN_USSR.sweep.windup, heading: Math.PI },
+  { state: 'stunned', seconds: CAPTAIN_USSR.sweep.exposedSeconds, heading: Math.PI },
   { state: 'defeated', seconds: 6, heading: Math.PI },
 ];
 const single = params.get('state') as CaptainUssrState | null;
@@ -100,6 +103,9 @@ const boss: Boss = {
 };
 /** The shockwave rolling out after its windup, as the brain would roll it. */
 const wave = { x: 0, z: 0, radius: -1 };
+/** The strip its sweep marks: straight ahead of it, 12 m long; and the strikes so far. */
+const strip = { fromX: 0, fromZ: 0, toX: 0, toZ: 0 };
+let sweepStrikes = 0;
 const follow = new THREE.Vector3();
 let beatIndex = 0;
 let beatTime = 0;
@@ -119,6 +125,7 @@ function script(dt: number): void {
     if (beat.state === 'stunned' && !single) view.crash();
     const before = beats[(beatIndex + beats.length - 1) % beats.length];
     if (beat.state === 'recovering' && before.state === 'shockwaveWindup') Object.assign(wave, boss.position, { radius: 0 });
+    if (before.state === 'sweepWindup' && beat.state !== 'sweepWindup') sweepStrikes++;
   }
   if (wave.radius >= 0) wave.radius = wave.radius + CAPTAIN_USSR.shockwave.speed * dt < CAPTAIN_USSR.shockwave.radius ? wave.radius + CAPTAIN_USSR.shockwave.speed * dt : -1;
   const beat = beats[beatIndex];
@@ -134,6 +141,10 @@ function script(dt: number): void {
   boss.shield = beat.state === 'shieldFlight'
     ? { x: boss.position.x + Math.sin(boss.heading) * reach, z: boss.position.z + Math.cos(boss.heading) * reach }
     : { ...boss.position };
+  Object.assign(strip, {
+    fromX: boss.position.x, fromZ: boss.position.z,
+    toX: boss.position.x + Math.sin(boss.heading) * 12, toZ: boss.position.z + Math.cos(boss.heading) * 12,
+  });
   if (beat.state === 'dormant' && beatTime >= 0.6 && beatTime - dt < 0.6) view.roar();
 }
 
@@ -152,7 +163,7 @@ renderer.setAnimationLoop((now) => {
   previous = now;
   script(dt);
   view.update(dt, boss, 0, LEAP_FROM);
-  telegraphs.update(dt, { ...boss, shockwave: wave }, 0);
+  telegraphs.update(dt, { ...boss, shockwave: wave, sweepMark: boss.state === 'sweepWindup' ? strip : null, sweepStrikes }, 0);
   // The camera follows him at a distance, still orbitable.
   if (!close && boss.state !== 'dormant') {
     follow.set(boss.position.x, 1.2, boss.position.z).sub(controls.target).multiplyScalar(1 - Math.exp(-2.5 * dt));

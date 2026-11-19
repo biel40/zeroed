@@ -33,6 +33,8 @@ const BELLOW_TRAUMA = 0.5;
 /** Camera jolt of a ground slam and of a shockwave leaving its feet, at point blank. */
 const SLAM_TRAUMA = 0.55;
 const SHOCKWAVE_TRAUMA = 0.65;
+/** Camera jolt of a sweep striking its strip, at point blank. */
+const SWEEP_TRAUMA = 0.4;
 /** Camera jolt of a blow that throws the player back. */
 const KNOCKBACK_TRAUMA = 0.35;
 /** Camera jolt of a bolt striking the ground nearby, at point blank. */
@@ -401,6 +403,13 @@ export class ZombiesGuardian {
         case 'shockwave':
           this.strikeGround(event.type === 'shockwave');
           break;
+        case 'sweepWindup':
+          // Each strip counts down on its own, heard from where it runs nearest the player.
+          this.ctx.audio.playSweepCharge(this.cueAt(event.x, this.guardian.groundY + 0.1, event.z), CAPTAIN_USSR.sweep.windup);
+          break;
+        case 'sweep':
+          this.strikeSweep(event.x, event.z);
+          break;
         case 'playerHit':
           this.run.hurtPlayer(event.damage);
           if (event.push) {
@@ -453,6 +462,14 @@ export class ZombiesGuardian {
     this.ctx.audio.playBarrierBreak(at);
     if (shockwave) this.ctx.audio.playElectricArc(at, 1);
     this.shakeNear(shockwave ? SHOCKWAVE_TRAUMA : SLAM_TRAUMA);
+  }
+
+  /** A sweep strikes its strip: the shield's thud at its feet, the discharge where the strip runs nearest (`x`, `z`), felt there. */
+  private strikeSweep(x: number, z: number): void {
+    this.ctx.audio.playGuardianFootfall(this.cueAtBoss(0.2), 1);
+    this.ctx.audio.playElectricArc(this.cueAt(x, this.guardian.groundY + 0.1, z), 1);
+    const distance = Math.hypot(x - this.player.x, z - this.player.z);
+    if (this.player.reachable && distance < TRAUMA_REACH) this.run.shake(SWEEP_TRAUMA * (1 - distance / TRAUMA_REACH));
   }
 
   /** The map answers each change of phase (its lights); 0 once the duel is over. */

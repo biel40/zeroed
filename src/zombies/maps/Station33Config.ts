@@ -16,6 +16,7 @@ import type { WeaponFinish } from '../../weapons/WeaponFinish';
 import { PTRS41_RESKIN, reskinWeapons } from '../../config/weaponReskins';
 import { BARRETT_CHEST_CODE, type CodeWeaponChestPlacement } from './shared/CodeWeaponChestConfig';
 import type { ZombieSpawnPoint } from '../ZombieSpawner';
+import { ZOMBIE_LATE_ROUND_START, type WavePacing } from '../ZombieConfig';
 import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import { entranceSpawn } from './shared/EntrancePassage';
 import type { LockerSize } from './shared/LockerBank';
@@ -302,6 +303,9 @@ export const KOVKA_UPGRADE_SITE = {
 const WEST_WALL_X = VESTIBULE.minX - STATION33_WALL_THICKNESS / 2;
 /** Station 33 presents the Barrett .50 as the Soviet PTRS-41 everywhere: box, chest, HUD and prompts. */
 export const STATION33_WEAPONS = reskinWeapons({ barrett: PTRS41_RESKIN });
+
+/** From the mid-game on, Station 33's waves arrive 8 % closer together; the early rounds keep the shared cadence. */
+export const STATION33_WAVE_PACING: WavePacing = { fromRound: ZOMBIE_LATE_ROUND_START, spawnIntervalScale: 0.92 };
 
 /** Evidence chest against the south wall, beside the holding cell, facing the room. */
 export const STATION33_WEAPON_CHEST: CodeWeaponChestPlacement = {

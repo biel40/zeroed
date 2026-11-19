@@ -1674,6 +1674,26 @@ export class AudioSystem {
   }
 
   /**
+   * A strip of ground charging up before an electrical sweep: a mains buzz
+   * climbing in pitch over `seconds` with a quickening crackle, so the rise
+   * itself counts down to the strike. Heard from where the strip runs
+   * nearest the listener, never too faint to warn.
+   */
+  public playSweepCharge(cue: SpatialCue, seconds: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue, 0.45);
+    const t = audio.ctx.currentTime;
+    const span = Math.max(0.2, seconds);
+    this.sweep(0, 'sawtooth', 70, 280, 0.09, span, t, output);
+    this.sweep(0, 'square', 140, 560, 0.03, span, t, output);
+    for (let crackle = 0; crackle < 7; crackle++) {
+      const at = span * (1 - Math.pow(0.72, crackle + 1));
+      this.tick(at, 2400 + crackle * 450, 0.05 + 0.02 * crackle, 3, 0.03, output);
+    }
+  }
+
+  /**
    * A boss's roar: a deep sawtooth bellow that swells and breaks over a
    * rasping throat; `fury` 0..1 roughens and deepens it. Heard from afar.
    */

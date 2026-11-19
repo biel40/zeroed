@@ -3,6 +3,7 @@ import {
   ROUND_START_DELAY,
   roundConfig,
   type RoundConfig,
+  type WavePacing,
 } from './ZombieConfig';
 
 export type RoundEventType = 'roundStarted' | 'spawnDue' | 'roundComplete';
@@ -33,9 +34,11 @@ export class RoundManager {
   private pendingSpawns = 0;
   private config: RoundConfig = roundConfig(1);
 
+  /** `pacing`: the map's own cadence for its waves, if it has one. */
   constructor(
     private readonly breakDuration = ROUND_BREAK_SECONDS,
     startDelay = ROUND_START_DELAY,
+    private readonly pacing?: WavePacing,
   ) {
     this.timer = startDelay;
   }
@@ -113,7 +116,7 @@ export class RoundManager {
 
   private startRound(): void {
     this.round++;
-    this.config = roundConfig(this.round);
+    this.config = roundConfig(this.round, this.pacing);
     this.pendingSpawns = this.config.zombieCount;
     this.spawnTimer = 0; // first zombie of the round spawns immediately
     this.phase = 'active';

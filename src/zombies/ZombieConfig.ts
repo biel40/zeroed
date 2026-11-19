@@ -331,15 +331,26 @@ export function earlyRoundSpeedMultiplier(round: number): number {
   return [0.65, 0.72, 0.8, 0.88, 0.95][r - 1] ?? 1;
 }
 
-/** Deterministic round scaling; round is 1-based and clamped to >= 1. */
-export function roundConfig(round: number): RoundConfig {
+/**
+ * A map's own cadence for its standard waves: from `fromRound` on, the
+ * interval between spawns is scaled by `spawnIntervalScale`. Counts, the
+ * alive cap and zombie stats stay the shared curve's.
+ */
+export interface WavePacing {
+  readonly fromRound: number;
+  readonly spawnIntervalScale: number;
+}
+
+/** Deterministic round scaling; round is 1-based and clamped to >= 1. `pacing`: the map's cadence, if it has one. */
+export function roundConfig(round: number, pacing?: WavePacing): RoundConfig {
   const r = Math.max(1, Math.floor(round));
+  const intervalScale = pacing && r >= pacing.fromRound ? pacing.spawnIntervalScale : 1;
   return {
     // ~6 → 9 → 12 → 19 at round 5 → ~45 at round 10, keeps growing.
     zombieCount: Math.round(6 * Math.pow(1.22, r - 1) + (r - 1) * 1.6),
     maxAlive: MAX_ALIVE,
     // 2.1 s at round 1, shrinking ~10 %/round, floored so late rounds stay fair.
-    spawnInterval: Math.max(0.35, 2.1 * Math.pow(0.9, r - 1)),
+    spawnInterval: Math.max(0.35, 2.1 * Math.pow(0.9, r - 1)) * intervalScale,
     // Preserve rounds 1–5; add 35 HP at R6, then another 35 each round.
     healthMultiplier: 1 + 3 * (1 - Math.exp(-(r - 1) / 12))
       + Math.max(0, r - ZOMBIE_LATE_ROUND_START + 1) * ZOMBIE_LATE_ROUND_HP_STEP / ZOMBIE_BASE_HP,

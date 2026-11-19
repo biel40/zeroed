@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { CAPTAIN_USSR, type CaptainUssrField } from '../src/zombies/guardians/CaptainUssrBrain';
 import { CaptainUssrTelegraphs, type CaptainUssrTelegraphSnapshot } from '../src/zombies/guardians/CaptainUssrTelegraphs';
 import { GUARDIAN_DISCHARGES, GuardianDuelDischarges } from '../src/zombies/guardians/GuardianDuelDischarges';
@@ -58,7 +59,8 @@ describe('Guardian duel discharges', () => {
 
 describe('Captain USSR telegraphs', () => {
   const boss = (overrides: Partial<CaptainUssrTelegraphSnapshot> = {}): CaptainUssrTelegraphSnapshot => ({
-    state: 'stalking', stateProgress: 0, position: { x: 15, z: 15 }, heading: 0, shockwave: { x: 0, z: 0, radius: -1 }, ...overrides,
+    state: 'stalking', stateProgress: 0, position: { x: 15, z: 15 }, heading: 0, shockwave: { x: 0, z: 0, radius: -1 },
+    sweepMark: null, sweepStrikes: 0, ...overrides,
   });
   const visibleMarks = (telegraphs: CaptainUssrTelegraphs): number => telegraphs.group.children.filter((mark) => mark.visible).length;
 
@@ -92,5 +94,68 @@ describe('Captain USSR telegraphs', () => {
     expect(front.scale.x).toBeCloseTo(4);
     telegraphs.update(DT, boss({ state: 'recovering' }), GROUND);
     expect(front.visible).toBe(false);
+  });
+
+  /** East–west across the yard, through (15, 20). */
+  const ACROSS = { fromX: 0, fromZ: 20, toX: 30, toZ: 20 };
+  /** North–south along x = 12. */
+  const ALONG = { fromX: 12, fromZ: 0, toX: 12, toZ: 30 };
+  const sweepMarks = (telegraphs: CaptainUssrTelegraphs): { strip: THREE.Object3D; flash: THREE.Object3D } => {
+    const [, , , strip, flash] = telegraphs.group.children;
+    return { strip, flash };
+  };
+
+  it('lays a marked sweep strip over its whole length, in its own shape and colour, filling up to the strike', () => {
+    const telegraphs = new CaptainUssrTelegraphs(CAPTAIN_USSR);
+    const { strip } = sweepMarks(telegraphs);
+    telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0.2, sweepMark: ACROSS }), GROUND);
+    expect(strip.visible).toBe(true);
+    expect(strip.position.x).toBeCloseTo(15);
+    expect(strip.position.z).toBeCloseTo(20);
+    expect(strip.position.y).toBeGreaterThan(GROUND);
+    expect(strip.rotation.y).toBeCloseTo(Math.PI / 2);
+    expect(strip.scale.z).toBeCloseTo(30);
+    // A band and its two rails, the full strip's width wide.
+    const box = new THREE.Box3().setFromObject(strip);
+    expect(box.max.z - box.min.z).toBeCloseTo(CAPTAIN_USSR.sweep.width);
+    const meshes = strip.children as THREE.Mesh[];
+    expect(meshes.length).toBeGreaterThanOrEqual(3);
+    const cone = telegraphs.group.children[0] as THREE.Mesh;
+    for (const mesh of meshes) {
+      expect((mesh.material as THREE.MeshBasicMaterial).color.getHex()).not.toBe((cone.material as THREE.MeshBasicMaterial).color.getHex());
+    }
+    const charge = meshes[meshes.length - 1];
+    const early = charge.scale.x;
+    telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0.9, sweepMark: ACROSS }), GROUND);
+    expect(charge.scale.x).toBeGreaterThan(early);
+  });
+
+  it('flashes the strip that struck while the next one of the chain is marked across it', () => {
+    const telegraphs = new CaptainUssrTelegraphs(CAPTAIN_USSR);
+    const { strip, flash } = sweepMarks(telegraphs);
+    telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0.98, sweepMark: ACROSS }), GROUND);
+    expect(flash.visible).toBe(false);
+    telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0, sweepMark: ALONG, sweepStrikes: 1 }), GROUND);
+    expect(flash.visible).toBe(true);
+    expect(flash.position.z).toBeCloseTo(20);
+    expect(flash.rotation.y).toBeCloseTo(Math.PI / 2);
+    expect(strip.visible).toBe(true);
+    expect(strip.position.x).toBeCloseTo(12);
+    for (let frame = 0; frame < 10; frame++) telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0.5, sweepMark: ALONG, sweepStrikes: 1 }), GROUND);
+    expect(flash.visible).toBe(false);
+  });
+
+  it('clears every sweep mark and flash the moment it falls, and on a reset', () => {
+    const telegraphs = new CaptainUssrTelegraphs(CAPTAIN_USSR);
+    const { strip, flash } = sweepMarks(telegraphs);
+    telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0.98, sweepMark: ACROSS }), GROUND);
+    telegraphs.update(DT, boss({ state: 'stunned', sweepStrikes: 1 }), GROUND);
+    expect(flash.visible).toBe(true);
+    telegraphs.update(DT, boss({ state: 'defeated', sweepStrikes: 1 }), GROUND);
+    expect(strip.visible).toBe(false);
+    expect(flash.visible).toBe(false);
+    telegraphs.update(DT, boss({ state: 'sweepWindup', stateProgress: 0.5, sweepMark: ALONG, sweepStrikes: 1 }), GROUND);
+    telegraphs.reset();
+    expect(visibleMarks(telegraphs)).toBe(0);
   });
 });

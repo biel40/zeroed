@@ -19,7 +19,7 @@ export interface ChoreographyInput {
   readonly perched: boolean;
   /** The current recovery follows a bash: its strike plays first. */
   readonly followThrough: boolean;
-  /** The current recovery follows a ground slam or a shockwave: the shield driven into the ground plays first. */
+  /** The current recovery (or the stun after a sweep) follows the shield driven into the ground: its impact plays first. */
   readonly slammed: boolean;
   /** The current stun follows a crash into a solid. */
   readonly crashed: boolean;
@@ -79,6 +79,9 @@ export function choreograph(input: ChoreographyInput, out: Pose): number {
     case 'shockwaveWindup':
       heave(out, input, 1);
       break;
+    case 'sweepWindup':
+      heave(out, input, 0.5);
+      break;
     case 'throwWindup':
       cockThrow(out, input);
       break;
@@ -94,6 +97,7 @@ export function choreograph(input: ChoreographyInput, out: Pose): number {
       break;
     case 'stunned':
       blendTowards(out, 1 - smooth((input.progress - 0.7) / 0.3), input.crashed ? floored : winded, input);
+      if (input.slammed && input.stateTime < IMPACT_SECONDS) agility = impact(out, input);
       break;
     case 'enraged':
       agility = enrage(out, input);
@@ -229,7 +233,7 @@ function lunge(out: Pose): void {
 }
 
 /**
- * The windup of a slam (`depth` 0) or a shockwave (1): it rears back, the
+ * The windup of a slam (`depth` 0), a sweep (0.5) or a shockwave (1): it rears back, the
  * shield heaved overhead face up in its arm and the free fist raised with
  * it, sinking lower on its legs for the shockwave.
  */

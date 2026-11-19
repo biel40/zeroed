@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { t } from '../i18n/i18n';
 import { actionKey, doorPrompt, wallBuyPrompt, weaponCaseLocked, weaponCasePrompt } from '../ui/InteractionPrompts';
-import { ZOMBIE_MAPS, type ZombieMapId } from '../config/zombieMaps';
+import { getZombieMapWavePacing, ZOMBIE_MAPS, type ZombieMapId } from '../config/zombieMaps';
 import type { MusicTrackName } from '../audio/MusicManager';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../config/weapons';
 import { PlayerEconomy } from '../game/PlayerEconomy';
@@ -33,6 +33,8 @@ import {
   ZEUS_MACHINE_CHARGE_REACH,
   ZEUS_MACHINE_CHARGE_SECONDS,
   ZOMBIES_RESERVE_AMMO,
+  ROUND_BREAK_SECONDS,
+  ROUND_START_DELAY,
   roundConfig,
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
@@ -137,7 +139,7 @@ export class ZombiesMode implements GameMode {
   private crystalRecoveries: ZombiesCrystalRecovery[] = [];
   /** The map's evacuation easter egg; null on maps without one. */
   private evacuation: ZombiesEvacuation | null = null;
-  private readonly rounds = new RoundManager();
+  private readonly rounds: RoundManager;
   private readonly health = new PlayerHealth(
     PLAYER_MAX_HP,
     PLAYER_HIT_INVULN,
@@ -183,6 +185,7 @@ export class ZombiesMode implements GameMode {
   constructor(readonly mapId: ZombieMapId = 'burned-mansion') {
     this.weaponIds = [...ZOMBIES_WEAPON_PRELOAD, ...ZOMBIE_MAPS[mapId].exclusiveWeapons];
     this.weaponDefinitions = ZOMBIE_MAPS[mapId].weapons;
+    this.rounds = new RoundManager(ROUND_BREAK_SECONDS, ROUND_START_DELAY, getZombieMapWavePacing(mapId));
   }
 
   /** The map's gameplay bed; Game starts it once the match begins. */

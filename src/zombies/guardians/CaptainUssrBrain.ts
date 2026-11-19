@@ -83,6 +83,19 @@ export interface CaptainUssrTuning {
     readonly band: number; readonly damage: number; readonly knockback: number; readonly recovery: number;
     readonly chance: PhaseValues;
   };
+  /**
+   * The electrical sweep: the shield driven into the ground sends a current
+   * along a strip, `width` wide and up to `length` long (cut at the field's
+   * bounds), laid through where the player stands from `minRange` on. It
+   * strikes once, `windup` seconds after the strip is marked, everyone in it.
+   * `followUps` more strips follow, each across the last one through where
+   * the player stood as it struck; after the last it stays `exposedSeconds`
+   * stunned with its guard down.
+   */
+  readonly sweep: {
+    readonly minRange: number; readonly windup: number; readonly length: number; readonly width: number;
+    readonly damage: number; readonly chance: PhaseValues; readonly followUps: PhaseValues; readonly exposedSeconds: number;
+  };
 }
 
 export const CAPTAIN_USSR: CaptainUssrTuning = {
@@ -116,23 +129,29 @@ export const CAPTAIN_USSR: CaptainUssrTuning = {
     triggerRange: 6, windup: 1.15, speed: 8, radius: 9, band: 0.9,
     damage: 30, knockback: 7, recovery: 1.0, chance: [0, 0, 0.35],
   },
+  // Rolled after a charge that did not come: about one attack in four at range from phase 2.
+  sweep: {
+    minRange: 4, windup: 1.2, length: 24, width: 2.8, damage: 35,
+    chance: [0, 0.5, 0.55], followUps: [0, 0, 1], exposedSeconds: 2.0,
+  },
 };
 
 /**
  * `dormant` until awakened, `arriving` during its leap, then it `stalks`
  * the player between attacks: a bash, a shield throw (`throwWindup`, then
  * `shieldFlight` until it catches the shield) or a charge that ends
- * `stunned`. From phase 2 it also slams the ground (`slamWindup`), and in
- * phase 3 it sends out a shockwave (`shockwaveWindup`). Every attack ends
- * `recovering` or `stunned` before the next. Each new phase stops it
+ * `stunned`. From phase 2 it also slams the ground (`slamWindup`) and
+ * sweeps a strip with current (`sweepWindup`, twice in a row in phase 3),
+ * and in phase 3 it sends out a shockwave (`shockwaveWindup`). Every attack
+ * ends `recovering` or `stunned` before the next. Each new phase stops it
  * `enraged`, screaming with its guard down.
  */
 export type CaptainUssrState =
   | 'dormant' | 'arriving' | 'stalking' | 'bashWindup' | 'throwWindup' | 'shieldFlight'
-  | 'chargeWindup' | 'charging' | 'slamWindup' | 'shockwaveWindup'
+  | 'chargeWindup' | 'charging' | 'slamWindup' | 'shockwaveWindup' | 'sweepWindup'
   | 'stunned' | 'recovering' | 'enraged' | 'defeated';
 
-export type CaptainUssrAttack = 'bash' | 'shield' | 'charge' | 'slam' | 'shockwave';
+export type CaptainUssrAttack = 'bash' | 'shield' | 'charge' | 'slam' | 'shockwave' | 'sweep';
 export type CaptainUssrHitPart = 'head' | 'torso' | 'shield';
 /** What a hit did: nothing (not fighting), stopped by the shield, damage, or the last blow. */
 export type CaptainUssrHitResult = 'ignored' | 'blocked' | 'hurt' | 'killed';
@@ -150,6 +169,9 @@ export type CaptainUssrEvent =
   | { readonly type: 'slam' }
   | { readonly type: 'shockwaveWindup' }
   | { readonly type: 'shockwave' }
+  /** A strip is marked (`sweepWindup`) or struck (`sweep`); (`x`, `z`) is its point nearest the player, for its sound. */
+  | { readonly type: 'sweepWindup'; readonly x: number; readonly z: number }
+  | { readonly type: 'sweep'; readonly x: number; readonly z: number }
   /** `push`: the velocity (m/s, on the ground plane) the blow throws the player back with, if any. */
   | { readonly type: 'playerHit'; readonly attack: CaptainUssrAttack; readonly damage: number; readonly push?: { readonly x: number; readonly z: number } }
   | { readonly type: 'defeated' };
@@ -169,16 +191,24 @@ export interface CaptainUssrShockwave {
   readonly radius: number;
 }
 
+/** A strip of the electrical sweep on the ground: its centre line from (`fromX`, `fromZ`) to (`toX`, `toZ`), `sweep.width` wide. */
+export interface CaptainUssrStrip {
+  readonly fromX: number;
+  readonly fromZ: number;
+  readonly toX: number;
+  readonly toZ: number;
+}
+
 /** States that last a set time; `stateProgress` runs 0..1 through them. */
 const TIMED: ReadonlySet<CaptainUssrState> = new Set([
-  'arriving', 'bashWindup', 'throwWindup', 'chargeWindup', 'slamWindup', 'shockwaveWindup', 'stunned', 'recovering', 'enraged',
+  'arriving', 'bashWindup', 'throwWindup', 'chargeWindup', 'slamWindup', 'shockwaveWindup', 'sweepWindup', 'stunned', 'recovering', 'enraged',
 ]);
 /** States a fit of rage can break into; it waits out a shield in the air, a charge under way and a stun. */
 const RAGE_BREAKS_INTO: ReadonlySet<CaptainUssrState> = new Set([
-  'stalking', 'bashWindup', 'throwWindup', 'chargeWindup', 'slamWindup', 'shockwaveWindup', 'recovering',
+  'stalking', 'bashWindup', 'throwWindup', 'chargeWindup', 'slamWindup', 'shockwaveWindup', 'sweepWindup', 'recovering',
 ]);
-/** Its shield is lifted off its front: thrown, heaved overhead for a slam or a shockwave, or let fall. */
-const GUARD_DOWN: ReadonlySet<CaptainUssrState> = new Set(['throwWindup', 'slamWindup', 'shockwaveWindup', 'stunned', 'enraged']);
+/** Its shield is lifted off its front: thrown, heaved overhead for a slam, a shockwave or a sweep, or let fall. */
+const GUARD_DOWN: ReadonlySet<CaptainUssrState> = new Set(['throwWindup', 'slamWindup', 'shockwaveWindup', 'sweepWindup', 'stunned', 'enraged']);
 
 /**
  * CAPITÁN URSS, the zombified Soviet super-soldier guarding an extraction.
@@ -215,6 +245,12 @@ export class CaptainUssrBrain {
   private lastAttack: CaptainUssrAttack | null = null;
   private readonly wave = { x: 0, z: 0, radius: -1 };
   private waveLanded = false;
+  /** The strip about to be struck, while `stripMarked`. */
+  private readonly strip = { fromX: 0, fromZ: 0, toX: 0, toZ: 0 };
+  private stripMarked = false;
+  /** Strips still to follow the marked one. */
+  private sweepsLeft = 0;
+  private strikes = 0;
 
   public constructor(
     private readonly tuning: CaptainUssrTuning,
@@ -276,6 +312,16 @@ export class CaptainUssrBrain {
     return this.wave;
   }
 
+  /** The strip marked for its sweep and about to be struck; null when none is. */
+  public get sweepMark(): CaptainUssrStrip | null {
+    return this.stripMarked ? this.strip : null;
+  }
+
+  /** Strips struck since it was last put to sleep: a change means one just struck. */
+  public get sweepStrikes(): number {
+    return this.strikes;
+  }
+
   /** Radius of its body, metres. */
   public get radius(): number {
     return this.tuning.radius;
@@ -314,6 +360,7 @@ export class CaptainUssrBrain {
     if (this.rageDue && RAGE_BREAKS_INTO.has(this.current)) {
       this.rageDue = false;
       this.chargesLeft = 0;
+      this.clearSweep();
       this.enter('enraged', this.tuning.rage.seconds);
       return;
     }
@@ -354,6 +401,11 @@ export class CaptainUssrBrain {
       case 'shockwaveWindup':
         this.turnTowards(player, step);
         if (this.stateTime >= this.stateDuration) this.releaseShockwave();
+        return;
+      case 'sweepWindup':
+        // The strip stays where it was marked: only the body turns.
+        this.turnTowards(player, step);
+        if (this.stateTime >= this.stateDuration) this.strikeSweep(player);
         return;
       case 'stunned':
       case 'recovering':
@@ -430,6 +482,8 @@ export class CaptainUssrBrain {
     this.lastAttack = null;
     this.wave.radius = -1;
     this.waveLanded = false;
+    this.clearSweep();
+    this.strikes = 0;
     this.syncShield();
     this.pendingEvents.length = 0;
   }
@@ -442,6 +496,7 @@ export class CaptainUssrBrain {
     if (this.hp > 0) return 'hurt';
     this.current = 'defeated';
     this.wave.radius = -1;
+    this.clearSweep();
     this.holdingShield = true;
     this.syncShield();
     this.pendingEvents.push({ type: 'defeated' });
@@ -466,16 +521,17 @@ export class CaptainUssrBrain {
     }
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.cooldown > 0 || !player.reachable) return;
-    this.chooseAttack(distance);
+    this.chooseAttack(distance, player);
   }
 
   /**
    * The phase's attack for the player's distance: the shockwave and the slam
    * first when the phase has them (never twice in a row), else the bash up
-   * close, a charge or a throw further out.
+   * close, a charge, a sweep (never twice in a row, never over a rolling
+   * shockwave) or a throw further out.
    */
-  private chooseAttack(distance: number): void {
-    const { bash, shieldThrow, charge, slam, shockwave } = this.tuning;
+  private chooseAttack(distance: number, player: CaptainUssrTarget): void {
+    const { bash, shieldThrow, charge, slam, shockwave, sweep } = this.tuning;
     const phase = this.currentPhase - 1;
     if (distance <= shockwave.triggerRange && this.lastAttack !== 'shockwave' && this.rolls(shockwave.chance[phase])) {
       this.beginAttack('shockwave', 'shockwaveWindup', shockwave.windup);
@@ -496,6 +552,12 @@ export class CaptainUssrBrain {
       this.chargesLeft = charge.followUps[phase];
       this.beginAttack('charge', 'chargeWindup', charge.windup);
       this.pendingEvents.push({ type: 'chargeWindup' });
+      return;
+    }
+    if (distance >= sweep.minRange && this.lastAttack !== 'sweep' && this.wave.radius < 0 && this.rolls(sweep.chance[phase])) {
+      this.sweepsLeft = sweep.followUps[phase];
+      this.lastAttack = 'sweep';
+      this.markSweep(player, player.x - this.pos.x, player.z - this.pos.z);
       return;
     }
     if (distance >= shieldThrow.minRange && distance <= shieldThrow.range) {
@@ -554,6 +616,91 @@ export class CaptainUssrBrain {
       }
     }
     if (this.wave.radius >= shockwave.radius) this.wave.radius = -1;
+  }
+
+  /**
+   * Marks a strip through where the player stands, along (`dirX`, `dirZ`),
+   * cut at the field's bounds, and winds up to strike it.
+   */
+  private markSweep(player: CaptainUssrTarget, dirX: number, dirZ: number): void {
+    const { bounds } = this.field;
+    const { sweep } = this.tuning;
+    let length = Math.hypot(dirX, dirZ);
+    if (length < 1e-6) {
+      dirX = Math.sin(this.yaw);
+      dirZ = Math.cos(this.yaw);
+      length = 1;
+    }
+    const x = Math.min(bounds.maxX, Math.max(bounds.minX, player.x));
+    const z = Math.min(bounds.maxZ, Math.max(bounds.minZ, player.z));
+    const unitX = dirX / length;
+    const unitZ = dirZ / length;
+    const ahead = this.reachInBounds(x, z, unitX, unitZ, sweep.length / 2);
+    const behind = this.reachInBounds(x, z, -unitX, -unitZ, sweep.length / 2);
+    this.strip.fromX = x - unitX * behind;
+    this.strip.fromZ = z - unitZ * behind;
+    this.strip.toX = x + unitX * ahead;
+    this.strip.toZ = z + unitZ * ahead;
+    this.stripMarked = true;
+    this.enter('sweepWindup', sweep.windup);
+    this.pushSweepEvent('sweepWindup', player);
+  }
+
+  /**
+   * The current runs along the marked strip: whoever stands in it is struck,
+   * once. A follow-up is marked across it through where the player stands;
+   * after the last, it is left stunned and open.
+   */
+  private strikeSweep(player: CaptainUssrTarget): void {
+    const { sweep } = this.tuning;
+    this.strikes++;
+    this.pushSweepEvent('sweep', player);
+    if (player.reachable && this.inStrip(player.x, player.z)) {
+      this.pendingEvents.push({ type: 'playerHit', attack: 'sweep', damage: sweep.damage });
+    }
+    this.stripMarked = false;
+    if (this.sweepsLeft > 0) {
+      this.sweepsLeft--;
+      this.markSweep(player, -(this.strip.toZ - this.strip.fromZ), this.strip.toX - this.strip.fromX);
+      return;
+    }
+    this.finishAttack('stunned', sweep.exposedSeconds);
+  }
+
+  private clearSweep(): void {
+    this.stripMarked = false;
+    this.sweepsLeft = 0;
+  }
+
+  /** (`x`, `z`) lies on the marked strip: between its ends and within half its width of its centre line. */
+  private inStrip(x: number, z: number): boolean {
+    const { fromX, fromZ, toX, toZ } = this.strip;
+    const length = Math.hypot(toX - fromX, toZ - fromZ);
+    if (length < 1e-6) return false;
+    const along = ((x - fromX) * (toX - fromX) + (z - fromZ) * (toZ - fromZ)) / length;
+    const across = Math.abs((x - fromX) * (toZ - fromZ) - (z - fromZ) * (toX - fromX)) / length;
+    return along >= 0 && along <= length && across <= this.tuning.sweep.width / 2;
+  }
+
+  /** A sweep event at the marked strip's point nearest the player. */
+  private pushSweepEvent(type: 'sweepWindup' | 'sweep', player: CaptainUssrTarget): void {
+    const { fromX, fromZ, toX, toZ } = this.strip;
+    const dx = toX - fromX;
+    const dz = toZ - fromZ;
+    const lengthSq = dx * dx + dz * dz;
+    const t = lengthSq > 1e-12 ? Math.min(1, Math.max(0, ((player.x - fromX) * dx + (player.z - fromZ) * dz) / lengthSq)) : 0;
+    this.pendingEvents.push({ type, x: fromX + dx * t, z: fromZ + dz * t });
+  }
+
+  /** How far from (`x`, `z`) inside the bounds one can go along the unit (`dirX`, `dirZ`), up to `limit`. */
+  private reachInBounds(x: number, z: number, dirX: number, dirZ: number, limit: number): number {
+    const { bounds } = this.field;
+    let reach = limit;
+    if (dirX > 1e-9) reach = Math.min(reach, (bounds.maxX - x) / dirX);
+    else if (dirX < -1e-9) reach = Math.min(reach, (bounds.minX - x) / dirX);
+    if (dirZ > 1e-9) reach = Math.min(reach, (bounds.maxZ - z) / dirZ);
+    else if (dirZ < -1e-9) reach = Math.min(reach, (bounds.minZ - z) / dirZ);
+    return Math.max(0, reach);
   }
 
   /** A blow that throws the player back along (`dx`, `dz`) from it at `knockback` m/s; straight ahead of it when on top of it. */

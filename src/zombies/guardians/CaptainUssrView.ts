@@ -81,7 +81,8 @@ function surface(kind: HitTarget['surface']): HitTarget {
 }
 
 function loadsAttack(state: CaptainUssrState): boolean {
-  return state === 'bashWindup' || state === 'throwWindup' || state === 'chargeWindup' || state === 'slamWindup' || state === 'shockwaveWindup';
+  return state === 'bashWindup' || state === 'throwWindup' || state === 'chargeWindup'
+    || state === 'slamWindup' || state === 'shockwaveWindup' || state === 'sweepWindup';
 }
 
 /**
@@ -360,7 +361,9 @@ export class CaptainUssrView {
     const to = boss.state;
     if (to !== 'dormant') this.perched = false;
     this.followThrough = from === 'bashWindup' && to === 'recovering';
-    this.slammed = (from === 'slamWindup' || from === 'shockwaveWindup') && to === 'recovering';
+    // A sweep's last strike leaves it stunned rather than recovering.
+    this.slammed = ((from === 'slamWindup' || from === 'shockwaveWindup') && to === 'recovering')
+      || (from === 'sweepWindup' && to === 'stunned');
     // The shield strikes the ground before it: snow thrown up from where it hit.
     if (this.slammed) this.burst(this.rig.shield.getWorldPosition(this.point).setY(this.rig.root.position.y + 0.05), 12, PUFF_STYLES.dust, 2.6, 1.3);
     if (from === 'stunned') this.crashed = false;

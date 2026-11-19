@@ -111,6 +111,11 @@ sufra tirones de compilacion de shaders.
   arsenal; prompts, `MysteryBoxView` y `CodeWeaponChest` lo reciben en vez de
   leer `WEAPON_DEFINITIONS`. Sin catalogo se usan las definiciones compartidas.
 
+- `ZombieMapDefinition.wavePacing` (`WavePacing`, opcional) ajusta la cadencia
+  de las rondas normales del mapa: `ZombiesMode` lo pasa a su `RoundManager`,
+  que lo aplica con `roundConfig`. Solo cambia el intervalo entre apariciones;
+  recuento, tope de vivos y estadisticas siguen la curva compartida.
+
 - `PlayerStance` concentra las posturas, alturas y multiplicadores de movimiento
   sin depender de Three.js. `PlayerController.rig` conserva el ancla del ojo de
   pie usada por mapas, plantas y navegacion; la camara y el volumen de colision

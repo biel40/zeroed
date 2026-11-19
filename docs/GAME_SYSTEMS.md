@@ -334,7 +334,10 @@ existente a `MOTDRULES`.
   walker, asi que el cuerpo sigue en el mismo material y draw call; un alpha test
   bajo recorta rasgaduras y encaje sin cortar el fundido de muerte.
 - Las rondas 1–5 aplican una rampa de velocidad progresiva (65 %, 72 %, 80 %,
-  88 % y 95 %) antes de alcanzar el ritmo normal en la ronda 6. Cada aparición
+  88 % y 95 %) antes de alcanzar el ritmo normal en la ronda 6. Desde esa
+  ronda, Station 33 acerca un 8 % las apariciones de cada ronda normal
+  (`STATION33_WAVE_PACING`); el resto de mapas y el cooperativo mantienen la
+  cadencia compartida. Cada aparición
   recibe velocidad, escala y una fase de marcha independientes para evitar que
   la horda avance como un bloque sincronizado.
 - El melee valida distancia XZ, diferencia vertical, linea de ataque, ventana de
@@ -763,17 +766,23 @@ existente a `MOTDRULES`.
   jugador que se aleja y recupera antes; añade el golpe al suelo (alza el
   escudo y lo clava delante: daña y empuja solo dentro de un cono marcado en
   rojo en el suelo, que deja de seguir al jugador al final de la carga),
-  pequeños grupos de zombis con tope estricto de vivos que nunca llegan en
+  el barrido electrico (marca en azul una franja entre dos raíles que cruza
+  el patio por donde esta el jugador, suena una carga que sube de tono y
+  1,2 s despues la descarga daña una vez a quien siga dentro; tras el
+  barrido queda aturdido y expuesto), pequeños grupos de zombis con tope estricto de vivos que nunca llegan en
   mitad de un ataque (`GuardianReinforcements`), luz de emergencia roja
   (`ArenaEvacuationGuardian.showDuelPhase`), sirena y aviso distorsionado por
   los altavoces del patio y chispas y humo en sus bordes. Fase 3 (ULTIMA
   ORDEN, 35 %): carga doble con una breve pausa legible entre cargas (si la
-  primera choca, no hay segunda), onda expansiva circular cuyo alcance se
+  primera choca, no hay segunda), barrido doble (la segunda franja, con su
+  propia marca y aviso, cruza la primera por donde estaba el jugador al caer
+  esta; la ventana de castigo llega tras la segunda), onda expansiva circular cuyo alcance se
   marca en el suelo (se evita quedando fuera o saltandola), nunca dos ondas
-  ni dos golpes al suelo seguidos, la onda se extingue antes de su siguiente
-  ataque, la luz parpadea de forma controlada, suena la bocina y caen
+  ni dos golpes al suelo o barridos seguidos, la onda se extingue antes de su
+  siguiente ataque y ningun barrido empieza con ella activa, la luz parpadea de forma controlada, suena la bocina y caen
   descargas electricas en los bordes del patio. Mientras alza el escudo para
-  el golpe al suelo o la onda, baja la guardia. Al cruzar cada fase, sin
+  el golpe al suelo, la onda o el barrido, baja la guardia. Su muerte, un
+  ataque de ira o reiniciar descartan cualquier barrido marcado. Al cruzar cada fase, sin
   cartel: al cruzarlas entra en un ataque de ira (`enraged`), se encorva
   temblando, grita al cielo agitando el puno y con las venas y los ojos
   encendidos, con la guardia baja. Si estaba con el escudo en el aire, en

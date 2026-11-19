@@ -6,7 +6,8 @@ import { BurnedMansionArena } from '../zombies/maps/BurnedMansionArena';
 import { DieKathedraleArena } from '../zombies/maps/DieKathedraleArena';
 import { Station33Arena } from '../zombies/maps/Station33Arena';
 import type { ZombieArena } from '../zombies/maps/ZombieArena';
-import { STATION33_WEAPONS } from '../zombies/maps/Station33Config';
+import { STATION33_WAVE_PACING, STATION33_WEAPONS } from '../zombies/maps/Station33Config';
+import type { WavePacing } from '../zombies/ZombieConfig';
 import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { ProductId } from './products';
 import { WEAPON_DEFINITIONS } from './weapons';
@@ -30,6 +31,8 @@ export interface ZombieMapDefinition {
   readonly exclusiveWeapons: readonly WeaponId[];
   /** How this map names and draws every weapon; gameplay always stays the shared definition's. */
   readonly weapons: WeaponCatalog;
+  /** The map's own cadence for its standard waves; omitted keeps the shared curve. */
+  readonly wavePacing?: WavePacing;
   readonly createArena: ZombieArenaFactory;
 }
 
@@ -52,6 +55,7 @@ export const ZOMBIE_MAPS = {
     coop: false,
     exclusiveWeapons: ['fakel'],
     weapons: STATION33_WEAPONS,
+    wavePacing: STATION33_WAVE_PACING,
     createArena: (scene, profile) => new Station33Arena(scene, profile),
   },
   'die-kathedrale': {
@@ -89,6 +93,12 @@ export function canAccessZombieMap(
 export function getZombieMapProduct(mapId: ZombieMapId): ProductId | undefined {
   const map: ZombieMapDefinition = ZOMBIE_MAPS[mapId];
   return map.product;
+}
+
+/** The map's cadence for its standard waves; undefined when it keeps the shared curve. */
+export function getZombieMapWavePacing(mapId: ZombieMapId): WavePacing | undefined {
+  const map: ZombieMapDefinition = ZOMBIE_MAPS[mapId];
+  return map.wavePacing;
 }
 
 export function getZombieMapDefinition(
