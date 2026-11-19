@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { COOP_ZOMBIE_MAP_ID, getZombieMapProduct, isZombieMapId, ZOMBIE_MAPS } from '../src/config/zombieMaps';
 import type { EntitlementProvider } from '../src/entitlements/EntitlementProvider';
+import { ca } from '../src/i18n/ca';
+import { en } from '../src/i18n/en';
+import { es } from '../src/i18n/es';
 import { HUD } from '../src/ui/HUD';
 
 const allProducts: EntitlementProvider = { owns: (): boolean => true };
@@ -10,6 +13,7 @@ const noProducts: EntitlementProvider = { owns: (): boolean => false };
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+const mapRelease = readFileSync(new URL('../src/config/mapRelease.ts', import.meta.url), 'utf8');
 
 class FakeElement {
   private readonly classes = new Set<string>();
@@ -26,6 +30,7 @@ class FakeElement {
   };
   readonly dataset: Record<string, string> = {};
   readonly style = { setProperty: () => undefined };
+  public disabled = false;
   onclick: (() => void) | null = null;
   public onsubmit: ((event: { preventDefault: () => void }) => void) | null = null;
   public value = '';
@@ -95,11 +100,36 @@ describe('Zombies map selection flow', () => {
   it('lists Burned Mansion for everyone and both premium maps as single-player maps', () => {
     expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true });
     expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, product: 'map.station-33', coop: false });
-    expect(ZOMBIE_MAPS['die-kathedrale']).toMatchObject({ visible: true, product: 'map.die-kathedrale', coop: false });
+    expect(ZOMBIE_MAPS['die-kathedrale']).toMatchObject({ visible: true, workInProgress: true, product: 'map.die-kathedrale', coop: false });
+    expect(ZOMBIE_MAPS['burned-mansion']).not.toHaveProperty('workInProgress');
+    expect(ZOMBIE_MAPS['station-33']).not.toHaveProperty('workInProgress');
     expect(getZombieMapProduct('die-kathedrale')).toBe('map.die-kathedrale');
     expect(COOP_ZOMBIE_MAP_ID).toBe('burned-mansion');
     expect(isZombieMapId('station-33')).toBe(true);
     expect(isZombieMapId('classic')).toBe(false);
+  });
+
+  it('labels the WIP padlock WIP in every language and only lets dev servers opt in', () => {
+    expect(html.match(/data-map-lock-label/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    for (const strings of [en, es, ca]) expect(strings['map.wip']).toBe('WIP');
+    expect(css).toMatch(/.map-card:disabled {[^}]*cursor: not-allowed;/);
+    // `vite build` replaces DEV with false, so no production build can release a WIP map.
+    expect(mapRelease).toMatch(/WIP_MAPS_ENABLED: boolean = import.meta.env.DEV && import.meta.env.VITE_WIP_MAPS === 'true'/);
+  });
+
+  it('releases WIP maps on a dev server only with VITE_WIP_MAPS=true', async () => {
+    try {
+      for (const [value, expected] of [[undefined, false], ['false', false], ['true', true]] as const) {
+        vi.resetModules();
+        if (value === undefined) vi.unstubAllEnvs();
+        else vi.stubEnv('VITE_WIP_MAPS', value);
+        const { WIP_MAPS_ENABLED } = await import('../src/config/mapRelease');
+        expect(WIP_MAPS_ENABLED).toBe(expected);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   it('keeps the map picker above the fixed game canvas', () => {
@@ -116,6 +146,7 @@ describe('Zombies map selection flow', () => {
       element.slots['[data-map-account]'] = new FakeElement();
       element.slots['[data-map-players]'] = new FakeElement();
       element.slots['[data-map-action]'] = new FakeElement();
+      element.slots['[data-map-lock-label]'] = new FakeElement();
       return element;
     };
     const mansion = card('burned-mansion');
@@ -171,7 +202,7 @@ describe('Zombies map selection flow', () => {
     try {
       const selected: string[] = [];
       const ui = new HUD();
-      ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts, false);
       // The loading screen cross-fades out over the menu before hiding.
       expect(startScreen.classList.contains('leaving')).toBe(true);
       vi.runAllTimers();
@@ -191,16 +222,40 @@ describe('Zombies map selection flow', () => {
       expect(station.slots['[data-map-access]'].textContent).toBe('PREMIUM');
       expect(station.slots['[data-map-account]'].textContent).toBe('ACCOUNT REQUIRED');
       expect(station.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
+      expect(station.slots['[data-map-lock-label]'].dataset.i18n).toBe('map.locked');
+      expect(station.disabled).toBe(false);
+      // Without the local WIP opt-in, Die Kathedrale stays listed under a WIP padlock and cannot be activated,
+      // even when the account owns it.
+      expect(cathedral.classList.contains('hidden')).toBe(false);
+      expect(cathedral.dataset.locked).toBe('true');
+      expect(cathedral.dataset.wip).toBe('true');
+      expect(cathedral.disabled).toBe(true);
+      expect(cathedral.onclick).toBeNull();
+      expect(cathedral.slots['[data-map-lock-label]'].textContent).toBe('WIP');
+      expect(cathedral.slots['[data-map-action]'].textContent).toBe('WIP');
+      expect(station.dataset.wip).toBe('false');
+      expect(mansion.dataset.wip).toBe('false');
+
+      // The local opt-in releases it as a regular premium map.
+      ui.showMapSelect((mapId) => selected.push(`wip:${mapId}`), allProducts, true);
+      expect(cathedral.dataset.wip).toBe('false');
+      expect(cathedral.disabled).toBe(false);
       expect(cathedral.dataset.access).toBe('premium');
       expect(cathedral.dataset.locked).toBe('false');
+      expect(cathedral.slots['[data-map-lock-label]'].dataset.i18n).toBe('map.locked');
       expect(cathedral.slots['[data-map-access]'].textContent).toBe('PREMIUM');
       expect(cathedral.slots['[data-map-account]'].textContent).toBe('ACCOUNT REQUIRED');
       expect(cathedral.slots['[data-map-players]'].dataset.i18n).toBe('map.players.solo');
+      cathedral.onclick?.();
+      expect(selected).toEqual(['wip:die-kathedrale']);
+      selected.length = 0;
+
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts, false);
       mansion.onclick?.();
       expect(selected).toEqual(['burned-mansion']);
       expect(mapSelect.classList.contains('hidden')).toBe(true);
 
-      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), allProducts);
+      ui.showMapSelect((mapId) => selected.push(`again:${mapId}`), allProducts, false);
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
@@ -221,7 +276,7 @@ describe('Zombies map selection flow', () => {
         signOut: async () => { accountEmail = null; },
         google: null,
       }, onAccountChanged);
-      ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts);
+      ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts, true);
       expect(station.classList.contains('hidden')).toBe(false);
       expect(station.dataset.locked).toBe('true');
       expect(station.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
@@ -278,11 +333,11 @@ describe('Zombies map selection flow', () => {
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
       // The account button in the menu corner reflects the session and opens the account dialog.
-      ui.showMapSelect((mapId) => selected.push(mapId), noProducts);
+      ui.showMapSelect((mapId) => selected.push(mapId), noProducts, false);
       expect(elements['account-label'].dataset.i18n).toBe('account.signIn');
       expect(elements['account-button'].dataset.signedIn).toBe('false');
       accountEmail = 'player@example.com';
-      ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts, false);
       expect(elements['account-label'].textContent).toBe('player@example.com');
       expect(elements['account-button'].dataset.signedIn).toBe('true');
       expect(elements['account-label'].dataset.i18n).toBeUndefined();
@@ -291,7 +346,7 @@ describe('Zombies map selection flow', () => {
       expect(elements['account-badge'].classList.contains('hidden')).toBe(true);
       betaTester = true;
       accountEmail = `${'player'.repeat(10)}@example.com`;
-      ui.showMapSelect((mapId) => selected.push(mapId), allProducts);
+      ui.showMapSelect((mapId) => selected.push(mapId), allProducts, false);
       expect(elements['account-label'].textContent).toBe(accountEmail);
       expect(elements['account-badge'].classList.contains('hidden')).toBe(false);
       expect(elements['account-badge'].dataset.i18n).toBe('betaThanks.tester');
@@ -315,8 +370,9 @@ describe('Zombies map selection flow', () => {
     expect(main).toContain('startGame(new ZombiesMode(mapId), mapId)');
     // Direct links use the same beta access rule as the menu, and startGame rechecks it.
     expect(main).toContain('startGame(new ZombiesMode(requestedMap), requestedMap)');
-    expect(main).toContain('canAccessZombieMap(requestedMap, this.entitlements)');
-    expect(main).toContain('if (!canAccessZombieMap(mapId, this.entitlements))');
+    expect(main).toContain('canAccessZombieMap(requestedMap, this.entitlements, WIP_MAPS_ENABLED)');
+    expect(main).toContain('if (!canAccessZombieMap(mapId, this.entitlements, WIP_MAPS_ENABLED))');
+    expect(main).toContain('this.entitlements, WIP_MAPS_ENABLED)');
     expect(main).not.toContain('showModeSelect');
     expect(main).not.toContain('ClassicMode');
   });

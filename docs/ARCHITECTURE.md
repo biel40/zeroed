@@ -91,10 +91,13 @@ sufra tirones de compilacion de shaders.
 
 - Un mapa premium declara `ZombieMapDefinition.product`, un `ProductId` de
   [productos](../src/config/products.ts); los gratuitos lo omiten y la tarjeta
-  premium del menu se deriva de el. `canAccessZombieMap` consulta un
+  premium del menu se deriva de el. `canAccessZombieMap` exige que el mapa
+  este publicado (`isZombieMapReleased`: los `workInProgress` solo con
+  [WIP_MAPS_ENABLED](../src/config/mapRelease.ts), falso en toda build de
+  produccion), consulta un
   [EntitlementProvider](../src/entitlements/EntitlementProvider.ts) y comparte
   la regla entre el selector y el arranque, incluidos enlaces directos; el
-  selector lista bloqueados los mapas sin permiso. Cada plataforma aporta su
+  selector lista bloqueados los mapas sin permiso y deshabilita los WIP. Cada plataforma aporta su
   proveedor; en web es [WebAccount](../src/account/WebAccount.ts), que recuerda
   los productos de la cuenta y los refresca con la
   [API de cuentas](../cloudflare/api/README.md) mediante un `AccountBackend`

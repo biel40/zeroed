@@ -85,6 +85,7 @@ export const es: Record<TranslationKey, string> = {
   'map.access.accountRequired': 'REQUIERE CUENTA',
   'map.access.premium': 'PREMIUM',
   'map.locked': 'PREMIUM',
+  'map.wip': 'WIP',
   'menu.play': 'JUGAR',
   'menu.unlock': 'DESBLOQUEAR',
   'menu.multiplayer': 'MODO MULTIJUGADOR',

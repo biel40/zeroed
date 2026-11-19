@@ -85,6 +85,7 @@ export const ca: Record<TranslationKey, string> = {
   'map.access.accountRequired': 'CAL COMPTE',
   'map.access.premium': 'PREMIUM',
   'map.locked': 'PREMIUM',
+  'map.wip': 'WIP',
   'menu.play': 'JUGAR',
   'menu.unlock': 'DESBLOQUEJAR',
   'menu.multiplayer': 'MODE MULTIJUGADOR',

@@ -18,6 +18,8 @@ export interface ZombieMapDefinition {
   readonly id: string;
   /** Listed in the map menu; maps the player cannot access yet appear locked. */
   readonly visible: boolean;
+  /** Still in development: listed under a WIP padlock and unplayable unless the build opts in (see mapRelease.ts). */
+  readonly workInProgress?: true;
   /** Premium maps require owning this product to play, from the menu or a direct link; free maps omit it. */
   readonly product?: ProductId;
   readonly nameKey: TranslationKey;
@@ -61,6 +63,7 @@ export const ZOMBIE_MAPS = {
   'die-kathedrale': {
     id: 'die-kathedrale',
     visible: true,
+    workInProgress: true,
     product: 'map.die-kathedrale',
     nameKey: 'map.dieKathedrale',
     coop: false,
@@ -79,12 +82,19 @@ export function isZombieMapId(value: string | null | undefined): value is Zombie
   return value != null && Object.hasOwn(ZOMBIE_MAPS, value);
 }
 
-/** Shared by menu visibility and every match entry point, including `?map=`. */
+/** False for a work-in-progress map unless `wipMapsEnabled` (WIP_MAPS_ENABLED outside tests). */
+export function isZombieMapReleased(mapId: ZombieMapId, wipMapsEnabled: boolean): boolean {
+  const map: ZombieMapDefinition = ZOMBIE_MAPS[mapId];
+  return map.workInProgress !== true || wipMapsEnabled;
+}
+
+/** Shared by the menu and every match entry point, including `?map=`: released and, if premium, owned. */
 export function canAccessZombieMap(
   value: string | null | undefined,
   entitlements: EntitlementProvider,
+  wipMapsEnabled: boolean,
 ): value is ZombieMapId {
-  if (!isZombieMapId(value)) return false;
+  if (!isZombieMapId(value) || !isZombieMapReleased(value, wipMapsEnabled)) return false;
   const product: ProductId | undefined = getZombieMapProduct(value);
   return product === undefined || entitlements.owns(product);
 }

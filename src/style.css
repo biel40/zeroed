@@ -3105,6 +3105,11 @@ html.coop-guest #pause-restart {
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
+/* Work-in-progress maps: a WIP padlock on a card that cannot be activated. */
+.map-card:disabled {
+  cursor: not-allowed;
+}
+
 .map-card[data-locked='true'] .map-card-image {
   filter: grayscale(0.7) brightness(0.5);
 }

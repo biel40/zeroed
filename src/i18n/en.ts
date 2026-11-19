@@ -87,6 +87,7 @@ export const en = {
   'map.access.accountRequired': 'ACCOUNT REQUIRED',
   'map.access.premium': 'PREMIUM',
   'map.locked': 'PREMIUM',
+  'map.wip': 'WIP',
   'menu.play': 'PLAY',
   'menu.unlock': 'UNLOCK',
   'menu.multiplayer': 'MULTIPLAYER MODE',

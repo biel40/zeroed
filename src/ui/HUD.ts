@@ -1,4 +1,4 @@
-import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
+import { canAccessZombieMap, getZombieMapDefinition, isZombieMapReleased, type ZombieMapId } from '../config/zombieMaps';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import { isQualityPreference, type QualityLevel, type QualityPreference } from '../core/DeviceProfile';
 import { grenadeCookDial, lethalPouchIcons } from './GrenadeHudPresentation';
@@ -433,8 +433,14 @@ export class HUD {
    * Initial picker: Zombies is the only mode, so the player chooses its arena
    * directly. Maps the player cannot access yet stay listed but locked; their
    * card opens the account dialog, and the map unlocks once the account owns it.
+   * Work-in-progress maps show a WIP padlock on a disabled card unless
+   * `wipMapsEnabled`; disabling it blocks pointer, touch, keyboard and gamepad.
    */
-  public showMapSelect(onSelect: (mapId: ZombieMapId) => void, entitlements: EntitlementProvider): void {
+  public showMapSelect(
+    onSelect: (mapId: ZombieMapId) => void,
+    entitlements: EntitlementProvider,
+    wipMapsEnabled: boolean,
+  ): void {
     this.fadeOutStartScreen();
     this.coopLobby.classList.add('hidden');
     this.mapSelect.classList.remove('hidden');
@@ -448,24 +454,28 @@ export class HUD {
         button.onclick = null;
         continue;
       }
-      const locked = !canAccessZombieMap(map.id, entitlements);
+      const wip = !isZombieMapReleased(map.id, wipMapsEnabled);
+      const locked = !canAccessZombieMap(map.id, entitlements, wipMapsEnabled);
       const premium = map.product !== undefined;
       if (!locked && !firstPlayableButton) firstPlayableButton = button;
       // The registry, not the markup, decides each card's players, access and action labels.
       button.dataset.access = premium ? 'premium' : 'free';
       button.dataset.locked = String(locked);
+      button.dataset.wip = String(wip);
+      button.disabled = wip;
+      setTranslatedText(button.querySelector('[data-map-lock-label]'), wip ? 'map.wip' : 'map.locked');
       setTranslatedText(button.querySelector('[data-map-access]'), premium ? 'map.access.premium' : 'map.access.free');
       // Whether playing the map needs signing in: never for free maps, always for premium ones.
       setTranslatedText(button.querySelector('[data-map-account]'), premium ? 'map.access.accountRequired' : 'map.access.noAccount');
       setTranslatedText(button.querySelector('[data-map-players]'), map.coop ? 'map.players.coop' : 'map.players.solo');
-      setTranslatedText(button.querySelector('[data-map-action]'), locked ? 'menu.unlock' : 'menu.play');
+      setTranslatedText(button.querySelector('[data-map-action]'), wip ? 'map.wip' : locked ? 'menu.unlock' : 'menu.play');
       const select = (): void => {
         for (const mapButton of buttons) mapButton.onclick = null;
         this.mapSelect.classList.add('hidden');
         onSelect(map.id);
       };
       // Assignment replaces a previous handler if this menu is shown again.
-      button.onclick = locked ? () => this.mapUnlock.open(map.nameKey) : select;
+      button.onclick = wip ? null : locked ? () => this.mapUnlock.open(map.nameKey) : select;
     }
     this.updateAccountButton();
     firstPlayableButton?.focus();

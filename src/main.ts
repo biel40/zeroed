@@ -6,6 +6,7 @@ import { readLoginToken } from './account/loginLink';
 import { WebAccount, type AccountStorage, type LoginCompletion } from './account/WebAccount';
 import { AssetManager, TEXTURE_MANIFEST, ZOMBIE_MANIFEST, type AssetManifest } from './assets/AssetManager';
 import { MusicManager } from './audio/MusicManager';
+import { WIP_MAPS_ENABLED } from './config/mapRelease';
 import { canAccessZombieMap, COOP_ZOMBIE_MAP_ID, ZOMBIE_MAPS, type ZombieMapId } from './config/zombieMaps';
 import { WEAPON_DEFINITIONS, WEAPON_ORDER } from './config/weapons';
 import { recordAutoQualityDowngrade, resolveAutoQuality, type AutoQualityLevel, type DeviceSignals, type GpuSignals } from './core/AutoQuality';
@@ -99,7 +100,7 @@ class ZeroedBoot {
   }
 
   private async startGame(mode: GameMode, mapId: ZombieMapId): Promise<void> {
-    if (!canAccessZombieMap(mapId, this.entitlements)) {
+    if (!canAccessZombieMap(mapId, this.entitlements, WIP_MAPS_ENABLED)) {
       this.showMapMenu();
       return;
     }
@@ -154,12 +155,13 @@ class ZeroedBoot {
   }
 
   private showMapMenu(): void {
-    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId), this.entitlements);
+    this.hud.showMapSelect((mapId) => void this.startGame(new ZombiesMode(mapId), mapId),
+      this.entitlements, WIP_MAPS_ENABLED);
   }
 
   private openRequestedMap(): void {
     const requestedMap = new URLSearchParams(window.location.search).get('map');
-    if (canAccessZombieMap(requestedMap, this.entitlements)) {
+    if (canAccessZombieMap(requestedMap, this.entitlements, WIP_MAPS_ENABLED)) {
       void this.startGame(new ZombiesMode(requestedMap), requestedMap);
     } else {
       this.showMapMenu();

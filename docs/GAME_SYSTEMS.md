@@ -527,11 +527,16 @@ existente a `MOTDRULES`.
 
 ## Mapas e interacciones
 
-- Burned Mansion sigue publico. Station 33 y Die Kathedrale aparecen en el menu
-  con candado mientras la cuenta no tenga su producto; durante la beta cerrada
-  los testers reciben ambos mapas. Tras el agradecimiento al tester empieza la
-  partida. Los enlaces directos respetan el
-  mismo permiso; detalles y limites en [acceso de beta](../public/beta/README.md).
+- Burned Mansion sigue publico. Station 33 aparece en el menu con candado
+  mientras la cuenta no tenga su producto; durante la beta cerrada los testers
+  lo reciben. Tras el agradecimiento al tester empieza la partida. Los enlaces
+  directos respetan el mismo permiso; detalles y limites en
+  [acceso de beta](../public/beta/README.md).
+- Die Kathedrale esta en desarrollo (`workInProgress` en el registro): su
+  tarjeta sigue visible con candado y "WIP", deshabilitada para raton, toque,
+  teclado y mando, y ni el menu ni `?map=` la arrancan aunque la cuenta tenga
+  su producto. Solo un servidor de desarrollo con `VITE_WIP_MAPS=true` la
+  libera; ninguna build de produccion lo permite.
 
 - `DieKathedraleArena`: Die Kathedrale, la catedral de Palma, individual y premium. La
   nave es un solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
@@ -833,7 +838,7 @@ existente a `MOTDRULES`.
   mapa incluido y dorado para los premium; un mapa bloqueado oscurece su arte
   bajo un candado. Las imagenes se recortan a la ilustracion y se acortan en
   ventanas bajas; nombres y lemas se traducen y `HUD` rellena desde el registro
-  las etiquetas de jugadores, acceso y accion (jugar o desbloquear). En
+  las etiquetas de jugadores, acceso y accion (jugar, desbloquear o WIP). En
   pantallas bajas el menu se compacta; si aun no cabe, se desplaza la capa
   completa (nunca el panel) y la niebla queda fija detras.
   La pantalla de carga y la pausa nombran el mapa elegido. `?map=<id>` sigue

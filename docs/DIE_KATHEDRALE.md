@@ -16,7 +16,10 @@ manda el codigo: actualiza la guia.
   el id `die-kathedrale` (tambien en `?map=die-kathedrale`) y las rutas
   `DieKathedrale`/`dieKathedrale`; producto y acceso se declaran en
   [el registro de mapas](../src/config/zombieMaps.ts). Comparte el acceso de
-  [beta cerrada](../public/beta/README.md) con Station 33.
+  [beta cerrada](../public/beta/README.md) con Station 33. Mientras sea
+  `workInProgress`, el menu la muestra bloqueada como WIP y ninguna entrada la
+  arranca; para jugarla en local, `VITE_WIP_MAPS=true` en `.env.local` y
+  `npm run dev`.
 - Se construye por fases, como Station 33. Cada fase debe ser una partida
   completa y nunca abrir puertas hacia el vacio. El plan de ejes esta al
   principio de `DieKathedraleConfig.ts`: el frente principal sobre z = 0, la nave hacia
