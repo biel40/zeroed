@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ArenaFootstepSurfaces } from '../zombies/maps/FootstepSurfaces';
 import { t } from '../i18n/i18n';
 import { actionKey, doorPrompt, wallBuyPrompt, weaponCaseLocked, weaponCasePrompt } from '../ui/InteractionPrompts';
 import { getZombieMapWavePacing, ZOMBIE_MAPS, type ZombieMapId } from '../config/zombieMaps';
@@ -39,6 +40,7 @@ import {
 } from '../zombies/ZombieConfig';
 import { ZombieFootsteps } from '../zombies/ZombieFootsteps';
 import { ZombieManager } from '../zombies/ZombieManager';
+import { ZombieMoans } from '../zombies/ZombieMoans';
 import { dressZombieSources } from '../zombies/skins/ZombieSkinBuilder';
 import type { ZombieKillSource } from '../zombies/ZombieDeath';
 import { RITUAL_SCARE_TIMELINE } from '../zombies/secret-room/SecretRoomSystem';
@@ -79,9 +81,6 @@ import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 const HIT_TRAUMA = 0.55;
 /** Camera jolt of a map ambush: the player flinches before anything hits. */
 const AMBUSH_TRAUMA = 0.45;
-/** Distant moans drift in every few seconds, never on a fixed rhythm. */
-const MOAN_MIN_DELAY = 6;
-const MOAN_SPREAD = 9;
 /** A key still held from starting the run must not also skip its intro. */
 const INTRO_SKIP_GUARD = 0.6;
 /** A horde a map stages in its filmed ending runs at least like this round's. */
@@ -169,7 +168,7 @@ export class ZombiesMode implements GameMode {
   /** Arena colliders currently registered in `ctx.hitColliders`. */
   private arenaStaticColliders = new Set<THREE.Object3D>();
   private readonly shake = new CameraShake();
-  private moanTimer = MOAN_MIN_DELAY;
+  private readonly zombieMoans = new ZombieMoans();
   private readonly roundCues = new RoundCueGate();
   /** Barrier the player is currently repairing, if any. */
   private activeRepairBarrier: WindowBarrier | null = null;
@@ -191,6 +190,11 @@ export class ZombiesMode implements GameMode {
   /** The map's gameplay bed; Game starts it once the match begins. */
   get gameplayMusic(): MusicTrackName | null {
     return this.arena?.ambience.musicTrack ?? null;
+  }
+
+  /** Where the local player's footsteps land on this map. */
+  getFootstepSurfaces(): ArenaFootstepSurfaces | null {
+    return this.arena?.footstepSurfaces ?? null;
   }
 
   init(ctx: ModeContext): void {
@@ -352,6 +356,7 @@ export class ZombiesMode implements GameMode {
     if (this.runFlow.state === 'CREDITS' || this.runFlow.state === 'FINISHED') return;
     this.updateIntro(dt);
     if (this.evacuation?.filming) {
+      this.zombieMoans.reset();
       this.updateFilmedGuardian(dt);
       return;
     }
@@ -367,7 +372,6 @@ export class ZombiesMode implements GameMode {
       }
       this.evacuation?.update(dt);
       this.updateRepair(dt);
-      this.updateAmbience(dt);
     }
 
     const playerPos = this.ctx.player.rig.position;
@@ -385,7 +389,7 @@ export class ZombiesMode implements GameMode {
       this.tmpDirection.x,
       this.tmpDirection.z,
     );
-    this.knife.update(dt, false, this.ctx.player.speed01);
+    this.knife.update(dt, false, this.ctx.player.walkGait);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.energy.update(dt);
     this.flames.update(dt, this.runAcceptsInput());
@@ -405,6 +409,8 @@ export class ZombiesMode implements GameMode {
     this.rings?.update(dt);
     this.gasMask?.update(dt);
     this.updateCameraShake(dt);
+    if (this.runAcceptsInput()) this.zombieMoans.update(dt, this.ctx.player.camera, this.zombies, this.ctx.audio);
+    else this.zombieMoans.reset();
     this.updateGameOverReveal();
     this.pushHudState();
   }
@@ -569,6 +575,7 @@ export class ZombiesMode implements GameMode {
   isSimulationPaused(): boolean { return this.codeLockDialog !== null; }
 
   onExit(): void {
+    this.zombieMoans.reset();
     this.codeLockDialog?.dispose();
     this.codeLockDialog = null;
     // The HUD outlives the run: no grenade row in the menu or a later co-op match.
@@ -1354,21 +1361,6 @@ export class ZombiesMode implements GameMode {
     this.shake.update(dt, this.ctx.player.camera);
   }
 
-  private updateAmbience(dt: number): void {
-    this.moanTimer -= dt;
-    if (this.moanTimer <= 0) {
-      this.moanTimer = MOAN_MIN_DELAY + Math.random() * MOAN_SPREAD;
-      // Moans come from a real zombie, so the ambience doubles as a radar.
-      const moaner = this.randomLivingZombie();
-      if (moaner) this.ctx.audio.playDistantMoan(this.spatialCueFor(voicePoint(moaner.position)));
-    }
-  }
-
-  private randomLivingZombie(): Zombie | null {
-    const living = [...this.zombies.actives].filter((zombie) => zombie.isAlive);
-    return living.length > 0 ? living[Math.floor(Math.random() * living.length)] : null;
-  }
-
   /** All weapon damage paths share perks and developer tuning. */
   private weaponDamageScale(id: WeaponId): number {
     return this.developerCommands.damageScale(id) * (this.rings?.damageScale ?? 1) * (this.weaponUpgrade?.damageScale(id) ?? 1);
@@ -1565,6 +1557,7 @@ export class ZombiesMode implements GameMode {
   }
 
   private beginEnding(ending: ArenaEnding): void {
+    this.zombieMoans.reset();
     this.activeRepairBarrier?.stopRepair();
     this.activeRepairBarrier = null;
     this.knife.reset();

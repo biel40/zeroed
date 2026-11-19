@@ -50,6 +50,10 @@ class FakeAudioContext {
     return { getChannelData: () => new Float32Array(8) };
   }
 
+  public async decodeAudioData(data: ArrayBuffer): Promise<Pick<AudioBuffer, 'duration'>> {
+    return { duration: new Uint8Array(data)[0] / 10 };
+  }
+
   public createBufferSource() {
     const node = { buffer: null, loop: false, playbackRate: param(), connect: vi.fn(), start: vi.fn(), stop: vi.fn() };
     this.sources.push(node);
@@ -163,8 +167,9 @@ describe('Ambience mix', () => {
     const busSpy = vi.spyOn(system, 'spatialBus');
     audio.playAmbientCue({ sound: 'wood-creak' }, { pan: 0, attenuation: 1, muffle: 0 });
     expect(busSpy.mock.calls[0][3]).toBe(ctx.gains[1]);
-    audio.playDistantMoan({ pan: 0, attenuation: 1, muffle: 0 });
-    expect(busSpy.mock.calls[1][3]).toBeUndefined();
+    const voiceGainIndex = ctx.gains.length;
+    audio.playZombieMoan({ pan: 0, attenuation: 1, muffle: 0 });
+    expect(ctx.gains[voiceGainIndex].connect).toHaveBeenCalledWith(ctx.gains[0]);
   });
 });
 
@@ -217,6 +222,91 @@ describe('Zombie voice budget', () => {
 
     audio.playZombieSpawn({ pan: 0.2, attenuation: 0.95, muffle: 0 });
     expect(busSpy.mock.calls).toHaveLength(farVoices + 1);
+  });
+
+  it('keeps a recorded voice slot for the full clip and still reserves space for nearby threats', async () => {
+    stubZombieVoiceFiles({ 'spawn_1.mp3': 25 });
+    const { audio, ctx } = startedSystem();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const sources = vi.spyOn(ctx, 'createBufferSource');
+    const far = { pan: -0.4, attenuation: 0.2, muffle: 0.5 };
+    const near = { pan: 0.2, attenuation: 0.95, muffle: 0 };
+
+    for (let index = 0; index < 3; index++) audio.playZombieSpawn(far);
+    expect(sources).toHaveBeenCalledTimes(3);
+
+    ctx.currentTime = 1;
+    audio.playZombieSpawn(far);
+    expect(sources).toHaveBeenCalledTimes(3);
+    audio.playZombieSpawn(near);
+    expect(sources).toHaveBeenCalledTimes(4);
+
+    ctx.currentTime = 2.5;
+    audio.playZombieSpawn(far);
+    expect(sources).toHaveBeenCalledTimes(5);
+  });
+});
+
+function stubZombieVoiceFiles(clips: Readonly<Record<string, number>>) {
+  const fetchSample = vi.fn(async (url: string) => {
+    const durationTenths = clips[url.split('/').at(-1)!];
+    return durationTenths === undefined
+      ? { ok: false, status: 404 }
+      : { ok: true, arrayBuffer: async () => Uint8Array.of(durationTenths).buffer };
+  });
+  vi.stubGlobal('fetch', fetchSample);
+  return fetchSample;
+}
+
+describe('Recorded zombie voices', () => {
+  it('falls back while loading, then cycles through the available recordings on the spatial bus', async () => {
+    const fetchSample = stubZombieVoiceFiles({ 'moan_1.mp3': 12, 'moan_3.mp3': 15 });
+    const { audio, ctx } = startedSystem();
+    const cue = { pan: -0.5, attenuation: 0.7, muffle: 0.4 };
+    const oscillators = vi.spyOn(ctx, 'createOscillator');
+    audio.playZombieMoan(cue);
+    expect(oscillators).toHaveBeenCalled();
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    audio.resume();
+    const panners = vi.spyOn(ctx, 'createStereoPanner');
+    const sources = vi.spyOn(ctx, 'createBufferSource');
+    oscillators.mockClear();
+    for (const time of [3, 6, 9]) {
+      ctx.currentTime = time;
+      audio.playZombieMoan(cue);
+    }
+
+    expect(oscillators).not.toHaveBeenCalled();
+    expect(sources.mock.results.map(({ value }) => value.buffer)).toEqual([
+      { duration: 1.2 }, { duration: 1.5 }, { duration: 1.2 },
+    ]);
+    expect(panners.mock.results.map(({ value }) => value.pan.value)).toEqual([-0.5, -0.5, -0.5]);
+    expect(fetchSample).toHaveBeenCalledTimes(4);
+  });
+
+  it('moves and damps the playing sample without retriggering it', async () => {
+    stubZombieVoiceFiles({ 'moan_1.mp3': 15 });
+    const { audio, ctx } = startedSystem();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const panners = vi.spyOn(ctx, 'createStereoPanner');
+    const filters = vi.spyOn(ctx, 'createBiquadFilter');
+    const sources = vi.spyOn(ctx, 'createBufferSource');
+    const playback = audio.playZombieMoan({ pan: 0.7, attenuation: 0.95, muffle: 0 })!;
+    const { pan } = panners.mock.results[0].value;
+    const { frequency } = filters.mock.results[0].value;
+    expect(pan.value).toBe(0.7);
+    expect(ctx.gains[3].gain.value).toBeGreaterThan(0.4);
+
+    ctx.currentTime = 0.2;
+    expect(playback.update({ pan: -0.8, attenuation: 0.6, muffle: 0.6 })).toBe(true);
+    expect(pan.setTargetAtTime).toHaveBeenCalledWith(-0.8, 0.2, expect.any(Number));
+    expect(frequency.setTargetAtTime.mock.calls[0][0]).toBeLessThan(frequency.value);
+    expect(ctx.gains[2].gain.setTargetAtTime).toHaveBeenCalledWith(0.6, 0.2, expect.any(Number));
+    expect(sources).toHaveBeenCalledOnce();
+
+    ctx.currentTime = 1.5;
+    expect(playback.update({ pan: 0, attenuation: 1, muffle: 0 })).toBe(false);
   });
 });
 

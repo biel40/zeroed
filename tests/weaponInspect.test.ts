@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { checksMagazine, INSPECT_TIMELINE } from '../src/weapons/InspectAnimator';
@@ -51,7 +52,7 @@ function rig(id: WeaponId) {
   camera.add(view.root, arms.root);
   const frame = (): void => {
     weapon.update(DT, IDLE);
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     arms.update(DT, view, null);
     camera.updateMatrixWorld(true);
   };
@@ -217,7 +218,7 @@ describe('Weapon inspection view', () => {
     expect(magazine.position.distanceTo(home)).toBeGreaterThan(0.02);
     const raised = setup.view.root.rotation.y;
     setup.weapon.update(DT, { trigger: true, ads: false });
-    setup.view.update(DT, setup.weapon, 0, 0, 0);
+    setup.view.update(DT, setup.weapon, STILL_GAIT, 0, 0);
     expect(magazine.position.distanceTo(home)).toBeLessThan(1e-6);
     // The pose is let go quickly rather than snapped.
     expect(Math.abs(setup.view.root.rotation.y)).toBeGreaterThan(0);

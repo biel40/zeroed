@@ -48,6 +48,7 @@ describe('player settings', () => {
 
   it('fills missing or invalid values with defaults and clamps ranges', () => {
     expect(sanitizeSettings(null)).toEqual(DEFAULT_SETTINGS);
+    expect(DEFAULT_SETTINGS.musicVolume).toBe(0.5);
     expect(sanitizeSettings({ masterVolume: 'loud', invertY: 1, fieldOfView: Number.NaN })).toEqual(DEFAULT_SETTINGS);
     const clamped = sanitizeSettings({ musicVolume: 4, lookSensitivity: -2, fieldOfView: 200, invertY: true });
     expect(clamped.musicVolume).toBe(SETTING_RANGES.musicVolume.max);

@@ -34,20 +34,20 @@ const OPEN_CUTOFF = 20000;
 const MUFFLED_CUTOFF = 750;
 
 /** Pure: listener position and forward vector against a source point. */
-export function spatialCue(listener: Point3, forward: Point3, source: Point3): SpatialCue {
+export function spatialCue(listener: Point3, forward: Point3, source: Point3,
+  out = { pan: 0, attenuation: 1, muffle: 0 }): SpatialCue {
   const dx = source.x - listener.x;
   const dy = source.y - listener.y;
   const dz = source.z - listener.z;
   const distance = Math.hypot(dx, dy, dz);
-  return {
-    pan: spatialPan(listener, forward, source),
-    attenuation: THREE.MathUtils.clamp(
-      1 / (1 + Math.max(0, distance - NEAR_DISTANCE) * FALLOFF),
-      MIN_ATTENUATION,
-      1,
-    ),
-    muffle: spatialMuffle(listener, forward, source),
-  };
+  out.pan = spatialPan(listener, forward, source);
+  out.attenuation = THREE.MathUtils.clamp(
+    1 / (1 + Math.max(0, distance - NEAR_DISTANCE) * FALLOFF),
+    MIN_ATTENUATION,
+    1,
+  );
+  out.muffle = spatialMuffle(listener, forward, source);
+  return out;
 }
 
 /** Stereo pan alone (-1 left, 1 right), without allocating. */

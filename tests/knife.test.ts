@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { describe, expect, it, vi } from 'vitest';
 import { PlayerEconomy, POINTS_KNIFE_KILL } from '../src/game/PlayerEconomy';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
@@ -23,7 +24,7 @@ function sampleBlade(knife: Knife, camera: THREE.PerspectiveCamera, time: number
   knife.reset();
   knife.setEnabled(true);
   knife.trigger();
-  knife.update(time, false, 0);
+  knife.update(time, false, STILL_GAIT);
   camera.updateMatrixWorld(true);
   const blade = knife.root.getObjectByName('knife-blade')!;
   const hilt = blade.localToWorld(new THREE.Vector3(0, 0.02, -0.055));
@@ -52,15 +53,15 @@ describe('Knife', () => {
     const geometry = (blade as THREE.Mesh).geometry;
     geometry.computeBoundingBox();
     expect(geometry.boundingBox!.getSize(new THREE.Vector3()).z).toBeGreaterThan(0.4);
-    knife.update(KNIFE_HIT_MOMENT - 0.01, true, 0);
+    knife.update(KNIFE_HIT_MOMENT - 0.01, true, STILL_GAIT);
     expect(swing).toHaveBeenCalledTimes(1);
     expect(impact).not.toHaveBeenCalled();
-    knife.update(0.01, true, 0);
+    knife.update(0.01, true, STILL_GAIT);
     expect(impact).toHaveBeenCalledTimes(1);
-    knife.update(KNIFE_ATTACK_DURATION, true, 0);
+    knife.update(KNIFE_ATTACK_DURATION, true, STILL_GAIT);
     expect(impact).toHaveBeenCalledTimes(1);
-    knife.update(0, false, 0);
-    knife.update(0, true, 0);
+    knife.update(0, false, STILL_GAIT);
+    knife.update(0, true, STILL_GAIT);
     expect(swing).toHaveBeenCalledTimes(2);
   });
 
@@ -69,9 +70,9 @@ describe('Knife', () => {
     const impact = vi.fn();
     knife.onImpact = impact;
     knife.setEnabled(true);
-    knife.update(0.1, true, 0);
+    knife.update(0.1, true, STILL_GAIT);
     knife.setEnabled(false);
-    knife.update(KNIFE_ATTACK_DURATION, true, 0);
+    knife.update(KNIFE_ATTACK_DURATION, true, STILL_GAIT);
     expect(knife.root.visible).toBe(false);
     expect(knife.isAttacking).toBe(false);
     expect(impact).not.toHaveBeenCalled();
@@ -184,11 +185,11 @@ describe('Knife', () => {
     expect(knife.firearmLowering).toBe(0);
     knife.setEnabled(true);
     knife.trigger();
-    knife.update(KNIFE_ATTACK_DURATION * 0.1, false, 0);
+    knife.update(KNIFE_ATTACK_DURATION * 0.1, false, STILL_GAIT);
     expect(knife.firearmLowering).toBe(1);
-    knife.update(KNIFE_HIT_MOMENT, false, 0);
+    knife.update(KNIFE_HIT_MOMENT, false, STILL_GAIT);
     expect(knife.firearmLowering).toBe(1);
-    knife.update(KNIFE_ATTACK_DURATION, false, 0);
+    knife.update(KNIFE_ATTACK_DURATION, false, STILL_GAIT);
     expect(knife.firearmLowering).toBe(0);
   });
 });

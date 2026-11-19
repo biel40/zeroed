@@ -17,6 +17,7 @@ import { RITUAL_SCARE_TIMELINE } from '../../zombies/secret-room/SecretRoomSyste
 import type { ModeContext } from '../GameMode';
 import { SoulLampTargeting } from '../SoulLampTargeting';
 import { cameraSpatialCue, type SpatialCue } from '../../audio/SpatialCue';
+import { ZombieMoans, type ZombieMoanPopulation } from '../../zombies/ZombieMoans';
 
 const GUEST_SPAWN_OFFSET_Z = -1.8;
 const DOOR_USE_RANGE = 2.5;
@@ -59,6 +60,7 @@ export class CoopWorld {
   private readonly soulLampTargeting = new SoulLampTargeting();
   private readonly tmpDirection = new THREE.Vector3();
   private readonly observerPosition = new THREE.Vector3();
+  private readonly zombieMoans = new ZombieMoans();
 
   public constructor(private readonly ctx: ModeContext,
     private readonly getViewCamera: () => THREE.Camera | null = () => null) {
@@ -95,9 +97,11 @@ export class CoopWorld {
     return { ...spawn, z: slot === 'host' ? spawn.z : spawn.z + GUEST_SPAWN_OFFSET_Z };
   }
 
-  public update(dt: number): void {
+  public update(dt: number, zombies?: ZombieMoanPopulation): void {
     const camera = this.getViewCamera();
     this.arena.update(dt, camera ? camera.getWorldPosition(this.observerPosition) : this.ctx.player.rig.position);
+    if (zombies) this.zombieMoans.update(dt, camera ?? this.ctx.player.camera, zombies, this.ctx.audio);
+    else this.zombieMoans.reset();
   }
 
   /** The local player's networked state, sampled from the first-person rig. */
@@ -355,6 +359,7 @@ export class CoopWorld {
   }
 
   public reset(): void {
+    this.zombieMoans.reset();
     this.arena.reset();
     this.syncTopology();
   }

@@ -375,7 +375,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     equipTime: 0.3,
     audio: {
       volume: 0.44, duration: 0.07, lowpass: 3900, thump: 190, mechanism: 0.12,
-      sampleFile: 'mp5_single_shot.wav', autoSampleFile: 'mp5_auto_shot.wav',
+      sampleFile: 'mp5a3_single_report.wav', autoSampleFile: 'mp5a3_auto_report.wav',
       variation: { pitch: 0.025, volume: 0.05 },
     },
     view: {

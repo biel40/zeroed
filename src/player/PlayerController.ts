@@ -8,6 +8,9 @@ import { blocksCircleMovement } from '../utils/collision';
 import { DEATH_FALL_DURATION, deathFallPose } from './DeathFall';
 import { requestedStance, STANCE, stanceEyeOffset, type PlayerStance } from './PlayerStance';
 import { StanceTransition } from './StanceTransition';
+import { WALK_BOB } from '../config/walkBob';
+import { WalkGait, type WalkGaitSample } from './WalkGait';
+import { createHeadBobOffset, headBobOffset } from './WalkBob';
 
 const SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.02;
@@ -113,6 +116,10 @@ export class PlayerController {
   private deathStartY = 0;
   /** Mode-owned multiplier on walking speed (the white ring); 1 is normal. */
   private moveSpeedScale = 1;
+  private readonly gait = new WalkGait(WALK_SPEED);
+  /** This frame's head bob, layered on the view by `applyViewEffects` and taken off again by the next `update`. */
+  private readonly headBob = createHeadBobOffset();
+  private headBobApplied = false;
 
   public get stance(): PlayerStance { return this.currentStance; }
 
@@ -128,9 +135,9 @@ export class PlayerController {
     this.rig.add(this.pitchNode);
   }
 
-  /** 0..1 fraction of walk speed, used by the view-model bob. */
-  get speed01(): number {
-    return clamp(this.velocity.length() / WALK_SPEED, 0, 1);
+  /** Walking cycle shared by the head bob and every first-person weapon or arm. */
+  public get walkGait(): WalkGaitSample {
+    return this.gait;
   }
 
   get floor(): number {
@@ -171,6 +178,8 @@ export class PlayerController {
     this.stanceTransition.reset();
     this.deathFallElapsed = null;
     this.camera.position.set(0, 0, 0);
+    this.gait.reset();
+    this.headBobApplied = false;
     if (bounds) this.bounds = bounds;
   }
 
@@ -205,6 +214,11 @@ export class PlayerController {
    * pose, so the nudge never reaches the aim.
    */
   public applyViewEffects(dt: number): void {
+    if (this.deathFallElapsed === null) {
+      this.camera.position.x += this.headBob.x;
+      this.camera.position.y += this.headBob.y;
+      this.headBobApplied = true;
+    }
     if (this.viewImpulse === 0) return;
     this.viewImpulse *= Math.exp(-18 * dt);
     if (Math.abs(this.viewImpulse) < 1e-5) this.viewImpulse = 0;
@@ -238,6 +252,7 @@ export class PlayerController {
   }
 
   update(dt: number, input: Input, weapon: Weapon, allowMovement = true, allowLook = allowMovement): void {
+    this.removeHeadBob();
     const definition = weapon.definition;
     const jumpPressed = allowMovement && input.wasPressed('Space');
     const wasStanding = this.currentStance === 'standing';
@@ -326,6 +341,7 @@ export class PlayerController {
       nextZ = this.rig.position.z;
     }
 
+    const walked = Math.hypot(nextX - this.rig.position.x, nextZ - this.rig.position.z);
     this.rig.position.x = nextX;
     this.rig.position.z = nextZ;
     this.knockback.multiplyScalar(Math.exp(-KNOCKBACK_DECAY * dt));
@@ -364,6 +380,8 @@ export class PlayerController {
       }
     }
     this.rig.position.y = this.groundY + this.jumpOffset;
+    this.gait.update(dt, walked, this.jumpOffset === 0 && !this.downedCamera && !this.isDying);
+    headBobOffset(this.gait, settings.walkBob * (1 - weapon.adsAlpha * WALK_BOB.head.adsReduction), this.headBob);
 
     const targetFov = lerp(settings.fieldOfView, definition.ads.fov, weapon.adsAlpha);
     if (Math.abs(targetFov - this.fov) > 0.05) {
@@ -371,6 +389,14 @@ export class PlayerController {
       this.camera.fov = this.fov;
       this.camera.updateProjectionMatrix();
     }
+  }
+
+  /** Takes last frame's head bob off the camera so movement, collision and aim read the bare eye position. */
+  private removeHeadBob(): void {
+    if (!this.headBobApplied) return;
+    this.camera.position.x -= this.headBob.x;
+    this.camera.position.y -= this.headBob.y;
+    this.headBobApplied = false;
   }
 
   resize(aspect: number): void {

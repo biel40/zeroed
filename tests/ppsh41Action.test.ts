@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { HANDLE_TRAVEL } from '../src/weapons/ReloadAnimator';
 import { Weapon } from '../src/weapons/Weapon';
@@ -38,7 +39,7 @@ function rig(reserve: number) {
       }
     }
     weapon.clearEvents();
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
   };
   return { weapon, view, handle, home, frame, shots: () => shots };
 }

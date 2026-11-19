@@ -55,15 +55,39 @@ function addPlates(context: Station33BuildContext, axis: 'x' | 'z', fixed: numbe
   }
 }
 
+/** One straight row of trench plates, along `axis` at `fixed`, from `from` to `to`. */
+interface TrenchPlateRow {
+  readonly axis: 'x' | 'z';
+  readonly fixed: number;
+  readonly from: number;
+  readonly to: number;
+  readonly seed: number;
+}
+
+const TRENCH_WEST_FEED = MOTOR_GENERATORS[0].x + MOTOR_GENERATOR.plinthWidth / 2;
+const TRENCH_EAST_FEED = MOTOR_GENERATORS[1].x - MOTOR_GENERATOR.plinthWidth / 2;
+/** The trench down the aisle and its branches under it to the feed side of each set. */
+const TRENCH_ROWS: ReadonlyArray<TrenchPlateRow> = [
+  { axis: 'z', fixed: POWER_LEVER.x, from: TRENCH.pitZ + TRENCH.pitSize / 2, to: TRENCH.startZ, seed: 11 },
+  { axis: 'x', fixed: TRENCH.branchZ, from: TRENCH_WEST_FEED + 0.05, to: POWER_LEVER.x - TRENCH.width / 2 - 0.05, seed: 31 },
+  { axis: 'x', fixed: TRENCH.branchZ, from: POWER_LEVER.x + TRENCH.width / 2 + 0.05, to: TRENCH_EAST_FEED - 0.05, seed: 37 },
+];
+
+/** Floor covered by the trench's checker plates and its pit cover (footsteps ring on steel there). */
+export const SUBESTACION_TRENCH_COVERS: ReadonlyArray<{ readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }> = [
+  ...TRENCH_ROWS.map(({ axis, fixed, from, to }) => (axis === 'z'
+    ? { minX: fixed - TRENCH.width / 2, maxX: fixed + TRENCH.width / 2, minZ: from, maxZ: to }
+    : { minX: from, maxX: to, minZ: fixed - TRENCH.width / 2, maxZ: fixed + TRENCH.width / 2 })),
+  {
+    minX: POWER_LEVER.x - TRENCH.pitSize / 2, maxX: POWER_LEVER.x + TRENCH.pitSize / 2,
+    minZ: TRENCH.pitZ - TRENCH.pitSize / 2, maxZ: TRENCH.pitZ + TRENCH.pitSize / 2,
+  },
+];
+
 function addTrench(context: Station33BuildContext): void {
-  const { width, startZ, pitZ, pitSize, branchZ, thickness } = TRENCH;
+  const { pitZ, pitSize, thickness } = TRENCH;
   const x = POWER_LEVER.x;
-  addPlates(context, 'z', x, pitZ + pitSize / 2, startZ, 11);
-  // The branches run under the aisle to the feed side of each set.
-  const west = MOTOR_GENERATORS[0].x + MOTOR_GENERATOR.plinthWidth / 2;
-  const east = MOTOR_GENERATORS[1].x - MOTOR_GENERATOR.plinthWidth / 2;
-  addPlates(context, 'x', branchZ, west + 0.05, x - width / 2 - 0.05, 31);
-  addPlates(context, 'x', branchZ, x + width / 2 + 0.05, east - 0.05, 37);
+  for (const row of TRENCH_ROWS) addPlates(context, row.axis, row.fixed, row.from, row.to, row.seed);
   // Square pit cover where the trench dives under the switchboards, its lifting rings sunk in it.
   const { batch, materials } = context;
   batch.addBox(materials.greySteel, x, 0.006, pitZ, pitSize + 0.08, 0.012, pitSize + 0.08);

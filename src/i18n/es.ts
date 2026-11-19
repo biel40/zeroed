@@ -115,6 +115,8 @@ export const es: Record<TranslationKey, string> = {
   'settings.cameraShakeHint': 'Explosiones, golpes y vibración del arma. Al 0 % la vista nunca tiembla y el retroceso al apuntar no cambia.',
   'settings.weaponKick': 'Sacudida del arma',
   'settings.weaponKickHint': 'Cuánto salta el arma en las manos al disparar. Solo visual: la precisión y el retroceso no cambian.',
+  'settings.walkBob': 'Movimiento al caminar',
+  'settings.walkBobHint': 'Ligero balanceo de la cabeza y el arma con cada paso. Al 0 % ambos quedan quietos y la puntería no cambia.',
   'settings.reset': 'REESTABLECER POR DEFECTO',
   'settings.close': 'CERRAR',
   'settings.save': 'GUARDAR',

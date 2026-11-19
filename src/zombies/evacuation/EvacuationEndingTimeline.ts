@@ -6,8 +6,10 @@
 export const EVACUATION_ENDING_TIMELINE = {
   /** The box body's rear doors swing shut behind the survivors. */
   doorsShut: 0.3,
-  /** Starter motor; the engine catches about a second later. */
+  /** Starter motor cranking. */
   ignition: 0.7,
+  /** The engine catches and settles into its idle. */
+  engineCatch: 1.55,
   /** Headlights flicker on. */
   headlights: 1.8,
   /** The truck pulls away. */

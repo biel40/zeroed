@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { ArenaEndingShot } from '../zombies/maps/ZombieArena';
+import type { ArenaEndingShot, ArenaShotJolt } from '../zombies/maps/ZombieArena';
 import { matchPlayerLens, type PathKey, sampleIntroPath, toPathKey } from './IntroCinematic';
 
 /** A shot ready to sample: its keys as vectors and where it starts on the ending's clock. */
@@ -8,6 +8,20 @@ interface ShotPath {
   readonly end: number;
   readonly keys: ReadonlyArray<PathKey>;
   readonly shake: number;
+  readonly jolts: ReadonlyArray<ArenaShotJolt>;
+}
+
+/** How fast a jolt dies away, per second. */
+const JOLT_DECAY = 7;
+
+/** Shake of `shot`, in metres, `time` seconds into it: its steady handheld jitter plus whatever jolts are still dying away. */
+export function shotShakeAt(shot: Pick<ArenaEndingShot, 'shake' | 'jolts'>, time: number): number {
+  let shake = shot.shake ?? 0;
+  for (const jolt of shot.jolts ?? []) {
+    const since = time - jolt.time;
+    if (since >= 0) shake += jolt.strength * Math.exp(-JOLT_DECAY * since);
+  }
+  return shake;
 }
 
 /** Sum of two incommensurate sines per axis, normalised to [-1, 1]: a handheld wobble with no randomness. */
@@ -35,7 +49,7 @@ export class EndingCinematic {
     let start = 0;
     this.shots = shots.map((shot) => {
       if (shot.keys.length === 0) throw new Error('Every ending shot needs at least one key');
-      const path: ShotPath = { start, end: start + shot.duration, keys: shot.keys.map(toPathKey), shake: shot.shake ?? 0 };
+      const path: ShotPath = { start, end: start + shot.duration, keys: shot.keys.map(toPathKey), shake: shot.shake ?? 0, jolts: shot.jolts ?? [] };
       start = path.end;
       return path;
     });
@@ -67,13 +81,14 @@ export class EndingCinematic {
     const shot = this.currentShot();
     const time = Math.min(this.elapsed, shot.end) - shot.start;
     sampleIntroPath(shot.keys, time, this.position, this.target);
-    if (shot.shake > 0) {
+    const shake = shotShakeAt(shot, time);
+    if (shake > 0) {
       const t = this.elapsed;
-      this.position.x += shot.shake * wobble(t, 0);
-      this.position.y += shot.shake * wobble(t, 1.9);
-      this.position.z += shot.shake * wobble(t, 4.1);
-      this.target.x += shot.shake * wobble(t, 2.7);
-      this.target.y += shot.shake * wobble(t, 5.3);
+      this.position.x += shake * wobble(t, 0);
+      this.position.y += shake * wobble(t, 1.9);
+      this.position.z += shake * wobble(t, 4.1);
+      this.target.x += shake * wobble(t, 2.7);
+      this.target.y += shake * wobble(t, 5.3);
     }
     this.camera.position.copy(this.position);
     this.camera.lookAt(this.target);

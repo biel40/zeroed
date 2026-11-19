@@ -14,8 +14,16 @@ export interface EscapeDriveConfig {
 
 /** Everything the departure shows at one instant. */
 export interface EscapeDrivePose {
+  /** Seconds since boarding. */
+  time: number;
   /** Metres driven north from the parking spot. */
   distance: number;
+  /** Metres per second down the road at this instant. */
+  speed: number;
+  /** Engine running: 0 off, 1 settled at idle or under load. */
+  engine: number;
+  /** 1 while the starter motor cranks, else 0. */
+  cranking: number;
   /** Rear doors: 0 open as parked, 1 shut. */
   doorsShut: number;
   /** Headlights and tail lights: 0 dark, 1 full. */
@@ -27,6 +35,8 @@ export interface EscapeDrivePose {
 }
 
 const DOORS_SHUT_SECONDS = 0.7;
+/** Seconds the engine takes to settle once it catches. */
+const ENGINE_SETTLE_SECONDS = 0.3;
 /** The lamps sputter (on/off/on) before they hold. */
 const HEADLIGHT_FLICKER = [0.08, 0.16, 0.3, 0.4] as const;
 /** Spring of each gate leaf on its hinge after the impact: overshoot, then settle. */
@@ -63,7 +73,7 @@ export function escapeHordeSpot(index: number, config: EscapeHordeConfig, out: {
 }
 
 export function createEscapeDrivePose(): EscapeDrivePose {
-  return { distance: 0, doorsShut: 0, headlights: 0, gateSwing: 0, jolt: 0 };
+  return { time: 0, distance: 0, speed: 0, engine: 0, cranking: 0, doorsShut: 0, headlights: 0, gateSwing: 0, jolt: 0 };
 }
 
 /**
@@ -73,9 +83,12 @@ export function createEscapeDrivePose(): EscapeDrivePose {
  * `gateImpact`, up to its top speed and down the road until `maxDistance`.
  */
 export function escapeDrivePose(time: number, config: EscapeDriveConfig, out: EscapeDrivePose): EscapeDrivePose {
+  out.time = time;
+  out.cranking = time >= BEAT.ignition && time < BEAT.engineCatch ? 1 : 0;
+  out.engine = smoothstep((time - BEAT.engineCatch) / ENGINE_SETTLE_SECONDS);
   out.doorsShut = smoothstep((time - BEAT.doorsShut) / DOORS_SHUT_SECONDS);
   out.headlights = headlightLevel(time - BEAT.headlights);
-  out.distance = driven(time - BEAT.launch, config);
+  drive(time - BEAT.launch, config, out);
   const sinceImpact = time - BEAT.gateImpact;
   if (sinceImpact <= 0) {
     out.gateSwing = 0;
@@ -88,15 +101,23 @@ export function escapeDrivePose(time: number, config: EscapeDriveConfig, out: Es
   return out;
 }
 
-function driven(sinceLaunch: number, config: EscapeDriveConfig): number {
-  if (sinceLaunch <= 0) return 0;
+/** Distance and speed `sinceLaunch` seconds after pulling away, into `out`. */
+function drive(sinceLaunch: number, config: EscapeDriveConfig, out: EscapeDrivePose): void {
+  if (sinceLaunch <= 0) {
+    out.distance = 0;
+    out.speed = 0;
+    return;
+  }
   const pullTime = BEAT.gateImpact - BEAT.launch;
   const acceleration = (2 * config.gateGap) / (pullTime * pullTime);
   const cruiseAfter = config.topSpeed / acceleration;
-  const distance = sinceLaunch < cruiseAfter
+  const accelerating = sinceLaunch < cruiseAfter;
+  const distance = accelerating
     ? 0.5 * acceleration * sinceLaunch * sinceLaunch
     : 0.5 * acceleration * cruiseAfter * cruiseAfter + config.topSpeed * (sinceLaunch - cruiseAfter);
-  return Math.min(distance, config.maxDistance);
+  const stopped = distance >= config.maxDistance;
+  out.distance = stopped ? config.maxDistance : distance;
+  out.speed = stopped ? 0 : accelerating ? acceleration * sinceLaunch : config.topSpeed;
 }
 
 function headlightLevel(sinceOn: number): number {

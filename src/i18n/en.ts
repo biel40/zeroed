@@ -117,6 +117,8 @@ export const en = {
   'settings.cameraShakeHint': 'Explosions, hits and weapon rumble. At 0 % the view never shakes; aiming recoil is unchanged.',
   'settings.weaponKick': 'Weapon kick',
   'settings.weaponKickHint': 'How much the weapon jumps in your hands when firing. Purely visual: accuracy and recoil stay the same.',
+  'settings.walkBob': 'Walking motion',
+  'settings.walkBobHint': 'Gentle head and weapon movement with each step. At 0 % both stay still; aiming is unchanged.',
   'settings.reset': 'RESET DEFAULTS',
   'settings.close': 'CLOSE',
   'settings.save': 'SAVE',

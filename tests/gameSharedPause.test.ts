@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { DynamicResolution } from '../src/core/DynamicResolution';
 import { Game } from '../src/core/Game';
 import { KNIFE_ATTACK_DURATION, Knife } from '../src/weapons/Knife';
@@ -42,7 +43,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     mode: { id: 'zombies', sharedSimulation, update: vi.fn(), isGameplayInputEnabled: () => true },
     renderer: { render: vi.fn() },
     scene: {},
-    player: { camera: { fov: 75 }, update: vi.fn(), applyViewEffects: vi.fn(), speed01: 0, rig: { position: { x: 0, z: 0 }, rotation: { y: 0 } } },
+    player: { camera: { fov: 75 }, update: vi.fn(), applyViewEffects: vi.fn(), walkGait: STILL_GAIT, rig: { position: { x: 0, z: 0 }, rotation: { y: 0 } } },
     input: {
       updateGamepad: vi.fn(), suppressGamepad: vi.fn(), blockingMenu: false,
       endFrame: vi.fn(), pointerLocked: true, wasPressed: () => false,
@@ -56,6 +57,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     effects: { update: vi.fn() },
     audio: { setFlameStream: vi.fn() },
     barrelSmoke: { update: vi.fn() },
+    footsteps: { update: vi.fn() },
     magazineDrops: { update: vi.fn() },
     viewArms: { root: { visible: true }, update: vi.fn() },
     flashLight: { intensity: 0 },
@@ -244,7 +246,7 @@ describe('cinematic first-person visibility', () => {
     weapon.reload();
     weapon.update(weapon.definition.reloadTime * 0.5, { trigger: false, ads: false });
     weapon.clearEvents();
-    view.update(0.016, weapon, 0, 0, 0);
+    view.update(0.016, weapon, STILL_GAIT, 0, 0);
     game.arsenal.set('m1911', { weapon, view });
     game.tmpMuzzle = new THREE.Vector3();
     game.audio.playReloadStart = vi.fn();
@@ -253,7 +255,7 @@ describe('cinematic first-person visibility', () => {
     game.input.wasPressed = (code: string) => code === 'Digit3';
     game.mode.usesFallbackAttack = () => knife.isAttacking;
     game.mode.getMeleeArm = () => knife.enabled ? knife : null;
-    game.mode.update = (dt: number) => { knife.update(dt, false, 0); };
+    game.mode.update = (dt: number) => { knife.update(dt, false, STILL_GAIT); };
     // A denied melee request leaves a legitimate reload running.
     game.mode.onMeleeAttack = () => false;
     prototype.frame.call(game);
@@ -308,7 +310,7 @@ describe('cinematic first-person visibility', () => {
     game.mode.usesFallbackAttack = () => knife.isAttacking;
     game.mode.getFallbackWeaponName = () => knife.isAttacking ? 'Knife' : null;
     game.mode.getMeleeArm = () => knife.isAttacking ? knife : null;
-    game.mode.update = (dt: number): void => { knife.update(dt, false, 0); };
+    game.mode.update = (dt: number): void => { knife.update(dt, false, STILL_GAIT); };
     let previousLowering = 1;
     let recoveryFrames = 0;
     for (let elapsed = 0; elapsed <= KNIFE_ATTACK_DURATION + 0.016; elapsed += 0.016) {

@@ -26,6 +26,9 @@ import { SpringRecoil } from './SpringRecoil';
 import { WeaponHands } from './WeaponHands';
 import { SustainedFireKick } from './SustainedFireKick';
 import { getSettings } from '../core/PlayerSettings';
+import { WALK_BOB } from '../config/walkBob';
+import { createWeaponBobPose, weaponBobPose } from '../player/WalkBob';
+import type { WalkGaitSample } from '../player/WalkGait';
 import type { Weapon } from './Weapon';
 import { WeaponFinishLayer, type WeaponFinish } from './WeaponFinish';
 import {
@@ -1247,7 +1250,7 @@ export class WeaponView {
   /** Hand targets: grips, reload choreography and the action hand. */
   readonly hands: WeaponHands;
   private flashTime = 0;
-  private bobPhase = 0;
+  private readonly bob = createWeaponBobPose();
   private swayX = 0;
   private swayY = 0;
   private pulseTime = 0;
@@ -1604,7 +1607,7 @@ export class WeaponView {
   update(
     dt: number,
     weapon: Weapon,
-    speed01: number,
+    gait: WalkGaitSample,
     mouseDeltaX: number,
     mouseDeltaY: number,
     lowering = 0,
@@ -1627,14 +1630,12 @@ export class WeaponView {
     this.root.rotation.y += this.swayX * 1.2;
     this.root.rotation.x += this.swayY * 0.8;
 
-    // 3. Movement bob, scaled by speed and suppressed while aiming.
-    const bobScale = view.bob * (1 - ads * 0.85) * speed01;
-    if (bobScale > 0.001) {
-      this.bobPhase += dt * (5 + speed01 * 5);
-      this.root.position.x += Math.sin(this.bobPhase) * 0.005 * bobScale;
-      this.root.position.y += Math.abs(Math.cos(this.bobPhase)) * 0.004 * bobScale;
-      this.root.rotation.z += Math.sin(this.bobPhase) * 0.012 * bobScale;
-    }
+    // 3. Walking bob from the shared gait: per-weapon handling and comfort setting, nearly gone while aiming.
+    const bob = weaponBobPose(gait, view.bob * getSettings().walkBob * (1 - ads * WALK_BOB.weapon.adsReduction), this.bob);
+    this.root.position.x += bob.x;
+    this.root.position.y += bob.y;
+    this.root.rotation.z += bob.roll;
+    this.root.rotation.x += bob.pitch;
 
     // 4. Independent visual recoil layer (spring).
     this.spring.update(dt);

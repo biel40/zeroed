@@ -52,10 +52,20 @@ extra se disipa suavemente al soltar el gatillo.
 El recoil de apuntado (incluido `recoil.cameraJolt`) mueve la camara antes de
 resolver los disparos; los efectos solo visuales (`CameraShake`, vibracion del
 lanzallamas, destello de las armas de energia, empujon al reanimar) se aplican
-despues, asi que nunca desvian la punteria. En Ajustes > Accesibilidad,
-`cameraShake` escala o desactiva esos efectos visuales y `weaponKick` la
-sacudida del arma en las manos; ninguno cambia recoil de apuntado, dispersion ni
-dano.
+despues, asi que nunca desvian la punteria. Al caminar, un unico ciclo de pasos
+(`WalkGait`) avanza con la distancia recorrida en el suelo y se desvanece al
+pararse, saltar o caer; de el salen un leve balanceo de cabeza (solo posicion,
+aplicado con los efectos visuales) y otro mas marcado del arma, cuchillo y
+granada, casi anulado al apuntar. Amplitudes y transiciones viven en
+[`walkBob.ts`](../src/config/walkBob.ts). Cada pisada de ese ciclo suena
+(`PlayerFootsteps`), alternando pie izquierdo y derecho, sobre la superficie
+que el mapa declara bajo el jugador (piedra, hormigon, metal, madera,
+escombros, agua o nieve); agachado suena mas bajo y tumbado no suena, y nunca
+en menus, cinematicas ni al morir. Las grabaciones, su mezcla y su variacion
+viven en [`footsteps.ts`](../src/config/footsteps.ts). En Ajustes > Accesibilidad,
+`cameraShake` escala o desactiva esos efectos visuales, `weaponKick` la
+sacudida del arma en las manos y `walkBob` el balanceo al caminar; ninguno
+cambia recoil de apuntado, dispersion ni dano.
 En individual y cooperativo, cada jugador empieza con seis cargadores de ocho
 balas para la M1911, incluido el que lleva puesto.
 `WeaponView` muestra el arma, `ViewArms` las manos que la sujetan y
@@ -194,8 +204,10 @@ gradualmente, sin efecto sintetico: el unico cue audible es el MP3 de ronda. `Ro
 en individual y en ambos clientes cooperativos, y se reinicia con la partida.
 La pausa silencia el bus y ocultar la pagina (cambio de pestaña o de app)
 suspende el contexto de efectos hasta volver. Los gemidos de zombi (aparicion y
-ambientales) comparten un cupo de voces simultaneas con huecos reservados para
-los cercanos, de modo que una horda no apila decenas de gruñidos.
+ambientales) usan [grabaciones posicionales](../ASSETS.md#voces-de-zombi-cc0)
+con respaldo procedural mientras cargan o si no se pueden reproducir. Comparten
+un cupo de voces simultaneas con huecos reservados para los cercanos, de modo
+que una horda no apila decenas de gruñidos.
 Station 33 usa «Creepy Halloween Music», de Tunetank (Pixabay), como pista propia;
 Burned Mansion conserva su música de partida. Los créditos y el origen del asset
 se recogen en `ASSETS.md`.
@@ -375,12 +387,14 @@ existente a `MOTDRULES`.
   alcance (mismo predicado exacto, coste proporcional al area ocupada).
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
   fallback sintetizado si falta el asset.
-- Audio direccional (`SpatialCue`): aparicion, tablas arrancadas y gemidos
-  ambientales (siempre de un zombie vivo) suenan desde su origen. Las fuentes a la
-  espalda o en otra planta pasan por un paso bajo que las apaga, tambien en
-  los pasos, para distinguir delante/detras y arriba/abajo. En cooperativo el
-  invitado reproduce las mismas señales a partir de los eventos del anfitrion,
-  y cada cliente oye los disparos del compañero desde su posicion
+- Audio direccional (`SpatialCue`): las apariciones y las tablas arrancadas
+  suenan desde su origen. Los gemidos se oyen aproximadamente cada dos segundos
+  cuando hay zombis vivos cerca. Alternan entre amenazas cercanas y siguen la
+  cabeza del zombi respecto a la camara durante todo el clip. Un filtro paso bajo
+  apaga las voces y pasos a la espalda o en otra planta. En cooperativo cada
+  cliente programa los gemidos a partir de los zombis de su escena. El invitado
+  reproduce las apariciones y las roturas a partir del estado del anfitrion.
+  Cada cliente oye los disparos del compañero desde su posicion
   (`playRemoteShot`: solo la detonacion, sin mecanismo ni cola de sala), a partir
   del `playerShoot` que ya se enviaba.
 - Animacion: aparicion y marcha son los clips originales del GLB; el idle
@@ -942,8 +956,14 @@ existente a `MOTDRULES`.
   audio `evacuation`) se rueda en la escena con `EndingCinematic` (planos con
   cortes en `PROTOCOL33_ESCAPE_SHOTS`) bajo la misma pantalla, transparente
   (`filmed`): letterbox y grano; el camion cierra sus puertas, enciende los
-  faros y arranca; embiste la puerta del patio, que se abre de golpe, y se
-  aleja por la carretera. Tras el, una horda
+  faros y arranca; embiste la puerta del patio, que se abre de golpe (la
+  camara acusa el golpe con un `jolt` del plano), y se aleja por la
+  carretera. La caja tiembla con el motor de arranque, vibra al ralenti y se
+  balancea con los baches segun la velocidad (`EscapeTruckMotion`), echa humo
+  por el escape y levanta nieve tras las ruedas (`EscapeTruckTrail`); sus
+  faros proyectan manchas de luz horneadas sobre el suelo y la cabina y las
+  ventanas del furgon se tiñen de rojo de emergencia, sin luces reales
+  nuevas. Tras el, una horda
   (`PROTOCOL33_ESCAPE_HORDE`) sale en tropel de la caseta de la escalera y
   corre hasta amontonarse en la puerta abierta: zombis reales del modo, al
   ritmo de una ronda alta como minimo, que no pueden herir porque la run ya

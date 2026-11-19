@@ -67,7 +67,9 @@ Obligatorio: `id` (igual a la clave del registro), `group`, `colliders`,
 `spawnPoints`, `barriers`, `doors`, `wallBuys`, `playerSpawn`,
 `useWallCollision`, `playerBounds`, `navigationBounds`, `ambience`,
 `onTopologyChanged`, `init`, `update`, `reset`, `activateDoor`,
-`refreshSpawnPoints` y `refreshColliders`.
+`refreshSpawnPoints` y `refreshColliders`. Aunque el tipo lo deja opcional, el
+test de contrato exige `footstepSurfaces` (`maps/FootstepSurfaces.ts`):
+superficie por defecto y zonas por planta derivadas de los datos del mapa.
 
 Opcional, solo si el mapa lo tiene:
 - `wallColliders`, `floorTransitions`, `mysteryBoxPlacement`, `ringMachines`;

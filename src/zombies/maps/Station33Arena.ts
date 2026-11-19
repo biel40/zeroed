@@ -1,6 +1,7 @@
 import { buildAmmoRefill } from './shared/AmmoRefill';
 import { buildGrenadeWallBuy } from './shared/GrenadeWallBuy';
 import * as THREE from 'three';
+import { STATION33_FOOTSTEP_SURFACES } from './station33/Station33FootstepSurfaces';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import { WindowBarrier } from '../barriers/WindowBarrier';
 import { WindowBarrierView } from '../barriers/WindowBarrierView';
@@ -141,6 +142,7 @@ export class Station33Arena implements ZombieArena {
   readonly useWallCollision = true;
   readonly playerBounds = STATION33_PLAYER_BOUNDS;
   readonly navigationBounds = STATION33_NAVIGATION_BOUNDS;
+  readonly footstepSurfaces = STATION33_FOOTSTEP_SURFACES;
   readonly mysteryBoxPlacement = STATION33_BOX_PLACEMENT;
   readonly doors: ReadonlyArray<PointDoor>;
   readonly wallBuys: ReadonlyArray<WallBuy>;

@@ -10,6 +10,7 @@ import {
   PROTOCOL33_HIGHLANDS,
   PROTOCOL33_SURFACE_Y,
   PROTOCOL33_TRUCK,
+  PROTOCOL33_TRUCK_BUMPER_REACH,
 } from '../src/zombies/maps/Station33Config';
 import { cathedralSite, ridgeHeight } from '../src/zombies/maps/station33/HighlandCathedral';
 import type { ArenaAmbush } from '../src/zombies/maps/ZombieArena';
@@ -116,6 +117,49 @@ describe('Station 33 filmed escape', () => {
     arena.reset();
     play(arena, 20);
     expect(asked).toHaveLength(PROTOCOL33_ESCAPE_HORDE.count + 1);
+  });
+
+  it('keeps the detailed truck inside its footprint, nothing ahead of the bumper that rams the gate', () => {
+    const arena = makeArena();
+    const [truck] = named(arena, 'surface-truck');
+    truck.updateMatrixWorld(true);
+    const bounds = new THREE.Box3();
+    truck.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.name.startsWith('station33-truck')) bounds.expandByObject(object);
+    });
+    const nose = PROTOCOL33_TRUCK.z - PROTOCOL33_TRUCK.length / 2;
+    expect(bounds.min.z).toBeGreaterThanOrEqual(nose - PROTOCOL33_TRUCK_BUMPER_REACH - 1e-6);
+    expect(bounds.min.z).toBeLessThan(nose - PROTOCOL33_TRUCK_BUMPER_REACH + 0.01);
+    // Only the corners of the tread lugs may graze the road.
+    expect(bounds.min.y).toBeGreaterThanOrEqual(PROTOCOL33_SURFACE_Y - 0.005);
+    // The radio whip over the cab is the only thing above the box body.
+    expect(bounds.max.y).toBeLessThan(PROTOCOL33_SURFACE_Y + PROTOCOL33_TRUCK.height + 1);
+  });
+
+  it('rides its body on the springs while driving, lights its lamps and the road, and smokes', () => {
+    const arena = makeArena();
+    const [body] = named(arena, 'surface-truck-body');
+    const [pool] = named(arena, 'surface-truck-headlight-pool') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[];
+    const [trail] = named(arena, 'surface-truck-trail');
+    expect(body.position.y).toBe(0);
+    expect(pool.visible).toBe(false);
+    expect(trail.visible).toBe(false);
+    arena.startEnding();
+    play(arena, BEAT.gateImpact + 1);
+    expect(pool.visible).toBe(true);
+    expect(pool.material.opacity).toBeGreaterThan(0);
+    expect(trail.visible).toBe(true);
+    let swayed = 0;
+    for (let frame = 0; frame < 20; frame++) {
+      play(arena, 0.05);
+      swayed = Math.max(swayed, Math.abs(body.position.y), Math.abs(body.rotation.x));
+    }
+    expect(swayed).toBeGreaterThan(0);
+    arena.reset();
+    expect(body.position.y).toBe(0);
+    expect(body.rotation.x).toBe(0);
+    expect(pool.visible).toBe(false);
+    expect(trail.visible).toBe(false);
   });
 
   it('parks the truck again and shuts the gate on a new run', () => {

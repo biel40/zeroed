@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { EndingCinematic } from '../src/rendering/EndingCinematic';
+import { EndingCinematic, shotShakeAt } from '../src/rendering/EndingCinematic';
 import type { ArenaEndingShot } from '../src/zombies/maps/ZombieArena';
 
 const SHOTS: ReadonlyArray<ArenaEndingShot> = [
@@ -72,6 +72,15 @@ describe('EndingCinematic', () => {
     expect(first.distanceTo(calm)).toBeGreaterThan(0);
     expect(first.distanceTo(calm)).toBeLessThanOrEqual(0.05 * Math.sqrt(3) + 1e-9);
     expect(sample(shaken).equals(first)).toBe(true);
+  });
+
+  it('jolts the camera on an impact and lets it die away', () => {
+    const jolted: ArenaEndingShot = { ...SHOTS[0], shake: 0.01, jolts: [{ time: 1, strength: 0.08 }] };
+    expect(shotShakeAt(jolted, 0.99)).toBe(0.01);
+    expect(shotShakeAt(jolted, 1)).toBeCloseTo(0.09, 9);
+    expect(shotShakeAt(jolted, 1.2)).toBeLessThan(shotShakeAt(jolted, 1.05));
+    expect(shotShakeAt(jolted, 2)).toBeLessThan(0.011);
+    expect(shotShakeAt(SHOTS[0], 1)).toBe(0);
   });
 
   it('follows the player camera lens', () => {

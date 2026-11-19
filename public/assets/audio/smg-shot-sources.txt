@@ -1,15 +1,12 @@
-MP5
+MP5A3
 
-«Healthcare Soldier Shoots with MP5 and M11 in PSD postures»
-Pierre-Etienne Courtejoie, U.S. Army. Public domain.
-https://www.dvidshub.net/video/400111/healthcare-soldier-shoots-with-mp5-and-m11-psd-postures
+“MP5 Submachine gun in doorway.aif” by Franki-01234, recorded with blanks.
+https://freesound.org/people/Franki-01234/sounds/201667/
+CC0 1.0 Universal. https://creativecommons.org/publicdomain/zero/1.0/
 
-Both MP5 clips use one report from the MP5 take starting at 251.162 s.
-The automatic edit fades earlier to fit between shots.
-
-DVIDS reuse notice
-https://www.dvidshub.net/about/copyright
-“The appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.”
+Both edits use the same report from 1.0718 s of the high-quality preview.
+The 385 ms semi-automatic edit softens the recorded reflections. The 53 ms
+automatic edit fades before the first strong reflection.
 
 PPSh-41
 

@@ -90,7 +90,7 @@ export class GrenadeHand {
         return;
       }
     }
-    this.view.update(dt, this.ctx.player.speed01, held);
+    this.view.update(dt, this.ctx.player.walkGait, held);
     // A plain tap only passes through the wind-up: the dial is for a held grenade.
     this.pushCookDial(held && this.view.isCooking && this.cooked !== null ? this.cooked : null);
   }

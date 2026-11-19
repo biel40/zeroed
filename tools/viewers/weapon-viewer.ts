@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../../src/player/WalkGait';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { AssetManager } from '../../src/assets/AssetManager';
 import { WEAPON_DEFINITIONS } from '../../src/config/weapons';
@@ -253,13 +254,13 @@ renderer.info.autoReset = false;
 function poseKnife({ knife, progress }: NonNullable<Slot['knife']>): boolean {
   if (progress < 0) {
     const started = !knife.isAttacking && knife.trigger();
-    knife.update(1 / 60 / knifeSlowdown, false, 0);
+    knife.update(1 / 60 / knifeSlowdown, false, STILL_GAIT);
     return started;
   }
   knife.reset();
   knife.setEnabled(true);
   knife.trigger();
-  knife.update(progress * KNIFE_ATTACK_DURATION, false, 0);
+  knife.update(progress * KNIFE_ATTACK_DURATION, false, STILL_GAIT);
   return true;
 }
 
@@ -270,7 +271,7 @@ function frame(): void {
     arenas.get(slot.scene)?.update(1 / 60, slot.camera.position);
     if (slot.knife && poseKnife(slot.knife)) slot.weapon.cancelReload();
     const melee = slot.knife?.knife ?? null;
-    slot.view.update(1 / 60, slot.weapon, 0, 0, 0, melee?.firearmLowering ?? 0);
+    slot.view.update(1 / 60, slot.weapon, STILL_GAIT, 0, 0, melee?.firearmLowering ?? 0);
     slot.arms?.update(1 / 60, slot.view, melee);
   }
   renderer.info.reset();

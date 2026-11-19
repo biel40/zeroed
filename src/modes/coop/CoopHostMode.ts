@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ArenaFootstepSurfaces } from '../../zombies/maps/FootstepSurfaces';
 import { CoopChestInteraction } from './CoopChestInteraction';
 import { t } from '../../i18n/i18n';
 import { actionKey, weaponCaseLocked, weaponCasePrompt } from '../../ui/InteractionPrompts';
@@ -128,6 +129,11 @@ export class CoopHostMode implements GameMode {
     return this.world?.arena.ambience.musicTrack ?? null;
   }
 
+  /** Where the local player's footsteps land on this map. */
+  public getFootstepSurfaces(): ArenaFootstepSurfaces | null {
+    return this.world?.arena.footstepSurfaces ?? null;
+  }
+
   private ctx!: ModeContext;
   private readonly chestInteraction = new CoopChestInteraction();
   private world!: CoopWorld;
@@ -248,7 +254,7 @@ export class CoopHostMode implements GameMode {
     if (this.hostPaused) return;
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
     this.knife.setEnabled(this.knife.isAttacking);
-    this.knife.update(dt, false, this.ctx.player.speed01);
+    this.knife.update(dt, false, this.ctx.player.walkGait);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.grenades.update(dt, this.isGameplayInputEnabled() && this.isCombatInputEnabled());
     this.box.update(dt);
@@ -274,7 +280,7 @@ export class CoopHostMode implements GameMode {
     this.spectator.update(this.guestAvatar,
       this.phase === 'playing' && this.guestConnected && this.players.host.life.state === 'dead',
       this.players.guest.life.state);
-    this.world.update(dt);
+    this.world.update(dt, this.phase === 'playing' ? this.zombies : undefined);
     const hostLife = this.players.host.life;
     const guestLife = this.players.guest.life;
     this.gesture.update(dt, guestLife.reviver === 'host' ? 'reviver'

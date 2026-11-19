@@ -97,6 +97,8 @@ export const MANSION_BUNKER_DIVIDER_X = 4.2;
 export const MANSION_STAIR_CENTER_X = 6.65;
 export const MANSION_STAIR_TOP_Z = -3.8;
 export const MANSION_STAIR_BOTTOM_Z = -7.3;
+/** The steel treads run wall to wall, this far either side of the stair's centre line. */
+export const MANSION_STAIR_TREAD_HALF_WIDTH = 1.175;
 
 /**
  * Great dining hall north of the Mystery Box room and the east hall, as wall
@@ -225,6 +227,12 @@ export const MANSION_AREA_LIGHTS: ReadonlyArray<MansionAreaLight> = [
 
 /** Charred cabinet standing in the east hall, by its centre on the floor. */
 export const MANSION_CHARRED_CABINET = { x: 0.4, z: -6.1, width: 0.45, height: 1.4, depth: 1.2 } as const;
+
+/** Heaps of ceiling plaster on the ground floor: centres, each scattered over `MANSION_PLASTER_SPREAD`. */
+export const MANSION_PLASTER_RUBBLE: ReadonlyArray<readonly [number, number]> = [
+  [-4.8, 4.4], [5.6, 8.4], [-2.6, -1.2], [2.9, -6.9], [7.6, 1.0], [-5.0, -9.4], [3.0, -14.6], [-5.6, -16.6],
+];
+export const MANSION_PLASTER_SPREAD = { x: 1.1, z: 0.9 } as const;
 
 export interface MansionSmoulderingFire {
   readonly id: string;

@@ -14,6 +14,7 @@ import type { WeaponFinish } from '../weapons/WeaponFinish';
 import type { WeaponCatalog, WeaponId } from '../weapons/WeaponTypes';
 import type { HandRings } from '../weapons/HandRings';
 import type { MeleeArmDriver } from '../weapons/ViewArms';
+import type { ArenaFootstepSurfaces } from '../zombies/maps/FootstepSurfaces';
 
 /** Everything a mode needs from the shared Game shell. */
 export interface ModeContext {
@@ -161,6 +162,8 @@ export interface GameMode {
    * set, the first-person weapon and arms are hidden.
    */
   getCinematicCamera?(): THREE.Camera | null;
+  /** Walking surfaces of the mode's map, read once `init` built it; absent plays the default surface. */
+  getFootstepSurfaces?(): ArenaFootstepSurfaces | null;
   /** Ordered desktop keyboard input for mode-owned developer commands. */
   onKeyInput?(key: string): void;
   /** Optional local developer tools; absent in cooperative modes. */

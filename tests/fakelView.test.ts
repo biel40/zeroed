@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS, ZOMBIES_WEAPON_PRELOAD } from '../src/config/weapons';
 import { ZOMBIE_MAPS } from '../src/config/zombieMaps';
@@ -42,7 +43,7 @@ function ready(): Weapon {
 function run(weapon: Weapon, seconds: number, input: typeof IDLE, events: WeaponEventType[] = [], view?: WeaponView): WeaponEventType[] {
   for (let t = 0; t < seconds; t += DT) {
     weapon.update(DT, input);
-    view?.update(DT, weapon, 0, 0, 0);
+    view?.update(DT, weapon, STILL_GAIT, 0, 0);
     for (const event of weapon.pendingEvents) events.push(event.type);
     weapon.clearEvents();
   }
@@ -159,7 +160,7 @@ describe('ФАКЕЛ-33 view model', () => {
     const weapon = ready();
     const view = new WeaponView(definition, null);
     const petal = view.root.getObjectByName('fakel-petal')!;
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     const closed = petal.rotation.x;
     run(weapon, 3, FIRE, [], view);
     expect(petal.rotation.x).toBeGreaterThan(closed + 0.5);
@@ -174,7 +175,7 @@ describe('ФАКЕЛ-33 view model', () => {
     const weapon = ready();
     const view = new WeaponView(definition, null);
     const pilot = view.root.getObjectByName('fakel-pilot-flame')!;
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     expect(pilot.visible).toBe(true);
     run(weapon, 5, FIRE, [], view);
     expect(weapon.heat.overheated).toBe(true);

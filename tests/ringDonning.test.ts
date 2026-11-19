@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { RING_DEFINITIONS } from '../src/game/rings/RingCatalog';
@@ -55,7 +56,7 @@ function playDonning(): { samples: Sample[]; arms: ViewArms; view: WeaponView; r
 
   const frame = (): void => {
     weapon.update(DT, { trigger: false, ads: false });
-    view.update(DT, weapon, 0, 0, 0, donning.firearmLowering);
+    view.update(DT, weapon, STILL_GAIT, 0, 0, donning.firearmLowering);
     arms.update(DT, view, donning.isAnimating ? donning : null);
   };
   for (let index = 0; index < 30; index++) frame();

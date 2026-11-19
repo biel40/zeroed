@@ -115,6 +115,8 @@ export const ca: Record<TranslationKey, string> = {
   'settings.cameraShakeHint': "Explosions, cops i vibració de l'arma. Al 0 % la vista no tremola mai; el retrocés en apuntar no canvia.",
   'settings.weaponKick': "Sacsejada de l'arma",
   'settings.weaponKickHint': "Quant salta l'arma a les mans en disparar. Només visual: la precisió i el retrocés no canvien.",
+  'settings.walkBob': 'Moviment en caminar',
+  'settings.walkBobHint': "Lleuger balanceig del cap i l'arma a cada pas. Al 0 % tots dos queden quiets i la punteria no canvia.",
   'settings.reset': 'RESTABLIR PER DEFECTE',
   'settings.close': 'TANCAR',
   'settings.save': 'DESAR',

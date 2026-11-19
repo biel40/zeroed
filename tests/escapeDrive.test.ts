@@ -67,6 +67,25 @@ describe('Station 33 escape drive', () => {
     expect(escapeHordeSpot(3, PROTOCOL33_ESCAPE_HORDE, { x: 0, z: 0 })).toEqual(spots[3]);
   });
 
+  it('cranks, catches and idles before it pulls away, then reports its speed down the road', () => {
+    expect(at(BEAT.ignition - 0.01).cranking).toBe(0);
+    expect(at(BEAT.ignition + 0.1).cranking).toBe(1);
+    expect(at(BEAT.engineCatch - 0.01).engine).toBe(0);
+    expect(at(BEAT.engineCatch + 0.01).cranking).toBe(0);
+    expect(at(BEAT.engineCatch + 0.5).engine).toBe(1);
+    expect(at(BEAT.launch).speed).toBe(0);
+    const step = 0.01;
+    for (let time = BEAT.launch + step; time < 30; time += 0.37) {
+      const ahead = at(time + step).distance;
+      const behind = at(time - step).distance;
+      const speed = at(time).speed;
+      if (ahead < PROTOCOL33_DEPARTURE.maxDistance) expect(speed).toBeCloseTo((ahead - behind) / (2 * step), 1);
+      expect(speed).toBeLessThanOrEqual(PROTOCOL33_DEPARTURE.topSpeed + 1e-9);
+    }
+    expect(at(60).speed).toBe(0);
+    expect(at(7.3).time).toBe(7.3);
+  });
+
   it('is a pure function of time', () => {
     const first = { ...at(7.3) };
     at(2);

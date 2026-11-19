@@ -32,6 +32,8 @@ import { MagazineDropPool } from '../weapons/MagazineDrop';
 import type { ShellCasingProfile, WeaponId } from '../weapons/WeaponTypes';
 import { WeaponView } from '../weapons/WeaponView';
 import { ViewArms } from '../weapons/ViewArms';
+import { PlayerFootsteps } from '../player/PlayerFootsteps';
+import { footstepSurfacesUsed } from '../zombies/maps/FootstepSurfaces';
 import { armDetailFor } from '../weapons/FirstPersonArm';
 import { FLARE_LIGHT_COLOR, flareLightDecay } from '../weapons/MuzzleFlare';
 
@@ -71,6 +73,7 @@ export class Game {
   private readonly effects: Effects;
   private readonly barrelSmoke: BarrelSmoke;
   private readonly audio: AudioSystem;
+  private readonly footsteps: PlayerFootsteps;
   private readonly stats = new Stats();
   /** Every weapon the mode may use, preloaded once; the inventory picks slots. */
   private readonly arsenal = new Map<WeaponId, ArsenalEntry>();
@@ -141,6 +144,7 @@ export class Game {
     private readonly qualityGovernor: AutoQualityGovernor | null = null,
   ) {
     this.audio = new AudioSystem(music);
+    this.footsteps = new PlayerFootsteps(this.audio);
     const rendererOptions = {
       // The post-processed frame is antialiased in its own offscreen target.
       antialias: !this.profile.useReducedEffects && !this.profile.useAdvancedRendering,
@@ -300,6 +304,9 @@ export class Game {
       returnToMainMenu: () => this.returnToMainMenu(),
       setDebugStatsEnabled: (enabled) => this.setDebugStatsEnabled(enabled),
     });
+    const footstepSurfaces = this.mode.getFootstepSurfaces?.() ?? null;
+    this.footsteps.setSurfaces(footstepSurfaces);
+    this.audio.preloadFootsteps(footstepSurfacesUsed(footstepSurfaces));
     applyEnvironmentSurfaceDetail(this.scene, this.profile.useAdvancedRendering);
     if (this.profile.useAdvancedRendering && features.reflections) {
       this.reflectionProbe = new ReflectionProbe(this.renderer, this.scene, this.player.rig, [this.flashLight], hdrTextureType(this.renderer));
@@ -993,7 +1000,7 @@ export class Game {
     this.currentView.update(
       dt,
       weapon,
-      this.player.speed01,
+      this.player.walkGait,
       this.input.mouseDeltaX,
       this.input.mouseDeltaY,
       melee?.firearmLowering ?? 0,
@@ -1003,6 +1010,9 @@ export class Game {
     this.currentView.root.visible &&= cinematicCamera === null && !this.player.isDying;
     this.viewArms.update(dt, this.currentView, melee);
     this.viewArms.root.visible = cinematicCamera === null;
+    // Steps land on the footfalls the head and weapon bob follow; none in menus, cinematics or death.
+    this.footsteps.update(this.player.walkGait, rig.position.x, rig.position.z, this.player.floor, this.player.stance,
+      allowGameplayInput && cinematicCamera === null && !this.player.isDying);
     if (this.currentView.root.visible) {
       this.currentView.getMuzzleWorldPosition(this.tmpMuzzle);
       this.barrelSmoke.update(dt, this.tmpMuzzle, weapon.heat.intensity, weapon.definition.muzzleSmoke?.scale);

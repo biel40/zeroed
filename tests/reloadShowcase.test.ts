@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { ViewArms } from '../src/weapons/ViewArms';
@@ -53,7 +54,7 @@ function rig(id: WeaponId) {
   camera.add(view.root, arms.root);
   const frame = (): void => {
     weapon.update(DT, { trigger: false, ads: false });
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     arms.update(DT, view, null);
     camera.updateMatrixWorld(true);
   };

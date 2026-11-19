@@ -1,0 +1,55 @@
+Player footsteps
+
+Every clip is a single recorded step, taken from the high-quality Freesound
+preview of the source below. All sources are CC0 1.0 Universal (public
+domain dedication, verified on each sound's page on 2026-11-19):
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Processing (all clips): mixed to mono, high-passed at 70 Hz, resampled to
+32 kHz, cut at the step's onset, tail trimmed 36 dB under its peak, faded
+(4 ms in, up to 50 ms out), level-matched on the loudest 60 ms to -16 dBFS
+RMS (peak capped at -1 dBFS), saved as 16-bit PCM WAV. No synthesis.
+
+concrete_1..5 (Cloth_And_Shoes_On_Concrete_01, _02, _13, _15, _17)
+  Pack "Concrete Footsteps" by BlondPanda
+  https://freesound.org/people/BlondPanda/sounds/778499/
+  https://freesound.org/people/BlondPanda/sounds/778500/
+  https://freesound.org/people/BlondPanda/sounds/778491/
+  https://freesound.org/people/BlondPanda/sounds/778493/
+  https://freesound.org/people/BlondPanda/sounds/778495/
+
+metal_1..5 (Boots_On_Hollow_Metal_Light_01 to _05)
+  Pack "Hollow Metal Footsteps" by BlondPanda
+  https://freesound.org/people/BlondPanda/sounds/778413/
+  https://freesound.org/people/BlondPanda/sounds/778414/
+  https://freesound.org/people/BlondPanda/sounds/778437/
+  https://freesound.org/people/BlondPanda/sounds/778415/
+  https://freesound.org/people/BlondPanda/sounds/778416/
+
+snow_1..5 (Steps_Fine_Snow_Or_Sand_Strong_18, _19, _20, _22, _25)
+  Pack "Fine Snow or Sand Footsteps" by BlondPanda
+  https://freesound.org/people/BlondPanda/sounds/778556/
+  https://freesound.org/people/BlondPanda/sounds/778557/
+  https://freesound.org/people/BlondPanda/sounds/778558/
+  https://freesound.org/people/BlondPanda/sounds/778561/
+  https://freesound.org/people/BlondPanda/sounds/778564/
+
+stone_1..5
+  "Footsteps On Tile" by IENBA (boots on a tile floor, 10 variations)
+  https://freesound.org/people/IENBA/sounds/834027/
+  Steps at 0.025, 0.915, 1.835, 2.755 and 3.670 s.
+
+debris_1..5
+  "Footsteps On Gravel" by IENBA (outdoors, no reverb)
+  https://freesound.org/people/IENBA/sounds/818562/
+  Steps at 0.030, 0.600, 1.085, 1.595 and 3.535 s.
+
+wood_1..5
+  "Footsteps on wood floor" by IENBA
+  https://freesound.org/people/IENBA/sounds/485421/
+  Steps at 0.060, 0.850, 3.360, 4.070 and 12.510 s.
+
+water_1..5
+  "Splashing Footsteps Shallow Water" by ChristopherJngs (wading through a puddle)
+  https://freesound.org/people/ChristopherJngs/sounds/861369/
+  Steps at 3.195, 3.570, 3.975, 4.790 and 5.380 s.

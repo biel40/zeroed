@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
@@ -156,15 +157,15 @@ describe('VORTEX-9 view model', () => {
     const idle = fakeWeapon('ready', 0);
     const flow = energy[0].emissiveMap!;
 
-    weaponView.update(1 / 60, idle, 0, 0, 0);
+    weaponView.update(1 / 60, idle, STILL_GAIT, 0, 0);
     const offset = flow.offset.y;
     const resting = energy[0].emissiveIntensity;
     weaponView.onShot();
-    weaponView.update(1 / 60, idle, 0, 0, 0);
+    weaponView.update(1 / 60, idle, STILL_GAIT, 0, 0);
     expect(energy[0].emissiveIntensity).toBeGreaterThan(resting + 1.5);
     expect(flow.offset.y).not.toBe(offset);
 
-    for (let frame = 0; frame < 60; frame++) weaponView.update(1 / 60, idle, 0, 0, 0);
+    for (let frame = 0; frame < 60; frame++) weaponView.update(1 / 60, idle, STILL_GAIT, 0, 0);
     expect(energy[0].emissiveIntensity).toBeLessThan(2.2);
   });
 });

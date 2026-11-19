@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { M14_PROFILE } from '../src/weapons/M14ViewModel';
@@ -230,7 +231,7 @@ describe('M14 reload', () => {
     const homeZ = handle.position.z;
     weapon.reserveAmmo = 0;
     weapon.ammoInMagazine = 0;
-    weaponView.update(1 / 120, weapon, 0, 0, 0);
+    weaponView.update(1 / 120, weapon, STILL_GAIT, 0, 0);
     expect(handle.position.z).toBeCloseTo(homeZ + HANDLE_TRAVEL, 6);
   });
 });

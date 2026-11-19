@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { RING_DEFINITIONS, RING_FINGERS } from '../src/game/rings/RingCatalog';
@@ -55,7 +56,7 @@ function rig(definition: WeaponDefinition): Rig {
 
 function frame({ weapon, view, arms }: Rig, options: { ads?: boolean; lowering?: number; melee?: Knife | null } = {}): void {
   weapon.update(DT, { trigger: false, ads: options.ads ?? false });
-  view.update(DT, weapon, 0, 0, 0, options.lowering ?? options.melee?.firearmLowering ?? 0);
+  view.update(DT, weapon, STILL_GAIT, 0, 0, options.lowering ?? options.melee?.firearmLowering ?? 0);
   arms.update(DT, view, options.melee ?? null);
 }
 
@@ -412,7 +413,7 @@ describe('Knife hand-off', () => {
     let sawKnifeHold = false;
     const handle = new THREE.Vector3();
     while (knife.isAttacking) {
-      knife.update(DT, false, 0);
+      knife.update(DT, false, STILL_GAIT);
       frame(setup, { melee: knife });
       if (knife.armWeight === 1) {
         knife.readHandTarget(handle, new THREE.Quaternion(), new THREE.Vector3());
@@ -434,7 +435,7 @@ describe('Knife hand-off', () => {
     knife.trigger();
     let shown = 0;
     while (knife.isAttacking) {
-      knife.update(DT, false, 0);
+      knife.update(DT, false, STILL_GAIT);
       frame(setup, { melee: knife });
       if (knife.knifeVisible) {
         shown++;
@@ -451,7 +452,7 @@ describe('Knife hand-off', () => {
       camera.aspect = aspect;
       camera.updateProjectionMatrix();
       knife.trigger();
-      knife.update(progress * KNIFE_ATTACK_DURATION, false, 0);
+      knife.update(progress * KNIFE_ATTACK_DURATION, false, STILL_GAIT);
       frame(setup, { melee: knife });
       camera.updateMatrixWorld(true);
       const frustum = new THREE.Frustum().setFromProjectionMatrix(

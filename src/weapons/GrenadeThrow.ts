@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { applyViewModelDepth } from '../rendering/ViewModelDepth';
+import { getSettings } from '../core/PlayerSettings';
+import { createWeaponBobPose, weaponBobPose } from '../player/WalkBob';
+import type { WalkGaitSample } from '../player/WalkGait';
 import { ARM_REST_BELOW_SCREEN, ArmChain, buildArmKeys, FIST_GRIP_ROTATION, type ArmPose } from './ArmChain';
 import { F1GrenadeModel } from './F1GrenadeModel';
 import type { MeleeArmDriver } from './ViewArms';
@@ -65,7 +68,7 @@ export class GrenadeThrow implements MeleeArmDriver {
   private elapsed = GRENADE_THROW_DURATION;
   private pinPulled = true;
   private released = true;
-  private bobTime = 0;
+  private readonly bob = createWeaponBobPose();
 
   public constructor() {
     this.root.name = 'grenade-throw-view';
@@ -122,18 +125,14 @@ export class GrenadeThrow implements MeleeArmDriver {
   }
 
   /** `holding` keeps the arm cocked at the wind-up (cooking) until it lets go. */
-  public update(dt: number, speed01: number, holding = false): void {
+  public update(dt: number, gait: WalkGaitSample, holding = false): void {
     if (!this.isThrowing) {
       this.root.visible = false;
       return;
     }
     // Same gait as the firearm bob so the arm stays grounded while moving.
-    this.bobTime += dt * (5 + speed01 * 5);
-    this.root.position.set(
-      Math.sin(this.bobTime) * 0.005 * speed01,
-      Math.abs(Math.cos(this.bobTime)) * 0.004 * speed01,
-      0,
-    );
+    const bob = weaponBobPose(gait, getSettings().walkBob, this.bob);
+    this.root.position.set(bob.x, bob.y, 0);
     const cocked = COCK_END * GRENADE_THROW_DURATION;
     const next = this.elapsed + dt;
     this.elapsed = Math.min(GRENADE_THROW_DURATION,

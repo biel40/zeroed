@@ -19,6 +19,7 @@ import type { TranslationKey } from '../../i18n/i18n';
 import type { EvacuationRules, EvacuationStage } from '../evacuation/EvacuationProtocol';
 import type { CaptainUssrField, GroundRect, GuardianDuelPhase } from '../guardians/CaptainUssrBrain';
 import type { GuardianEntranceBeats } from '../guardians/GuardianEntrance';
+import type { ArenaFootstepSurfaces } from './FootstepSurfaces';
 
 export interface MysteryBoxPlacement {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -317,6 +318,17 @@ export interface ArenaEndingShot {
   readonly keys: ReadonlyArray<ArenaIntroShot>;
   /** Optional handheld shake: the largest jitter, in metres, of the camera and its aim. */
   readonly shake?: number;
+  /**
+   * Optional impacts felt through the camera, on the shot's own clock: from
+   * `time`, an extra shake of up to `strength` metres that dies away fast.
+   */
+  readonly jolts?: ReadonlyArray<ArenaShotJolt>;
+}
+
+/** One impact of an `ArenaEndingShot`. */
+export interface ArenaShotJolt {
+  readonly time: number;
+  readonly strength: number;
 }
 
 /** A camera keyframe in world space (map intros and filmed endings). */
@@ -463,6 +475,8 @@ export interface ZombieArena {
   readonly weaponStations?: ReadonlyArray<ArenaWeaponStation>;
   /** Weapon upgrade machine, if the map has one. */
   readonly upgradeMachine?: ArenaUpgradeMachine;
+  /** What the player walks on where (`FootstepSurfaces`); omitted plays the default surface everywhere. */
+  readonly footstepSurfaces?: ArenaFootstepSurfaces;
   /**
    * Developer console: powers the map and opens every door on the way to its
    * upgrade machine, so it can be tested at once. False when it cannot.

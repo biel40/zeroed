@@ -200,9 +200,10 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `m1911_shot.mp3` | Disparo de la M1911: mono, 44,1 kHz, 96 kbps, ~1,2 s con cola (con fallback procedural) |
 | `ak47_single_report.wav`, `ak47_auto_report.wav` | Grabación de un disparo de AK-47 por ninebilly, editada para ambos modos (CC0). [Fuente](https://freesound.org/people/ninebilly/sounds/520934/) |
-| `mp5_single_shot.wav`, `mp5_auto_shot.wav` | Disparo de MP5 grabado por Pierre-Etienne Courtejoie para el U.S. Army (dominio público) |
+| `mp5a3_single_report.wav`, `mp5a3_auto_report.wav` | Grabación de una MP5A3 disparando con fogueo, por Franki-01234 (CC0). [Fuente](https://freesound.org/people/Franki-01234/sounds/201667/) |
 | `ppsh41_single_shot.wav`, `ppsh41_auto_shot.wav` | Disparos de PPSh-41 de The Free Firearm Sound Library (CC0) |
 | `misterio-halloween-theme-2-256014-license.txt` | Certificado de licencia de `menu_theme.mp3` |
+| `footsteps/<superficie>_1..5.wav` | Pasos del jugador por superficie: grabaciones CC0 de BlondPanda, IENBA y ChristopherJngs, recortadas a un paso, mono 32 kHz. [Fuentes y cortes](public/assets/audio/footsteps/SOURCES.txt) |
 
 Las fuentes, los cortes y las condiciones de reutilización de la MP5 y la
 PPSh-41 se distribuyen con el juego. [Créditos de los disparos](public/assets/audio/smg-shot-sources.txt).
@@ -240,6 +241,19 @@ https://creativecommons.org/publicdomain/zero/1.0/
 variación la aporta el motor (playbackRate 0.9–1.12 y jitter de cadencia).
 Si un archivo falta o no decodifica, ambos sonidos vuelven a su síntesis
 procedural.
+
+### Voces de zombi (CC0)
+
+Las grabaciones de voz se convirtieron a MP3 mono de 44,1 kHz para el audio
+posicional. [Zomby sfx pack, de saturn91](https://opengameart.org/content/zomby-sfx-pack) ·
+[Licencia CC0](https://creativecommons.org/publicdomain/zero/1.0/)
+
+| Archivo | Original | Uso |
+| --- | --- | --- |
+| `zombies/spawn_1.mp3` | `01_zombey.mp3` | Aviso de aparición |
+| `zombies/moan_1.mp3` | `02_zombey.mp3` | Gemido ambiental |
+| `zombies/moan_2.mp3` | `03_zombey.mp3` | Gemido ambiental |
+| `zombies/moan_3.mp3` | `07_zombey.mp3` | Gemido ambiental |
 
 ## Portadas de mapas (`public/assets/maps/`)
 

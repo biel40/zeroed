@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { makeSoftSpot } from '../shared/SoftSpotTexture';
 import type { QualityLevel } from '../../../core/DeviceProfile';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { COCHERAS, CONSIGNA, KOVKA, MILICIA, SUBESTACION, TALLER, TALLER_CRANE, VESTIBULE } from '../Station33Config';
+import { COCHERAS, CONSIGNA, KOVKA, MILICIA, STATION33_DRIP_SOURCES as DRIP_SOURCES, STATION33_PUDDLE, SUBESTACION, TALLER, TALLER_CRANE, VESTIBULE } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { Station33Lighting } from './Station33Lighting';
 import { ceilingHeightAt, VESTIBULE_VAULT } from './VaultProfile';
@@ -27,31 +27,6 @@ const DUST_VOLUMES: ReadonlyArray<DustVolume> = [
   { room: KOVKA.hall, count: { low: 12, medium: 24, high: 40, ultraMax: 60 }, ceiling: KOVKA.wallHeight, seed: 3431 },
 ];
 const STEAM_PUFFS: Readonly<Record<QualityLevel, number>> = { low: 2, medium: 3, high: 5, ultraMax: 8 };
-/**
- * Seepage points in the ceilings; the third one is the hole the vault
- * plaster fell from, the next two soak the luggage office, three drip from
- * the joints of the train sheds' iron rings, two leak onto the machine-room
- * floor, one into the substation gallery and the last two into the workshop.
- */
-const DRIP_SOURCES = [
-  { x: -1.2, z: 7.3, interval: 2.3 },
-  { x: 2.7, z: 12.2, interval: 3.1 },
-  { x: 4.6, z: 15.0, interval: 1.7 },
-  { x: 16.1, z: 11.6, interval: 2.6 },
-  { x: 19.6, z: 16.7, interval: 1.9 },
-  { x: 9.6, z: -5.4, interval: 2.1 },
-  { x: 12.4, z: -17.3, interval: 1.5 },
-  { x: 19.4, z: -24.1, interval: 2.8 },
-  { x: 9.2, z: -36.5, interval: 2.4 },
-  { x: 16.9, z: -38.6, interval: 1.8 },
-  { x: 12.7, z: -30.4, interval: 2.2 },
-  { x: 7.6, z: -57.2, interval: 2.0 },
-  { x: 14.2, z: -51.4, interval: 2.7 },
-  // The KOVKA chamber's vault weeps onto the deck, a lane and the deck behind the reactor.
-  { x: -11.8, z: -43.2, interval: 1.9 },
-  { x: -24.0, z: -58.3, interval: 2.5 },
-  { x: -8.2, z: -67.6, interval: 1.6 },
-] as const;
 /** Severed cables hanging out of the ceilings: anchor, length and sway phase. */
 const HANGING_CABLES = [
   { x: 4.4, z: 14.8, length: 1.6, phase: 0.4 },
@@ -154,7 +129,7 @@ export class Station33Atmosphere {
       name: 'station33_drops', size: 0.05, map: spot, color: 0xa9c4c4, transparent: true, opacity: 0.8, depthWrite: false,
     }));
     for (const drip of this.drips) {
-      const puddle = new THREE.PlaneGeometry(0.9, 0.7).rotateX(-Math.PI / 2).rotateY(drip.x).translate(drip.x, 0.007, drip.z);
+      const puddle = new THREE.PlaneGeometry(STATION33_PUDDLE.halfWidth * 2, STATION33_PUDDLE.halfDepth * 2).rotateX(-Math.PI / 2).rotateY(drip.x).translate(drip.x, 0.007, drip.z);
       context.batch.add(puddle, context.materials.puddle);
     }
 

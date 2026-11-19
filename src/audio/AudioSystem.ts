@@ -11,6 +11,8 @@ import { muffleCutoff, type SpatialCue } from './SpatialCue';
 import { AmbientBed, type AmbientBedId } from './AmbientBed';
 import { VoiceLimiter } from './VoiceLimiter';
 import { shotGainScale, shotPlaybackRate } from './ShotVariation';
+import { FOOTSTEP_MIX, FOOTSTEP_SAMPLES, type FootSide, type FootstepSurface } from '../config/footsteps';
+import { FootstepVariantPicker, footstepGainScale, footstepPlaybackRate } from './FootstepVariation';
 import { EVACUATION_ENDING_TIMELINE as ESCAPE_BEAT } from '../zombies/evacuation/EvacuationEndingTimeline';
 
 const PING_THROTTLE = 0.045;
@@ -192,7 +194,7 @@ const AMBIENCE_ROUND_SWELL = 6;
 const AMBIENCE_PAUSE_FADE = 0.3;
 const AMBIENCE_RESUME_FADE = 1;
 /**
- * Zombie voices (spawn groans, distant moans) that may overlap; voices at
+ * Zombie voices (spawn groans and moans) that may overlap; voices at
  * least this loud (nearby) may use the reserved slots.
  */
 const ZOMBIE_VOICE_CAPACITY = 3;
@@ -200,6 +202,11 @@ const ZOMBIE_VOICE_RESERVE = 2;
 const NEARBY_VOICE_ATTENUATION = 0.6;
 const SPAWN_VOICE_SECONDS = 0.85;
 const MOAN_VOICE_SECONDS = 1.5;
+const ZOMBIE_SPAWN_SAMPLE = 'zombies/spawn_1.mp3';
+const ZOMBIE_MOAN_SAMPLES = ['zombies/moan_1.mp3', 'zombies/moan_2.mp3', 'zombies/moan_3.mp3'] as const;
+const ZOMBIE_SPAWN_GAIN = 0.34;
+const ZOMBIE_MOAN_GAIN = 0.46;
+const ZOMBIE_MOAN_SMOOTHING = 0.035;
 /** A teammate's gunfire sits under the player's own and never vanishes across the map. */
 const REMOTE_SHOT_GAIN = 0.7;
 const REMOTE_SHOT_MIN_ATTENUATION = 0.12;
@@ -237,6 +244,19 @@ interface AudioContextParts {
   noise: AudioBuffer;
 }
 
+export interface ZombieMoanPlayback {
+  /** Updates the current voice. False once the clip has ended. */
+  update(cue: SpatialCue): boolean;
+  stop(): void;
+}
+
+interface SpatialBusNodes {
+  readonly input: AudioNode;
+  readonly gain: AudioParam;
+  readonly cutoff: AudioParam | null;
+  readonly pan: AudioParam | null;
+}
+
 /**
  * Procedural Web Audio sounds: filtered noise bursts for gunshots, short
  * band-passed ticks for mechanics and a sine ping for steel hits. No audio
@@ -266,11 +286,13 @@ export class AudioSystem {
   /** True while this class suspended the context because the page went to the background. */
   private suspendedWhileHidden = false;
   private readonly zombieVoices = new VoiceLimiter(ZOMBIE_VOICE_CAPACITY, ZOMBIE_VOICE_RESERVE);
+  private nextZombieMoan = 0;
   private mysteryBoxOpenBuffer: AudioBuffer | null = null;
   private dryFireBuffer: AudioBuffer | null = null;
   private doorPurchaseBuffer: AudioBuffer | null = null;
   private barricadeRepairBuffer: AudioBuffer | null = null;
   private readonly optionalSamples = new Map<string, AudioBuffer | null>();
+  private readonly footstepVariants = new FootstepVariantPicker();
   private ringJingle: RingJingle | null = null;
   /** Looping layers of a flame stream, built on its first burst. */
   private flameLoop: FlameStreamLoop | null = null;
@@ -300,6 +322,8 @@ export class AudioSystem {
     const ctx = this.ensureGraph();
     if (ctx.state === 'suspended') void ctx.resume();
     this.suspendedWhileHidden = false;
+    this.optionalSample(ZOMBIE_SPAWN_SAMPLE);
+    for (const file of ZOMBIE_MOAN_SAMPLES) this.optionalSample(file);
     this.music.preload();
   }
 
@@ -491,6 +515,41 @@ export class AudioSystem {
   public playGrenadeBounce(cue: SpatialCue, strength: number): void {
     const audio = this.context();
     if (audio) playGrenadeBounce(audio.ctx, this.spatialBus(audio, cue), audio.noise, strength);
+  }
+
+  /** Starts decoding the step clips of `surfaces` (a map's), so the first step on each finds its clip ready. */
+  public preloadFootsteps(surfaces: Iterable<FootstepSurface>): void {
+    for (const surface of surfaces) {
+      for (const file of FOOTSTEP_SAMPLES[surface].files) this.optionalSample(file);
+    }
+  }
+
+  /**
+   * One of the player's own steps on `surface`: a recorded clip (never the
+   * one before it), slightly varied in pitch and level, a touch to the side
+   * of the `foot` that landed. Silent until the surface's clips decode.
+   */
+  public playFootstep(surface: FootstepSurface, foot: FootSide, loudness: number): void {
+    const audio = this.context();
+    if (!audio) return;
+    const samples = FOOTSTEP_SAMPLES[surface];
+    const buffer = this.optionalSample(samples.files[this.footstepVariants.next(surface, samples.files.length)]);
+    if (!buffer) return;
+    const source = audio.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = footstepPlaybackRate(Math.random);
+    const gain = audio.ctx.createGain();
+    gain.gain.value = FOOTSTEP_MIX.level * samples.gain * loudness * footstepGainScale(Math.random);
+    source.connect(gain);
+    let output: AudioNode = audio.master;
+    if (typeof audio.ctx.createStereoPanner === 'function') {
+      const panner = audio.ctx.createStereoPanner();
+      panner.pan.value = foot === 'left' ? -FOOTSTEP_MIX.footPan : FOOTSTEP_MIX.footPan;
+      panner.connect(audio.master);
+      output = panner;
+    }
+    gain.connect(output);
+    source.start();
   }
 
   /** Starts decoding a weapon's shot clips ahead of the first trigger pull. */
@@ -1071,7 +1130,7 @@ export class AudioSystem {
     const { ctx, master } = audio;
     const at = (beat: number): number => ctx.currentTime + beat;
     for (let crank = 0; crank < 9; crank++) this.tick(ESCAPE_BEAT.ignition + crank * 0.09, 420, 0.16, 3, 0.06);
-    const caught = ESCAPE_BEAT.ignition + 0.85;
+    const caught = ESCAPE_BEAT.engineCatch;
     const passing = ESCAPE_BEAT.gateImpact + 1;
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -1710,14 +1769,17 @@ export class AudioSystem {
     for (let rasp = 0; rasp < 6; rasp++) this.tick(rasp * 0.15, 340 + rasp * 25, 0.09 + 0.05 * rage, 1.4, 0.2, output);
   }
 
-  /**
-   * Rising earthy groan from the point where a zombie enters the map: an
-   * upward glide reads as "arriving".
-   */
+  /** Short vocal cue from the point where a zombie enters the map. */
   public playZombieSpawn(cue: SpatialCue): void {
     const audio = this.context();
-    if (!audio || !this.claimZombieVoice(audio, cue, SPAWN_VOICE_SECONDS)) return;
+    if (!audio) return;
+    const sample = this.optionalSample(ZOMBIE_SPAWN_SAMPLE);
+    if (!this.claimZombieVoice(audio, cue, sample?.duration ?? SPAWN_VOICE_SECONDS)) return;
     const output = this.spatialBus(audio, cue);
+    if (sample) {
+      this.playSample(audio, sample, ZOMBIE_SPAWN_GAIN, 0, output);
+      return;
+    }
     const t = audio.ctx.currentTime;
     this.tick(0, 120, 0.3, 0.8, 0.32, output);
     this.sweep(0.08, 'sawtooth', 58, 96, 0.2, 0.7, t + 0.08, output);
@@ -1741,15 +1803,49 @@ export class AudioSystem {
     this.applyAmbienceLevel(suspended ? AMBIENCE_PAUSE_FADE : AMBIENCE_RESUME_FADE);
   }
 
-  /** Low, slow groan from a living zombie, quiet enough to be half-imagined. */
-  public playDistantMoan(cue: SpatialCue): void {
-    const audio: AudioContextParts | null = this.context();
-    if (!audio || !this.claimZombieVoice(audio, cue, MOAN_VOICE_SECONDS)) return;
-    const output = this.spatialBus(audio, cue);
-    const t: number = audio.ctx.currentTime;
-    const base: number = 65 + Math.random() * 40;
-    this.sweep(0, 'sawtooth', base, base * 0.6, 0.09, 1.4, t, output);
-    this.sweep(0.1, 'triangle', base * 1.5, base, 0.06, 1.1, t + 0.1, output);
+  /** Plays a groan and lets the caller keep its position in sync with the zombie. */
+  public playZombieMoan(cue: SpatialCue): ZombieMoanPlayback | null {
+    const audio = this.context();
+    if (!audio) return null;
+    const sample = this.pickZombieMoan();
+    const duration = sample?.duration ?? MOAN_VOICE_SECONDS;
+    if (!this.claimZombieVoice(audio, cue, duration)) return null;
+    const { input, gain, cutoff, pan } = this.buildSpatialBus(audio, cue, 0, audio.master, true);
+    const context = audio.ctx;
+    const start = context.currentTime;
+    if (sample) {
+      this.playSample(audio, sample, ZOMBIE_MOAN_GAIN, 0, input);
+    } else {
+      const base = 65 + Math.random() * 40;
+      this.sweep(0, 'sawtooth', base, base * 0.6, 0.14, 1.4, start, input);
+      this.sweep(0.1, 'triangle', base * 1.5, base, 0.09, 1.1, start + 0.1, input);
+    }
+    const end = start + duration;
+    let stopped = false;
+    return {
+      update(nextCue: SpatialCue): boolean {
+        const now = context.currentTime;
+        if (stopped || now >= end) return false;
+        gain.setTargetAtTime(nextCue.attenuation, now, ZOMBIE_MOAN_SMOOTHING);
+        cutoff?.setTargetAtTime(muffleCutoff(nextCue.muffle), now, ZOMBIE_MOAN_SMOOTHING);
+        pan?.setTargetAtTime(nextCue.pan, now, ZOMBIE_MOAN_SMOOTHING);
+        return true;
+      },
+      stop(): void {
+        if (stopped) return;
+        stopped = true;
+        gain.setTargetAtTime(0, context.currentTime, 0.015);
+      },
+    };
+  }
+
+  private pickZombieMoan(): AudioBuffer | null {
+    for (let attempt = 0; attempt < ZOMBIE_MOAN_SAMPLES.length; attempt++) {
+      const sample = this.optionalSample(ZOMBIE_MOAN_SAMPLES[this.nextZombieMoan]);
+      this.nextZombieMoan = (this.nextZombieMoan + 1) % ZOMBIE_MOAN_SAMPLES.length;
+      if (sample) return sample;
+    }
+    return null;
   }
 
   /**
@@ -1786,7 +1882,7 @@ export class AudioSystem {
     }
   }
 
-  /** Optional ambience and weapon files load on first use; null until (or unless) they decode. */
+  /** Requests a clip once. The caller gets null until it decodes or if it fails to load. */
   private optionalSample(file: string): AudioBuffer | null {
     if (!this.optionalSamples.has(file)) {
       this.optionalSamples.set(file, null);
@@ -2241,23 +2337,35 @@ export class AudioSystem {
     minAttenuation: number = 0,
     destination: AudioNode = audio.master,
   ): AudioNode {
+    return this.buildSpatialBus(audio, cue, minAttenuation, destination, false).input;
+  }
+
+  private buildSpatialBus(
+    audio: AudioContextParts, cue: SpatialCue, minAttenuation: number, destination: AudioNode, tracked: boolean,
+  ): SpatialBusNodes {
     const gain = audio.ctx.createGain();
     gain.gain.value = clamp(Math.max(minAttenuation, cue.attenuation), 0, 1);
     gain.connect(destination);
     let input: AudioNode = gain;
-    if (cue.muffle > 0) {
+    let cutoff: AudioParam | null = null;
+    let pan: AudioParam | null = null;
+    if (tracked || cue.muffle > 0) {
       const lowpass = audio.ctx.createBiquadFilter();
       lowpass.type = 'lowpass';
       lowpass.frequency.value = muffleCutoff(cue.muffle);
       lowpass.Q.value = 0.5;
       lowpass.connect(input);
       input = lowpass;
+      cutoff = lowpass.frequency;
     }
-    if (typeof audio.ctx.createStereoPanner !== 'function') return input;
-    const panner = audio.ctx.createStereoPanner();
-    panner.pan.value = clamp(cue.pan, -1, 1);
-    panner.connect(input);
-    return panner;
+    if (typeof audio.ctx.createStereoPanner === 'function') {
+      const panner = audio.ctx.createStereoPanner();
+      panner.pan.value = clamp(cue.pan, -1, 1);
+      panner.connect(input);
+      input = panner;
+      pan = panner.pan;
+    }
+    return { input, gain: gain.gain, cutoff, pan };
   }
 
   private toneTo(

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import {
@@ -56,11 +57,11 @@ describe('VORTEX-9 Muzzle & Projectile VFX', () => {
     expect(flash!.visible).toBe(true);
 
     // Still visible at 50 ms
-    view.update(0.05, fakeWeapon(), 0, 0, 0);
+    view.update(0.05, fakeWeapon(), STILL_GAIT, 0, 0);
     expect(flash!.visible).toBe(true);
 
     // Cleared past 65 ms (~50-80 ms window)
-    view.update(0.02, fakeWeapon(), 0, 0, 0);
+    view.update(0.02, fakeWeapon(), STILL_GAIT, 0, 0);
     expect(flash!.visible).toBe(false);
   });
 

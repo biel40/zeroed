@@ -8,6 +8,8 @@ const PORTAL_HALF = ESCALATOR_PORTAL.width / 2;
 const WALL_BACK_Z = VESTIBULE.minZ - STATION33_WALL_THICKNESS;
 /** Upper landing between the wall and the first moving step. */
 const LANDING_END_Z = WALL_BACK_Z - 2;
+/** Granite floor of that landing, through the portal from the vestibule. */
+export const ESCALATOR_LANDING = { minX: -PORTAL_HALF, maxX: PORTAL_HALF, minZ: LANDING_END_Z, maxZ: VESTIBULE.minZ } as const;
 /** Slope of the shaft; boxes along it turn by -INCLINE about X so their hall end rises. */
 const INCLINE = Math.PI / 6;
 const STEP_RISE = 0.2;

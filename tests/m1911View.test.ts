@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Weapon } from '../src/weapons/Weapon';
@@ -180,7 +181,7 @@ describe('M1911 first-person model', () => {
     const maxFrames = Math.ceil(definition.reloadTime / dt) + 10;
     while (weapon.state === 'reloading' && reloadFrames < maxFrames) {
       weapon.update(dt, { trigger: false, ads: false });
-      view.update(dt, weapon, 0, 0, 0);
+      view.update(dt, weapon, STILL_GAIT, 0, 0);
       reloadFrames++;
     }
 
@@ -200,7 +201,7 @@ describe('M1911 first-person model', () => {
     weapon.ammoInMagazine = 0;
     weapon.reserveAmmo = 0;
     expect(weapon.reload()).toBe(false);
-    view.update(dt, weapon, 0, 0, 0);
+    view.update(dt, weapon, STILL_GAIT, 0, 0);
     expect(slide.position.z).toBeGreaterThan(homeZ + 0.03);
 
     weapon.reserveAmmo = definition.reserveAmmo!;
@@ -209,7 +210,7 @@ describe('M1911 first-person model', () => {
     const advanceTo = (progress: number) => {
       while (weapon.state === 'reloading' && weapon.stateProgress < progress) {
         weapon.update(dt, { trigger: false, ads: false });
-        view.update(dt, weapon, 0, 0, 0);
+        view.update(dt, weapon, STILL_GAIT, 0, 0);
       }
     };
     // The emptied magazine leaves without its top round; the fresh one shows it.
@@ -273,7 +274,7 @@ describe('M1911 first-person model', () => {
 
     for (let frame = 0; frame < 50; frame++) {
       weapon.update(1 / 120, { trigger: false, ads: false });
-      view.update(1 / 120, weapon, 0, 0, 0);
+      view.update(1 / 120, weapon, STILL_GAIT, 0, 0);
     }
     view.reset();
     expect(magazine.visible).toBe(true);
@@ -284,13 +285,13 @@ describe('M1911 first-person model', () => {
   it('dips out of the knife arm path and returns exactly to the hip pose', () => {
     const weapon = new Weapon(definition, () => 0.5);
     const view = new WeaponView(definition, null);
-    view.update(1 / 60, weapon, 0, 0, 0);
+    view.update(1 / 60, weapon, STILL_GAIT, 0, 0);
     const hip = view.root.position.clone();
 
-    view.update(1 / 60, weapon, 0, 0, 0, 1);
+    view.update(1 / 60, weapon, STILL_GAIT, 0, 0, 1);
     expect(view.root.position.y).toBeLessThan(hip.y - 0.15);
 
-    view.update(1 / 60, weapon, 0, 0, 0, 0);
+    view.update(1 / 60, weapon, STILL_GAIT, 0, 0, 0);
     expect(view.root.position.distanceTo(hip)).toBeLessThan(1e-6);
     expect(view.root.rotation.x).toBeCloseTo(0, 6);
   });

@@ -24,10 +24,12 @@ const ARENA_BUDGETS: Record<ZombieMapId, Pick<ArenaMetrics, BudgetMetric>> = {
   },
   // The KOVKA chamber and its corridor widened floor 0's navigation westwards and added their own solids,
   // invisible proxies and set dressing (about 4k visible triangles of cells, console, stretcher and flood),
-  // then the forge and the hatch lamp (about 1k triangles and five materials).
+  // then the forge and the hatch lamp (about 1k triangles and five materials). The evacuation truck's overhaul
+  // (shaped cab with a modelled interior, lugged tyres, kung detail, baked light pools, wake) added about 11k
+  // triangles, 1 MiB of geometry and ten materials at the same draw count.
   'station-33': {
-    drawables: 1_100, visibleDrawables: 800, triangles: 205_000, visibleTriangles: 190_000,
-    geometryMiB: 17.5, materials: 260, colliders: 340, wallBoxes: 235, navCells: 56_000,
+    drawables: 1_100, visibleDrawables: 800, triangles: 217_000, visibleTriangles: 202_000,
+    geometryMiB: 18.5, materials: 270, colliders: 340, wallBoxes: 235, navCells: 56_000,
   },
   // Phase 1: the nave, the chancel and the plaza. Every wall piece, passage box and proxy is its own solid;
   // the stone, glass and furniture merge into one mesh per material and area.
@@ -94,6 +96,18 @@ describe.each(Object.values(ZOMBIE_MAPS))('ZombieArena contract: $id', (map) => 
     arena.init();
     return arena;
   }
+
+  it('declares its walking surfaces on floors it has', () => {
+    const arena = map.createArena(new THREE.Scene(), TEST_PROFILE);
+    const surfaces = arena.footstepSurfaces;
+    expect(surfaces).toBeDefined();
+    const floors = new Set(arena.navigationBounds.map((bounds) => bounds.floor));
+    for (const zone of surfaces!.zones) {
+      expect(zone.maxX).toBeGreaterThan(zone.minX);
+      expect(zone.maxZ).toBeGreaterThan(zone.minZ);
+      if (zone.floor !== undefined) expect(floors.has(zone.floor)).toBe(true);
+    }
+  });
 
   it.each(QUALITY_LEVELS)('stays within the %s scene budget with doors closed and unlocked', (quality) => {
     const mapIndex = Object.keys(ZOMBIE_MAPS).indexOf(map.id);

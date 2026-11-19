@@ -175,6 +175,39 @@ export const VESTIBULE_BENCHES = [
   { id: 'overturned-bench', x: -5.1, z: 2.0, yaw: 0, overturned: true },
 ] as const;
 
+/** Vault plaster that came down in the vestibule: pieces scattered `spreadX` by `spreadZ` around (`x`, `z`), under a drip. */
+export const VESTIBULE_COLLAPSED_PATCH = { x: 4.6, z: 15.0, spreadX: 1.2, spreadZ: 1.0 } as const;
+
+/**
+ * Seepage points in the ceilings, each over the puddle it keeps wet; the
+ * third one is the hole the vault plaster fell from, the next two soak the
+ * luggage office, three drip from the joints of the train sheds' iron
+ * rings, two leak onto the machine-room floor, one into the substation
+ * gallery and the next two into the workshop.
+ */
+export const STATION33_DRIP_SOURCES = [
+  { x: -1.2, z: 7.3, interval: 2.3 },
+  { x: 2.7, z: 12.2, interval: 3.1 },
+  { x: VESTIBULE_COLLAPSED_PATCH.x, z: VESTIBULE_COLLAPSED_PATCH.z, interval: 1.7 },
+  { x: 16.1, z: 11.6, interval: 2.6 },
+  { x: 19.6, z: 16.7, interval: 1.9 },
+  { x: 9.6, z: -5.4, interval: 2.1 },
+  { x: 12.4, z: -17.3, interval: 1.5 },
+  { x: 19.4, z: -24.1, interval: 2.8 },
+  { x: 9.2, z: -36.5, interval: 2.4 },
+  { x: 16.9, z: -38.6, interval: 1.8 },
+  { x: 12.7, z: -30.4, interval: 2.2 },
+  { x: 7.6, z: -57.2, interval: 2.0 },
+  { x: 14.2, z: -51.4, interval: 2.7 },
+  // The KOVKA chamber's vault weeps onto the deck, a lane and the deck behind the reactor.
+  { x: -11.8, z: -43.2, interval: 1.9 },
+  { x: -24.0, z: -58.3, interval: 2.5 },
+  { x: -8.2, z: -67.6, interval: 1.6 },
+] as const;
+
+/** Half size of the puddle under each drip. */
+export const STATION33_PUDDLE = { halfWidth: 0.45, halfDepth: 0.35 } as const;
+
 /** Board tuning shared with the mansion's balance. */
 export const STATION33_BARRIER_CONFIG: WindowBarrierConfig = {
   boardCount: 5,
@@ -988,6 +1021,8 @@ export const PROTOCOL33_ESCAPE_SHOTS: ReadonlyArray<ArenaEndingShot> = [
   {
     duration: 3.1,
     shake: 0.02,
+    // The nose bursts through the gate a second into the shot.
+    jolts: [{ time: ESCAPE_BEAT.gateImpact - (ESCAPE_BEAT.launch + 0.3), strength: 0.06 }],
     keys: [
       { time: 0, position: { x: 17.2, y: 7.35, z: -107.5 }, target: { x: 20.4, y: 8.3, z: -100.2 } },
       { time: 1.3, position: { x: 17.3, y: 7.36, z: -107.7 }, target: { x: 20.4, y: 8.2, z: -101 } },

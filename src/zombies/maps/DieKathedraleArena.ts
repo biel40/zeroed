@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DIE_KATHEDRALE_FOOTSTEP_SURFACES } from './dieKathedrale/DieKathedraleFootstepSurfaces';
 import { WEAPON_DEFINITIONS } from '../../config/weapons';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import { WindowBarrier } from '../barriers/WindowBarrier';
@@ -88,6 +89,7 @@ export class DieKathedraleArena implements ZombieArena {
   public readonly useWallCollision = true;
   public readonly playerBounds = DIE_KATHEDRALE_PLAYER_BOUNDS;
   public readonly navigationBounds = DIE_KATHEDRALE_NAVIGATION_BOUNDS;
+  public readonly footstepSurfaces = DIE_KATHEDRALE_FOOTSTEP_SURFACES;
   public readonly mysteryBoxPlacement = DIE_KATHEDRALE_BOX_PLACEMENT;
   public readonly doors: ReadonlyArray<PointDoor>;
   public readonly wallBuys: ReadonlyArray<WallBuy>;

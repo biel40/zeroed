@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildGasMaskModel, GAS_MASK_LENS_CENTER } from '../../gasMask/GasMaskModel';
 import { seededRandom } from '../shared/ProceduralNoise';
-import { MANSION_BUNKER_Y } from '../BurnedMansionConfig';
+import { MANSION_BUNKER_Y, MANSION_PLASTER_RUBBLE, MANSION_PLASTER_SPREAD } from '../BurnedMansionConfig';
 import { buildBanquetFurniture } from './MansionBanquetHall';
 import type { MansionBuildContext } from './MansionBuildContext';
 import { addFramedPicture, addOnFace, mansionWallFace as face, onFace } from './MansionWallMounts';
@@ -126,12 +126,12 @@ function addRubbleAndLitter(context: MansionBuildContext): void {
   const { batch, materials } = context;
   const random = seededRandom(5303);
   // Plaster that dropped from the burnt-through ceiling.
-  for (const [cx, cz] of [[-4.8, 4.4], [5.6, 8.4], [-2.6, -1.2], [2.9, -6.9], [7.6, 1.0], [-5.0, -9.4], [3.0, -14.6], [-5.6, -16.6]] as const) {
+  for (const [cx, cz] of MANSION_PLASTER_RUBBLE) {
     for (let index = 0; index < 7; index++) {
       const size = 0.06 + random() * 0.16;
       batch.addBox(
         materials.rubble,
-        cx + (random() - 0.5) * 1.1, size * 0.22, cz + (random() - 0.5) * 0.9,
+        cx + (random() - 0.5) * MANSION_PLASTER_SPREAD.x, size * 0.22, cz + (random() - 0.5) * MANSION_PLASTER_SPREAD.z,
         size * 1.3, Math.min(0.1, size * 0.45), size,
         random() * 0.4, random() * Math.PI, random() * 0.4,
       );

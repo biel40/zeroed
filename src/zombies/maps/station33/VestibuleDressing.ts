@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { placement } from '../shared/StaticMeshBatch';
-import { STATION33_BARRIERS, VESTIBULE, VESTIBULE_COLUMNS } from '../Station33Config';
+import { STATION33_BARRIERS, VESTIBULE, VESTIBULE_COLLAPSED_PATCH, VESTIBULE_COLUMNS } from '../Station33Config';
 import type { Station33BuildContext } from './Station33BuildContext';
 import type { SignId } from './Station33Signage';
 
@@ -144,14 +144,15 @@ function addFallenFences(context: Station33BuildContext): void {
 
 /** A slab of vault plaster that came down; the drips under its hole keep the floor wet. */
 function addCollapsedPatch(context: Station33BuildContext): void {
+  const { x, z, spreadX, spreadZ } = VESTIBULE_COLLAPSED_PATCH;
   const random = seededRandom(3389);
   for (let index = 0; index < 8; index++) {
     const size = 0.12 + random() * 0.3;
     context.batch.addBox(
       context.materials.vaultPlaster,
-      4.6 + (random() - 0.5) * 1.2,
+      x + (random() - 0.5) * spreadX,
       size * 0.25,
-      15.0 + (random() - 0.5) * 1.0,
+      z + (random() - 0.5) * spreadZ,
       size * 1.4, Math.min(0.2, size * 0.5), size,
       random() * 0.4, random() * Math.PI, random() * 0.4,
     );

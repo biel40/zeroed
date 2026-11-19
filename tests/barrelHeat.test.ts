@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { BarrelHeat } from '../src/weapons/BarrelHeat';
@@ -117,11 +118,11 @@ describe('Barrel overheating', () => {
     const view = new WeaponView(definition, null);
     const glow = findGlow(view);
     expect(glow).toBeDefined();
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     expect(glow!.visible).toBe(false);
     rest(weapon, definition.equipTime + 0.1);
     holdTrigger(weapon, 6);
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     expect(glow!.visible).toBe(true);
     // The sleeve hugs the muzzle: it starts at the crown and runs back along the barrel.
     glow!.geometry.computeBoundingBox();
@@ -160,7 +161,7 @@ describe('Barrel overheating', () => {
     tapTrigger(weapon, definition.magazineSize, 0.25);
     expect(weapon.heat.intensity).toBeGreaterThan(0.5);
     expect(weapon.heat.overheated).toBe(false);
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     expect(findGlow(view)!.visible).toBe(true);
     rest(weapon, definition.heat!.coolTime + 0.5);
     expect(weapon.heat.level).toBe(0);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ArenaFootstepSurfaces } from '../../zombies/maps/FootstepSurfaces';
 import { CoopChestInteraction } from './CoopChestInteraction';
 import { t } from '../../i18n/i18n';
 import { actionKey, weaponCaseLocked, weaponCasePrompt } from '../../ui/InteractionPrompts';
@@ -56,6 +57,11 @@ export class CoopGuestMode implements GameMode {
 
   public get gameplayMusic(): MusicTrackName | null {
     return this.world?.arena.ambience.musicTrack ?? null;
+  }
+
+  /** Where the local player's footsteps land on this map. */
+  public getFootstepSurfaces(): ArenaFootstepSurfaces | null {
+    return this.world?.arena.footstepSurfaces ?? null;
   }
 
   private ctx!: ModeContext;
@@ -150,7 +156,7 @@ export class CoopGuestMode implements GameMode {
     }
     if (!this.isGameplayInputEnabled() && this.knife.enabled) this.knife.reset();
     this.knife.setEnabled(this.knife.isAttacking);
-    this.knife.update(dt, false, this.ctx.player.speed01);
+    this.knife.update(dt, false, this.ctx.player.walkGait);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.grenades.update(dt, this.isGameplayInputEnabled() && this.isCombatInputEnabled());
     this.boxView.update(dt, this.box);
@@ -161,7 +167,7 @@ export class CoopGuestMode implements GameMode {
     this.spectator.update(this.hostAvatar,
       !this.hostLost && this.match?.phase === 'playing' && this.match.stats.guest.life === 'dead',
       this.match?.stats.host.life ?? 'alive');
-    this.world.update(dt);
+    this.world.update(dt, this.playing && !this.hostLost && this.match?.phase === 'playing' ? this.replica : undefined);
     const own = this.match?.stats.guest;
     const host = this.match?.stats.host;
     this.gesture.update(dt, host?.reviver === 'guest' ? 'reviver'

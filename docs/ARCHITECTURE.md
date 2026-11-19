@@ -19,6 +19,8 @@ main.ts -> PWA + DeviceProfile + AssetManager + selector de mapa
 El loop y la pausa pertenecen a `Game`; la pausa compartida depende de la autoridad del modo. Consulta el [comportamiento cooperativo](MULTIPLAYER.md#alcance-y-límites). `Game.dispose()` libera los servicios y vuelve al menu sin recargar.
 En cooperativo, `CoopWorld` recibe la camara de observacion para situar el audio
 y actualizar la visibilidad del mapa; observar al compañero no desplaza el rig local.
+`ZombieMoans` usa las entidades locales del modo y esa camara para seguir las
+voces activas. En el invitado sigue las replicas interpoladas del anfitrion.
 El loop no arranca en el constructor: `Game.prepare()` compila todos los
 materiales (incluidos pools ocultos), sube sus texturas y dibuja un frame
 mientras `#map-loading` cubre la pantalla, para que la entrada al mapa no
@@ -175,6 +177,10 @@ sufra tirones de compilacion de shaders.
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
   `ammoRefills`, `grenadeBuys`, `mysteryBoxPlacement`, `ringMachines`, `evacuation`).
+  `footstepSurfaces` describe como datos (rectangulos por planta sobre una
+  superficie por defecto) lo que pisa el jugador; el modo lo entrega con
+  `GameMode.getFootstepSurfaces` y `Game` lo usa en `PlayerFootsteps`, que
+  sigue las pisadas de `WalkGait` y suena por `AudioSystem.playFootstep`.
   El aspecto de la horda tambien: `zombieSkins` (repartidas por turnos) o
   `zombieSkinShares` (tiradas por peso en cada spawn), y `zombieEyes`;
   `dressZombieSources` las convierte en fuentes del pool y `ZombieManager`

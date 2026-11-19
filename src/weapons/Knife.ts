@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { applyViewModelDepth } from '../rendering/ViewModelDepth';
+import { getSettings } from '../core/PlayerSettings';
+import { createWeaponBobPose, weaponBobPose } from '../player/WalkBob';
+import type { WalkGaitSample } from '../player/WalkGait';
 import { ARM_REST_BELOW_SCREEN, ArmChain, buildArmKeys, FIST_GRIP_ROTATION, type ArmPose } from './ArmChain';
 import { buildKnifeModel } from './KnifeViewModel';
 import type { MeleeArmDriver } from './ViewArms';
@@ -89,7 +92,7 @@ export class Knife implements MeleeArmDriver {
   private impactApplied = false;
   private previousTrigger = false;
   private active = false;
-  private bobTime = 0;
+  private readonly bob = createWeaponBobPose();
 
   public constructor() {
     this.root.name = 'knife-view';
@@ -164,19 +167,15 @@ export class Knife implements MeleeArmDriver {
     return true;
   }
 
-  public update(dt: number, trigger: boolean, speed01: number): void {
+  public update(dt: number, trigger: boolean, gait: WalkGaitSample): void {
     const triggerEdge = trigger && !this.previousTrigger;
     this.previousTrigger = trigger;
     if (!this.active) return;
 
     if (triggerEdge) this.trigger();
     // Same gait as the firearm bob so the arm stays grounded while moving.
-    this.bobTime += dt * (5 + speed01 * 5);
-    this.root.position.set(
-      Math.sin(this.bobTime) * 0.005 * speed01,
-      Math.abs(Math.cos(this.bobTime)) * 0.004 * speed01,
-      0,
-    );
+    const bob = weaponBobPose(gait, getSettings().walkBob, this.bob);
+    this.root.position.set(bob.x, bob.y, 0);
     if (!this.isAttacking) return;
 
     const previous = this.elapsed;

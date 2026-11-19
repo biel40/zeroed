@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { GRENADE_DEFINITIONS, LETHAL_GRENADE_LOADOUT } from '../src/config/grenades';
 import type { PlayerEconomy } from '../src/game/PlayerEconomy';
 import { PlayerHealth } from '../src/game/PlayerHealth';
@@ -58,7 +59,7 @@ describe('first-person grenade throw', () => {
     let pinnedAt = -1;
     let releasedAt = -1;
     for (let time = 0; time < GRENADE_THROW_DURATION + 0.1; time += DT) {
-      hand.update(DT, 0);
+      hand.update(DT, STILL_GAIT);
       if (pinnedAt < 0 && pin.mock.calls.length > 0) pinnedAt = time;
       if (releasedAt < 0 && release.mock.calls.length > 0) releasedAt = time;
       if (time > 0.2 && time < 0.4) {
@@ -80,9 +81,9 @@ describe('first-person grenade throw', () => {
     const hand = new GrenadeThrow();
     const grenade = hand.root.getObjectByName('f1-grenade')!;
     hand.start();
-    hand.update(GRENADE_THROW_DURATION * 0.3, 0);
+    hand.update(GRENADE_THROW_DURATION * 0.3, STILL_GAIT);
     expect(grenade.visible).toBe(true);
-    hand.update(GRENADE_THROW_DURATION * 0.3, 0);
+    hand.update(GRENADE_THROW_DURATION * 0.3, STILL_GAIT);
     expect(grenade.visible).toBe(false);
   });
 
@@ -91,9 +92,9 @@ describe('first-person grenade throw', () => {
     const release = vi.fn();
     hand.onRelease = release;
     hand.start();
-    hand.update(0.2, 0);
+    hand.update(0.2, STILL_GAIT);
     hand.reset();
-    hand.update(1, 0);
+    hand.update(1, STILL_GAIT);
     expect(release).not.toHaveBeenCalled();
     expect(hand.isThrowing).toBe(false);
   });
@@ -170,10 +171,10 @@ describe('cooking a grenade', () => {
     const release = vi.fn();
     hand.onRelease = release;
     hand.start();
-    for (let time = 0; time < 1.5; time += DT) hand.update(DT, 0, true);
+    for (let time = 0; time < 1.5; time += DT) hand.update(DT, STILL_GAIT, true);
     expect(hand.isCooking).toBe(true);
     expect(release).not.toHaveBeenCalled();
-    for (let time = 0; time < GRENADE_THROW_DURATION; time += DT) hand.update(DT, 0, false);
+    for (let time = 0; time < GRENADE_THROW_DURATION; time += DT) hand.update(DT, STILL_GAIT, false);
     expect(release).toHaveBeenCalledOnce();
     expect(hand.isThrowing).toBe(false);
   });

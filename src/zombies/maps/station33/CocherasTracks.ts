@@ -10,12 +10,21 @@ const RAIL = { width: 0.07, height: 0.12, foot: 0.14 } as const;
 const THIRD_RAIL_OFFSET = 1.55;
 const BUFFER_STOP = { width: 2.0, depth: 1.2, height: 1.15 } as const;
 
-interface TrackRun {
+/** Width of the ballast bed under each track. */
+export const TRACK_BED_WIDTH = 2.6;
+
+export interface TrackRun {
   readonly x: number;
   /** North end (towards -Z) and the buffer stop end. */
   readonly fromZ: number;
   readonly toZ: number;
 }
+
+/** The west track (on into its tunnel) and the east one, each from its north end to its buffer stop. */
+export const COCHERAS_TRACK_RUNS: readonly [TrackRun, TrackRun] = [
+  { x: COCHERAS_TRACKS.west.x, fromZ: hall.minZ - STATION33_WALL_THICKNESS - 6.4, toZ: COCHERAS_TRACKS.west.bufferZ },
+  { x: COCHERAS_TRACKS.east.x, fromZ: hall.minZ, toZ: COCHERAS_TRACKS.east.bufferZ },
+];
 
 /**
  * Track work set flush into the shed floor: ballast beds, sleepers, rails,
@@ -25,11 +34,7 @@ interface TrackRun {
  * Only the buffer stops are solid; the rest stays under obstacle height.
  */
 export function buildCocherasTracks(context: Station33BuildContext, lighting: Station33Lighting): void {
-  const { west, east } = COCHERAS_TRACKS;
-  const runs: ReadonlyArray<TrackRun> = [
-    { x: west.x, fromZ: hall.minZ - STATION33_WALL_THICKNESS - 6.4, toZ: west.bufferZ },
-    { x: east.x, fromZ: hall.minZ, toZ: east.bufferZ },
-  ];
+  const runs = COCHERAS_TRACK_RUNS;
   for (const run of runs) addTrack(context, run);
   addThirdRail(context, runs[1]);
   for (const run of runs) addBufferStop(context, lighting, run.x, run.toZ);
@@ -39,7 +44,7 @@ function addTrack(context: Station33BuildContext, run: TrackRun): void {
   const { batch, materials } = context;
   const length = run.toZ - run.fromZ;
   const centerZ = (run.fromZ + run.toZ) / 2;
-  batch.addBox(materials.trackBed, run.x, 0, centerZ, 2.6, 0.024, length, 0, 0, 0, run.x);
+  batch.addBox(materials.trackBed, run.x, 0, centerZ, TRACK_BED_WIDTH, 0.024, length, 0, 0, 0, run.x);
   for (let z = run.fromZ + SLEEPER_SPACING / 2; z < run.toZ; z += SLEEPER_SPACING) {
     batch.addBox(materials.serviceConcrete, run.x, 0.035, z, 2.3, 0.05, 0.24);
   }

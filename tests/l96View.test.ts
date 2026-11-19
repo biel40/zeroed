@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
@@ -140,13 +141,13 @@ describe('L96A1 view model', () => {
     const weaponView = new WeaponView(definition, null);
     const onBoltEject = vi.fn();
     weaponView.onBoltEject = onBoltEject;
-    weaponView.update(1 / 60, fakeWeapon('cycling', BOLT_REAR_FRACTION - 0.05), 0, 0, 0);
+    weaponView.update(1 / 60, fakeWeapon('cycling', BOLT_REAR_FRACTION - 0.05), STILL_GAIT, 0, 0);
     expect(onBoltEject).not.toHaveBeenCalled();
-    weaponView.update(1 / 60, fakeWeapon('cycling', BOLT_REAR_FRACTION + 0.01), 0, 0, 0);
-    weaponView.update(1 / 60, fakeWeapon('cycling', 0.9), 0, 0, 0);
+    weaponView.update(1 / 60, fakeWeapon('cycling', BOLT_REAR_FRACTION + 0.01), STILL_GAIT, 0, 0);
+    weaponView.update(1 / 60, fakeWeapon('cycling', 0.9), STILL_GAIT, 0, 0);
     expect(onBoltEject).toHaveBeenCalledTimes(1);
-    weaponView.update(1 / 60, fakeWeapon('ready', 0), 0, 0, 0);
-    weaponView.update(1 / 60, fakeWeapon('cycling', 0.5), 0, 0, 0);
+    weaponView.update(1 / 60, fakeWeapon('ready', 0), STILL_GAIT, 0, 0);
+    weaponView.update(1 / 60, fakeWeapon('cycling', 0.5), STILL_GAIT, 0, 0);
     expect(onBoltEject).toHaveBeenCalledTimes(2);
   });
 
@@ -158,9 +159,9 @@ describe('L96A1 view model', () => {
 
     weaponView.onShot();
     expect(flash.visible).toBe(true);
-    weaponView.update(1 / 15, fakeWeapon('ready', 0), 0, 0, 0);
+    weaponView.update(1 / 15, fakeWeapon('ready', 0), STILL_GAIT, 0, 0);
     expect(flash.visible).toBe(true);
-    weaponView.update(1 / 15, fakeWeapon('ready', 0), 0, 0, 0);
+    weaponView.update(1 / 15, fakeWeapon('ready', 0), STILL_GAIT, 0, 0);
     expect(flash.visible).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STILL_GAIT } from '../src/player/WalkGait';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MUZZLE_FLARES } from '../src/config/muzzleFlares';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
@@ -200,10 +201,10 @@ describe('Muzzle flare in the weapon view', () => {
     const view = new WeaponView(definition, null, null, { cinematicFlash: true });
     for (let frame = 0; frame < 60; frame++) {
       weapon.update(DT, { trigger: false, ads });
-      view.update(DT, weapon, 0, 0, 0);
+      view.update(DT, weapon, STILL_GAIT, 0, 0);
     }
     view.onShot();
-    view.update(DT, weapon, 0, 0, 0);
+    view.update(DT, weapon, STILL_GAIT, 0, 0);
     view.root.updateMatrixWorld(true);
     const flame = view.root.getObjectByName(FLARE_NAME)!;
     const muzzle = view.getMuzzleWorldPosition(new THREE.Vector3());

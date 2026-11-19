@@ -32,6 +32,8 @@ export interface PlayerSettings {
   readonly cameraShake: number;
   /** 0..1 scale of the weapon's visual kick in the hands; aim recoil and accuracy are unchanged. */
   readonly weaponKick: number;
+  /** 0..1 scale of the head and weapon bob while walking; 0 keeps both still. Aim is unchanged. */
+  readonly walkBob: number;
 }
 
 export type NumericSetting = {
@@ -59,6 +61,7 @@ export const SETTING_RANGES: Readonly<Record<NumericSetting, SettingRange>> = {
   fieldOfView: { min: 65, max: 95, step: 1 },
   cameraShake: { min: 0, max: 1, step: 0.05 },
   weaponKick: { min: 0, max: 1, step: 0.05 },
+  walkBob: { min: 0, max: 1, step: 0.05 },
   gamepadLookHorizontal: { min: 30, max: 360, step: 5 },
   gamepadLookVertical: { min: 30, max: 270, step: 5 },
   gamepadMoveDeadZone: { min: 0.05, max: 0.5, step: 0.01 },
@@ -69,7 +72,7 @@ export const SETTING_RANGES: Readonly<Record<NumericSetting, SettingRange>> = {
 export const DEFAULT_SETTINGS: PlayerSettings = {
   masterVolume: 1,
   effectsVolume: 1,
-  musicVolume: 1,
+  musicVolume: 0.5,
   lookSensitivity: 1,
   adsSensitivity: 1,
   invertY: false,
@@ -84,6 +87,7 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   fieldOfView: 75,
   cameraShake: 1,
   weaponKick: 1,
+  walkBob: 1,
 };
 
 const STORAGE_KEY = 'zeroed.settings';

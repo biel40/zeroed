@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MANSION_FOOTSTEP_SURFACES } from './burnedMansion/MansionFootstepSurfaces';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { DeviceProfile } from '../../core/DeviceProfile';
 import { EYE_HEIGHT, type FloorTransitionZone, type StairRamp } from '../../player/PlayerController';
@@ -83,6 +84,7 @@ import {
   MANSION_STAIR_BOTTOM_Z,
   MANSION_STAIR_CENTER_X,
   MANSION_STAIR_TOP_Z,
+  MANSION_STAIR_TREAD_HALF_WIDTH,
   MANSION_SECRET_AREAS,
   MANSION_SECRET_ROOM,
   MANSION_SOUL_LAMPS,
@@ -255,6 +257,7 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     { floor: -1, ...MANSION_BUNKER_BOUNDS, baseY: MANSION_BUNKER_Y },
   ] as const;
   readonly floorTransitions: ReadonlyArray<FloorTransitionZone>;
+  readonly footstepSurfaces = MANSION_FOOTSTEP_SURFACES;
   readonly completionInteraction: ArenaCompletionInteraction = MANSION_BUNKER_ENDING;
   readonly ritualInteraction: ArenaRitualInteraction;
   readonly gasMaskRack: ArenaGasMaskRack;
@@ -840,7 +843,10 @@ export class BurnedMansionArena implements ZombieArena, SoulRitualArena {
     const run = topZ - bottomZ;
     const depth = run / steps;
     const rise = Math.abs(MANSION_BUNKER_Y) / steps;
-    const sideWalls = [[4.35, 5.475], [7.825, 9]] as const;
+    const sideWalls = [
+      [4.35, MANSION_STAIR_CENTER_X - MANSION_STAIR_TREAD_HALF_WIDTH],
+      [MANSION_STAIR_CENTER_X + MANSION_STAIR_TREAD_HALF_WIDTH, 9],
+    ] as const;
     // Treads span wall to wall so no slit opens beside them.
     const stepWidth = sideWalls[1][0] - sideWalls[0][1];
     const stepGeometries: THREE.BoxGeometry[] = [];

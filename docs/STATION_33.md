@@ -317,7 +317,10 @@ codigo: actualiza la guia.
   una ciudad jugable: un patio de losas bajo nieve pisada y aguanieve,
   cercado por valla prefabricada de hormigon con relieve de rombos, espino y
   concertina, la puerta de acero cerrada con su estrella roja, un camion
-  militar verde oliva con caja de furgon sanitaria abierta y su baliza, una
+  militar sovietico de cabina avanzada, verde oliva gastado con barro en
+  pasos de rueda y bajos, cabina con interior visible tras el cristal
+  (salpicadero de relojes analogicos, volante fino, asientos, radio) y caja de
+  furgon sanitaria abierta con su baliza, una
   farola de sodio que sigue encendida con dos altavoces de bocina, bloques de
   hormigon, bidones, el nido de sacos de la guardia con su barril de brasas
   (lo unico sin nieve) y neumaticos. En la caseta de la escalera ondea una
@@ -488,7 +491,10 @@ codigo: actualiza la guia.
   alli huye el camion. Va bajo el titulo dorado, eco del de la intro. Sin
   ciudad jugable ni rotulos: la huida la cuentan el camion, la puerta abierta,
   el incendio y la radio. Camion y puerta son rigs propios (`EscapeTruck`,
-  `YardGate`), fuera del batch estatico, para poder moverse; el incendio
+  `YardGate`), fuera del batch estatico, para poder moverse; la carroceria
+  del camion va sobre suspension con pocos materiales (una llamada de
+  dibujo por material) y su luz es simulada: manchas en el suelo, halos y
+  brillo emisivo rojo en la cabina, nunca luces reales nuevas; el incendio
   (`StationBlaze`) y la cordillera (`HighlandCathedral`) solo existen
   durante el final.
 - Cualquier momento premium nuevo (finales, revelaciones, nuevas zonas) debe
