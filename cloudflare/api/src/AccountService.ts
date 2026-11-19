@@ -153,11 +153,15 @@ export class AccountService {
     return credentials?.passwordHash ? 'wrong-password' : 'no-account';
   }
 
-  /** Sets a new password for a signed-in account, e.g. after a recovery link; false when it is not acceptable. */
+  /**
+   * Sets a new password for a signed-in account, e.g. after a recovery link,
+   * and signs out its other sessions so whoever knew the old one loses access;
+   * false when it is not acceptable.
+   */
   public async changePassword(session: AuthenticatedSession, password: unknown): Promise<boolean> {
     if (!isAcceptablePassword(password)) return false;
     const { store, randomBytes } = this.options;
-    await store.setPassword(session.userId, await hashPassword(password, randomBytes));
+    await store.setPassword(session.userId, await hashPassword(password, randomBytes), session.tokenHash);
     return true;
   }
 

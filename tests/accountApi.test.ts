@@ -292,6 +292,18 @@ describe('account API', () => {
       expect((await signInWithPassword('a@example.com', 'brand new one')).status).toBe(200);
       expect((await signInWithPassword('a@example.com', 'forgotten one')).status).toBe(401);
     });
+
+    it('signs out every other session of the account when the password changes', async () => {
+      // Someone registered the address first and stays signed in.
+      const squatter = (await (await register('a@example.com', 'squatted one')).json()) as { token: string };
+      const owner = await signIn('a@example.com');
+      const other = await signIn('b@example.com');
+
+      expect((await post('/me/password', { password: 'brand new one' }, { authorization: `Bearer ${owner}` })).status).toBe(204);
+      expect((await getEntitlements(squatter.token)).status).toBe(401);
+      expect((await getEntitlements(owner)).status).toBe(200);
+      expect((await getEntitlements(other)).status).toBe(200);
+    });
   });
 
   describe('Google sign-in', () => {

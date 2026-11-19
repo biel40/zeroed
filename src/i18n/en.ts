@@ -45,6 +45,7 @@ export const en = {
   'account.weakPassword': 'The password must be 8 to 128 characters long.',
   'account.googleRejected': 'Google could not confirm your account. Try again.',
   'account.forgotPassword': 'Forgot your password?',
+  'account.linkInvalid': 'This link was already used or has expired. Request another with “Forgot your password?”.',
   'account.sending': 'Sending…',
   'account.recoverySent': 'We sent a link to {email}. Open it on this device to sign in and choose a new password.',
   'account.confirmPassword': 'Repeat the password',

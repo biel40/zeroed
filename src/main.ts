@@ -285,6 +285,7 @@ class ZeroedBoot {
       this.openRequestedMap();
       // Recovery links are only sent for forgotten passwords, so the next step is choosing a new one.
       if (login === 'signed-in') this.hud.askForNewPassword();
+      else if (login) this.hud.reportRecoveryFailure(login);
     } catch (error: unknown) {
       this.hud.setError(error instanceof Error ? t('start.initFailed', { message: error.message }) : t('start.initFailedGeneric'));
     }

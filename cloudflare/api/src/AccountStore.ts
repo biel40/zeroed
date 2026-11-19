@@ -84,8 +84,12 @@ export class AccountStore {
     return result.meta.changes > 0;
   }
 
-  public async setPassword(userId: string, passwordHash: string): Promise<void> {
-    await this.database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, userId).run();
+  /** Replaces the password and ends every other session of the account, keeping only `keptSessionHash`. */
+  public async setPassword(userId: string, passwordHash: string, keptSessionHash: string): Promise<void> {
+    await this.database.batch([
+      this.database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(passwordHash, userId),
+      this.database.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?').bind(userId, keptSessionHash),
+    ]);
   }
 
   public async countPasswordFailuresSince(email: string, requesterHash: string, since: number): Promise<RecentAttempts> {

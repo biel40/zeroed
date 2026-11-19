@@ -8,6 +8,7 @@ import { NUCLEAR_DETONATION_TIME } from '../zombies/ZombiesRunFlow';
 import type { Weapon } from '../weapons/Weapon';
 import { BetaThanksScreen } from './BetaThanksScreen';
 import { MapUnlockDialog, type MapUnlockAccount } from './MapUnlockDialog';
+import type { LoginCompletion } from '../account/WebAccount';
 import { LanguagePicker } from './LanguagePicker';
 import type { ObjectiveNote } from './ObjectiveAnnouncer';
 import { ObjectiveTracker } from './ObjectiveTracker';
@@ -502,6 +503,11 @@ export class HUD {
   /** After a recovery link signs the player in, asks for their new password. */
   public askForNewPassword(): void {
     this.mapUnlock.openNewPassword();
+  }
+
+  /** A recovery link that could not sign the player in: used, expired, or the server was unreachable. */
+  public reportRecoveryFailure(reason: Exclude<LoginCompletion, 'signed-in'>): void {
+    this.mapUnlock.openRecoveryFailed(reason);
   }
 
   private updateAccountButton(): void {

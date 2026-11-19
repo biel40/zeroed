@@ -43,6 +43,7 @@ export const es: Record<TranslationKey, string> = {
   'account.weakPassword': 'La contraseña debe tener entre 8 y 128 caracteres.',
   'account.googleRejected': 'Google no ha podido confirmar tu cuenta. Vuelve a intentarlo.',
   'account.forgotPassword': '¿Has olvidado la contraseña?',
+  'account.linkInvalid': 'Este enlace ya se ha usado o ha caducado. Pide otro con «¿Has olvidado la contraseña?».',
   'account.sending': 'Enviando…',
   'account.recoverySent': 'Te hemos enviado un enlace a {email}. Ábrelo en este dispositivo para entrar y elegir una contraseña nueva.',
   'account.confirmPassword': 'Repite la contraseña',

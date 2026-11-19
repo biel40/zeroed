@@ -1,6 +1,6 @@
 import type { LoginRequestOutcome } from '../account/AccountApi';
 import type { GoogleSignInButton } from '../account/GoogleIdentityButton';
-import type { GoogleSignIn, PasswordChange, PasswordSignIn, Registration } from '../account/WebAccount';
+import type { GoogleSignIn, LoginCompletion, PasswordChange, PasswordSignIn, Registration } from '../account/WebAccount';
 import { setTranslatedText, t, type TranslationKey } from '../i18n/i18n';
 
 /** What the dialog needs from the player's account; `main.ts` supplies it. */
@@ -71,7 +71,8 @@ const SUBMIT_LABELS: Readonly<Record<Exclude<Mode, 'account'>, TranslationKey>> 
  * Opened from a locked map card or the menu's account button. Signed out, it
  * signs in with Google or with email and password, or creates an account with
  * a confirmed password, and closes; a forgotten password gets a mailed
- * recovery link, after which `openNewPassword` asks for a new one. Signed in,
+ * recovery link, after which `openNewPassword` asks for a new one, or
+ * `openRecoveryFailed` explains why the link did not work. Signed in,
  * it names the account (and, for a map, that it is not owned) and offers to
  * sign out. Access rules stay in the account.
  */
@@ -109,6 +110,12 @@ export class MapUnlockDialog {
     if (!this.account?.getEmail()) return;
     this.mapNameKey = null;
     this.show('new-password');
+  }
+
+  /** Explains why a recovery link did not sign the player in, so they can ask for another. */
+  public openRecoveryFailed(reason: Exclude<LoginCompletion, 'signed-in'>): void {
+    this.open(null);
+    setTranslatedText(this.view.message, reason === 'invalid-link' ? 'account.linkInvalid' : 'account.unavailable');
   }
 
   private show(mode: Mode): void {

@@ -18,7 +18,7 @@
     "APP_URL": "https://www.zeroed.es",
     "ALLOWED_ORIGINS": "https://www.zeroed.es,https://zeroed.es,https://localhost,app://zeroed",
     // Web client id from Google Cloud Console (public); empty disables Google sign-in.
-    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_CLIENT_ID": "988060754008-uetr98unfhliivf7q7340rbuj14dmrv1.apps.googleusercontent.com",
     "EMAIL_FROM": "Zeroed <login@zeroed.es>"
   }
 }
