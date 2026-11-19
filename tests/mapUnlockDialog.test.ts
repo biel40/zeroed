@@ -252,6 +252,17 @@ describe('map unlock dialog', () => {
     expect(onAccountChanged).toHaveBeenCalledOnce();
   });
 
+  it('explains a used or expired recovery link on the sign-in form', () => {
+    const { unlock, view, dialog } = createDialog(signedOut());
+    unlock.openRecoveryFailed('invalid-link');
+    expect(dialog.open).toBe(true);
+    expect(view.forgotButton.isHidden()).toBe(false);
+    expect(view.message.dataset.i18n).toBe('account.linkInvalid');
+
+    unlock.openRecoveryFailed('unavailable');
+    expect(view.message.dataset.i18n).toBe('account.unavailable');
+  });
+
   it('only asks for a new password while signed in', () => {
     const { unlock, dialog } = createDialog(signedOut());
     unlock.openNewPassword();

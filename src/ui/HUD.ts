@@ -1,4 +1,4 @@
-import { canAccessZombieMap, getZombieMapDefinition, isZombieMapReleased, type ZombieMapId } from '../config/zombieMaps';
+import { canAccessZombieMap, getZombieMapDefinition, type ZombieMapId } from '../config/zombieMaps';
 import type { EntitlementProvider } from '../entitlements/EntitlementProvider';
 import { isQualityPreference, type QualityLevel, type QualityPreference } from '../core/DeviceProfile';
 import { grenadeCookDial, lethalPouchIcons } from './GrenadeHudPresentation';
@@ -432,10 +432,9 @@ export class HUD {
 
   /**
    * Initial picker: Zombies is the only mode, so the player chooses its arena
-   * directly. Maps the player cannot access yet stay listed but locked; their
-   * card opens the account dialog, and the map unlocks once the account owns it.
-   * Work-in-progress maps show a WIP padlock on a disabled card unless
-   * `wipMapsEnabled`; disabling it blocks pointer, touch, keyboard and gamepad.
+   * directly. Locked premium maps open the account dialog. Work-in-progress
+   * maps show a disabled WIP card until the player can launch them on a
+   * development server.
    */
   public showMapSelect(
     onSelect: (mapId: ZombieMapId) => void,
@@ -455,8 +454,8 @@ export class HUD {
         button.onclick = null;
         continue;
       }
-      const wip = !isZombieMapReleased(map.id, wipMapsEnabled);
       const locked = !canAccessZombieMap(map.id, entitlements, wipMapsEnabled);
+      const wip = map.workInProgress === true && locked;
       const premium = map.product !== undefined;
       if (!locked && !firstPlayableButton) firstPlayableButton = button;
       // The registry, not the markup, decides each card's players, access and action labels.

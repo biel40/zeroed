@@ -25,7 +25,8 @@ ya la tiene lleva a entrar, conservando el correo escrito. Al entrar, el juego
 carga los productos y, si la cuenta es de beta, muestra
 [BetaThanksScreen](../../src/ui/BetaThanksScreen.ts) antes del menu. "¿Has
 olvidado la contraseña?" envia un enlace; al abrirlo, el juego inicia sesion y
-pide una contraseña nueva. Una cuenta sin el mapa ve su correo y puede cerrar sesion. El boton de
+pide una contraseña nueva; guardarla cierra las demas sesiones de la cuenta. Un
+enlace usado o caducado abre el dialogo pidiendo otro. Una cuenta sin el mapa ve su correo y puede cerrar sesion. El boton de
 cuenta, arriba a la derecha del menu, muestra la inicial y el correo, con la
 placa "BETA TESTER" en cuentas de beta (o "Iniciar sesion"). Si falta espacio,
 el correo se acorta con puntos suspensivos. El boton abre el dialogo para
@@ -36,8 +37,9 @@ con la tarjeta correspondiente bloqueada.
 Limites: el codigo de los mapas premium sigue en el paquete del juego, asi que
 un cliente modificado puede abrirlos. Como el registro no verifica el correo,
 quien conozca el correo de un tester que aun no se ha registrado puede hacerlo
-antes que el; el tester lo recupera con Google o con el enlace de
-recuperacion. Las apps Android y de escritorio solo ofrecen correo y
+antes que el; el tester lo recupera con el enlace de recuperacion, cuya
+contraseña nueva expulsa al otro (entrar con Google da acceso pero no lo
+expulsa). Las apps Android y de escritorio solo ofrecen correo y
 contraseña.
 
 `vercel.json` redirige las antiguas paginas de beta al juego.

@@ -259,7 +259,7 @@ describe('Zombies map selection flow', () => {
       station.onclick?.();
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
-      // Signed out, the card stays listed but locked behind the sign-in prompt.
+      // Signed out, released premium maps prompt for sign-in and WIP maps stay disabled.
       mansion.focused = false;
       let accountEmail: string | null = null;
       let betaTester = false;
@@ -276,12 +276,19 @@ describe('Zombies map selection flow', () => {
         signOut: async () => { accountEmail = null; },
         google: null,
       }, onAccountChanged);
-      ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts, true);
+      for (const wipMapsEnabled of [false, true]) {
+        ui.showMapSelect((mapId) => selected.push(`locked:${mapId}`), noProducts, wipMapsEnabled);
+        expect(cathedral.classList.contains('hidden')).toBe(false);
+        expect(cathedral.dataset.locked).toBe('true');
+        expect(cathedral.dataset.wip).toBe('true');
+        expect(cathedral.disabled).toBe(true);
+        expect(cathedral.onclick).toBeNull();
+        expect(cathedral.slots['[data-map-lock-label]'].textContent).toBe('WIP');
+        expect(cathedral.slots['[data-map-action]'].textContent).toBe('WIP');
+      }
       expect(station.classList.contains('hidden')).toBe(false);
       expect(station.dataset.locked).toBe('true');
       expect(station.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
-      expect(cathedral.dataset.locked).toBe('true');
-      expect(cathedral.slots['[data-map-action]'].dataset.i18n).toBe('menu.unlock');
       expect(mansion.dataset.locked).toBe('false');
       expect(mansion.focused).toBe(true);
       station.onclick?.();
@@ -292,10 +299,6 @@ describe('Zombies map selection flow', () => {
       expect(elements['beta-google-field'].classList.contains('hidden')).toBe(true);
       expect(elements['beta-signout'].classList.contains('hidden')).toBe(true);
       expect(mapSelect.classList.contains('hidden')).toBe(false);
-      unlockDialog.close();
-      cathedral.onclick?.();
-      expect(unlockDialog.open).toBe(true);
-      expect(elements['beta-unlock-map'].dataset.i18n).toBe('map.dieKathedrale');
       expect(selected).toEqual(['burned-mansion', 'again:station-33']);
 
       const flush = async (): Promise<void> => {

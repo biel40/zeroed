@@ -15,7 +15,8 @@ no la usan. El cliente la usa mediante `WebAccount`; aun no esta desplegada.
   tiene contraseña y 401 si no coincide. Hash PBKDF2-SHA256 en
   [passwords.ts](src/passwords.ts); 10 fallos por correo o 30 por IP bloquean
   una hora.
-- Cambio de contraseña (`POST /me/password`) con la sesion.
+- Cambio de contraseña (`POST /me/password`) con la sesion; cierra las demas
+  sesiones de la cuenta.
 - Google (`POST /auth/google`): el cliente envia el ID token de Google Identity
   Services y [googleIdToken.ts](src/googleIdToken.ts) comprueba firma, `aud`,
   emisor, caducidad y correo verificado. Se une a la cuenta del mismo correo.

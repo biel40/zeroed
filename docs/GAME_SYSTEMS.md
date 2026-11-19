@@ -533,10 +533,10 @@ existente a `MOTDRULES`.
   directos respetan el mismo permiso; detalles y limites en
   [acceso de beta](../public/beta/README.md).
 - Die Kathedrale esta en desarrollo (`workInProgress` en el registro): su
-  tarjeta sigue visible con candado y "WIP", deshabilitada para raton, toque,
-  teclado y mando, y ni el menu ni `?map=` la arrancan aunque la cuenta tenga
-  su producto. Solo un servidor de desarrollo con `VITE_WIP_MAPS=true` la
-  libera; ninguna build de produccion lo permite.
+  tarjeta aparece con candado y "WIP" para cualquiera que no pueda jugarla,
+  incluidas las sesiones sin cuenta. Para abrirla desde el menu o `?map=` hace
+  falta un servidor de desarrollo con `VITE_WIP_MAPS=true` y una cuenta con
+  acceso al mapa.
 
 - `DieKathedraleArena`: Die Kathedrale, la catedral de Palma, individual y premium. La
   nave es un solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
