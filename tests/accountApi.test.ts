@@ -75,6 +75,16 @@ describe('account API', () => {
     return Promise.resolve(app.request('/me/entitlements', { headers }));
   }
 
+  it.each([' BIELET40@gmail.com ', 'biel40aws@gmail.com'])('grants only the cathedral preview to %s', async (email) => {
+    const response = await getEntitlements(await signIn(email));
+    expect(await response.json()).toEqual({
+      email: email.trim().toLowerCase(),
+      products: [],
+      beta: false,
+      previews: ['map.die-kathedrale'],
+    });
+  });
+
   function register(email: string, password: string): Promise<Response> {
     return post('/auth/register', { email, password });
   }

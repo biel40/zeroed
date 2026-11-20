@@ -44,6 +44,10 @@ export interface EntrancePassageShape {
   readonly width: number;
   readonly height: number;
   readonly wallThickness: number;
+  /** Feet height of the floor the passage opens onto (default 0). */
+  readonly baseY?: number;
+  /** The player can reach the outside of the shell from another sector. */
+  readonly blocksPlayer?: boolean;
 }
 
 /**
@@ -59,7 +63,7 @@ export function addEntrancePassageShell(
   material: THREE.Material,
   surface: SurfaceType,
 ): void {
-  const { length, width, height, wallThickness } = shape;
+  const { length, width, height, wallThickness, baseY = 0, blocksPlayer = false } = shape;
   const halfWall = wallThickness / 2;
   const start = halfWall;
   const end = start + length;
@@ -68,8 +72,8 @@ export function addEntrancePassageShell(
   const solid = (along: number, across: number, y: number, alongSize: number, acrossSize: number, ySize: number, role: string, seed: number): void => {
     const { x, z } = frame.point(along, across);
     const { width: sizeX, depth: sizeZ } = frame.size(alongSize, acrossSize);
-    structure.addBox(x, y, z, sizeX, ySize, sizeZ, material, {
-      name: `${id}-${role}`, surface, mapRole: role, castShadow: false, uvSeed: seed, blocksPlayer: false,
+    structure.addBox(x, baseY + y, z, sizeX, ySize, sizeZ, material, {
+      name: `${id}-${role}`, surface, mapRole: role, castShadow: false, uvSeed: seed, blocksPlayer,
     });
   };
   solid(middle, 0, -0.08, length, outerWidth, 0.16, 'passage-floor', 1);
@@ -87,8 +91,8 @@ export interface EntranceSpawnDepths {
   readonly breachDepth: number;
 }
 
-/** The spawn point at the end of an entrance's passage, tied to its barrier. */
-export function entranceSpawn(site: EntranceSite & { readonly id: string }, depths: EntranceSpawnDepths): ZombieSpawnPoint {
+/** The spawn point at the end of an entrance's passage, tied to its barrier; `floor` only for a floor other than the ground. */
+export function entranceSpawn(site: EntranceSite & { readonly id: string }, depths: EntranceSpawnDepths, floor?: number): ZombieSpawnPoint {
   const along = (depth: number): { x: number; z: number } => ({
     x: site.x + site.outwardX * depth,
     z: site.z + site.outwardZ * depth,
@@ -105,6 +109,7 @@ export function entranceSpawn(site: EntranceSite & { readonly id: string }, dept
     breachX: breach.x,
     breachZ: breach.z,
     exterior: true,
+    ...(floor === undefined ? {} : { floor }),
   };
 }
 
@@ -113,13 +118,13 @@ export function entranceSpawn(site: EntranceSite & { readonly id: string }, dept
  * never walkable once the boards are gone. Player only: zombies and bullets
  * go through.
  */
-export function entrancePlayerStop(site: EntranceSite, width: number, top: number, wallThickness: number): THREE.Box3 {
+export function entrancePlayerStop(site: EntranceSite, width: number, top: number, wallThickness: number, baseY = 0): THREE.Box3 {
   const halfAlong = width / 2;
   const halfAcross = wallThickness / 2;
   const alongX = site.outwardX === 0;
   return new THREE.Box3(
-    new THREE.Vector3(site.x - (alongX ? halfAlong : halfAcross), 0, site.z - (alongX ? halfAcross : halfAlong)),
-    new THREE.Vector3(site.x + (alongX ? halfAlong : halfAcross), top, site.z + (alongX ? halfAcross : halfAlong)),
+    new THREE.Vector3(site.x - (alongX ? halfAlong : halfAcross), baseY, site.z - (alongX ? halfAcross : halfAlong)),
+    new THREE.Vector3(site.x + (alongX ? halfAlong : halfAcross), baseY + top, site.z + (alongX ? halfAcross : halfAlong)),
   );
 }
 

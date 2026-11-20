@@ -167,6 +167,8 @@ export class Zombie implements HitTarget {
   deathStyle: ZombieDeathStyle = 'knockback';
   /** Legs blown off by a grenade: it crawls on, slower and low, until it dies. */
   private crippled = false;
+  /** Rising out of the scenery: the spawn lasts until its owner ends it (see `beginEmergence`). */
+  private spawnHeld = false;
 
   private stateTimer = 0;
   private attackCooldown = 0;
@@ -280,6 +282,7 @@ export class Zombie implements HitTarget {
     this.maxHp = hp;
     this.speed = speed;
     this.state = 'spawn';
+    this.spawnHeld = false;
     this.deathKind = 'normal';
     this.stateTimer = ZOMBIE_SPAWN_DURATION;
     this.previousYaw = 0;
@@ -324,6 +327,39 @@ export class Zombie implements HitTarget {
 
   /** Ends the ground rise at once: the body appears standing (a map ambush). */
   skipSpawnRise(): void {
+    if (this.state === 'spawn') this.setWalk();
+  }
+
+  /**
+   * Holds the spawn of a body rising out of the scenery (a tomb): it stays
+   * buried, unable to hunt or strike, while its owner drives the rise and
+   * the climb through `setEmergencePose`, until `endEmergence`.
+   */
+  public beginEmergence(): void {
+    if (this.state !== 'spawn') return;
+    this.spawnHeld = true;
+    this.visual.setSpawnRise(0);
+  }
+
+  /**
+   * Pose of a held rising: `rise` from buried (0) to standing (1), then
+   * `climb` over a rim `rim` high above the feet that lies `rimDepth` ahead
+   * (negative once crossed), stepping with the walk cycle as through a window.
+   */
+  public setEmergencePose(rise: number, climb: number, rim: number, rimDepth: number): void {
+    if (!this.spawnHeld || this.state !== 'spawn') return;
+    this.visual.setSpawnRise(rise);
+    if (climb <= 0) return;
+    this.visual.setState('walk');
+    const scale = Math.max(0.01, this.group.scale.y);
+    this.visual.setWindowVault(climb, rim / scale, rimDepth / scale);
+  }
+
+  /** The rising is over: the body stands clear of the prop and starts hunting. */
+  public endEmergence(): void {
+    if (!this.spawnHeld) return;
+    this.spawnHeld = false;
+    this.visual.clearWindowVault();
     if (this.state === 'spawn') this.setWalk();
   }
 
@@ -669,6 +705,7 @@ export class Zombie implements HitTarget {
 
     switch (this.state) {
       case 'spawn': {
+        if (this.spawnHeld) break;
         this.stateTimer -= dt;
         const t = 1 - Math.max(0, this.stateTimer / ZOMBIE_SPAWN_DURATION);
         // Ease-out rise from the ground: fast at first, settles at the end.

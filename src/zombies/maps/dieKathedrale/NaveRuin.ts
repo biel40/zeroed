@@ -1,5 +1,15 @@
 import * as THREE from 'three';
-import { BROKEN_PEWS, DIE_KATHEDRALE_DOORS, DIE_KATHEDRALE_SCREENS, NAVE, PEW, type BrokenPew } from '../DieKathedraleConfig';
+import {
+  BROKEN_PEWS,
+  DIE_KATHEDRALE_DOORS,
+  DIE_KATHEDRALE_SCREENS,
+  dieKathedraleFloorY,
+  NAVE,
+  PEW,
+  siteFloor,
+  type BrokenPew,
+  type DieKathedraleDoor,
+} from '../DieKathedraleConfig';
 import { seededRandom } from '../shared/ProceduralNoise';
 import { addSolidProxy } from '../shared/SolidProxy';
 import { cobwebGeometry } from './CobwebTexture';
@@ -68,14 +78,19 @@ function addGrilleCobwebs(context: DieKathedraleBuildContext): void {
   }
 }
 
-/** Something was dragged through every gate, away from the doors. */
+/** Something was dragged through every gate of the cathedral's floor, away from the doors. */
 function addGateTrails(context: DieKathedraleBuildContext): void {
-  const { batch, materials } = context;
   const random = seededRandom(6403);
   for (const door of DIE_KATHEDRALE_DOORS) {
-    if (door.kind !== 'gate') continue;
-    const yaw = Math.atan2(door.outwardX, door.outwardZ) + (random() - 0.5) * 0.3;
-    batch.add(floorDecal(0.8 + random() * 0.4, 3, door.x + door.outwardX * 0.9, door.z + door.outwardZ * 0.9, yaw, 0.013), materials.bloodSmear);
-    if (random() < 0.5) batch.add(floorDecal(1.6, 1.6, door.x - door.outwardX * 1.3, door.z - door.outwardZ * 1.3, random() * Math.PI, 0.012), materials.bloodSplatter);
+    if (door.kind === 'gate' && siteFloor(door) === 0) addGateTrail(context, door, random);
   }
+}
+
+/** A smear dragged through `door` away from the start, sometimes with a splash before it, on the door's own floor. */
+export function addGateTrail(context: DieKathedraleBuildContext, door: DieKathedraleDoor, random: () => number): void {
+  const { batch, materials } = context;
+  const floorY = dieKathedraleFloorY(siteFloor(door));
+  const yaw = Math.atan2(door.outwardX, door.outwardZ) + (random() - 0.5) * 0.3;
+  batch.add(floorDecal(0.8 + random() * 0.4, 3, door.x + door.outwardX * 0.9, door.z + door.outwardZ * 0.9, yaw, floorY + 0.013), materials.bloodSmear);
+  if (random() < 0.5) batch.add(floorDecal(1.6, 1.6, door.x - door.outwardX * 1.3, door.z - door.outwardZ * 1.3, random() * Math.PI, floorY + 0.012), materials.bloodSplatter);
 }

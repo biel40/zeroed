@@ -3,8 +3,9 @@ import { ZombieBlood } from './ZombieBlood';
 import {
   EYE_HEIGHT,
   PLAYER_BODY_RADIUS,
-  stairGroundY,
+  stairRampGroundAt,
   type FloorTransitionZone,
+  type StairCurve,
   type StairRamp,
 } from '../player/PlayerController';
 import { damp } from '../utils/math';
@@ -42,9 +43,12 @@ import type { GrenadeBlastConfig } from '../config/grenades';
 import { resolveBlastOutcome } from './grenades/GrenadeBlast';
 import { arenaFloorHeight } from './maps/ArenaFloors';
 export type { ZombieKillSource } from './ZombieDeath';
+import { EmergenceSitePicker } from './emergence/EmergenceSitePicker';
+import type { ZombieEmergenceSite, ZombieEmergenceStage, ZombieEmergenceTuning } from './emergence/ZombieEmergence';
+import { ZombieEmergences } from './emergence/ZombieEmergences';
 import { ZombieLookPicker } from './ZombieLookPicker';
 import { ZombiePool } from './ZombiePool';
-import { MIN_PLAYER_DISTANCE, ZombieSpawner } from './ZombieSpawner';
+import { MIN_PLAYER_DISTANCE, spawnFloor, ZombieSpawner } from './ZombieSpawner';
 import type { ZombieSpawnDefinition, ZombieSpawnPoint } from './ZombieSpawner';
 import {
   ZombieVisual,
@@ -129,7 +133,15 @@ const MAX_OBSTACLE_FOOTPRINT = 20;
  * skins), dealt in turn to its pooled bodies. Missing keys use that model's
  * distinct fallback.
  */
-export type ZombieModelSources = Partial<Record<ZombieModelId, ZombieModelSource | readonly ZombieModelSource[] | null>>;
+export type ZombieModelSources = Partial<Record<ZombieModelId, ZombieModelSource | readonly ZombieModelSource[] | null>> & {
+  /** Walker looks of a floor's own reserve, one per extra pooled body (see `ZombieArena.zombieFloorLook`). */
+  readonly floorWalkers?: ZombieFloorWalkers;
+};
+
+export interface ZombieFloorWalkers {
+  readonly floor: number;
+  readonly looks: readonly ZombieModelSource[];
+}
 export const ZOMBIE_POOL_MODELS = (Object.keys(ZOMBIE_MODEL_POOL_CAPACITIES) as ZombieModelId[])
   .flatMap((modelId) => Array<ZombieModelId>(ZOMBIE_MODEL_POOL_CAPACITIES[modelId]).fill(modelId));
 
@@ -228,8 +240,12 @@ export class ZombieManager {
   public onZombieSpawned: ((zombie: Zombie) => void) | null = null;
   public onZombieAttack: ((zombie: Zombie, targetId: ZombieTargetId) => void) | null = null;
   public onBarrierImpact: ((barrier: WindowBarrier) => void) | null = null;
+  /** A body began rising out of an emergence site (`stir`), or broke out of it (`breach`): the map's and the sound's cue. */
+  public onZombieEmerging: ((site: ZombieEmergenceSite, stage: ZombieEmergenceStage) => void) | null = null;
 
   private readonly pool: ZombiePool;
+  private readonly emergenceSites: EmergenceSitePicker;
+  private readonly emergences = new ZombieEmergences();
   /** Rolls each spawned walker's look when the map weights its skins. */
   private readonly looks = new ZombieLookPicker();
   /** Wall set shared by every pooled zombie's gibs. */
@@ -240,6 +256,7 @@ export class ZombieManager {
   private colliders: THREE.Object3D[] = [];
   /** Static obstacle AABBs (walls, barriers, crates, posts) blocking movement. */
   private readonly obstacles: THREE.Box3[] = [];
+  private readonly windingStairs: ReadonlyArray<StairRamp>;
   /** Solids that bullets ignore but bodies cannot cross (the Mystery Box). */
   private bodyObstacles: readonly THREE.Box3[] = [];
   // Reused temporaries: no allocations in the per-frame steering loop.
@@ -311,19 +328,26 @@ export class ZombieManager {
     private readonly typeRng: () => number = rng,
   ) {
     this.rng = rng;
+    this.emergenceSites = new EmergenceSitePicker(rng);
+    this.emergences.onStage = (site, stage) => this.onZombieEmerging?.(site, stage);
     this.group.add(this.blood.group);
     this.spawner = new ZombieSpawner(rng, spawnPoints ?? undefined);
-    this.pool = new ZombiePool(ZOMBIE_POOL_MODELS.length, (index) => {
-      const modelId = ZOMBIE_POOL_MODELS[index];
+    this.windingStairs = [...new Set(floorTransitions.flatMap(({ ramp }) => ramp?.curve ? [ramp] : []))];
+    // A floor's own walkers are extra bodies after the shared reserves; the population cap stays MAX_ALIVE.
+    const floorWalkers = sources.floorWalkers ?? null;
+    const sharedBodies = ZOMBIE_POOL_MODELS.length;
+    this.pool = new ZombiePool(sharedBodies + (floorWalkers?.looks.length ?? 0), (index) => {
+      const floorLook = floorWalkers && index >= sharedBodies ? floorWalkers.looks[index - sharedBodies] : null;
+      const modelId: ZombieModelId = floorLook ? 'walker' : ZOMBIE_POOL_MODELS[index];
       const model = ZOMBIE_MODELS[modelId];
       const tint = model.tints[(this.nextZombieId - 1) % model.tints.length];
-      const source = zombiePoolSource(sources, index);
+      const source = floorLook ?? zombiePoolSource(sources, index);
       const zombie = new Zombie(
         new ZombieVisual(modelId, source, tint, castShadows),
         this.gibWalls,
         this.blood,
       );
-      this.looks.register(zombie, source);
+      this.looks.register(zombie, source, floorLook ? floorWalkers!.floor : null);
       this.zombieIds.set(zombie, this.nextZombieId++);
       zombie.onDeathFinished = () => this.finishDeath(zombie);
       this.group.add(zombie.group);
@@ -358,6 +382,16 @@ export class ZombieManager {
   /** Replace spawn points when a new zone is unlocked. */
   setSpawnPoints(spawnPoints: ReadonlyArray<ZombieSpawnDefinition>): void {
     this.spawner = new ZombieSpawner(this.rng, spawnPoints);
+  }
+
+  /** Map sites some walkers rise out of instead of their spawn (tombs); empty or null tuning turns them off. */
+  public setEmergenceSites(sites: ReadonlyArray<ZombieEmergenceSite>, tuning: ZombieEmergenceTuning | null): void {
+    this.emergenceSites.setSites(sites, tuning);
+  }
+
+  /** True while `zombie` is still rising out of a site, before it may hunt. */
+  public isEmerging(zombie: Zombie): boolean {
+    return this.emergences.isEmerging(zombie);
   }
 
   public setNavigationBounds(bounds: ReadonlyArray<ZombieNavigationBounds>): void {
@@ -523,28 +557,62 @@ export class ZombieManager {
     return this.navigationComputations;
   }
 
-  /** Spawns one zombie for the round; false when the pool is exhausted. */
-  spawnZombie(config: RoundConfig, playerX: number, playerZ: number, round = 1): boolean {
+  /**
+   * Spawns one zombie for the round; false when the pool is exhausted. A
+   * spawn on the player's floor is preferred when the map has one far enough.
+   * The spawn is chosen before the body, since a floor may dress its own.
+   * A walker on a floor with emergence sites may rise out of one instead.
+   */
+  spawnZombie(config: RoundConfig, playerX: number, playerZ: number, round = 1, playerFloor = 0): boolean {
     let typeId = selectZombieType(round, this.activeTypeCounts(), this.typeRng);
+    if (this.pool.full) return false;
     let profile = ZOMBIE_TYPE_CONFIGS[typeId];
-    let zombie = this.acquireBody(profile.modelId);
+    const spawn = this.pickValidSpawn(playerX, playerZ, profile.bodyRadius, playerFloor);
+    if (!spawn) return false;
+    const floor = spawnFloor(spawn);
+    let zombie = this.acquireBody(profile.modelId, floor);
     // A future type may share a smaller model reserve with another type.
     // Preserve round cadence by degrading to the default walker if it is full.
     if (!zombie && typeId !== 'normal') {
       typeId = 'normal';
       profile = ZOMBIE_TYPE_CONFIGS.normal;
-      zombie = this.acquireBody(profile.modelId);
+      zombie = this.acquireBody(profile.modelId, floor);
     }
     if (!zombie) return false;
-    const spawn = this.pickValidSpawn(playerX, playerZ, profile.bodyRadius);
-    if (!spawn) {
-      this.pool.release(zombie);
-      return false;
+    const site = this.pickEmergenceSite(zombie, floor, round, playerX, playerZ);
+    if (site) {
+      this.placeEmerging(zombie, site, config, round, typeId);
+      return true;
     }
-    this.placeZombie(zombie, spawn, config, round, typeId);
+    this.placeZombie(zombie, spawn, config, round, typeId, this.floorBaseY(floor), floor);
     this.assignSpawnRoute(zombie, spawn);
     this.registerSpawned(zombie);
     return true;
+  }
+
+  /** An emergence site of `floor` a man-sized walker rises from instead of its spawn, or null. */
+  private pickEmergenceSite(zombie: Zombie, floor: number, round: number, playerX: number, playerZ: number): ZombieEmergenceSite | null {
+    if (zombie.visual.modelId !== 'walker' || !this.emergenceSites.active) return null;
+    return this.emergenceSites.pick(floor, round, playerX, playerZ, (site) => this.emergenceExitClear(site, zombie));
+  }
+
+  /** The site's exit is navigable floor with no solid and no other body on it. */
+  private emergenceExitClear(site: ZombieEmergenceSite, zombie: Zombie): boolean {
+    const { x, z } = site.exit;
+    return this.isWithinNavigationBounds(x, z, site.floor)
+      && !this.hitsObstacle(x, z, this.floorBaseY(site.floor), zombie.bodyRadius)
+      && !this.isOccupiedByZombie(x, z, site.floor, zombie);
+  }
+
+  /** The body starts buried at the site's rise point, without barrier or entry route, and rises out on its own. */
+  private placeEmerging(zombie: Zombie, site: ZombieEmergenceSite, config: RoundConfig, round: number, typeId: ZombieTypeId): void {
+    const timing = this.emergenceSites.active?.timing;
+    if (!timing) throw new Error('Emergence site picked without tuning');
+    this.placeZombie(zombie, site.rise, config, round, typeId, this.floorBaseY(site.floor), site.floor);
+    zombie.barrierTarget = null;
+    this.entryRoutes.delete(zombie);
+    this.emergences.begin(zombie, site, timing);
+    this.registerSpawned(zombie);
   }
 
   /**
@@ -558,7 +626,7 @@ export class ZombieManager {
     const profile = ZOMBIE_TYPE_CONFIGS.normal;
     const feetY = this.floorBaseY(floor);
     if (this.hitsObstacle(x, z, feetY, profile.bodyRadius)) return false;
-    const zombie = this.acquireBody(profile.modelId);
+    const zombie = this.acquireBody(profile.modelId, floor);
     if (!zombie) return false;
     this.placeZombie(zombie, { x, z }, config, round, 'normal', feetY, floor);
     zombie.barrierTarget = null;
@@ -569,11 +637,15 @@ export class ZombieManager {
     return true;
   }
 
-  /** A free pooled body of the model, wearing a rolled look when the map weights them. */
-  private acquireBody(modelId: ZombieModelId): Zombie | null {
-    if (!this.looks.weighted) return this.pool.acquire(modelId);
-    this.looks.roll(this.rng());
-    return this.pool.acquire(modelId, this.looks.wearsRolledLook);
+  /**
+   * A free pooled body of the model for a spawn on `floor`: from that floor's
+   * own reserve when the map keeps one, wearing a rolled look when the map
+   * weights them.
+   */
+  private acquireBody(modelId: ZombieModelId, floor: number): Zombie | null {
+    if (!this.looks.active) return this.pool.acquire(modelId);
+    this.looks.roll(this.rng(), modelId, floor);
+    return this.pool.acquire(modelId, this.looks.wearsRolledLook, this.looks.risesOnRolledFloor);
   }
 
   private placeZombie(
@@ -646,13 +718,13 @@ export class ZombieManager {
     }
   }
 
-  private pickValidSpawn(playerX: number, playerZ: number, bodyRadius: number): ZombieSpawnPoint | null {
-    const preferred = this.spawner.pickSpawn(playerX, playerZ);
-    if (!this.hitsObstacle(preferred.x, preferred.z, 0, bodyRadius)) return preferred;
+  private pickValidSpawn(playerX: number, playerZ: number, bodyRadius: number, playerFloor: number): ZombieSpawnPoint | null {
+    const preferred = this.spawner.pickSpawn(playerX, playerZ, playerFloor);
+    if (!this.spawnBlocked(preferred, bodyRadius)) return preferred;
     let farthest: ZombieSpawnPoint | null = null;
     let farthestDistance = -1;
     for (const spawn of this.spawner.points) {
-      if (this.hitsObstacle(spawn.x, spawn.z, 0, bodyRadius)) continue;
+      if (this.spawnBlocked(spawn, bodyRadius)) continue;
       const distance = Math.hypot(spawn.x - playerX, spawn.z - playerZ);
       if (distance >= MIN_PLAYER_DISTANCE) return spawn;
       if (distance > farthestDistance) {
@@ -852,6 +924,7 @@ export class ZombieManager {
     }
     this.refreshBarrierQueues();
     this.drainPathQueue();
+    this.emergenceSites.update(dt);
     for (const zombie of this.pool.actives) {
       let targetId: ZombieTargetId = 'host';
       let targetX = playerX;
@@ -877,7 +950,9 @@ export class ZombieManager {
       const previousX = zombie.position.x;
       const previousZ = zombie.position.z;
       const previousYaw = zombie.group.rotation.y;
-      if (zombie.isAlive) {
+      // A body still rising out of a site neither steers, strikes nor gets recovered.
+      const emerging = this.emergences.advance(zombie, dt);
+      if (zombie.isAlive && !emerging) {
         if (
           this.isOutsideNavigationBounds(zombie) &&
           this.relocateZombie(
@@ -920,7 +995,7 @@ export class ZombieManager {
         const heading = this.smoothHeading(zombie, zombie.position.x - previousX, zombie.position.z - previousZ, dt);
         zombie.faceTowards(zombie.position.x + heading.x, zombie.position.z + heading.z, TURN_SPEED * dt);
       }
-      zombie.trackWindowVault(this.barriers);
+      if (!emerging) zombie.trackWindowVault(this.barriers);
       zombie.update(dt, visualSpeed / Math.max(0.01, zombie.group.scale.x));
     }
   }
@@ -966,6 +1041,8 @@ export class ZombieManager {
       this.removeColliders(zombie);
     }
     this.pool.releaseAll();
+    this.emergences.reset();
+    this.emergenceSites.reset();
     this.roundState.clear();
     this.headings.clear();
     this.entryRoutes.clear();
@@ -989,7 +1066,7 @@ export class ZombieManager {
     playerFacingX: number,
     playerFacingZ: number,
   ): void {
-    if (zombie.state !== 'walk') {
+    if (zombie.state !== 'walk' || this.windingStairAt(zombie.position.x, zombie.position.z, zombie.position.y)) {
       return;
     }
 
@@ -1166,7 +1243,9 @@ export class ZombieManager {
       return;
     }
 
-    if (zombie.floor !== playerFloor) {
+    const zombieStair = this.windingStairAt(zombie.position.x, zombie.position.z, zombie.position.y);
+    const playerStair = this.windingStairAt(playerX, playerZ, playerY - EYE_HEIGHT);
+    if (zombie.floor !== playerFloor && (!zombieStair || zombieStair !== playerStair)) {
       const portal = this.findNextFloorTransition(zombie.floor, playerFloor);
       if (portal) {
         // Copied out: the direction below reuses the same scratch vector, and
@@ -1182,6 +1261,15 @@ export class ZombieManager {
           this.seek(zombie, dt, toPortal, centerX, centerZ, true);
         }
       }
+      return;
+    }
+
+    const curve = (zombieStair ?? playerStair)?.curve;
+    if (curve && !this.canAttackPlayer(zombie, playerX, playerZ, playerFloor, playerY)) {
+      const { x, z } = this.resolveCurveWaypoint(curve, zombie, playerX, playerY - EYE_HEIGHT, playerZ, this.tmpToPlayer);
+      zombie.faceTowards(x, z, TURN_SPEED * dt);
+      const direction = this.tmpToPlayer.set(x - zombie.position.x, 0, z - zombie.position.z).normalize();
+      this.seek(zombie, dt, direction, x, z, true);
       return;
     }
 
@@ -1272,8 +1360,8 @@ export class ZombieManager {
     // A body already standing on the stairwell needs the corridor too: plain
     // lateral separation used to eject it sideways off the slope.
     const stairRamp =
-      useStairCorridor || this.rampContaining(zombie.position.x, zombie.position.z)
-        ? this.findRampAt(zombie.position.x, zombie.position.z)
+      useStairCorridor || this.rampContaining(zombie.position.x, zombie.position.z, zombie.position.y)
+        ? this.findRampAt(zombie.position.x, zombie.position.z, zombie.position.y)
         : null;
     if (stairRamp) this.navPaths.delete(zombie);
     let path = this.navPaths.get(zombie);
@@ -1354,7 +1442,8 @@ export class ZombieManager {
       // Followers must never push the contact/entry owner away from its lane.
       if (queue && queue.indexOf(other) > queueIndex) continue;
       const sharesFloor = other.floor === zombie.floor;
-      const sharesRamp = stairRamp !== null && this.findRampAt(other.position.x, other.position.z) === stairRamp;
+      if (stairRamp?.curve && Math.abs(other.position.y - zombie.position.y) > 1.5) continue;
+      const sharesRamp = stairRamp !== null && this.findRampAt(other.position.x, other.position.z, other.position.y) === stairRamp;
       if (!sharesFloor && !sharesRamp) continue;
       const delta = this.tmpDelta.copy(zombie.position).sub(other.position);
       delta.y = 0;
@@ -1382,7 +1471,10 @@ export class ZombieManager {
     // centerline instead; this remains ordinary velocity, never a position snap.
     let stairCenterX = 0;
     let stairCenterZ = 0;
-    if (stairRamp) {
+    if (stairRamp?.curve) {
+      const along = separation.dot(toTarget);
+      separation.copy(toTarget).multiplyScalar(along);
+    } else if (stairRamp) {
       const axisX = stairRamp.bottom.x - stairRamp.top.x;
       const axisZ = stairRamp.bottom.z - stairRamp.top.z;
       const axisLength = Math.hypot(axisX, axisZ);
@@ -1646,14 +1738,18 @@ export class ZombieManager {
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (zombie.bodyRadius * 0.45)));
     const stepX = dx / steps;
     const stepZ = dz / steps;
+    const ramp = this.windingStairAt(pos.x, pos.z, pos.y);
+    const onWindingFlight = ramp?.curve && pos.y > ramp.bottom.y + 0.02 && pos.y < ramp.top.y - 0.02;
     for (let step = 0; step < steps; step++) {
       if (stepX !== 0 && (!queued || this.isWithinNavigationBounds(pos.x + stepX, pos.z, zombie.floor))
+        && (!onWindingFlight || stairRampGroundAt(ramp, pos.x + stepX, pos.z, pos.y) !== null)
         && !this.hitsObstacle(pos.x + stepX, pos.z, pos.y, zombie.bodyRadius)
         && !this.wouldIntersectPlayer(zombie, pos.x + stepX, pos.z)) {
         pos.x += stepX;
         moved = true;
       }
       if (stepZ !== 0 && (!queued || this.isWithinNavigationBounds(pos.x, pos.z + stepZ, zombie.floor))
+        && (!onWindingFlight || stairRampGroundAt(ramp, pos.x, pos.z + stepZ, pos.y) !== null)
         && !this.hitsObstacle(pos.x, pos.z + stepZ, pos.y, zombie.bodyRadius)
         && !this.wouldIntersectPlayer(zombie, pos.x, pos.z + stepZ)) {
         pos.z += stepZ;
@@ -1779,7 +1875,7 @@ export class ZombieManager {
   /**
    * Hit-window validation, run when the bite visually lands — never at
    * wind-up start. The attack connects only if the player is still on the
-   * same floor, still inside horizontal and vertical melee range and still
+   * same floor or winding stair, still inside horizontal and vertical melee range and still
    * reachable in a straight line (the same predicates that allowed wind-up).
    * The zombie side is already guaranteed alive by the state machine: the
    * callback only fires from the attack state, and death leaves it.
@@ -1863,12 +1959,15 @@ export class ZombieManager {
     playerFloor: number,
     playerY: number,
   ): boolean {
-    if (zombie.floor !== playerFloor) return false;
     const dx = playerX - zombie.position.x;
     const dz = playerZ - zombie.position.z;
     if (dx * dx + dz * dz > ZOMBIE_ATTACK_RANGE * ZOMBIE_ATTACK_RANGE) return false;
     const playerFeetY = playerY - EYE_HEIGHT;
     if (Math.abs(playerFeetY - zombie.position.y) > ZOMBIE_ATTACK_VERTICAL_TOLERANCE) return false;
+    if (zombie.floor !== playerFloor) {
+      const stair = this.windingStairAt(zombie.position.x, zombie.position.z, zombie.position.y);
+      if (!stair || stair !== this.windingStairAt(playerX, playerZ, playerFeetY)) return false;
+    }
     return this.attackLineClear(
       zombie.position.x,
       zombie.position.z,
@@ -1935,6 +2034,7 @@ export class ZombieManager {
     if (!ramp) return transition.box.getCenter(out);
     const destinationY = transition.targetY - EYE_HEIGHT;
     const destination = Math.abs(destinationY - ramp.bottom.y) < 0.05 ? ramp.bottom : ramp.top;
+    if (ramp.curve) return this.resolveCurveWaypoint(ramp.curve, zombie, destination.x, destination.y, destination.z, out);
     const target = this.containsXZ(ramp.box, zombie.position.x, zombie.position.z)
       ? destination
       : (destination === ramp.bottom ? ramp.top : ramp.bottom);
@@ -1956,18 +2056,36 @@ export class ZombieManager {
     return out.set(target.x, target.y, target.z);
   }
 
-  /** Strict stairwell volume: the only place where height follows the slope. */
-  private rampContaining(x: number, z: number): StairRamp | null {
-    for (const transition of this.floorTransitions) {
-      if (transition.ramp && this.containsXZ(transition.ramp.box, x, z)) return transition.ramp;
+  private resolveCurveWaypoint(curve: StairCurve, zombie: Zombie, x: number, y: number, z: number, out: THREE.Vector3): THREE.Vector3 {
+    curve.waypoint(zombie.position.x, zombie.position.y, zombie.position.z, x, y, z, out);
+    return out;
+  }
+
+  private windingStairAt(x: number, z: number, feetY: number): StairRamp | null {
+    for (const ramp of this.windingStairs) {
+      if (stairRampGroundAt(ramp, x, z, feetY) !== null) return ramp;
     }
     return null;
   }
 
-  private findRampAt(x: number, z: number): StairRamp | null {
+  /** Strict stairwell volume: the only place where height follows the slope. */
+  private rampContaining(x: number, z: number, feetY: number): StairRamp | null {
+    for (const transition of this.floorTransitions) {
+      const { ramp } = transition;
+      if (!ramp || !this.containsXZ(ramp.box, x, z)) continue;
+      if (!ramp.curve || ramp.curve.groundAt(x, z, feetY) !== null) return ramp;
+    }
+    return null;
+  }
+
+  private findRampAt(x: number, z: number, feetY: number): StairRamp | null {
     for (const transition of this.floorTransitions) {
       const ramp = transition.ramp;
       if (!ramp) continue;
+      if (ramp.curve) {
+        if (stairRampGroundAt(ramp, x, z, feetY) !== null) return ramp;
+        continue;
+      }
       const axisX = ramp.bottom.x - ramp.top.x;
       const axisZ = ramp.bottom.z - ramp.top.z;
       const length = Math.hypot(axisX, axisZ);
@@ -2009,7 +2127,7 @@ export class ZombieManager {
 
   private beginStairExit(zombie: Zombie, transition: FloorTransitionZone): void {
     const ramp = transition.ramp;
-    if (!ramp) return;
+    if (!ramp || ramp.curve) return;
     const destinationY = transition.targetY - EYE_HEIGHT;
     const exitsAtBottom = Math.abs(destinationY - ramp.bottom.y) < 0.05;
     const destination = exitsAtBottom ? ramp.bottom : ramp.top;
@@ -2092,17 +2210,19 @@ export class ZombieManager {
     let bestScore = -Infinity;
     const facingLength = Math.hypot(playerFacingX, playerFacingZ);
     for (const spawn of this.spawner.points) {
-      if (!this.isWithinNavigationBounds(spawn.x, spawn.z, 0)) continue;
-      if (this.hitsObstacle(spawn.x, spawn.z, 0, zombie.bodyRadius)) continue;
-      if (this.isOccupiedByZombie(spawn.x, spawn.z, 0, zombie)) continue;
+      const floor = spawnFloor(spawn);
+      if (!this.isWithinNavigationBounds(spawn.x, spawn.z, floor)) continue;
+      if (this.spawnBlocked(spawn, zombie.bodyRadius)) continue;
+      if (this.isOccupiedByZombie(spawn.x, spawn.z, floor, zombie)) continue;
       const dx = spawn.x - playerX;
       const dz = spawn.z - playerZ;
       const distance = Math.hypot(dx, dz);
       if (distance < 3) continue;
-      const inView = facingLength > 0 && distance > 0 &&
+      const inView = floor === playerFloor && facingLength > 0 && distance > 0 &&
         (dx * playerFacingX + dz * playerFacingZ) / (distance * facingLength) > 0.35 &&
-        this.lineOfSightClearFrom(playerX, playerZ, spawn.x, spawn.z, 0);
-      const score = (inView ? 0 : 1000) + distance;
+        this.lineOfSightClearFrom(playerX, playerZ, spawn.x, spawn.z, this.floorBaseY(floor));
+      // Out of sight first, then the player's own floor, then the farthest.
+      const score = (inView ? 0 : 1000) + (floor === playerFloor ? 500 : 0) + distance;
       if (score > bestScore) {
         bestScore = score;
         bestSpawn = spawn;
@@ -2110,8 +2230,9 @@ export class ZombieManager {
     }
 
     if (bestSpawn) {
-      zombie.position.set(bestSpawn.x, 0, bestSpawn.z);
-      zombie.floor = 0;
+      const floor = spawnFloor(bestSpawn);
+      zombie.position.set(bestSpawn.x, this.floorBaseY(floor), bestSpawn.z);
+      zombie.floor = floor;
       zombie.barrierTarget = null;
       this.assignSpawnRoute(zombie, bestSpawn);
       this.stairTraversals.delete(zombie);
@@ -2168,12 +2289,13 @@ export class ZombieManager {
   }
 
   private isOccupiedByZombie(x: number, z: number, floor: number, ignored: Zombie): boolean {
-    const candidateRamp = this.findRampAt(x, z);
+    const candidateRamp = this.findRampAt(x, z, ignored.position.y);
     for (const other of this.pool.actives) {
       if (other === ignored || !other.isAlive) continue;
+      if (candidateRamp?.curve && Math.abs(other.position.y - ignored.position.y) > 1.5) continue;
       if (
         other.floor !== floor &&
-        (!candidateRamp || this.findRampAt(other.position.x, other.position.z) !== candidateRamp)
+        (!candidateRamp || this.findRampAt(other.position.x, other.position.z, other.position.y) !== candidateRamp)
       ) continue;
       if (Math.hypot(other.position.x - x, other.position.z - z) < ignored.bodyRadius + other.bodyRadius) {
         return true;
@@ -2348,6 +2470,11 @@ export class ZombieManager {
     return this.findObstacle(x, z, y, bodyRadius) !== null;
   }
 
+  /** A solid stands where a body would appear at `spawn`, on its own floor. */
+  private spawnBlocked(spawn: ZombieSpawnPoint, bodyRadius: number): boolean {
+    return this.hitsObstacle(spawn.x, spawn.z, this.floorBaseY(spawnFloor(spawn)), bodyRadius);
+  }
+
   private findObstacle(x: number, z: number, y: number, bodyRadius = ZOMBIE_BODY_RADIUS): THREE.Box3 | null {
     for (const box of this.obstacles) {
       if (box.max.y <= y + 0.05 || box.min.y >= y + 1.8) continue;
@@ -2361,9 +2488,10 @@ export class ZombieManager {
   }
 
   private applyFloorTransition(zombie: Zombie, dt: number): void {
-    const ramp = this.rampContaining(zombie.position.x, zombie.position.z);
+    const { x, y, z } = zombie.position;
+    const ramp = this.rampContaining(x, z, y);
     if (ramp) {
-      zombie.position.y = stairGroundY(ramp, zombie.position.x, zombie.position.z);
+      zombie.position.y = stairRampGroundAt(ramp, x, z, y) ?? y;
     } else {
       // Outside the stairwell the body belongs to its floor plane. Without
       // this a zombie pushed off the ramp kept its slope height forever and

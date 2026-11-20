@@ -44,6 +44,19 @@ describe('ZombieSpawner', () => {
     expect(picks.size).toBeGreaterThan(1);
   });
 
+  it('prefers the spawns on the player\'s floor, and falls back to every floor when none qualifies', () => {
+    const ground = { x: 20, z: 0 };
+    const cellar = { x: -20, z: 0, floor: -1 };
+    const spawner = new ZombieSpawner(() => 0, [ground, cellar]);
+    // A floor-blind pick keeps the old behaviour: any distant spawn.
+    expect(spawner.pickSpawn(0, 0)).toBe(ground);
+    expect(spawner.pickSpawn(0, 0, 0)).toBe(ground);
+    expect(spawner.pickSpawn(0, 0, -1)).toBe(cellar);
+    // Nothing distant on the player's floor: the horde still comes, from wherever it can.
+    expect(spawner.pickSpawn(-18, 0, -1)).toBe(ground);
+    expect(spawner.pickSpawn(0, 0, 2)).toBe(ground);
+  });
+
   it('every configured spawn point is outside the minimum distance from the play area', () => {
     // These isolated fallback points remain outside this test's player area.
     for (const point of SPAWN_POINTS) {

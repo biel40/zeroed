@@ -127,6 +127,58 @@ describe('weighted walker looks', () => {
     const picker = new ZombieLookPicker();
     const body = { visual: { modelId: 'walker' } } as unknown as Zombie;
     picker.register(body, look());
-    expect(picker.weighted).toBe(false);
+    expect(picker.active).toBe(false);
+  });
+});
+
+describe('floor-bound walker looks', () => {
+  const CRYPT = -1;
+  type Body = Zombie & { readonly tag: string };
+  const body = (tag: string, modelId: 'walker' | 'brute' = 'walker'): Body => ({ tag, visual: { modelId } }) as unknown as Body;
+
+  function crypt(): { pool: ZombiePool; picker: ZombieLookPicker; bodies: Body[] } {
+    const horde = [look(2), look(1)];
+    const dead = [look(3), look(1)];
+    const bodies = [body('horde-a'), body('horde-b'), body('brute', 'brute'), body('crypt-a'), body('crypt-b')];
+    const picker = new ZombieLookPicker();
+    picker.register(bodies[0], horde[0]);
+    picker.register(bodies[1], horde[1]);
+    picker.register(bodies[2], null);
+    picker.register(bodies[3], dead[0], CRYPT);
+    picker.register(bodies[4], dead[1], CRYPT);
+    return { pool: new ZombiePool(bodies.length, (index) => bodies[index]), picker, bodies };
+  }
+
+  it('dresses a walker by the floor it rises on, never borrowing a body of the other reserve', () => {
+    const { pool, picker } = crypt();
+    const acquire = (floor: number, roll: number): Body | null => {
+      picker.roll(roll, 'walker', floor);
+      return pool.acquire('walker', picker.wearsRolledLook, picker.risesOnRolledFloor) as Body | null;
+    };
+    expect(acquire(CRYPT, 0.1)?.tag).toBe('crypt-a');
+    expect(acquire(0, 0.1)?.tag).toBe('horde-a');
+    expect(acquire(CRYPT, 0.1)?.tag).toBe('crypt-b');
+    // The crypt reserve is spent: a crypt spawn finds no body rather than a horde one.
+    expect(acquire(CRYPT, 0.1)).toBeNull();
+    expect(acquire(0, 0.1)?.tag).toBe('horde-b');
+    expect(acquire(0, 0.1)).toBeNull();
+  });
+
+  it('rolls the floor\'s own looks by weight', () => {
+    const { pool, picker } = crypt();
+    picker.roll(0.9, 'walker', CRYPT);
+    expect((pool.acquire('walker', picker.wearsRolledLook, picker.risesOnRolledFloor) as Body).tag).toBe('crypt-b');
+  });
+
+  it('leaves models without a floor reserve to their usual bodies on every floor', () => {
+    const { pool, picker } = crypt();
+    picker.roll(0.5, 'brute', CRYPT);
+    expect((pool.acquire('brute', picker.wearsRolledLook, picker.risesOnRolledFloor) as Body).tag).toBe('brute');
+  });
+
+  it('is active with a floor reserve even when no look is weighted', () => {
+    const picker = new ZombieLookPicker();
+    picker.register(body('crypt'), look(), CRYPT);
+    expect(picker.active).toBe(true);
   });
 });

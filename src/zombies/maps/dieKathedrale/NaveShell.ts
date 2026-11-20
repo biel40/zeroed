@@ -25,6 +25,7 @@ import {
 import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 import { addStoneWall, roseRingGeometry, roundPaneGeometry, scaleUVs } from './DieKathedraleWalls';
 import { addGreatDoorFace } from './MainPortal';
+import { ROOF_NAVE_OPENING, ROOF_TERRACES, UPPER_FLOOR_Y } from './upper/UpperCathedralConfig';
 
 const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 const VAULT_SEGMENTS = 10;
@@ -81,8 +82,18 @@ function addWalls(context: DieKathedraleBuildContext): void {
   const outerMaxX = NAVE.maxX + DIE_KATHEDRALE_WALL_THICKNESS;
   // The wicket splits the front in two; the chancel arch does the same to the far wall.
   addStoneWall(context, 'nave-front-wall', { axis: 'x', fixed: NAVE.maxZ + HALF_WALL, min: outerMinX, max: outerMaxX, height: NAVE.endWallHeight });
+  const endWall = { axis: 'x', fixed: NAVE.minZ - HALF_WALL } as const;
+  // The west roof passage lies directly over the crypt gate. Building the west
+  // half in two heights lets each aperture have its own sill and lintel.
+  addStoneWall(context, 'nave-chancel-west-base', {
+    ...endWall, min: outerMinX, max: ROOF_TERRACES.maxX, height: UPPER_FLOOR_Y,
+  });
+  addStoneWall(context, 'nave-chancel-west-roof', {
+    ...endWall, min: outerMinX, max: ROOF_TERRACES.maxX, baseY: UPPER_FLOOR_Y,
+    height: NAVE.endWallHeight - UPPER_FLOOR_Y, cuts: [], extraOpenings: [ROOF_NAVE_OPENING],
+  });
   addStoneWall(context, 'nave-chancel-wall', {
-    axis: 'x', fixed: NAVE.minZ - HALF_WALL, min: outerMinX, max: outerMaxX, height: NAVE.endWallHeight,
+    ...endWall, min: ROOF_TERRACES.maxX, max: outerMaxX, height: NAVE.endWallHeight,
     extraOpenings: [{ center: 0, width: CHANCEL.maxX - CHANCEL.minX, bottom: 0, top: CHANCEL.apexY }],
   });
 }

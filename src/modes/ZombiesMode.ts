@@ -47,6 +47,7 @@ import { RITUAL_SCARE_TIMELINE } from '../zombies/secret-room/SecretRoomSystem';
 import { WindowBarrier } from '../zombies/barriers/WindowBarrier';
 import { PointDoor } from '../zombies/doors/PointDoor';
 import type { WallBuy } from '../zombies/wallbuys/WallBuy';
+import type { ZombieEmergenceSite, ZombieEmergenceStage } from '../zombies/emergence/ZombieEmergence';
 import { hasSoulRitual, type ArenaAmbush, type ZombieArena } from '../zombies/maps/ZombieArena';
 import type {
   ArenaAmmoRefill,
@@ -79,6 +80,9 @@ import type { ObjectiveNote } from '../ui/ObjectiveAnnouncer';
 
 /** Camera-shake tuning: how much one zombie hit rattles the view. */
 const HIT_TRAUMA = 0.55;
+/** Old stone dust round the opening a dead body comes out of: dim, slow to settle, puffs per beat. */
+const EMERGENCE_DUST = { tint: 0x5d574c, size: 0.55, lifetime: 1.8, spread: 0.45, stirPuffs: 4, breachPuffs: 6 } as const;
+
 /** Camera jolt of a map ambush: the player flinches before anything hits. */
 const AMBUSH_TRAUMA = 0.45;
 /** A key still held from starting the run must not also skip its intro. */
@@ -178,6 +182,7 @@ export class ZombiesMode implements GameMode {
   private readonly objectiveNotes: ObjectiveNote[] = [];
   private readonly tmpAudioPosition = new THREE.Vector3();
   private readonly tmpShotOrigin = new THREE.Vector3();
+  private readonly tmpDustPoint = new THREE.Vector3();
   private readonly knife = new Knife();
   private readonly knifeCombat = new KnifeCombat();
 
@@ -216,6 +221,7 @@ export class ZombiesMode implements GameMode {
       dressZombieSources(ctx.assets.getZombieModels(), {
         skins: this.arena.zombieSkins,
         skinShares: this.arena.zombieSkinShares,
+        floorLook: this.arena.zombieFloorLook,
         eyes: this.arena.zombieEyes,
         surfaceDetail: ctx.profile.useAdvancedRendering,
       }),
@@ -226,6 +232,7 @@ export class ZombiesMode implements GameMode {
       this.arena.floorTransitions,
     );
     this.zombies.setNavigationBounds(this.arena.navigationBounds);
+    this.zombies.setEmergenceSites(this.arena.emergenceSites ?? [], this.arena.emergenceTuning ?? null);
     ctx.player.setBodyColliders(this.zombies.actives);
     const boxPlacement = this.arena.mysteryBoxPlacement;
     this.zombies.setBodyObstacles(boxPlacement ? [mysteryBoxFootprint(boxPlacement)] : []);
@@ -244,6 +251,7 @@ export class ZombiesMode implements GameMode {
     this.zombies.onZombieDamaged = (damage) => { this.totalDamage += damage; };
     this.zombies.onPlayerAttack = (damage, _target, attacker) => this.onPlayerHit(damage, false, attacker.position);
     this.zombies.onZombieSpawned = (zombie) => ctx.audio.playZombieSpawn(this.spatialCueFor(voicePoint(zombie.position)));
+    this.zombies.onZombieEmerging = (site, stage) => this.playEmergence(site, stage);
     this.zombies.onBarrierImpact = (barrier) => ctx.audio.playBarrierBreak(
       this.spatialCueFor({ x: barrier.position.x, y: barrier.y, z: barrier.position.z }),
     );
@@ -1181,6 +1189,7 @@ export class ZombiesMode implements GameMode {
     this.arenaStaticColliders = new Set(this.arena.colliders);
     if (this.arena.wallColliders) this.ctx.player.setWallColliders(this.arena.wallColliders);
     this.zombies.setSpawnPoints(this.arena.spawnPoints);
+    this.zombies.setEmergenceSites(this.arena.emergenceSites ?? [], this.arena.emergenceTuning ?? null);
     this.zombies.setBarriers(this.arena.barriers);
     this.zombies.registerColliders(this.ctx.hitColliders);
     this.zombies.setEffectColliders(this.arena.colliders);
@@ -1206,7 +1215,7 @@ export class ZombiesMode implements GameMode {
         case 'spawnDue':
           if (
             this.zombies &&
-            !this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z, event.round)
+            !this.zombies.spawnZombie(event.config, playerPos.x, playerPos.z, event.round, this.ctx.player.floor)
           ) {
             // Corpses still occupy pool slots and invalid map spawns are
             // rejected. Neither case may silently shorten the round.
@@ -1318,6 +1327,20 @@ export class ZombiesMode implements GameMode {
    * map's spot, so the round's total is unchanged. Refused between rounds,
    * once the round has nobody left to send, or when the spot is blocked.
    */
+  /** A body stirring in, then breaking out of, a map site: the map moves its stone, dust lifts off the rim, the stone grinds. */
+  private playEmergence(site: ZombieEmergenceSite, stage: ZombieEmergenceStage): void {
+    this.arena.disturbEmergenceSite?.(site.id, stage);
+    const { x, z } = site.rise;
+    const rimY = site.rise.y + site.rim;
+    this.ctx.audio.playTombEmergence(this.spatialCueFor({ x, y: rimY, z }), stage);
+    const puffs = (stage === 'stir' ? EMERGENCE_DUST.stirPuffs : EMERGENCE_DUST.breachPuffs) >> (this.ctx.profile.useReducedEffects ? 1 : 0);
+    for (let index = 0; index < puffs; index++) {
+      const angle = (index / puffs) * Math.PI * 2;
+      this.tmpDustPoint.set(x + Math.cos(angle) * EMERGENCE_DUST.spread, rimY + 0.05, z + Math.sin(angle) * EMERGENCE_DUST.spread);
+      this.ctx.effects.puff(this.tmpDustPoint, EMERGENCE_DUST.tint, EMERGENCE_DUST.size, EMERGENCE_DUST.lifetime);
+    }
+  }
+
   private spawnAmbush(ambush: ArenaAmbush): boolean {
     if (!this.runAcceptsInput()) return false;
     const config = this.rounds.takePendingSpawn();
@@ -1610,7 +1633,7 @@ export class ZombiesMode implements GameMode {
   private spawnRoundZombie(): boolean {
     const player = this.ctx.player.rig.position;
     const round = Math.max(1, this.rounds.round);
-    return this.zombies.spawnZombie(roundConfig(round), player.x, player.z, round);
+    return this.zombies.spawnZombie(roundConfig(round), player.x, player.z, round, this.ctx.player.floor);
   }
 
   private finishRun(): void {

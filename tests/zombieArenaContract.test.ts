@@ -36,9 +36,14 @@ const ARENA_BUDGETS: Record<ZombieMapId, Pick<ArenaMetrics, BudgetMetric>> = {
   // The nave's zones added seven paid gates (each a shared BuyableDoorVisual: about 20 drawables and 8 materials
   // until it is bought), three entrances with their passages, and one low solid per stretch of grille or parapet;
   // the bars themselves merge into the interior batch (about 9k triangles).
+  // The royal catacombs added a second floor (its own navigation grid, about 24k cells), five gates, six entrances,
+  // their walls and invisible proxies, and about 40k triangles of rooms and remains. They hang in their own group,
+  // drawn only near or below the stair, so at the spawn only the stair and the crypt gate are new (about 2k triangles).
+  // The expansion adds four gates, four entrances, the grounds and the roof. The wider ground grid and the new
+  // roof grid add cells; the two sector groups keep the narthex's visible geometry budget independent of that growth.
   'die-kathedrale': {
-    drawables: 600, visibleDrawables: 400, triangles: 54_000, visibleTriangles: 52_000,
-    geometryMiB: 4.5, materials: 145, colliders: 200, wallBoxes: 150, navCells: 27_000,
+    drawables: 1_335, visibleDrawables: 440, triangles: 119_000, visibleTriangles: 56_000,
+    geometryMiB: 9.5, materials: 275, colliders: 510, wallBoxes: 405, navCells: 81_000,
   },
 };
 
@@ -124,12 +129,10 @@ describe.each(Object.values(ZOMBIE_MAPS))('ZombieArena contract: $id', (map) => 
       const observer = new THREE.Vector3(x, y, z);
       arena.update(FIXED_DELTA, observer);
       const closed = measureArena(arena, NAV_CELL_SIZE);
-      checkSceneBudget(map.id, closed, 'closed');
 
       openEveryDoor(arena);
       arena.update(FIXED_DELTA, observer);
       const unlocked = measureArena(arena, NAV_CELL_SIZE);
-      checkSceneBudget(map.id, unlocked, 'unlocked');
 
       if (REPORT_PERFORMANCE) {
         const updateMs = timeArenaUpdate(arena, observer);
@@ -141,6 +144,8 @@ describe.each(Object.values(ZOMBIE_MAPS))('ZombieArena contract: $id', (map) => 
         const refreshMs = (performance.now() - refreshStart) / 30;
         console.log(JSON.stringify({ map: map.id, quality, closed, unlocked, buildMs, updateMs, refreshMs }));
       }
+      checkSceneBudget(map.id, closed, 'closed');
+      checkSceneBudget(map.id, unlocked, 'unlocked');
     } finally {
       random.mockRestore();
     }

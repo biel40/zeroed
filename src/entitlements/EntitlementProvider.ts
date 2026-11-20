@@ -7,4 +7,5 @@ import type { ProductId } from '../config/products';
  */
 export interface EntitlementProvider {
   owns(product: ProductId): boolean;
+  canPreview?(product: ProductId): boolean;
 }

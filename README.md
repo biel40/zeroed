@@ -38,10 +38,19 @@ en otra terminal; más detalles en la [guía multijugador](docs/MULTIPLAYER.md).
 ## 🧰 Desarrollo
 
 ```bash
-npm run test       # Tests
-npm run typecheck  # TypeScript
-npm run build      # Comprobación y build de producción
+npm run test:affected   # Cambios desde la última validación incremental correcta
+npm run test:feature    # Impacto de la rama desde el ancestro común con main
+npm run test:full       # Vitest, ambos relays y escritorio
+npm run typecheck       # TypeScript
+npm run build           # Comprobación y build de producción
 ```
+
+Para repetir una prueba concreta, usa `npm test -- tests/<archivo>.test.ts`.
+`npm test` sigue ejecutando toda la suite de Vitest y acepta sus opciones habituales.
+
+Los modos por impacto incluyen cambios confirmados, preparados, sin preparar y archivos nuevos que Git no ignora. La primera ejecución incremental establece una referencia local si las pruebas pasan. Si falta una referencia fiable o el cambio requiere más cobertura, se ejecuta la suite completa. Para validar una rama, se usa `origin/main` si está disponible.
+
+[GitHub Actions](.github/workflows/tests.yml) ejecuta las pruebas completas y TypeScript en las solicitudes de cambio y los pushes a `main`. Para bloquear merges y promociones a producción hasta que pasen, exige el check `Full regression` en la protección de `main` y en los [Deployment Checks de Vercel](https://vercel.com/docs/deployment-checks). El relay de Cloudflare se prueba en Ubuntu porque el runtime local de Wrangler requiere una versión de glibc superior a la de la imagen de build de Vercel.
 
 ## 📚 Más información
 

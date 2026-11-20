@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import type { StainFaces } from '../../GibWalls';
 import type { WallAxis, WallOpening } from '../shared/ArenaStructure';
-import { wallOpeningsAt } from '../shared/EntrancePassage';
+import { wallOpeningsAt, type WallCut } from '../shared/EntrancePassage';
 import { DIE_KATHEDRALE_WALL_CUTS, DIE_KATHEDRALE_WALL_THICKNESS } from '../DieKathedraleConfig';
 import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 import { FACING_YAW, type WallFacing } from './GothicVault';
@@ -19,21 +20,30 @@ export interface DieKathedraleWallLine {
   readonly breaks?: ReadonlyArray<number>;
   /** Holes of the wall's own, besides the entrances and doors that fall on it. */
   readonly extraOpenings?: ReadonlyArray<WallOpening>;
+  /** Feet height of the floor it stands on (default the cathedral's, 0). */
+  readonly baseY?: number;
+  /** Default: the cathedral's walls. */
+  readonly thickness?: number;
+  /** The entrances and doors of its floor (default the cathedral's). */
+  readonly cuts?: ReadonlyArray<WallCut>;
+  /** Faces that keep blood; omitted, all (a drawn wall). A wall drawn by something else keeps none. */
+  readonly stainFaces?: StainFaces;
 }
 
 /** Builds a stone wall in pieces, cut by every entrance and door on its line. */
 export function addStoneWall(context: DieKathedraleBuildContext, name: string, line: DieKathedraleWallLine, material: THREE.Material = context.materials.wallStone): void {
   const breaks = (line.breaks ?? []).filter((stop) => stop > line.min && stop < line.max).sort((a, b) => a - b);
   const stops = [line.min, ...breaks, line.max];
+  const cuts = line.cuts ?? DIE_KATHEDRALE_WALL_CUTS;
   for (let index = 0; index + 1 < stops.length; index++) {
     const from = stops[index];
     const to = stops[index + 1];
     const inPiece = (opening: WallOpening): boolean => opening.center > from && opening.center < to;
     context.structure.addWallWithOpenings(
-      line.axis, line.fixed, from, to, 0, line.height, DIE_KATHEDRALE_WALL_THICKNESS,
-      [...wallOpeningsAt(line.axis, line.fixed, from, to, DIE_KATHEDRALE_WALL_CUTS), ...(line.extraOpenings ?? []).filter(inPiece)],
+      line.axis, line.fixed, from, to, line.baseY ?? 0, line.height, line.thickness ?? DIE_KATHEDRALE_WALL_THICKNESS,
+      [...wallOpeningsAt(line.axis, line.fixed, from, to, cuts), ...(line.extraOpenings ?? []).filter(inPiece)],
       material,
-      { name: `${name}-${index}`, surface: 'concrete', mapRole: 'wall', castShadow: false, uvSeed: index, worldUVs: true, blocksPlayer: true },
+      { name: `${name}-${index}`, surface: 'concrete', mapRole: 'wall', castShadow: false, uvSeed: index, worldUVs: true, blocksPlayer: true, stainFaces: line.stainFaces },
     );
   }
 }

@@ -53,6 +53,19 @@ export interface DieKathedraleMaterials {
   readonly cobweb: THREE.MeshBasicMaterial;
   readonly bloodSplatter: THREE.MeshStandardMaterial;
   readonly bloodSmear: THREE.MeshStandardMaterial;
+  /** Catacombs: the same stone underground, darker, damp and stained with minerals. */
+  readonly cryptStone: THREE.MeshStandardMaterial;
+  readonly cryptFloor: THREE.MeshStandardMaterial;
+  /** Dust-dulled marble of the royal effigies and their tombs. */
+  readonly effigyMarble: THREE.MeshStandardMaterial;
+  readonly bone: THREE.MeshStandardMaterial;
+  /** The dark at the back of a loculus, in a crack or a carved groove. */
+  readonly cavity: THREE.MeshStandardMaterial;
+  readonly root: THREE.MeshStandardMaterial;
+  /** Damp and mineral stains on walls and floors (decal). */
+  readonly dampStain: THREE.MeshBasicMaterial;
+  /** The wind's cold glow, kept for the places of the future bow: runes, sockets, the crack. */
+  readonly windGlow: THREE.MeshBasicMaterial;
   /** Invisible proxy for collision-only volumes (never drawn). */
   readonly collider: THREE.MeshBasicMaterial;
 }
@@ -204,6 +217,17 @@ export function createDieKathedraleMaterials(anisotropy: number): DieKathedraleM
     }),
     bloodSplatter: decalMaterial('die-kathedrale_blood_splatter', makeBloodDecalTexture('splatter', 6201), 0.35),
     bloodSmear: decalMaterial('die-kathedrale_blood_smear', makeBloodDecalTexture('smear', 6202), 0.4),
+    cryptStone: surfaceMaterial('die-kathedrale_crypt_stone', bake('die-kathedrale-crypt-stone', 256, 2.6, ashlarPainter(256, 6301, [70, 67, 60], 5, 3, 0.9)), anisotropy, 2.6),
+    cryptFloor: surfaceMaterial('die-kathedrale_crypt_floor', bake('die-kathedrale-crypt-floor', 256, 2, slabPainter(256, 6302, [72, 68, 60], [58, 56, 51], 3, 0.74)), anisotropy, 3),
+    effigyMarble: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_effigy_marble', color: 0x8f897d, roughness: 0.62 }),
+    bone: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_bone', color: 0xa69a80, roughness: 0.82 }),
+    cavity: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_cavity', color: 0x0a0908, roughness: 1 }),
+    root: new THREE.MeshStandardMaterial({ name: 'die-kathedrale_root', color: 0x2c2219, roughness: 0.95 }),
+    dampStain: new THREE.MeshBasicMaterial({
+      name: 'die-kathedrale_damp_stain', map: makeSoftSpot(32), color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide,
+    }),
+    windGlow: new THREE.MeshBasicMaterial({ name: 'die-kathedrale_wind_glow', color: 0x3b7d75 }),
     collider: new THREE.MeshBasicMaterial({ name: 'die-kathedrale_collider', visible: false }),
   };
 }

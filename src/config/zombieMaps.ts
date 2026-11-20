@@ -18,7 +18,7 @@ export interface ZombieMapDefinition {
   readonly id: string;
   /** Listed in the map menu; maps the player cannot access yet appear locked. */
   readonly visible: boolean;
-  /** Still in development: listed under a WIP padlock and unplayable unless the build opts in (see mapRelease.ts). */
+  /** Still in development: requires a preview entitlement or a development build opt-in. */
   readonly workInProgress?: true;
   /** Premium maps require owning this product to play, from the menu or a direct link; free maps omit it. */
   readonly product?: ProductId;
@@ -88,14 +88,16 @@ export function isZombieMapReleased(mapId: ZombieMapId, wipMapsEnabled: boolean)
   return map.workInProgress !== true || wipMapsEnabled;
 }
 
-/** Shared by the menu and every match entry point, including `?map=`: released and, if premium, owned. */
+/** Shared by the menu and every match entry point, including `?map=`. */
 export function canAccessZombieMap(
   value: string | null | undefined,
   entitlements: EntitlementProvider,
   wipMapsEnabled: boolean,
 ): value is ZombieMapId {
-  if (!isZombieMapId(value) || !isZombieMapReleased(value, wipMapsEnabled)) return false;
+  if (!isZombieMapId(value)) return false;
   const product: ProductId | undefined = getZombieMapProduct(value);
+  if (!isZombieMapReleased(value, false) && product !== undefined && entitlements.canPreview?.(product)) return true;
+  if (!isZombieMapReleased(value, wipMapsEnabled)) return false;
   return product === undefined || entitlements.owns(product);
 }
 

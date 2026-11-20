@@ -147,6 +147,25 @@ describe('account API client', () => {
 });
 
 describe('web account sign-in', () => {
+  it('remembers known preview grants for the signed-in account and clears them on sign-out', async () => {
+    const server = new FakeServer({
+      'POST /auth/password': { status: 200, body: { token: 'session-1', email: 'player@example.com' } },
+      'GET /me/entitlements': { status: 200, body: {
+        email: 'player@example.com', products: [], beta: false, previews: ['map.die-kathedrale', 'map.future', 7],
+      } },
+    });
+    const storage = memoryStorage();
+    const account = new WebAccount(new AccountApi(API, server.fetch), storage);
+    expect(account.canPreview('map.die-kathedrale')).toBe(false);
+    expect(await account.signInWithPassword('player@example.com', 'password1')).toBe('signed-in');
+    expect(account.canPreview('map.die-kathedrale')).toBe(true);
+    expect(account.canPreview('map.station-33')).toBe(false);
+    expect(account.owns('map.die-kathedrale')).toBe(false);
+    expect(new WebAccount(new AccountApi(API, server.fetch), storage).canPreview('map.die-kathedrale')).toBe(true);
+    await account.signOut();
+    expect(account.canPreview('map.die-kathedrale')).toBe(false);
+  });
+
   it('signs in with a password, loads its products and remembers them', async () => {
     const server = new FakeServer({
       'POST /auth/password': { status: 200, body: { token: 'session-1', email: 'tester@example.com' } },

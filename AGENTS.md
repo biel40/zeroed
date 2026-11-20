@@ -10,11 +10,18 @@
 - Para logica nueva, escribe primero tests deterministas e inyecta las fuentes de aleatoriedad cuando corresponda.
 - Declara explicitamente la visibilidad de los miembros de las clases y el tipo de retorno. Mantén el estado interno privado y la API publica minima; usa `static` solo cuando no dependa de la instancia.
 - Todo script o codigo fuente generado debe ser escalable, legible y mantenible: nombres claros, responsabilidades acotadas, modulos pequeños y cohesionados, contratos explicitos y sin logica oculta ni dependencias implicitas.
-- Elimina codigo muerto o duplicado derivado de tus cambios. Ejecuta `npm run typecheck` y `npm run test`, ademas de las validaciones pertinentes al area, y revisa regresiones antes de finalizar.
+- Elimina codigo muerto o duplicado derivado de tus cambios. Ejecuta `npm run typecheck`, las pruebas relevantes y las validaciones pertinentes al area. Revisa regresiones antes de finalizar.
 - La validacion visual en el navegador la realiza siempre el usuario manualmente. No automatices ni controles el navegador para esta validacion; completa las comprobaciones automaticas e indica que debe revisar el usuario.
 - La documentacion describe el codigo; no debe sustituirlo ni repetir detalles faciles de obtener al leerlo. Actualiza las fuentes afectadas segun el apartado de documentacion; no inventes estado ni declares resuelta una limitacion sin evidencia.
 - Durante la beta cerrada, para probar produccion (https://zeroed.es) accede con `bielet40@gmail.com`.
 - Trabaja directamente en el checkout principal. No crees ni uses worktrees salvo peticion explicita del usuario.
+
+## Validacion automatica
+
+- Durante la iteracion usa `npm test -- tests/<archivo>.test.ts` para un caso conocido o `npm run test:affected` para seleccionar por dependencias desde la ultima validacion incremental correcta. Tras corregir un fallo puedes repetir primero su archivo o caso con `-t`.
+- Antes de cerrar un cambio ejecuta las pruebas relevantes. Usa `npm run test:feature` cuando el cambio abarque varios subsistemas o quieras validar el impacto de toda la rama. Completa tambien las validaciones especificas de la tabla.
+- Reserva `npm run test:full` para cambios de alto impacto, los casos en que el selector necesite ampliar la validacion y los controles de integracion y despliegue. CI siempre ejecuta la suite completa.
+- Conserva el resumen y los detalles de los fallos. Evita copiar la salida extensa de pruebas correctas y resume cuantas se ejecutaron, pasaron, fallaron y se omitieron cuando el runner proporcione esos datos.
 
 ## Rutas de lectura
 

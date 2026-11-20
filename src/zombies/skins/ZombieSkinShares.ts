@@ -1,3 +1,4 @@
+import type { ZombieEyeColors } from '../ZombieVisual';
 import type { ZombieSkinId } from './ZombieSkinCatalog';
 
 /**
@@ -9,6 +10,19 @@ export interface ZombieSkinShare {
   /** The walker skin, or null for the plain walker asset. */
   readonly skin: ZombieSkinId | null;
   readonly weight: number;
+}
+
+/**
+ * Walkers rising on one floor wear these looks instead of the horde's and
+ * keep them wherever they chase (`ZombieArena.zombieFloorLook`). They come
+ * from a reserve of bodies of their own, as large as the walker reserve, so
+ * neither look ever stands in for the other. Appearance only.
+ */
+export interface ZombieFloorLook {
+  readonly floor: number;
+  readonly skinShares: readonly ZombieSkinShare[];
+  /** Eye colors of these walkers; omitted keeps the map's. */
+  readonly eyes?: ZombieEyeColors;
 }
 
 /** Index of the share `roll` (0..1) falls in, by cumulative weight. */

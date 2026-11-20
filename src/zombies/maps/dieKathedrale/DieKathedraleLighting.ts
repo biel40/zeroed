@@ -32,6 +32,8 @@ export class DieKathedraleLighting {
   private readonly distance: Float32Array;
   private readonly home: THREE.Vector3;
   private readonly ignition: CandleIgnition;
+  private readonly moon: THREE.DirectionalLight;
+  private readonly moonIntensity: number;
   private time = 0;
   private untilRetarget = 0;
 
@@ -58,17 +60,23 @@ export class DieKathedraleLighting {
       group.add(light);
     }
 
-    const moon = new THREE.DirectionalLight(DIE_KATHEDRALE_MOON.color, reducedEffects ? DIE_KATHEDRALE_MOON.reducedIntensity : DIE_KATHEDRALE_MOON.intensity);
-    moon.name = 'die-kathedrale-moonlight';
+    this.moonIntensity = reducedEffects ? DIE_KATHEDRALE_MOON.reducedIntensity : DIE_KATHEDRALE_MOON.intensity;
+    this.moon = new THREE.DirectionalLight(DIE_KATHEDRALE_MOON.color, this.moonIntensity);
+    this.moon.name = 'die-kathedrale-moonlight';
     const { x, y, z } = DIE_KATHEDRALE_MOON.direction;
-    moon.position.set(-x * 60, -y * 60, -z * 60);
-    group.add(moon, moon.target);
+    this.moon.position.set(-x * 60, -y * 60, -z * 60);
+    group.add(this.moon, this.moon.target);
     this.reset();
   }
 
   /** Real lights alive: always the whole pool. */
   public get pointLightCount(): number {
     return this.lights.length;
+  }
+
+  /** Share of the moonlight that gets through (none below ground). */
+  public setMoonShare(share: number): void {
+    this.moon.intensity = this.moonIntensity * share;
   }
 
   /** Puts the pool on the sites nearest the player spawn, fully lit, as a run starts. */

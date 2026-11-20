@@ -190,13 +190,14 @@ Generado en runtime con `RoomEnvironment` (incluido en three.js, licencia MIT)
 | --- | --- |
 | `zombies_round_start.mp3` | Sting de inicio de ronda |
 | `menu_theme.mp3` | Música en bucle del menú principal y de pausa |
-| `background_music_theme.mp3` | Música en bucle durante la partida en Burned Mansion |
-| `station33_theme.mp3` | Música en bucle durante la partida en Station 33 |
+| `background_music_theme.mp3` | Música en bucle durante la partida en Burned Mansion y Die Kathedrale (carga diferida) |
+| `station33_theme.mp3` | Música en bucle durante la partida en Station 33 (carga diferida) |
 | `captain_ussr_theme.mp3` | Tema en bucle del duelo contra el CAPITÁN URSS (carga diferida). Copiado sin modificar de `captain_urss_boss_fight.mp3`, aportado por el usuario; origen y licencia pendientes de registrar |
 | `mystery_box_open.mp3` | Apertura de la Mystery Box (con fallback procedural) |
 | `encasquillada_arma.mp3` | Disparo en seco de un arma sin munición (con fallback procedural) |
 | `door_purchase.mp3` | Compra de una puerta por Points (con fallback procedural) |
 | `barricade_repair.mp3` | Tablón reparado en una barricada (+10 Points). Opcional: sin el archivo suena el tick procedural. Origen y licencia pendientes de registrar |
+| `f1_explosion.mp3` | Detonación de la F‑1. «Wall collapse» de SpritePilot, MP3 original (CC0 1.0). [Fuente](https://spritepilot.com/free-game-assets/sound-effects/explosions#wall-collapse) |
 | `zombies/footsteps.mp3` | Paso de zombie posicional 3D (con fallback procedural) |
 | `m1911_shot.mp3` | Disparo de la M1911: mono, 44,1 kHz, 96 kbps, ~1,2 s con cola (con fallback procedural) |
 | `ak47_single_report.wav`, `ak47_auto_report.wav` | Grabación de un disparo de AK-47 por ninebilly, editada para ambos modos (CC0). [Fuente](https://freesound.org/people/ninebilly/sounds/520934/) |

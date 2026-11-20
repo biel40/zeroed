@@ -82,5 +82,5 @@ Sin cambios, porque se derivan del catalogo:
   - `reset` lo quita todo.
 - Si colocas una maquina nueva en Station 33, actualiza las expectativas de
   `tests/station33.test.ts` (taquillas libres de solidos y pasajes).
-- `npx tsc --noEmit` y `npx vitest run` (`tests/i18n.test.ts` exige las
-  mismas claves en los tres idiomas).
+- Ejecuta `npm run typecheck` y comprueba `tests/i18n.test.ts`, que exige las
+  mismas claves en los tres idiomas. Sigue la [validacion del repositorio](../../../AGENTS.md#validacion-automatica).

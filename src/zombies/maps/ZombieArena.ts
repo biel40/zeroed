@@ -7,9 +7,10 @@ import type { FloorTransitionZone } from '../../player/PlayerController';
 import type { EndingPresentationId, IntroPresentationId } from '../../ui/HUD';
 import type { WindowBarrier } from '../barriers/WindowBarrier';
 import type { PointDoor } from '../doors/PointDoor';
+import type { ZombieEmergenceSite, ZombieEmergenceStage, ZombieEmergenceTuning } from '../emergence/ZombieEmergence';
 import type { SecretRoomSnapshot } from '../secret-room/SecretRoomSystem';
 import type { ZombieSkinId } from '../skins/ZombieSkinCatalog';
-import type { ZombieSkinShare } from '../skins/ZombieSkinShares';
+import type { ZombieFloorLook, ZombieSkinShare } from '../skins/ZombieSkinShares';
 import type { ZombieEyeColors } from '../ZombieVisual';
 import type { WallBuy } from '../wallbuys/WallBuy';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
@@ -511,8 +512,18 @@ export interface ZombieArena {
    * of `zombieSkins`; a map declares one or the other.
    */
   readonly zombieSkinShares?: readonly ZombieSkinShare[];
+  /** Optional: walkers rising on one floor wear their own looks, such as the dead of a crypt. */
+  readonly zombieFloorLook?: ZombieFloorLook;
   /** Optional: eye colors of every zombie on the map; omitted keeps each model's own. */
   readonly zombieEyes?: ZombieEyeColors;
+  /**
+   * Optional: sites in the open zones that some walkers rise out of instead
+   * of an entrance (tombs), refreshed with `spawnPoints`, and how often.
+   */
+  readonly emergenceSites?: ReadonlyArray<ZombieEmergenceSite>;
+  readonly emergenceTuning?: ZombieEmergenceTuning;
+  /** Optional: the map's side of a rising at one of its sites (a lid grinding aside). */
+  disturbEmergenceSite?(siteId: string, stage: ZombieEmergenceStage): void;
   /** Optional: ambient sounds the map schedules itself; the mode plays them. */
   onAmbientCue?: ((cue: ArenaAmbientCue) => void) | null;
   /**

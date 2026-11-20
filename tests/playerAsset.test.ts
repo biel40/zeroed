@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { findClip, REMOTE_SOLDIER_MODEL_URL, type ClipRole } from '../src/rendering/RemotePlayerAvatar';
 import { createRemoteAvatar, type RemoteAvatarMotion } from '../src/rendering/RemotePlayerAvatar';
@@ -23,7 +23,7 @@ function readGlbJson(file: string): GltfJson {
   return JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8')) as GltfJson;
 }
 
-describe.skipIf(!existsSync(path))('remote soldier asset contract', () => {
+describe('remote soldier asset contract', () => {
   it('animates the real skeleton through low postures and restores standing without accumulated transforms', async () => {
     // Keep geometry, skin and clips; omit textures so this deterministic test needs no browser image decoder.
     const bytes = readFileSync(path);

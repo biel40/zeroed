@@ -23,6 +23,7 @@ export interface AccountEntitlements {
   readonly email: string;
   readonly products: ProductId[];
   readonly beta: boolean;
+  readonly previews?: ProductId[];
 }
 
 /**
@@ -111,7 +112,12 @@ export class AccountApi implements AccountBackend {
     if (response.status === 401) return null;
     const body = await AccountApi.readJson(response);
     if (typeof body.email !== 'string' || !Array.isArray(body.products)) throw new Error('Malformed entitlements');
-    return { email: body.email, products: body.products.filter(isProductId), beta: body.beta === true };
+    return {
+      email: body.email,
+      products: body.products.filter(isProductId),
+      beta: body.beta === true,
+      ...(Array.isArray(body.previews) ? { previews: body.previews.filter(isProductId) } : {}),
+    };
   }
 
   public async logout(sessionToken: string): Promise<void> {

@@ -19,13 +19,14 @@ export class ZombiePool {
 
   /**
    * Returns the requested fixed visual model without exceeding the global cap.
-   * `prefer` picks among the free bodies of that model (a rolled look); when
-   * none matches, any free body of the model is returned.
+   * Only bodies passing `eligible` (a reserve, when given) can come out;
+   * `prefer` picks among them (a rolled look) and, when none matches, any
+   * eligible free body of the model is returned.
    */
-  acquire(modelId?: ZombieModelId, prefer?: (zombie: Zombie) => boolean): Zombie | null {
-    if (this.active.size >= this.maxActive) return null;
-    let index = prefer ? this.lastFreeIndex(modelId, prefer) : -1;
-    if (index < 0) index = this.lastFreeIndex(modelId);
+  acquire(modelId?: ZombieModelId, prefer?: (zombie: Zombie) => boolean, eligible?: (zombie: Zombie) => boolean): Zombie | null {
+    if (this.full) return null;
+    let index = prefer ? this.lastFreeIndex(modelId, eligible, prefer) : -1;
+    if (index < 0) index = this.lastFreeIndex(modelId, eligible);
     if (index < 0) return null;
     const zombie = this.free[index];
     const last = this.free.pop() as Zombie;
@@ -49,6 +50,11 @@ export class ZombiePool {
     return this.active.size;
   }
 
+  /** True when the population cap is reached, whatever bodies are free. */
+  get full(): boolean {
+    return this.active.size >= this.maxActive;
+  }
+
   get freeCount(): number {
     return this.free.length;
   }
@@ -64,12 +70,12 @@ export class ZombiePool {
     return this.active;
   }
 
-  /** Most recently freed body of `modelId` (any model when omitted) that passes `filter`; -1 when none. */
-  private lastFreeIndex(modelId?: ZombieModelId, filter?: (zombie: Zombie) => boolean): number {
+  /** Most recently freed body of `modelId` (any model when omitted) that passes both filters; -1 when none. */
+  private lastFreeIndex(modelId?: ZombieModelId, filter?: (zombie: Zombie) => boolean, also?: (zombie: Zombie) => boolean): number {
     for (let index = this.free.length - 1; index >= 0; index--) {
       const zombie = this.free[index];
       if (modelId && zombie.visual?.modelId !== modelId) continue;
-      if (!filter || filter(zombie)) return index;
+      if ((!filter || filter(zombie)) && (!also || also(zombie))) return index;
     }
     return -1;
   }

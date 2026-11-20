@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 860" role="img" aria-labelledby="title description">
+  <title id="title">Die Kathedrale · plantas esquemáticas</title>
+  <desc id="description">Cuatro planos cenitales con la catedral, el exterior, el campanario y las catacumbas. Los marcadores indican rejas, aparición del jugador y anillos.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, "Segoe UI", sans-serif; fill: #f0eadb; }
+      .panel { fill: #1b252b; stroke: #45555c; }
+      .title { font-size: 24px; font-weight: 650; }
+      .heading { font-size: 19px; font-weight: 650; }
+      .subtitle { font-size: 13px; fill: #b9c9cb; }
+      .label { font-size: 13px; font-weight: 600; }
+      .detail { font-size: 12px; fill: #ccd9d9; }
+      .caption { font-size: 12px; fill: #ebbd70; }
+      .existing { fill: #47545a; stroke: #a8b5b4; stroke-width: 1.2; }
+      .added { fill: #305851; stroke: #93cfbd; stroke-width: 1.2; }
+      .obstacle { fill: #1d3333; stroke: #82978e; stroke-width: 1; }
+      .route { fill: none; stroke: #dfc088; stroke-width: 1.4; stroke-dasharray: 4 3; }
+      .door { stroke: #f5c272; stroke-width: 4; stroke-linecap: round; }
+      .leader { fill: none; stroke: #91a7a8; stroke-width: 1; }
+      .ring { fill: #f5c272; stroke: #1d282a; stroke-width: 2; }
+      .ringLabel { font-size: 10px; font-weight: 800; fill: #192528; text-anchor: middle; }
+      .spawn { fill: #abdcc9; stroke: #192528; stroke-width: 1; }
+    </style>
+    <g id="start">
+      <path class="spawn" d="M 0,-9 L 8,7 L 0,4 L -8,7 Z"/>
+    </g>
+    <g id="resurrection">
+      <circle class="ring" r="8"/>
+      <text class="ringLabel" y="3.5">R</text>
+    </g>
+    <g id="armor">
+      <circle class="ring" r="8"/>
+      <text class="ringLabel" y="3.5">A</text>
+    </g>
+    <g id="sleight">
+      <circle class="ring" r="8"/>
+      <text class="ringLabel" y="3.5">P</text>
+    </g>
+    <g id="double-tap">
+      <circle class="ring" r="8"/>
+      <text class="ringLabel" y="3.5">T</text>
+    </g>
+  </defs>
+
+  <rect width="1180" height="860" fill="#11191d"/>
+  <text class="title" x="30" y="43">Die Kathedrale</text>
+  <text class="subtitle" x="246" y="42">Plantas jugables · paneles a distinta escala</text>
+  <path class="leader" d="M 1070,48 V 22 l -4,6 m 4,-6 l 4,6 M 1070,48 h 26 l -6,-4 m 6,4 l -6,4"/>
+  <text class="detail" x="1048" y="25">−Z</text>
+  <text class="detail" x="1104" y="52">+X</text>
+
+  <g id="main-panel">
+    <rect class="panel" x="30" y="69" width="550" height="354" rx="12"/>
+    <text class="heading" x="51" y="101">Catedral</text>
+    <text class="subtitle" x="51" y="122">Planta 0 · y = 0 m</text>
+
+    <!-- Map scale 4 px/m; origin (270,378). -->
+    <rect class="existing" x="246" y="142" width="48" height="40"/>
+    <rect class="existing" x="214" y="182" width="112" height="28"/>
+    <rect class="existing" x="214" y="210" width="30" height="112"/>
+    <rect class="existing" x="244" y="210" width="52" height="112"/>
+    <rect class="existing" x="296" y="210" width="30" height="112"/>
+    <rect class="existing" x="214" y="322" width="112" height="56"/>
+    <rect class="existing" x="247" y="379" width="46" height="15"/>
+    <path class="door" d="M 227,181 h 6 M 213,191 v 6 M 228,210 h 10 M 264,210 h 12 M 244,220 v 8 M 296,276 v 8 M 326,257 v 8 M 228,322 h 10 M 264,322 h 12 M 301,322 h 10 M 264,378 h 12"/>
+    <text class="detail" x="235" y="137">Presbiterio</text>
+    <text class="label" x="246" y="201">Crucero</text>
+    <text class="label" x="253" y="270">Nave</text>
+    <text class="label" x="245" y="343">Nártex</text>
+    <use href="#start" x="270" y="364"/>
+    <use href="#resurrection" x="305.6" y="371.6"/>
+    <use href="#armor" x="219.6" y="260.8"/>
+
+    <path class="leader" d="M 95,152 H 215 L 230,181 M 144,193 H 209 M 158,274 H 214 M 326,261 H 384 M 326,289 H 384 M 294,386 H 384"/>
+    <text class="label" x="51" y="156">Cripta</text>
+    <text class="label" x="51" y="197">Campanario</text>
+    <text class="label" x="51" y="279">Capillas oeste</text>
+    <text class="label" x="392" y="265">Portal del Mirador</text>
+    <text class="label" x="392" y="293">Capillas este</text>
+    <text class="label" x="392" y="391">Postigo de la plaza</text>
+  </g>
+
+  <g id="exterior-panel">
+    <rect class="panel" x="600" y="69" width="550" height="354" rx="12"/>
+    <text class="heading" x="621" y="101">Exterior</text>
+    <text class="subtitle" x="621" y="122">Planta 0 · acceso por la plaza o el lateral este</text>
+
+    <!-- Map scale 4.5 px/m; origin (726,306). -->
+    <rect class="existing" x="663" y="307.4" width="126" height="75.1"/>
+    <path class="added" d="M 790.35,148.5 H 870 V 238.5 H 834 V 382.5 H 790.35 Z"/>
+    <rect class="added" x="870" y="157.5" width="45" height="63"/>
+    <path class="door" d="M 721,306.7 h 10 M 789.7,357 v 10 M 789.7,169.4 v 10 M 870,186 v 10"/>
+    <path class="route" d="M 726,307 V 362 H 813 V 174.4 H 790 M 813,191.25 H 892"/>
+    <use href="#sleight" x="904.7" y="179.55"/>
+    <text class="label" x="699" y="373">Plaza</text>
+    <text class="detail" x="823" y="268" transform="rotate(90 823 268)">Paso del Palau</text>
+    <path class="leader" d="M 790,174.4 H 754 V 178 H 744 M 851,148 V 142 H 928 M 915,194 H 928 M 837,362 H 928"/>
+    <text class="label" x="621" y="181">Portal del Mirador</text>
+    <text class="detail" x="621" y="201">A la nave lateral este</text>
+    <text class="label" x="938" y="146">Explanada</text>
+    <text class="label" x="938" y="199">Patio lateral</text>
+    <text class="label" x="938" y="366">Postigo del Palau</text>
+    <text class="caption" x="622" y="403">La bahía y el perfil de Palma se ven desde la plaza.</text>
+  </g>
+
+  <g id="upper-panel">
+    <rect class="panel" x="30" y="442" width="550" height="361" rx="12"/>
+    <text class="heading" x="51" y="474">Campanario y terrazas</text>
+    <text class="subtitle" x="51" y="495">Planta +1 · y = 15,2 m</text>
+
+    <!-- Map scale 8 px/m; origin (380,963). -->
+    <rect class="added" x="176" y="523" width="89.6" height="42.4"/>
+    <rect class="added" x="265.6" y="527" width="58.8" height="212"/>
+    <circle class="added" cx="220" cy="595" r="30"/>
+    <circle class="obstacle" cx="220" cy="595" r="7"/>
+    <rect class="obstacle" x="286.6" y="623.5" width="16.8" height="26.3" rx="2"/>
+    <path class="route" d="M 267,595 H 240 A 20,20 0 1 1 220,575 V 544.6 H 275 V 608 H 315 V 665 H 275 V 608"/>
+    <path class="door" d="M 267,590 v 10"/>
+    <use href="#double-tap" x="296" y="676.6"/>
+    <path class="leader" d="M 176,549 H 154 M 190,596 H 161 M 323,566 H 362 M 323,665 H 362 M 269,595 H 340 V 617 H 362"/>
+    <text class="label" x="52" y="554">Campanas</text>
+    <text class="label" x="52" y="601">Caracol</text>
+    <text class="label" x="371" y="570">Terrazas</text>
+    <text class="label" x="371" y="621">Reja al crucero</text>
+    <text class="detail" x="371" y="641">En la planta 0</text>
+    <text class="label" x="371" y="669">Vuelta de la cubierta</text>
+  </g>
+
+  <g id="underground-panel">
+    <rect class="panel" x="600" y="442" width="550" height="361" rx="12"/>
+    <text class="heading" x="621" y="474">Catacumbas Reales</text>
+    <text class="subtitle" x="621" y="495">Planta −1 · y = −6 m</text>
+
+    <!-- Map scale 5.5 px/m; origin (830,1026) before translation. -->
+    <g transform="translate(0 18)">
+      <rect class="existing" x="761.25" y="517.8" width="39.6" height="13.2"/>
+      <rect class="existing" x="721.65" y="557.4" width="13.2" height="14.3"/>
+      <circle class="existing" cx="728.25" cy="524.4" r="33"/>
+      <rect class="existing" x="802.5" y="514.5" width="55" height="46.2"/>
+      <rect class="existing" x="794.8" y="564" width="110" height="110"/>
+      <rect class="existing" x="665" y="571.7" width="126.5" height="96.8"/>
+      <rect class="existing" x="758.5" y="668.5" width="33" height="26.4"/>
+      <rect class="existing" x="768.4" y="694.9" width="13.2" height="60"/>
+      <rect class="obstacle" x="683.7" y="590.5" width="35.2" height="59.4"/>
+      <rect class="obstacle" x="737.6" y="590.5" width="35.2" height="59.4"/>
+      <path class="door" d="M 800.8,520 v 9 M 724,570 h 9 M 825,562.3 h 10 M 793.2,614 v 10 M 770,754 h 10"/>
+      <path class="route" d="M 775,754 V 655 H 728.25 V 537 M 775,655 H 781 V 619 H 830 V 524.4 H 752"/>
+      <text class="detail" x="698" y="528">Santuario</text>
+      <text class="detail" x="837" y="623">Panteón</text>
+      <text class="detail" x="675" y="663">Galerías</text>
+      <path class="leader" d="M 857,541 H 930 M 904,615 H 930 M 734,563 H 770 V 570 H 930 M 781,731 H 930"/>
+      <text class="label" x="940" y="544">Relicario</text>
+      <text class="label" x="940" y="574">Atajo del osario</text>
+      <text class="label" x="940" y="619">Sepulcros reales</text>
+      <text class="label" x="940" y="735">Escalera al crucero</text>
+    </g>
+  </g>
+
+  <g id="legend" transform="translate(43 832)">
+    <use href="#start"/>
+    <text class="detail" x="13" y="4">Inicio</text>
+    <path class="door" d="M 79,0 h 12"/>
+    <text class="detail" x="98" y="4">Reja de pago</text>
+    <rect class="existing" x="199" y="-7" width="14" height="14"/>
+    <text class="detail" x="222" y="4">Sector existente</text>
+    <rect class="added" x="344" y="-7" width="14" height="14"/>
+    <text class="detail" x="367" y="4">Ampliación</text>
+    <use href="#resurrection" x="483"/>
+    <text class="detail" x="496" y="4">Resurrección</text>
+    <use href="#armor" x="597"/>
+    <text class="detail" x="610" y="4">Armadura</text>
+    <use href="#sleight" x="700"/>
+    <text class="detail" x="713" y="4">Prestidigitación</text>
+    <use href="#double-tap" x="836"/>
+    <text class="detail" x="849" y="4">Tiro Doble</text>
+  </g>
+</svg>

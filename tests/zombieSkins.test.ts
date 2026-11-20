@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  AnimationMixer, Box3, Color, SkinnedMesh, Texture, Vector3, type BufferAttribute,
+  AnimationMixer, Box3, Color, Matrix4, SkinnedMesh, Texture, Vector3, type BufferAttribute,
   type AnimationClip, type BufferGeometry, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -13,9 +13,10 @@ import { STATION33_ZOMBIE_EYES, STATION33_ZOMBIE_SKINS } from '../src/zombies/ma
 import { buildSkinnedWalkerGeometry, createSkinnedWalkerSource, dressZombieSources } from '../src/zombies/skins/ZombieSkinBuilder';
 import { MANSION_ZOMBIE_SKINS } from '../src/zombies/maps/BurnedMansionConfig';
 import { DIE_KATHEDRALE_ZOMBIE_EYES, DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES } from '../src/zombies/maps/DieKathedraleConfig';
+import { CATACOMB_FLOOR, CRYPT_ZOMBIE_LOOK } from '../src/zombies/maps/DieKathedraleCatacombsConfig';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from '../src/zombies/skins/ZombieSkinCatalog';
 import { GARMENT_ALPHA_TEST, garmentAtlasTexture, walkerPaletteUv } from '../src/zombies/skins/ZombieGarmentPatterns';
-import { walkerBandAt, walkerSkinRegion } from '../src/zombies/skins/ZombieSkinRegions';
+import { WALKER_BAND_COLORS, walkerBandAt, walkerSkinRegion, type WalkerPaletteBand } from '../src/zombies/skins/ZombieSkinRegions';
 import { Zombie } from '../src/zombies/Zombie';
 
 const WALKER_GLB = fileURLToPath(new URL('../public/assets/zombies/zombie_walker.glb', import.meta.url));
@@ -24,6 +25,12 @@ const SKIN_IDS = Object.keys(ZOMBIE_SKINS) as ZombieSkinId[];
 const CLERGY_SKINS: ReadonlySet<ZombieSkinId> = new Set(
   DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES.flatMap((share) => (share.skin ? [share.skin] : [])),
 );
+/** The dead of the Die Kathedrale crypt, wasted to the bone under their shrouds. */
+const CRYPT_SKINS: ReadonlySet<ZombieSkinId> = new Set(
+  CRYPT_ZOMBIE_LOOK.skinShares.flatMap((share) => (share.skin ? [share.skin] : [])),
+);
+/** Skins in long draped cloth: the cathedral clergy and the crypt dead. */
+const VESTED_SKINS: ReadonlySet<ZombieSkinId> = new Set([...CLERGY_SKINS, ...CRYPT_SKINS]);
 
 async function loadWalker(): Promise<ZombieModelSource> {
   const buffer = readFileSync(WALKER_GLB);
@@ -95,7 +102,7 @@ describe('walker skins', async () => {
       // Hats and belts stay a small fraction of the 2116-triangle body; full
       // vestments stay well under the body itself.
       else expect(triangles - plainTriangles).toBeGreaterThan(0);
-      expect(triangles - plainTriangles).toBeLessThan(CLERGY_SKINS.has(skinId) ? 1700 : 400);
+      expect(triangles - plainTriangles).toBeLessThan(VESTED_SKINS.has(skinId) ? 1700 : 400);
 
       const weights = geometry.getAttribute('skinWeight');
       const indices = geometry.getAttribute('skinIndex');
@@ -107,7 +114,7 @@ describe('walker skins', async () => {
         }
         expect(total).toBeCloseTo(1, 5);
         // Uniform accessories are rigid: all of their weight on one bone.
-        if (!CLERGY_SKINS.has(skinId)) expect(weights.getX(vertex)).toBe(1);
+        if (!VESTED_SKINS.has(skinId)) expect(weights.getX(vertex)).toBe(1);
       }
     });
   }
@@ -302,7 +309,7 @@ describe('walker skins', async () => {
 describe('Die Kathedrale clergy', async () => {
   const walker = await loadWalker();
   const plainVertices = (skinnedMeshOf(walker).geometry.index?.count ?? 0);
-  const clergy = [...CLERGY_SKINS];
+  const clergy = [...VESTED_SKINS];
 
   /** Skinned vertex positions of a dressed body, world meters; the bind pose without a clip. */
   function posed(visual: ZombieVisual, mixer: AnimationMixer, clip: AnimationClip | null, time = 0): Vector3[] {
@@ -569,9 +576,172 @@ describe('Die Kathedrale clergy', async () => {
   });
 });
 
+describe('Die Kathedrale crypt dead', async () => {
+  const walker = await loadWalker();
+  const plain = skinnedMeshOf(walker);
+  const plainGeometry = plain.geometry.index ? plain.geometry.toNonIndexed() : plain.geometry;
+  const bodyVertices = plainGeometry.getAttribute('position').count;
+  const boneNames = plain.skeleton.bones.map((bone) => bone.name);
+  const bind = new Matrix4();
+  const joints = plain.skeleton.boneInverses.map((inverse) => new Vector3().setFromMatrixPosition(
+    bind.copy(inverse).invert().premultiply(plain.bindMatrixInverse),
+  ));
+  const crypt = [...CRYPT_SKINS];
+
+  function dominantBone(geometry: BufferGeometry, vertex: number): string {
+    const weights = geometry.getAttribute('skinWeight');
+    const indices = geometry.getAttribute('skinIndex');
+    let best = 0;
+    for (let slot = 1; slot < 4; slot++) if (weights.getComponent(vertex, slot) > weights.getComponent(vertex, best)) best = slot;
+    return boneNames[indices.getComponent(vertex, best)];
+  }
+
+  /** Measure radial spread around the limb's center and length along its bind-pose axis. */
+  function limbExtent(geometry: BufferGeometry, bone: string, child: string): { radius: number; length: number } {
+    const direction = joints[boneNames.indexOf(child)].clone().sub(joints[boneNames.indexOf(bone)]).normalize();
+    const position = geometry.getAttribute('position');
+    const point = new Vector3();
+    const radialSum = new Vector3();
+    let squaredRadius = 0;
+    let samples = 0;
+    let start = Infinity;
+    let end = -Infinity;
+    for (let vertex = 0; vertex < bodyVertices; vertex++) {
+      if (dominantBone(plainGeometry, vertex) !== bone) continue;
+      point.fromBufferAttribute(position, vertex);
+      const along = point.dot(direction);
+      point.addScaledVector(direction, -along);
+      radialSum.add(point);
+      squaredRadius += point.lengthSq();
+      samples++;
+      start = Math.min(start, along);
+      end = Math.max(end, along);
+    }
+    const radialVariance = squaredRadius / samples - radialSum.divideScalar(samples).lengthSq();
+    return { radius: Math.sqrt(radialVariance), length: end - start };
+  }
+
+  /** Linear color a body vertex shows: its vertex color times the atlas band it samples. */
+  function shown(geometry: BufferGeometry, vertex: number): { band: WalkerPaletteBand; color: Color } {
+    const uv = plainGeometry.getAttribute('uv');
+    const band = walkerBandAt(uv.getX(vertex), uv.getY(vertex));
+    const [r, g, b] = WALKER_BAND_COLORS[band];
+    const tint = geometry.getAttribute('color');
+    const color = new Color().setRGB(r / 255, g / 255, b / 255, 'srgb');
+    return { band, color: color.multiply(new Color(tint.getX(vertex), tint.getY(vertex), tint.getZ(vertex))) };
+  }
+
+  const luminance = (color: Color): number => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+
+  for (const skinId of crypt) {
+    it(`${skinId} narrows limbs while preserving their length and the skull's shape`, () => {
+      const geometry = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry;
+      const limbs = [['LeftForeArm', 'LeftHand'], ['RightArm', 'RightForeArm'], ['LeftLeg', 'LeftFoot']] as const;
+      for (const [bone, child] of limbs) {
+        const original = limbExtent(plainGeometry, bone, child);
+        const wasted = limbExtent(geometry, bone, child);
+        expect(wasted.radius / original.radius, bone).toBeLessThan(0.7);
+        expect(wasted.length / original.length, bone).toBeGreaterThan(0.9);
+        expect(wasted.length / original.length, bone).toBeLessThan(1.1);
+      }
+      const position = geometry.getAttribute('position');
+      const original = plainGeometry.getAttribute('position');
+      const indices = plainGeometry.getAttribute('skinIndex');
+      const weights = plainGeometry.getAttribute('skinWeight');
+      const head = boneNames.indexOf('Head');
+      let skullVertices = 0;
+      for (let vertex = 0; vertex < bodyVertices; vertex++) {
+        let headWeight = 0;
+        for (let slot = 0; slot < 4; slot++) {
+          if (indices.getComponent(vertex, slot) === head) headWeight += weights.getComponent(vertex, slot);
+        }
+        // Vertices shared with the neck may move to keep the joint continuous.
+        if (headWeight < 0.9999) continue;
+        skullVertices++;
+        for (let axis = 0; axis < 3; axis++) {
+          expect(position.getComponent(vertex, axis)).toBeCloseTo(original.getComponent(vertex, axis), 5);
+        }
+      }
+      expect(skullVertices).toBeGreaterThan(0);
+    });
+
+    it(`${skinId} shows aged yellowish-grey bone and dark empty sockets, never clean white`, () => {
+      const geometry = skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry;
+      const bone = new Color(0, 0, 0);
+      let bare = 0;
+      let sockets = 0;
+      for (let vertex = 0; vertex < bodyVertices; vertex++) {
+        const { band, color } = shown(geometry, vertex);
+        if (band === 'eyes') {
+          expect(luminance(color)).toBeLessThan(0.02);
+          sockets++;
+        } else if (band === 'skin' && /(Hand|ForeArm)/.test(dominantBone(plainGeometry, vertex))) {
+          bone.add(color);
+          bare++;
+          expect(luminance(color)).toBeLessThan(0.45);
+        }
+      }
+      expect(sockets).toBeGreaterThan(0);
+      expect(bare).toBeGreaterThan(50);
+      bone.multiplyScalar(1 / bare);
+      // Yellowed and greyed by the grave: warmer than it is blue, far from white, still readable.
+      expect(bone.r).toBeGreaterThan(bone.b * 1.15);
+      expect(luminance(bone)).toBeGreaterThan(0.06);
+      expect(luminance(bone)).toBeLessThan(0.3);
+    });
+  }
+
+  it('dresses a reserve of crypt dead apart from the horde, as large as the walker reserve, with dim sockets for eyes', () => {
+    const dressed = dressZombieSources({ walker, brute: null }, {
+      skinShares: DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES,
+      eyes: DIE_KATHEDRALE_ZOMBIE_EYES,
+      floorLook: CRYPT_ZOMBIE_LOOK,
+    });
+    const cryptScenes = new Set(crypt.map((skinId) => createSkinnedWalkerSource(walker, skinId).scene));
+    expect(dressed.floorWalkers?.floor).toBe(CATACOMB_FLOOR);
+    const reserve = dressed.floorWalkers!.looks;
+    expect(reserve).toHaveLength(ZOMBIE_MODEL_POOL_CAPACITIES.walker);
+    expect(reserve.every((look) => cryptScenes.has(look.scene))).toBe(true);
+    expect(new Set(reserve.map((look) => look.scene)).size).toBe(crypt.length);
+    expect(reserve.every((look) => look.eyes === CRYPT_ZOMBIE_LOOK.eyes)).toBe(true);
+    expect(luminance(new Color(CRYPT_ZOMBIE_LOOK.eyes!.core))).toBeLessThan(0.05);
+    // The horde upstairs keeps its own looks and eyes.
+    const horde = dressed.walker as readonly ZombieModelSource[];
+    expect(horde.some((look) => cryptScenes.has(look.scene))).toBe(false);
+    expect(horde.every((look) => look.eyes === DIE_KATHEDRALE_ZOMBIE_EYES)).toBe(true);
+    // Maps without a crypt build no reserve.
+    expect(dressZombieSources({ walker, brute: null }, { skinShares: DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES }).floorWalkers).toBeUndefined();
+  });
+
+  it('raises the crypt dead only from crypt spawns, with the stats of any walker, even with the whole horde below', () => {
+    let state = 5;
+    const rng = (): number => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 0x100000000;
+    };
+    const sources = dressZombieSources({ walker, brute: null }, { skinShares: DIE_KATHEDRALE_ZOMBIE_SKIN_SHARES, floorLook: CRYPT_ZOMBIE_LOOK });
+    const spawns = [{ x: 0, z: -20 }, { x: 0, z: -30, floor: CATACOMB_FLOOR }];
+    const manager = new ZombieManager(rng, sources, false, spawns);
+    manager.registerColliders([]);
+    const cryptGeometries = new Set(crypt.map((skinId) => skinnedMeshOf(createSkinnedWalkerSource(walker, skinId)).geometry));
+    for (let i = 0; i < 200; i++) {
+      expect(manager.spawnZombie(roundConfig(1), 0, 0, 1, i % 2 === 0 ? 0 : CATACOMB_FLOOR)).toBe(true);
+      const [zombie] = manager.actives;
+      expect(cryptGeometries.has(zombie.visual.skinnedBody!.geometry), `spawn ${i}`).toBe(zombie.floor === CATACOMB_FLOOR);
+      expect(zombie.hp).toBe(Math.round(ZOMBIE_BASE_HP * roundConfig(1).healthMultiplier * ZOMBIE_TYPE_CONFIGS[zombie.typeId].healthMultiplier));
+      manager.reset();
+    }
+    // A full horde below still finds a body for every spawn, and each one is a crypt dead.
+    for (let i = 0; i < ZOMBIE_MODEL_POOL_CAPACITIES.walker; i++) expect(manager.spawnZombie(roundConfig(1), 0, 0, 1, CATACOMB_FLOOR)).toBe(true);
+    expect([...manager.actives].every((zombie) => cryptGeometries.has(zombie.visual.skinnedBody!.geometry))).toBe(true);
+    // The population cap holds: the next spawn upstairs waits for a slot like any other.
+    expect(manager.spawnZombie(roundConfig(1), 0, 0, 1, 0)).toBe(false);
+  });
+});
+
 describe('map skins', () => {
   it('dresses the Station 33 horde in every uniform and civilian look, none of them burnt', () => {
-    const unburnt = SKIN_IDS.filter((skinId) => !(ZOMBIE_SKINS[skinId] as ZombieSkinDefinition).burns && !CLERGY_SKINS.has(skinId));
+    const unburnt = SKIN_IDS.filter((skinId) => !(ZOMBIE_SKINS[skinId] as ZombieSkinDefinition).burns && !VESTED_SKINS.has(skinId));
     expect(new Set(STATION33_ZOMBIE_SKINS)).toEqual(new Set(unburnt));
     expect(STATION33_ZOMBIE_SKINS).toHaveLength(unburnt.length);
   });

@@ -58,7 +58,8 @@ y, en otra terminal, iniciar Vite con
 `$env:VITE_COOP_SERVER_URL='ws://localhost:8787/multiplayer'; npm run dev`
 (PowerShell). Con Wrangler activo en el puerto 8787, ejecutar
 `npm run multiplayer:cloudflare:test` para probar el protocolo. El relay Node.js
-sigue disponible para desarrollo.
+sigue disponible para desarrollo. `npm run test:full` inicia su propio Worker
+local en un puerto efímero para esta prueba y lo cierra al terminar.
 
 El plan Workers Free admite Durable Objects con almacenamiento SQLite, sujeto
 a los limites gratuitos de Cloudflare. El servidor usa WebSocket Hibernation

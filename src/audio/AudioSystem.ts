@@ -3,7 +3,10 @@ import type { FireMode, ReloadPhase, ReloadStyle, WeaponAudioConfig } from '../w
 import { HANDLE_RELEASE_FRACTION } from '../weapons/ReloadAnimator';
 import { effectsGain, onSettingsChange } from '../core/PlayerSettings';
 import { FlameStreamLoop } from './FlameStreamLoop';
-import { playCookTick, playGrenadeBounce, playPinPull, playProceduralExplosion, playSampledExplosion, playThrowWhoosh } from './ExplosionSound';
+import {
+  playCookTick, playExplosionRinging, playGrenadeBounce, playPinPull, playProceduralExplosion,
+  playSampledExplosion, playThrowWhoosh,
+} from './ExplosionSound';
 import type { GrenadeAudioConfig } from '../config/grenades';
 import { MusicManager, type EndingAudioId, type MusicTrackName } from './MusicManager';
 import { RING_JINGLE_TUNES, renderRingJingle, type RingJingleId } from './RingJingleTunes';
@@ -158,7 +161,7 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
 export type AmbientCueSound =
   | 'pa-crackle' | 'distant-train' | 'power-dip' | 'metal-echo' | 'machinery'
   | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl' | 'forge-wail'
-  | 'forge-surge' | 'forge-discharge';
+  | 'forge-surge' | 'forge-discharge' | 'water-drip' | 'stone-settle';
 
 /** What to play for a map ambient event; `sampleFile` (in `assets/audio/`) replaces the procedural sound. */
 export interface AmbientCuePlayback {
@@ -485,7 +488,8 @@ export class AudioSystem {
     const output = this.spatialBus(audio, cue, EXPLOSION_MIN_ATTENUATION);
     const sample = config.explosionSampleFile ? this.optionalSample(config.explosionSampleFile) : null;
     if (sample) playSampledExplosion(audio.ctx, output, sample, config.explosionVolume);
-    else playProceduralExplosion(audio.ctx, output, audio.noise, config.explosionVolume, proximity);
+    else playProceduralExplosion(audio.ctx, output, audio.noise, config.explosionVolume);
+    playExplosionRinging(audio.ctx, output, proximity);
   }
 
   /** Starts decoding a grenade's optional explosion MP3 so the first blast already uses it. */
@@ -1701,6 +1705,29 @@ export class AudioSystem {
   }
 
   /**
+   * A dead body in a stone tomb. `stir`: a dull knock from inside, then
+   * stone dragged over stone, a grinding rasp under a low rumble.
+   * `breach`: grit trickling off the rim and a dry crack as it comes out.
+   */
+  public playTombEmergence(cue: SpatialCue, stage: 'stir' | 'breach'): void {
+    const audio = this.context();
+    if (!audio) return;
+    const output = this.spatialBus(audio, cue);
+    const t = audio.ctx.currentTime;
+    if (stage === 'stir') {
+      this.tick(0, 150, 0.24, 0.9, 0.14, output);
+      this.tick(0.3, 125, 0.2, 0.9, 0.14, output);
+      for (let grain = 0; grain < 14; grain++) this.tick(0.5 + grain * 0.05 + Math.random() * 0.03, 360 + Math.random() * 280, 0.05, 1.6, 0.07, output);
+      this.sweep(0.45, 'sawtooth', 64, 46, 0.07, 0.9, t + 0.45, output);
+      this.tick(1.05, 95, 0.18, 0.8, 0.2, output);
+      return;
+    }
+    this.tick(0, 1700, 0.06, 5, 0.03, output);
+    this.tick(0.04, 820, 0.08, 3, 0.05, output);
+    for (let grain = 0; grain < 8; grain++) this.tick(0.08 + Math.random() * 0.7, 2600 + Math.random() * 1600, 0.012, 4, 0.02, output);
+  }
+
+  /**
    * A giant's footfall, `weight` 0..1: a low thump through the ground under
    * the crunch of what it lands on. Its landing slam and its fall use it at
    * full weight.
@@ -1879,7 +1906,30 @@ export class AudioSystem {
       case 'forge-wail': this.playForgeWail(audio, output, t); break;
       case 'forge-surge': this.playForgeSurge(output, t); break;
       case 'forge-discharge': this.playForgeDischarge(output, t); break;
+      case 'water-drip': this.playWaterDrip(output, t); break;
+      case 'stone-settle': this.playStoneSettle(output, t); break;
     }
+  }
+
+  /** Two or three drops falling into a puddle far down a vault: a falling plink each, ringing a little. */
+  private playWaterDrip(output: AudioNode, t: number): void {
+    const drops = 2 + Math.floor(Math.random() * 2);
+    let at = 0;
+    for (let drop = 0; drop < drops; drop++) {
+      const pitch = 1250 + Math.random() * 900;
+      this.sweep(at, 'sine', pitch, pitch * 0.55, 0.05, 0.09, t + at, output);
+      this.tick(at + 0.005, 3200, 0.012, 6, 0.02, output);
+      at += 0.55 + Math.random() * 1.1;
+    }
+  }
+
+  /** Old stone taking a weight somewhere in the dark: a dry crack, grit trickling, and a low rumble going away under it. */
+  private playStoneSettle(output: AudioNode, t: number): void {
+    this.tick(0, 900, 0.09, 3, 0.05, output);
+    this.tick(0.02, 2400, 0.04, 6, 0.03, output);
+    for (let grain = 0; grain < 8; grain++) this.tick(0.15 + Math.random() * 0.9, 2800 + Math.random() * 1800, 0.01, 4, 0.02, output);
+    this.sweep(0.05, 'sine', 48, 34, 0.12, 2.2, t + 0.05, output);
+    this.tick(0.08, 70, 0.1, 0.9, 1.8, output);
   }
 
   /** Requests a clip once. The caller gets null until it decodes or if it fails to load. */

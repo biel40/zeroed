@@ -9,6 +9,37 @@ import type { AmbientEventTiming } from './shared/AmbientEventScheduler';
 import type { WallAxis } from './shared/ArenaStructure';
 import { entranceSpawn, type WallCut } from './shared/EntrancePassage';
 import type { ArenaAmbience, ArenaAmbientCue, ArenaIntro, MysteryBoxPlacement, PlayerBounds, ZombieNavigationBounds } from './ZombieArena';
+import {
+  CATACOMB_DOORS,
+  CATACOMB_ENTRANCES,
+  CATACOMB_FLOOR,
+  CATACOMB_FLOOR_Y,
+  CATACOMB_LIGHT_SITES,
+  CATACOMB_ROOMS,
+  CATACOMB_WALL_BUYS,
+  CATACOMB_WALL_THICKNESS,
+  CATACOMB_ZONES,
+  CRYPT_STAIR,
+  CRYPT_STAIR_X,
+} from './DieKathedraleCatacombsConfig';
+import {
+  EXTERIOR_DOORS,
+  EXTERIOR_ENTRANCES,
+  EXTERIOR_LIGHT_SITES,
+  EXTERIOR_NAVIGATION_MAX_X,
+  EXTERIOR_PLAYER_MAX_X,
+  EXTERIOR_ZONES,
+} from './DieKathedraleExteriorConfig';
+import {
+  BELL_TOWER_GROUND_MIN_X,
+  UPPER_DOORS,
+  UPPER_ENTRANCES,
+  UPPER_FLOOR,
+  UPPER_FLOOR_Y,
+  UPPER_LIGHT_SITES,
+  UPPER_NAVIGATION_BOUNDS,
+  UPPER_ZONES,
+} from './dieKathedrale/upper/UpperCathedralConfig';
 
 /**
  * Die Kathedrale layout data. Every coordinate is in metres, feet height 0 on the
@@ -21,12 +52,11 @@ import type { ArenaAmbience, ArenaAmbientCue, ArenaIntro, MysteryBoxPlacement, P
  *   the liturgical east: the great rose window hangs over the chancel arch.
  * - The nave is three aisles wide: the central one between the column rows
  *   at x = ±NAVE.columnX, a side aisle beyond each row out to the walls.
- * - The entrance plaza lies south of the front (z > 0), closed by its side
- *   walls and by the parapet over the sea. Everything beyond the parapet is
- *   scenery (`PlazaVista`): the bay, the moon and the Almudaina's outline.
- * - Zombie entrances run DIE_KATHEDRALE_PASSAGE.length outward from their wall:
- *   later zones (cloister, bell tower, the Almudaina, Parc de la Mar) must
- *   leave those footprints free or re-route the entrance.
+ * - The entrance plaza lies south of the front (z > 0). The Palau passage
+ *   joins it to the east grounds, with a separate way through the Mirador.
+ *   The western tower joins the crossing to the roofs above the side vaults.
+ * - Zombie entrances run DIE_KATHEDRALE_PASSAGE.length outward from their wall.
+ *   The grounds leave those passage footprints free and block player access.
  * - The nave is one room to the eye and five to the feet: `DIE_KATHEDRALE_SCREENS`
  *   (iron grilles, waist-high parapets, a collapse) split it into zones along
  *   its own lines, the bay lines and the two column rows. Nothing rises to
@@ -145,10 +175,15 @@ export type DieKathedraleEntranceKind = keyof typeof DIE_KATHEDRALE_OPENINGS;
  * - `westAisle` / `eastAisle`: the side aisles beside it, with their chapels.
  * - `crossing`: the last bay, wall to wall, and the chancel behind its arch.
  * - `plaza`: outside, through the wicket in the great doors.
+ * - the catacombs below (`CATACOMB_ZONES`), down the stair from the crossing.
  */
-export const DIE_KATHEDRALE_ZONES = ['narthex', 'nave', 'westAisle', 'eastAisle', 'crossing', 'plaza'] as const;
+export const DIE_KATHEDRALE_BASE_ZONES = ['narthex', 'nave', 'westAisle', 'eastAisle', 'crossing', 'plaza'] as const;
+export const DIE_KATHEDRALE_ZONES = [...DIE_KATHEDRALE_BASE_ZONES, ...CATACOMB_ZONES, ...EXTERIOR_ZONES, ...UPPER_ZONES] as const;
 
 export type DieKathedraleZoneId = typeof DIE_KATHEDRALE_ZONES[number];
+
+/** Original nave sectors and the plaza, whose areas are derived from the bay lines. */
+type DieKathedraleBaseZoneId = typeof DIE_KATHEDRALE_BASE_ZONES[number];
 
 export const DIE_KATHEDRALE_START_ZONE: DieKathedraleZoneId = 'narthex';
 
@@ -164,7 +199,7 @@ export interface FloorRect {
 }
 
 /** Floor of every zone inside the nave, for placement checks. The crossing also holds `CHANCEL`. */
-export const DIE_KATHEDRALE_ZONE_AREAS: Readonly<Record<Exclude<DieKathedraleZoneId, 'plaza'>, FloorRect>> = {
+export const DIE_KATHEDRALE_ZONE_AREAS: Readonly<Record<Exclude<DieKathedraleBaseZoneId, 'plaza'>, FloorRect>> = {
   narthex: { minX: NAVE.minX, maxX: NAVE.maxX, minZ: ROOD_Z, maxZ: NAVE.maxZ },
   nave: { minX: -NAVE.columnX, maxX: NAVE.columnX, minZ: CHOIR_Z, maxZ: ROOD_Z },
   westAisle: { minX: NAVE.minX, maxX: -NAVE.columnX, minZ: CHOIR_Z, maxZ: ROOD_Z },
@@ -183,14 +218,28 @@ export interface DieKathedraleEntrance {
   readonly kind: DieKathedraleEntranceKind;
   /** Zone whose unlock wakes this entrance. */
   readonly zone: DieKathedraleZoneId;
+  /** Logical floor; omitted is the cathedral's (0). */
+  readonly floor?: number;
+}
+
+/** Floor an entrance or door stands on. */
+export function siteFloor(site: { readonly floor?: number }): number {
+  return site.floor ?? 0;
+}
+
+/** Feet height of a logical floor, outside the stairs. */
+export function dieKathedraleFloorY(floor: number): number {
+  if (floor === UPPER_FLOOR) return UPPER_FLOOR_Y;
+  return floor === CATACOMB_FLOOR ? CATACOMB_FLOOR_Y : 0;
 }
 
 /**
- * Zombie entrances, two per zone that has an outer wall: one each side of
- * the narthex, a door and a chapel window along each side aisle, the last
- * east chapel and the sacristy door for the crossing, and a gate in each
- * side wall of the plaza. The central nave has no wall of its own: its horde
- * comes through whichever grilles are open.
+ * Zombie entrances of the cathedral, two per zone that has an outer wall:
+ * one each side of the narthex, a door and a chapel window along each side
+ * aisle, the last east chapel and the sacristy door for the crossing, and a
+ * gate in each side wall of the plaza. The central nave has no wall of its
+ * own: its horde comes through whichever grilles are open. The catacombs'
+ * follow them (`CATACOMB_ENTRANCES`).
  */
 export const DIE_KATHEDRALE_ENTRANCES: ReadonlyArray<DieKathedraleEntrance> = [
   { id: 'nave-almoina-door', x: WEST_WALL_X, z: naveBayCenter(1), outwardX: -1, outwardZ: 0, kind: 'door', zone: 'narthex' },
@@ -203,6 +252,9 @@ export const DIE_KATHEDRALE_ENTRANCES: ReadonlyArray<DieKathedraleEntrance> = [
   { id: 'chancel-sacristy', x: CHANCEL_EAST_WALL_X, z: -54, outwardX: 1, outwardZ: 0, kind: 'door', zone: 'crossing' },
   { id: 'plaza-almudaina-gate', x: WEST_WALL_X, z: 10, outwardX: -1, outwardZ: 0, kind: 'door', zone: 'plaza' },
   { id: 'plaza-palau-gate', x: EAST_WALL_X, z: 6.5, outwardX: 1, outwardZ: 0, kind: 'door', zone: 'plaza' },
+  ...CATACOMB_ENTRANCES,
+  ...EXTERIOR_ENTRANCES,
+  ...UPPER_ENTRANCES,
 ];
 
 /** `wicket`: boards over a hole in the great doors. `gate`: an iron leaf in one of the nave's screens. */
@@ -220,6 +272,8 @@ export interface DieKathedraleDoor {
   readonly kind: DieKathedraleDoorKind;
   /** The two zones it joins: buying it wakes whichever still sleeps. */
   readonly zones: readonly [DieKathedraleZoneId, DieKathedraleZoneId];
+  /** Logical floor; omitted is the cathedral's (0). */
+  readonly floor?: number;
 }
 
 /** X of the side-aisle gates: the middle of the walkway the chapels leave beside the column row. */
@@ -230,7 +284,8 @@ const AISLE_GATE_X = 9.2;
  * a gate into each side aisle and the wicket out to the plaza. The central
  * nave opens sideways into both aisles, in the two bays whose pews were
  * cleared, and through the choir gate onto the crossing and the chancel; the west aisle reaches the crossing too, the
- * east one ends under the collapse.
+ * east one ends under the collapse. The crypt gate, in the crossing's north
+ * wall, opens the stair down to the catacombs, whose own gates follow.
  */
 export const DIE_KATHEDRALE_DOORS: ReadonlyArray<DieKathedraleDoor> = [
   { id: 'rood-gate', x: 0, z: ROOD_Z, outwardX: 0, outwardZ: -1, cost: 750, kind: 'gate', zones: ['narthex', 'nave'] },
@@ -241,18 +296,37 @@ export const DIE_KATHEDRALE_DOORS: ReadonlyArray<DieKathedraleDoor> = [
   { id: 'choir-gate', x: 0, z: CHOIR_Z, outwardX: 0, outwardZ: -1, cost: 1500, kind: 'gate', zones: ['nave', 'crossing'] },
   { id: 'ambulatory-gate', x: -AISLE_GATE_X, z: CHOIR_Z, outwardX: 0, outwardZ: -1, cost: 1250, kind: 'gate', zones: ['westAisle', 'crossing'] },
   { id: 'to-plaza', x: 0, z: FRONT_WALL_Z, outwardX: 0, outwardZ: 1, cost: 1250, kind: 'wicket', zones: ['narthex', 'plaza'] },
+  { id: 'crypt-gate', x: CRYPT_STAIR_X, z: NAVE.minZ - HALF_WALL, outwardX: 0, outwardZ: -1, cost: 1500, kind: 'gate', zones: ['crossing', 'galleries'] },
+  ...CATACOMB_DOORS,
+  ...EXTERIOR_DOORS,
+  ...UPPER_DOORS,
 ];
 
 const DOOR_OPENING = { width: POINT_DOOR_SIZE.width, bottom: 0, top: POINT_DOOR_SIZE.height } as const;
 
-/** The hole every paid door needs in the wall or screen it stands on. */
-export const DIE_KATHEDRALE_DOOR_CUTS: ReadonlyArray<WallCut> = DIE_KATHEDRALE_DOORS.map((door) => ({ x: door.x, z: door.z, opening: DOOR_OPENING }));
+function doorCutsOn(floor: number): WallCut[] {
+  return DIE_KATHEDRALE_DOORS.filter((door) => siteFloor(door) === floor).map((door) => ({ x: door.x, z: door.z, opening: DOOR_OPENING }));
+}
 
-/** Every hole the entrances and doors cut in the walls, shared by all shells. */
-export const DIE_KATHEDRALE_WALL_CUTS: ReadonlyArray<WallCut> = [
-  ...DIE_KATHEDRALE_ENTRANCES.map((entrance) => ({ x: entrance.x, z: entrance.z, opening: DIE_KATHEDRALE_OPENINGS[entrance.kind] })),
-  ...DIE_KATHEDRALE_DOOR_CUTS,
-];
+function wallCutsOn(floor: number): WallCut[] {
+  return [
+    ...DIE_KATHEDRALE_ENTRANCES.filter((entrance) => siteFloor(entrance) === floor)
+      .map((entrance) => ({ x: entrance.x, z: entrance.z, opening: DIE_KATHEDRALE_OPENINGS[entrance.kind] })),
+    ...doorCutsOn(floor),
+  ];
+}
+
+/** The hole every paid door of the cathedral needs in the wall or screen it stands on. */
+export const DIE_KATHEDRALE_DOOR_CUTS: ReadonlyArray<WallCut> = doorCutsOn(0);
+
+/** Every hole the entrances and doors cut in the cathedral's walls and screens, shared by all its shells. */
+export const DIE_KATHEDRALE_WALL_CUTS: ReadonlyArray<WallCut> = wallCutsOn(0);
+
+/** The same holes in the catacombs' walls. */
+export const CATACOMB_WALL_CUTS: ReadonlyArray<WallCut> = wallCutsOn(CATACOMB_FLOOR);
+
+/** Barrier and door apertures at terrace height. */
+export const DIE_KATHEDRALE_UPPER_WALL_CUTS: ReadonlyArray<WallCut> = wallCutsOn(UPPER_FLOOR);
 
 /**
  * How a screen is built. None reaches the vault:
@@ -365,19 +439,18 @@ export const DIE_KATHEDRALE_PASSAGE = {
   breachDepth: 0.6,
 } as const;
 
+/** The catacombs' walls are twice as thick: the first point inside stands that much further from the wall line. */
+const CATACOMB_PASSAGE_DEPTHS = { ...DIE_KATHEDRALE_PASSAGE, breachDepth: CATACOMB_WALL_THICKNESS / 2 + 0.5 } as const;
+
 function spawnsOf(zone: DieKathedraleZoneId): ReadonlyArray<ZombieSpawnPoint> {
-  return DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === zone).map((entrance) => entranceSpawn(entrance, DIE_KATHEDRALE_PASSAGE));
+  return DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === zone)
+    .map((entrance) => entranceSpawn(entrance, entrance.floor === CATACOMB_FLOOR ? CATACOMB_PASSAGE_DEPTHS : DIE_KATHEDRALE_PASSAGE, entrance.floor));
 }
 
-/** Spawn points per unlocked zone, one at the end of each entrance passage. */
-export const DIE_KATHEDRALE_SPAWNS: Readonly<Record<DieKathedraleZoneId, ReadonlyArray<ZombieSpawnPoint>>> = {
-  narthex: spawnsOf('narthex'),
-  nave: spawnsOf('nave'),
-  westAisle: spawnsOf('westAisle'),
-  eastAisle: spawnsOf('eastAisle'),
-  crossing: spawnsOf('crossing'),
-  plaza: spawnsOf('plaza'),
-};
+/** Spawn points per unlocked zone, one at the end of each entrance passage (on its own floor). */
+export const DIE_KATHEDRALE_SPAWNS: Readonly<Record<DieKathedraleZoneId, ReadonlyArray<ZombieSpawnPoint>>> = Object.fromEntries(
+  DIE_KATHEDRALE_ZONES.map((zone) => [zone, spawnsOf(zone)]),
+) as Record<DieKathedraleZoneId, ReadonlyArray<ZombieSpawnPoint>>;
 
 /** Weapon outlines 2 cm in front of the wall face. */
 export const DIE_KATHEDRALE_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
@@ -421,6 +494,7 @@ export const DIE_KATHEDRALE_WALL_BUYS: ReadonlyArray<WallBuyConfig> = [
     yaw: 0,
     floor: 0,
   },
+  ...CATACOMB_WALL_BUYS,
 ];
 
 /** The plaza's crate, against the front east of the great doors, facing the sea. */
@@ -466,29 +540,65 @@ export const DIE_KATHEDRALE_INTRO: ArenaIntro = {
 };
 
 /**
- * One rectangle over the nave, the chancel and the plaza, inset by the body
- * radius: walls and the closed wicket keep the player out of what is not
- * open yet, and the arena stops them at every walk-through entrance.
+ * The rectangle spans the surface sectors and both stairs to their far
+ * landings. Walls, gates and entrance stops enclose the actual walkable space.
  */
 export const DIE_KATHEDRALE_PLAYER_BOUNDS: PlayerBounds = {
-  minX: NAVE.minX + 0.4,
-  maxX: NAVE.maxX - 0.4,
-  minZ: CHANCEL.minZ + 0.4,
+  minX: BELL_TOWER_GROUND_MIN_X,
+  maxX: EXTERIOR_PLAYER_MAX_X,
+  minZ: CRYPT_STAIR.bottomZ - 1,
   maxZ: PLAZA.maxZ - 0.4,
 };
 
-const PASSAGE_REACH = HALF_WALL + DIE_KATHEDRALE_PASSAGE.length + DIE_KATHEDRALE_WALL_THICKNESS + 0.3;
+/** Every catacomb room, and the stair up to its head, where the floor changes back. */
+export const CATACOMB_PLAYER_BOUNDS: PlayerBounds = (() => {
+  const rooms = Object.values(CATACOMB_ROOMS);
+  return {
+    minX: Math.min(...rooms.map((room) => room.minX)) + 0.4,
+    maxX: Math.max(...rooms.map((room) => room.maxX)) - 0.4,
+    minZ: Math.min(...rooms.map((room) => room.minZ)) + 0.4,
+    maxZ: CRYPT_STAIR.headZ - 0.4,
+  };
+})();
 
-/** Every room plus every entrance passage. Walls longer than the zombie obstacle limit (20 m) are built in pieces. */
+const PASSAGE_REACH = HALF_WALL + DIE_KATHEDRALE_PASSAGE.length + DIE_KATHEDRALE_WALL_THICKNESS + 0.3;
+const CATACOMB_PASSAGE_REACH = CATACOMB_WALL_THICKNESS / 2 + DIE_KATHEDRALE_PASSAGE.length + CATACOMB_WALL_THICKNESS + 0.3;
+
+/** Reach of the catacombs' floor: every room, every entrance passage and the whole stair. */
+function catacombNavigationBounds(): ZombieNavigationBounds {
+  const rooms = Object.values(CATACOMB_ROOMS);
+  const reach = (entrance: DieKathedraleEntrance): { x: number; z: number } => ({
+    x: entrance.x + entrance.outwardX * CATACOMB_PASSAGE_REACH,
+    z: entrance.z + entrance.outwardZ * CATACOMB_PASSAGE_REACH,
+  });
+  const ends = CATACOMB_ENTRANCES.map(reach);
+  const margin = CATACOMB_WALL_THICKNESS + 0.3;
+  return {
+    floor: CATACOMB_FLOOR,
+    minX: Math.min(...rooms.map((room) => room.minX - margin), ...ends.map((end) => end.x)),
+    maxX: Math.max(...rooms.map((room) => room.maxX + margin), ...ends.map((end) => end.x)),
+    minZ: Math.min(...rooms.map((room) => room.minZ - margin), ...ends.map((end) => end.z)),
+    maxZ: Math.max(CRYPT_STAIR.headZ, ...ends.map((end) => end.z)),
+    baseY: CATACOMB_FLOOR_Y,
+  };
+}
+
+/**
+ * Every room plus every entrance passage, per floor; each floor also covers
+ * the whole stair, since a body keeps its floor until the far landing.
+ * Walls longer than the zombie obstacle limit (20 m) are built in pieces.
+ */
 export const DIE_KATHEDRALE_NAVIGATION_BOUNDS: ReadonlyArray<ZombieNavigationBounds> = [
   {
     floor: 0,
-    minX: WEST_WALL_X - PASSAGE_REACH,
-    maxX: EAST_WALL_X + PASSAGE_REACH,
-    minZ: CHANCEL.minZ - DIE_KATHEDRALE_WALL_THICKNESS - 0.3,
+    minX: Math.min(WEST_WALL_X - PASSAGE_REACH, BELL_TOWER_GROUND_MIN_X - 0.5),
+    maxX: EXTERIOR_NAVIGATION_MAX_X,
+    minZ: CRYPT_STAIR.bottomZ - DIE_KATHEDRALE_WALL_THICKNESS - 0.3,
     maxZ: PLAZA.maxZ + DIE_KATHEDRALE_WALL_THICKNESS + 0.3,
-    baseY: 0,
+    baseY: dieKathedraleFloorY(0),
   },
+  catacombNavigationBounds(),
+  UPPER_NAVIGATION_BOUNDS,
 ];
 
 /**
@@ -651,6 +761,9 @@ export const DIE_KATHEDRALE_LIGHT_SITES: ReadonlyArray<DieKathedraleLightSite> =
   { id: 'plaza-lantern-east', x: 4.7, y: 3.3, z: PLAZA.minZ + 1.7, color: LANTERN_COLOR, intensity: 6, distance: 10, flicker: true },
   { id: 'plaza-lamp-west', x: -9.5, y: 3.9, z: 12.2, color: LANTERN_COLOR, intensity: 7, distance: 11, flicker: false },
   { id: 'plaza-lamp-east', x: 9.5, y: 3.9, z: 12.2, color: LANTERN_COLOR, intensity: 7, distance: 11, flicker: false },
+  ...CATACOMB_LIGHT_SITES,
+  ...EXTERIOR_LIGHT_SITES,
+  ...UPPER_LIGHT_SITES,
 ];
 
 /**

@@ -16,6 +16,7 @@ interface SavedAccount {
   readonly sessionToken: string;
   readonly email: string;
   readonly products: readonly ProductId[];
+  readonly previews?: readonly ProductId[];
   readonly beta: boolean;
 }
 
@@ -38,6 +39,10 @@ export class WebAccount implements EntitlementProvider {
 
   public owns(product: ProductId): boolean {
     return this.saved?.products.includes(product) ?? false;
+  }
+
+  public canPreview(product: ProductId): boolean {
+    return this.saved?.previews?.includes(product) ?? false;
   }
 
   public getEmail(): string | null {
@@ -156,9 +161,12 @@ export class WebAccount implements EntitlementProvider {
     try {
       const value: unknown = JSON.parse(this.storage?.getItem(STORAGE_KEY) ?? 'null');
       if (!value || typeof value !== 'object') return null;
-      const { sessionToken, email, products, beta } = value as Record<string, unknown>;
+      const { sessionToken, email, products, beta, previews } = value as Record<string, unknown>;
       if (typeof sessionToken !== 'string' || typeof email !== 'string' || !Array.isArray(products)) return null;
-      return { sessionToken, email, products: products.filter(isProductId), beta: beta === true };
+      return {
+        sessionToken, email, products: products.filter(isProductId), beta: beta === true,
+        previews: Array.isArray(previews) ? previews.filter(isProductId) : [],
+      };
     } catch {
       return null;
     }

@@ -470,7 +470,7 @@ codigo: actualiza la guia.
 
 ## Presentacion premium
 
-- Tarjeta del menu con arte SVG propio (tunel, tubos turquesa, puerta con
+- Tarjeta del menu con portada WebP (tunel, tubos turquesa, puerta con
   franjas de peligro, "33" dorado) y brillo dorado de acceso premium.
 - Intro de 8 s al entrar por primera vez en la partida: camara real en la
   escena, apagon con solo la luz de emergencia, tren que sacude la boveda,

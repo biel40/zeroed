@@ -93,15 +93,13 @@ sufra tirones de compilacion de shaders.
 
 - Un mapa premium declara `ZombieMapDefinition.product`, un `ProductId` de
   [productos](../src/config/products.ts); los gratuitos lo omiten y la tarjeta
-  premium del menu se deriva de el. `canAccessZombieMap` exige que el mapa
-  este publicado (`isZombieMapReleased`: los `workInProgress` solo con
-  [WIP_MAPS_ENABLED](../src/config/mapRelease.ts), falso en toda build de
-  produccion), consulta un
+  premium del menu se deriva de el. `canAccessZombieMap` consulta un
   [EntitlementProvider](../src/entitlements/EntitlementProvider.ts) y comparte
-  la regla entre el selector y el arranque, incluidos enlaces directos; el
-  selector lista bloqueados los mapas sin permiso y deshabilita los WIP. Cada plataforma aporta su
-  proveedor; en web es [WebAccount](../src/account/WebAccount.ts), que recuerda
-  los productos de la cuenta y los refresca con la
+  la regla entre el selector y el arranque, incluidos enlaces directos. Un mapa
+  `workInProgress` requiere un permiso de prueba para su producto o el opt-in
+  local [WIP_MAPS_ENABLED](../src/config/mapRelease.ts) con el acceso premium habitual.
+  Cada plataforma aporta su proveedor. En web, [WebAccount](../src/account/WebAccount.ts)
+  recuerda los productos y permisos de prueba de la cuenta y los refresca con la
   [API de cuentas](../cloudflare/api/README.md) mediante un `AccountBackend`
   (`AccountApi`; en `npm run dev`, `LocalTesterBackend` lo envuelve y da
   entrada inmediata a los testers locales). `main.ts`
@@ -173,7 +171,15 @@ sufra tirones de compilacion de shaders.
   lo que el mapa mueve; con `hordeChase`, el mapa pide zombis con
   `onEndingZombie` y el modo los lleva a ese punto sin que puedan herir) y
   avisa con `onTopologyChanged` cuando
-  puertas o muros cambian la topologia. Las capacidades propias de un mapa
+  puertas o muros cambian la topologia. Un mapa de varias plantas las une con
+  `floorTransitions`. Una escalera curva declara en `StairRamp.curve` la
+  altura de la vuelta a partir de la posición de los pies y la dirección
+  local de la horda. El gestor sigue la primera transición de la cadena
+  entre plantas y continúa con navegación local en cada rellano. La arena
+  puede declarar la planta de cada punto de aparicion
+  (`ZombieSpawnPoint.floor`); `ZombieManager.spawnZombie` prefiere entonces
+  los puntos lejanos de la planta del jugador y, si no hay, cualquiera, como en
+  un mapa de una planta. Las capacidades propias de un mapa
   (`SoulRitualArena`) se consultan con type guard, nunca con `instanceof`;
   las que cualquier mapa puede ofrecer son campos opcionales (`weaponPickups`,
   `ammoRefills`, `grenadeBuys`, `mysteryBoxPlacement`, `ringMachines`, `evacuation`).
@@ -182,9 +188,19 @@ sufra tirones de compilacion de shaders.
   `GameMode.getFootstepSurfaces` y `Game` lo usa en `PlayerFootsteps`, que
   sigue las pisadas de `WalkGait` y suena por `AudioSystem.playFootstep`.
   El aspecto de la horda tambien: `zombieSkins` (repartidas por turnos) o
-  `zombieSkinShares` (tiradas por peso en cada spawn), y `zombieEyes`;
-  `dressZombieSources` las convierte en fuentes del pool y `ZombieManager`
-  elige el cuerpo con `ZombieLookPicker`, sin tocar tipo ni estadisticas.
+  `zombieSkinShares` (tiradas por peso en cada spawn), `zombieFloorLook`
+  (aspectos propios de los walkers que aparecen en una planta, con su reserva
+  de cuerpos) y `zombieEyes`; `dressZombieSources` las convierte en fuentes
+  del pool y `ZombieManager` elige el punto de spawn y luego el cuerpo con
+  `ZombieLookPicker`, sin tocar tipo ni estadisticas.
+  `emergenceSites` y `emergenceTuning` declaran puntos tematicos de los que
+  sale parte de los walkers de su planta (sepulcros), refrescados con
+  `spawnPoints`. `ZombieManager.setEmergenceSites` los recibe;
+  `EmergenceSitePicker` decide que spawn los usa y `ZombieEmergences`
+  conduce el cuerpo, que retiene su estado `spawn` (`Zombie.beginEmergence`)
+  sin IA hasta soltarlo en la salida (`src/zombies/emergence/`).
+  `onZombieEmerging` avisa al modo, que reproduce sonido y polvo y llama a
+  `disturbEmergenceSite` para la parte del mapa (una losa que se desliza).
   `ArenaEvacuation` (el Protocolo 33 de Station 33) declara reglas, puntos de
   uso, interruptores (`ArenaPowerSwitch`) y final; `ZombiesEvacuation`
   ejecuta el estado puro `EvacuationProtocol` y el ritmo de `EvacuationHorde`
@@ -213,8 +229,8 @@ sufra tirones de compilacion de shaders.
   rueda los planos, `ZombiesMode` congela la run mientras dura y el HUD
   muestra la tarjeta (`showBossIntro`). Con `music` (un `MusicTrackName`) su
   tema de duelo sustituye la musica del mapa: `MusicManager.startDuelTheme`
-  pausa la pista del mapa y `stopDuelTheme` la devuelve donde estaba; las
-  pistas `lazy` no se precargan y, si su archivo falta, sigue la del mapa.
+  pausa la pista del mapa y `stopDuelTheme` la devuelve donde estaba. Si el
+  tema del duelo no se puede reproducir, sigue sonando la pista del mapa.
   Los pickups con `codeLock` separan la validacion del codigo de la aplicacion
   de una apertura autorizada; cooperativo replica las aperturas y recogidas
   bajo autoridad del anfitrion, sin introducir dependencias de un mapa.
@@ -255,9 +271,10 @@ mapa; entra solo en la condicion del anillo blanco (`RING_IDS`), que ocupa el
 pulgar fuera del catalogo. Nuevo modo:
 `GameMode` y selector. Nuevo mapa: clase que implemente `ZombieArena` (sus
 datos en un config propio, utilidades comunes de `maps/shared/`), entrada en
-`ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` (arte SVG propio) y claves
-`map.<nombre>` y `map.<nombre>.tagline` en los tres diccionarios; el test de contrato lo recorre solo. Un final nuevo anade su id
-de presentacion en `HUD` y de audio en `MusicManager`; si se rueda en la escena,
+`ZOMBIE_MAPS`, tarjeta `data-map` en `#map-select` con portada WebP y claves
+`map.<nombre>` y `map.<nombre>.tagline` en los tres diccionarios. Los temas de
+partida se declaran `lazy` en `MusicManager` para cargarlos al empezar a jugar.
+Un final nuevo anade su id de presentacion en `HUD` y de audio en `MusicManager`; si se rueda en la escena,
 el HUD lo recibe como `filmed` y su overlay deja ver la escena. Una intro nueva anade su
 id en `IntroPresentationId` y su overlay en `#intro-screen`. Nuevo blanco: `HitTarget` y
 registro en colliders. Nuevo tipo zombie: registro de estadisticas/modelo,

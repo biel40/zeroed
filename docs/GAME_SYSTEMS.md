@@ -329,6 +329,28 @@ existente a `MOTDRULES`.
   si no queda ninguno libre usa cualquier walker libre. Los cuerpos del pool se
   reparten entre los aspectos en proporcion a los pesos, con al menos uno cada
   uno. Solo apariencia: no cambia tipo, vida, velocidad ni dano.
+- Aspecto por planta: `ZombieArena.zombieFloorLook` viste con sus propias
+  skins ponderadas a los walkers que aparecen en una planta, segun el punto de
+  spawn y no la posicion del jugador; conservan ese aspecto al perseguir a
+  otras plantas. Tienen una reserva propia de cuerpos del tamano de la del
+  walker (el tope de vivos sigue siendo el mismo), asi que ninguna de las dos
+  reservas presta cuerpos a la otra. Una skin con `remains` consume el cuerpo
+  hasta el hueso: acerca la carne al eje de cada hueso, con articulaciones
+  medidas sobre la propia piel, sin tocar craneo, longitudes ni rig, y pinta
+  lo descubierto como hueso viejo con cuencas vacias
+  ([restos](../src/zombies/skins/ZombieSkinRemains.ts)). El invitado
+  cooperativo sigue viendo walkers sin vestir.
+- Salida de la escenografia: un mapa puede declarar
+  `ZombieArena.emergenceSites` (sepulcros u objetos parecidos, solo en zonas
+  abiertas) con su `emergenceTuning`. Desde su ronda minima, una parte de los
+  walkers que iban a aparecer en esa planta sale de un sitio en reposo,
+  alejado del jugador y con la salida libre; los brutos y el resto de spawns
+  no cambian. El sitio se agita un momento sin cuerpo visible, el cuerpo se
+  alza dentro y trepa el borde con la animacion de ventana hasta suelo
+  navegable; hasta entonces no se mueve, no persigue ni golpea, aunque se le
+  puede disparar. Despues persigue como cualquier walker. Lleva el aspecto de
+  su planta, polvo de las `Effects` compartidas y un sonido de piedra.
+  Solo en individual: el anfitrion cooperativo no los activa.
 - Vestiduras largas ([prendas](../src/zombies/skins/ZombieClergyGarments.ts)):
   habitos, albas, casullas, sobrevestas, velos y cofias se funden en la misma
   malla. Por encima de la cadera la tela copia los pesos del torso bajo ella;
@@ -382,7 +404,9 @@ existente a `MOTDRULES`.
   vaciado longitudinal y empunadura nervada.
 - La navegacion combina steering, A* por planta y anti-stuck. Puertas y
   barreras modifican la topologia; la escalera del bunker es una pendiente
-  continua de canal unico, sin teletransporte. La rejilla se reconstruye en
+  continua de canal unico, sin teletransporte. En un mapa cuyas entradas
+  tienen planta (las catacumbas y el campanario de Die Kathedrale), cada zombi de la ronda
+  aparece por una entrada lejana de la planta del jugador si la hay. La rejilla se reconstruye en
   cada cambio de barrera, asi que cada obstaculo solo marca las celdas a su
   alcance (mismo predicado exacto, coste proporcional al area ocupada).
 - Pasos: ocho fuentes `PositionalAudio`, reasignadas a los zombies mas cercanos;
@@ -526,10 +550,10 @@ existente a `MOTDRULES`.
   reales): destello cegador, bola de fuego con columna, onda de choque y
   resplandor falso sobre el suelo, metralla incandescente, polvo rasante,
   humo que sube varios segundos y una quemadura que dura unos 20 s en el
-  suelo. El sonido es procedural (chasquido, estampido, subgrave, cascotes,
-  cola y pitido de oidos si fue cerca) salvo que exista
-  `public/assets/audio/f1_explosion.mp3` (`GrenadeAudioConfig.explosionSampleFile`),
-  que lo sustituye. En cooperativo cada jugador lleva su bolsa; consulta
+  suelo. La F-1 reproduce una [muestra posicional](../ASSETS.md#audio-publicassetsaudio)
+  y usa una detonacion procedural si la muestra no esta disponible. En ambos
+  casos se añade un pitido de oidos si la explosion fue cerca.
+  En cooperativo cada jugador lleva su bolsa. Consulta
   [cooperativo](MULTIPLAYER.md#alcance-y-límites).
 - Zombis tullidos (`Zombie.cripple`): caen sobre las manos y siguen
   arrastrandose con el clip `ZombieCrawl` del GLB (el mismo de la aparicion)
@@ -548,9 +572,9 @@ existente a `MOTDRULES`.
   [acceso de beta](../public/beta/README.md).
 - Die Kathedrale esta en desarrollo (`workInProgress` en el registro): su
   tarjeta aparece con candado y "WIP" para cualquiera que no pueda jugarla,
-  incluidas las sesiones sin cuenta. Para abrirla desde el menu o `?map=` hace
-  falta un servidor de desarrollo con `VITE_WIP_MAPS=true` y una cuenta con
-  acceso al mapa.
+  incluidas las sesiones sin cuenta. Las cuentas con permiso de prueba pueden
+  abrirla desde el menu o `?map=`. El servidor de desarrollo tambien admite
+  `VITE_WIP_MAPS=true` con el acceso premium habitual.
 
 - `DieKathedraleArena`: Die Kathedrale, la catedral de Palma, individual y premium. La
   nave es un solo espacio a la vista y cinco zonas a pie, separadas por rejas, pretiles
@@ -562,8 +586,22 @@ existente a `MOTDRULES`.
   el inicio; los demas prenden progresivamente al acercarse por zonas abiertas
   y conservan sus llamas hasta reiniciar. Las luces reales se reutilizan cerca
   del jugador dentro del presupuesto de calidad; la intro no descubre velas.
-  Sin anillos, electricidad ni final. Zonas, precios y guia en
-  [Die Kathedrale](DIE_KATHEDRALE.md).
+  El paso del Palau une la plaza con la explanada y el portal del Mirador
+  completa el circuito con la nave lateral este. Desde la explanada se
+  puede abrir el patio. La escalera de caracol del crucero lleva a la
+  cámara de campanas y al circuito de terrazas (planta +1). Los cuatro
+  anillos se reparten entre el nártex, las capillas oeste, el patio y la
+  terraza y se compran sin electricidad.
+  La reja de la cripta, en el muro norte del crucero, abre una escalera a las
+  catacumbas reales (planta -1): galerias de nichos (Vector), panteon real
+  con cuatro sepulcros (M4A1), relicario y santuario circular, unidos por
+  rejas en un circuito con atajo de vuelta a las galerias. Abajo aparecen
+  zombis por sus propias entradas, el ambiente se vuelve mas oscuro y sin
+  luna, y suenan goteos, piedra y viento en lugar de los sonidos de la nave.
+  El altar del relicario y los lugares del futuro Arco del Viento estan
+  preparados solo como datos y decorado. Consulta el
+  [plano de Die Kathedrale](maps/die-kathedrale-topology.md) y su
+  [dirección artística](DIE_KATHEDRALE.md).
 
 - `BurnedMansionArena`: dos plantas, colision, diez ventanas, puertas por
   Points, wall buys, bunker, pickups, escalera continua y sala secreta. Es el
@@ -1184,6 +1222,14 @@ no puede verlas; desde la sala de la escalera solo conserva la franja de la
 otra planta visible a traves del hueco. Colliders y luces nunca cambian de
 capa: los raycasts tambien filtran por capas y alterar el numero de luces
 activas recompilaria los shaders.
+
+Die Kathedrale agrupa las catacumbas, el exterior y los niveles visibles
+de la catedral. Oculta los grupos lejanos de la ampliación según la posición
+del observador y mantiene lotes estáticos separados para la explanada, el
+paso del Palau, el patio, el campanario y las terrazas. Las catacumbas se
+dibujan cerca o por debajo de su escalera con la reja de la cripta abierta.
+La catedral se oculta al pasar el rellano de la cripta. Las luces reales
+siguen en la raíz con su presupuesto fijo.
 
 Los zombis se dibujan opacos y solo pasan a mezcla durante el fundido de
 muerte (`rendering/FadeMaterials.ts`); `Game.prepare` precompila esa variante.

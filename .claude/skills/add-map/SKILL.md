@@ -82,10 +82,10 @@ Opcional, solo si el mapa lo tiene:
 | Archivo | Que anadir |
 |---|---|
 | `src/config/zombieMaps.ts` | Entrada en `ZOMBIE_MAPS`: `id`, `visible`, `nameKey`, `coop`, `product` solo si es premium, `createArena`. |
-| `index.html` | Tarjeta `<button class="map-card" data-map="<id>">` copiando la estructura de las existentes: arte SVG propio dentro de `.map-card-media` con su `.map-card-lock`, `data-map-access`, `data-map-players`, `data-map-action`, nombre y lema con `data-i18n`. |
+| `index.html` | Tarjeta `<button class="map-card" data-map="<id>">` copiando la estructura de las existentes: portada WebP de `public/assets/maps/` dentro de `.map-card-media` con su `.map-card-lock`, `data-map-access`, `data-map-players`, `data-map-action`, nombre y lema con `data-i18n`. |
 | `src/style.css` | Estilos y animaciones del arte de la tarjeta, si los necesita. |
 | `src/i18n/en.ts`, `es.ts`, `ca.ts` | `map.<clave>` y `map.<clave>.tagline` en los tres idiomas (`tests/i18n.test.ts` exige las mismas claves). |
-| `src/audio/MusicManager.ts` | Si tiene musica propia: `MusicTrackName`, `ZOMBIES_MUSIC_PATHS`, `MUSIC_TRACKS`; el arena la elige en `ambience.musicTrack`. El MP3 va a `public/assets/audio/` y su licencia a `ASSETS.md`. |
+| `src/audio/MusicManager.ts` | Si tiene musica propia: `MusicTrackName`, `ZOMBIES_MUSIC_PATHS` y una entrada `lazy: true` en `MUSIC_TRACKS`. El arena la elige en `ambience.musicTrack`. El MP3 va a `public/assets/audio/` y su licencia a `ASSETS.md`. |
 
 Intro opcional:
 - `ArenaIntro` en el config;
@@ -121,7 +121,8 @@ Un final opcional sigue el mismo patron con `EndingPresentationId`.
   - los wall buys estan a 2 cm de un muro y al alcance;
   - las puertas despiertan sus zonas, y `reset` las cierra de nuevo.
 - Si tiene intro: anade su caso a `tests/mapIntro.test.ts`.
-- `npx tsc --noEmit` y `npx vitest run`.
+- Ejecuta `npm run typecheck` y valida la rama con `npm run test:feature`.
+  Durante la iteracion, sigue la [validacion del repositorio](../../../AGENTS.md#validacion-automatica).
 
 ## 6. Documentacion
 

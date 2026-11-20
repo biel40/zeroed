@@ -26,6 +26,9 @@ no la usan. El cliente la usa mediante `WebAccount`; aun no esta desplegada.
   nueva, que guarda con `/me/password`.
 - `*` concede todos los productos premium, presentes y futuros; se usa para los
   testers de la beta cerrada.
+- `GET /me/entitlements` incluye los permisos de prueba `previews` de las
+  [cuentas de desarrollo](../../src/account/developerMapPreviews.ts). Estos
+  permisos se aplican a productos concretos mientras sus mapas siguen en desarrollo.
 - `ALLOWED_ORIGINS` incluye la web, la app Android (`https://localhost`) y la de
   escritorio (`app://zeroed`).
 - Correo de recuperacion en [loginEmail.ts](src/loginEmail.ts). El logo

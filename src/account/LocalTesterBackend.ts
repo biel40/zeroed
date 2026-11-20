@@ -1,5 +1,6 @@
 import { PRODUCT_IDS } from '../config/products';
 import type { Language } from '../i18n/i18n';
+import { getDeveloperMapPreviews } from './developerMapPreviews';
 import type {
   AccountBackend, AccountEntitlements, IssuedSession, LoginRequestOutcome, RegistrationRejection, SignInRejection,
 } from './AccountApi';
@@ -49,7 +50,9 @@ export class LocalTesterBackend implements AccountBackend {
 
   public async fetchEntitlements(sessionToken: string): Promise<AccountEntitlements | null> {
     const email = this.localTesterOf(sessionToken);
-    return email ? { email, products: [...PRODUCT_IDS], beta: true } : this.remote.fetchEntitlements(sessionToken);
+    return email
+      ? { email, products: [...PRODUCT_IDS], beta: true, previews: getDeveloperMapPreviews(email) }
+      : this.remote.fetchEntitlements(sessionToken);
   }
 
   public async logout(sessionToken: string): Promise<void> {

@@ -93,12 +93,25 @@ describe('Duel theme', () => {
     expect(player(ZOMBIES_MUSIC_PATHS.station33)!.paused).toBe(false);
   });
 
-  it('is not preloaded with the other tracks: it loads when a duel starts', () => {
+  it.each([
+    [BED, ZOMBIES_MUSIC_PATHS.station33, ZOMBIES_MUSIC_PATHS.gameplay],
+    ['background_music_theme', ZOMBIES_MUSIC_PATHS.gameplay, ZOMBIES_MUSIC_PATHS.station33],
+  ] as const)('loads %s only when its match starts', (track, selected, other) => {
     const manager = new MusicManager();
     manager.setEnabled(true);
+    manager.startMenuLoop();
     manager.preload();
+    expect(player(ZOMBIES_MUSIC_PATHS.menu)?.paused).toBe(false);
+    expect(player(selected)).toBeUndefined();
+    expect(player(other)).toBeUndefined();
     expect(player(ZOMBIES_MUSIC_PATHS.captainUssr)).toBeUndefined();
-    expect(player(ZOMBIES_MUSIC_PATHS.station33)).toBeDefined();
+
+    manager.stopMenuLoop();
+    manager.startGameplayLoop(track);
+    expect(player(selected)).toMatchObject({ loop: true, paused: false });
+    expect(player(selected)?.load).toHaveBeenCalledOnce();
+    expect(player(other)).toBeUndefined();
+    expect(player(ZOMBIES_MUSIC_PATHS.captainUssr)).toBeUndefined();
   });
 
   it('holds through the pause menu and never starts the bed while paused', () => {

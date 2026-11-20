@@ -14,6 +14,7 @@ import {
   DIE_KATHEDRALE_CHAPELS,
   DIE_KATHEDRALE_DOORS,
   DIE_KATHEDRALE_ENTRANCES,
+  DIE_KATHEDRALE_BASE_ZONES,
   DIE_KATHEDRALE_LIGHT_SITES,
   DIE_KATHEDRALE_PASSAGE,
   DIE_KATHEDRALE_PLAYER_SPAWN,
@@ -36,6 +37,7 @@ import {
   type DieKathedraleEntrance,
   type DieKathedraleZoneId,
 } from '../src/zombies/maps/DieKathedraleConfig';
+import { CATACOMB_LIGHT_SITES } from '../src/zombies/maps/DieKathedraleCatacombsConfig';
 import { pointedArch, ribVaultGeometry, vaultHeightAt } from '../src/zombies/maps/dieKathedrale/GothicVault';
 import { pewBlockFootprint } from '../src/zombies/maps/dieKathedrale/NaveFurniture';
 import { naveVaultBays } from '../src/zombies/maps/dieKathedrale/NaveShell';
@@ -129,7 +131,17 @@ const WAY_INTO: Readonly<Record<DieKathedraleZoneId, ReadonlyArray<string>>> = {
   eastAisle: ['mirador-gate'],
   crossing: ['rood-gate', 'choir-gate'],
   plaza: ['to-plaza'],
+  galleries: ['rood-gate', 'choir-gate', 'crypt-gate'],
+  pantheon: ['rood-gate', 'choir-gate', 'crypt-gate', 'pantheon-gate'],
+  reliquary: ['rood-gate', 'choir-gate', 'crypt-gate', 'pantheon-gate', 'reliquary-gate'],
+  sanctuary: ['rood-gate', 'choir-gate', 'crypt-gate', 'ossuary-gate'],
+  esplanade: ['mirador-gate', 'mirador-portal'],
+  sideCourtyard: ['mirador-gate', 'mirador-portal', 'courtyard-grille'],
+  bellTower: ['rood-gate', 'choir-gate', 'bell-tower-gate'],
 };
+
+/** The cathedral's own entrances, on its floor; the catacombs' are tested in dieKathedraleCatacombs.test.ts. */
+const GROUND_ENTRANCES = DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.floor === undefined);
 
 /** A spot to stand on in each zone, plus the chancel and two chapels. */
 const PROBES = {
@@ -274,7 +286,9 @@ describe('Die Kathedrale layout', () => {
     expect(arena.doors.map((door) => [door.id, door.cost, door.isLocked])).toEqual([
       ['rood-gate', 750, true], ['almoina-gate', 1000, true], ['mirador-gate', 1000, true],
       ['nave-west-gate', 750, true], ['nave-east-gate', 750, true], ['choir-gate', 1500, true],
-      ['ambulatory-gate', 1250, true], ['to-plaza', 1250, true],
+      ['ambulatory-gate', 1250, true], ['to-plaza', 1250, true], ['crypt-gate', 1500, true],
+      ['pantheon-gate', 1500, true], ['reliquary-gate', 1250, true], ['sanctuary-gate', 1500, true], ['ossuary-gate', 2500, true],
+      ['mirador-portal', 1000, true], ['palau-postern', 750, true], ['courtyard-grille', 750, true], ['bell-tower-gate', 1250, true],
     ]);
     const narthex = DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === 'narthex');
     expect(narthex).toHaveLength(2);
@@ -302,7 +316,7 @@ describe('Die Kathedrale layout', () => {
     for (const door of DIE_KATHEDRALE_DOORS) openDoor(arena, door.id);
     expect(arena.spawnPoints).toHaveLength(DIE_KATHEDRALE_ENTRANCES.length);
     const solids = solidBoxes(arena);
-    for (const spawn of Object.values(DIE_KATHEDRALE_SPAWNS).flat()) {
+    for (const spawn of Object.values(DIE_KATHEDRALE_SPAWNS).flat().filter((point) => point.floor === undefined)) {
       expect(insideRoom(spawn.x, spawn.z), `spawn ${spawn.barrierId}`).toBe(false);
       const body = bodyBox(spawn.x, spawn.z, 0.45);
       for (const box of solids) expect(box.intersectsBox(body), `spawn ${spawn.barrierId}`).toBe(false);
@@ -315,12 +329,12 @@ describe('Die Kathedrale layout', () => {
   });
 
   it('keeps every entrance passage off the others and off every room but its own wall', () => {
-    const passages = DIE_KATHEDRALE_ENTRANCES.map(passageBox);
+    const passages = GROUND_ENTRANCES.map(passageBox);
     for (let index = 0; index < passages.length; index++) {
       for (let other = index + 1; other < passages.length; other++) expect(passages[index].intersectsBox(passages[other])).toBe(false);
       for (const room of DIE_KATHEDRALE_ROOMS) {
         const interior = new THREE.Box3(new THREE.Vector3(room.minX, 0, room.minZ), new THREE.Vector3(room.maxX, 3, room.maxZ)).expandByScalar(-0.01);
-        expect(interior.intersectsBox(passages[index]), DIE_KATHEDRALE_ENTRANCES[index].id).toBe(false);
+        expect(interior.intersectsBox(passages[index]), GROUND_ENTRANCES[index].id).toBe(false);
       }
     }
   });
@@ -338,7 +352,7 @@ describe('Die Kathedrale layout', () => {
     }
   });
 
-  it.each(DIE_KATHEDRALE_ENTRANCES.map((entrance) => [entrance.id, entrance.zone] as const))('gives the %s entrance (%s) a walkable route to the player spawn', (id, zone) => {
+  it.each(GROUND_ENTRANCES.map((entrance) => [entrance.id, entrance.zone] as const))('gives the %s entrance (%s) a walkable route to the player spawn', (id, zone) => {
     const arena = makeArena();
     for (const door of WAY_INTO[zone]) openDoor(arena, door);
     openBarrier(arena, id);
@@ -350,10 +364,10 @@ describe('Die Kathedrale layout', () => {
     const arena = makeArena();
     openPlaza(arena);
     expect(arena.wallBuys.map((wallBuy) => [wallBuy.weaponId, wallBuy.price, wallBuy.ammoPrice])).toEqual([
-      ['m14', 800, 625], ['ppsh41', 1250, 625], ['ak47', 1750, 900], ['m60', 2500, 1250],
+      ['m14', 800, 625], ['ppsh41', 1250, 625], ['ak47', 1750, 900], ['m60', 2500, 1250], ['vector', 1200, 600], ['m4a1', 1500, 750],
     ]);
     const inside = (point: THREE.Vector3): boolean => arena.wallColliders.some((box) => box.containsPoint(point));
-    for (const wallBuy of DIE_KATHEDRALE_WALL_BUYS) {
+    for (const wallBuy of DIE_KATHEDRALE_WALL_BUYS.filter((candidate) => candidate.floor === 0)) {
       const facing = new THREE.Vector3(Math.sin(wallBuy.yaw), 0, Math.cos(wallBuy.yaw));
       const position = new THREE.Vector3(wallBuy.position.x, wallBuy.position.y, wallBuy.position.z);
       expect(inside(position.clone().addScaledVector(facing, -0.03)), wallBuy.id).toBe(true);
@@ -482,12 +496,12 @@ describe('Die Kathedrale zones', () => {
   });
 
   it('gives every zone with an outer wall two entrances, and keeps every one of them inside its own zone', () => {
-    for (const zone of DIE_KATHEDRALE_ZONES) {
+    for (const zone of DIE_KATHEDRALE_BASE_ZONES) {
       const entrances = DIE_KATHEDRALE_ENTRANCES.filter((entrance) => entrance.zone === zone);
       expect(entrances, zone).toHaveLength(zone === 'nave' ? 0 : 2);
       if (zone === 'plaza') continue;
       for (const entrance of entrances) {
-        const area = entrance.id === 'chancel-sacristy' ? CHANCEL : DIE_KATHEDRALE_ZONE_AREAS[zone as Exclude<DieKathedraleZoneId, 'plaza'>];
+        const area = entrance.id === 'chancel-sacristy' ? CHANCEL : DIE_KATHEDRALE_ZONE_AREAS[zone];
         expect(entrance.z, entrance.id).toBeGreaterThan(area.minZ);
         expect(entrance.z, entrance.id).toBeLessThan(area.maxZ);
       }
@@ -532,7 +546,9 @@ describe('Die Kathedrale zones', () => {
     for (const door of ['rood-gate', 'nave-west-gate', 'nave-east-gate', 'choir-gate']) openDoor(arena, door);
     for (const id of ['narthex-east-chapel', 'chancel-sacristy']) openBarrier(arena, id);
     // From the narthex window to the back of the arms chapel, through the central nave.
-    const chapel = chaseUntilHit(arena, spawnOf(arena, 'narthex-east-chapel'), -13, naveBayCenter(4) + 2, 200);
+    const chapelCorner = { x: -13, z: -32.1 };
+    expect(isClear(arena, chapelCorner.x, chapelCorner.z, 0.42)).toBe(true);
+    const chapel = chaseUntilHit(arena, spawnOf(arena, 'narthex-east-chapel'), chapelCorner.x, chapelCorner.z, 200);
     expect(chapel.hit).toBe(true);
     // From the sacristy to the dead end under the collapse, at the top of the east aisle.
     const deadEnd = chaseUntilHit(arena, spawnOf(arena, 'chancel-sacristy'), 9, CHOIR_Z + 2.2, 200);
@@ -712,11 +728,12 @@ describe('Die Kathedrale lights and ambience', () => {
     }
   });
 
-  it('keeps candle islands local and the ambient fill low, with cold window accents allowed nearby', () => {
+  it('keeps the cathedral candle islands local and the ambient fill low, with cold window accents allowed nearby', () => {
     const { hemisphereLight, environmentIntensity } = makeArena().ambience;
     expect(hemisphereLight.intensity).toBeLessThanOrEqual(0.3);
     expect(environmentIntensity.intensity).toBeLessThanOrEqual(0.08);
-    const indoor = DIE_KATHEDRALE_LIGHT_SITES.filter((site) => site.z < NAVE.maxZ);
+    const surfaceLights = DIE_KATHEDRALE_LIGHT_SITES.filter((site) => !CATACOMB_LIGHT_SITES.includes(site));
+    const indoor = surfaceLights.filter((site) => site.z < NAVE.maxZ && site.x >= NAVE.minX && site.x <= NAVE.maxX && site.y < NAVE.aisleSpringY);
     for (const site of indoor) {
       expect(site.distance, site.id).toBeLessThanOrEqual(13);
       for (const other of indoor) {
@@ -725,10 +742,12 @@ describe('Die Kathedrale lights and ambience', () => {
         }
       }
     }
-    // The run starts in a pool of light, and every weapon on a wall has one within reach.
-    const lit = (x: number, z: number): boolean => DIE_KATHEDRALE_LIGHT_SITES.some((site) => Math.hypot(site.x - x, site.z - z) < site.distance * 0.8);
+    // The run starts in a pool of light, and every surface weapon has one within reach.
+    const lit = (x: number, z: number): boolean => surfaceLights.some((site) => Math.hypot(site.x - x, site.z - z) < site.distance * 0.8);
     expect(lit(DIE_KATHEDRALE_PLAYER_SPAWN.x, DIE_KATHEDRALE_PLAYER_SPAWN.z)).toBe(true);
-    for (const wallBuy of DIE_KATHEDRALE_WALL_BUYS) expect(lit(wallBuy.position.x, wallBuy.position.z), wallBuy.id).toBe(true);
+    for (const wallBuy of DIE_KATHEDRALE_WALL_BUYS) {
+      if (wallBuy.floor === 0) expect(lit(wallBuy.position.x, wallBuy.position.z), wallBuy.id).toBe(true);
+    }
   });
 
   it('schedules rare ambient sounds through the map cue hook, and none while time stands still', () => {

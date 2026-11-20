@@ -17,8 +17,17 @@ import {
 import { wornColor } from './ZombieGarmentWear';
 import { buildAccessoryParts } from './ZombieSkinAccessories';
 import { ZOMBIE_SKINS, type ZombieSkinDefinition, type ZombieSkinId } from './ZombieSkinCatalog';
-import { apportionShares, type ZombieSkinShare } from './ZombieSkinShares';
+import { apportionShares, type ZombieFloorLook, type ZombieSkinShare } from './ZombieSkinShares';
 import { buildStumpParts, burnAt, charColor, severedBoneRemap, severedTriangles } from './ZombieSkinDamage';
+import {
+  DRIED_BLOOD_TINT,
+  SkullSockets,
+  rigJointsOf,
+  remainsColor,
+  wasteToBones,
+  wearsRemains,
+  type ZombieRigJoints,
+} from './ZombieSkinRemains';
 import {
   ACCESSORY_BAND,
   ACCESSORY_UV,
@@ -64,12 +73,14 @@ function canBurn(band: WalkerPaletteBand): boolean {
  * vertex color multiplier, burns and stains painted the same way, severed
  * forearms cut away and accessories (and stumps) appended as triangles
  * weighted to one bone or, for long cloth, draped over the hips and thighs, so the body stays a single skinned draw sharing the original
- * texture. Returns non-indexed geometry.
+ * texture. A skeletal skin also wastes the body to its bones, which needs the
+ * rig's `joints`. Returns non-indexed geometry.
  */
 export function buildSkinnedWalkerGeometry(
   geometry: THREE.BufferGeometry,
   boneNames: readonly string[],
   skin: ZombieSkinDefinition,
+  joints?: ZombieRigJoints,
 ): THREE.BufferGeometry {
   const base = geometry.index ? geometry.toNonIndexed() : geometry;
   const body = new ZombieBodyFrame(base, boneNames, ZOMBIE_MODELS.walker.height);
@@ -131,19 +142,29 @@ export function buildSkinnedWalkerGeometry(
   write(skinWeight, 4, 0, base.getAttribute('skinWeight'), kept);
   const lostBones = severedBoneRemap(boneNames, severedLimbs);
   for (let slot = 0; slot < baseCount * 4; slot++) skinIndex[slot] = lostBones.get(skinIndex[slot]) ?? skinIndex[slot];
+  if (skin.remains) {
+    if (!joints) throw new Error('Skeletal zombie skins need the rig joints');
+    wasteToBones(position, skinIndex, skinWeight, baseCount, boneNames, joints);
+  }
 
   const tints = new Map<string, THREE.Color>();
   const bodyPoint = new THREE.Vector3();
   const burnt = new THREE.Color();
   const aged = new THREE.Color();
+  const sockets = skin.remains ? skullSockets(body, kept, uv) : null;
   for (let index = 0; index < baseCount; index++) {
     const vertex = kept[index];
     const band = walkerBandAt(uv[index * 2], uv[index * 2 + 1]);
-    const region = walkerSkinRegion(band, boneNames[body.dominantBone(vertex)]);
+    const bone = boneNames[body.dominantBone(vertex)];
+    const region = walkerSkinRegion(band, bone);
     const hex = region ? skin.regions[region] : undefined;
     const burn = skin.burns && canBurn(band) ? burnAt(body.bodyPoint(vertex, bodyPoint), skin.burns) : 0;
     let tint = WHITE;
-    if (burn > 0) {
+    if (skin.remains && wearsRemains(band)) {
+      tint = band === 'blood'
+        ? DRIED_BLOOD_TINT
+        : tintFor(remainsColor(band, bone, body.bodyPoint(vertex, bodyPoint), skin.remains, sockets, aged), band);
+    } else if (burn > 0) {
       tint = tintFor(charColor(hex !== undefined ? burnt.set(hex) : burnt.copy(bandColor(band)), burn), band);
     } else if (hex !== undefined && skin.stains) {
       tint = tintFor(wornColor(aged.set(hex), body.bodyPoint(vertex, bodyPoint), skin.stains), band);
@@ -205,6 +226,15 @@ export function buildSkinnedWalkerGeometry(
   return result;
 }
 
+/** The skull's sockets, placed on the walker's own eyes (the vertices of `kept` sampling the eyes band). */
+function skullSockets(body: ZombieBodyFrame, kept: readonly number[], uv: Float32Array): SkullSockets {
+  const eyes: THREE.Vector3[] = [];
+  kept.forEach((vertex, index) => {
+    if (walkerBandAt(uv[index * 2], uv[index * 2 + 1]) === 'eyes') eyes.push(body.bodyPoint(vertex, new THREE.Vector3()));
+  });
+  return new SkullSockets(eyes);
+}
+
 function findSkinnedMesh(root: THREE.Object3D): THREE.SkinnedMesh {
   let found: THREE.SkinnedMesh | null = null;
   root.traverse((object) => {
@@ -238,6 +268,7 @@ export function createSkinnedWalkerSource(source: ZombieModelSource, skinId: Zom
     mesh.geometry,
     mesh.skeleton.bones.map((bone) => bone.name),
     ZOMBIE_SKINS[skinId],
+    rigJointsOf(mesh),
   );
   mesh.boundingBox = bodyBounds;
   const garmentAtlas = mesh.geometry.userData.garmentAtlas === true;
@@ -258,11 +289,13 @@ export function createSkinnedWalkerSource(source: ZombieModelSource, skinId: Zom
   return skinned;
 }
 
-/** How a map dresses its horde (see `ZombieArena.zombieSkins`, `zombieSkinShares` and `zombieEyes`). */
+/** How a map dresses its horde (see `ZombieArena.zombieSkins`, `zombieSkinShares`, `zombieFloorLook` and `zombieEyes`). */
 export interface ZombieHordeLook {
   readonly skins?: readonly ZombieSkinId[];
   /** Weighted looks; when present they replace `skins`. */
   readonly skinShares?: readonly ZombieSkinShare[];
+  /** A floor's own walkers, dressed into a reserve of their own. */
+  readonly floorLook?: ZombieFloorLook;
   readonly eyes?: ZombieEyeColors;
   /** See `ZombieModelSource.surfaceDetail`. */
   readonly surfaceDetail?: boolean;
@@ -290,25 +323,29 @@ function weightedWalkerLooks(
  * Zombie sources dressed for a map: the walker becomes one look per listed
  * skin, dealt in turn across its pool (or rolled per spawn by weight with
  * `skinShares`), and every model takes the map's eye colors and the surface
- * detail flag. Missing assets (procedural fallback) keep their own look;
+ * detail flag. A `floorLook` adds a walker reserve of its own
+ * (`floorWalkers`). Missing assets (procedural fallback) keep their own look;
  * without a look the sources pass through untouched.
  */
 export function dressZombieSources(
   sources: Readonly<Record<ZombieModelId, ZombieModelSource | null>>,
-  { skins = [], skinShares = [], eyes, surfaceDetail = false }: ZombieHordeLook = {},
+  { skins = [], skinShares = [], floorLook, eyes, surfaceDetail = false }: ZombieHordeLook = {},
 ): ZombieModelSources {
-  if (skins.length === 0 && skinShares.length === 0 && !eyes && !surfaceDetail) return sources;
-  const withLook = (source: ZombieModelSource): ZombieModelSource =>
-    (eyes || surfaceDetail ? { ...source, ...(eyes && { eyes }), ...(surfaceDetail && { surfaceDetail }) } : source);
+  if (skins.length === 0 && skinShares.length === 0 && !floorLook && !eyes && !surfaceDetail) return sources;
+  const withEyes = (lookEyes: ZombieEyeColors | undefined) => (source: ZombieModelSource): ZombieModelSource =>
+    (lookEyes || surfaceDetail ? { ...source, ...(lookEyes && { eyes: lookEyes }), ...(surfaceDetail && { surfaceDetail }) } : source);
+  const withLook = withEyes(eyes);
   const dressWalker = (walker: ZombieModelSource): ZombieModelSource | ZombieModelSource[] => {
     if (skinShares.length > 0) return weightedWalkerLooks(walker, skinShares, withLook);
     if (skins.length > 0) return skins.map((skinId) => withLook(createSkinnedWalkerSource(walker, skinId)));
     return withLook(walker);
   };
-  const dressed: ZombieModelSources = {};
+  const dressed: Partial<Record<ZombieModelId, ZombieModelSource | ZombieModelSource[] | null>> = {};
   for (const modelId of Object.keys(sources) as ZombieModelId[]) {
     const source = sources[modelId];
     dressed[modelId] = !source ? source : modelId === 'walker' ? dressWalker(source) : withLook(source);
   }
-  return dressed;
+  if (!floorLook || !sources.walker) return dressed;
+  const looks = weightedWalkerLooks(sources.walker, floorLook.skinShares, withEyes(floorLook.eyes ?? eyes));
+  return { ...dressed, floorWalkers: { floor: floorLook.floor, looks } };
 }

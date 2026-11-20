@@ -11,15 +11,13 @@ const RINGING_PROXIMITY = 0.55;
  * Procedural grenade blast, played into `output` (already panned, muffled
  * and attenuated by the caller): the supersonic crack, a lowpassed boom
  * that sweeps down as it rolls away, a sub-bass thump felt more than heard,
- * fragments and debris rattling down, a long rumbling tail and, when it
- * went off close (`proximity` near 1), the ears ringing afterwards.
+ * fragments and debris rattling down, and a long rumbling tail.
  */
 export function playProceduralExplosion(
   ctx: AudioContext,
   output: AudioNode,
   noise: AudioBuffer,
   volume: number,
-  proximity: number,
 ): void {
   const t = ctx.currentTime;
   noiseBurst(ctx, output, noise, t, 'highpass', 1800, 1800, volume * 0.55, 0.07);
@@ -32,10 +30,6 @@ export function playProceduralExplosion(
     const pitch = 1400 + Math.random() * 3200;
     noiseBurst(ctx, output, noise, at, 'bandpass', pitch, pitch, volume * (0.05 + Math.random() * 0.07), 0.04 + Math.random() * 0.05);
   }
-  if (proximity > RINGING_PROXIMITY) {
-    const ringing = (proximity - RINGING_PROXIMITY) / (1 - RINGING_PROXIMITY);
-    tone(ctx, output, t + 0.15, 'sine', 3300, 3150, 0.05 * ringing, 2.4);
-  }
 }
 
 /** A sampled blast: the file as recorded, its loudness set by the caller's bus. */
@@ -47,6 +41,13 @@ export function playSampledExplosion(ctx: AudioContext, output: AudioNode, sampl
   source.buffer = sample;
   source.connect(gain);
   source.start();
+}
+
+/** Ears ringing after a nearby blast, sampled or procedural. */
+export function playExplosionRinging(ctx: AudioContext, output: AudioNode, proximity: number): void {
+  if (proximity <= RINGING_PROXIMITY) return;
+  const ringing = (proximity - RINGING_PROXIMITY) / (1 - RINGING_PROXIMITY);
+  tone(ctx, output, ctx.currentTime + 0.15, 'sine', 3300, 3150, 0.05 * ringing, 2.4);
 }
 
 /** The pin coming out of the fuse: a bright metallic ping over a dry click. */

@@ -149,12 +149,26 @@ export interface ZombieSkinStains {
 /** A forearm lost below the elbow; the upper arm ends in a charred stump. */
 export type ZombieSeveredLimb = 'leftForearm' | 'rightForearm';
 
+/**
+ * Centuries in the grave: limbs and waist wasted down to the bone, every bare
+ * part aged bone with grime and scraps of dried tissue, empty eye sockets
+ * (see ZombieSkinRemains). The rig, and with it every animation, is unchanged.
+ */
+export interface ZombieSkinRemains {
+  /** Aged bone of the skull, hands and every bare part. */
+  readonly bone: number;
+  /** 0..1: roughly the share of the bones still clad in dried tissue. */
+  readonly tissue: number;
+  readonly seed: number;
+}
+
 export interface ZombieSkinDefinition {
   readonly regions: Readonly<Partial<Record<ZombieSkinRegion, number>>>;
   readonly accessories: readonly ZombieAccessory[];
   readonly burns?: ZombieSkinBurns;
   readonly stains?: ZombieSkinStains;
   readonly severedLimbs?: readonly ZombieSeveredLimb[];
+  readonly remains?: ZombieSkinRemains;
 }
 
 const BOOT_LEATHER = 0x24201c;
@@ -172,6 +186,10 @@ const OLD_LEATHER = 0x3a2a1d;
 const ROPE = 0x7f6f50;
 /** Tint for brocades, whose pattern bakes its own colors: near-white, a little aged. */
 const BAKED = 0xe6dfd2;
+/** Die Kathedrale crypt: grey-brown burial linen, rotten cloth and rusted mail. */
+const SHROUD = 0x5c5547;
+const GRAVE_ROT = 0x302a23;
+const RUSTED_MAIL = 0x4f4134;
 
 export const ZOMBIE_SKINS = {
   /** Civilian left behind by the evacuation: worn trousers and shoes. */
@@ -451,6 +469,47 @@ export const ZOMBIE_SKINS = {
       { kind: 'crozier', metal: 0x9a7c3c },
     ],
     stains: { coverage: 0.24, seed: 241 },
+  },
+  /**
+   * Crypt dead in a burial shroud: torn grey linen to the ankles and a hood
+   * framing the skull, the rest of the old clothes rotted dark.
+   */
+  cryptShrouded: {
+    regions: { tunic: SHROUD, thighs: GRAVE_ROT, shins: GRAVE_ROT },
+    accessories: [
+      { kind: 'robe', cloth: SHROUD, hem: 'ankle', tatter: 0.12 },
+      { kind: 'hood', cloth: 0x4d473b },
+    ],
+    stains: { coverage: 0.42, seed: 251 },
+    remains: { bone: 0x9a8f74, tissue: 0.18, seed: 257 },
+  },
+  /**
+   * Crypt knight: a rusted mail coif and hauberk skirt under the rags of a
+   * surcoat whose cross has faded to brown, a rotten sword belt.
+   */
+  cryptKnight: {
+    regions: { tunic: RUSTED_MAIL, thighs: GRAVE_ROT, shins: GRAVE_ROT },
+    accessories: [
+      { kind: 'robe', cloth: RUSTED_MAIL, hem: 'knee', tatter: 0.06, surface: 'chainmail' },
+      { kind: 'coif', mail: RUSTED_MAIL },
+      { kind: 'surcoat', cloth: 0x5e5546, cross: 0x4a1a14 },
+      { kind: 'swordBelt', leather: 0x2a1f17, buckle: 0x5a4630 },
+    ],
+    stains: { coverage: 0.38, seed: 263 },
+    remains: { bone: 0x8f8268, tissue: 0.12, seed: 269 },
+  },
+  /**
+   * Crypt noble: a shroud under the remains of a dark crimson burial cloak,
+   * more tissue still on the bones.
+   */
+  cryptNoble: {
+    regions: { tunic: 0x3a1c1c, thighs: GRAVE_ROT, shins: GRAVE_ROT },
+    accessories: [
+      { kind: 'robe', cloth: 0x4f493c, hem: 'ankle', tatter: 0.1 },
+      { kind: 'cloak', cloth: 0x3a1618, hem: 'shin' },
+    ],
+    stains: { coverage: 0.4, seed: 271 },
+    remains: { bone: 0xa29679, tissue: 0.24, seed: 277 },
   },
 } as const satisfies Record<string, ZombieSkinDefinition>;
 

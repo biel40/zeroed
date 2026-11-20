@@ -27,7 +27,7 @@ interface MusicTrackDef {
   readonly path: string;
   readonly volume: number;
   readonly loop: boolean;
-  /** Loaded only when first played, never with the rest: a duel's theme that may not be shipped yet. */
+  /** Skip global preload and load the track when its playback is requested. */
   readonly lazy?: boolean;
 }
 
@@ -67,12 +67,14 @@ const MUSIC_TRACKS: Record<MusicTrackName, MusicTrackDef> = {
     path: ZOMBIES_MUSIC_PATHS.gameplay,
     volume: 0.2,
     loop: true,
+    lazy: true,
   },
   station33_theme: {
     name: 'station33_theme',
     path: ZOMBIES_MUSIC_PATHS.station33,
     volume: 0.15,
     loop: true,
+    lazy: true,
   },
   captain_ussr_theme: {
     name: 'captain_ussr_theme',

@@ -57,6 +57,20 @@ export interface StairRamp {
   readonly top: { readonly x: number; readonly y: number; readonly z: number };
   readonly bottom: { readonly x: number; readonly y: number; readonly z: number };
   readonly topApproach?: { readonly x: number; readonly y: number; readonly z: number };
+  readonly curve?: StairCurve;
+}
+
+/** A winding stair can have several walkable flights at the same horizontal position. */
+export interface StairCurve {
+  groundAt(x: number, z: number, feetY: number): number | null;
+  waypoint(x: number, y: number, z: number, targetX: number, targetY: number, targetZ: number, out: THREE.Vector3): void;
+}
+
+/** The surface at these coordinates, using the previous feet height to distinguish overlapping flights. */
+export function stairRampGroundAt(ramp: StairRamp, x: number, z: number, feetY: number): number | null {
+  const { min, max } = ramp.box;
+  if (x < min.x || x > max.x || z < min.z || z > max.z) return null;
+  return ramp.curve ? ramp.curve.groundAt(x, z, feetY) : stairGroundY(ramp, x, z);
 }
 
 /** Ground height on a linear stair ramp, clamped to its two landings. */
@@ -98,6 +112,7 @@ export class PlayerController {
   private wallColliders: readonly THREE.Box3[] = [];
   private bodyColliders: Iterable<PlayerBodyCollider> = [];
   private floorTransitions: readonly FloorTransitionZone[] = [];
+  private windingStairs: readonly StairRamp[] = [];
   private currentFloor = 0;
   private groundY = EYE_HEIGHT;
   private targetY = EYE_HEIGHT;
@@ -162,6 +177,7 @@ export class PlayerController {
   /** Replace stair transition triggers. */
   public setFloorTransitions(zones: readonly FloorTransitionZone[]): void {
     this.floorTransitions = zones;
+    this.windingStairs = [...new Set(zones.flatMap(({ ramp }) => ramp?.curve ? [ramp] : []))];
   }
 
   /** Snap player to a spawn point and floor (used on restart). */
@@ -332,11 +348,15 @@ export class PlayerController {
     );
 
     // Resolve each axis independently so the player can slide around walls and bodies.
-    if (this.wouldIntersectWall(nextX, this.rig.position.z)
+    const feetY = this.groundY - EYE_HEIGHT;
+    const windingFlight = this.windingFlightAtFeet(feetY);
+    if ((windingFlight && stairRampGroundAt(windingFlight, nextX, this.rig.position.z, feetY) === null)
+      || this.wouldIntersectWall(nextX, this.rig.position.z)
       || this.wouldIntersectBody(this.rig.position.x, this.rig.position.z, nextX, this.rig.position.z)) {
       nextX = this.rig.position.x;
     }
-    if (this.wouldIntersectWall(nextX, nextZ)
+    if ((windingFlight && stairRampGroundAt(windingFlight, nextX, nextZ, feetY) === null)
+      || this.wouldIntersectWall(nextX, nextZ)
       || this.wouldIntersectBody(nextX, this.rig.position.z, nextX, nextZ)) {
       nextZ = this.rig.position.z;
     }
@@ -346,14 +366,16 @@ export class PlayerController {
     this.rig.position.z = nextZ;
     this.knockback.multiplyScalar(Math.exp(-KNOCKBACK_DECAY * dt));
 
-    let ramp: StairRamp | undefined;
+    let rampGround: number | null = null;
     for (const zone of this.floorTransitions) {
-      if (zone.ramp && this.containsXZ(zone.ramp.box, nextX, nextZ)) { ramp = zone.ramp; break; }
+      if (!zone.ramp) continue;
+      rampGround = stairRampGroundAt(zone.ramp, nextX, nextZ, feetY);
+      if (rampGround !== null) break;
     }
-    if (ramp) {
+    if (rampGround !== null) {
       // The camera follows the physical slope exactly, so stopping or turning
       // on the stairs cannot produce delayed vertical motion or a snap.
-      this.groundY = stairGroundY(ramp, nextX, nextZ) + EYE_HEIGHT;
+      this.groundY = rampGround + EYE_HEIGHT;
       this.targetY = this.groundY;
     }
 
@@ -368,7 +390,7 @@ export class PlayerController {
         break;
       }
     }
-    if (!ramp) this.groundY = damp(this.groundY, this.targetY, FLOOR_BLEND_SPEED, dt);
+    if (rampGround === null) this.groundY = damp(this.groundY, this.targetY, FLOOR_BLEND_SPEED, dt);
     if (jumpPressed && wasStanding && this.currentStance === 'standing' && !this.downedCamera
       && !this.isDying && this.jumpOffset === 0) this.jumpVelocity = JUMP_SPEED;
     if (this.jumpVelocity !== 0 || this.jumpOffset > 0) {
@@ -428,7 +450,13 @@ export class PlayerController {
     return false;
   }
 
-  private containsXZ(box: THREE.Box3, x: number, z: number): boolean {
-    return x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z;
+  /** Moving off a winding flight is permitted at either level landing. */
+  private windingFlightAtFeet(feetY: number): StairRamp | undefined {
+    const position = this.rig.position;
+    for (const ramp of this.windingStairs) {
+      if (feetY <= ramp.bottom.y + 0.02 || feetY >= ramp.top.y - 0.02) continue;
+      if (stairRampGroundAt(ramp, position.x, position.z, feetY) !== null) return ramp;
+    }
+    return undefined;
   }
 }

@@ -433,8 +433,7 @@ export class HUD {
   /**
    * Initial picker: Zombies is the only mode, so the player chooses its arena
    * directly. Locked premium maps open the account dialog. Work-in-progress
-   * maps show a disabled WIP card until the player can launch them on a
-   * development server.
+   * maps show a disabled WIP card while the player lacks access.
    */
   public showMapSelect(
     onSelect: (mapId: ZombieMapId) => void,

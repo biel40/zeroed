@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AudioSystem } from '../src/audio/AudioSystem';
 import { MusicManager, ZOMBIES_MUSIC_PATHS } from '../src/audio/MusicManager';
+import { GRENADE_DEFINITIONS } from '../src/config/grenades';
 import { WEAPON_DEFINITIONS } from '../src/config/weapons';
 import { Game } from '../src/core/Game';
 
@@ -558,6 +559,49 @@ describe('AudioSystem sampled effects', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('plays the F-1 sample from its position and adds ringing only for a nearby blast', async () => {
+    const audio = new AudioSystem() as any;
+    const sample = {} as AudioBuffer;
+    const source = { buffer: null as AudioBuffer | null, connect: vi.fn(), start: vi.fn() };
+    const gain = {
+      gain: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      connect: vi.fn(),
+    };
+    const oscillator = {
+      frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      connect: vi.fn(), start: vi.fn(), stop: vi.fn(),
+    };
+    const context = {
+      ctx: {
+        currentTime: 2,
+        createBufferSource: () => source,
+        createGain: () => gain,
+        createOscillator: vi.fn(() => oscillator),
+      },
+      master: {},
+    };
+    vi.spyOn(audio, 'context').mockReturnValue(context);
+    const bus = {};
+    const spatialBus = vi.spyOn(audio, 'spatialBus').mockReturnValue(bus);
+    const loadSample = vi.spyOn(audio, 'loadSample').mockResolvedValue(sample);
+    const config = GRENADE_DEFINITIONS.f1.audio;
+    const cue = { pan: 0.4, attenuation: 0.5, muffle: 0.2 };
+
+    audio.preloadGrenadeAudio(config);
+    await loadSample.mock.results[0].value;
+
+    audio.playGrenadeExplosion(config, cue, 0);
+    expect(context.ctx.createOscillator).not.toHaveBeenCalled();
+
+    audio.playGrenadeExplosion(config, cue, 1);
+    expect(loadSample.mock.calls).toEqual([[expect.stringContaining('assets/audio/f1_explosion.mp3')]]);
+    expect(spatialBus).toHaveBeenCalledWith(context, cue, 0.3);
+    expect(source.buffer).toBe(sample);
+    expect(source.start).toHaveBeenCalledTimes(2);
+    expect(context.ctx.createOscillator).toHaveBeenCalledOnce();
+    expect(oscillator.start).toHaveBeenCalledWith(2.15);
   });
 
   it.each([

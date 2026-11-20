@@ -3,8 +3,10 @@
 Burned Mansion sigue abierto, en individual y cooperativo, sin cuenta. Los
 mapas con `product` en [el registro](../../src/config/zombieMaps.ts),
 actualmente Station 33 y Die Kathedrale, aparecen con candado mientras la cuenta
-no los tenga. Die Kathedrale, ademas, sigue en desarrollo: queda bloqueada como
-WIP para todos, testers incluidos.
+no los tenga. Die Kathedrale sigue en desarrollo y aparece como WIP para los
+testers de beta. Las cuentas de desarrollo con permiso de prueba pueden jugarla
+desde el menu y por enlace directo. La [API de cuentas](../../cloudflare/api/README.md)
+concede ese permiso específico al consultar una sesión autenticada.
 
 Los testers ya no se comprueban en el cliente: tienen una concesion `*` en la
 [API de cuentas](../../cloudflare/api/README.md), que incluye todo el contenido
@@ -31,8 +33,8 @@ cuenta, arriba a la derecha del menu, muestra la inicial y el correo, con la
 placa "BETA TESTER" en cuentas de beta (o "Iniciar sesion"). Si falta espacio,
 el correo se acorta con puntos suspensivos. El boton abre el dialogo para
 entrar o cerrar sesion, donde se ve la direccion completa de la cuenta.
-`?map=station-33` sin permiso y `?map=die-kathedrale` siempre muestran el menu
-con la tarjeta correspondiente bloqueada.
+Los enlaces `?map=station-33` y `?map=die-kathedrale` comprueban el mismo acceso
+que el menu. Si falta el permiso, muestran la tarjeta correspondiente bloqueada.
 
 Limites: el codigo de los mapas premium sigue en el paquete del juego, asi que
 un cliente modificado puede abrirlos. Como el registro no verifica el correo,
@@ -58,4 +60,6 @@ agradecimiento y jugar a Station 33 (Die Kathedrale sigue WIP); recargar; cerrar
 comprobar que una contraseña distinta se rechaza y la correcta entra; probar
 Google con una cuenta de tester; pedir el
 enlace de recuperacion, abrirlo y guardar otra contraseña; probar un correo sin
-concesion. Repetir en movil, PWA instalada y app Android.
+concesion. Entrar con cada cuenta de desarrollo, abrir Die Kathedrale desde el
+menu, salir de la partida y cerrar sesion para comprobar que vuelve el candado
+WIP. Repetir en movil, PWA instalada y app Android.

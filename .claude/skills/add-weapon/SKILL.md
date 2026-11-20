@@ -114,6 +114,7 @@ No hay que tocar el modelo.
 - Anade el id a `STANDARD_FIREARMS` de `tests/headshotRewards.test.ts` y al
   pool esperado de `tests/mysteryBox.test.ts` (la matematica de `pickWeighted`
   usa una rueda fija y no cambia).
-- `npx tsc --noEmit` y `npx vitest run`.
+- Ejecuta `npm run typecheck` y valida la rama con `npm run test:feature`.
+  Durante la iteracion, sigue la [validacion del repositorio](../../../AGENTS.md#validacion-automatica).
 - Documenta en `docs/GAME_SYSTEMS.md` / `docs/STATION_33.md` solo si cambia
   el contenido de un mapa (que arma hay en pared y a que precio).

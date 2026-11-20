@@ -97,6 +97,16 @@ describe('Zombies map selection flow', () => {
     expect(css).toMatch(/\.map-card\[data-locked='true'\] \.map-card-lock \{\s*display: flex;/);
   });
 
+  it('ships one WebP cover per menu card', () => {
+    const covers = [...html.matchAll(/<image class="map-card-image" href="\.\/(assets\/maps\/[^"]+)"/g)];
+    expect(covers).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
+    for (const [, path] of covers) {
+      expect(path).toMatch(/\.webp$/);
+      const cover = readFileSync(new URL(`../public/${path}`, import.meta.url));
+      expect(cover.toString('ascii', 8, 12)).toBe('WEBP');
+    }
+  });
+
   it('lists Burned Mansion for everyone and both premium maps as single-player maps', () => {
     expect(ZOMBIE_MAPS['burned-mansion']).toMatchObject({ visible: true, coop: true });
     expect(ZOMBIE_MAPS['station-33']).toMatchObject({ visible: true, product: 'map.station-33', coop: false });
@@ -113,7 +123,7 @@ describe('Zombies map selection flow', () => {
     expect(html.match(/data-map-lock-label/g)).toHaveLength(Object.keys(ZOMBIE_MAPS).length);
     for (const strings of [en, es, ca]) expect(strings['map.wip']).toBe('WIP');
     expect(css).toMatch(/.map-card:disabled {[^}]*cursor: not-allowed;/);
-    // `vite build` replaces DEV with false, so no production build can release a WIP map.
+    // Production builds cannot opt in globally through this flag.
     expect(mapRelease).toMatch(/WIP_MAPS_ENABLED: boolean = import.meta.env.DEV && import.meta.env.VITE_WIP_MAPS === 'true'/);
   });
 
@@ -235,6 +245,22 @@ describe('Zombies map selection flow', () => {
       expect(cathedral.slots['[data-map-action]'].textContent).toBe('WIP');
       expect(station.dataset.wip).toBe('false');
       expect(mansion.dataset.wip).toBe('false');
+
+      const preview: EntitlementProvider = { ...noProducts, canPreview: (product) => product === 'map.die-kathedrale' };
+      ui.showMapSelect((mapId) => selected.push(mapId), preview, false);
+      expect(cathedral.dataset.locked).toBe('false');
+      expect(cathedral.dataset.wip).toBe('false');
+      expect(cathedral.disabled).toBe(false);
+      expect(cathedral.slots['[data-map-action]'].textContent).toBe('PLAY');
+      expect(station.dataset.locked).toBe('true');
+      cathedral.onclick?.();
+      expect(selected).toEqual(['die-kathedrale']);
+      selected.length = 0;
+
+      ui.showMapSelect((mapId) => selected.push(mapId), noProducts, false);
+      expect(cathedral.dataset.wip).toBe('true');
+      expect(cathedral.disabled).toBe(true);
+      expect(cathedral.onclick).toBeNull();
 
       // The local opt-in releases it as a regular premium map.
       ui.showMapSelect((mapId) => selected.push(`wip:${mapId}`), allProducts, true);
