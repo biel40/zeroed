@@ -245,11 +245,51 @@ export interface WindShotLook {
 }
 
 /**
+ * Gust a full draw drives down the shot line when it strikes a body: it
+ * shoves the bodies queued behind the burst further along the line, without
+ * damage. A cone from the impact along the shot, starting where the burst
+ * ends.
+ */
+export interface WindConeGustConfig {
+  /** Reach of the gust beyond the burst's edge, metres. */
+  readonly length: number;
+  /** Half angle of the cone round the shot line, radians. */
+  readonly halfAngle: number;
+  /** Bodies it can shove, nearest first. */
+  readonly maxTargets: number;
+  /** Shove at the burst's edge, metres. */
+  readonly pushDistance: number;
+  /** Share of `pushDistance` left at the far end of the gust. */
+  readonly edgePush: number;
+}
+
+/**
+ * What a full draw does to a wind shot: each value multiplies the base
+ * config's (1 keeps it); a partial draw interpolates linearly from 1, so a
+ * quick shot is the base config. Gameplay only: the look follows `intensity`.
+ */
+export interface WindChargeScale {
+  /** Direct damage on the body struck. */
+  readonly damage: number;
+  readonly burstDamage: number;
+  readonly burstRadius: number;
+  readonly pushDistance: number;
+  readonly pushSeconds: number;
+  readonly projectileSpeed: number;
+  readonly maxTargets: number;
+  /** Strength of every wind effect (trail, arrowhead, burst). */
+  readonly intensity: number;
+  /** Gust a full draw (and only a full one) drives behind a body struck; null for none. */
+  readonly gust: WindConeGustConfig | null;
+}
+
+/**
  * Condensed wind shot (EXHALIS), Zombies mode only: a fast, visible gust
  * that strikes the first body or wall on its line and bursts there,
  * shoving every zombie around the impact away from the shooter. Crowd
  * control first: the shove opens room, the damage only softens. Every
- * value is data, so a stronger variant of the weapon is another config.
+ * value is data, so a stronger variant of the weapon is another config;
+ * the values here are a quick shot's, `charged` scales a drawn one.
  */
 export interface WindWeaponConfig {
   /** Visible travel speed, m/s. */
@@ -268,7 +308,20 @@ export interface WindWeaponConfig {
   readonly edgePush: number;
   /** Seconds a shove lasts. */
   readonly pushSeconds: number;
+  /** How a drawn shot grows towards a full draw (see `WeaponDefinition.charge`). */
+  readonly charged: WindChargeScale;
   readonly look: WindShotLook;
+}
+
+/**
+ * Hold-to-draw trigger: pressing starts the draw, releasing looses one shot
+ * carrying the charge reached (0 for a quick tap .. 1), which grows linearly
+ * and stops at full. Holding never fires. What the charge does is the
+ * weapon's own config (`WindWeaponConfig.charged`).
+ */
+export interface ChargeShotConfig {
+  /** Seconds of drawing from no charge to a full one. */
+  readonly fullSeconds: number;
 }
 
 export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal' | 'drum';
@@ -526,6 +579,8 @@ export interface WeaponDefinition {
   readonly flame?: FlameWeaponConfig;
   /** Condensed wind shot the mode resolves itself, instead of ballistics. */
   readonly wind?: WindWeaponConfig;
+  /** Hold-to-draw trigger; absence fires on the press. */
+  readonly charge?: ChargeShotConfig;
   readonly recoil: RecoilConfig;
   readonly spread: SpreadConfig;
   /** Full-auto barrel overheating; absence means the barrel never heats. */
@@ -557,6 +612,10 @@ export type WeaponEventType =
   | 'reloadEnd'
   | 'boltStart'
   | 'boltEnd'
+  /** A hold-to-draw weapon started drawing. */
+  | 'chargeStart'
+  /** Its draw reached full charge. */
+  | 'chargeFull'
   | 'fireModeChanged';
 
 export type WeaponEvent =

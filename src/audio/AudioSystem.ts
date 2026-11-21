@@ -161,7 +161,7 @@ const RELOAD_PROFILES: Record<ReloadStyle, ReloadProfile> = {
 export type AmbientCueSound =
   | 'pa-crackle' | 'distant-train' | 'power-dip' | 'metal-echo' | 'machinery'
   | 'wood-creak' | 'distant-knock' | 'wind-gust' | 'ember-crackle' | 'distant-howl' | 'forge-wail'
-  | 'forge-surge' | 'forge-discharge' | 'water-drip' | 'stone-settle';
+  | 'forge-surge' | 'forge-discharge' | 'water-drip' | 'stone-settle' | 'tower-bell';
 
 /** What to play for a map ambient event; `sampleFile` (in `assets/audio/`) replaces the procedural sound. */
 export interface AmbientCuePlayback {
@@ -933,11 +933,31 @@ export class AudioSystem {
     this.sweep(0.02, 'sine', 1300, 1900, volume * 0.035, 0.22);
   }
 
-  /** A wind shot bursting: a soft air thump and a gust that rolls away. */
-  public playWindImpact(): void {
-    this.sweep(0, 'sine', 95, 40, 0.42, 0.24);
-    this.tick(0, 520, 0.32, 0.8, 0.32);
-    this.scrape(0.02, 1600, 280, 0.22, 0.4);
+  /**
+   * A wind shot bursting: a soft air thump and a gust that rolls away.
+   * `charge` (0..1, how far the shot was drawn) deepens the thump, lengthens
+   * the gust and, near a full draw, adds a low pressure boom under it.
+   */
+  public playWindImpact(charge = 0): void {
+    const c = Math.min(1, Math.max(0, charge));
+    this.sweep(0, 'sine', 95 - 20 * c, 40 - 12 * c, 0.42 + 0.14 * c, 0.24 + 0.12 * c);
+    this.tick(0, 520 - 140 * c, 0.32 + 0.08 * c, 0.8, 0.32 + 0.16 * c);
+    this.scrape(0.02, 1600, 280 - 80 * c, 0.22 + 0.1 * c, 0.4 + 0.3 * c);
+    if (c > 0.6) this.sweep(0.015, 'triangle', 62, 28, 0.3 * (c - 0.6) / 0.4, 0.5);
+  }
+
+  /** A hold-to-draw bow starts drawing: the limbs' low wooden creak and the string's tension. */
+  public playBowDraw(): void {
+    this.tick(0, 180, 0.12, 2.5, 0.22);
+    this.sweep(0.02, 'triangle', 140, 190, 0.05, 0.35);
+    this.scrape(0, 900, 420, 0.05, 0.4);
+  }
+
+  /** The draw is full: a restrained, airy rising tone, like wind caught in a bottle. */
+  public playBowFullDraw(): void {
+    this.sweep(0, 'sine', 620, 930, 0.07, 0.18);
+    this.sweep(0.06, 'sine', 930, 1240, 0.04, 0.22);
+    this.scrape(0, 2600, 1800, 0.04, 0.25);
   }
 
   /** Arc weapon shot: bright descending zap with a short high sizzle. */
@@ -1934,7 +1954,18 @@ export class AudioSystem {
       case 'forge-discharge': this.playForgeDischarge(output, t); break;
       case 'water-drip': this.playWaterDrip(output, t); break;
       case 'stone-settle': this.playStoneSettle(output, t); break;
+      case 'tower-bell': this.playTowerBell(audio.ctx, output, t); break;
     }
+  }
+
+  /** One bronze bell strike: the high partials fall away before the hum. */
+  private playTowerBell(ctx: AudioContext, output: AudioNode, at: number): void {
+    this.toneTo(ctx, output, at, 'sine', 110, 0.14, 6.5);
+    this.toneTo(ctx, output, at, 'sine', 220, 0.24, 5.2);
+    this.toneTo(ctx, output, at, 'sine', 264, 0.13, 3.5);
+    this.toneTo(ctx, output, at, 'sine', 331, 0.08, 2.6);
+    this.toneTo(ctx, output, at, 'sine', 450, 0.12, 2);
+    this.toneTo(ctx, output, at, 'sine', 612, 0.08, 0.85);
   }
 
   /** Two or three drops falling into a puddle far down a vault: a falling plink each, ringing a little. */

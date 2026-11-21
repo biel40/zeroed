@@ -4,6 +4,8 @@ import { resetSettings, updateSettings } from '../src/core/PlayerSettings';
 import { actionKey, doorPrompt, wallBuyPrompt } from '../src/ui/InteractionPrompts';
 import { bindInteractionPromptVisibility, interactionPromptContent } from '../src/ui/InteractionPromptView';
 import { PointDoor } from '../src/zombies/doors/PointDoor';
+import { MANSION_DOORS } from '../src/zombies/maps/BurnedMansionConfig';
+import { DIE_KATHEDRALE_DOORS } from '../src/zombies/maps/DieKathedraleConfig';
 import { STATION33_DOORS } from '../src/zombies/maps/Station33Config';
 
 describe('interaction prompt presentation', () => {
@@ -60,9 +62,11 @@ describe('interaction prompt presentation', () => {
     expect(interactionPromptContent(doorPrompt(door, true)).action?.key).toBe('USE');
   });
 
-  it.each(LANGUAGES)('shows translated Station 33 destinations in %s', (language) => {
+  it.each(LANGUAGES)('shows every map door destination in %s', (language) => {
     setLanguage(language);
-    for (const config of STATION33_DOORS) {
+    const configs = [...MANSION_DOORS, ...STATION33_DOORS, ...DIE_KATHEDRALE_DOORS];
+    for (const config of configs) {
+      if ('prompt' in config && config.prompt) continue;
       const nameKey = `door.${config.id}`;
       expect(isTranslationKey(nameKey)).toBe(true);
       if (!isTranslationKey(nameKey)) continue;

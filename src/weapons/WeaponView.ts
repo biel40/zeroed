@@ -194,6 +194,11 @@ export interface BuiltProcedural {
   openBolt?: THREE.Object3D;
   /** Weapon-specific moving parts the builder animates itself from the weapon state. */
   liveParts?: ViewModelLiveParts;
+  /**
+   * Part the right hand's resting grip rides (the EXHALIS draw handle): its
+   * anchor is read in this part's frame, which matches the root's at rest.
+   */
+  rightGrip?: THREE.Object3D;
 }
 
 /**
@@ -205,7 +210,7 @@ export interface ViewModelLiveParts {
   /** `reloadGlow` is the reload animator's 0..1 energy spin-up. */
   update(dt: number, weapon: Weapon, reloadGlow: number): void;
   reset(): void;
-  /** A shot just left the weapon (the EXHALIS limbs snap and its wind arrow is loosed). */
+  /** A shot just left the weapon (the EXHALIS limbs snap and its arrow is loosed). */
   onShot?(): void;
   /** A flame weapon's parts (its core crystal) in a finish's look; null restores their own. */
   setFlameLook?(look: FlameShotLook | null): void;
@@ -1289,6 +1294,7 @@ export class WeaponView {
     this.hipPosition = new THREE.Vector3(view.hip[0], view.hip[1], view.hip[2]);
 
     let reloadParts: Partial<ReloadParts> = {};
+    let rightGrip: THREE.Object3D | null = null;
     if (model && view.modelLength !== undefined && view.modelYaw !== undefined) {
       const attached = this.attachGlbModel(model, view);
       this.adsPosition = new THREE.Vector3(view.ads[0], -attached.sightY + view.ads[1], view.ads[2]);
@@ -1317,13 +1323,14 @@ export class WeaponView {
       }
       this.liveParts = built.liveParts ?? null;
       reloadParts = built.reloadParts ?? {};
+      rightGrip = built.rightGrip ?? null;
     }
     this.root.add(this.muzzle, this.ejectionPort);
 
     this.hands = new WeaponHands(
       view.hands,
       this.root,
-      { magazine: reloadParts.magazine ?? null, handle: reloadParts.handle ?? null },
+      { magazine: reloadParts.magazine ?? null, handle: reloadParts.handle ?? null, rightGrip },
       view.reloadAnim ?? null,
       definition.boltAction,
       // ADS centers the camera on the sight line: root y = sightY.

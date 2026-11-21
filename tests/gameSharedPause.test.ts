@@ -24,6 +24,7 @@ function stubGame(sharedSimulation: boolean, paused: boolean): { game: Stub; wea
     update: vi.fn(),
     inspect: vi.fn(),
     cancelInspect: vi.fn(),
+    cancelCharge: vi.fn(),
     pendingEvents: [],
     clearEvents: vi.fn(),
     currentSpread: () => 0,
@@ -230,6 +231,39 @@ describe('weapon inspection input', () => {
     const menu = stubGame(true, true);
     prototype.frame.call(menu.game);
     expect(menu.weapon.cancelInspect).toHaveBeenCalled();
+  });
+});
+
+describe('bow draw interruption', () => {
+  it('drops the draw while the single-player match is paused, so resuming never looses it', () => {
+    const { game, weapon } = stubGame(false, true);
+    prototype.frame.call(game);
+    expect(weapon.cancelCharge).toHaveBeenCalled();
+    expect(weapon.update).not.toHaveBeenCalled();
+  });
+
+  it('drops the draw while combat input is gated (menu, downed) and when the knife takes the arm', () => {
+    const menu = stubGame(true, true);
+    prototype.frame.call(menu.game);
+    expect(menu.weapon.cancelCharge).toHaveBeenCalled();
+
+    const downed = stubGame(false, false);
+    downed.game.mode.isCombatInputEnabled = () => false;
+    prototype.frame.call(downed.game);
+    expect(downed.weapon.cancelCharge).toHaveBeenCalled();
+
+    const knife = stubGame(false, false);
+    knife.game.mode.onMeleeAttack = vi.fn(() => true);
+    knife.game.mode.usesFallbackAttack = () => true;
+    prototype.frame.call(knife.game);
+    expect(knife.weapon.cancelCharge).toHaveBeenCalled();
+  });
+
+  it('keeps the draw while the player can fight', () => {
+    const { game, weapon } = stubGame(false, false);
+    prototype.frame.call(game);
+    expect(weapon.cancelCharge).not.toHaveBeenCalled();
+    expect(weapon.update).toHaveBeenCalled();
   });
 });
 

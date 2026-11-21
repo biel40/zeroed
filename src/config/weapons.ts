@@ -1394,15 +1394,29 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     boltCycleTime: 0,
     scoped: false,
     damage: 450,
+    // Hold to draw, release to loose: a quick tap is the base shot below.
+    charge: { fullSeconds: 1.5 },
     wind: {
       projectileSpeed: 70,
       range: 60,
-      burstRadius: 3,
+      burstRadius: 4.05,
       burstDamage: 160,
-      maxTargets: 8,
-      pushDistance: 3.4,
+      maxTargets: 10,
+      pushDistance: 4.25,
       edgePush: 0.45,
       pushSeconds: 0.38,
+      // A full draw: 990 direct, a 5.4 m burst and a 6.8 m shove; only it drives the gust.
+      charged: {
+        damage: 2.2,
+        burstDamage: 1.25,
+        burstRadius: 4 / 3,
+        pushDistance: 1.6,
+        pushSeconds: 1.25,
+        projectileSpeed: 1.5,
+        maxTargets: 1.4,
+        intensity: 1.5,
+        gust: { length: 7, halfAngle: 0.35, maxTargets: 6, pushDistance: 4.5, edgePush: 0.4 },
+      },
       look: { core: 0xeafffb, color: 0x8fe3d6, intensity: 1 },
     },
     recoil: {

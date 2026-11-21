@@ -24,6 +24,8 @@ export const BELL_STAIR = {
 } as const;
 
 export const BELL_CHAMBER = { minX: -25.5, maxX: -14.3, minZ: -55, maxZ: BELL_STAIR.upperMouthZ } as const;
+export const BELL_LIP_Y = UPPER_FLOOR_Y + 3.35;
+export const MAIN_BELL_POSITION = { x: -22.8, y: BELL_LIP_Y, z: -52.25 } as const;
 export const ROOF_TERRACES = { minX: BELL_CHAMBER.maxX, maxX: -6.95, minZ: -54.5, maxZ: -28 } as const;
 export const ROOF_CHAMBER_OPENING = { center: -52.3, width: 2.5, bottom: 0, top: 3.1 } as const;
 export const ROOF_NAVE_OPENING = {

@@ -137,6 +137,13 @@ sufra tirones de compilacion de shaders.
   `ZombiesWindShots`, solo en los mapas que precargan un arma de viento). Cada
   disparo de viento lleva su config y su arma de origen, sin identificarse
   por color.
+- Un arma con `charge` (EXHALIS) dispara al soltar: `Weapon` lleva la
+  tension, emite `chargeStart`/`chargeFull` y deja la carga del ultimo
+  disparo en `lastShotCharge`, que el modo lee al resolverlo; la vista lee
+  `chargeLevel`. Como un gatillo sin entrada de combate se lee suelto, el
+  shell llama a `Weapon.cancelCharge()` durante la pausa, sin entrada de
+  combate, con el ataque de reserva y al iniciar una accion del brazo; los
+  modos no duplican esa politica.
 - El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
   inventario. Sirve como fallback sin municion y como ataque rapido dedicado;
   `GameMode.usesFallbackAttack()` permite que el shell ceda fire/ADS durante

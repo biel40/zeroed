@@ -17,11 +17,13 @@ export interface DieKathedraleRingSite {
 export const DIE_KATHEDRALE_RING_SITES = [
   {
     ringId: 'resurrection', room: 'narthex-funerary-alcove', zone: 'narthex', floor: 0, floorY: 0,
-    x: 8.9, z: -1.6, approach: { x: 8.9, z: -3.2 },
+    // Backed against the inside of the front wall, east of the great doors.
+    x: 8.9, z: -0.45, approach: { x: 8.9, z: -2.05 },
   },
   {
     ringId: 'armor', room: 'chapel-west-4', zone: 'westAisle', floor: 0, floorY: 0,
-    x: -12.6, z: -29.3, approach: { x: -12.6, z: -30.8 },
+    // Backed against the aisle's side wall, clear of the chapel's wall buy.
+    x: -13.55, z: -29.3, approach: { x: -11.95, z: -29.3 },
   },
   {
     ringId: 'sleightOfHand', room: 'sideCourtyard', zone: 'sideCourtyard', floor: 0, floorY: 0,

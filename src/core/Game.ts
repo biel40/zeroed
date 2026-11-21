@@ -54,6 +54,8 @@ const FLAME_RUMBLE = 0.0055;
 /** A loosed breath: a faint cold glint off the riser, gone in a couple of frames, and a small kick of the view. */
 const WIND_LIGHT_INTENSITY = 3;
 const WIND_IMPULSE = 0.01;
+/** Extra share of the wind shot's kick, light and puff at a full draw. */
+const WIND_DRAW_BOOST = 0.5;
 const MAX_SPREAD_PIXELS = 130;
 /** A driver that never reports its programs ready must not hold the loading screen. */
 const SHADER_WARMUP_TIMEOUT_MS = 10000;
@@ -799,12 +801,14 @@ export class Game {
     }
     const wind = weapon.definition.wind;
     if (wind) {
-      // A bowstring looses no powder: no case, no smoke, only a stir of pale air off the riser.
+      // A bowstring looses no powder: no case, no smoke, only a stir of pale air off the riser,
+      // a little stronger the further it was drawn.
+      const drawn = 1 + WIND_DRAW_BOOST * weapon.lastShotCharge;
       this.flashLight.color.setHex(wind.look.color);
-      this.flashLight.intensity = WIND_LIGHT_INTENSITY * wind.look.intensity;
+      this.flashLight.intensity = WIND_LIGHT_INTENSITY * wind.look.intensity * drawn;
       this.flashLightDecay = ENERGY_FLASH_LIGHT_DECAY;
-      this.player.playViewImpulse(WIND_IMPULSE);
-      this.effects.puff(this.tmpMuzzle, wind.look.color, 0.14 * wind.look.intensity);
+      this.player.playViewImpulse(WIND_IMPULSE * drawn);
+      this.effects.puff(this.tmpMuzzle, wind.look.color, 0.14 * wind.look.intensity * drawn);
       return;
     }
     const flare = this.profile.useAdvancedRendering ? weapon.definition.muzzleFlare : undefined;
@@ -870,6 +874,12 @@ export class Game {
         case 'boltStart':
           this.audio.playBolt(weapon.boltCycleDuration);
           break;
+        case 'chargeStart':
+          this.audio.playBowDraw();
+          break;
+        case 'chargeFull':
+          this.audio.playBowFullDraw();
+          break;
         case 'fireModeChanged':
           this.audio.playFireMode();
           break;
@@ -887,6 +897,7 @@ export class Game {
    */
   private startModeArmAction(weapon: Weapon, start: () => boolean): void {
     weapon.cancelInspect();
+    weapon.cancelCharge();
     if (!start()) return;
     weapon.cancelReload();
     this.meleeReloadWeapon = weapon.ammoInMagazine === 0 ? weapon : null;
@@ -915,6 +926,8 @@ export class Game {
     // player, weapon, ballistics, mode, effects or timers advance. A shared
     // (networked) match never halts here; the menu only gates local input.
     if ((this.paused && !this.mode.sharedSimulation) || this.mode.isSimulationPaused?.()) {
+      // A draw held into the pause is dropped, never loosed by the release that resumes play.
+      this.currentWeapon.cancelCharge();
       this.input.suppressGamepad();
       this.present(this.mode.getCinematicCamera?.() ?? this.player.camera);
       this.debugStats?.pause();
@@ -971,6 +984,8 @@ export class Game {
     if (!allowCombatInput) weapon.cancelInspect();
 
     const fallbackAttack = this.mode.usesFallbackAttack?.() ?? false;
+    // Without combat input the trigger reads released: a draw is dropped rather than loosed.
+    if (!allowCombatInput || fallbackAttack) weapon.cancelCharge();
     if (this.meleeReloadWeapon) {
       if (this.meleeReloadWeapon !== weapon || weapon.ammoInMagazine !== 0) this.meleeReloadWeapon = null;
       else if (allowCombatInput && !fallbackAttack) {

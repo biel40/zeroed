@@ -38,8 +38,9 @@ import { buildPlaza } from './dieKathedrale/PlazaBuilder';
 import { buildPlazaVista } from './dieKathedrale/PlazaVista';
 import { buildSideChapels } from './dieKathedrale/SideChapels';
 import { bellTowerTransitions } from './dieKathedrale/upper/BellTowerStair';
+import { QuarterHourChime } from './dieKathedrale/upper/QuarterHourChime';
 import { buildUpperCathedral } from './dieKathedrale/upper/UpperCathedralBuilder';
-import { UPPER_FLOOR } from './dieKathedrale/upper/UpperCathedralConfig';
+import { MAIN_BELL_POSITION, UPPER_FLOOR } from './dieKathedrale/upper/UpperCathedralConfig';
 import {
   CATACOMB_AMBIENT_EVENTS,
   CATACOMB_FLOOR,
@@ -92,6 +93,7 @@ const CRYPT_GATE_ID = 'crypt-gate';
 const UNDERGROUND_SOUND_DEPTH = 0.5;
 const UPPER_VIEW_EYE_Y = 8;
 const UPPER_VISIBILITY = { x: -17, z: -43, radius: 36 } as const;
+const TOWER_BELL_CUE: ArenaAmbientCue = { sound: 'tower-bell', position: MAIN_BELL_POSITION };
 
 /**
  * Entrances stop the player at the wall line, so no spawn
@@ -175,6 +177,7 @@ export class DieKathedraleArena implements ZombieArena {
   private readonly openDoors = new Set<string>();
   private readonly ambientEvents = new AmbientEventScheduler(DIE_KATHEDRALE_AMBIENT_EVENTS);
   private readonly catacombEvents = new AmbientEventScheduler(CATACOMB_AMBIENT_EVENTS);
+  private readonly towerChime = new QuarterHourChime();
   /** Bound once: the scheduler calls it from the frame loop. */
   private readonly playAmbientEvent = (cue: ArenaAmbientCue): void => this.onAmbientCue?.(cue);
   private readonly lighting: DieKathedraleLighting;
@@ -334,6 +337,7 @@ export class DieKathedraleArena implements ZombieArena {
     }
     this.tombLids.update(dt);
     if (this.introElapsed !== null) return;
+    if (dt > 0 && this.towerChime.update(Date.now())) this.playAmbientEvent(TOWER_BELL_CUE);
     if (this.presence.depth >= UNDERGROUND_SOUND_DEPTH) this.catacombEvents.update(dt, this.playAmbientEvent);
     else this.ambientEvents.update(dt, this.playAmbientEvent);
   }
@@ -353,6 +357,7 @@ export class DieKathedraleArena implements ZombieArena {
     this.tombLids.reset();
     this.ambientEvents.reset();
     this.catacombEvents.reset();
+    this.towerChime.reset();
     applySceneAmbience(this.scene, this.ambience, this.profile.useReducedEffects);
     this.mood.reset();
     this.openDoors.clear();

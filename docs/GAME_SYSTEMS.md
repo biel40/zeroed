@@ -180,25 +180,47 @@ demas armas con bloqueo no lo usan. La recarga `crystal` abre la jaula
 (`cover`), saca el cristal gastado (cae al mundo apagado), mete uno nuevo,
 cierra y reenergiza el nucleo en cada recarga, tactica o vacia.
 Un arma de viento (`wind`, la EXHALIS de Die Kathedrale) tampoco pasa por la
-balistica: `ZombiesWindShots` suelta una rafaga visible y rapida (`WindShots`:
-estela palida con dos anillos de viento; sin luces nuevas, casquillos ni humo) que
-revienta en el primer cuerpo o muro de su linea, o al agotar su alcance. El
-cuerpo alcanzado recibe el dano del arma y paga como una bala. La rafaga
+balistica. Se tensa: con `charge` en la definicion, `Weapon` empieza a tensar
+al pulsar con el arma lista y dispara una sola vez al soltar; mantener nunca
+dispara, tampoco con el boton tactil que repite las semiautomaticas. La carga
+crece lineal hasta el maximo (`charge.fullSeconds`) solo cuando el arma ya se
+ha recuperado del disparo anterior, asi que tensar no acumula cadencia; un
+toque rapido es el disparo base y soltar antes de recuperarse no dispara.
+Recargar o cambiar de arma suelta la tension; la pausa, un menu, quedar
+derribado, el cuchillo o las manos ocupadas la cancelan sin disparar y
+piden una pulsacion nueva. `ZombiesWindShots` suelta una rafaga visible y
+rapida (`WindShots`: la misma flecha de la vista, ampliada, sobre una estela
+palida con dos anillos de viento; sin luces nuevas, casquillos ni humo) que
+revienta en el primer cuerpo o muro de su linea, o al agotar su alcance.
+`WindShotStats` escala el disparo con la carga: cada valor va lineal del de la
+config al de `wind.charged` (dano directo, dano y radio de rafaga, empujon,
+velocidad, tope de cuerpos e intensidad visual). El cuerpo alcanzado recibe
+el dano del arma y paga como una bala. La rafaga
 (`WindGust`) toma los cuerpos de su radio que ve desde el impacto, del mas
 cercano al mas lejano hasta su tope; a los demas les quita un dano que decae
 con la distancia y solo paga sus bajas. A todos los empuja lejos del jugador,
-nunca hacia el, y mas cuanto mas cerca del impacto. El empujon
+nunca hacia el, y mas cuanto mas cerca del impacto. Una tension completa que
+alcanza un cuerpo empuja ademas, sin dano, a la cola de cuerpos que hay tras la
+rafaga en un cono a lo largo del disparo (`wind.charged.gust`,
+`selectWindConeTargets`). La rafaga se ve como anillos de presion planos que
+se abren hasta su radio de juego, un frente menor de cara al disparo, un soplo
+y polvo de piedra arrastrado en la direccion del tiro. El empujon
 (`ZombieKnockback`) recorre su distancia en menos de medio segundo, frenando,
 y `ZombieManager` lo mueve con la misma colision que la marcha: los muros lo
 paran, no cambia de planta ni gira al zombi, que no camina mientras dura. Un
 empujon nuevo solo sustituye al anterior si llega mas lejos. No mueve a quien
 esta tras una ventana, entrando, saliendo de una tumba o en una escalera; un
 bruto conserva una cuarta parte (`knockbackScale`) y un guardian solo recibe
-el dano. Las bajas caen con el estilo `blown`, sin sangre. En la vista, cada
-disparo suelta los brazos del arco, que vibran con la cuerda, y la flecha de
-viento se forma de nuevo en el culatin; la recarga `cell` cambia la ampolla
-de aliento. Cada `wind` lleva su alcance, empuje y aspecto, de modo que una
-version mejorada sera otro dato; la escala de dano de una mejora ya se aplica.
+el dano. Las bajas caen con el estilo `blown`, sin sangre. En la vista, la
+flecha (`ExhalisArrow`: punta de bronce, astil claro, plumas y runas de
+viento) descansa en la cuerda; tensar lleva atras la cuerda, la flecha, el
+asa y la mano derecha, dobla los brazos, aviva el viento que gira en la punta
+y el brillo de sus runas, y la tension completa suena y destella una vez.
+Cada disparo suelta los brazos del arco, que vibran con la cuerda (mas tras
+una tension larga), y una flecha nueva se forma en el culatin; la recarga
+`cell` cambia la ampolla de aliento. Cada `wind` lleva su alcance, empuje,
+escala de tension y aspecto, de modo que una version mejorada sera otro
+dato; la escala de dano de una mejora ya se aplica.
 `BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
@@ -609,9 +631,11 @@ existente a `MOTDRULES`.
   El paso del Palau une la plaza con la explanada y el portal del Mirador
   completa el circuito con la nave lateral este. Desde la explanada se
   puede abrir el patio. La escalera de caracol del crucero lleva a la
-  cámara de campanas y al circuito de terrazas (planta +1). Los cuatro
-  anillos se reparten entre el nártex, las capillas oeste, el patio y la
-  terraza y se compran sin electricidad.
+  cámara de campanas y al circuito de terrazas (planta +1). La campana da un
+  toque a los minutos :00, :15, :30 y :45 de la hora local del
+  dispositivo durante la partida. Los toques que pasan durante la pausa o la
+  intro se omiten. Los cuatro anillos se reparten entre el nártex, las
+  capillas oeste, el patio y la terraza y se compran sin electricidad.
   La reja de la cripta, en el muro norte del crucero, abre una escalera a las
   catacumbas reales (planta -1): galerias de nichos (Vector), panteon real
   con cuatro sepulcros (M4A1), relicario y santuario circular, unidos por
@@ -1316,7 +1340,9 @@ de la pausa y VER CONTROLES en Ajustes abren un dialogo por categorias
 Los avisos de interaccion comparten una tarjeta oscura de alto contraste, con
 accion, tecla o boton tactil y coste separados. La entrada despliega el marco
 y un reflejo breve, seguido de dos pulsos en la tecla; se omiten con movimiento
-reducido. Los requisitos bloqueados conservan su texto sin ofrecer una tecla.
+reducido. Los nombres de las zonas que abren las puertas siguen el idioma de la
+partida y se ofrecen en español, inglés y catalán. Los requisitos bloqueados
+conservan su texto sin ofrecer una tecla.
 En tactil, la tarjeta es el control de usar: tocarla interactua, incluidas las
 acciones mantenidas. En Ajustes > Accesibilidad se pueden ocultar estos avisos; la preferencia se
 guarda y se aplica al instante, sin desactivar las interacciones del juego, y no

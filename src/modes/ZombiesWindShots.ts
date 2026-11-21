@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { WEAPON_DEFINITIONS } from '../config/weapons';
 import type { PlayerEconomy } from '../game/PlayerEconomy';
 import type { Weapon } from '../weapons/Weapon';
-import type { WeaponId, WindWeaponConfig } from '../weapons/WeaponTypes';
-import { selectWindGustTargets, type WindGustHit } from '../zombies/WindGust';
+import type { WeaponId } from '../weapons/WeaponTypes';
+import { selectWindConeTargets, selectWindGustTargets, type WindGustHit } from '../zombies/WindGust';
 import { WindShots } from '../zombies/WindShots';
+import type { WindShotStats } from '../zombies/WindShotStats';
 import type { Zombie } from '../zombies/Zombie';
 import { splashDamageAt, type ZombieHitPart } from '../zombies/ZombieConfig';
 import type { ZombieManager } from '../zombies/ZombieManager';
@@ -29,17 +30,21 @@ export type WindGuardianStrike = (object: THREE.Object3D, damage: number, point:
  * body struck takes the weapon's damage (a head counts double, as ever)
  * and the burst shoves every zombie in its radius and in sight of it away
  * from the player, nearest first and up to its cap; those beyond the body
- * struck also take burst damage that falls off with distance. The weapon's
- * damage scale (an upgrade) applies to both, and the shot's own config
- * carries the reach, the shove and the look, so a stronger variant is only
- * data. Rewards follow the usual rules: the direct hit pays like a bullet,
- * the burst pays only for its kills. `ZombiesMode` delegates every wind
- * concern here.
+ * struck also take burst damage that falls off with distance. How far the
+ * bow was drawn (`Weapon.lastShotCharge`) scales the shot through its
+ * config's `charged` values, and a full draw that strikes a body also
+ * drives a gust down the shot line, shoving the bodies queued behind the
+ * burst without damage. The weapon's damage scale (an upgrade) applies to
+ * both damages, and the shot's own config carries the reach, the shove and
+ * the look, so a stronger variant is only data. Rewards follow the usual
+ * rules: the direct hit pays like a bullet, the burst pays only for its
+ * kills. `ZombiesMode` delegates every wind concern here.
  */
 export class ZombiesWindShots {
   private readonly shots: WindShots;
   private readonly candidates: Zombie[] = [];
   private readonly targets: WindGustHit<Zombie>[] = [];
+  private readonly gusted: WindGustHit<Zombie>[] = [];
   private readonly raycaster = new THREE.Raycaster();
   private readonly rayHits: THREE.Intersection[] = [];
   private readonly shooter = new THREE.Vector3();
@@ -56,13 +61,14 @@ export class ZombiesWindShots {
     private readonly strikeGuardian: WindGuardianStrike = () => false,
   ) {
     this.shots = new WindShots(ctx.hitColliders, ctx.scene, ctx.profile.useReducedEffects);
-    this.shots.onImpact = (point, object, distance, config, source) => this.burst(point, object, distance, config, source);
+    this.shots.onImpact = (point, object, distance, stats, direction, source) =>
+      this.burst(point, object, distance, stats, direction, source);
   }
 
-  /** Looses the shot of `weapon` from the eye along `direction`. */
+  /** Looses the shot of `weapon`, drawn as far as its last release, from the eye along `direction`. */
   public fire(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): void {
     const wind = weapon.definition.wind;
-    if (wind) this.shots.fire(origin, direction, wind, weapon.definition.id);
+    if (wind) this.shots.fire(origin, direction, wind, weapon.lastShotCharge, weapon.definition.id);
   }
 
   public update(dt: number): void {
@@ -74,10 +80,13 @@ export class ZombiesWindShots {
     this.shots.reset();
   }
 
-  private burst(point: THREE.Vector3, object: THREE.Object3D | null, distance: number, config: WindWeaponConfig, source: WeaponId): void {
-    this.ctx.audio.playWindImpact();
+  private burst(
+    point: THREE.Vector3, object: THREE.Object3D | null, distance: number, stats: WindShotStats, direction: THREE.Vector3,
+    source: WeaponId,
+  ): void {
+    this.ctx.audio.playWindImpact(stats.charge);
     const scale = this.damageScale(source);
-    const damage = WEAPON_DEFINITIONS[source].damage * scale;
+    const damage = WEAPON_DEFINITIONS[source].damage * scale * stats.damageScale;
     if (object && this.strikeGuardian(object, damage, point, distance)) return;
 
     const struck = object?.userData.zombie as Zombie | undefined;
@@ -98,21 +107,36 @@ export class ZombiesWindShots {
     this.center.multiplyScalar(toShooter > 1e-4 ? Math.min(BURST_PULLBACK, toShooter) / toShooter : 0).add(point);
     this.candidates.length = 0;
     for (const zombie of this.zombies.actives) if (zombie.isAlive) this.candidates.push(zombie);
-    selectWindGustTargets(point, this.shooter, this.candidates, config, this.targets);
+    selectWindGustTargets(point, this.shooter, this.candidates, stats, this.targets);
     for (const { target, distance: fromImpact, share, dirX, dirZ } of this.targets) {
       if (target !== struck) {
         if (!this.inSight(target)) continue;
-        const burstDamage = splashDamageAt(config.burstDamage * scale, fromImpact, config.burstRadius);
+        const burstDamage = splashDamageAt(stats.burstDamage * scale, fromImpact, stats.burstRadius);
         if (burstDamage > 0) {
           hitAny = true;
           if (this.zombies.damageZombie(target, 'torso', burstDamage, source)) continue;
         }
       }
-      if (target.isAlive) this.zombies.knockBack(target, dirX, dirZ, config.pushDistance * share, config.pushSeconds);
+      if (target.isAlive) this.zombies.knockBack(target, dirX, dirZ, stats.pushDistance * share, stats.pushSeconds);
     }
+    if (struck && stats.gust) this.gust(point, direction, stats);
     if (!hitAny) return;
     this.ctx.stats.registerHit(distance);
     if (!struck) this.ctx.hud.showHitmarker(false);
+  }
+
+  /**
+   * A full draw's gust behind the body struck: the bodies queued down the
+   * shot line past the burst, in sight of it, are shoved along the line.
+   */
+  private gust(point: THREE.Vector3, direction: THREE.Vector3, stats: WindShotStats): void {
+    const gust = stats.gust;
+    const flat = Math.hypot(direction.x, direction.z);
+    if (!gust || flat < 1e-4) return;
+    selectWindConeTargets(point, direction.x / flat, direction.z / flat, stats.burstRadius, this.candidates, gust, this.gusted);
+    for (const { target, share, dirX, dirZ } of this.gusted) {
+      if (target.isAlive && this.inSight(target)) this.zombies.knockBack(target, dirX, dirZ, gust.pushDistance * share, stats.pushSeconds);
+    }
   }
 
   /** Whether walls and closed doors leave `zombie`'s torso open to the burst. */

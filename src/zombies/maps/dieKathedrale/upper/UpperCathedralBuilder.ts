@@ -6,7 +6,7 @@ import type { DieKathedraleBuildContext } from '../DieKathedraleBuildContext';
 import { addStoneWall } from '../DieKathedraleWalls';
 import { archPoints, ribGeometries } from '../GothicVault';
 import { buildBellStair } from './BellStairGeometry';
-import { BELL_CHAMBER, BELL_STAIR, DOUBLE_TAP_SITE, ROOF_CHAMBER_OPENING, ROOF_NAVE_OPENING, ROOF_TERRACES, UPPER_ENTRANCES, UPPER_FLOOR_Y } from './UpperCathedralConfig';
+import { BELL_CHAMBER, BELL_LIP_Y, BELL_STAIR, DOUBLE_TAP_SITE, MAIN_BELL_POSITION, ROOF_CHAMBER_OPENING, ROOF_NAVE_OPENING, ROOF_TERRACES, UPPER_ENTRANCES, UPPER_FLOOR_Y } from './UpperCathedralConfig';
 
 const HALF_WALL = DIE_KATHEDRALE_WALL_THICKNESS / 2;
 const CHAMBER_HEIGHT = 8.45;
@@ -60,14 +60,14 @@ function buildBellChamber(context: DieKathedraleBuildContext): void {
     batch.addBox(materials.dressedStone, x, roofY + 0.64, z + side * (depth / 2 + 0.27), width + 0.68, 1.08, 0.32);
     for (const sideZ of [-1, 1]) addPinnacle(context, x + side * width / 2, roofY + 0.2, z + sideZ * depth / 2, 1.4);
   }
-  addBell(context, -22.8, -52.25, 1.25);
+  addBell(context, MAIN_BELL_POSITION.x, MAIN_BELL_POSITION.z, 1.25);
   addBell(context, -17.45, -52.25, 1.01);
   addBellRoomDressing(context);
 }
 
 function addBell(context: DieKathedraleBuildContext, x: number, z: number, scale: number): void {
   const { batch, materials } = context;
-  const lipY = UPPER_FLOOR_Y + 3.35;
+  const lipY = BELL_LIP_Y;
   const profile = [
     [0.82, -0.05], [1.03, -0.05], [1.08, 0.02], [1.00, 0.18], [0.80, 0.35],
     [0.72, 0.70], [0.60, 1.04], [0.45, 1.22], [0.20, 1.36], [0.13, 1.31],
@@ -159,12 +159,13 @@ function addRoofShrineSurround(context: DieKathedraleBuildContext): void {
   const { batch, materials } = context;
   const { x, z } = DOUBLE_TAP_SITE;
   for (const side of [-1, 1]) {
-    batch.addBox(materials.dressedStone, x + side * 0.86, UPPER_FLOOR_Y + 0.94, z + 0.62, 0.22, 1.88, 0.39);
+    batch.addBox(materials.dressedStone, x + side * 0.86, UPPER_FLOOR_Y + 0.94, z + 0.42, 0.22, 1.88, 0.39);
   }
-  batch.addBox(materials.wallStone, x, UPPER_FLOOR_Y + 0.94, z + 0.76, 1.8, 1.88, 0.23);
-  addPointedArch(context, x, z + 0.62, 1.72, UPPER_FLOOR_Y + 1.88, 0.65);
-  addSolidProxy(context, 'west-terrace-ring-recess', { x: x - 0.97, y: UPPER_FLOOR_Y, z: z + 0.63 },
-    { x: x + 0.97, y: UPPER_FLOOR_Y + 1.89, z: z + 0.9 }, 'concrete', 'none');
+  // The recess's back wall meets the shrine's base.
+  batch.addBox(materials.wallStone, x, UPPER_FLOOR_Y + 0.94, z + 0.56, 1.8, 1.88, 0.23);
+  addPointedArch(context, x, z + 0.42, 1.72, UPPER_FLOOR_Y + 1.88, 0.65);
+  addSolidProxy(context, 'west-terrace-ring-recess', { x: x - 0.97, y: UPPER_FLOOR_Y, z: z + 0.43 },
+    { x: x + 0.97, y: UPPER_FLOOR_Y + 1.89, z: z + 0.7 }, 'concrete', 'none');
 }
 
 function addPointedArch(context: DieKathedraleBuildContext, x: number, z: number, width: number, springY: number, rise: number): void {

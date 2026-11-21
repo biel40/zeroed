@@ -57,15 +57,15 @@ export function dressCourtyard(context: DieKathedraleBuildContext): void {
   addScatter(context, 33.6, -32, 0.9, 1206);
   addScatter(context, 41.3, -20.6, 0.65, 1207);
 
-  // A stepped votive shrine frames the ring's pedestal, with the landing kept
-  // clear in front of the pedestal and around both sides of the well.
-  addVotiveBacking(context, x, z - 1.72);
-  addCandleCluster(context, x - 0.81, 0.39, z - 1.78, 5, 0.36, seededRandom(1208));
-  addCandleCluster(context, x + 0.81, 0.39, z - 1.78, 6, 0.36, seededRandom(1209));
+  // A stepped votive shrine frames the ring's pedestal, which rests against its
+  // lowest tread, with the landing kept clear in front and around the well.
+  addVotiveBacking(context, x, z - 1.21);
+  addCandleCluster(context, x - 0.81, 0.39, z - 1.27, 5, 0.36, seededRandom(1208));
+  addCandleCluster(context, x + 0.81, 0.39, z - 1.27, 6, 0.36, seededRandom(1209));
   for (const offset of [-1, -0.77, 0.97]) {
     // Soot-blackened votive cups sit on the lowest tread beside the living flames.
-    batch.add(new THREE.CylinderGeometry(0.071, 0.05, 0.055, 7).translate(x + offset, 0.158, z - 1.06), materials.gateIron);
-    batch.add(new THREE.CircleGeometry(0.055, 7).rotateX(-Math.PI / 2).translate(x + offset, 0.187, z - 1.06), materials.cavity);
+    batch.add(new THREE.CylinderGeometry(0.071, 0.05, 0.055, 7).translate(x + offset, 0.158, z - 0.55), materials.gateIron);
+    batch.add(new THREE.CircleGeometry(0.055, 7).rotateX(-Math.PI / 2).translate(x + offset, 0.187, z - 0.55), materials.cavity);
   }
   addFloorStain(batch, materials, x, 0, z, 4, 3.4, 0);
   for (const [mossX, mossZ, yaw] of [[33.2, -32.55, 0.53], [40.65, -32.5, -0.3], [41.46, -27.1, 1.34]] as const) {

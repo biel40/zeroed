@@ -52,6 +52,11 @@ export class Weapon {
   /** Seconds into the running inspection; null when the weapon is not being inspected. */
   private inspectTimer: number | null = null;
   private secondsSinceShot = Infinity;
+  /** Hold-to-draw weapons: the trigger was pressed on a ready weapon and is still held. */
+  private drawing = false;
+  /** Seconds drawn so far, from the moment the weapon recovered from its last shot. */
+  private drawSeconds = 0;
+  private shotCharge = 0;
 
   constructor(
     readonly definition: WeaponDefinition,
@@ -157,6 +162,31 @@ export class Weapon {
     return this.definition.boltCycleTime / this.fireRateScale;
   }
 
+  /** 0 → 1 charge of the draw in progress; 0 when not drawing or still recovering. */
+  public get chargeLevel(): number {
+    const charge = this.definition.charge;
+    return this.drawing && charge ? Math.min(1, this.drawSeconds / charge.fullSeconds) : 0;
+  }
+
+  /** True while a hold-to-draw trigger is held for the next shot. */
+  public get isCharging(): boolean {
+    return this.drawing;
+  }
+
+  /** Charge the latest shot was loosed with (0 for weapons without a draw). */
+  public get lastShotCharge(): number {
+    return this.shotCharge;
+  }
+
+  /**
+   * Drops the draw in progress without a shot (pause, menu, knife, downed);
+   * a still-held trigger must be pressed again to draw.
+   */
+  public cancelCharge(): void {
+    this.drawing = false;
+    this.drawSeconds = 0;
+  }
+
   get currentBloom(): number {
     return this.bloom;
   }
@@ -195,6 +225,10 @@ export class Weapon {
 
     let triggerEdge = input.trigger && !this.prevTrigger;
     this.prevTrigger = input.trigger;
+    if (this.definition.charge) {
+      this.updateDraw(dt, input.trigger, triggerEdge, this.definition.charge.fullSeconds);
+      return;
+    }
 
     const repeatsWhileHeld = this.fireMode === 'auto' || input.repeatSemiAuto === true;
     const wantsFire = repeatsWhileHeld ? input.trigger : triggerEdge;
@@ -241,6 +275,7 @@ export class Weapon {
 
   equip(): void {
     this.activeReloadType = null;
+    this.cancelCharge();
     this.reloadAfterEquip =
       this.ammoInMagazine === 0 && (this.reserveAmmo === null || this.reserveAmmo > 0);
     this.prevTrigger = false;
@@ -277,6 +312,8 @@ export class Weapon {
     this.prevTrigger = false;
     this.inspectTimer = null;
     this.secondsSinceShot = Infinity;
+    this.cancelCharge();
+    this.shotCharge = 0;
     this.heat.reset();
     this.recoil.reset();
     this.pendingEvents.length = 0;
@@ -360,6 +397,44 @@ export class Weapon {
       this.reload();
     }
     return true;
+  }
+
+  /**
+   * Hold-to-draw trigger: a press on a ready weapon starts the draw, which
+   * charges only once the last shot's interval has passed (a long draw banks
+   * no time) and stops at full; the release looses one shot with that charge,
+   * unless the weapon has not recovered yet. Leaving the ready state
+   * (reload, switch) drops the draw.
+   */
+  private updateDraw(dt: number, trigger: boolean, triggerEdge: boolean, fullSeconds: number): void {
+    this.cooldown = Math.max(0, this.cooldown);
+    if (this.weaponState !== 'ready') {
+      this.cancelCharge();
+      return;
+    }
+    if (!this.drawing) {
+      if (!triggerEdge || !this.isAimReady()) return;
+      if (this.ammoInMagazine <= 0) {
+        this.pendingEvents.push({ type: 'dryFire' });
+        return;
+      }
+      this.drawing = true;
+      this.drawSeconds = 0;
+      return;
+    }
+    if (trigger) {
+      if (this.cooldown > 1e-8) return;
+      const drawn = this.drawSeconds;
+      this.drawSeconds = Math.min(fullSeconds, drawn + dt);
+      if (drawn === 0) this.pendingEvents.push({ type: 'chargeStart' });
+      if (drawn < fullSeconds && this.drawSeconds >= fullSeconds) this.pendingEvents.push({ type: 'chargeFull' });
+      return;
+    }
+    const charge = this.chargeLevel;
+    this.cancelCharge();
+    if (this.cooldown > 1e-8) return;
+    this.shotCharge = charge;
+    this.tryFire(true);
   }
 
   /** False while an ADS-only weapon is not fully aimed; its trigger is then silently ignored. */

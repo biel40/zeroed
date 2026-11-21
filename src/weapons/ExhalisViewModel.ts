@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildExhalisArrowGeometry, EXHALIS_ARROW } from './ExhalisArrow';
 import { strut } from './ProfileGeometry';
 import { steelWearTexture, woodGrainTexture } from './ProceduralTextures';
 import { mergeAssemblies } from './ViewModelBatching';
@@ -10,18 +11,21 @@ type LimbPoint = readonly [along: number, back: number];
 
 /**
  * EXHALIS layout in model metres. The root frame keeps -Z towards the
- * target; the shot line (the nock and the wind arrow) runs `nockY`, three
+ * target; the shot line (the nock and the arrow) runs `nockY`, three
  * centimetres under the sight line. The bow itself is built in its own
  * plane (y up the riser, z along the shot, x across) around the point where
  * the shot line crosses the riser, and canted by `cant` so its upper half
  * leans left, out of the sight picture; the line passes the riser through a
  * window cut beside its spine. The draw handle hangs plumb from the nock
  * where the ZEUS-77 has its grip, so the right hand closes on it unchanged.
+ * A full draw takes the nock, the arrow, the handle and the hand `draw`
+ * metres back towards the archer.
  */
 export const EXHALIS_PROFILE = {
   nockY: 0.045,
   riserZ: -0.21,
   nockZ: 0.075,
+  draw: 0.065,
   cant: 0.35,
   /** Bow-plane heights of the riser's sections, from the lower limb's root to the upper's. */
   riser: { bottom: -0.23, gripBottom: -0.13, windowBottom: -0.02, windowTop: 0.06, top: 0.15, width: 0.03, depth: 0.05 },
@@ -45,10 +49,26 @@ const RELEASE_FLEX = 0.075;
 const RELEASE_DECAY = 11;
 const RELEASE_FREQUENCY = 42;
 const RELEASE_SETTLE = 0.6;
-/** Seconds the wind arrow takes to gather again after a shot (never longer than the shot interval). */
+/** Extra share of the release quiver after a full draw. */
+const RELEASE_DRAWN = 0.8;
+/** Limb bend back (radians) at a full draw. */
+const DRAW_FLEX = 0.05;
+/** Seconds a new arrow takes to gather on the string after a shot (never longer than the shot interval). */
 const ARROW_GATHER = 0.55;
-const ARROW_OPACITY = 0.5;
+/** Peak opacity of the wind swirling round the arrowhead, and the share of it shown undrawn. */
+const SWIRL_OPACITY = 0.6;
+const SWIRL_REST = 0.15;
+/** Swirl turn rate undrawn (rad/s), and how many times faster it adds at a full draw. */
 const SWIRL_SPEED = 7;
+const SWIRL_DRAWN = 2.5;
+/** Glow of the arrow's engraved runes undrawn, and added at a full draw. */
+const RUNE_GLOW = 0.5;
+const RUNE_DRAWN = 2.6;
+/** The full-draw pulse round the arrowhead: seconds, start and end scale, peak opacity. */
+const PULSE_SECONDS = 0.3;
+const PULSE_FROM = 0.6;
+const PULSE_TO = 1.9;
+const PULSE_OPACITY = 0.8;
 const UP = new THREE.Vector3(0, 1, 0);
 
 interface ExhalisParts {
@@ -56,26 +76,39 @@ interface ExhalisParts {
   readonly lowerLimb: THREE.Object3D;
   readonly upperString: THREE.Object3D;
   readonly lowerString: THREE.Object3D;
+  /** The draw handle, carried back with the nock (and the right hand with it). */
+  readonly handle: THREE.Object3D;
   readonly arrow: THREE.Object3D;
   readonly swirl: THREE.Object3D;
-  readonly arrowMaterial: THREE.MeshBasicMaterial;
+  readonly pulse: THREE.Object3D;
+  readonly swirlMaterial: THREE.MeshBasicMaterial;
+  readonly pulseMaterial: THREE.MeshBasicMaterial;
+  readonly runeMaterial: THREE.MeshStandardMaterial;
   /** Bow-plane points the string is laid between. */
   readonly upperRoot: number;
   readonly lowerRoot: number;
+  /** Bow-plane nock at rest; drawing moves it back along +Z. */
   readonly nock: THREE.Vector3;
 }
 
 /**
- * The bow's moving parts, driven from the weapon state. Every loosed breath
- * snaps the limbs forward and lets them quiver back while the string
- * follows their tips; the wind arrow on the string vanishes with the shot
- * and gathers again from the nock, slowly turning, and stays gone while
- * the bow is empty, being reloaded or drawn. Purely visual.
+ * The bow's moving parts, driven from the weapon state. Drawing (the
+ * weapon's charge) takes the nock, the arrow, the draw handle and so the
+ * right hand back, bends the limbs and feeds the wind turning round the
+ * arrowhead and the glow of its runes; a full draw flashes a short pulse
+ * there. Every loosed breath snaps the limbs forward, harder the further it
+ * was drawn, and lets them quiver back while the string follows their tips;
+ * the arrow vanishes with the shot and a new one gathers on the string, and
+ * none is nocked while the bow is empty or being reloaded. Purely visual.
  */
 class ExhalisLiveParts implements ViewModelLiveParts {
   private sinceShot = Number.POSITIVE_INFINITY;
   private form = 1;
   private time = 0;
+  private swirlAngle = 0;
+  private charge = 0;
+  private sincePulse = Number.POSITIVE_INFINITY;
+  private readonly nock = new THREE.Vector3();
   private readonly tip = new THREE.Vector3();
   private readonly direction = new THREE.Vector3();
 
@@ -91,44 +124,70 @@ class ExhalisLiveParts implements ViewModelLiveParts {
   public update(dt: number, weapon: Weapon, reloadGlow: number): void {
     this.time += dt;
     this.sinceShot += dt;
+    this.sincePulse += dt;
+    const charge = weapon.chargeLevel;
+    if (charge >= 1 && this.charge < 1) this.sincePulse = 0;
+    this.charge = charge;
+    const drawn = 1 - (1 - charge) * (1 - charge);
     const s = this.sinceShot;
-    this.layLimbs(s < RELEASE_SETTLE ? RELEASE_FLEX * Math.exp(-RELEASE_DECAY * s) * Math.cos(RELEASE_FREQUENCY * s) : 0);
+    const release = s < RELEASE_SETTLE
+      ? RELEASE_FLEX * (1 + RELEASE_DRAWN * weapon.lastShotCharge) * Math.exp(-RELEASE_DECAY * s) * Math.cos(RELEASE_FREQUENCY * s)
+      : 0;
+    this.layLimbs(release - DRAW_FLEX * drawn, EXHALIS_PROFILE.draw * drawn);
     const nocked = weapon.ammoInMagazine > 0 && weapon.state !== 'reloading' && weapon.state !== 'equipping';
     const gather = Math.min(ARROW_GATHER, weapon.shotInterval * 0.9);
     this.form = nocked ? Math.min(1, this.form + dt / gather) : Math.max(0, this.form - dt * 6);
-    this.showArrow(this.form, 1 + reloadGlow);
+    this.swirlAngle = (this.swirlAngle + dt * SWIRL_SPEED * (1 + SWIRL_DRAWN * charge)) % (Math.PI * 2);
+    this.showArrow(this.form, 1 + reloadGlow, charge);
   }
 
   public reset(): void {
     this.sinceShot = Number.POSITIVE_INFINITY;
+    this.sincePulse = Number.POSITIVE_INFINITY;
     this.form = 1;
     this.time = 0;
-    this.layLimbs(0);
-    this.showArrow(1, 1);
+    this.swirlAngle = 0;
+    this.charge = 0;
+    this.layLimbs(0, 0);
+    this.showArrow(1, 1, 0);
   }
 
-  private showArrow(form: number, glow: number): void {
-    const { arrow, swirl, arrowMaterial } = this.parts;
+  private showArrow(form: number, glow: number, charge: number): void {
+    const { arrow, swirl, swirlMaterial, runeMaterial, pulse, pulseMaterial } = this.parts;
     arrow.visible = form > 0.02;
     if (!arrow.visible) return;
     const eased = form * form * (3 - 2 * form);
     arrow.scale.set(0.6 + 0.4 * eased, 0.6 + 0.4 * eased, eased);
-    swirl.rotation.z = this.time * SWIRL_SPEED;
-    arrowMaterial.opacity = ARROW_OPACITY * eased * glow * (0.85 + 0.15 * Math.sin(this.time * 9));
+    swirl.rotation.z = this.swirlAngle;
+    swirl.scale.setScalar(1 + 0.2 * charge * (0.8 + 0.2 * Math.sin(this.time * 23)));
+    const gathered = SWIRL_REST + (1 - SWIRL_REST) * charge;
+    swirlMaterial.opacity = SWIRL_OPACITY * gathered * eased * glow * (0.85 + 0.15 * Math.sin(this.time * 9));
+    runeMaterial.emissiveIntensity = (RUNE_GLOW + RUNE_DRAWN * charge) * glow;
+    const p = this.sincePulse / PULSE_SECONDS;
+    pulse.visible = p < 1;
+    if (!pulse.visible) return;
+    pulse.scale.setScalar(PULSE_FROM + (PULSE_TO - PULSE_FROM) * (1 - (1 - p) * (1 - p)));
+    pulseMaterial.opacity = PULSE_OPACITY * (1 - p);
   }
 
-  /** Limbs swung forward by `flex` radians and the string laid from both tips to the nock. */
-  private layLimbs(flex: number): void {
+  /**
+   * Limbs swung forward by `flex` radians, the nock, arrow and handle drawn
+   * `draw` metres back, and the string laid from both tips to the nock.
+   */
+  private layLimbs(flex: number, draw: number): void {
     const { parts } = this;
     parts.upperLimb.rotation.x = -flex;
     parts.lowerLimb.rotation.x = flex;
+    this.nock.copy(parts.nock).z += draw;
+    parts.handle.position.z = draw;
+    parts.arrow.position.z = EXHALIS_PROFILE.nockZ + draw;
     this.stretch(parts.upperString, limbTip(1, parts.upperRoot, -flex, this.tip));
     this.stretch(parts.lowerString, limbTip(-1, parts.lowerRoot, flex, this.tip));
   }
 
   /** Lays a unit string segment (its base at the origin, along +Y) from `from` to the nock. */
   private stretch(segment: THREE.Object3D, from: THREE.Vector3): void {
-    this.direction.subVectors(this.parts.nock, from);
+    this.direction.subVectors(this.nock, from);
     const length = this.direction.length();
     segment.position.copy(from);
     segment.quaternion.setFromUnitVectors(UP, this.direction.divideScalar(length));
@@ -197,7 +256,8 @@ function limbGeometry(sign: 1 | -1): THREE.BufferGeometry {
  * tips, a pale whisper-string and runes of contained wind inlaid in the
  * riser. A bronze-caged ampoule of breath sits in the back of the riser
  * (the reload part), a bronze draw handle hangs from the nock (the right
- * hand's grip) and a wind arrow rests on the string, ready to be loosed.
+ * hand's grip) and an arrow rests on the string and the shelf, its
+ * broadhead ahead of the riser, ready to be drawn and loosed.
  */
 export function buildExhalis(config: ViewModelConfig): BuiltProcedural {
   const P = EXHALIS_PROFILE;
@@ -219,10 +279,20 @@ export function buildExhalis(config: ViewModelConfig): BuiltProcedural {
   });
   const glass = new THREE.MeshStandardMaterial({ color: 0xc8f1ea, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.3, depthWrite: false });
   const string = new THREE.MeshStandardMaterial({ color: 0xd8ece6, emissive: 0x2f7d73, emissiveIntensity: 0.55, roughness: 0.55, metalness: 0 });
-  const arrowMaterial = new THREE.MeshBasicMaterial({
-    name: 'exhalis-wind-arrow', color: config.energyColor ?? 0x8fe3d6, transparent: true, opacity: ARROW_OPACITY,
+  // Bleached ash shaft and grey-goose vanes: pale against the blackened bow.
+  const ash = new THREE.MeshStandardMaterial({
+    name: 'exhalis-arrow-ash', color: 0xc9bea6, map: woodGrainTexture(), roughness: 0.78, metalness: 0, side: THREE.DoubleSide,
+  });
+  // Driven by the draw: faint at rest, bright when full.
+  const runeMaterial = new THREE.MeshStandardMaterial({
+    name: 'exhalis-arrow-rune', color: 0x0d2522, emissive: 0x3fb8a4, emissiveIntensity: RUNE_GLOW, roughness: 0.4, metalness: 0.1,
+  });
+  const windGlow = (name: string): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({
+    name, color: config.energyColor ?? 0x8fe3d6, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide,
   });
+  const swirlMaterial = windGlow('exhalis-wind-swirl');
+  const pulseMaterial = windGlow('exhalis-charge-pulse');
 
   const assembly = (parent: THREE.Object3D, name: string): THREE.Group => {
     const part = new THREE.Group();
@@ -344,29 +414,41 @@ export function buildExhalis(config: ViewModelConfig): BuiltProcedural {
   add(frame, 'stem', strut(handleTop, new THREE.Vector3(0, P.nockY - 0.008, P.nockZ), 0.0045), bronze);
   box(frame, 'clasp', bronze, [0.012, 0.016, 0.014], 0, P.nockY - 0.002, P.nockZ);
 
-  // The wind arrow nocked on the string, reaching through the window: a pale cone and a turning swirl.
-  const arrowLength = P.nockZ - (P.riserZ - 0.035);
+  // The arrow nocked on the string, its shaft through the window over the shelf and its head
+  // ahead of the riser; wind gathers round the head as the bow is drawn.
   const arrow = new THREE.Group();
   arrow.name = 'exhalis-wind-arrow';
   arrow.position.set(0, P.nockY, P.nockZ);
   group.add(arrow);
-  add(arrow, 'arrow-body', new THREE.ConeGeometry(0.0065, arrowLength, 8, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -arrowLength / 2), arrowMaterial);
+  const arrowGeometry = buildExhalisArrowGeometry();
+  add(arrow, 'arrow-body', arrowGeometry.body, ash);
+  add(arrow, 'arrow-metal', arrowGeometry.metal, bronze);
+  add(arrow, 'arrow-runes', arrowGeometry.runes, runeMaterial);
+  const headBase = EXHALIS_ARROW.length - EXHALIS_ARROW.head.length;
   const swirl = new THREE.Group();
   swirl.name = 'exhalis-wind-swirl';
   arrow.add(swirl);
+  const swirlLength = 0.13;
   const helix = new THREE.CatmullRomCurve3(Array.from({ length: 26 }, (_, index) => {
     const t = index / 25;
     const angle = t * Math.PI * 5;
-    const radius = 0.0075 * (1 - t * 0.7);
-    return new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, -t * arrowLength);
+    // Widest round the head's base, closing on the tip.
+    const radius = 0.0105 * Math.sin(Math.PI * (0.15 + 0.75 * t));
+    return new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, -(headBase - swirlLength + 0.03 + t * swirlLength));
   }));
-  add(swirl, 'arrow-swirl', new THREE.TubeGeometry(helix, 40, 0.0011, 4, false), arrowMaterial);
+  add(swirl, 'arrow-swirl', new THREE.TubeGeometry(helix, 24, 0.0011, 3, false), swirlMaterial);
+  const pulse = new THREE.Group();
+  pulse.name = 'exhalis-charge-pulse';
+  pulse.position.z = -(headBase + EXHALIS_ARROW.head.length * 0.3);
+  pulse.visible = false;
+  arrow.add(pulse);
+  add(pulse, 'charge-pulse', new THREE.TorusGeometry(0.011, 0.0011, 3, 16), pulseMaterial);
 
   mergeAssemblies(bow);
   mergeAssemblies(group);
   group.scale.setScalar(config.scale);
   const liveParts = new ExhalisLiveParts({
-    upperLimb, lowerLimb, upperString, lowerString, arrow, swirl, arrowMaterial,
+    upperLimb, lowerLimb, upperString, lowerString, handle: frame, arrow, swirl, pulse, swirlMaterial, pulseMaterial, runeMaterial,
     upperRoot: R.top, lowerRoot: R.bottom, nock: new THREE.Vector3(0, 0, P.nockZ - P.riserZ),
   });
   return {
@@ -376,6 +458,7 @@ export function buildExhalis(config: ViewModelConfig): BuiltProcedural {
     sightY: config.sightHeight * config.scale,
     energyMaterials: [inlay, breath],
     reloadParts: { magazine: ampoule },
+    rightGrip: frame,
     liveParts,
   };
 }

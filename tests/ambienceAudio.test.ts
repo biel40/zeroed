@@ -171,6 +171,23 @@ describe('Ambience mix', () => {
     audio.playZombieMoan({ pan: 0, attenuation: 1, muffle: 0 });
     expect(ctx.gains[voiceGainIndex].connect).toHaveBeenCalledWith(ctx.gains[0]);
   });
+
+  it('plays the tower bell as a single strike with decaying partials on the ambience bus', () => {
+    const { audio, ctx } = startedSystem();
+    const firstGain = ctx.gains.length;
+    const firstSource = ctx.sources.length;
+    ctx.currentTime = 10;
+
+    audio.playAmbientCue({ sound: 'tower-bell' }, { pan: 0.5, attenuation: 0.5, muffle: 0.8 });
+
+    const partials = ctx.sources.slice(firstSource);
+    expect(partials.length).toBeGreaterThan(1);
+    for (const partial of partials) {
+      expect(partial.start).toHaveBeenCalledExactlyOnceWith(ctx.currentTime);
+      expect(partial.stop.mock.calls[0][0]).toBeGreaterThan(ctx.currentTime);
+    }
+    expect(ctx.gains[firstGain].connect).toHaveBeenCalledWith(ctx.gains[1]);
+  });
 });
 
 describe('Backgrounding', () => {

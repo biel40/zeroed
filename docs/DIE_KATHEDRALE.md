@@ -116,6 +116,7 @@ terraza. [Sala de campanas de La Seu](https://catedraldemallorca.org/noticias/co
 
 Consulta el [plano y las conexiones jugables](maps/die-kathedrale-topology.md)
 para ver las rejas, los recorridos y la distribución de anillos.
+El horario de la campana se describe en [Mapas e interacciones](GAME_SYSTEMS.md#mapas-e-interacciones).
 
 ## Catacumbas reales (construidas)
 
@@ -276,10 +277,11 @@ salto y pausa de Station 33; consulta [sistemas](GAME_SYSTEMS.md#mapas-e-interac
   arriba y abajo.
 - Arco del Viento: mision, piezas, montaje y version mejorada. EXHALIS base:
   validacion visual y sonora en navegador (el arco en primera persona y en el
-  altar, la rafaga y el empujon en los pasillos de las catacumbas) y FPS en
-  PC y Android; los valores de dano, empuje y precio son una primera
-  propuesta sin probar en partida.
-- Musica propia y sonidos ambientales de campanas y organo.
+  altar, la tension y la flecha, la rafaga, el cono de la tension completa y
+  el empujon en los pasillos de las catacumbas) y FPS en PC y Android; los
+  valores de dano, empuje, tension y precio son una primera propuesta sin
+  probar en partida.
+- Música propia y sonido ambiental de órgano.
 - Zonas previstas: claustro, Almudaina, Parc de la Mar y casco antiguo.
   También están pendientes la electricidad, la mejora de armas y un final
   propio.

@@ -119,7 +119,12 @@ export class WeaponHands {
   constructor(
     config: WeaponHandsConfig,
     private readonly root: THREE.Object3D,
-    private readonly parts: { readonly magazine: THREE.Object3D | null; readonly handle: THREE.Object3D | null },
+    private readonly parts: {
+      readonly magazine: THREE.Object3D | null;
+      readonly handle: THREE.Object3D | null;
+      /** Part the right hand's resting grip rides (a drawn bowstring's handle); null keeps it on the root. */
+      readonly rightGrip?: THREE.Object3D | null;
+    },
     private readonly reload: ReloadAnimConfig | null,
     private readonly boltAction: boolean,
     /** Height of the sight line in the root frame; the resting grips keep their fingers under it. */
@@ -168,8 +173,9 @@ export class WeaponHands {
   read(side: HandSide, position: THREE.Vector3, rotation: THREE.Quaternion): HandPose | null {
     const anchor = this.anchors[side];
     if (!anchor) return side === 'left' ? this.readReloadOnlyHand(position, rotation) : null;
-    this.root.updateWorldMatrix(true, false);
-    this.world(anchor, this.root, position, rotation);
+    const frame = (side === 'right' ? this.parts.rightGrip : null) ?? this.root;
+    frame.updateWorldMatrix(true, false);
+    this.world(anchor, frame, position, rotation);
     let pose = anchor.pose;
 
     if (side === 'left') pose = this.applyMagazine(position, rotation, pose);

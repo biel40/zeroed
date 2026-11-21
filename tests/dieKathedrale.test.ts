@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { QUALITY_LEVELS, type DeviceProfile, type QualityLevel } from '../src/core/DeviceProfile';
 import { ZombiesMode } from '../src/modes/ZombiesMode';
 import type { Input } from '../src/player/Input';
@@ -41,8 +41,9 @@ import { CATACOMB_LIGHT_SITES } from '../src/zombies/maps/DieKathedraleCatacombs
 import { pointedArch, ribVaultGeometry, vaultHeightAt } from '../src/zombies/maps/dieKathedrale/GothicVault';
 import { pewBlockFootprint } from '../src/zombies/maps/dieKathedrale/NaveFurniture';
 import { naveVaultBays } from '../src/zombies/maps/dieKathedrale/NaveShell';
+import { MAIN_BELL_POSITION } from '../src/zombies/maps/dieKathedrale/upper/UpperCathedralConfig';
 import { POINT_LIGHT_BUDGET } from '../src/zombies/maps/shared/PointLightBudget';
-import type { ZombieArena } from '../src/zombies/maps/ZombieArena';
+import type { ArenaAmbientCue, ZombieArena } from '../src/zombies/maps/ZombieArena';
 import { mysteryBoxFootprint } from '../src/zombies/MysteryBoxFootprint';
 import { roundConfig } from '../src/zombies/ZombieConfig';
 import { ZombieManager } from '../src/zombies/ZombieManager';
@@ -753,7 +754,9 @@ describe('Die Kathedrale lights and ambience', () => {
   it('schedules rare ambient sounds through the map cue hook, and none while time stands still', () => {
     const arena = makeArena();
     const heard: string[] = [];
-    arena.onAmbientCue = (cue) => heard.push(cue.sound);
+    arena.onAmbientCue = (cue) => {
+      if (cue.sound !== 'tower-bell') heard.push(cue.sound);
+    };
     arena.update(0);
     expect(heard).toHaveLength(0);
     for (let step = 0; step < 600; step++) arena.update(1);
@@ -761,6 +764,37 @@ describe('Die Kathedrale lights and ambience', () => {
     // Silence does most of the work: well under one sound every ten seconds.
     expect(heard.length).toBeLessThan(60);
     for (const event of DIE_KATHEDRALE_AMBIENT_EVENTS) expect(event.initialDelay).toBeGreaterThanOrEqual(20);
+  });
+
+  it('emits the bell from the tower when the device reaches a quarter hour after the intro', () => {
+    const arena = makeArena();
+    const bells: ArenaAmbientCue[] = [];
+    arena.onAmbientCue = (cue) => {
+      if (cue.sound === 'tower-bell') bells.push(cue);
+    };
+    const firstQuarter = new Date(2026, 0, 15, 10, 15).getTime();
+    const nextQuarter = new Date(2026, 0, 15, 10, 30).getTime();
+    const now = vi.spyOn(Date, 'now');
+    try {
+      arena.startIntro();
+      now.mockReturnValue(firstQuarter - 16);
+      arena.update(DT);
+      now.mockReturnValue(firstQuarter + 16);
+      arena.update(DT);
+      arena.finishIntro();
+      arena.update(DT);
+      expect(bells).toEqual([]);
+
+      now.mockReturnValue(nextQuarter - 16);
+      arena.update(DT);
+      now.mockReturnValue(nextQuarter + 16);
+      arena.update(DT);
+      arena.update(DT);
+      expect(bells).toEqual([{ sound: 'tower-bell', position: MAIN_BELL_POSITION }]);
+      expect(arena.doors.find((door) => door.id === 'bell-tower-gate')?.isLocked).toBe(true);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 
