@@ -66,6 +66,7 @@ import { ZombiesPowerSwitch } from './ZombiesPowerSwitch';
 import { ZombiesWeaponUpgrade } from './ZombiesWeaponUpgrade';
 import { ZombiesRings } from './ZombiesRings';
 import { ZombiesFlames, type ForgedFlame } from './ZombiesFlames';
+import { ZombiesWindShots } from './ZombiesWindShots';
 import { ZombiesGrenades } from './ZombiesGrenades';
 import { ZombiesCrystalRecovery } from './ZombiesCrystalRecovery';
 import { ZombiesEvacuation } from './ZombiesEvacuation';
@@ -120,6 +121,8 @@ export class ZombiesMode implements GameMode {
   private energy!: EnergyProjectiles;
   private chain!: ChainLightning;
   private flames!: ZombiesFlames;
+  /** Built only on maps that hand out a wind weapon (EXHALIS). */
+  private wind: ZombiesWindShots | null = null;
   /** The lethal grenades: pouch, throw, live grenades and their blasts. */
   private grenades: ZombiesGrenades | null = null;
   private footsteps!: ZombieFootsteps;
@@ -285,6 +288,11 @@ export class ZombiesMode implements GameMode {
     this.chain = new ChainLightning(ctx.scene);
     this.flames = new ZombiesFlames(ctx, this.zombies, this.economy, () => this.arena.colliders,
       (id) => this.weaponDamageScale(id), (id) => this.forgedFlame(id));
+    this.wind = this.weaponIds.some((id) => WEAPON_DEFINITIONS[id].wind)
+      ? new ZombiesWindShots(ctx, this.zombies, this.economy, () => this.arena.colliders,
+        (id) => this.weaponDamageScale(id),
+        (object, damage, point, distance) => this.evacuation?.guardian?.bolt(object, damage, point, distance) ?? false)
+      : null;
     this.grenades = new ZombiesGrenades(ctx, this.zombies, this.economy, this.arena, {
       damageScale: () => this.rings?.damageScale ?? 1,
       hurtPlayer: (damage) => this.onPlayerHit(damage, true),
@@ -400,6 +408,7 @@ export class ZombiesMode implements GameMode {
     this.knife.update(dt, false, this.ctx.player.walkGait);
     if (!this.knife.isAttacking) this.knife.setEnabled(false);
     this.energy.update(dt);
+    this.wind?.update(dt);
     this.flames.update(dt, this.runAcceptsInput());
     this.grenades?.update(dt, this.runAcceptsInput());
     for (const station of this.arena.weaponStations ?? []) station.setOwned(this.ctx.hasWeapon(station.weaponId));
@@ -477,12 +486,19 @@ export class ZombiesMode implements GameMode {
     if (echo) this.zombies.applySplash(point, echo.echoRadius, damage * echo.echoDamageShare, weapon.definition.id);
   }
 
-  /** The VORTEX-9 bypasses hitscan ballistics and fires a visible bolt; a flame weapon scorches its cone. */
+  /**
+   * The VORTEX-9 bypasses hitscan ballistics and fires a visible bolt; a
+   * flame weapon scorches its cone; a wind weapon looses its gust.
+   */
   onWeaponFired(weapon: Weapon, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
     if (!this.runAcceptsInput()) return true;
     if (weapon.definition.flame) {
       this.flames.fire(weapon, origin, direction);
       this.evacuation?.guardian?.scorch(weapon, origin, direction, weapon.definition.damage * this.weaponDamageScale(weapon.definition.id));
+      return true;
+    }
+    if (weapon.definition.wind) {
+      this.wind?.fire(weapon, origin, direction);
       return true;
     }
     const energy = weapon.definition.energy;
@@ -1531,6 +1547,7 @@ export class ZombiesMode implements GameMode {
     this.rounds.reset();
     this.roundCues.reset();
     this.energy?.reset();
+    this.wind?.reset();
     this.flames?.reset();
     this.grenades?.reset();
     for (const recovery of this.crystalRecoveries) recovery.reset();

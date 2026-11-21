@@ -67,7 +67,7 @@ export const ZOMBIE_MAPS = {
     product: 'map.die-kathedrale',
     nameKey: 'map.dieKathedrale',
     coop: false,
-    exclusiveWeapons: [],
+    exclusiveWeapons: ['exhalis'],
     weapons: WEAPON_DEFINITIONS,
     createArena: (scene, profile) => new DieKathedraleArena(scene, profile),
   },

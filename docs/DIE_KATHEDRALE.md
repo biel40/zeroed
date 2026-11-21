@@ -96,11 +96,15 @@ Las tablas exactas (rejas, capillas, entradas, luces y sonidos) estan en
 
 ## Explanada, patio y campanario
 
-La plaza conserva su papel de mirador sobre la bahía. El paso del Palau
-rodea el lateral este hasta la explanada, donde el portal del Mirador abre
-una vuelta hacia las capillas. Los contrafuertes de piedra marcan el ritmo
-del muro y estrechan los pasos. El patio de la reja lateral reserva un nicho
-de velas para el anillo de Prestidigitación.
+La plaza mira a la bahía. Un tapiz rasgado y velas al pie de la portada
+guardan el rastro de una procesión interrumpida. El paso del Palau rodea
+el lateral este bajo un estandarte que se mueve con el viento, entre
+postigos cerrados y losas de desagüe gastadas. En la explanada, una cisterna
+abierta y la antorcha de la entrada norte contrastan con la luz fría del
+portal del Mirador, que abre una vuelta hacia las capillas. Los contrafuertes
+marcan el ritmo del muro y estrechan los pasos. El patio de Prestidigitación
+recoge las ofrendas en las gradas del nicho, con cipreses recortados sobre
+la tapia.
 La portada toma como referencia la fachada meridional y el umbral sobre el
 mar de La Seu. [Portal del Mirador](https://blog.catedraldemallorca.org/opinion/joan-bauza/una-catedral-que-remite-a-otras/)
 
@@ -159,15 +163,24 @@ pilares compuestos, nervaduras sobre cada tramo).
   polvo de piedra y un roce grave, sin brillos ni efectos de fantasia, y solo
   despues de abrir el panteon (`CRYPT_TOMB_EMERGENCE`).
 
-### Arco del Viento: solo preparado
+### Arco del Viento: EXHALIS base y mision pendiente
 
-El arma, su mision, sus piezas recogibles, el montaje y la recompensa no
-existen. Solo hay ids estables (`WIND_BOW_COMPONENTS`: `oathwood`,
-`whisperstring`, `tempestCore`), sus lugares reservados
-(`WIND_BOW_COMPONENT_SITES`: el sepulcro vacio, el confesionario de la nave
-lateral este y el pedestal del santuario) y el altar de montaje con sus tres
-huecos (`WIND_BOW_ALTAR`, `windBowSocket`). Todo esta en
-`DieKathedraleCatacombsConfig.ts`; la logica futura debe leerlo de ahi.
+La version base del arma existe: EXHALIS, "el ultimo aliento", una reliquia
+gotica de madera petrificada y ennegrecida, bronce envejecido con coronas y
+remates funerarios, una cuerda palida y runas de viento contenido en turquesa
+apagado; ni neon ni ciencia ficcion. Su papel es abrir espacio en los pasos
+estrechos, no limpiar rondas ([comportamiento](GAME_SYSTEMS.md)).
+
+Mientras no exista su mision, el arco montado flota sobre los tres huecos del
+altar del relicario y se compra alli como una estacion de arma
+(`EXHALIS_ALTAR_OFFERING`, `ExhalisAltarOffering`). Es provisional: la mision
+sustituira la venta por el montaje. Las piezas recogibles, el montaje, la
+recompensa y la version mejorada no existen; solo hay ids estables
+(`WIND_BOW_COMPONENTS`: `oathwood`, `whisperstring`, `tempestCore`), sus
+lugares reservados (`WIND_BOW_COMPONENT_SITES`: el sepulcro vacio, el
+confesionario de la nave lateral este y el pedestal del santuario) y el altar
+de montaje con sus tres huecos (`WIND_BOW_ALTAR`, `windBowSocket`). Todo esta
+en `DieKathedraleCatacombsConfig.ts`; la logica futura debe leerlo de ahi.
 
 ## Entrada cinematografica
 
@@ -261,7 +274,11 @@ salto y pausa de Station 33; consulta [sistemas](GAME_SYSTEMS.md#mapas-e-interac
 - Reverberacion propia de la catedral y de las catacumbas: el audio no tiene
   aun reverb por mapa ni por planta, y el fondo sonoro de viento es el mismo
   arriba y abajo.
-- Arco del Viento: arma, mision, piezas y montaje.
+- Arco del Viento: mision, piezas, montaje y version mejorada. EXHALIS base:
+  validacion visual y sonora en navegador (el arco en primera persona y en el
+  altar, la rafaga y el empujon en los pasillos de las catacumbas) y FPS en
+  PC y Android; los valores de dano, empuje y precio son una primera
+  propuesta sin probar en partida.
 - Musica propia y sonidos ambientales de campanas y organo.
 - Zonas previstas: claustro, Almudaina, Parc de la Mar y casco antiguo.
   También están pendientes la electricidad, la mejora de armas y un final

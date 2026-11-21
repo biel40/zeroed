@@ -13,9 +13,9 @@ import { ZOMBIE_BASE_HP } from '../src/zombies/ZombieConfig';
 
 const definition = WEAPON_DEFINITIONS.vector;
 const view = definition.view;
-// Bullet firearms: energy weapons and the flame stream play by other rules.
+// Bullet firearms: energy weapons, the flame stream and the wind bow play by other rules.
 const FIREARMS = (Object.keys(WEAPON_DEFINITIONS) as WeaponId[])
-  .filter((id) => !WEAPON_DEFINITIONS[id].energy && !WEAPON_DEFINITIONS[id].flame);
+  .filter((id) => !WEAPON_DEFINITIONS[id].energy && !WEAPON_DEFINITIONS[id].flame && !WEAPON_DEFINITIONS[id].wind);
 
 describe('Vector definition', () => {
   it('is the highest-cadence firearm with 30 rounds and the lightest hits', () => {

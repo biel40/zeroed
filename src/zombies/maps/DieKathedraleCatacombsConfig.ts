@@ -1,3 +1,4 @@
+import type { WeaponId } from '../../weapons/WeaponTypes';
 import type { ZombieEmergenceSite, ZombieEmergenceTuning } from '../emergence/ZombieEmergence';
 import type { ZombieFloorLook } from '../skins/ZombieSkinShares';
 import type { WallBuyConfig } from '../wallbuys/WallBuy';
@@ -324,6 +325,24 @@ export const WIND_BOW_ALTAR = {
   socketRadius: 0.17,
   socketSpacing: 0.72,
 } as const;
+
+/**
+ * Temporary offering of the base EXHALIS (the Wind Bow) until its quest
+ * exists: the assembled bow already floats over the altar's sockets, sold
+ * like a map's weapon station and refilled there with breath ampoules. The
+ * quest will replace the sale with the assembly of `WIND_BOW_COMPONENTS`;
+ * nothing else reads this.
+ */
+export const EXHALIS_ALTAR_OFFERING: {
+  readonly id: string;
+  readonly weaponId: WeaponId;
+  readonly price: number;
+  readonly ammoPrice: number;
+  /** Metres from the altar's centre the player may buy from. */
+  readonly useRange: number;
+  /** Height of the floating bow over the altar's top. */
+  readonly hover: number;
+} = { id: 'reliquary-exhalis', weaponId: 'exhalis', price: 3500, ammoPrice: 1750, useRange: 2.4, hover: 0.16 };
 
 /** World position of a socket on the altar's top, where its part will be set. */
 export function windBowSocket(component: WindBowComponentId): { readonly x: number; readonly y: number; readonly z: number } {

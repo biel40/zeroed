@@ -131,7 +131,12 @@ sufra tirones de compilacion de shaders.
   Three.js; `WeaponView` adapta sus eventos mediante `pendingEvents`. Cada
   evento `shot` entrega su dispersion al shell, que aplica el cono antes de
   crear la trayectoria o pasar la direccion al modo; el HUD consulta la
-  dispersion actual sin alterar las balas ya emitidas.
+  dispersion actual sin alterar las balas ya emitidas. Las armas que no
+  disparan balas las resuelve el modo con un componente por tipo de dato
+  (`energy`: `EnergyProjectiles`; `flame`: `ZombiesFlames`; `wind`:
+  `ZombiesWindShots`, solo en los mapas que precargan un arma de viento). Cada
+  disparo de viento lleva su config y su arma de origen, sin identificarse
+  por color.
 - El Knife es un melee propio de `ZombiesMode`, fuera de las dos ranuras del
   inventario. Sirve como fallback sin municion y como ataque rapido dedicado;
   `GameMode.usesFallbackAttack()` permite que el shell ceda fire/ADS durante

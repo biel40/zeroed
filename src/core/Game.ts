@@ -51,6 +51,9 @@ const FLAME_LIGHT_DECAY = 9;
 const FLAME_LIGHT = { color: 0xff7a2e, intensity: 11, ahead: 2.6 } as const;
 /** Each tick of a flame stream rattles the view up or down a hair: the weapon fights the hands. */
 const FLAME_RUMBLE = 0.0055;
+/** A loosed breath: a faint cold glint off the riser, gone in a couple of frames, and a small kick of the view. */
+const WIND_LIGHT_INTENSITY = 3;
+const WIND_IMPULSE = 0.01;
 const MAX_SPREAD_PIXELS = 130;
 /** A driver that never reports its programs ready must not hold the loading screen. */
 const SHADER_WARMUP_TIMEOUT_MS = 10000;
@@ -792,6 +795,16 @@ export class Game {
       this.flashLight.color.setHex(FLAME_LIGHT.color);
       this.flashLight.intensity = FLAME_LIGHT.intensity * (0.75 + Math.random() * 0.5);
       this.flashLightDecay = FLAME_LIGHT_DECAY;
+      return;
+    }
+    const wind = weapon.definition.wind;
+    if (wind) {
+      // A bowstring looses no powder: no case, no smoke, only a stir of pale air off the riser.
+      this.flashLight.color.setHex(wind.look.color);
+      this.flashLight.intensity = WIND_LIGHT_INTENSITY * wind.look.intensity;
+      this.flashLightDecay = ENERGY_FLASH_LIGHT_DECAY;
+      this.player.playViewImpulse(WIND_IMPULSE);
+      this.effects.puff(this.tmpMuzzle, wind.look.color, 0.14 * wind.look.intensity);
       return;
     }
     const flare = this.profile.useAdvancedRendering ? weapon.definition.muzzleFlare : undefined;

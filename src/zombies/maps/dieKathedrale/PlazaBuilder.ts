@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { DIE_KATHEDRALE_WALL_THICKNESS, NAVE, PLAZA, ROSE_WINDOWS } from '../DieKathedraleConfig';
+import { seededRandom } from '../shared/ProceduralNoise';
 import { addSolidProxy } from '../shared/SolidProxy';
+import { addCandleCluster, addFloorStain, addWallStain } from './catacombs/CatacombDecor';
 import { lancetShape, wallShapeGeometry } from './GothicVault';
 import type { DieKathedraleBuildContext } from './DieKathedraleBuildContext';
 import { addStoneWall, roseRingGeometry, roundPaneGeometry } from './DieKathedraleWalls';
@@ -36,6 +38,7 @@ export function buildPlaza(context: DieKathedraleBuildContext): void {
   addEnclosure(context);
   addFront(context);
   addStreetFurniture(context);
+  addProcessionalDressing(context);
 }
 
 function addGround(context: DieKathedraleBuildContext): void {
@@ -44,6 +47,29 @@ function addGround(context: DieKathedraleBuildContext): void {
   context.structure.addBox(0, -0.08, PLAZA.minZ + depth / 2, width, 0.16, depth, context.materials.plazaPaving, {
     name: 'plaza-floor', surface: 'concrete', mapRole: 'slab', castShadow: false, uvSeed: 3, worldUVs: true, blocksPlayer: false,
   });
+}
+
+/** A torn runner and sheltered votives are all that remain of the procession. */
+function addProcessionalDressing(context: DieKathedraleBuildContext): void {
+  const { batch, materials } = context;
+  const face = PLAZA.minZ;
+  // Outline on the ground, with a torn seaward end and an edge folded back over itself.
+  const runner = new THREE.Shape()
+    .moveTo(-1.03, -1.1).lineTo(1.03, -1.16).lineTo(1.06, -3.68).lineTo(0.94, -5.33)
+    .lineTo(0.54, -5.16).lineTo(0.16, -5.38).lineTo(-0.04, -4.86).lineTo(-0.49, -5.2)
+    .lineTo(-0.88, -5.12).lineTo(-1.06, -4.07).lineTo(-0.99, -2.51).closePath();
+  batch.add(new THREE.ShapeGeometry(runner).rotateX(-Math.PI / 2).translate(0, 0.017, face), materials.redCloth);
+  const fold = new THREE.Shape().moveTo(0.15, -0.06).lineTo(0.76, -0.44).lineTo(0.16, -0.47).closePath();
+  batch.add(new THREE.ShapeGeometry(fold).rotateX(-Math.PI / 2 - 0.31).translate(0, 0.019, face + 4.76), materials.redCloth);
+  for (const side of [-1, 1]) {
+    batch.addBox(materials.gilt, side * 0.85, 0.019, face + 2.96, 0.04, 0.005, 3.48);
+    const lanternX = side * 4.7;
+    addCandleCluster(context, lanternX, 0, face + 0.42, side === -1 ? 7 : 4, 0.45, seededRandom(1210 + side));
+    addWallStain(batch, materials, lanternX, 0, face, 0, 1, 1.35, 3.7);
+    const parapetX = side * 7.6;
+    addWallStain(batch, materials, parapetX, 0, PLAZA.maxZ, 0, -1, 2.8, 1.03);
+    addFloorStain(batch, materials, parapetX, 0, PLAZA.maxZ - 0.86, 3.5, 1.5, side * 0.18);
+  }
 }
 
 /** Tall side walls (the gates are zombie entrances) and the low parapet on the sea side. */

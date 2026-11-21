@@ -34,6 +34,7 @@ import {
   ROYAL_TOMBS,
   SANCTUARY,
   WIND_ACCENT_COLOR,
+  EXHALIS_ALTAR_OFFERING,
   WIND_BOW_ALTAR,
   WIND_BOW_COMPONENT_SITES,
   WIND_BOW_COMPONENTS,
@@ -532,7 +533,7 @@ describe('Die Kathedrale catacombs: the dead rise from their tombs', () => {
   });
 });
 
-describe('Die Kathedrale catacombs: the Wind Bow, prepared and not built', () => {
+describe('Die Kathedrale catacombs: the Wind Bow quest, prepared and not built', () => {
   it('reserves stable ids and places for its three parts, two below ground and one hidden upstairs', () => {
     expect(WIND_BOW_COMPONENTS).toEqual(['oathwood', 'whisperstring', 'tempestCore']);
     const oathwood = WIND_BOW_COMPONENT_SITES.oathwood;
@@ -569,12 +570,13 @@ describe('Die Kathedrale catacombs: the Wind Bow, prepared and not built', () =>
     expect(WIND_BOW_ALTAR.x).toBeLessThan(RELIQUARY.maxX);
   });
 
-  it('adds no bow, no pickup and no quest interaction to the map', () => {
+  it('adds no part pickup and no quest interaction: the base bow is only offered on the altar', () => {
     const arena: ZombieArena = makeArena();
     expect(arena.weaponPickups).toBeUndefined();
     expect(arena.completionInteraction).toBeUndefined();
     expect(arena.ritualInteraction).toBeUndefined();
-    expect(arena.wallBuys.map((wallBuy) => wallBuy.weaponId)).not.toContain('windBow');
+    expect(arena.wallBuys.map((wallBuy) => wallBuy.weaponId)).not.toContain('exhalis');
+    expect(arena.weaponStations?.map((station) => station.id)).toEqual([EXHALIS_ALTAR_OFFERING.id]);
   });
 });
 

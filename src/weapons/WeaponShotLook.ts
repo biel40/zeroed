@@ -62,12 +62,12 @@ export interface WeaponShotLooks {
   readonly flame: Partial<Record<WeaponId, FlameShotLook>>;
 }
 
-/** The look of a conventional firearm's shots under `looks`; null without them or for energy and flame weapons. */
+/** The look of a conventional firearm's shots under `looks`; null without them or for energy, flame and wind weapons. */
 export function firearmShotLook(
-  definition: Pick<WeaponDefinition, 'energy' | 'flame'>,
+  definition: Pick<WeaponDefinition, 'energy' | 'flame' | 'wind'>,
   looks: WeaponShotLooks | null | undefined,
 ): FirearmShotLook | null {
-  if (!looks || definition.energy || definition.flame) return null;
+  if (!looks || definition.energy || definition.flame || definition.wind) return null;
   return looks.firearm;
 }
 

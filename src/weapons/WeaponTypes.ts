@@ -1,6 +1,6 @@
 import type { ShotVariation } from '../audio/ShotVariation';
 
-export type WeaponId = 'm4a1' | 'ak47' | 'm14' | 'm60' | 'l96' | 'm40' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+export type WeaponId = 'm4a1' | 'ak47' | 'm14' | 'm60' | 'l96' | 'm40' | 'barrett' | 'vortex9' | 'm1911' | 'tesla' | 'mp5' | 'vector' | 'ppsh41' | 'fakel' | 'exhalis';
 
 export type FireMode = 'auto' | 'semi';
 
@@ -197,10 +197,11 @@ export interface WeaponAudioConfig {
   /** Optional subtle pitch and gain jitter per sampled shot. */
   readonly variation?: ShotVariation;
   /**
-   * Energy weapons get a sci-fi synth shot instead of a powder report; the
-   * value picks the voice: the VORTEX-9's warbling zap or the arc weapon's.
+   * Special weapons get a synthesized shot instead of a powder report; the
+   * value picks the voice: the VORTEX-9's warbling zap, the arc weapon's, or
+   * a bowstring loosing a rush of wind.
    */
-  readonly energy?: 'vortex9' | 'arc';
+  readonly energy?: 'vortex9' | 'arc' | 'wind';
 }
 
 /** Behaviour of an energy projectile weapon (VORTEX-9). Zombies mode only. */
@@ -231,6 +232,43 @@ export interface FlameWeaponConfig {
   readonly burnSeconds: number;
   /** Burn damage per second while it lasts. */
   readonly burnDamagePerSecond: number;
+}
+
+/** Colours and strength of a wind shot, its burst and the glow on the weapon. */
+export interface WindShotLook {
+  /** Pale heart of the shot. */
+  readonly core: number;
+  /** Streaks, rings and the burst. */
+  readonly color: number;
+  /** Opacity and size multiplier of every wind effect (1 = the base weapon). */
+  readonly intensity: number;
+}
+
+/**
+ * Condensed wind shot (EXHALIS), Zombies mode only: a fast, visible gust
+ * that strikes the first body or wall on its line and bursts there,
+ * shoving every zombie around the impact away from the shooter. Crowd
+ * control first: the shove opens room, the damage only softens. Every
+ * value is data, so a stronger variant of the weapon is another config.
+ */
+export interface WindWeaponConfig {
+  /** Visible travel speed, m/s. */
+  readonly projectileSpeed: number;
+  /** Reach before the gust disperses mid-air, metres. */
+  readonly range: number;
+  /** Radius of the burst around the impact, metres (horizontal). */
+  readonly burstRadius: number;
+  /** Burst damage at the impact, falling linearly to zero at the edge; the body struck takes the weapon's damage instead. */
+  readonly burstDamage: number;
+  /** Bodies one burst can shove, nearest first. */
+  readonly maxTargets: number;
+  /** How far a body at the impact is driven back, metres. */
+  readonly pushDistance: number;
+  /** Share of `pushDistance` a body at the burst's edge still gets. */
+  readonly edgePush: number;
+  /** Seconds a shove lasts. */
+  readonly pushSeconds: number;
+  readonly look: WindShotLook;
 }
 
 export type MagazineStyle = 'straight' | 'curved' | 'box' | 'internal' | 'drum';
@@ -429,7 +467,10 @@ export interface ViewModelConfig {
   readonly sightHeight: number;
   /** Overall chunkiness multiplier. */
   readonly bulk: number;
-  /** When set, the dedicated VORTEX-9 procedural builder is used with this glow color. */
+  /**
+   * Glow colour of a special weapon: a soft flash in it replaces the powder
+   * flash. Without a dedicated `frame` it also picks the VORTEX-9 builder.
+   */
   readonly energyColor?: number;
   /**
    * 'pistol' uses the handgun builder (slide, hammer, grip magazine);
@@ -444,9 +485,10 @@ export interface ViewModelConfig {
    * semiautomatic .50 rifle with a ventilated shroud and muzzle brake; 'ptrs41' builds
    * its Station 33 look, the Soviet PTRS-41 (long bare barrel, wooden stock, box brake); 'fakel' builds the
    * ФАКЕЛ-33 flamethrower (caged red core crystal, fuel tank, petal nozzle); 'm14' builds the
-   * walnut-stocked M14 (open-top receiver, right-side operating rod, aperture sight). Default: generic long gun.
+   * walnut-stocked M14 (open-top receiver, right-side operating rod, aperture sight); 'exhalis' builds the
+   * EXHALIS relic bow (blackened wood, bronze, a breath core in the riser). Default: generic long gun.
    */
-  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'm14' | 'l96' | 'm40' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel';
+  readonly frame?: 'pistol' | 'lmg' | 'ak47' | 'm4a1' | 'm14' | 'l96' | 'm40' | 'barrett' | 'ptrs41' | 'mp5' | 'vector' | 'ppsh41' | 'fakel' | 'exhalis';
   /** 'tesla' uses the dedicated ZEUS-77 builder (coils, capacitor fins, fork emitter). */
   readonly teslaFrame?: 'tesla';
   /** Reload choreography; absence keeps the legacy generic dip. */
@@ -482,6 +524,8 @@ export interface WeaponDefinition {
   readonly energy?: EnergyWeaponConfig;
   /** Continuous flame stream the mode resolves itself, instead of ballistics. */
   readonly flame?: FlameWeaponConfig;
+  /** Condensed wind shot the mode resolves itself, instead of ballistics. */
+  readonly wind?: WindWeaponConfig;
   readonly recoil: RecoilConfig;
   readonly spread: SpreadConfig;
   /** Full-auto barrel overheating; absence means the barrel never heats. */

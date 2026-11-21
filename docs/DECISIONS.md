@@ -25,6 +25,11 @@
   curvas en espacio corporal horneado a clip por rig (IK de brazos y piernas,
   enderezado del encorvamiento y restriccion de suelo sobre la malla). Sin
   fisica en el loop ni assets nuevos, y el estilo viaja como dato en red.
+- **Empujones como desplazamiento, no fisica.** Un empujon (la rafaga de
+  EXHALIS) es un desplazamiento corto y amortiguado que el gestor aplica con
+  el mismo movimiento con colision que la marcha, sin cuerpos rigidos ni
+  ragdoll: barato en movil, nunca atraviesa muros ni saca a un zombi de la
+  navegacion, y no se acumula, para que no bloquee hordas sin fin.
 - **Navegacion recuperable.** Steering es el camino barato; A* por planta,
   ajuste local y recolocacion validada son fallback, no un navmesh continuo.
 - **Escritorio con Electron.** Steam recibe el mismo build web dentro de
@@ -88,7 +93,7 @@
 
 - **Armas exclusivas de mapa como dato del registro.** Un mapa declara en
   `ZombieMapDefinition.exclusiveWeapons` las armas que solo el reparte (la
-  ФАКЕЛ-33 en Station 33); `ZombiesMode` las precarga solo en ese mapa y las
+  ФАКЕЛ-33 en Station 33, EXHALIS en Die Kathedrale); `ZombiesMode` las precarga solo en ese mapa y las
   vende su `ArenaWeaponStation`. Nunca entran en la Mystery Box, en
   `ZOMBIES_WEAPON_PRELOAD` ni en el cooperativo, y el modo no conoce el mapa.
 - **Variantes de arma por mapa como reskin, no como arma nueva.** Un mapa

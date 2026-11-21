@@ -260,6 +260,7 @@ export class ZombieManager {
   /** Solids that bullets ignore but bodies cannot cross (the Mystery Box). */
   private bodyObstacles: readonly THREE.Box3[] = [];
   // Reused temporaries: no allocations in the per-frame steering loop.
+  private readonly knockbackStep = { x: 0, z: 0 };
   private readonly tmpToPlayer = new THREE.Vector3();
   private readonly tmpSeparation = new THREE.Vector3();
   private readonly tmpDelta = new THREE.Vector3();
@@ -881,6 +882,36 @@ export class ZombieManager {
     return survivors;
   }
 
+  /**
+   * Shoves `zombie` `distance` metres along world (dirX, dirZ) over
+   * `seconds` (a wind burst); over the next frames the walking mover carries
+   * it, so walls stop it and it never leaves its floor plane. Bodies still
+   * outside a window, climbing in, rising or on a stair traversal keep
+   * their place. Returns whether the shove took.
+   */
+  public knockBack(zombie: Zombie, dirX: number, dirZ: number, distance: number, seconds: number): boolean {
+    if (!this.canBeShoved(zombie) || !zombie.knockBack(dirX, dirZ, distance, seconds)) return false;
+    // Being blown back is not being stuck: progress tracking starts again after the shove.
+    this.stuckState.delete(zombie);
+    return true;
+  }
+
+  private canBeShoved(zombie: Zombie): boolean {
+    return zombie.barrierTarget === null && !this.entryRoutes.has(zombie) && !this.stairTraversals.has(zombie)
+      && !this.emergences.isEmerging(zombie);
+  }
+
+  /** Moves a shoved body this frame; false when it is not being shoved. */
+  private applyKnockback(zombie: Zombie, dt: number): boolean {
+    if (!zombie.stepKnockback(dt, this.knockbackStep)) return false;
+    if (!this.canBeShoved(zombie)) {
+      zombie.cancelKnockback();
+      return false;
+    }
+    this.moveWithCollision(zombie, this.knockbackStep.x, this.knockbackStep.z);
+    return true;
+  }
+
   private applyTrackedDamage(
     zombie: Zombie, damage: number, headshot: boolean, x: number, z: number, source: ZombieKillSource | undefined,
     forged: ZombieForgedDeath | null = null,
@@ -947,8 +978,8 @@ export class ZombieManager {
       }
       // With the host ignored and nobody else to chase, a zombie loses the scent.
       const hunting = nearest < Infinity || !this.isHostIgnored;
-      const previousX = zombie.position.x;
-      const previousZ = zombie.position.z;
+      let previousX = zombie.position.x;
+      let previousZ = zombie.position.z;
       const previousYaw = zombie.group.rotation.y;
       // A body still rising out of a site neither steers, strikes nor gets recovered.
       const emerging = this.emergences.advance(zombie, dt);
@@ -970,6 +1001,11 @@ export class ZombieManager {
           this.stuckState.delete(zombie);
           this.navPaths.delete(zombie);
           this.recoveryCount++;
+        }
+        if (this.applyKnockback(zombie, dt)) {
+          // A shove is not a step: the walk clip and the heading follow the body's own pace only.
+          previousX = zombie.position.x;
+          previousZ = zombie.position.z;
         }
         this.steer(zombie, dt, targetX, targetZ, targetFloor, targetY, targetId, hunting);
         this.applyFloorTransition(zombie, dt);

@@ -6,6 +6,7 @@ import type { DieKathedraleBuildContext } from '../DieKathedraleBuildContext';
 import { addStoneWall } from '../DieKathedraleWalls';
 import { dressCourtyard, dressEsplanade, dressSidePassage } from './ExteriorDressing';
 import { addEastFacade } from './MiradorPortal';
+import { PalauBanner } from './PalauBanner';
 import { buildPalauSteps } from './PalauSteps';
 
 const NO_SHADOWS = { castShadow: false, receiveShadow: false };
@@ -13,14 +14,16 @@ const CORNER_OVERLAP = 0.15;
 const { esplanade, sidePassage, sideCourtyard } = EXTERIOR_AREAS;
 
 /** Preserves the entrance plaza and joins the new eastern precinct to its side wall. */
-export function buildExterior(context: DieKathedraleBuildContext): void {
+export function buildExterior(context: DieKathedraleBuildContext): PalauBanner {
   buildEsplanade(context);
   const passage = { ...context, batch: new StaticMeshBatch() };
   buildSidePassage(passage);
+  const banner = new PalauBanner(passage);
   passage.batch.build(passage.group, 'die-kathedrale-palau-passage', NO_SHADOWS);
   const courtyard = { ...context, batch: new StaticMeshBatch() };
   buildCourtyard(courtyard);
   courtyard.batch.build(courtyard.group, 'die-kathedrale-side-courtyard', NO_SHADOWS);
+  return banner;
 }
 
 function buildEsplanade(context: DieKathedraleBuildContext): void {

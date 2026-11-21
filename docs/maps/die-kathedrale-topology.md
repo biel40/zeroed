@@ -51,7 +51,7 @@ flowchart TB
     L["landing · rellano · planta −1"]
     G["galleries · galerías de nichos"]
     PA["pantheon · panteón real"]
-    R["reliquary · altar con tres huecos"]
+    R["reliquary · altar con tres huecos · EXHALIS 3 500"]
     B["breathPassage · paso del santuario"]
     S["sanctuary · santuario circular"]
     O["ossuaryPassage · atajo del osario"]
@@ -66,7 +66,7 @@ flowchart TB
   end
   C <-->|"crypt-gate · 1 500"| CS
 
-  WB["Arco del Viento · misión y arma previstas"]
+  WB["Arco del Viento · misión prevista"]
   WB -.-> E
   WB -.-> PA
   WB -.-> R
@@ -139,8 +139,9 @@ de servicio de la cubierta.
   Se conservan la escalera, las rejas y las entradas de esta planta.
 - El Arco del Viento tiene tres lugares reservados: el sepulcro este del
   panteón, el confesionario del lateral este y el pedestal del santuario.
-  El altar del relicario está construido; el arma, sus piezas recogibles
-  y su misión siguen previstos.
+  Sobre el altar del relicario se compra, de forma provisional, la EXHALIS
+  base (3 500; ampollas a 1 750); sus piezas recogibles, su misión y su
+  versión mejorada siguen previstas.
 - KOVKA se encuentra en Station 33, al oeste de su subestación. Para entrar
   se abren las cocheras y la subestación, se restaura la electricidad y se
   compran la compuerta por 3 500 puntos y la mejora por 5 000. Die

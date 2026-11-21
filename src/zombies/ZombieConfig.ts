@@ -45,6 +45,8 @@ export interface ZombieTypeConfig {
   readonly walkAnimationMultiplier: number;
   /** How hard hits rock this type (ZombieStagger force multiplier); cosmetic reel plus a brief loss of pace. */
   readonly staggerScale: number;
+  /** Share of a shove (a wind burst) that moves this type across the floor; a hulk keeps its ground. */
+  readonly knockbackScale: number;
   /** Scales every kill payout (body, headshot and knife) for this type. */
   readonly killRewardMultiplier: number;
   readonly spawnChance?: (round: number) => number;
@@ -71,6 +73,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     bodyRadius: 0.42,
     walkAnimationMultiplier: 1,
     staggerScale: 1,
+    knockbackScale: 1,
     killRewardMultiplier: 1,
   },
   shiny: {
@@ -85,6 +88,7 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     bodyRadius: 0.42,
     walkAnimationMultiplier: 1,
     staggerScale: 1,
+    knockbackScale: 1,
     killRewardMultiplier: 1,
     spawnChance: () => SHINY_ZOMBIE_CHANCE,
   },
@@ -104,6 +108,8 @@ export const ZOMBIE_TYPE_CONFIGS: Readonly<Record<ZombieTypeId, ZombieTypeConfig
     walkAnimationMultiplier: 1,
     // A hulk: hits rock it half as much and barely slow it.
     staggerScale: 0.5,
+    // Rocked, not thrown: a burst wins the player a step of room, never a free escape.
+    knockbackScale: 0.25,
     // Double payout for the riskiest regular enemy.
     killRewardMultiplier: 2,
     spawnChance: getBruteSpawnChance,

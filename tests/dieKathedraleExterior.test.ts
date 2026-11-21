@@ -44,6 +44,27 @@ function grid(arena: DieKathedraleArena, forPlayer: boolean): NavigationGrid {
 }
 
 describe('Die Kathedrale exterior', () => {
+  it.each([false, true])('moves the Palau banner only in view and follows reduced effects (%s)', (useReducedEffects) => {
+    const arena = new DieKathedraleArena(new THREE.Scene(), { ...TEST_PROFILE, useReducedEffects });
+    const banner = arena.group.getObjectByName('die-kathedrale-palau-banner')!;
+    const initialAngle = banner.rotation.x;
+    arena.update(1);
+    expect(banner.rotation.x).toBe(initialAngle);
+
+    const passage = new THREE.Vector3(21, EYE_HEIGHT, -5);
+    arena.update(1, passage);
+    if (useReducedEffects) expect(banner.rotation.x).toBe(initialAngle);
+    else expect(banner.rotation.x).not.toBe(initialAngle);
+
+    arena.reset();
+    expect(banner.rotation.x).toBe(initialAngle);
+    arena.update(1, passage);
+    const angleAfterRestart = banner.rotation.x;
+    arena.reset();
+    arena.update(1, passage);
+    expect(banner.rotation.x).toBe(angleAfterRestart);
+  });
+
   it.each([
     ['the Mirador portal', ['mirador-gate', 'mirador-portal']],
     ['the Palau postern', ['to-plaza', 'palau-postern']],

@@ -36,6 +36,7 @@ import { ZombieBloodPool } from './ZombieBloodPool';
 import { prepareSkinSurface, SkinSurfaceSampler, type SkinSurfaceHit } from './wounds/SkinSurfaceSampler';
 import { ZombieWounds } from './wounds/ZombieWounds';
 import { ZombieStagger } from './ZombieStagger';
+import { ZombieKnockback } from './ZombieKnockback';
 import { locateBone, type ZombieBodyLocation } from './wounds/ZombieBodyRegion';
 import { bulletImpactWeight, bulletWoundRadius, ZOMBIE_WOUND_LIMIT } from './wounds/WoundConfig';
 
@@ -199,6 +200,8 @@ export class Zombie implements HitTarget {
   private readonly tmpShotDirection = new THREE.Vector3();
   /** Reel and brief loss of pace of the latest hits (bullets, knife, blasts). */
   private readonly stagger = new ZombieStagger();
+  /** Shove across the floor (a wind burst); the manager moves the body through collisions. */
+  private readonly knockback = new ZombieKnockback();
 
   /** `gibWalls` is the map wall set shared by the pool; a shattered body's pieces bounce off it. */
   constructor(visual?: ZombieVisual, private readonly gibWalls: GibWalls = { boxes: [] }, private readonly blood?: ZombieBlood) {
@@ -250,9 +253,42 @@ export class Zombie implements HitTarget {
     return this.isAlive && !this.crippled && this.state !== 'spawn' && this.typeId !== 'brute';
   }
 
-  /** Share of its walking pace a hit-stunned body keeps (1 when unhurt); steering scales by it. */
+  /**
+   * Share of its walking pace a hit-stunned body keeps (1 when unhurt);
+   * steering scales by it. A shoved body does not walk against the shove.
+   */
   public get paceScale(): number {
-    return this.isAlive ? this.stagger.paceScale : 1;
+    if (!this.isAlive) return 1;
+    return this.knockback.active ? 0 : this.stagger.paceScale;
+  }
+
+  /**
+   * Shoves the body `distance` metres along world (dirX, dirZ) over
+   * `seconds`, scaled by its type (a brute keeps its ground). A body still
+   * rising, climbing through a window, at a barrier or dead ignores it.
+   * Returns whether the body is now being shoved.
+   */
+  public knockBack(dirX: number, dirZ: number, distance: number, seconds: number): boolean {
+    if (!this.isAlive || this.state === 'spawn' || this.state === 'barrierAttack' || this.state === 'barrierBreak'
+      || this.vaultOpening) return false;
+    const scaled = distance * ZOMBIE_TYPE_CONFIGS[this.typeId].knockbackScale;
+    if (scaled <= 0) return false;
+    this.knockback.push(dirX, dirZ, scaled, seconds);
+    return this.knockback.active;
+  }
+
+  /** This frame's shove displacement into `out` (world x/z); false while the body is not being shoved. */
+  public stepKnockback(dt: number, out: { x: number; z: number }): boolean {
+    if (!this.isAlive) {
+      this.knockback.reset();
+      return false;
+    }
+    return this.knockback.step(dt, out);
+  }
+
+  /** Drops whatever is left of a shove (the body entered a stair or a passage it must not leave). */
+  public cancelKnockback(): void {
+    this.knockback.reset();
   }
 
   /** Standing movement volume, without the animated attack lunge or death pose. */
@@ -306,6 +342,7 @@ export class Zombie implements HitTarget {
     this.bleeding.reset();
     this.wounds.clear();
     this.stagger.reset();
+    this.knockback.reset();
     this.visual.setState('spawn');
     this.group.visible = true;
   }

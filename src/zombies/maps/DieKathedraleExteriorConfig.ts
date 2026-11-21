@@ -10,7 +10,7 @@ export const EXTERIOR_AREAS = {
   sideCourtyard: { minX: 32, maxX: 42, minZ: -33, maxZ: -19 },
 } as const satisfies Readonly<Record<string, FloorRect>>;
 
-const EAST_FACADE = 14.15;
+export const EAST_FACADE = 14.15;
 const COURTYARD_WALL = EXTERIOR_AREAS.sideCourtyard.maxX;
 
 export const EXTERIOR_PLAYER_MAX_X = COURTYARD_WALL - 0.4;
@@ -42,6 +42,12 @@ export const EXTERIOR_ENTRANCES = [
 /** Back edge of the votive courtyard, facing the open centre to the south. */
 export const SLEIGHT_OF_HAND_SITE = { x: 39.7, z: -28.1 } as const;
 
+/** Wall fixtures shared by the visible torches and their pooled light sites. */
+export const PRECINCT_TORCHES = {
+  palau: { x: EXTERIOR_AREAS.sidePassage.maxX - 0.15, y: 2.14, z: -3.82, facingX: -1, facingZ: 0 },
+  mirador: { x: 28.75, y: 2.52, z: EXTERIOR_AREAS.esplanade.minZ + 0.15, facingX: 0, facingZ: 1 },
+} as const;
+
 /** An existing interior entrance whose passage now projects into playable grounds. */
 export function passageFacesExterior(entrance: DieKathedraleEntrance): boolean {
   return (entrance.floor ?? 0) === 0 && entrance.x === EAST_FACADE && entrance.outwardX === 1
@@ -53,4 +59,8 @@ export const EXTERIOR_LIGHT_SITES: ReadonlyArray<DieKathedraleLightSite> = [
   { id: 'mirador-moon', x: 18.5, y: 5, z: MIRADOR_PORTAL.z, color: 0x819ccc, intensity: 7, distance: 14, flicker: false },
   { id: 'palau-postern-lantern', x: 16, y: 3, z: PALAU_POSTERN.z + 1, color: 0xffb866, intensity: 7, distance: 8, flicker: true },
   { id: 'courtyard-votives', x: SLEIGHT_OF_HAND_SITE.x, y: 2, z: SLEIGHT_OF_HAND_SITE.z, color: 0xffab64, intensity: 6, distance: 7, flicker: true },
+  ...Object.entries(PRECINCT_TORCHES).map(([id, { x, y, z, facingX, facingZ }]) => ({
+    id: `precinct-${id}-torch`, x: x + facingX * 0.68, y: y + 0.2, z: z + facingZ * 0.68,
+    color: 0xffbc78, intensity: 8, distance: 9, flicker: true,
+  })),
 ];

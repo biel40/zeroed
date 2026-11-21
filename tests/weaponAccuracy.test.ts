@@ -7,7 +7,7 @@ const IDLE: WeaponFrameInput = { trigger: false, ads: false };
 const FIRE: WeaponFrameInput = { trigger: true, ads: false };
 const DEFINITIONS = Object.values(WEAPON_DEFINITIONS);
 const AUTOMATICS = DEFINITIONS.filter((definition) => definition.fireModes.includes('auto') && !definition.flame);
-const FIREARMS = DEFINITIONS.filter((definition) => !definition.energy && !definition.flame);
+const FIREARMS = DEFINITIONS.filter((definition) => !definition.energy && !definition.flame && !definition.wind);
 
 /** Heat has its own tests; remove it when measuring bloom alone. */
 function makeWeapon(id: WeaponId = 'm4a1', heat = false): Weapon {

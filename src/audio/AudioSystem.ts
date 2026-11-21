@@ -392,6 +392,10 @@ export class AudioSystem {
       this.playVortex9Shot(config);
       return;
     }
+    if (config.energy === 'wind') {
+      this.playWindShot(config);
+      return;
+    }
     if (config.energy) {
       this.playEnergyShot(config);
       return;
@@ -912,6 +916,28 @@ export class AudioSystem {
   /** Clamped multiplier applied to every reload sound so it reads clearly over gunfire/music. */
   private static boostReloadVolume(volume: number): number {
     return Math.min(1, volume * RELOAD_VOLUME_BOOST);
+  }
+
+  /**
+   * Wind bow shot (EXHALIS): the deep pluck of a heavy bowstring, the limbs'
+   * wooden knock, and compressed air rushing out of it, a hollow rush that
+   * falls in pitch as it leaves, under a thin rising whistle. No laser.
+   */
+  private playWindShot(config: WeaponAudioConfig): void {
+    const volume = config.volume;
+    this.sweep(0, 'triangle', config.thump * 2, config.thump, volume * 0.5, 0.2);
+    this.sweep(0, 'sine', config.thump * 5.6, config.thump * 4.4, volume * 0.12, 0.14);
+    this.tick(0, 420, volume * 0.35, 5, 0.05);
+    this.scrape(0, config.lowpass, config.lowpass * 0.18, volume * 0.55, config.duration);
+    this.tick(0.01, 260, volume * 0.4, 0.9, config.duration * 1.2);
+    this.sweep(0.02, 'sine', 1300, 1900, volume * 0.035, 0.22);
+  }
+
+  /** A wind shot bursting: a soft air thump and a gust that rolls away. */
+  public playWindImpact(): void {
+    this.sweep(0, 'sine', 95, 40, 0.42, 0.24);
+    this.tick(0, 520, 0.32, 0.8, 0.32);
+    this.scrape(0.02, 1600, 280, 0.22, 0.4);
   }
 
   /** Arc weapon shot: bright descending zap with a short high sizzle. */

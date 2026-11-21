@@ -40,6 +40,8 @@ const WEAPON_DEATH_STYLES: Record<ZombieKillSource, ZombieDeathStyle> = {
   fakel: 'burn',
   // A grenade hurls the body off its feet; one at its feet blows it apart (Zombie.applyExplosion).
   f1: 'blown',
+  // The wind bow's burst throws the body a length back, off its feet.
+  exhalis: 'blown',
 };
 
 /**

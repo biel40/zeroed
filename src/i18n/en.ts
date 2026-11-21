@@ -272,6 +272,7 @@ export const en = {
   'prompt.upgradeCollect': 'TAKE {weapon} FROM KOVKA\n{key}',
   'prompt.upgradeNeedsSecondWeapon': 'FORGE {weapon} IN KOVKA\nCARRY ANOTHER WEAPON FIRST',
   'prompt.coreCrystals': '{weapon} CORE CRYSTALS\n{key} — {cost} PTS',
+  'prompt.breathAmpoules': '{weapon} BREATH AMPOULES\n{key} — {cost} PTS',
 
   'door.to-dining': 'THE PARLOUR',
   'door.to-banquet': 'THE BANQUET HALL',

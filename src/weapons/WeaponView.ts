@@ -19,6 +19,7 @@ import { buildVector } from './VectorViewModel';
 import { buildPPSH41 } from './PPSH41ViewModel';
 import { buildM60 } from './M60ViewModel';
 import { buildVortex9 } from './Vortex9ViewModel';
+import { buildExhalis } from './ExhalisViewModel';
 import { buildFakel } from './FakelViewModel';
 import { InspectAnimator } from './InspectAnimator';
 import { BOLT_REAR_FRACTION, HANDLE_TRAVEL, ReloadAnimator, type ReloadParts } from './ReloadAnimator';
@@ -204,6 +205,8 @@ export interface ViewModelLiveParts {
   /** `reloadGlow` is the reload animator's 0..1 energy spin-up. */
   update(dt: number, weapon: Weapon, reloadGlow: number): void;
   reset(): void;
+  /** A shot just left the weapon (the EXHALIS limbs snap and its wind arrow is loosed). */
+  onShot?(): void;
   /** A flame weapon's parts (its core crystal) in a finish's look; null restores their own. */
   setFlameLook?(look: FlameShotLook | null): void;
 }
@@ -1151,6 +1154,7 @@ function buildProcedural(config: ViewModelConfig): BuiltProcedural {
  */
 export function buildProceduralViewModel(view: ViewModelConfig): BuiltProcedural {
   if (view.teslaFrame === 'tesla') return buildTesla(view);
+  if (view.frame === 'exhalis') return buildExhalis(view);
   if (view.energyColor !== undefined) return buildVortex9(view);
   if (view.frame === 'pistol') return buildPistol(view);
   if (view.frame === 'lmg') return buildM60(view);
@@ -1526,6 +1530,7 @@ export class WeaponView {
     // Pistol slide cycles with every shot.
     if (this.slide) this.slideBlowback = 1;
     if (this.openBolt) this.openBoltCycle = 1;
+    this.liveParts?.onShot?.();
     this.energySurge = 1;
   }
 

@@ -1369,6 +1369,117 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       },
     },
   },
+  /**
+   * EXHALIS, "the last breath" — original Gothic relic bow of Die
+   * Kathedrale's royal catacombs, exclusive to that map. Every draw looses
+   * condensed wind: the body struck takes a heavy hit and the burst shoves
+   * every zombie around the impact away from the player. Crowd control
+   * first: it opens room in the narrow passages and buys breath when
+   * cornered, it does not clear rounds on its own. Six breaths per ampoule,
+   * six spare ampoules.
+   */
+  exhalis: {
+    id: 'exhalis',
+    name: 'EXHALIS',
+    fireModes: ['semi'],
+    defaultFireMode: 'semi',
+    // One loosed breath every 0.8 s.
+    rpm: 75,
+    magazineSize: 6,
+    reserveAmmo: 36,
+    // Every reload swaps the ampoule, so a tactical one takes as long.
+    reloadTime: 2.6,
+    tacticalReloadTime: 2.6,
+    boltAction: false,
+    boltCycleTime: 0,
+    scoped: false,
+    damage: 450,
+    wind: {
+      projectileSpeed: 70,
+      range: 60,
+      burstRadius: 3,
+      burstDamage: 160,
+      maxTargets: 8,
+      pushDistance: 3.4,
+      edgePush: 0.45,
+      pushSeconds: 0.38,
+      look: { core: 0xeafffb, color: 0x8fe3d6, intensity: 1 },
+    },
+    recoil: {
+      verticalKick: 0.01,
+      horizontalKick: 0.003,
+      horizontalBias: 0,
+      kickVariance: 0.2,
+      recoverySpeed: 9,
+      recoveryDelay: 0.08,
+      cameraShare: 0.5,
+      adsRecoilMultiplier: 0.8,
+    },
+    spread: {
+      hipBase: 0.014,
+      adsBase: 0.001,
+      bloomPerShot: 0.002,
+      maxBloom: 0.008,
+      bloomRecovery: 0.05,
+      adsBloomMultiplier: 0.4,
+    },
+    ads: { fov: 62, speed: 9, sensitivity: 0.82 },
+    projectile: { muzzleVelocity: 70, gravity: 0, maxDistance: 60, drag: 0 },
+    moveSpeedMultiplier: 1,
+    equipTime: 0.5,
+    audio: { volume: 0.55, duration: 0.3, lowpass: 2600, thump: 90, energy: 'wind' },
+    view: {
+      // Dedicated procedural builder (ExhalisViewModel). The draw handle sits
+      // where the ZEUS-77 has its grip, so the right hand shares its anchor.
+      frame: 'exhalis',
+      energyColor: 0x8fe3d6,
+      hip: [0.24, -0.22, -0.44],
+      ads: [0, 0, -0.3],
+      sway: 1,
+      bob: 1,
+      visualRecoil: { kickImpulse: 0.5, pitchImpulse: 1.1, rollImpulse: 0.4, stiffness: 140, damping: 14 },
+      scale: 1,
+      // Petrified, blackened wood and aged bronze.
+      bodyColor: 0x1d1915,
+      accentColor: 0x7a5a2c,
+      barrelLength: 0.1,
+      barrelRadius: 0.012,
+      receiverLength: 0.2,
+      stockLength: 0,
+      magazine: 'internal',
+      optic: 'irons',
+      sightHeight: 0.075,
+      bulk: 1,
+      hands: {
+        // The whole hand closes on the draw handle hanging from the nock.
+        right: {
+          position: [0, -0.085, 0.091], axis: [0, 1, -0.12], palm: [-1, -0.1, 0], pose: 'handleGrip',
+          hold: { size: [0.05, 0.05], axis: [0, 0.946, -0.326] },
+        },
+        // Around the wrapped riser grip from its left flank, canted with the bow.
+        left: {
+          position: [0.0257, -0.0255, -0.21], axis: [-0.333, 0.912, -0.24], palm: [0.939, 0.343, 0], pose: 'supportMagwell',
+          hold: { size: [0.032, 0.044], axis: [-0.333, 0.912, -0.24] },
+        },
+        // Lifts the breath ampoule by its top, out of its cage.
+        magazine: { position: [0, 0.035, 0], axis: [0, 0, 1], palm: [0, -1, 0], pose: 'magazineGrab' },
+      },
+      reloadAnim: {
+        style: 'cell',
+        magOut: 0.12,
+        magDrop: 0.3,
+        magIn: 0.5,
+        magSeat: 0.66,
+        // No action to work: the charge window wakes the fresh breath.
+        charge: 0.7,
+        chargeEnd: 0.95,
+        // Raised and turned so the back of the riser, and its ampoule, face the eye.
+        swapPose: { shift: [-0.05, 0.07, 0.02], yaw: 0.12, roll: 0.1, tilt: -0.12 },
+        magSize: [0.022, 0.05, 0.022],
+        magColor: 0x8fe3d6,
+      },
+    },
+  },
 };
 
 export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh41', 'ak47', 'm14', 'm60', 'l96', 'm40', 'barrett', 'm1911', 'fakel'];
@@ -1380,7 +1491,7 @@ export const WEAPON_ORDER: readonly WeaponId[] = ['m4a1', 'mp5', 'vector', 'ppsh
  * the zombies inventory starts with the M1911 alone (see
  * ZombiesMode.startingInventory); both Wonder Weapons can come from the
  * Mystery Box; the VORTEX-9 is exclusive to it. Map
- * exclusives (the ФАКЕЛ-33) are not here: the map registry adds them to
+ * exclusives (the ФАКЕЛ-33, EXHALIS) are not here: the map registry adds them to
  * the preload of their own map only (`ZombieMapDefinition.exclusiveWeapons`).
  */
 export const ZOMBIES_WEAPON_PRELOAD: readonly WeaponId[] = [

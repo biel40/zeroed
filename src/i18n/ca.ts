@@ -270,6 +270,7 @@ export const ca: Record<TranslationKey, string> = {
   'prompt.upgradeCollect': 'RECOLLIR {weapon} DE KOVKA\n{key}',
   'prompt.upgradeNeedsSecondWeapon': 'FORJAR {weapon} A KOVKA\nCAL PORTAR UNA ALTRA ARMA',
   'prompt.coreCrystals': 'CRISTALLS DE {weapon}\n{key} — {cost} PTS',
+  'prompt.breathAmpoules': 'AMPOLLES D’ALÈ DE {weapon}\n{key} — {cost} PTS',
 
   'door.to-dining': 'EL SALÓ',
   'door.to-banquet': 'EL GRAN MENJADOR',

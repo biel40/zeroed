@@ -12,6 +12,7 @@ import { WallBuyView } from '../wallbuys/WallBuyView';
 import type { ZombieSpawnDefinition } from '../ZombieSpawner';
 import { buildCatacombs } from './dieKathedrale/catacombs/CatacombsBuilder';
 import { buildCryptStair, cryptStairTransitions } from './dieKathedrale/catacombs/CryptStair';
+import { ExhalisAltarOffering } from './dieKathedrale/catacombs/ExhalisAltarOffering';
 import { addFlameHalos } from './dieKathedrale/catacombs/FlameHalos';
 import { TombLids } from './dieKathedrale/catacombs/TombLids';
 import { SanctuaryMotes } from './dieKathedrale/catacombs/SanctuaryMotes';
@@ -21,6 +22,7 @@ import { buildChancel } from './dieKathedrale/ChancelBuilder';
 import { ColumnCandleFlames } from './dieKathedrale/ColumnCandleFlames';
 import { buildEntrancePassages } from './dieKathedrale/EntrancePassages';
 import { buildExterior } from './dieKathedrale/exterior/ExteriorGrounds';
+import type { PalauBanner } from './dieKathedrale/exterior/PalauBanner';
 import { palauStepSurfaces } from './dieKathedrale/exterior/PalauSteps';
 import { DieKathedraleAtmosphere } from './dieKathedrale/DieKathedraleAtmosphere';
 import type { DieKathedraleBuildContext } from './dieKathedrale/DieKathedraleBuildContext';
@@ -46,6 +48,7 @@ import {
   CRYPT_EMERGENCE_SITES,
   CRYPT_TOMB_EMERGENCE,
   CRYPT_ZOMBIE_LOOK,
+  EXHALIS_ALTAR_OFFERING,
 } from './DieKathedraleCatacombsConfig';
 import {
   CATACOMB_PLAYER_BOUNDS,
@@ -80,7 +83,7 @@ import { ArenaStructure } from './shared/ArenaStructure';
 import { entrancePlayerStop } from './shared/EntrancePassage';
 import { StaticMeshBatch } from './shared/StaticMeshBatch';
 import type { ZombieEmergenceSite, ZombieEmergenceStage } from '../emergence/ZombieEmergence';
-import type { ArenaAmbientCue, ArenaRingMachine, ZombieArena } from './ZombieArena';
+import type { ArenaAmbientCue, ArenaRingMachine, ArenaWeaponStation, ZombieArena } from './ZombieArena';
 
 /** Height of a barrier's boards above its own floor, as on every map. */
 const BARRIER_BOARD_Y = 1.15;
@@ -148,6 +151,9 @@ export class DieKathedraleArena implements ZombieArena {
   public readonly ringMachines: ReadonlyArray<ArenaRingMachine>;
   public readonly doors: ReadonlyArray<PointDoor>;
   public readonly wallBuys: ReadonlyArray<WallBuy>;
+  /** The base EXHALIS over the reliquary's altar, until the Wind Bow's quest replaces the sale. */
+  public readonly weaponStations: ReadonlyArray<ArenaWeaponStation>;
+  private readonly exhalisAltar: ExhalisAltarOffering;
   public onTopologyChanged: (() => void) | null = null;
   public onBarrierBoardRebuilt: (() => void) | null = null;
   public onAmbientCue: ((cue: ArenaAmbientCue) => void) | null = null;
@@ -173,6 +179,7 @@ export class DieKathedraleArena implements ZombieArena {
   private readonly playAmbientEvent = (cue: ArenaAmbientCue): void => this.onAmbientCue?.(cue);
   private readonly lighting: DieKathedraleLighting;
   private readonly atmosphere: DieKathedraleAtmosphere;
+  private readonly palauBanner: PalauBanner;
   private readonly mood: UndergroundMood;
   private readonly motes: SanctuaryMotes;
   private readonly tombLids: TombLids;
@@ -220,7 +227,7 @@ export class DieKathedraleArena implements ZombieArena {
     buildNaveDressing(interior);
     buildNaveRuin(interior);
     buildPlaza(plaza);
-    buildExterior(exterior);
+    this.palauBanner = buildExterior(exterior);
     buildUpperCathedral(upper, terrace);
     buildCryptStair(stair);
     buildCatacombs(catacombs);
@@ -292,6 +299,8 @@ export class DieKathedraleArena implements ZombieArena {
     for (const wallBuy of this.wallBuys) {
       new WallBuyView(wallBuy, WEAPON_DEFINITIONS[wallBuy.weaponId], levelOf(wallBuy.floor), profile.useAdvancedRendering);
     }
+    this.exhalisAltar = new ExhalisAltarOffering(this.catacombGroup, WEAPON_DEFINITIONS[EXHALIS_ALTAR_OFFERING.weaponId]);
+    this.weaponStations = [this.exhalisAltar];
 
     this.showLevels(this.home);
     this.refreshZones();
@@ -318,7 +327,11 @@ export class DieKathedraleArena implements ZombieArena {
     this.mood.update(this.presence.depth);
     this.lighting.update(dt, observerPosition, this.introElapsed === null ? this.activeZones : undefined);
     if (this.presence.showCathedral) this.atmosphere.update(dt);
-    if (this.presence.showCatacombs) this.motes.update(dt);
+    if (this.presence.showCathedral && this.exteriorGroup.visible) this.palauBanner.update(dt);
+    if (this.presence.showCatacombs) {
+      this.motes.update(dt);
+      this.exhalisAltar.update(dt);
+    }
     this.tombLids.update(dt);
     if (this.introElapsed !== null) return;
     if (this.presence.depth >= UNDERGROUND_SOUND_DEPTH) this.catacombEvents.update(dt, this.playAmbientEvent);
@@ -333,7 +346,9 @@ export class DieKathedraleArena implements ZombieArena {
     for (const view of this.doorViews) view.reset();
     this.lighting.reset();
     this.atmosphere.reset();
+    this.palauBanner.reset();
     this.motes.reset();
+    this.exhalisAltar.reset();
     for (const shrine of this.ringMachines) shrine.setDisplay('stocked');
     this.tombLids.reset();
     this.ambientEvents.reset();

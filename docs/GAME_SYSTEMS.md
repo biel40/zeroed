@@ -179,6 +179,26 @@ poder disparar (`cooledDown`: chasquido y piloto que se reenciende); las
 demas armas con bloqueo no lo usan. La recarga `crystal` abre la jaula
 (`cover`), saca el cristal gastado (cae al mundo apagado), mete uno nuevo,
 cierra y reenergiza el nucleo en cada recarga, tactica o vacia.
+Un arma de viento (`wind`, la EXHALIS de Die Kathedrale) tampoco pasa por la
+balistica: `ZombiesWindShots` suelta una rafaga visible y rapida (`WindShots`:
+estela palida con dos anillos de viento; sin luces nuevas, casquillos ni humo) que
+revienta en el primer cuerpo o muro de su linea, o al agotar su alcance. El
+cuerpo alcanzado recibe el dano del arma y paga como una bala. La rafaga
+(`WindGust`) toma los cuerpos de su radio que ve desde el impacto, del mas
+cercano al mas lejano hasta su tope; a los demas les quita un dano que decae
+con la distancia y solo paga sus bajas. A todos los empuja lejos del jugador,
+nunca hacia el, y mas cuanto mas cerca del impacto. El empujon
+(`ZombieKnockback`) recorre su distancia en menos de medio segundo, frenando,
+y `ZombieManager` lo mueve con la misma colision que la marcha: los muros lo
+paran, no cambia de planta ni gira al zombi, que no camina mientras dura. Un
+empujon nuevo solo sustituye al anterior si llega mas lejos. No mueve a quien
+esta tras una ventana, entrando, saliendo de una tumba o en una escalera; un
+bruto conserva una cuarta parte (`knockbackScale`) y un guardian solo recibe
+el dano. Las bajas caen con el estilo `blown`, sin sangre. En la vista, cada
+disparo suelta los brazos del arco, que vibran con la cuerda, y la flecha de
+viento se forma de nuevo en el culatin; la recarga `cell` cambia la ampolla
+de aliento. Cada `wind` lleva su alcance, empuje y aspecto, de modo que una
+version mejorada sera otro dato; la escala de dano de una mejora ya se aplica.
 `BallisticsSystem` usa raycast segmentado,
 gravedad/drag y pool fijo. Impactos directos: cabeza = 3x; el feedback de
 headshot no se duplica en splash ni cadena.
@@ -598,8 +618,10 @@ existente a `MOTDRULES`.
   rejas en un circuito con atajo de vuelta a las galerias. Abajo aparecen
   zombis por sus propias entradas, el ambiente se vuelve mas oscuro y sin
   luna, y suenan goteos, piedra y viento en lugar de los sonidos de la nave.
-  El altar del relicario y los lugares del futuro Arco del Viento estan
-  preparados solo como datos y decorado. Consulta el
+  Sobre el altar del relicario flota la EXHALIS base, el Arco del Viento,
+  que se compra alli como una estacion de arma (3500; ampollas de aliento a
+  1750), exclusiva del mapa. Es provisional hasta que exista su mision; los
+  lugares de sus piezas siguen siendo solo datos y decorado. Consulta el
   [plano de Die Kathedrale](maps/die-kathedrale-topology.md) y su
   [dirección artística](DIE_KATHEDRALE.md).
 
